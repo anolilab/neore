@@ -5,24 +5,20 @@
  *
  * Which chats may use a login: the user's own chats (threads with no teammate) always; a teammate's threads only when the
  * login names that teammate (`teammateIds`), which only its owner sets. A run decides from its thread, never from anything
- * the client sends (`usableSiteLogins`).
+ * the client sends, and only in a turn with nothing but safe text in front of the model (`site-login-turn.ts`).
  */
 import { env } from "cloudflare:workers";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { threadPathTaint } from "../agent/thread-summary-taint";
-import { messageCarriesGuestText, messageCarriesOutsideAgentText, messagesCarryAttachedText } from "../chat/lib/attached-text";
-import { loadEligibleThread } from "../devices/internal";
-import { computeTaint } from "../devices/lib/taint";
-import { vDeviceTaintSource } from "../devices/validators";
 import { encryptKey } from "../lib/encryption";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { currentShard, ROOT_SHARD_KEY, servesUser } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
 import { normalizeSiteOrigin, SITE_ORIGIN_MAX } from "./lib/site-origin";
+import { type SiteLoginTurn, siteLoginTurnVerdict } from "./site-login-turn";
 
 /** Logins one user may keep, and the most any read returns. Bounded so every read is complete. */
 export const MAX_SITE_LOGINS = 100;
@@ -250,6 +246,7 @@ export const deleteSiteLogin = authMutation
 /**
  * What a run knows about the turn it belongs to, as the tool that asks for a login reads it from its `ToolCtx` and the
  * turn's record. Every field is required, so a caller that does not know one cannot fall back to an allowing default.
+ * What each must hold is decided in `site-login-turn.ts`.
  */
 const siteLoginTurnFields = {
     /** `ToolCtx.headless`: a sub-agent, trigger, task, eval or messenger reply. Nobody is at the app to see the run. */
@@ -266,125 +263,40 @@ const siteLoginTurnFields = {
     /** `ToolCtx.startedBy`: who started the turn. A continuation runs as the owner whoever that was. */
     startedBy: v.string().max(64),
     /**
-     * What the run had read before it asked: `computeTaint` over the messages the model saw for that step (AI SDK
-     * `ToolExecutionOptions.messages`, as a device call computes it), plus `files` when `messagesCarryAttachedText`, so a
-     * page, a file or a tool result read earlier in the turn or the thread counts. Any entry refuses every login.
+     * The messages the model saw for the step, as they are (AI SDK `ToolExecutionOptions.messages`): this run's own steps
+     * are not on the saved path above the prompt yet. Each is classified by the same allowlist as a saved row; none at all
+     * refuses. Too many to send is a refusal too.
      */
-    taintedBy: v.array(vDeviceTaintSource),
+    stepMessages: v.array(v.object({ content: v.optional(v.any()), role: v.string().max(16) })).max(1000),
     /**
-     * Whether the system prompt carries text the owner did not write in this chat: knowledge excerpts, memories, project
-     * context, the thread's stored instructions or skill text, as the low-risk check reads it (`untrustedContext` in
-     * `chat/execute.ts`, `injectsUntrustedContext`). None of it is in the step's messages or on the path, so it is told here.
+     * Every kind of text in the run's system prompt, one per piece as it is assembled: `instructions` (the app's own,
+     * always), `personalization`, `teammate`, and for anything else its own kind (`knowledge`, `memory`, `project`,
+     * `threadInstructions`, `requestInstructions`, `skills`, `threadNotes`, `attachedDocuments`, …). Any kind but the safe
+     * three refuses, so an unnamed one cannot pass.
      */
-    untrustedContext: v.boolean(),
-};
-
-export type SiteLoginTurn = {
-    headless: boolean;
-    impersonated: boolean;
-    origin: string;
-    promptMessageId: Id<"messages">;
-    startedBy: string;
-    taintedBy: ReadonlyArray<string>;
-    untrustedContext: boolean;
+    systemContext: v.array(v.string().max(40)).max(32),
+    /** The source of every tool the model is offered (`ToolSource`: `builtin`, `mcp`, `connector`, `device`); only `builtin` passes. */
+    toolSources: v.array(v.string().max(16)).max(500),
 };
 
 /**
- * Whether the run is the owner's own turn at the app: the owner started it themselves, signed in as themselves, in their
- * own chat (origin `lead`, not headless). Anything else is refused, including an origin this check does not know, so a new
- * way to start a run gets no logins until it is added here on purpose. A public API run records the key's owner as
- * `startedBy`, so `startedBy` alone does not prove a person typed the turn.
- */
-export const isOwnInteractiveTurn = (turn: SiteLoginTurn, userId: string): boolean =>
-    turn.startedBy === userId && turn.origin === "lead" && turn.headless === false && turn.impersonated === false;
-
-/**
- * Threads an unattended run opened (`triggers/execute.ts`, `tasks/execute.ts`, `evals/execute.ts`): their first prompt is
- * a webhook payload, a task or an eval input, saved as the owner's row, so a regenerate there would pass as the owner's.
- */
-const UNATTENDED_THREAD_TAGS: ReadonlySet<string> = new Set(["eval", "task", "trigger"]);
-
-/**
- * The turn's prompt is the owner's own words: a user row of this thread that the owner wrote, carrying no outside agent's
- * text (a regenerate of a public API prompt runs with no origin, so its saved mark is what tells), no guest's note and no
- * content the owner attached rather than typed: a document's extracted text or a captured page
- * (`messagesCarryAttachedText`), a file or image part or a goal's review note (`computeTaint`), or files named only by
- * `fileIds`. A row an agent wrote under the owner's id (a goal's next round, `agentName`) is not theirs, nor is one with no
- * author. A part that is not text is refused, so a new kind gets no logins until it is classified here on purpose.
- */
-const ownPromptRow = async (
-    ctx: Pick<QueryCtx, "db">,
-    promptMessageId: Id<"messages">,
-    threadId: Id<"threads">,
-    userId: string,
-): Promise<Doc<"messages"> | undefined> => {
-    const prompt = await ctx.db.get("messages", promptMessageId);
-
-    if (!prompt || prompt.threadId !== threadId || prompt.userId !== userId || prompt.agentName !== undefined || (prompt.fileIds?.length ?? 0) > 0) {
-        return undefined;
-    }
-
-    const message = prompt.message as Parameters<typeof messageCarriesOutsideAgentText>[0];
-    const typedOnly =
-        typeof message?.content === "string" ||
-        (Array.isArray(message?.content) && (message.content as ReadonlyArray<{ type?: unknown }>).every((part) => part.type === "text"));
-
-    const own =
-        message?.role === "user" &&
-        typedOnly &&
-        !messageCarriesOutsideAgentText(message) &&
-        !messageCarriesGuestText(message) &&
-        !messagesCarryAttachedText([message]) &&
-        computeTaint([message]).length === 0;
-
-    return own ? prompt : undefined;
-};
-
-/**
- * Whether the run has read anything untrusted before it asked: what it reports from the step's messages
- * (`turn.taintedBy`: this turn's tool results) and its system prompt (`turn.untrustedContext`), and, read here whatever the caller says, the prompt's path up to it, the
- * thread's context summaries and a coding agent's handoff (`threadPathTaint`).
- */
-const turnIsTainted = async (ctx: Pick<QueryCtx, "db">, turn: SiteLoginTurn, threadId: Id<"threads">, prompt: Doc<"messages">): Promise<boolean> => {
-    if (turn.untrustedContext || turn.taintedBy.length > 0) {
-        return true;
-    }
-
-    const read = await threadPathTaint(ctx, threadId, prompt);
-
-    return read.length > 0;
-};
-
-/**
- * The logins a run of `threadId` may use, for the agent's browser. Only the owner's own turn at the app
- * (`isOwnInteractiveTurn`, with a prompt the owner typed and nothing untrusted read so far, `turnIsTainted`), and only in a thread nobody else's text can reach
- * (`loadEligibleThread`: not shared, public, a group chat, a messenger conversation or deleted; nor one a trigger, task
- * or eval opened), since whoever can steer
- * the model could otherwise sign in as the owner. The owner's own chats get every login; a teammate's thread only the
- * logins naming that teammate, while it still exists and is theirs.
+ * The logins a run of `threadId` may use, for the agent's browser: none unless `siteLoginTurnVerdict` allows the turn
+ * (the owner's own turn at the app, in a chat only they can reach, with only safe text in front of the model). Then the
+ * owner's own chats get every login; a teammate's thread only the logins naming that teammate, while it still exists
+ * and is theirs.
  */
 export const usableSiteLogins = async (
     ctx: Pick<QueryCtx, "db">,
     args: { threadId: Id<"threads">; turn: SiteLoginTurn; userId: string },
 ): Promise<Doc<"savedSiteLogins">[]> => {
-    if (!isOwnInteractiveTurn(args.turn, args.userId)) {
-        return [];
-    }
+    const verdict = await siteLoginTurnVerdict(ctx, args);
 
-    const thread = await loadEligibleThread(ctx, args.threadId, args.userId);
-
-    if (!thread || (thread.tags ?? []).some((tag) => UNATTENDED_THREAD_TAGS.has(tag))) {
-        return [];
-    }
-
-    const prompt = await ownPromptRow(ctx, args.turn.promptMessageId, args.threadId, args.userId);
-
-    if (!prompt || (await turnIsTainted(ctx, args.turn, args.threadId, prompt))) {
+    if (!verdict.allowed) {
         return [];
     }
 
     const rows = await ownLogins(ctx, args.userId);
-    const { botId } = thread;
+    const { botId } = verdict.thread;
 
     if (botId === undefined) {
         return rows;

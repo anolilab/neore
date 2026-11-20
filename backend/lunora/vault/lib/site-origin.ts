@@ -9,6 +9,9 @@ export const SITE_ORIGIN_MAX = 255;
 /** The URL parser writes every IPv4 form (decimal, hex, short) back as a dotted quad. */
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 
+/** A scheme at the very start (`https://`, `ftp://`); a `://` later on, in a path or a query, is not one. */
+const LEADING_SCHEME = /^[a-z][\d+.a-z-]*:\/\//i;
+
 /**
  * The `https://host[:port]` origin of `input`, or `null` when it is not a site a login can belong to: anything but
  * HTTPS, a URL carrying credentials, an IP address (`10.0.0.1`, and `0x7f.1`, which the URL parser reads as one), a
@@ -20,8 +23,8 @@ export const normalizeSiteOrigin = (input: string): string | null => {
     let url: URL;
 
     try {
-        // A bare host ("example.com") is read as HTTPS.
-        url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+        // A bare host ("example.com", or "example.com/login?next=https://…") is read as HTTPS.
+        url = new URL(LEADING_SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`);
     } catch {
         return null;
     }

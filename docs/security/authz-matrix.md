@@ -758,14 +758,16 @@ for a schema table that is neither policed nor listed:
 | `workflow_presence.saveVersion` | mutation | authMutation | projects, workflowVersions | workflow owner | accepted — no rate limit; `v.any()` content into the caller's own workflow |
 
   Saved site logins reach a run only through the internal `vault_site_logins.listUsableSiteLogins` and
-  `siteLoginForFill`, never a client procedure. Both admit only the owner's own turn at the app
-  (`isOwnInteractiveTurn`): `startedBy` is the owner, origin `lead`, not headless, not sent by an impersonating admin,
-  and its prompt row is one the owner typed (their `userId`, no `agentName`, no outside agent's or guest's text, no
-  attached document, captured page, file or image or `fileIds`; any part that is not text refuses), and the run has read
-  nothing untrusted (the turn's `taintedBy` and `untrustedContext`, and `threadPathTaint` over the prompt's path, summaries and handoff). A public API run records the key's
-  owner as `startedBy`, so `startedBy` alone is not enough; triggers, tasks, evals, messenger replies, sub-agents and any
-  origin not named there get none. The thread must pass `loadEligibleThread` and not be one a trigger, task or eval opened; a teammate's thread gets only the logins
-  naming it.
+  `siteLoginForFill`, never a client procedure. Both decide only through `vault/site-login-turn.ts#siteLoginTurnVerdict`,
+  an ALLOWLIST: anything not known to be safe refuses. The turn must be the owner's own at the app
+  (`isOwnInteractiveTurn`: `startedBy` the owner, origin `lead`, not headless, not impersonated; a public API run records
+  the key's owner as `startedBy`, so that alone is not enough), offered built-in tools only, its system prompt only the
+  app's instructions, the owner's personalization and the teammate's instructions. The thread must pass
+  `loadEligibleThread`, be tagged `chat` and nothing else, and not be a coding agent's, handed over, imported, derived
+  (any `threadRelationships` row) or summarised. Every saved row on the prompt's path, prompt included, and every one of
+  the step's messages must be the owner's own typed text, the lead model's own reply (`agentName` a model id or unset; no
+  speaker, coding agent, sources, memories, file, marks or unknown parts) or the result of `SAFE_RESULT_TOOLS`. A
+  teammate's thread gets only the logins naming it.
 
 ## Removed from the client surface in this audit
 

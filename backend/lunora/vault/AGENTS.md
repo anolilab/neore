@@ -9,17 +9,21 @@
 - A login belongs to one exact origin (`lib/site-origin.ts#normalizeSiteOrigin`: HTTPS only, punycode host, default
   port dropped, a trailing-dot host refused since the browser keeps the dot). Compare origins as plain strings; never match a subdomain, port or suffix. The origin of a saved login
   never changes on edit.
-- Which run may use a login is decided from its THREAD and TURN (`usableSiteLogins`), never from client input: only
-  the owner's own turn at the app (`isOwnInteractiveTurn`: `startedBy` is the owner, origin `lead`, not headless, not
-  impersonated), whose prompt row the owner typed (theirs, no `agentName`, no outside agent's or guest's text, no
-  attached document, captured page, file or image part or `fileIds`, only text parts: an unknown part refuses), with
-  nothing untrusted read yet (`turn.taintedBy` from the step's messages, `turn.untrustedContext` for knowledge,
-  memories, project context or skill text in the system prompt, and the prompt's path, summaries and handoff via
-  `agent/thread-summary-taint.ts#threadPathTaint`), in a
-  thread `devices/internal.ts#loadEligibleThread` admits (not shared, public, a group chat, a messenger conversation or
-  deleted) that no trigger, task or eval opened. `startedBy` alone proves nothing: a public API run records the key's owner. A new run origin gets no login
-  until it is added there on purpose. Then the owner's own chats get every login; a teammate's thread only the logins
-  naming that teammate, and none once the teammate is deleted (its threads keep `botId`).
+- Which run may use a login is decided from its THREAD, TURN and the text in front of the model, never from client
+  input, by ONE function: `site-login-turn.ts#siteLoginTurnVerdict`, an ALLOWLIST. Both queries use it, and the fill
+  tool of the next part must call it too (through `usableSiteLogins`), never a check of its own. Safe, and only this:
+  the owner's own typed text (their row, text parts with no mark, attachment, guest or outside-agent text, goal note or
+  compressed history), the lead model's own replies (text, reasoning, tool calls; no speaker, `acp-host`, sources,
+  memories, file, `neore…` metadata but `neoreGateway`), rows whose `agentName` is a model id or unset
+  (`isLeadAgentName`: lead rows and the prompt carry the model id; every other writer names itself, and a test pins
+  that none of those names is a model id), results of `SAFE_RESULT_TOOLS`, built-in tools only (`toolSources`), and a
+  system prompt of only `SAFE_SYSTEM_CONTEXT` kinds. The step's own messages are classified by the same allowlist as
+  the saved path (`messageRefusal`). The turn is the owner's own at the app (`isOwnInteractiveTurn`); the thread passes
+  `loadEligibleThread`, is tagged `chat` and nothing else, and is no coding agent's, handoff, import, branch or other
+  derived thread (`threadRelationships`) and has no context summary. Anything else refuses, including a row, part,
+  tool, tag or context kind nobody classified: add one to the safe lists only on purpose, and when unsure leave it out.
+  `agent/thread-summary-taint.ts#threadPathTaint` is not used here; do not widen it for this. Then the owner's own chats
+  get every login; a teammate's thread only the logins naming that teammate, and none once it is deleted.
 - Logins live on the owner's own shard: save/delete refuse and list returns nothing on `__root__` or when `servesUser`
   is false (`servesUser` alone admits `__root__`, which any caller can name; a collaborator reaches every procedure on a
   shared thread's shard). Dev `SHARD_ROUTING=off` puts everyone on root, so root is allowed there. A save keeps only
@@ -35,9 +39,13 @@
   `siteLoginForFill` the origin of the page the browser is on, never a site the model names; checks that origin again
   inside the browser-renderer right before typing, after any navigation; and decrypts and types in one action, never
   returning the ciphertext from a workflow step or putting it in a queue payload. It fills the turn from its tool context
-  (`dispatchOrigin`, `headless`, `startedBy`, `promptMessageId`; `ToolCtx.messageId` is never set) and `taintedBy`
-  from `computeTaint` over `ToolExecutionOptions.messages`, plus `files` when `messagesCarryAttachedText`, and
-  `untrustedContext` from the run's context as the low-risk check reads it; never `[]` or `false` by default. A failed
+  (`dispatchOrigin`, `headless`, `startedBy`, `promptMessageId`; `ToolCtx.messageId` is never set), `stepMessages` as
+  `ToolExecutionOptions.messages` holds them (never filtered), `toolSources` with one entry per offered tool, and
+  `systemContext` with one kind per piece pushed onto the system prompt where it is assembled (`instructions` always; a
+  piece it cannot name, a request's own instructions, or a built-in whose description lists stored text such as skills
+  or workers gets a kind of its own, which refuses). A failed
   read of the turn is a refusal. No turn records
   impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
   `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.
+  Rows, steers, bot instructions and personalization an impersonating admin wrote carry no mark yet either: mark them
+  (and refuse them here) before the fill ships.
