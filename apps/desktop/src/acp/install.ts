@@ -182,7 +182,7 @@ export class AgentInstaller {
         }
 
         // The binary a version manager's shim runs, not the shim: the install and the agent use it with no manager config.
-        const found = await (this.options.resolveTools ?? (async (tools) => await resolveNodeTools(tools)))(located);
+        const found = await (this.options.resolveTools ?? resolveNodeTools)(located);
 
         // Taken as the dialog opens: the core refuses a node or npm that is no longer the file the person confirmed.
         const identify = this.options.toolIdentity ?? loadToolIdentity();
@@ -193,7 +193,7 @@ export class AgentInstaller {
             throw new Error("Node.js and npm were not found. Install Node.js (which includes npm), then try again.");
         }
 
-        // The dialog names the node the core records (as found), and where that link points now.
+        // The dialog names the node the core records, and where it points now if it is a link.
         const tools = { ...found, resolvedNode: realpathOr(found.node) };
         const fetchImpl = this.options.fetch ?? globalThis.fetch;
         const entry = await lookupNpmIntegrity(fetchImpl, resolved.name, resolved.version);
