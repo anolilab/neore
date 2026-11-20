@@ -330,12 +330,12 @@ const BotsSettings = () => {
 
         const { stored } = outcome;
 
-        // The list takes the stored pick before the dialog closes, so a reopen before the refresh starts from it, never from the old one.
+        // The list takes the stored pick before the dialog closes, so a reopen before the server's push starts from it, never from the old one.
         // A read already in flight is dropped first: it left before the save and would put the old pick back.
         await queryClient.cancelQueries({ queryKey: botsQuery.queryKey });
         queryClient.setQueryData<typeof bots>(botsQuery.queryKey, (current) => withStoredSelection(current, savedId, stored));
 
-        // Settled as soon as the save landed, before the list refresh: a reopened copy must not be saved back meanwhile.
+        // Settled as soon as the save landed, before the server's push: a reopened copy must not be saved back meanwhile.
         if (toolsDialogSession.current === session) {
             setEditingTools(null);
         } else {
@@ -346,8 +346,9 @@ const BotsSettings = () => {
             );
         }
 
+        // No refetch: while the list is subscribed, a refetch is answered from the subscription's copy, read before this save,
+        // until the server's push brings the stored row; it would put the old pick back meanwhile.
         toast.success(t`The bot's tools were saved`);
-        await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey }).catch(() => undefined);
     };
 
     const handleDelete = async () => {

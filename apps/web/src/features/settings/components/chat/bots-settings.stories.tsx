@@ -502,7 +502,7 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
         await waitFor(async () => await expect(slowSave.finish).toBeDefined());
         slowSave.finish?.();
         await lunoraAnswered(api.bots.functions.updateBot);
-        // The save then refreshes the bots list before it would close a dialog.
+        // The save's answer then reaches the dialog, which it would close if it were still the one the save came from.
         await lunoraIdle();
 
         await expect(screen.getByRole("dialog")).toBeVisible();
@@ -510,8 +510,8 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
     },
 };
 
-/** The bots list after the save below: held until the story released it, then the server's stored bot. */
-const heldList: { held: boolean; waiting: (() => void)[] } = { held: false, waiting: [] };
+/** The bots list after the save below: held until the story released it, then the server's stored bot. `reads`: the reads answered. */
+const heldList: { held: boolean; reads: number; waiting: (() => void)[] } = { held: false, reads: 0, waiting: [] };
 /** The patches the reopen story below sent. */
 const reopenedPatches: unknown[] = [];
 
@@ -527,6 +527,7 @@ export const ReopenBeforeRefresh: Story = {
         }
 
         heldList.held = false;
+        heldList.reads = 0;
         heldList.waiting = [];
         reopenedPatches.length = 0;
     },
@@ -543,6 +544,8 @@ export const ReopenBeforeRefresh: Story = {
 
                             return [{ ...BOT, toolSelection: undefined }];
                         }
+
+                        heldList.reads += 1;
 
                         return [BOT];
                     }),
@@ -562,11 +565,13 @@ export const ReopenBeforeRefresh: Story = {
         const first = await openTools(canvas);
 
         await waitFor(async () => await expect(within(first).getByRole("radio", { name: "Custom" })).toBeChecked());
+        // The live list's poll has answered too: a refetch of it is then answered from that copy, read before the save.
+        await waitFor(async () => await expect(heldList.reads).toBeGreaterThanOrEqual(2), { timeout: 5000 });
         await userEvent.click(within(first).getByRole("radio", { name: "All tools" }));
         await userEvent.click(within(first).getByRole("button", { name: "Save tools" }));
         await waitFor(async () => await expect(screen.queryByRole("dialog")).toBeNull());
 
-        // The list refresh is still held: the reopened dialog reads the pick the save stored.
+        // The list's reads are held from the save on: the reopened dialog reads the pick the save stored, not the live copy.
         const reopened = await openTools(canvas);
 
         await waitFor(async () => await expect(within(reopened).getByRole("radio", { name: "All tools" })).toBeChecked());
