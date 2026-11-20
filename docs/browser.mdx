@@ -79,6 +79,35 @@ click or type in it. The card goes away when the browser session ends or after a
 - The deployment needs `CLOUDFLARE_ACCOUNT_ID` and `BROWSER_LIVE_VIEW_API_TOKEN` (an API token with Browser
   Rendering Write) set on the backend. Without them the card says the live view is not available.
 
+### Taking Control of the Browser
+
+The chat's owner, and anyone the chat is shared with who can write in it, can choose **Take control** on the
+Browser card, for example to sign in or enter a code. Your clicks, typing and scrolling in the view then go to the
+browser, and the address field above the view opens another page (the chat owner's allowed and blocked domains
+apply). While you have control:
+
+- The AI does not use the browser. A browser action it tries is not run, and it is told that you are using the
+  browser.
+- Only one person has control at a time, and the others who watch see that someone has control instead of the page.
+- You cannot take control while the AI is in the middle of a browser action. An action can take over a minute, so
+  try again shortly.
+- A page you open from the address field can take up to about a minute to load. Opening a page gives you a fresh
+  two minutes of control.
+- An admin acting as you cannot take control of the browser.
+
+Control goes back to the AI when you choose **Hand back**, when you close the view or leave the chat, or after two
+minutes without input the card can see. Thirty seconds before that, the card asks whether you are still there;
+**Keep control** gives you two more minutes. Typing inside the view does not count as input the card sees, so
+during a long entry choose **Keep control** when asked. If you take control in a second tab, the first tab's view
+closes. If the browser is closed or replaced, control ends and the card offers **Take control** again.
+
+When it next uses the browser, the AI is told that you had control and on which page the browser is now. An action
+that would change the page is not run that one time: it gets a screenshot of the page instead, and looks before it
+acts.
+
+If the browser session is closed while a browser action still runs, that action's result is discarded, also when a
+later action has already opened a new browser.
+
 ### URL Safety
 
 Every URL the browser is asked to open is validated before the request leaves

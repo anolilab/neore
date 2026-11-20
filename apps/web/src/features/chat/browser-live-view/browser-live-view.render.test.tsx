@@ -1,8 +1,9 @@
+import { api } from "@neore/backend/api";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BrowserLiveView from "./browser-live-view";
 
@@ -21,28 +22,55 @@ const { backend } = vi.hoisted(() => {
             browser: null as {
                 accessUntil?: number;
                 browserId: string;
+                canControl?: boolean;
                 control?: { byYou: boolean; until: number };
                 currentUrl?: string;
                 idleUntil: number;
                 /** The server's clock at the answer; this device's when left out. */
                 now?: number;
             } | null,
+            handBack: vi.fn(),
+            /** Whether an admin acts as this account. */
+            impersonating: false,
+            keep: vi.fn(),
+            navigate: vi.fn(),
             /** When set, the status read fails with it. */
             statusError: undefined as Error | undefined,
             open: vi.fn(),
+            take: vi.fn(),
             /** How often the status was read. */
             statusReads: 0,
         },
     };
 });
 
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonating: () => backend.impersonating };
+});
+
 vi.mock("@/lib/lunora/crpc", () => {
     return {
-        useAction: () => backend.open,
+        useAction: (reference: unknown) => {
+            if (reference === api.browser.live_view.takeControl) {
+                return backend.take;
+            }
+
+            return reference === api.browser.live_view.navigateInControl ? backend.navigate : backend.open;
+        },
         useCRPC: () => {
             return {
                 browser: {
                     live_view: {
+                        handBack: {
+                            mutationOptions: () => {
+                                return { mutationFn: backend.handBack };
+                            },
+                        },
+                        keepControl: {
+                            mutationOptions: () => {
+                                return { mutationFn: backend.keep };
+                            },
+                        },
                         getThreadBrowser: {
                             queryOptions: (args: unknown) => {
                                 return {
@@ -98,7 +126,18 @@ afterEach(() => {
     backend.browser = null;
     backend.statusError = undefined;
     backend.statusReads = 0;
-    backend.open.mockReset();
+    backend.impersonating = false;
+});
+
+// The last test's card unmounts after it, and hands back a tick later: that call must not count in this test.
+beforeEach(async () => {
+    await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+    });
+
+    for (const mock of [backend.open, backend.handBack, backend.keep, backend.navigate, backend.take]) {
+        mock.mockReset();
+    }
 });
 
 describe("BrowserLiveView", () => {
@@ -562,5 +601,406 @@ describe("BrowserLiveView", () => {
             expect(frameSource()).toBe(URL);
         });
         expect(backend.open).toHaveBeenCalledTimes(3);
+    });
+
+    describe("taking control", () => {
+        const CONTROL_URL = "https://live.browser.run/ui/view?mode=tab&control";
+        const CONTROL_VIEW = "Live view of the agent's browser (you have control)";
+        const READ_ONLY_VIEW = "Live view of the agent's browser (read-only)";
+
+        const controllable = (): void => {
+            backend.browser = { browserId: "b-1", canControl: true, idleUntil: Date.now() + 600_000 };
+            backend.open.mockResolvedValue({ connectBy: Date.now() + 600_000, status: "ok", url: URL });
+        };
+
+        /** Pushes a new status, as the live query would after a write. */
+        const push = async (queryClient: QueryClient, next: NonNullable<typeof backend.browser>): Promise<void> => {
+            backend.browser = next;
+            await act(async () => {
+                await queryClient.invalidateQueries();
+            });
+        };
+
+        /**
+         * The person takes control under `claim`; the status then says they hold the lease until `until`. The view
+         * connects, unless `connect` is false (its URL is then renewed past the connect deadline).
+         */
+        const takeControl = async (queryClient: QueryClient, until = Date.now() + 120_000, connect = true): Promise<void> => {
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 60_000, status: "ok", url: CONTROL_URL });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, until } });
+
+            const frame = await screen.findByTitle(CONTROL_VIEW);
+
+            if (connect) {
+                fireEvent.load(frame);
+            }
+        };
+
+        const typeAddress = async (url = "https://example.com/next"): Promise<void> => {
+            fireEvent.change(screen.getByRole("textbox", { name: "Page address" }), { target: { value: url } });
+            await userEvent.click(screen.getByRole("button", { name: "Go" }));
+        };
+
+        it("opens the interactive view, and hands back under its claim to a read-only one", async () => {
+            controllable();
+            backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            expect(frameSource()).toBe(CONTROL_URL);
+            expect(backend.open).not.toHaveBeenCalled();
+
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+
+            expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", reason: "handed_back", threadId: THREAD });
+            expect(await screen.findByTitle(READ_ONLY_VIEW)).toBeTruthy();
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByText("You handed the browser back to the agent.")).toBeTruthy();
+        });
+
+        it("offers no control to a read-only viewer", async () => {
+            backend.browser = { browserId: "b-1", canControl: false, idleUntil: Date.now() + 60_000 };
+            mountCard();
+
+            await screen.findByRole("button", { name: "Watch live" });
+            expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+        });
+
+        it.each([
+            ["busy", "The agent is finishing a browser action, which can take over a minute. Try again shortly."],
+            ["taken", "Someone else has control of this browser."],
+            ["unavailable", "The live view is not available right now."],
+        ])("says why control was not given when the answer is %s", async (answer, message) => {
+            controllable();
+            backend.take.mockResolvedValue({ status: answer });
+            mountCard();
+
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+
+            expect(await screen.findByRole("status")).toHaveProperty("textContent", message);
+        });
+
+        it("keeps sending the old claim while a renewal is minted, and the new one once it answers ok", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const renewal: ((value: unknown) => void)[] = [];
+
+            await takeControl(queryClient, Date.now() + 90_000, false);
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        renewal.push(resolve);
+                    }),
+            );
+            // The interactive URL never connected: its one renewal is asked for.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+            expect(backend.take).toHaveBeenCalledTimes(2);
+
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            expect(backend.keep.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
+
+            await act(async () => {
+                renewal[0]?.({ claim: "claim-2", connectBy: Date.now() + 60_000, status: "ok", url: OTHER_URL });
+            });
+            expect(frameSource()).toBe(OTHER_URL);
+
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+            expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-2", reason: "handed_back", threadId: THREAD });
+        });
+
+        it("closes the interactive view and hands back when a renewal answers unavailable", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 600_000, false);
+            backend.take.mockResolvedValueOnce({ status: "unavailable" });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByText("The live view is not available right now.")).toBeTruthy();
+            expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", reason: "left", threadId: THREAD });
+            expect(screen.queryByRole("button", { name: "Hand back" })).toBeNull();
+        });
+
+        it("closes the interactive view once keepControl answers that this tab no longer holds control", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.keep.mockResolvedValue(null);
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+
+            await vi.waitFor(() => {
+                expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            });
+            expect(screen.getByText("You no longer have control of the browser.")).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+        });
+
+        it("closes the interactive view and hands back once the person may no longer write", async () => {
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await push(queryClient, { ...backend.browser!, canControl: false });
+
+            await vi.waitFor(() => {
+                expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            });
+            expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", reason: "left", threadId: THREAD });
+            expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+        });
+
+        it("hands back under its claim when the card unmounts as the status answers no browser", async () => {
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            backend.browser = null;
+            await act(async () => {
+                await queryClient.invalidateQueries();
+            });
+            await act(async () => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 10);
+                });
+            });
+
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it("hands back when the person hides the view", async () => {
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await userEvent.click(screen.getByRole("button", { name: "Hide live view" }));
+            await act(async () => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 10);
+                });
+            });
+
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+            expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+        });
+
+        it("hands back and closes the interactive view when the person leaves the page", async () => {
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await act(async () => {
+                globalThis.dispatchEvent(new Event("pagehide"));
+            });
+
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.queryByText("Opening the live view…")).toBeNull();
+        });
+
+        it("ignores a page answer that comes back after control moved on to a new lease", async () => {
+            controllable();
+            const answers: ((value: unknown) => void)[] = [];
+
+            backend.navigate.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        answers.push(resolve);
+                    }),
+            );
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await typeAddress();
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+            await push(queryClient, { ...backend.browser!, control: undefined });
+            await takeControl(queryClient);
+
+            await act(async () => {
+                answers[0]?.({ error: "You do not have control of the browser.", status: "refused" });
+            });
+
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Go" })).toHaveProperty("disabled", false);
+        });
+
+        it("hands back a lease whose answer came after the person hid the view", async () => {
+            controllable();
+            const late: ((value: unknown) => void)[] = [];
+
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        late.push(resolve);
+                    }),
+            );
+            mountCard();
+
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await userEvent.click(screen.getByRole("button", { name: "Hide live view" }));
+            await act(async () => {
+                late[0]?.({ claim: "claim-late", connectBy: Date.now() + 60_000, status: "ok", url: CONTROL_URL });
+            });
+
+            expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-late", reason: "left", threadId: THREAD });
+            expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+        });
+
+        it("warns before an idle hand back, keeps control on request, and closes the view once control lapsed", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.keep.mockResolvedValue({ until: Date.now() + 120_000 });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            expect(screen.queryByRole("button", { name: "Keep control" })).toBeNull();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            expect(backend.keep.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(30_000);
+            });
+
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByText("Control of the browser is back with the agent.")).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+        });
+
+        it("opens a typed page under the claim, reads the status again, and says why one was refused", async () => {
+            controllable();
+            backend.navigate.mockResolvedValue({ error: "URL is not allowed", status: "refused" });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            const reads = backend.statusReads;
+
+            await typeAddress();
+
+            expect(backend.navigate.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD, url: "https://example.com/next" });
+            expect(await screen.findByRole("alert")).toHaveProperty("textContent", "That page could not be opened: URL is not allowed");
+            expect(backend.statusReads).toBeGreaterThan(reads);
+        });
+
+        it("waits for a slow page without giving up, and keeps the view while it loads", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.navigate.mockImplementation(async () => {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 70_000);
+                });
+
+                return { status: "ok" };
+            });
+            const queryClient = mountCard();
+
+            // A load grants the lease a fresh window: the status the page's load pushes moves `until`.
+            await takeControl(queryClient, Date.now() + 600_000);
+            await typeAddress();
+            expect(screen.getByText("Opening the page. This can take up to a minute.")).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Go" })).toHaveProperty("disabled", true);
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(70_100);
+            });
+
+            expect(screen.queryByText("Opening the page. This can take up to a minute.")).toBeNull();
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.queryByRole("alert")).toBeNull();
+        });
+
+        it("says a timed-out page is still loading for about 15 seconds", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.navigate.mockResolvedValue({ error: "The page you opened is still loading.", status: "refused" });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 600_000);
+            await typeAddress();
+
+            expect(await screen.findByText("The page you opened is still loading.")).toBeTruthy();
+            expect(screen.queryByRole("alert")).toBeNull();
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(15_100);
+            });
+            expect(screen.queryByText("The page you opened is still loading.")).toBeNull();
+        });
+
+        it.each([
+            [{ status: "closed" }, "The agent's browser closed while the page loaded."],
+            [{ error: "You do not have control of the browser.", status: "refused" }, "You no longer have control of the browser."],
+        ])("closes the interactive view when navigating answers %o", async (answer, message) => {
+            controllable();
+            backend.navigate.mockResolvedValue(answer);
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await typeAddress();
+
+            expect(await screen.findByText(message)).toBeTruthy();
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+        });
+
+        it("closes the interactive view and offers control again when the renderer replaced the browser", async () => {
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await push(queryClient, { browserId: "b-2", canControl: true, idleUntil: Date.now() + 600_000 });
+
+            expect(await screen.findByText("The agent's browser was replaced, and control went back to the agent. You can take control again.")).toBeTruthy();
+            expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+            expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+            expect(backend.take).toHaveBeenCalledTimes(1);
+        });
+
+        it("says control is not available while impersonating, with no retry", async () => {
+            controllable();
+            backend.impersonating = true;
+            backend.take.mockRejectedValue({ code: "FORBIDDEN" });
+            mountCard();
+
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+
+            expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Taking control is not available while impersonating.");
+            expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+        });
+
+        it("says so when keeping control or opening a page is refused while impersonating", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.impersonating = true;
+            backend.keep.mockRejectedValue({ code: "FORBIDDEN" });
+            backend.navigate.mockRejectedValue({ data: { code: "FORBIDDEN" } });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            await typeAddress();
+            expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Taking control is not available while impersonating.");
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            await vi.waitFor(() => {
+                expect(screen.getAllByText("Taking control is not available while impersonating.")).toHaveLength(2);
+            });
+        });
     });
 });
