@@ -63,7 +63,7 @@
   through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
   admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. Still unmarked, to mark (a draft
   kind the verdict names) before the fill ships: forwarded messages, Generate image/video (the reply's text sent as a
-  prompt), follow-up suggestions; and bot instructions and personalization an impersonating admin wrote (a
+  prompt), follow-up and welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt; and bot instructions and personalization an impersonating admin wrote (a
   `systemContext` kind that refuses). The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

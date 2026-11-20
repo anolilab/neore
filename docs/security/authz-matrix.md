@@ -768,10 +768,16 @@ for a schema table that is neither policed nor listed:
   the step's messages must be the owner's own typed text, the lead model's own reply (`agentName` a model id or unset; no
   speaker, coding agent, sources, memories, file, marks or unknown parts) or the result of `SAFE_RESULT_TOOLS`. A
   teammate's thread gets only the logins naming it. Text the owner did not type is marked where it is saved
-  (`lib/not-typed-text.ts`, `providerOptions.neore.notTyped`) and refused by name: a composer draft from a `?prompt=` link,
-  a desktop `neore://new?text=` link or someone else's saved prompt (`draftFrom`, which the web client names from the
-  text it noted, `draft-origin.ts`), and any prompt, edit, steer or local turn an admin sent while impersonating (or, on
-  `/chat/edit`, under a sign-in that cannot be confirmed). The client's `draftFrom` only ever restricts.
+  (`lib/not-typed-text.ts`, `providerOptions.neore.notTyped`) and refused by name. The web client never matches text: the
+  composer draft itself carries the mark (`composerDraftFrom`, `features/chat/core/utils/draft-origin.ts`) from when it is
+  filled until it is sent or emptied, through edits, a pane switch, a reload, the queue and a failed send, and each send
+  names it as `draftFrom`. Its sources: a `?prompt=` link or a chat's `?initialMessage=` (`promptLink`), an
+  organization's shared prompt (`sharedPrompt`), a desktop `neore://new?text=` link, share or Quick Composer (`shellLink`),
+  and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
+  prompt, edit, steer or local turn an admin sent while impersonating (or, on `/chat/edit`, under a sign-in that cannot
+  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. Still unmarked, and to be marked
+  before the fill tool ships: forwarded messages, Generate image/video (a reply's text sent as a prompt), follow-up and
+  welcome-screen suggestions, the prompt improver's Apply and the media gallery's stored prompt.
 
 ## Removed from the client surface in this audit
 
