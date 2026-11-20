@@ -1,7 +1,7 @@
 import { dynamicTool, jsonSchema, type JSONSchema7, type ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift } from "./mcp-tool-fingerprint";
+import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift, mcpToolDriftReason, mcpToolOrigin, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 
 /** An MCP tool shaped like the ones the MCP client builds from a `tools/list` entry. */
 const mcpTool = (schema: JSONSchema7 | PromiseLike<JSONSchema7>): ToolSet[string] =>
@@ -170,6 +170,39 @@ describe(fingerprintMcpTool, () => {
     });
 });
 
+describe(mcpToolOrigin, () => {
+    const USER_SERVER = { endpoint: "https://docs.example.com/mcp", protocol: "http", serverName: "Docs", toolName: "search" };
+    const CONNECTOR = { ...USER_SERVER, connectorSlug: "notion", serverName: "Notion" };
+
+    it("is the same for the same server and tool", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER })).toBe(await mcpToolOrigin(USER_SERVER));
+        expect(await mcpToolOrigin(USER_SERVER)).toMatch(SHORT_HASH);
+    });
+
+    it("changes when a server's tool now goes to another address", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, endpoint: "https://other.example.com/mcp" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+    });
+
+    it("changes when the same address is now reached over another transport", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, protocol: "sse" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+        expect(await mcpToolOrigin({ ...CONNECTOR, protocol: "sse" })).not.toBe(await mcpToolOrigin(CONNECTOR));
+    });
+
+    it("changes when a connector's tool now goes to another address, and not when only its display name does", async () => {
+        expect(await mcpToolOrigin({ ...CONNECTOR, endpoint: "https://elsewhere.example.com/mcp" })).not.toBe(await mcpToolOrigin(CONNECTOR));
+        expect(await mcpToolOrigin({ ...CONNECTOR, serverName: "Notion (work)" })).toBe(await mcpToolOrigin(CONNECTOR));
+    });
+
+    it("tells two servers saved under one address apart, and a server from a connector at the same address", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, serverName: "Docs 2" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+        expect(await mcpToolOrigin(CONNECTOR)).not.toBe(await mcpToolOrigin(USER_SERVER));
+    });
+
+    it("changes with the tool", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, toolName: "delete" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+    });
+});
+
 describe(mcpToolDrift, () => {
     const saved = { mcp_Docs__search: "aaa" };
 
@@ -192,5 +225,34 @@ describe(mcpToolDrift, () => {
     it("is unchanged for a tool the snapshot did not fingerprint, or a snapshot that predates fingerprints", () => {
         expect(mcpToolDrift(saved, {}, "webSearch", false)).toBe("unchanged");
         expect(mcpToolDrift(undefined, {}, "mcp_Docs__search", false)).toBe("unchanged");
+    });
+});
+
+describe(mcpToolOriginDrift, () => {
+    const saved = { mcp_Docs__search: "aaa" };
+
+    it("is unchanged when the name still stands for the same origin", () => {
+        expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "aaa" }, "mcp_Docs__search", true)).toBe("unchanged");
+    });
+
+    it("is replaced when the name now stands for another origin", () => {
+        expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "bbb" }, "mcp_Docs__search", true)).toBe("replaced");
+    });
+
+    // Two saved entries of one name and address share an origin: it cannot say which entry the approval was for, and asking
+    // again cannot either, so the reason says how to tell them apart instead of to call again.
+    it("is ambiguous when either run lists the origin under two names", async () => {
+        const docs = { endpoint: "https://docs.example/mcp", protocol: "http", serverName: "Docs", toolName: "search" };
+        const shared = await mcpToolOrigin(docs);
+        const renamed = await mcpToolOrigin({ ...docs, serverName: "Docs (work)" });
+        const twice = { mcp_Docs__search: shared, mcp_Docs__search_2: shared };
+
+        expect(mcpToolOriginDrift({ mcp_Docs__search: shared }, twice, "mcp_Docs__search", true)).toBe("ambiguous");
+        expect(mcpToolOriginDrift(twice, { mcp_Docs__search: shared }, "mcp_Docs__search", true)).toBe("ambiguous");
+        expect(mcpToolDriftReason("ambiguous")).toContain("rename one of them");
+        // Renamed, the two entries have their own origins, and an approval for one runs.
+        expect(mcpToolOriginDrift({ mcp_Docs__search: shared }, { mcp_Docs__search: shared, mcp_Docs__search_2: renamed }, "mcp_Docs__search", true)).toBe(
+            "unchanged",
+        );
     });
 });

@@ -435,22 +435,43 @@ describe("threadModeForApp", () => {
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
         });
 
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "supervised", organizationId: null });
-        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null, organizationId: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "supervised", organizationId: null, toolSelection: null });
+        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null, organizationId: null, toolSelection: null });
 
         // An open chat whose owner chose full: the grantee gets the defaults, never the owner's full.
         await harness.run(async (context: any) => {
             await context.db.patch("threads", threadId, { permissionMode: "full" });
         });
 
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: null, organizationId: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: null, organizationId: null, toolSelection: null });
 
         await harness.run(async (context: any) => {
             await context.db.patch("threads", threadId, { lockedAt: 2 });
         });
 
-        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "full", organizationId: null });
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null, organizationId: null });
+        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "full", organizationId: null, toolSelection: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null, organizationId: null, toolSelection: null });
+    });
+
+    it("gives a grantee of a bot's chat that bot's tool selection", async () => {
+        const toolSelection = { exclude: ["connector=notion:*"] };
+
+        await harness.run(async (context: any) => {
+            const botId = await context.db.insert("bots", {
+                computerEnabled: false,
+                instructions: "x",
+                model: "m",
+                name: "Bot",
+                toolSelection,
+                updatedAt: 0,
+                userId: OWNER,
+            });
+
+            await context.db.patch("threads", threadId, { botId });
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
+        });
+
+        expect(await readFor(GRANTEE)).toMatchObject({ allowed: true, toolSelection: { ownerId: OWNER, selection: toolSelection } });
     });
 
     it("names the organization whose cap holds the chat: the one it is filed under, else the one a temporary chat started in", async () => {
