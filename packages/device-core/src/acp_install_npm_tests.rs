@@ -2516,20 +2516,29 @@ fn npm_is_told_to_fetch_nothing_from_git() {
         .any(|arg| arg == "--allow-git=none"));
 }
 
+/// Installs `bytes` as the registry entry would with `env` as its variables.
+fn install_with_env(
+    state: &DeviceState,
+    node: &Path,
+    npm: &Path,
+    bytes: &[u8],
+    env: &[(&str, &str)],
+) {
+    let mut request = request(state, node, npm, bytes, integrity(bytes));
+
+    request.env = env
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+        .collect();
+    state.acp_install_npm(request).unwrap();
+}
+
 #[test]
 fn a_reinstall_drops_the_variables_the_registry_no_longer_sets_and_keeps_the_persons_own() {
     let (state, dir) = state("registry-env");
     let (node, npm, _) = fake_tools(&dir);
     let bytes = tarball(&manifest(), &[]);
-    let install = |env: &[(&str, &str)]| {
-        let mut request = request(&state, &node, &npm, &bytes, integrity(&bytes));
-
-        request.env = env
-            .iter()
-            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
-            .collect();
-        state.acp_install_npm(request).unwrap();
-    };
+    let install = |env: &[(&str, &str)]| install_with_env(&state, &node, &npm, &bytes, env);
     let env = || -> Vec<(String, String)> {
         state.settings().acp_agents[0]
             .env
@@ -2599,15 +2608,7 @@ fn a_registry_variable_the_person_changed_is_theirs_and_a_reinstall_keeps_it() {
     let (state, dir) = state("registry-env-override");
     let (node, npm, _) = fake_tools(&dir);
     let bytes = tarball(&manifest(), &[]);
-    let install = |env: &[(&str, &str)]| {
-        let mut request = request(&state, &node, &npm, &bytes, integrity(&bytes));
-
-        request.env = env
-            .iter()
-            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
-            .collect();
-        state.acp_install_npm(request).unwrap();
-    };
+    let install = |env: &[(&str, &str)]| install_with_env(&state, &node, &npm, &bytes, env);
 
     install(&[("FIXTURE_MODE", "legacy")]);
     state
