@@ -6,6 +6,7 @@
     "add-approval-chain-source",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
     "session-options-to-session-state"
@@ -4037,6 +4038,53 @@
         "timestamp": {
           "fields": [
             "timestamp"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
+    "botOwners": {
+      "commitOrdered": false,
+      "fields": {
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "bots"
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "deletedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_botId": {
+          "fields": [
+            "botId"
+          ],
+          "unique": false
+        },
+        "by_ownerId": {
+          "fields": [
+            "ownerId"
           ],
           "unique": false
         }
@@ -10493,6 +10541,38 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "evidence": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "at": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "messageId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "quote": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "threadId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
         },
         "importance": {
           "kind": "number",
@@ -20953,6 +21033,12 @@
               },
               "text": {
                 "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "textLength": {
+                "kind": "number",
                 "nullable": false,
                 "optional": true,
                 "unique": false

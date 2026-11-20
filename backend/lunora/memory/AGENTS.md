@@ -52,45 +52,48 @@
   cleaning and after the cut, so preview and save agree; a quoted value the detector reads across lines, one without
   spaces, is redacted before the split) and merged texts, the manual edit (a text that is only a secret is refused),
   and `insertMemory` / `saveImportedMemoryBatch` / `updateMemoryInternal` / `applyReflectionOps` as the backstop.
-  Confirmations write no text. A fact that is nothing but a secret is dropped (`redactMemoryText` returns `null`),
-  never saved as `«redacted»`: `insertMemory` returns `null` and supersedes nothing (the import reports `dropped`);
-  a revision or import merge whose wording is only a secret does not apply, and its fact is saved as new, as for any
-  that cannot apply; a dropped reflection merge or UPDATE wording keeps the rows it would absorb (and is not counted
-  as merged or resolved). The import's exact-text and twin checks key on the redacted text. Compression that loses a
-  fact this way does not run; a stored row that is only a secret is left out of compression, neither sent nor
-  superseded. Reflection text (and the digest summary) is redacted before its cut to length, and a cut that removes
-  every marker must still state a fact (`recheckCutMemoryText`); a belief revision's UPDATE text is not cut.
-  Extraction (its facts, and its revision wordings), compression, reflection, the import save and the manual edit
-  log one `memory.secret_redaction` event each (path, counts; no text); the backstops do not. A new write path
-  calls the same helpers and `logRedaction`.
-- **Dates** (`memory/dates.ts`): extraction writes relative dates out as absolute
-  ones in the user's timezone and may set `validUntil` (last day a fact holds) and
-  `eventStart`/`eventEnd` (local `YYYY-MM-DD`); yearly dates set none. Retrieval
-  and dedup (`activeOn`, also on rows read past the window) skip an unpinned fact
-  past `validUntil`; reflection retires it over every row read, before the 120-row
-  selection (`splitExpired`), and keeps expired rows out of merges and revisions.
-  **The newer statement decides the dates** (`restatedDates`, the one place): a
-  revision or confirming restatement writes the newer statement's three dates in
-  place of the old, clearing one it does not carry (`dates` on
-  `reviseExtractedMemory` and `updateMemoryInternal` replaces all three columns). The person's own edit in
-  settings is the newest statement (`updateMemory` `dates`, checked by
-  `userFactDates`). Extraction: UPDATE takes them; a restatement with other dates
-  supersedes the row with the new statement, text and dates together
-  (`restatementOutcome`), or is saved beside a pinned one (UPDATE and SUPERSEDE
-  too: a pinned row's text and dates never change). An event on another day is
-  another occurrence (`differentEventDays`): saved beside, never revised; a row
-  superseded or confirmed in a run is not matched again (a revised one is, by its
-  revised text and dates), and a statement the extractor returned twice is saved once. Relative dates resolve against the
-  saved prompt's time; a steer sent on another day carries `[sent on <day>]`
-  (`labelSentDays`, from the time the user queued it).
-  Reflection: only rows with the same dates cluster, so a merge never changes
-  dates (a pinned row's included) and never leaves text naming another day;
-  two events on different days are never paired for revision either. UPDATE and
-  SUPERSEDE keep the newer row with its own dates (UPDATE takes the merged
-  wording, which belief revision writes for the newer row's dates when the two
-  rows' dates differ); IGNORE with other dates keeps the newer row.
-  Dated rows are never promoted or compressed (both rewrite text without dates).
-  An import carries no dates and leaves a row's dates alone: a pasted line is
-  not a newer statement. Like extraction it never matches, confirms or merges
-  into an unpinned row past its end date (action and save both check; the save's
-  exact-text check skips it too): the fact is saved beside it.
+  Confirmations write no memory text; one may add a quote that passed `evidenceQuote` to a row that has none. A fact
+  that is nothing but a secret is dropped (`redactMemoryText` returns `null`), never saved as `«redacted»`:
+  `insertMemory` returns `null` and supersedes nothing (the import reports `dropped`); a revision or import merge
+  whose wording is only a secret does not apply, and its fact is saved as new, as for any that cannot apply; a dropped
+  reflection merge or UPDATE wording keeps the rows it would absorb (and is not counted as merged or resolved). The
+  import's exact-text and twin checks key on the redacted text. Compression that loses a fact this way does not run; a
+  stored row that is only a secret is left out of compression, neither sent nor superseded. Reflection text (and the
+  digest summary) is redacted before its cut to length, and a cut that removes every marker must still state a fact
+  (`recheckCutMemoryText`); a belief revision's UPDATE text is not cut. Extraction (its facts, and its revision
+  wordings), compression, reflection, the import save and the manual edit log one `memory.secret_redaction` event each
+  (path, counts; no text); the backstops do not. A new write path calls the same helpers and `logRedaction`.
+- **Dates** (`memory/dates.ts`): extraction writes relative dates out as absolute ones in the user's timezone and may
+  set `validUntil` (last day a fact holds) and `eventStart`/`eventEnd` (local `YYYY-MM-DD`); yearly dates set none.
+  Retrieval and dedup (`activeOn`, past the window too) skip an unpinned fact past `validUntil`; reflection retires it
+  over every row read, before the 120-row selection (`splitExpired`), and keeps expired rows out of merges and
+  revisions. **The newer statement decides the dates** (`restatedDates` only): a revision or confirming restatement
+  writes the newer statement's three dates in place of the old, clearing one it does not carry (`dates` on
+  `reviseExtractedMemory` / `updateMemoryInternal` replaces all three). The person's own edit in settings is the
+  newest statement (`updateMemory` `dates`, checked by `userFactDates`). Extraction: UPDATE takes them; a restatement
+  with other dates supersedes the row with the new statement, text and dates together (`restatementOutcome`), or is
+  saved beside a pinned one (a pinned row's text and dates never change). An event on another day is another
+  occurrence (`differentEventDays`): saved beside, never revised; a row superseded or confirmed in a run is not
+  matched again (a revised one is, by its revised text and dates), and a statement the extractor returned twice is
+  saved once. Relative dates resolve against the saved prompt's time; a steer sent on another day carries
+  `[sent on <day>]` (`labelSentDays`, from its `sentAt`; steer offsets count the label, and `factEvidence` never
+  quotes it). Reflection: only rows with the same dates cluster, so a merge never changes dates or leaves text naming
+  another day; events on different days are never paired for revision. UPDATE, SUPERSEDE and IGNORE with other dates
+  keep the newer row with its own dates; belief revision writes UPDATE's merged wording for them. Dated rows are never
+  promoted or compressed. An import carries no dates and leaves a row's dates alone: a pasted line is not a newer
+  statement. Like extraction it never matches, confirms or merges into an unpinned row past its end date (the action
+  and the save, exact-text check included): the fact is saved beside it.
+- **Provenance** (`memory/evidence.ts`) — `memories.evidence` holds a quote of the user's own words, its thread and
+  message (the prompt's, or the steer's). A quote is kept only through `evidenceQuote` over the TYPED text
+  (`chat/lib/attached-text.ts`: no attachment, page capture or guest note; trigger, headless and outside-agent runs
+  pass none); it checks `containsSecret` and its own labels, and drops one naming a health condition. Merges take the
+  newer quote, ranked by `evidence.at`: when the words were sent (`promptAt`, or the steer's own `sentAt`, stamped by
+  `steerRun`), never when the job ran nor `updatedAt`; a belief-revision UPDATE (`reviseExtractedMemory`) takes its
+  own quote; its `base` check leaves a row rewritten meanwhile alone. A reflection merge (`merge: true`) gives a
+  quote-less survivor the absorbed quote, unless the user wrote it (`manual`); a contradiction never does; a merge
+  applies whole or not at all (`staleMerges`: text or dates moved since the plan). Compression takes the newest quote
+  its source rows hold at save time (`saveMemoryBatch`, `evidenceFrom`). A user's rewrite drops the evidence
+  (`updateMemory`). The live list carries only `hasEvidence` and reads no thread; the quote and link come on expand
+  from `getMemorySource`, which shows the quote only for the user's own chat (trash too) or a shared one they still
+  hold a grant to, hides it otherwise (`quoteHidden`: the UI reads it, not `hasEvidence`), links only with `full`
+  access to a thread not deleted, and gives the message's position so the chat can page back to it (capped walk).

@@ -20,11 +20,14 @@ import {
     IMPORTED_IMPORTANCE,
     vImportApp,
 } from "./import-logic";
+import { botOwnerRows } from "./bot-owner";
+import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { localDayOf } from "./reflection-logic";
 import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
-import { requireOwnedThread } from "../agent/thread-read-access";
+import { candidatesOnActivePath } from "../agent/branch-rows";
+import { requireOwnedThread, resolveThreadReadAccess } from "../agent/thread-read-access";
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
@@ -46,13 +49,35 @@ export const readMemoryEnabled = async (ctx: Pick<QueryCtx, "db">, userId: strin
 /** Most memories one user-facing read looks at. */
 const MEMORY_READ_CAP = 2000;
 
-/** The row as the settings UI sees it. */
-const toMemoryView = (m: Doc<"memories">) => {
+/**
+ * The row as the settings UI sees it. `botNames` holds the names of the user's bots that still exist.
+ * The quote itself is read on expand (`getMemorySource`), so this live list never reads a thread.
+ */
+type BotOwnerRow = { deleted: boolean; ownerId: string };
+
+const toMemoryView = (m: Doc<"memories">, botNames: ReadonlyMap<string, string>, owners: ReadonlyMap<string, BotOwnerRow>, userId: string) => {
+    const botId = m.botId as string | undefined;
+    // The `botOwners` row is the authority, read for every unnamed bot. A deleted row, or one naming this user (whose bot
+    // is not here any more), is a bot that is gone. No row says nothing: rows exist only for bots created since
+    // `botOwners`, so an older bot may still be live.
+    const row = botId === undefined ? undefined : owners.get(botId);
+    const named = botId !== undefined && botNames.has(botId);
+
     return {
         _creationTime: m._creationTime,
         _id: m._id as string,
+        // Unset with `fromBot` set: the bot was deleted, or it is the bot of whoever shared the chat (on their shard).
+        botName: botId === undefined ? undefined : botNames.get(botId),
+        // Set only on a bot memory whose bot another user owns and still has; with no `botName`, it tells a shared chat's bot from a deleted one.
+        botOwnedByOther: row !== undefined && row.ownerId !== userId && !row.deleted ? true : undefined,
+        // Set only on an unnamed bot memory whose bot has no `botOwners` row: whether it is live or deleted, and whose, is unknown.
+        botOwnerUnknown: botId !== undefined && !named && row === undefined ? true : undefined,
         confidence: m.confidence ?? undefined,
         createdAt: m._creationTime,
+        // When the words the shown quote came from were said: the date the row shows beside its label.
+        evidenceAt: m.evidence?.at,
+        fromBot: botId !== undefined,
+        hasEvidence: m.evidence !== undefined,
         importance: m.importance ?? undefined,
         importedFrom: m.importedFrom ?? undefined,
         lastConfirmedAt: lastConfirmedOf(m),
@@ -111,10 +136,16 @@ export const listUserMemories = authQuery
             v.object({
                 _creationTime: v.number(),
                 _id: v.string(),
+                botName: v.optional(v.string()),
+                botOwnedByOther: v.optional(v.boolean()),
+                botOwnerUnknown: v.optional(v.boolean()),
                 confidence: v.optional(v.number()),
                 createdAt: v.number(),
                 eventEnd: v.optional(v.string()),
                 eventStart: v.optional(v.string()),
+                evidenceAt: v.optional(v.number()),
+                fromBot: v.boolean(),
+                hasEvidence: v.boolean(),
                 importance: v.optional(v.number()),
                 importedFrom: v.optional(vImportApp),
                 lastConfirmedAt: v.number(),
@@ -142,8 +173,109 @@ export const listUserMemories = authQuery
         // Filter out superseded memories unless explicitly requested
         const filtered = includeSuperseded ? memories : memories.filter((m) => !m.supersededBy);
 
+        // "Learned by <bot>": one read per distinct bot; a deleted bot has no name.
+        const botIds = [...new Set(filtered.map((m) => m.botId).filter((id): id is Id<"bots"> => id !== undefined))];
+        const bots = await Promise.all(botIds.map(async (id) => context.db.get("bots", id)));
+        const botNames = new Map(bots.filter((bot): bot is Doc<"bots"> => bot !== null && bot.userId === userId).map((bot) => [bot._id as string, bot.name]));
+
+        // A bot another user owns is not on this shard, so its name is unknown here; its `botOwners` row says who owns it and whether it was deleted.
+        const unnamedBotIds = botIds.filter((id) => !botNames.has(id as string)).map((id) => id as string);
+        const owners = await botOwnerRows(context, unnamedBotIds);
+
         // The index orders by type first, so recency is imposed here.
-        return filtered.toSorted((a, b) => b._creationTime - a._creationTime).map((m) => toMemoryView(m));
+        return filtered.toSorted((a, b) => b._creationTime - a._creationTime).map((m) => toMemoryView(m, botNames, owners, userId));
+    });
+
+/**
+ * Why a memory is there, read when its row is expanded: the user's own words
+ * and where to open the chat they were in.
+ *
+ * - `quote` is hidden while that chat is locked: the words stay behind its passcode, and `quoteHidden` says so
+ *   (a memory rewritten since has no quote, which reads differently).
+ * - `threadId` (and `messageId` while that message still exists) only when the
+ *   caller can open the chat now: not gone, in the trash, locked (no passcode
+ *   proof is taken here) or no longer readable by them. Short of a lock, the quote stays.
+ *
+ * `null` for a memory that is not the caller's.
+ */
+/** Whether `userId` holds an unexpired grant to another person's thread (`threadAccess`, global, so readable from any shard). */
+const holdsThreadGrant = async (context: Pick<QueryCtx, "db">, threadId: string, userId: string): Promise<boolean> => {
+    // Primary: a replica that lags a revocation would still show the grant.
+    const grant = await context.db.threadAccess.findFirst({ consistency: "primary", where: { threadId: threadId as Id<"threads">, userId } });
+
+    return grant !== null && (grant.expiresAt === undefined || grant.expiresAt >= Date.now());
+};
+
+/** Rows `getMemorySource` walks back from the chat's newest message to find out whether a quote's message is on display. */
+const SOURCE_PATH_WALK_LIMIT = 2000;
+
+export const getMemorySource = authQuery
+    .input({ memoryId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.union(
+            v.null(),
+            v.object({
+                messageId: v.optional(v.string()),
+                /** Where the message sits in the thread, so the chat can page back to it however old it is. */
+                messageOrder: v.optional(v.number()),
+                messageStepOrder: v.optional(v.number()),
+                quote: v.optional(v.string()),
+                /** When the quoted words were said, read with the quote: the list's date may be older than a newer quote. */
+                quoteAt: v.optional(v.number()),
+                quoteHidden: v.optional(v.boolean()),
+                threadId: v.optional(v.string()),
+            }),
+        ),
+    )
+    .query(async ({ args: { memoryId }, ctx: context }) => {
+        const { userId } = context.user;
+        const memory = await context.db.get("memories", memoryId as Id<"memories">);
+
+        if (!memory || memory.userId !== userId) {
+            return null;
+        }
+
+        // The evidence names the message the quote came from; older rows only their thread.
+        const threadId = memory.evidence?.threadId ?? (memory.threadId as string | undefined);
+        const access = threadId === undefined ? null : await resolveThreadReadAccess(context, threadId as Id<"threads">, userId);
+        // A quote is shown while its chat can still be read: the user's own chat, in the trash too, or a shared chat they still
+        // hold a grant to (it lives on its owner's shard, so only the global grant is seen from here). A chat locked since, one
+        // purged, and one whose owner took this user's access away (a former collaborator) keep their words to themselves.
+        const readable =
+            threadId === undefined ||
+            (access?.kind === "full" && (access.thread.deleted !== true || access.thread.userId === userId)) ||
+            (access === null && (await holdsThreadGrant(context, threadId, userId)));
+        const quoteHidden = !readable && memory.evidence?.quote !== undefined;
+        const quote = readable ? memory.evidence?.quote : undefined;
+        const quoteAt = quote === undefined ? undefined : memory.evidence?.at;
+
+        if (access?.kind !== "full" || access.thread.deleted === true) {
+            return withoutUndefined({ quote, quoteAt, quoteHidden: quoteHidden || undefined });
+        }
+
+        const messageId = memory.evidence?.messageId;
+        const message = messageId === undefined ? null : await context.db.get("messages", messageId as Id<"messages">);
+        // The chat shows only the branch on display: a message on a branch the user left has no row to jump to.
+        const leaf = access.thread.activeLeafMessageId;
+        let onPath = message !== null && message.threadId === access.thread._id;
+
+        if (message && onPath && leaf) {
+            // Bounded: a message further back than the walk reaches links to its chat only.
+            const onBranch = await candidatesOnActivePath(context, access.thread._id, leaf, [{ _id: message._id as string, order: message.order }], {
+                limit: SOURCE_PATH_WALK_LIMIT,
+            });
+
+            onPath = onBranch.has(message._id as string);
+        }
+
+        return withoutUndefined({
+            messageId: onPath ? messageId : undefined,
+            messageOrder: onPath ? message?.order : undefined,
+            messageStepOrder: onPath ? (message?.stepOrder ?? 0) : undefined,
+            quote,
+            quoteAt,
+            threadId,
+        });
     });
 
 /**
@@ -355,25 +487,31 @@ export const updateMemory = authMutation
         // The person's own edit is the newest statement: its dates replace the row's (`restatedDates`).
         const nextDates = typedDates && restatedDates(factDatesOf(existing), typedDates);
         const { now } = context;
-        const textChanged = text !== undefined && text !== existing.memory;
+        // A save of the text as it stands is no rewrite, even when redaction would reword a legacy row that holds a secret:
+        // only the user's own change moves the row to `manual` and drops its evidence.
+        const textChanged = text !== undefined && text !== existing.memory && trimmed !== existing.memory;
+        // That save still writes the redacted text, so a secret a legacy row holds does not stay in it.
+        const redactedOnly = text !== undefined && text !== existing.memory && trimmed === existing.memory;
 
+        // A text the user rewrote is theirs now: the words it was learned from no longer back it, so its evidence goes.
         await patchRow(context.db, "memories", existing, {
             ...withoutUndefined({
                 lastConfirmedAt: now,
-                memory: textChanged ? text : undefined,
+                memory: textChanged || redactedOnly ? text : undefined,
                 source: textChanged ? ("manual" as const) : undefined,
                 type,
                 updatedAt: now,
             }),
             ...(nextDates && dateColumns(nextDates)),
+            ...(textChanged && { evidence: undefined }),
         });
 
         // The previous embedding vector is stale once the text changed.
-        if (textChanged) {
+        if (textChanged || redactedOnly) {
             await reembedRewordedMemory(context, existing._id, userId);
         }
 
-        logRedaction(context.log, "edit", { dropped: 0, redacted: text !== undefined && text !== trimmed ? 1 : 0 });
+        logRedaction(context.log, "edit", { dropped: 0, redacted: (textChanged || redactedOnly) && text !== trimmed ? 1 : 0 });
         context.log.event("memory.update_memory", { datesChanged: nextDates !== undefined, textChanged, typeChanged: type !== undefined });
 
         return null;
@@ -511,6 +649,7 @@ const vMemoryInsertFields = {
     confidence: v.optional(v.number()),
     eventEnd: v.optional(v.string()),
     eventStart: v.optional(v.string()),
+    evidence: v.optional(vMemoryEvidence),
     importance: v.optional(v.number()),
     importedFrom: v.optional(vImportApp),
     memory: v.string(),
@@ -527,6 +666,7 @@ type MemoryInsert = {
     confidence?: number;
     eventEnd?: string;
     eventStart?: string;
+    evidence?: MemoryEvidence;
     importance?: number;
     importedFrom?: ImportApp;
     memory: string;
@@ -555,6 +695,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
         confidence: mem.confidence,
         eventEnd: mem.eventEnd,
         eventStart: mem.eventStart,
+        evidence: mem.evidence,
         importance: mem.importance,
         importedFrom: mem.importedFrom,
         lastConfirmedAt: now,
@@ -589,6 +730,8 @@ export const saveMemoryBatch = internalMutation
         memories: v.array(
             v.object({
                 ...vMemoryInsertFields,
+                // Each source with the text the synthesis read: a row revised since is no longer the words the fact was made from.
+                evidenceFrom: v.optional(v.array(v.object({ id: v.id("memories"), memory: v.string() }))),
                 supersedesBase: v.optional(v.string()),
                 supersedesDates: v.optional(
                     v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
@@ -614,7 +757,28 @@ export const saveMemoryBatch = internalMutation
             }
         }
 
-        for (const { supersedesBase, supersedesDates, ...mem } of args.memories) {
+        for (const { evidenceFrom, supersedesBase, supersedesDates, ...mem } of args.memories) {
+            // `evidenceFrom` takes the newest quote the named rows hold now, not when the caller read them: a quote
+            // the user cleared or a row they deleted meanwhile is not brought back.
+            const sources = evidenceFrom
+                ? await Promise.all(
+                      evidenceFrom.map(async ({ id, memory }) => {
+                          return { memory, row: await ctx.db.get("memories", id) };
+                      }),
+                  )
+                : undefined;
+            // Only a source still active, in the new memory's scope, and still reading the text the fact was made from: a
+            // superseded input's quote is obsolete, and a row revised since would lend its newer quote to older wording.
+            const evidence = sources
+                ? newestEvidence(
+                      sources.flatMap(({ memory, row }) =>
+                          row?.userId === mem.userId && !row.supersededBy && (row.botId ?? undefined) === (mem.botId ?? undefined) && row.memory === memory
+                              ? [row]
+                              : [],
+                      ),
+                  )
+                : mem.evidence;
+
             // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
             // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
             const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
@@ -630,7 +794,7 @@ export const saveMemoryBatch = internalMutation
                     ? mem.supersedes
                     : undefined;
 
-            memoryIds.push(await insertMemory(ctx, { ...mem, supersedes }, now));
+            memoryIds.push(await insertMemory(ctx, { ...mem, evidence, supersedes }, now));
         }
 
         // The originals are retired by the same write. Each points at itself: `supersededBy` is its own id when compression retired it.
@@ -955,6 +1119,8 @@ export const reviseExtractedMemory = internalMutation
         confidence: v.number(),
         // The newer statement's dates, replacing all three columns (`restatedDates`); absent keeps the row's.
         dates: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
+        // The words the revision's new wording came from; without them the row keeps its own quote.
+        evidence: v.optional(vMemoryEvidence),
         lastConfirmedAt: v.number(),
         memory: v.string(),
         memoryId: v.id("memories"),
@@ -982,11 +1148,22 @@ export const reviseExtractedMemory = internalMutation
             return false;
         }
 
+        // The quote goes with the wording it explains: a row quoting words said later than the revision's would otherwise
+        // show them beside a text the earlier, perhaps conflicting, words decided.
+        const { evidence } = args;
+
         await patchRow(ctx.db, "memories", row, {
-            confidence: args.confidence,
-            lastConfirmedAt: args.lastConfirmedAt,
-            memory,
-            updatedAt: ctx.now,
+            ...withoutUndefined({
+                confidence: args.confidence,
+                evidence,
+                lastConfirmedAt: args.lastConfirmedAt,
+                memory,
+                // Generated text is never the user's words: a revision of a row the user wrote makes it auto, so it is not
+                // labelled "Added by you". Any other source (imported, compressed, reflection) keeps its label and its
+                // place in compression, and a revision that keeps the wording changes no source.
+                source: row.source === "manual" && memory !== row.memory ? ("auto" as const) : undefined,
+                updatedAt: ctx.now,
+            }),
             ...(args.dates && dateColumns(args.dates)),
         });
 
@@ -1044,18 +1221,26 @@ export const updateMemoryInternal = internalMutation
  * already known. Only the owner's rows are touched.
  */
 export const confirmMemories = internalMutation
-    .input({ confirms: v.array(v.object({ base: v.string(), memoryId: v.id("memories") })), userId: v.string() })
+    .input({
+        confirms: v.array(v.object({ base: v.string(), evidence: v.optional(vMemoryEvidence), memoryId: v.id("memories") })),
+        userId: v.string(),
+    })
     .output(v.array(v.number()))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
         // Indexes of the confirmations that did not apply: their row no longer reads as the text the fact matched.
         const unconfirmed: number[] = [];
 
-        for (const [index, { base, memoryId }] of args.confirms.entries()) {
+        for (const [index, { base, evidence, memoryId }] of args.confirms.entries()) {
             const memory = await ctx.db.get("memories", memoryId);
 
             if (memory?.userId === args.userId && !memory.supersededBy && memory.memory === base) {
-                await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
+                // A restatement brings its quote to a memory that has none (a legacy row); a quote it already has stays.
+                await ctx.db.patch(
+                    "memories",
+                    memoryId,
+                    withoutUndefined({ evidence: memory.evidence === undefined ? evidence : undefined, lastConfirmedAt: now }),
+                );
             } else {
                 unconfirmed.push(index);
             }

@@ -44,6 +44,7 @@ import {
     vRetrievalMetrics,
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
+import { vMemoryEvidence } from "./memory/evidence";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
 import {
@@ -349,6 +350,25 @@ export const schema = defineSchema({
         .index("targetUserId", ["targetUserId"])
         .index("action", ["action"])
         .index("timestamp", ["timestamp"]),
+
+    /**
+     * Who created each bot, kept for as long as the bot id can appear on a memory. A global table: a memory is written on
+     * the shard of the person it belongs to, and a shared chat's bot lives on its owner's shard, so the write cannot read
+     * the bot row there. Written by `createBot`; a row outlives its bot (a deleted bot still names its owner) and is
+     * erased with its owner (`bots/gdpr.ts`). `deletedAt` is set by `deleteBot`, so the memory list can tell a shared bot
+     * that is gone from one that is still live; a deleted bot's row is removed 90 days later (`bots/owner.ts`,
+     * `BOT_OWNER_TOMBSTONE_TTL_MS`), so the table holds live bots and recent deletions only. Bots created before this
+     * table have no row.
+     */
+    botOwners: defineTable({
+        botId: v.id("bots"),
+        createdAt: v.number(),
+        deletedAt: v.optional(v.number()),
+        ownerId: v.string(),
+    })
+        .global()
+        .index("by_botId", ["botId"])
+        .index("by_ownerId", ["ownerId"]),
 
     /**
      * A persistent teammate: a named persona (instructions + model) the user
@@ -1452,6 +1472,9 @@ export const schema = defineSchema({
         // The day or days the event happens, local `YYYY-MM-DD` (`memory/dates.ts`).
         eventEnd: v.optional(v.string()),
         eventStart: v.optional(v.string()),
+        // Where the memory was learned: a short verbatim quote of the user's own words and the message they were in.
+        // Replaced whole when newer evidence revises the memory. See `memory/evidence.ts`.
+        evidence: v.optional(vMemoryEvidence),
         importance: v.optional(v.number()),
         // The assistant an `imported` memory was brought in from (`memory/import.ts`).
         importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
@@ -2012,10 +2035,15 @@ export const schema = defineSchema({
                     messageId: v.optional(v.string()),
                     /** Set on delivery: the run's pending row, moved under that message, so a stop finds it even when that message is gone. */
                     pendingMessageId: v.optional(v.string()),
-                    /** When the user sent it: memory reads "tomorrow" in it against that day, not the delivery's. */
+                    /**
+                     * When the user sent it: memory reads "tomorrow" in it against that day, not the delivery's, and a memory
+                     * quoting it is dated by it. Kept on delivery, so a recovered reply dates its steers.
+                     */
                     sentAt: v.optional(v.number()),
                     status: v.union(v.literal("queued"), v.literal("delivered"), v.literal("withdrawn")),
                     text: v.optional(v.string()),
+                    /** Set on delivery: the length of the text, so a recovered reply can split the combined row into its steers. */
+                    textLength: v.optional(v.number()),
                 }),
             ),
         ),

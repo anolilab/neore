@@ -5,10 +5,14 @@ import { Button } from "@neore/ui/components/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Textarea } from "@neore/ui/components/textarea";
 import cn from "@neore/ui/utils/cn";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CheckIcon, ExternalLinkIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, ExternalLinkIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Icon, XIcon } from "lucide-react";
 import type { FC } from "react";
 import { useId, useState } from "react";
+
+import { messageHash } from "@/features/chat/thread/message-windowing";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { ImportApp } from "./memory-import-apps";
 import { useImportAppLabels } from "./memory-import-apps";
@@ -17,10 +21,16 @@ import { isMemoryType, MEMORY_TYPE_COLORS, MEMORY_TYPES, useMemoryTypeLabels } f
 
 export interface MemoryItemData {
     _id: string;
+    botName?: string;
+    botOwnedByOther?: boolean;
+    botOwnerUnknown?: boolean;
     createdAt: number;
     /** Local calendar days, `YYYY-MM-DD`: the days an event happens, and the last day a fact holds. */
     eventEnd?: string;
     eventStart?: string;
+    evidenceAt?: number;
+    fromBot: boolean;
+    hasEvidence: boolean;
     importedFrom?: ImportApp;
     lastConfirmedAt: number;
     memory: string;
@@ -48,6 +58,112 @@ interface MemoryItemProps {
     relativeTime: (timestamp: number) => string;
 }
 
+/** Sources this list labels by who learned them; any other (an import) keeps its own label. */
+const LEARNED_SOURCES = new Set(["auto", "compressed", "reflection", undefined]);
+
+/**
+ * Who the memory came from (the user, a bot, or a plain chat) and the date, as one translatable message per case, so a
+ * translator can put the date before or after the source. A source labelled elsewhere (an import) shows the date alone.
+ */
+const useLearnedLabel = (memory: MemoryItemData, learnedOn: string): string => {
+    const { t } = useLingui();
+
+    if (memory.source === "manual") {
+        return t`Added by you · ${learnedOn}`;
+    }
+
+    if (!LEARNED_SOURCES.has(memory.source)) {
+        return learnedOn;
+    }
+
+    if (!memory.fromBot) {
+        return t`Learned in chat · ${learnedOn}`;
+    }
+
+    const { botName } = memory;
+
+    if (botName !== undefined) {
+        return t`Learned by ${botName} · ${learnedOn}`;
+    }
+
+    // Unnamed: the bot belongs to someone else (the person who shared the chat), was deleted by its owner, or predates
+    // the owner records, so nothing says which.
+    if (memory.botOwnedByOther === true) {
+        return t`Learned by the shared chat's bot · ${learnedOn}`;
+    }
+
+    return memory.botOwnerUnknown === true ? t`Learned by a bot · ${learnedOn}` : t`Learned by a deleted bot · ${learnedOn}`;
+};
+
+/**
+ * Why the memory is there: the user's own words, and a link to the chat they were
+ * in, at the message when it still exists. Read each time the row is expanded, so
+ * a chat locked, trashed or unshared since shows no link (and, locked, no quote).
+ */
+/** `describedBy` names the memory's text, so each "Open message" link says which memory it belongs to. */
+const MemorySource: FC<{ describedBy: string; memoryId: string }> = ({ describedBy, memoryId }) => {
+    const { i18n, t } = useLingui();
+    const crpc = useCRPC();
+    const {
+        data: source,
+        isError,
+        isPending,
+    } = useQuery({
+        // One-shot: a live subscription per expanded row would crowd the socket's cap.
+        ...crpc.memory.functions.getMemorySource.queryOptions({ memoryId }, { live: false }),
+        // Nothing is kept once the row closes, and each expand asks again: a re-expand never shows a quote or link from
+        // before a lock or unshare.
+        gcTime: 0,
+        staleTime: 0,
+    });
+
+    if (isError) {
+        return (
+            <p className="text-destructive text-[10px]" role="alert">
+                {t`Could not load where this memory came from.`}
+            </p>
+        );
+    }
+
+    if (isPending) {
+        return <p className="text-muted-foreground text-xs" role="status">{t`Loading…`}</p>;
+    }
+
+    return (
+        <>
+            {source?.quote === undefined ? (
+                // The backend says when a kept quote is held back (a locked or deleted chat, or one you can no longer open);
+                // the list's flag may be older than a rewrite.
+                <p className="text-muted-foreground text-xs">
+                    {source?.quoteHidden === true ? t`The quote stays hidden while you can't open its chat.` : t`No quote was kept for this memory.`}
+                </p>
+            ) : (
+                <>
+                    <blockquote className="text-muted-foreground text-xs italic">{`“${source.quote}”`}</blockquote>
+                    {/* The quote's own date, read with it: the row's date comes from the list and may predate a newer quote. */}
+                    {source.quoteAt !== undefined && (
+                        <time className="text-muted-foreground text-[10px]" dateTime={new Date(source.quoteAt).toISOString()}>
+                            {i18n.date(new Date(source.quoteAt), { dateStyle: "medium" })}
+                        </time>
+                    )}
+                </>
+            )}
+            {source?.threadId !== undefined && (
+                <Link
+                    aria-describedby={describedBy}
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[10px] underline-offset-2 hover:underline pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                    params={{ threadId: source.threadId }}
+                    to="/chat/$threadId"
+                    {...(source.messageId !== undefined && { hash: messageHash(source.messageId, source.messageOrder, source.messageStepOrder) })}
+                >
+                    {source.messageId === undefined ? t`Open chat` : t`Open message`}
+                    <ExternalLinkIcon aria-hidden="true" className="size-2.5" />
+                </Link>
+            )}
+        </>
+    );
+};
+
 /**
  * One memory, white-box: its type (changeable), text (editable), pin (never
  * decays), the thread it came from, when it was last confirmed, and delete.
@@ -65,6 +181,14 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     }
 
     const untilLabel = memory.validUntil ? t`Until ${day(memory.validUntil)}` : undefined;
+    const [showSource, setShowSource] = useState(false);
+    const sourceId = useId();
+    const textId = useId();
+    // The date of the words the shown quote came from; the creation date when there is none.
+    const learnedOn = i18n.date(new Date(memory.evidenceAt ?? memory.createdAt), { dateStyle: "medium" });
+    const learnedLabel = useLearnedLabel(memory, learnedOn);
+    // A rewrite drops the evidence, so a memory the user wrote shows one only when a later statement backed it again.
+    const hasSource = memory.hasEvidence || (memory.source !== "manual" && memory.threadId !== undefined);
     const typeLabels = useMemoryTypeLabels();
     const appLabels = useImportAppLabels();
     const importedFromLabel = appLabels[memory.importedFrom ?? "other"];
@@ -146,17 +270,21 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                 </Select>
                 {eventLabel && <span className="text-[10px] font-medium">{eventLabel}</span>}
                 {untilLabel && <span className="text-[10px] font-medium">{untilLabel}</span>}
+                <span className="text-muted-foreground text-[10px]">{learnedLabel}</span>
                 <span className="text-muted-foreground text-[10px]">{t`Last confirmed ${relativeTime(memory.lastConfirmedAt)}`}</span>
                 {memory.source === "imported" && <span className="text-muted-foreground text-[10px]">{t`Imported from ${importedFromLabel}`}</span>}
-                {memory.threadId && (
-                    <Link
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[10px] underline-offset-2 hover:underline"
-                        params={{ threadId: memory.threadId }}
-                        to="/chat/$threadId"
+                {hasSource && (
+                    <button
+                        aria-controls={sourceId}
+                        aria-expanded={showSource}
+                        aria-label={t`Why was this remembered?`}
+                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-0.5 rounded text-[10px] outline-none focus-visible:ring-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                        onClick={() => setShowSource((shown) => !shown)}
+                        type="button"
                     >
-                        {t`Source chat`}
-                        <ExternalLinkIcon aria-hidden="true" className="size-2.5" />
-                    </Link>
+                        {t`Why?`}
+                        <ChevronDownIcon aria-hidden="true" className={cn("size-2.5 transition-transform", showSource && "rotate-180")} />
+                    </button>
                 )}
                 <div className="ml-auto flex items-center gap-0.5">
                     <Button
@@ -230,6 +358,20 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                 </div>
             ) : (
                 <p className="mt-0.5 text-sm leading-snug">{memory.memory}</p>
+            )}
+            {/* What each source link is described by: kept while the row is edited too, so the link never loses it. */}
+            <span hidden id={textId}>
+                {memory.memory}
+            </span>
+
+            {hasSource && (
+                <div
+                    className={cn("border-border mt-1 flex-col items-start gap-0.5 border-l-2 pl-2", showSource ? "flex" : "hidden")}
+                    hidden={!showSource}
+                    id={sourceId}
+                >
+                    {showSource && <MemorySource describedBy={textId} memoryId={memory._id} />}
+                </div>
             )}
         </li>
     );

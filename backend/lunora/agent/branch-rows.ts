@@ -265,13 +265,15 @@ export const loadActivePath = async (context: Reader, threadId: Id<"threads">, s
 /**
  * Which of `candidates` sit on the thread's displayed path. The walk starts at
  * the leaf and ends at the oldest candidate, so it costs what lies between the
- * two rather than the whole thread.
+ * two rather than the whole thread; `limit` caps it, and a candidate past the
+ * cap reads as off the path.
  */
 export const candidatesOnActivePath = async (
     context: Reader,
     threadId: Id<"threads">,
     storedLeafId: string,
     candidates: ReadonlyArray<{ _id: string; order: number }>,
+    { limit = Infinity }: { limit?: number } = {},
 ): Promise<Set<string>> => {
     const leaf = candidates.length > 0 ? await resolveLeafRow(context, threadId, storedLeafId) : null;
 
@@ -281,7 +283,7 @@ export const candidatesOnActivePath = async (
 
     const wanted = new Set(candidates.map((row) => row._id));
     const { rows } = await walkPath(context, threadId, leaf, {
-        limit: Infinity,
+        limit,
         stopBelowOrder: Math.min(...candidates.map((row) => row.order)),
     });
 

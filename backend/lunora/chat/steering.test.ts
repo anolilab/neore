@@ -77,7 +77,7 @@ const steer = async (text: string, userId = OWNER, stream = streamId, steerId?: 
 const withdraw = async (steerId: string, userId = OWNER, unlockProof?: string): Promise<{ outcome: string }> =>
     (await as(userId).mutation(withdrawSteer as never, { steerId, streamId, threadId, unlockProof } as never)) as { outcome: string };
 
-const deliver = async (): Promise<{ messageId: string; parts?: { sentAt?: number; text: string }[]; text: string } | null> =>
+const deliver = async (): Promise<{ messageId: string; parts: { sentAt: number; text: string }[]; text: string } | null> =>
     await harness.run(async (ctx: any) => await ctx.runMutation(deliverSteers, { pendingMessageId: pendingId, streamId, threadId, userId: OWNER }));
 
 const insertStream = async (fields: Record<string, unknown> = {}): Promise<string> =>
@@ -165,7 +165,9 @@ describe("steerRun", () => {
         const delivered = await deliver();
 
         expect(await steer("use the other file", OWNER, streamId, "client-steer-1")).toStrictEqual({ steerId });
-        expect(await steersOnStream()).toStrictEqual([{ id: steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, status: "delivered" }]);
+        expect(await steersOnStream()).toStrictEqual([
+            { id: steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, sentAt: expect.any(Number), status: "delivered", textLength: 18 },
+        ]);
     });
 
     it("refuses a run someone else asked for", async () => {
@@ -218,14 +220,49 @@ describe("deliverSteers and withdrawSteer", () => {
 
         expect(rows.map((row) => row.text)).toStrictEqual(["summarise my file", "use the other file\n\nand keep it short"]);
         expect(await steersOnStream()).toStrictEqual([
-            { id: first.steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, status: "delivered" },
-            { id: second.steerId, messageId: delivered!.messageId, pendingMessageId: pendingId, status: "delivered" },
+            {
+                id: first.steerId,
+                messageId: delivered!.messageId,
+                pendingMessageId: pendingId,
+                sentAt: expect.any(Number),
+                status: "delivered",
+                textLength: 18,
+            },
+            {
+                id: second.steerId,
+                messageId: delivered!.messageId,
+                pendingMessageId: pendingId,
+                sentAt: expect.any(Number),
+                status: "delivered",
+                textLength: 17,
+            },
         ]);
         expect(await withdraw(first.steerId)).toStrictEqual({ outcome: "delivered" });
 
         const active = await as(OWNER).query(getActiveStreamForThread as never, { threadId } as never);
 
         expect(active).toStrictEqual({ deliveredSteerIds: [first.steerId, second.steerId], streamId });
+    });
+
+    it("gives each delivered message the time it was sent, not the time the run took it", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            vi.setSystemTime(1000);
+            await steer("use the other file");
+            vi.setSystemTime(2000);
+            await steer("and keep it short");
+            vi.setSystemTime(9000);
+
+            const delivered = await deliver();
+
+            expect(delivered?.parts).toStrictEqual([
+                { sentAt: 1000, text: "use the other file" },
+                { sentAt: 2000, text: "and keep it short" },
+            ]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("never delivers a withdrawn message", async () => {

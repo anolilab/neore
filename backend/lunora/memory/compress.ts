@@ -30,6 +30,7 @@ Guidelines:
 - Keep separate facts that are genuinely distinct
 - Output 3-6 consolidated facts maximum
 - Write in third-person, present tense
+- For each fact, list in "sources" the numbers of the memories it was built from
 
 ${MEMORY_TYPE_GUIDE}`;
 
@@ -37,7 +38,7 @@ ${MEMORY_TYPE_GUIDE}`;
 // Types
 // ============================================================================
 
-type ThreadMemory = {
+export type ThreadMemory = {
     _id: string;
     confidence?: number | null;
     dated?: boolean;
@@ -77,8 +78,27 @@ const compressedFactSchema = z.object({
     confidence: z.int().min(50).max(100),
     importance: z.int().min(30).max(100),
     memory: z.string(),
+    // 1-based numbers of the input memories the fact merges, for its evidence.
+    sources: z.array(z.int()).optional(),
     type: z.enum(MEMORY_TYPES),
 });
+
+/**
+ * The inputs a compressed fact names, whose newest quote becomes its evidence when it is saved, each with the text the
+ * synthesis read (`memory`): a row revised since no longer backs the wording. Numbers out of range are ignored; a fact
+ * that names none valid gets no quote, never a guess.
+ */
+export const compressedEvidenceSources = (
+    sources: ReadonlyArray<number> | undefined,
+    inputs: ReadonlyArray<ThreadMemory>,
+): { id: Id<"memories">; memory: string }[] =>
+    (sources ?? [])
+        .filter((n) => n >= 1 && n <= inputs.length)
+        .map((n) => {
+            const input = inputs[n - 1]!;
+
+            return { id: input._id as Id<"memories">, memory: input.memory };
+        });
 
 // ============================================================================
 // Compression Lock (H1 race condition fix)
@@ -219,7 +239,7 @@ export const compressThreadMemories = internalAction
             return;
         }
 
-        const memoriesList = autoMemories.map((m: ThreadMemory) => `- [${m.type}] ${m.memory}`).join("\n");
+        const memoriesList = autoMemories.map((m: ThreadMemory, index) => `${index + 1}. [${m.type}] ${m.memory}`).join("\n");
 
         // LLM synthesis
         let synthesizedFacts: z.infer<typeof compressedFactSchema>[] = [];
@@ -283,6 +303,9 @@ export const compressThreadMemories = internalAction
                 return {
                     botId: args.botId,
                     confidence: f.confidence,
+                    // Read at save time from the rows themselves: a quote cleared or a row deleted during synthesis stays gone.
+                    evidence: undefined,
+                    evidenceFrom: compressedEvidenceSources(f.sources, autoMemories),
                     importance: f.importance,
                     memory: f.memory,
                     source: "compressed" as const,

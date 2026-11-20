@@ -158,12 +158,8 @@ export const deliverSteers = internalMutation
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(
-        v.union(
-            v.null(),
-            v.object({ messageId: v.string(), parts: v.array(v.object({ sentAt: v.optional(v.number()), text: v.string() })), text: v.string() }),
-        ),
-    )
+    // `parts`: each steer taken, with when it was sent (now, for one queued before that was kept).
+    .output(v.union(v.null(), v.object({ messageId: v.string(), parts: v.array(v.object({ sentAt: v.number(), text: v.string() })), text: v.string() })))
     .mutation(async ({ args: { pendingMessageId, streamId, threadId, userId }, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
@@ -193,5 +189,11 @@ export const deliverSteers = internalMutation
 
         await patchRow(ctx.db, "persistentStreams", stream, { steers: taken.deliver(row.messageId, pendingMessageId) });
 
-        return { messageId: row.messageId, parts: taken.parts, text: taken.text };
+        return {
+            messageId: row.messageId,
+            parts: taken.parts.map((part) => {
+                return { sentAt: part.sentAt ?? ctx.now, text: part.text };
+            }),
+            text: taken.text,
+        };
     });

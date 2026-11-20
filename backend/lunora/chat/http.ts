@@ -30,10 +30,10 @@ import { vGoalRunConfig } from "./goals/validators";
 import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
-import { capTitlePrompt, fileOnlyPromptPart } from "./lib/first-user-prompt";
+import { capTitlePrompt, fileOnlyPromptPart, imagePromptPart } from "./lib/first-user-prompt";
 import type { StartTitleJob } from "./lib/start-title-jobs";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { documentTextPart, guestNoteIdOfMessage, guestTextPart } from "./lib/attached-text";
+import { documentTextPart, guestNoteIdOfMessage, guestTextPart, outsideAgentTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import type { ChatStartRequest, StartClaim } from "./start-claim";
@@ -956,9 +956,10 @@ const runChatStartOnShard = async (
         // The mark carries the note's id, so a send that stored this message but no record is found later (`settleSend`).
         messageContent.push(guestTextPart(guestNote.text, body.guestMessageId));
     } else if (body.prompt) {
-        messageContent.push({ text: body.prompt.trim(), type: "text" });
+        // An outside agent's words are marked, so a regenerate never quotes them as the person's (`execute.ts`).
+        messageContent.push(origin === "outside_agent" ? outsideAgentTextPart(body.prompt.trim()) : { text: body.prompt.trim(), type: "text" });
     } else if (contentType === "image") {
-        messageContent.push({ text: "Generate an image", type: "text" });
+        messageContent.push(origin === "outside_agent" ? outsideAgentTextPart("Generate an image") : imagePromptPart());
     } else {
         messageContent.push(fileOnlyPromptPart());
     }

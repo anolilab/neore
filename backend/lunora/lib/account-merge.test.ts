@@ -118,7 +118,7 @@ const fakeShards = (
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
 
-                return { reassigned: 0 } as never;
+                return { done: true, reassigned: 0 } as never;
             }
             case "reassignThreadFollowsPage": {
                 const moved = Math.min(pageSize, followsLeft);

@@ -494,6 +494,7 @@ for a schema table that is neither policed nor listed:
 | `media_functions.listUserImages` | query | authQuery | files, threads | row.userId == caller | ok |
 | `memory_functions.clearAllUserMemories` | mutation | authMutation + RL | embeddings_768 | caller-scoped (ctx.user) | ok |
 | `memory_functions.deleteMemory` | mutation | authMutation + RL | embeddings_768 | owner helper | ok |
+| `memory_functions.getMemorySource` | query | authQuery | memories, threads, messages | row.userId == caller; link via `resolveThreadReadAccess` (full, not deleted; no unlock proof, so a locked chat gives no link and hides the quote from its owner, `quoteHidden`; a collaborator's memory quotes only their own words and keeps them, as after an unshare); message id only while it is in that thread | ok |
 | `memory_functions.getMemoryStats` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `memory_functions.getMessageMemoryUsage` | query | authQuery | memories, threads | row.userId == caller | ok |
 | `memory_functions.listUserMemories` | query | authQuery | — | caller-scoped (ctx.user) | ok |

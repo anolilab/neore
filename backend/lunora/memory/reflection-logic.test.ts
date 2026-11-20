@@ -4,6 +4,7 @@ import {
     buildReflectionPrompt,
     checkReflectionEligibility,
     clusterBySimilarity,
+    committedReflectionOps,
     countAppliedMerges,
     countResolvedContradictions,
     createReflectionBudget,
@@ -112,8 +113,16 @@ describe("merge", () => {
         const ops = mergeToOps({ absorbedIds: [weak.id], survivorId: strong.id, texts: [], type: "preference" }, byId([weak, strong]), NOW, " Merged. ");
 
         expect(ops).toEqual([
-            { checkDates: { memory: {} }, confidence: 90, kind: "patch", lastConfirmedAt: NOW, memory: "Merged.", memoryId: strong.id },
-            { byMemoryId: strong.id, checkDates: { by: {}, memory: {} }, kind: "supersede", memoryId: weak.id },
+            {
+                checkDates: { memory: {} },
+                confidence: 90,
+                kind: "patch",
+                lastConfirmedAt: NOW,
+                memory: "Merged.",
+                memoryId: strong.id,
+                readText: "User prefers tabs.",
+            },
+            { absorbedText: "User prefers tabs", byMemoryId: strong.id, checkDates: { by: {}, memory: {} }, kind: "supersede", memoryId: weak.id, merge: true },
         ]);
     });
 
@@ -122,6 +131,20 @@ describe("merge", () => {
         const [patch] = mergeToOps({ absorbedIds: [], survivorId: a.id, texts: [], type: "preference" }, byId([a]), NOW, " ".repeat(3));
 
         expect(patch).not.toHaveProperty("memory");
+    });
+
+    it("counts no merge the write skipped because a row changed after the plan", () => {
+        const merges = [
+            { absorbedIds: ["a1"], survivorId: "a", texts: [], type: "preference" as const },
+            { absorbedIds: ["b1"], survivorId: "b", texts: [], type: "preference" as const },
+        ];
+        const ops = [
+            { absorbedText: "x", byMemoryId: "a", kind: "supersede" as const, memoryId: "a1", merge: true as const },
+            { absorbedText: "y", byMemoryId: "b", kind: "supersede" as const, memoryId: "b1", merge: true as const },
+        ];
+
+        // The write superseded only `a1`: `b`'s survivor was edited meanwhile.
+        expect(countAppliedMerges(merges, committedReflectionOps(ops, ["a1"]))).toBe(1);
     });
 
     it("counts only the merges whose rows the written ops still supersede", () => {
