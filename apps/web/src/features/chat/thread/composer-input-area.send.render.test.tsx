@@ -63,13 +63,10 @@ describe("send button while attachments upload", () => {
         // The tooltip positions itself with a ResizeObserver, which the shared jsdom setup stubs as a plain function.
         vi.stubGlobal(
             "ResizeObserver",
-            class {
-                disconnect(): void {}
-
-                observe(): void {}
-
-                unobserve(): void {}
-            },
+            // eslint-disable-next-line prefer-arrow-callback -- the tooltip calls `new ResizeObserver()`, which an arrow function cannot serve
+            vi.fn(function ResizeObserver() {
+                return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+            }),
         );
 
         render(
