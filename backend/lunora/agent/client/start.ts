@@ -26,7 +26,7 @@ import type { Agent } from "./index";
 import saveInputMessages from "./save-input-messages";
 import { applyStepLabels } from "./step-labels";
 import { embedMessages, fetchContextWithPrompt } from "./search";
-import type { ActionCtx as ActionContext, AgentComponent, Config, Options } from "./types";
+import type { ActionCtx as ActionContext, AgentComponent, Config, Options, TakeSteer } from "./types";
 
 const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext extends object = object>(
     context_: ActionContext & CustomContext,
@@ -126,7 +126,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     settleAbort: () => Promise<void>;
     stepOrder: number;
     /** Steering: delivers a queued message at a step boundary, after which saves follow it. */
-    takeSteer: () => Promise<{ messageId: string; text: string } | null>;
+    takeSteer: () => ReturnType<TakeSteer>;
     updateModel: (model: ModelOrMetadata | undefined) => void;
     userId: string | undefined;
 }> => {

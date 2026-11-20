@@ -16,11 +16,15 @@
  */
 
 import { stripHiddenText } from "@neore/ai/utils";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
+import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 
 export interface QueuedPrompt<A> {
     attachments: A[];
+    /** The draft's not-typed mark when it was queued (`core/utils/draft-origin.ts`): its send carries it, also after an edit here. */
+    draftFrom?: DraftFrom;
     /** Attachments that did not survive a reload: ones that had no uploaded file id to keep. */
     droppedAttachments?: number;
     id: string;
@@ -214,7 +218,15 @@ export interface StoredAttachment {
 interface StoredPromptQueue {
     /** Absent in a queue stored before `tried` was kept: whether its messages were sent is not known. */
     format?: 2;
-    items: { attachments?: StoredAttachment[]; droppedAttachments: number; id: string; steer?: QueuedSteer; text: string; tried?: true }[];
+    items: {
+        attachments?: StoredAttachment[];
+        draftFrom?: DraftFrom;
+        droppedAttachments: number;
+        id: string;
+        steer?: QueuedSteer;
+        text: string;
+        tried?: true;
+    }[];
 }
 
 const ATTACHMENT_KINDS: ReadonlySet<string> = new Set(["document", "file", "image"]);
@@ -255,6 +267,7 @@ export const serializePromptQueue = <A>(
         return [
             {
                 ...(attachments.length > 0 && { attachments }),
+                ...(item.draftFrom !== undefined && { draftFrom: item.draftFrom }),
                 droppedAttachments: item.attachments.length - attachments.length + (item.droppedAttachments ?? 0),
                 id: item.id,
                 ...(item.steer && { steer: { id: item.steer.id, streamId: item.steer.streamId } }),
@@ -392,8 +405,9 @@ export const restorePromptQueue = <A = never>(
     const items: QueuedPrompt<A>[] = [];
 
     for (const candidate of rawItems as unknown[]) {
-        const { attachments, droppedAttachments, id, steer, text, tried } = (candidate ?? {}) as {
+        const { attachments, draftFrom, droppedAttachments, id, steer, text, tried } = (candidate ?? {}) as {
             attachments?: unknown;
+            draftFrom?: unknown;
             droppedAttachments?: unknown;
             id?: unknown;
             steer?: unknown;
@@ -418,9 +432,12 @@ export const restorePromptQueue = <A = never>(
         // Every stored entry not kept is lost, a malformed one too, so the chip says so.
         const dropped = stated + (Array.isArray(attachments) ? attachments.length : 0) - kept.length;
         const restoredSteer = readSteer(steer);
+        // An unknown mark still marks: the message is not read as typed because its mark is unreadable.
+        const mark = parseNotTypedDraft(draftFrom);
 
         items.push({
             attachments: kept,
+            ...(mark !== undefined && { draftFrom: mark ?? "promptLink" }),
             ...(dropped > 0 && { droppedAttachments: dropped }),
             id,
             ...(restoredSteer && { steer: restoredSteer }),

@@ -63,7 +63,8 @@ import {
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
-import { writableProject } from "../projects/functions";
+import { projectRunContext, writableProject } from "../projects/functions";
+import { readProjectRuleFiles } from "../projects/rule-file-rows";
 
 export type TaskRunOrigin = "dependency" | "manual" | "repair" | "retry" | "schedule";
 
@@ -600,9 +601,17 @@ export const runProjectFor = internalQuery
     .output(v.union(v.null(), v.object({ context: v.optional(v.string()), projectId: v.id("projects") })))
     .query(async ({ args, ctx }) => {
         const task = await ctx.db.get("tasks", args.taskId);
-        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId) : null;
+        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId, { primary: true }) : null;
 
-        return project ? { projectId: project._id, ...(project.context && { context: project.context }) } : null;
+        if (!project) {
+            return null;
+        }
+
+        // A task's run attaches no files: its project's `always` rule files, a legacy `context` first, as a chat gets them;
+        // read on the primary, as a chat's are (`getProjectContextForRun`).
+        const context = projectRunContext(ctx, project._id, await readProjectRuleFiles(ctx, project, { primary: true }), []);
+
+        return { projectId: project._id, ...(context && { context }) };
     });
 
 /**

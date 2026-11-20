@@ -44,6 +44,7 @@ import {
     vRetrievalMetrics,
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
+import { vNotTypedMarks } from "./lib/not-typed-text-validator";
 import { vMemoryEvidence } from "./memory/evidence";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
@@ -2002,6 +2003,9 @@ export const schema = defineSchema({
         // How many times the run was resumed after its worker died (`interrupted.ts`); capped, the next one fails the run.
         interruptions: v.optional(v.number()),
         messageId: v.string(),
+        // The steers above holding text the run's user did not type (`lib/not-typed-text.ts`), by id: the row they are
+        // delivered as, and the run's message, carry the mark. At most one per steer (`MAX_STEERS_PER_RUN`).
+        notTypedSteers: v.optional(v.array(v.object({ id: v.string(), notTyped: vNotTypedMarks }))),
         // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
         // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
         // names this pause, and exactly one resume claims it (`claimRunResume`). `run` is the job's own
@@ -2179,6 +2183,35 @@ export const schema = defineSchema({
         .index("by_user_and_url", ["userId", "url"])
         .index("by_organization_and_url", ["organizationId", "url"]),
 
+    // A project's rule files, one row per project holding the whole list in order (`projects/rule-files.ts`): kept off the
+    // project row, which every project read is charged for whole. Access follows the project's; `userId` copies its owner
+    // only so account deletion finds a row whose project is gone (`projects/rule-file-rows.ts`).
+    projectRuleFiles: defineTable({
+        // The fingerprint of the legacy `context` this list took over, "" or absent for none (`rule-files.ts#contextFingerprint`).
+        carriedContext: v.optional(v.string()),
+        // When a project delete started erasing it, 0 or absent when none: a sweep finishes one the delete left (`projects/gdpr.ts`).
+        deletingAt: v.optional(v.number()),
+        files: v.array(
+            v.object({
+                content: v.string(),
+                globs: v.optional(v.array(v.string())),
+                id: v.string(),
+                mode: v.union(v.literal("always"), v.literal("glob")),
+                title: v.string(),
+            }),
+        ),
+        projectId: v.id("projects"),
+        updatedAt: v.number(),
+        userId: v.optional(v.string()),
+        // Counts the saves, absent before the first counted one, so a save writes only over the row it compared against
+        // (`writeProjectRuleFiles`).
+        version: v.optional(v.number()),
+    })
+        .global()
+        .index("by_project", ["projectId"], { unique: true })
+        .index("by_user", ["userId"])
+        .index("by_deleting_at", ["deletingAt"]),
+
     projects: defineTable({
         color: v.optional(v.string()),
         context: v.optional(v.string()),
@@ -2244,6 +2277,10 @@ export const schema = defineSchema({
     promptHistory: defineTable({
         changeType: v.string(),
         content: v.string(),
+        // Who wrote this version's words, as on `prompts` (`prompts/content-author.ts`); a restore carries it back.
+        contentBy: v.optional(v.string()),
+        contentByImpersonator: v.optional(v.boolean()),
+        contentByOthers: v.optional(v.boolean()),
         createdAt: v.number(),
         description: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -2272,6 +2309,14 @@ export const schema = defineSchema({
 
     prompts: defineTable({
         content: v.string(),
+        // Who wrote the words (`content`, variable defaults), from the session, never from input
+        // (`prompts/content-author.ts`): an org member can edit a teammate's prompt and an impersonating admin writes
+        // under the user's id, so `userId` does not say whose words it holds. `contentBy` is the last writer;
+        // `contentByOthers` and `contentByImpersonator` are set once anyone else, or anyone impersonated, wrote part of
+        // them, and only a restore clears them. Unset on rows from before them.
+        contentBy: v.optional(v.string()),
+        contentByImpersonator: v.optional(v.boolean()),
+        contentByOthers: v.optional(v.boolean()),
         currentVersion: v.optional(v.number()),
         description: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),

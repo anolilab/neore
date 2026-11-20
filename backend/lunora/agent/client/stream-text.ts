@@ -4,6 +4,7 @@ import type { StepResult, StreamTextResult, ToolSet, UIMessage as AIUIMessage } 
 import { streamText as streamTextAi } from "ai";
 
 import { compressContextMessages, getModelContextWindow, isContextExceededError } from "../../chat/lib/auto-continue";
+import { userTextContent } from "../../lib/not-typed-text";
 import { getModelName, getProviderName } from "../shared";
 import type { Agent } from "./index";
 import startGeneration from "./start";
@@ -169,7 +170,11 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
             if (steer) {
                 return {
                     ...stepResult,
-                    messages: [...(stepResult?.messages ?? callOptions.messages), { content: steer.text, role: "user" as const }],
+                    // Marked as the saved row is (`agent/steer-rows.ts`): the step's messages are read as they are.
+                    messages: [
+                        ...(stepResult?.messages ?? callOptions.messages),
+                        { content: userTextContent(steer.text, steer.notTyped ?? {}), role: "user" as const },
+                    ],
                 };
             }
 

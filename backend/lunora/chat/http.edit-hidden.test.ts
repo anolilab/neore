@@ -7,12 +7,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => {
     return {
         charges: 0,
-        enqueued: [] as { prompt?: string }[],
+        enqueued: [] as { notTyped?: unknown; prompt?: string }[],
         /** The edited row is a guest's note the owner sent on. */
         guestRow: false,
         /** The thread's owner; anyone else editing in it is a stranger. */
         owner: "user-a",
+        /** The edited row's own content, when a test sets it. */
+        row: undefined as unknown,
         saved: [] as { message: { content: { text?: string; type: string }[] } }[],
+        /** The sign-in is an admin acting as the owner (`impersonating`), or cannot be confirmed (`unconfirmed`). */
+        signIn: "own" as "impersonating" | "own" | "unconfirmed",
         /** The thread keeps no memory (`statelessMode`): its reply saves the prompt again from plain text. */
         stateless: false,
     };
@@ -53,7 +57,7 @@ const THREAD_ID = "k57a1b2c3d4e5f6g7h8i9j0k1l2m3n4o";
 
 const context = () =>
     ({
-        auth: { getIdentity: async () => null },
+        auth: { getIdentity: async () => (state.signIn === "unconfirmed" ? null : { sessionId: "session-1" }) },
         runMutation: async (reference: { __lunoraRef?: string }, args: (typeof state.saved)[number]) => {
             if (String(reference.__lunoraRef).includes("saveEditedSibling")) {
                 state.saved.push(args);
@@ -66,10 +70,14 @@ const context = () =>
         runQuery: async (reference: { __lunoraRef?: string }) => {
             const name = String(reference.__lunoraRef);
 
+            if (name.includes("getSessionOrganizationForCap")) {
+                return state.signIn === "impersonating" ? { impersonating: true, organizationId: null } : { organizationId: null };
+            }
+
             if (name.includes("getMessagesByIdsUnfiltered")) {
                 return [
                     {
-                        message: state.guestRow ? { content: [guestTextPart("a guest's words", "note-1")], role: "user" } : { role: "user" },
+                        message: state.row ?? (state.guestRow ? { content: [guestTextPart("a guest's words", "note-1")], role: "user" } : { role: "user" }),
                         threadId: THREAD_ID,
                     },
                 ];
@@ -87,7 +95,7 @@ const context = () =>
         },
     }) as never;
 
-const edit = async (text: unknown): Promise<Response> =>
+const edit = async (text: unknown, extra: Record<string, unknown> = {}): Promise<Response> =>
     await editMessageHttpAction(
         context(),
         new Request("https://example.test/chat/edit", {
@@ -96,6 +104,7 @@ const edit = async (text: unknown): Promise<Response> =>
                     return { text: part, type: "text" };
                 }),
                 messageId: MESSAGE_ID,
+                ...extra,
             }),
             method: "POST",
         }),
@@ -106,6 +115,8 @@ beforeEach(() => {
     state.enqueued = [];
     state.saved = [];
     state.guestRow = false;
+    state.signIn = "own";
+    state.row = undefined;
     state.stateless = false;
     state.owner = "user-a";
 });
@@ -204,5 +215,53 @@ describe("editMessageHttpAction hidden characters", () => {
         const response = await edit("reworded");
 
         expect(response.status).toBe(404);
+    });
+});
+
+describe("editMessageHttpAction text the owner did not type", () => {
+    const marked = (notTyped: unknown) => [{ providerOptions: { neore: { notTyped } }, text: "fix this", type: "text" }];
+
+    it("keeps the mark of the prompt it replaces, so an edit never launders a draft from a link", async () => {
+        state.row = { content: [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "x", type: "text" }], role: "user" };
+
+        const response = await edit("fix this");
+
+        expect(response.status).toBe(200);
+        expect(state.saved[0]?.message.content).toStrictEqual(marked({ draft: "promptLink" }));
+    });
+
+    it("marks an edit holding someone else's saved prompt, one an admin acting as the owner sends, and one whose sign-in is not confirmed", async () => {
+        await edit("fix this", { draftFrom: "sharedPrompt" });
+        state.signIn = "impersonating";
+        await edit("fix this");
+        state.signIn = "unconfirmed";
+        await edit("fix this");
+
+        expect(state.saved.map((saved) => saved.message.content)).toStrictEqual([
+            marked({ draft: "sharedPrompt" }),
+            marked({ impersonated: true }),
+            marked({ impersonated: true }),
+        ]);
+    });
+
+    it("hands a stateless reply the marks, so the prompt it saves again stays marked; an own edit hands none", async () => {
+        state.stateless = true;
+        await edit("fix this", { draftFrom: "sharedPrompt" });
+        await edit("fix this");
+
+        expect(state.enqueued.map((job) => job.notTyped)).toStrictEqual([{ draft: "sharedPrompt" }, undefined]);
+    });
+
+    it('marks a recalled prompt an admin wrote as the owner, sent again as "impersonated"', async () => {
+        await edit("fix this", { draftFrom: "impersonated" });
+
+        expect(state.saved[0]?.message.content).toStrictEqual(marked({ impersonated: true }));
+    });
+
+    it("refuses a draft source nobody named, and saves nothing", async () => {
+        const response = await edit("fix this", { draftFrom: "typed" });
+
+        expect(response.status).toBe(400);
+        expect(state.saved).toStrictEqual([]);
     });
 });

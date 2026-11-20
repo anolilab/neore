@@ -25,6 +25,7 @@ import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { autoCompactBeforeReply } from "../agent/thread-compaction";
 import { streamLogger } from "../lib/logger";
+import { notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
 import { COMPLETION_MESSAGE_IDS_MAX } from "../sub-agents/logic";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
@@ -293,6 +294,7 @@ export const runStreamingAgent = internalAction
                 const runContextPromise = loadRunContext(ctx, {
                     admittedRun: true,
                     customSystemPrompt,
+                    fileIds,
                     promptText: prompt,
                     researchDepth: streamingConfig.researchDepth,
                     threadId,
@@ -603,7 +605,8 @@ export const runStreamingAgent = internalAction
                 });
 
                 if (threadStatelessMode) {
-                    streamTextArgs.prompt = prompt;
+                    // It saves its prompt again from this, so the saved prompt's not-typed marks go with it.
+                    streamTextArgs.prompt = statelessPrompt(prompt, notTypedMarksOfMessage(message?.message as Parameters<typeof notTypedMarksOfMessage>[0]));
                 } else {
                     // A resumed run continues from the last row it saved before the pause, so its rows land under that row.
                     streamTextArgs.promptMessageId = resumedFrom ?? messageId;

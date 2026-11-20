@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPromptHistoryEntries, isStillRecalled, navigatePromptHistory } from "./prompt-history";
+import { buildPromptHistoryEntries, buildPromptHistoryMarks, isStillRecalled, navigatePromptHistory } from "./prompt-history";
 
 describe(buildPromptHistoryEntries, () => {
     it("returns user messages newest first, skipping assistant and blank ones", () => {
@@ -23,6 +23,40 @@ describe(buildPromptHistoryEntries, () => {
                 { role: "user", text: "a" },
             ]),
         ).toStrictEqual(["a", "b", "a"]);
+    });
+});
+
+describe(buildPromptHistoryMarks, () => {
+    it("keeps the mark of each prompt the server saved as not typed, a marked copy winning over an unmarked one", () => {
+        const marked = {
+            parts: [{ providerMetadata: { neore: { notTyped: { draft: "sharedPrompt" } } }, text: "a colleague's prompt", type: "text" }],
+            role: "user",
+        };
+
+        expect(
+            buildPromptHistoryMarks([
+                { role: "user", text: "a colleague's prompt" },
+                marked,
+                { role: "user", text: "a colleague's prompt" },
+                { parts: [{ text: "mine", type: "text" }], role: "user" },
+                { ...marked, role: "assistant" },
+            ]),
+        ).toStrictEqual(new Map([["a colleague's prompt", "sharedPrompt"]]));
+    });
+
+    it("keeps an admin's mark on a prompt they wrote as the owner, over a draft's", () => {
+        const byAdmin = (notTyped: unknown, text: string) => {
+            return { parts: [{ providerMetadata: { neore: { notTyped } }, text, type: "text" }], role: "user" };
+        };
+
+        expect(
+            buildPromptHistoryMarks([byAdmin({ impersonated: true }, "sent as you"), byAdmin({ draft: "promptLink", impersonated: true }, "a link, as you")]),
+        ).toStrictEqual(
+            new Map([
+                ["a link, as you", "impersonated"],
+                ["sent as you", "impersonated"],
+            ]),
+        );
     });
 });
 

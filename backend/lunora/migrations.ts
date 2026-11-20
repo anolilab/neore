@@ -88,6 +88,17 @@ export const addApprovalChainSource = defineMigration({
     up: () => undefined,
 });
 
+/**
+ * A group pause's snapshot gained an optional `group.fileIds` (`chat/group/validators.ts`), the files the turn's message
+ * attached. Nothing to fill: a row without it gives the speakers after the pause no pattern rule files, as before. A
+ * no-op for the same reason as {@link addApprovalChainSource}.
+ */
+export const addGroupPauseFileIds = defineMigration({
+    id: "add-group-pause-file-ids",
+    table: "toolApprovalRuns",
+    up: () => undefined,
+});
+
 /** The options a row stored under `agentOptions` (the read path that is retired), in its own shape. */
 interface LegacyAgentOptions {
     configOptions?: { category?: string; choices: { name: string; value: string }[]; currentValue: string; id: string; name: string }[];

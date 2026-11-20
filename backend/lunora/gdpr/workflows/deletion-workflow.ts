@@ -557,15 +557,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(steps.deleteUserWorkflowData, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-workflow-data", round) }),
         );
 
-        await context.step.do(
+        await drain(
             "delete-user-projects",
-            async () =>
+            async (round) =>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserProjects,
-                    {
-                        userId: args.userId,
-                    },
-                    { dedupId: stepDedupId(scope, "delete-user-projects") },
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-projects", round) },
                 ),
         );
 

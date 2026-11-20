@@ -266,6 +266,12 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
     { name: "sweepExpiredAuthRateLimits", ref: internal.auth.rate_limit_sweep.sweepExpiredAuthRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
     // Claim-once rows past their TTL (`lib/claim-once.ts`).
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims, schedule: { everyMinutes: 60, kind: "interval" } },
+    // Rule files a failed project delete left marked (`projects/gdpr.ts`).
+    {
+        name: "sweepUnfinishedRuleFileErasures",
+        ref: internal.projects.gdpr.sweepUnfinishedRuleFileErasures,
+        schedule: { hourUTC: 4, kind: "daily", minuteUTC: 45 },
+    },
     // 0 */6 * * *
     {
         name: "cleanupExpiredExports",

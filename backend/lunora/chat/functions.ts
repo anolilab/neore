@@ -3,6 +3,7 @@ import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
+import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -66,6 +67,8 @@ import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { statelessPrompt } from "../lib/not-typed-text";
+import { vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { readableProject } from "../projects/functions";
@@ -4769,10 +4772,14 @@ export const streamAsync = internalAction
     .input({
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
+        /** The files the edited message attaches: the project's rule files applied by pattern match their names. */
+        fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_ATTACHED_FILES)),
         /** Set by `runJobOnce` when `/chat/edit` enqueues this; nothing reads it. */
         jobId: v.optional(v.string()),
         messageId: v.string(),
         model: v.string(),
+        /** The edited prompt's not-typed marks (`lib/not-typed-text.ts`): a stateless reply saves its prompt again, marked. */
+        notTyped: v.optional(vNotTypedMarks),
         parentId: v.optional(v.string()),
         prompt: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -4790,7 +4797,7 @@ export const streamAsync = internalAction
             timestamp: streamAsyncStartTime,
         });
 
-        const { customSystemPrompt, messageId, model, prompt, reasoningEffort, statelessMode, threadId } = args;
+        const { customSystemPrompt, messageId, model, notTyped, prompt, reasoningEffort, statelessMode, threadId } = args;
 
         // Get thread to find userId
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -4836,6 +4843,7 @@ export const streamAsync = internalAction
             // The access `createThread` applied (owner or organization member), not the owner-only read.
             projectContext =
                 (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                    ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
                     projectId: appThread.projectId as Id<"projects">,
                     userId,
                 })) ?? undefined;
@@ -4864,7 +4872,7 @@ export const streamAsync = internalAction
         const streamTextArgs: any = Object.keys(providerOptions).length > 0 ? { providerOptions } : {};
 
         if (threadStatelessMode) {
-            streamTextArgs.prompt = prompt;
+            streamTextArgs.prompt = statelessPrompt(prompt ?? "", notTyped ?? {});
         } else {
             streamTextArgs.promptMessageId = messageId;
         }

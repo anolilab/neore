@@ -65,7 +65,7 @@ const { SUB_AGENT_NAME } = await import("../sub-agents/logic");
 const { CODING_AGENTS } = await import("../coding-agents/commands");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
 const { MODEL_LOOKUP } = await import("@neore/ai/models");
-const { isLeadAgentName } = await import("./site-login-turn");
+const { isLeadAgentName, messageRefusal } = await import("./site-login-turn");
 const { SITE_LOGIN_CHANGED } = await import("./lib/site-login-shape");
 
 // The model a lead run is named for.
@@ -562,6 +562,44 @@ describe("which chats may use a login", () => {
         }
 
         expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
+    });
+
+    it("a prompt, a row above it or a step the owner did not type gets none: a link's or someone else's saved prompt, an admin's", async () => {
+        await save({ password: PASSWORD });
+
+        const marks = [{ draft: "promptLink" }, { draft: "shellLink" }, { draft: "sharedPrompt" }, { impersonated: true }];
+        const markedMessage = (notTyped: unknown) => {
+            return { content: [{ providerOptions: { neore: { notTyped } }, text: "Sign in", type: "text" }], role: "user" };
+        };
+
+        for (const notTyped of marks) {
+            const promptMessageId = await insertPrompt(plainThread, { message: markedMessage(notTyped) });
+
+            expect(await usable(plainThread, OWNER, { promptMessageId })).toStrictEqual([]);
+            expect(await forFill(plainThread, SITE, OWNER, { promptMessageId })).toBeNull();
+            // A steer delivered into the run reaches the step's messages marked (`agent/client/stream-text.ts`).
+            expect(await forFill(plainThread, SITE, OWNER, { stepMessages: [markedMessage(notTyped)] })).toBeNull();
+        }
+
+        // An admin's row above the owner's own typed prompt.
+        const thread = await insertThread({});
+        const above = await insertPrompt(thread, { message: markedMessage({ impersonated: true }) });
+        const typed = await insertPrompt(thread, { order: 1, parentMessageId: above });
+
+        expect(await forFill(thread, SITE, OWNER, { promptMessageId: typed })).toBeNull();
+        expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
+    });
+
+    it("names why a message the owner did not type is refused", () => {
+        const withMark = (notTyped: unknown) => {
+            return { content: [{ providerOptions: { neore: { notTyped } }, text: "Sign in", type: "text" }], role: "user" };
+        };
+
+        expect(messageRefusal(withMark({ draft: "promptLink" }))).toBe("draft-promptLink");
+        expect(messageRefusal(withMark({ draft: "sharedPrompt", impersonated: true }))).toBe("impersonated");
+        // A mark nobody classified refuses too.
+        expect(messageRefusal(withMark({ by: "someone" }))).toBe("impersonated");
+        expect(messageRefusal({ content: "Sign in", role: "user" })).toBeNull();
     });
 
     it("a prompt that carries content the owner attached rather than typed gets none: a document, a captured page, a file", async () => {

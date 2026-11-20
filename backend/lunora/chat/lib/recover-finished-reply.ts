@@ -74,6 +74,24 @@ export const splitSteerRow = (
     });
 };
 
+/**
+ * A steer row's text as the run took it: a plain string, or the text of its parts, as `insertSteerRow` saves a steer the
+ * owner did not type (one marked text part, `userTextContent`). Read whole, so `splitSteerRow`'s lengths still add up.
+ */
+const steerRowText = (content: unknown): string => {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    if (!Array.isArray(content)) {
+        return "";
+    }
+
+    return (content as ReadonlyArray<{ text?: unknown; type?: unknown }>)
+        .flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : []))
+        .join("");
+};
+
 export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery" | "scheduler">, reply: FinishedReply): Promise<void> => {
     const { goal, labels, messageId, origin, replyRowIds, skill, steerRowIds = [], steers = [], threadId, timeZone, userId, userPrompt } = reply;
     const found = await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: replyRowIds as Id<"messages">[] });
@@ -83,7 +101,7 @@ export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | 
     const steerRows =
         steerRowIds.length > 0 ? await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: steerRowIds as Id<"messages">[] }) : [];
     const steered = steerRows.flatMap((row) => {
-        const text = typeof row?.message?.content === "string" ? row.message.content : "";
+        const text = steerRowText(row?.message?.content);
 
         if (!row || !text) {
             return [];

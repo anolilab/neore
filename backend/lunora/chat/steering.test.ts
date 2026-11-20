@@ -18,10 +18,16 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
 });
 
-const { sessionFrom } = vi.hoisted(() => {
+const { impersonation, sessionFrom } = vi.hoisted(() => {
+    // Set while a test acts as an admin impersonating the signed-in user.
+    const state = { by: undefined as string | undefined };
+
     return {
+        impersonation: state,
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                : null,
     };
 });
 
@@ -138,6 +144,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    impersonation.by = undefined;
     harness.close();
 });
 
@@ -205,6 +212,36 @@ describe("steerRun", () => {
 });
 
 describe("deliverSteers and withdrawSteer", () => {
+    it("delivers marked a steer the owner did not type: an admin's acting as them, or a draft from a link", async () => {
+        impersonation.by = "admin-user";
+        await steer("sign in to my bank");
+        impersonation.by = undefined;
+        await as(OWNER).mutation(steerRun as never, { draftFrom: "promptLink", streamId, text: "and pay the bill", threadId } as never);
+
+        const delivered = (await deliver()) as { notTyped?: unknown } | null;
+        const marked = { draft: "promptLink", impersonated: true };
+        const rows = (await harness.run(async (ctx: any) => await ctx.db.query("messages").collect())) as { message?: { content?: unknown; role?: string } }[];
+        const steerRow = rows.findLast((row) => row.message?.role === "user");
+
+        // The run's own message is built from what the delivery reports (`agent/client/stream-text.ts`).
+        expect(delivered?.notTyped).toStrictEqual(marked);
+        expect(steerRow?.message?.content).toStrictEqual([
+            { providerOptions: { neore: { notTyped: marked } }, text: "sign in to my bank\n\nand pay the bill", type: "text" },
+        ]);
+    });
+
+    it('delivers marked an admin\'s steer the owner sends again from history (`draftFrom: "impersonated"`)', async () => {
+        await as(OWNER).mutation(steerRun as never, { draftFrom: "impersonated", streamId, text: "and pay the bill", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ impersonated: true });
+    });
+
+    it("delivers the owner's own steer unmarked", async () => {
+        await steer("use the other file");
+
+        expect(await deliver()).not.toHaveProperty("notTyped");
+    });
+
     it("delivers every queued message as one user row, and reports them delivered", async () => {
         const first = await steer("use the other file");
         const second = await steer("and keep it short");

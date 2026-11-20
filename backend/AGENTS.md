@@ -61,6 +61,7 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 ## Database access
 
 - `.global()` tables: never `ctx.db.query(t).withIndex(...)`; use `ctx.db.<table>.findFirst/findMany` (`lib/global-table-reader.test.ts`).
+- A metered `.global()` read is charged the whole row: `select` lowers what it returns, never what it costs against the read budget (`projects/project-row.ts#projectRowsReadBytes`).
 - `findMany` without `limit` returns every row and always a `QueryPage` (`.page`); test past 25 rows before claiming read completeness. `findUnique` throws `NOT_UNIQUE`, takes no `limit`/`cursor`.
 - Index `.eq()` takes `null`, never `undefined` (`args.x ?? null`).
 - Never pass `undefined` (or `null` for a `v.optional` column) to `ctx.db.patch`: use `lib/patch.ts` (`patchRow`/`patchById`, `withoutUndefined`).

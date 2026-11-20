@@ -6,6 +6,7 @@
     "add-approval-bot-lookup",
     "add-approval-chain-source",
     "add-approval-tool-origins",
+    "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
     "add-steer-text-length",
@@ -20553,6 +20554,70 @@
           "optional": false,
           "unique": false
         },
+        "notTypedSteers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "notTyped": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "draft": {
+                    "kind": "union",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "members": [
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"promptLink\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"sharedPrompt\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"shellLink\""
+                      }
+                    ]
+                  },
+                  "impersonated": {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "literal": "true"
+                  }
+                }
+              }
+            }
+          }
+        },
         "pause": {
           "kind": "object",
           "nullable": false,
@@ -21687,6 +21752,137 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "projectRuleFiles": {
+      "commitOrdered": false,
+      "fields": {
+        "carriedContext": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deletingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "files": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "content": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "globs": {
+                "kind": "array",
+                "nullable": false,
+                "optional": true,
+                "unique": false,
+                "of": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              },
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "mode": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"always\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"glob\""
+                  }
+                ]
+              },
+              "title": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
+        "projectId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "projects"
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "version": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_deleting_at": {
+          "fields": [
+            "deletingAt"
+          ],
+          "unique": false
+        },
+        "by_project": {
+          "fields": [
+            "projectId"
+          ],
+          "unique": true
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "projects": {
       "commitOrdered": false,
       "fields": {
@@ -22136,6 +22332,24 @@
           "optional": false,
           "unique": false
         },
+        "contentBy": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByImpersonator": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByOthers": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -22274,6 +22488,24 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "contentBy": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByImpersonator": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByOthers": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "currentVersion": {
@@ -29047,6 +29279,19 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false
+                },
+                "fileIds": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  },
+                  "refined": true
                 },
                 "isAnonymous": {
                   "kind": "boolean",
