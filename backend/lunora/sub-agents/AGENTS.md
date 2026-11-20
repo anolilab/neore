@@ -65,12 +65,14 @@
 - **Lifecycle** ([reference](../../../docs/agents/sub-agents.md)): a send in a child ends its moved-past waits
   (`afterOwnerMessage`); a hard delete sets `deletingAt` and ends the thread's runs (`endSubAgentRunsOfDeletedThread`).
 - **Roles** (`roles.ts` rules, `role-settings.ts` reads): a model, mode, effort and instructions per kind of delegated
-  work, on `userSettings.subAgentRoles`, overridden field by field by `projects.subAgentRoles` (owner-written,
-  `setProjectSubAgentRole`; the user's via `setSubAgentRole`, never `updateUserSettings`). A role is on only with a
-  model. `createRun` resolves a named role BEFORE admission charges anything and refuses a role with no model or one
-  `roleModelRefusal` refuses for THIS user (the sub-agent rule, model filters, paid plan or key; saves check the same):
-  never pick another model instead. Only the user's backup model still applies on a gateway failure, as for every
-  run. The run keeps the resolved role on its row (a worker
-  copies its first run's), and `execute.ts` re-checks the model, so a settings change never reaches a running role.
-  The lead's catalog (`buildRoleCatalog`: names, scopes, modes, never the instructions) is added only when the run has
-  the delegate tool (`chat/execute.ts`); `loadRunContext` reads it only when asked (`roleCatalog: true`).
+  work, on `userSettings.subAgentRoles` (`setSubAgentRole`, never `updateUserSettings`), overridden field by field by
+  `projects.subAgentRoles` (`setProjectSubAgentRole` under `writableProject`, as `updateProject`: the owner, or any
+  member of an ownerless organization project). A role is on only with a model. `createRun` resolves a named role
+  BEFORE admission charges anything and refuses a role with no model or one `roleModelRefusal` refuses for THIS user
+  (the sub-agent rule, model filters, paid plan or key, their own enabled server-side custom endpoint; saves check the
+  same): never pick another model instead. Only the user's backup model still applies on a gateway failure, as for
+  every run. The run keeps the resolved role on its row (a worker copies its first run's), and `execute.ts` re-checks
+  the model (a worker's thread model too), so a settings change never reaches a running role. A host worker gets the
+  role's instructions ahead of the task (`host-runs.ts`). The lead's catalog (`buildRoleCatalog`: names, scopes,
+  modes, never the instructions) is added only when the run has the delegate tool (`chat/execute.ts`);
+  `loadRunContext` reads it only when asked (`roleCatalog: true`).

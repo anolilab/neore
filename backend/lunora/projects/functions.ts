@@ -616,7 +616,8 @@ export const createProject = authMutation
 
 /**
  * Sets or clears one sub-agent role override on a project (`sub-agents/roles.ts`); `null` makes the role inherit the
- * user's again. Only the project's owner may: the overrides apply to every member's runs in it.
+ * user's again. The rule is `writableProject`'s, as for `updateProject` and the project's context: its owner, or any
+ * member for an organization project nobody owns. The overrides apply to every member's runs in it.
  */
 export const setProjectSubAgentRole = authMutation
     .use(rateLimit("projects/update"))

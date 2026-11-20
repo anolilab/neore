@@ -3,7 +3,7 @@
  * writes stay with the modules that own those tables (`auth/functions.ts:setSubAgentRole`,
  * `projects/functions.ts:setProjectSubAgentRole`). The rules themselves are in `roles.ts`.
  */
-import { MODEL_LOOKUP } from "@neore/ai/models";
+import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
@@ -11,6 +11,8 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { readUserRunPlan } from "../auth/lib/plan";
 import { backupFilterRejection } from "../chat/lib/backup-model";
+import type { CustomProviderType } from "../chat/lib/custom-providers";
+import { isLocalBrowserProvider } from "../chat/lib/custom-providers";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { authQuery } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -38,17 +40,29 @@ export const roleModelRefusal = async (ctx: QueryCtx | MutationCtx, userId: stri
         return `${modelId} cannot run sub-agents.`;
     }
 
-    // A custom endpoint is checked by the run itself (`resolveRunModel`), as for a task.
-    const definition = MODEL_LOOKUP.get(modelId);
-
-    if (!definition) {
-        return undefined;
-    }
-
     const preferences = await ctx.db
         .query("aiUserPreferences")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .unique();
+    const custom = parseCustomModelId(modelId);
+
+    // The user's own endpoint, under the checks `resolveRunModel` makes: theirs, on, and one the server can call.
+    if (custom) {
+        const provider = (preferences?.customAIProviders as Record<string, { enabled?: boolean; type?: CustomProviderType }> | undefined)?.[custom.providerId];
+
+        if (!provider?.enabled) {
+            return `${modelId} is not one of your enabled custom endpoints.`;
+        }
+
+        return isLocalBrowserProvider(provider.type) ? `${modelId} runs in your browser, and sub-agents run on the server.` : undefined;
+    }
+
+    const definition = MODEL_LOOKUP.get(modelId);
+
+    if (!definition) {
+        return `${modelId} is not a known model.`;
+    }
+
     const excluded = backupFilterRejection(definition, preferences?.modelFilterRules ?? undefined);
 
     if (excluded) {

@@ -92,6 +92,35 @@ describe("resolveRunRole", () => {
     });
 });
 
+describe("resolveRunRole with a custom endpoint", () => {
+    const setEndpoints = async (customAIProviders: Record<string, unknown>) =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { customAIProviders, userId }));
+
+    it.each([
+        ["one the user does not have", {}, "not one of your enabled custom endpoints"],
+        ["a switched-off one", { mine: { enabled: false, endpoint: "https://llm.example.com", type: "openai" } }, "not one of your enabled custom endpoints"],
+        ["one the browser runs", { mine: { enabled: true, endpoint: "http://127.0.0.1:11434", type: "local-browser" } }, "runs in your browser"],
+    ])("refuses %s before anything is charged", async (_label, providers, reason) => {
+        await setEndpoints(providers);
+        await setUserRoles({ review: { model: "custom:mine/llama" } });
+        const parentThreadId = await insertThread();
+
+        expect(await harness.run(async (ctx: any) => await resolveRunRole(ctx, { parentThreadId, userId }, "review"))).toStrictEqual({
+            error: expect.stringContaining(reason),
+        });
+    });
+
+    it("launches on the user's own enabled server-side endpoint", async () => {
+        await setEndpoints({ mine: { enabled: true, endpoint: "https://llm.example.com", type: "openai" } });
+        await setUserRoles({ review: { model: "custom:mine/llama" } });
+        const parentThreadId = await insertThread();
+
+        expect(await harness.run(async (ctx: any) => await resolveRunRole(ctx, { parentThreadId, userId }, "review"))).toStrictEqual({
+            role: { model: "custom:mine/llama", name: "review" },
+        });
+    });
+});
+
 describe("admitSubAgentRun with a role", () => {
     it("keeps the resolved role on the row", async () => {
         const parentThreadId = await insertThread();

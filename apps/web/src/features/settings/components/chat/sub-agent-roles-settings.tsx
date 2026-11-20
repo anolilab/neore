@@ -13,15 +13,16 @@ import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Textarea } from "@neore/ui/components/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
-import useDebouncedCallback from "@neore/ui/hooks/use-debounced-callback";
+import { useCallbackRef } from "@neore/ui/hooks/use-callback-ref";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import { ModelSelect } from "@/features/settings/components/chat/default-models-settings";
 import { offerableBackupModels } from "@/features/settings/lib/backup-model-options";
+import useTaskProjects from "@/features/tasks/hooks/use-task-projects";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -81,34 +82,101 @@ interface RoleCardProps {
     /** What the role is when this scope sets nothing: the user's own role in a project scope, nothing otherwise. */
     inherited?: RoleConfig;
     isProject: boolean;
-    isSaving: boolean;
     models: GatewayModel[];
     name: RoleName;
-    onSave: (name: RoleName, config: RoleConfig | null) => void;
+    /** Saves the whole role; answers whether the save went through. */
+    onSave: (name: RoleName, config: RoleConfig | null) => Promise<boolean>;
     readOnly: boolean;
     value: RoleConfig | undefined;
 }
 
-const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, isSaving, models, name, onSave, readOnly, value }) => {
+const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSave, readOnly, value }) => {
     const { i18n, t } = useLingui();
     const modeLabelId = useId();
     const instructionsId = useId();
-    const own = value ?? {};
+    // The card's own copy of the role: every save sends the whole role, so it is built from the edits made here, not
+    // from a server copy that may not have caught up with the previous save yet.
+    const [own, setOwnState] = useState<RoleConfig>(value ?? {});
+    const ownRef = useRef(own);
+    const serverValue = useRef(value);
+    const inFlight = useRef(0);
+    const saveChain = useRef<Promise<void>>(Promise.resolve());
+    const effortTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const effectiveModelId = own.model ?? inherited?.model;
     const effectiveModel = models.find((model) => model.id === effectiveModelId);
     const effectiveMode = own.mode ?? inherited?.mode ?? "prefer";
     const [draft, setDraft] = useState(own.instructions ?? "");
-    const [pendingEffort, setPendingEffort] = useState<number | undefined>();
     const roleLabel = i18n._(ROLE_LABELS[name]);
-    const disabled = isSaving || readOnly;
-    const save = (patch: Partial<RoleConfig>) => onSave(name, compact({ ...own, ...patch }));
-    const saveEffort = useDebouncedCallback((reasoningEffort: number | undefined) => {
-        save({ reasoningEffort });
-        setPendingEffort(undefined);
-    }, EFFORT_SAVE_DELAY_MS);
+    const disabled = readOnly;
+
+    const setOwn = (next: RoleConfig) => {
+        const kept = compact(next) ?? {};
+
+        ownRef.current = kept;
+        setOwnState(kept);
+    };
+
+    // The server's copy replaces the card's only once nothing the card sent is still on its way.
+    useEffect(() => {
+        serverValue.current = value;
+
+        if (inFlight.current === 0 && effortTimer.current === undefined) {
+            ownRef.current = value ?? {};
+            setOwnState(value ?? {});
+        }
+    }, [value]);
+
+    // One save at a time, each sending the role as it is when its turn comes, so they reach the server in order.
+    const send = useCallbackRef(() => {
+        const runSave = async () => {
+            const saved = await onSave(name, compact(ownRef.current));
+
+            inFlight.current -= 1;
+
+            // A refused save leaves the card showing what the server has.
+            if (!saved && inFlight.current === 0) {
+                ownRef.current = serverValue.current ?? {};
+                setOwnState(serverValue.current ?? {});
+            }
+        };
+
+        inFlight.current += 1;
+        saveChain.current = saveChain.current.then(runSave);
+    });
+
+    const save = (patch: Partial<RoleConfig>) => {
+        setOwn({ ...ownRef.current, ...patch });
+        send();
+    };
+
+    const flushEffort = useCallbackRef(() => {
+        if (effortTimer.current === undefined) {
+            return;
+        }
+
+        clearTimeout(effortTimer.current);
+        effortTimer.current = undefined;
+        send();
+    });
+
+    // Leaving the card (another scope, the settings closed) still saves an effort the slider was just moved to.
+    useEffect(() => flushEffort, [flushEffort]);
+
+    const changeEffort = (reasoningEffort: number | undefined) => {
+        setOwn({ ...ownRef.current, reasoningEffort });
+        clearTimeout(effortTimer.current);
+        effortTimer.current = setTimeout(flushEffort, EFFORT_SAVE_DELAY_MS);
+    };
 
     const inheritedModelName = inherited?.model ? (models.find((model) => model.id === inherited.model)?.name ?? inherited.model) : undefined;
     const inheritLabel = inheritedModelName ? t`Your default (${inheritedModelName})` : t`Your default (off)`;
+    let rolePlaceholder = t`Added after the built-in instructions for this role, e.g. "Check every change against our style guide."`;
+
+    if (isProject && own.instructions === "") {
+        rolePlaceholder = t`No extra instructions in this project. Reset to use your default again.`;
+    } else if (isProject && inherited?.instructions) {
+        rolePlaceholder = inherited.instructions;
+    }
 
     return (
         <Card>
@@ -117,13 +185,15 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, isSaving, models, n
                     <CardTitle className="text-base">{roleLabel}</CardTitle>
                     <CardDescription>{i18n._(ROLE_DESCRIPTIONS[name])}</CardDescription>
                 </div>
-                {isProject && value !== undefined && !readOnly && (
+                {isProject && Object.keys(own).length > 0 && !readOnly && (
                     <Button
                         aria-label={t`Reset ${roleLabel} to your default`}
-                        disabled={isSaving}
                         onClick={() => {
+                            clearTimeout(effortTimer.current);
+                            effortTimer.current = undefined;
                             setDraft("");
-                            onSave(name, null);
+                            setOwn({});
+                            send();
                         }}
                         size="sm"
                         variant="ghost"
@@ -177,14 +247,7 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, isSaving, models, n
                 )}
 
                 {effectiveModel && !readOnly && (
-                    <ReasoningEffortSelector
-                        model={effectiveModel}
-                        onChange={(reasoningEffort) => {
-                            setPendingEffort(reasoningEffort);
-                            saveEffort(reasoningEffort);
-                        }}
-                        value={pendingEffort ?? own.reasoningEffort ?? inherited?.reasoningEffort}
-                    />
+                    <ReasoningEffortSelector model={effectiveModel} onChange={changeEffort} value={own.reasoningEffort ?? inherited?.reasoningEffort} />
                 )}
 
                 <div className="space-y-1.5">
@@ -201,15 +264,16 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, isSaving, models, n
                             }
                         }}
                         onChange={(event) => setDraft(event.target.value)}
-                        placeholder={
-                            isProject && inherited?.instructions
-                                ? inherited.instructions
-                                : t`Added after the built-in instructions for this role, e.g. "Check every change against our style guide."`
-                        }
+                        placeholder={rolePlaceholder}
                         rows={3}
                         spellCheck
                         value={draft}
                     />
+                    {isProject && inherited?.instructions && own.instructions === undefined && !readOnly && (
+                        <Button className="h-auto px-0" onClick={() => save({ instructions: "" })} size="sm" variant="link">
+                            {t`Don't use your default instructions in this project`}
+                        </Button>
+                    )}
                 </div>
             </CardContent>
         </Card>
@@ -222,10 +286,13 @@ const SubAgentRolesSettings: FC = () => {
     const scopeLabelId = useId();
     const [scope, setScope] = useState<string>(ALL_CHATS);
     const projectId = scope === ALL_CHATS ? undefined : (scope as Id<"projects">);
-    const projectsQuery = useQuery(crpc.projects.functions.listProjects.queryOptions({ paginationOpts: { cursor: null, numItems: 50 } }));
+    // Every project the user can read, a page at a time: their own and their organization's.
+    const projectList = useTaskProjects("");
     const rolesQuery = useQuery(crpc.sub_agents.role_settings.getSubAgentRoles.queryOptions(projectId ? { projectId } : {}));
-    const setUserRole = useMutation(crpc.auth.functions.setSubAgentRole.mutationOptions());
-    const setProjectRole = useMutation(crpc.projects.functions.setProjectSubAgentRole.mutationOptions());
+    // Offline, a save still goes to the Lunora client, which queues it for the reconnect; TanStack would hold it back
+    // in memory instead, where closing the tab loses it.
+    const setUserRole = useMutation({ ...crpc.auth.functions.setSubAgentRole.mutationOptions(), networkMode: "always" });
+    const setProjectRole = useMutation({ ...crpc.projects.functions.setProjectSubAgentRole.mutationOptions(), networkMode: "always" });
     const flaggedModels = useFeatureFlaggedModels();
     const { data: access } = useQuery(crpc.auth.functions.getPaidModelAccess.queryOptions({}, { live: false }));
     const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
@@ -240,19 +307,19 @@ const SubAgentRolesSettings: FC = () => {
         access?.canRunPaidModels === true,
         providersWithKey,
     );
-    const projects = (projectsQuery.data?.page ?? []).filter((project) => project.projectType !== "workflow");
+    const projects = projectList.readableProjects.filter((project) => project.projectType !== "workflow");
     const user: Roles = rolesQuery.data?.user ?? {};
     const project = rolesQuery.data?.project;
-    const isSaving = setUserRole.isPending || setProjectRole.isPending;
+    const handleSave = async (name: RoleName, config: RoleConfig | null): Promise<boolean> => {
+        const saving = projectId ? setProjectRole.mutateAsync({ config, projectId, role: name }) : setUserRole.mutateAsync({ config, role: name });
 
-    const handleSave = (name: RoleName, config: RoleConfig | null) => {
-        const onError = (error: unknown) => showError(error instanceof Error ? error : t`Could not save the role`);
+        return await saving
+            .then(() => true)
+            .catch((error: unknown) => {
+                showError(error instanceof Error ? error : t`Could not save the role`);
 
-        if (projectId) {
-            setProjectRole.mutate({ config, projectId, role: name }, { onError });
-        } else {
-            setUserRole.mutate({ config, role: name }, { onError });
-        }
+                return false;
+            });
     };
 
     return (
@@ -295,6 +362,14 @@ const SubAgentRolesSettings: FC = () => {
                 </Select>
             </div>
 
+            {projectList.hasMore && (
+                <div className="flex justify-end">
+                    <Button disabled={projectList.isLoadingMore} onClick={projectList.loadMore} size="sm" variant="ghost">
+                        {projectList.isLoadingMore ? t`Loading projects…` : t`Show more projects`}
+                    </Button>
+                </div>
+            )}
+
             {project && !project.editable && (
                 <p className="text-muted-foreground text-sm" role="status">
                     {t`Only the project's owner can change its roles.`}
@@ -311,7 +386,6 @@ const SubAgentRolesSettings: FC = () => {
                         <RoleCard
                             inherited={projectId ? user[name] : undefined}
                             isProject={projectId !== undefined}
-                            isSaving={isSaving}
                             // A new scope starts its instruction draft from what that scope stores.
                             key={`${scope}:${name}`}
                             models={models}
