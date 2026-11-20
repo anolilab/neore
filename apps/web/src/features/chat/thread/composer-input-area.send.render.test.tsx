@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import ComposerInputArea from "./composer-input-area";
@@ -57,6 +57,40 @@ describe("send button while attachments upload", () => {
         renderArea({ isSendWaiting: true, isUploading: true, value: "see the file" });
 
         expect(screen.getByText("Sending once uploads finish…", { selector: "[aria-live='polite']" })).toBeTruthy();
+    });
+
+    it("shows on the queue button, while a reply streams, that a send now waits for the uploads", async () => {
+        // The tooltip positions itself with a ResizeObserver, which the shared jsdom setup stubs as a plain function.
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                disconnect(): void {}
+
+                observe(): void {}
+
+                unobserve(): void {}
+            },
+        );
+
+        render(
+            <ComposerInputArea
+                canQueueWhileStreaming
+                isSendWaiting
+                isStreaming
+                isUploading
+                onCancel={() => {}}
+                onChange={() => {}}
+                onSubmit={() => {}}
+                value="see the file"
+            />,
+        );
+
+        fireEvent.focus(screen.getByRole("button", { name: "Waiting for uploads to complete…" }));
+
+        await waitFor(() => {
+            // Once in the live region, which is always there, and once in the queue button's tooltip.
+            expect(screen.getAllByText("Sending once uploads finish…")).toHaveLength(2);
+        });
     });
 
     it("keeps the live region empty when no send waits", () => {

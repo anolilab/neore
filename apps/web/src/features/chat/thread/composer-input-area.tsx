@@ -202,6 +202,8 @@ const ComposerInputArea = ({
     // A send pressed during an upload waits for it, and the button says so until the send goes out.
     // The send keeps its name while uploads run. The tooltip says what the press does, and the status region announces a wait.
     const uploadTooltip = isSendWaiting ? t`Sending once uploads finish…` : t`Send when uploads finish`;
+    // While a reply streams the queue button is the visible control, so it shows that a send now waits, as the send button does.
+    const queueUploadTooltip = isSendWaiting ? t`Sending once uploads finish…` : t`Waiting for uploads to complete…`;
     // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
     const isOverCap = value.length > MAX_PROMPT_CHARS;
     const lengthNoticeId = useId();
@@ -389,7 +391,7 @@ const ComposerInputArea = ({
                                     }
                                 />
                                 <TooltipContent side="bottom">
-                                    {isUploading ? t`Waiting for uploads to complete…` : t`Queue message — sends when the current reply finishes`}
+                                    {isUploading ? queueUploadTooltip : t`Queue message — sends when the current reply finishes`}
                                 </TooltipContent>
                             </Tooltip>
                         )}
