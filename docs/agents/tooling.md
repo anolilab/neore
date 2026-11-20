@@ -80,7 +80,9 @@ Prettier on Markdown, `sort-package-json` on staged `package.json` files, from t
 **pre-push** runs the package.json order check and the same two formatters in check mode on every file changed since
 the merge base with `main`, root files included. Both hooks and `pnpm lint:oxfmt` run from the repository root and read
 the same ignore files: `.gitignore` (nested ones too) and the root `.prettierignore`, the only one they read, which lists the
-projects and docs that have no format check. pre-push then runs `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
+projects and docs that have no format check. Prettier refuses a symlink named on its command line, so both hooks pass
+`--no-error-on-unmatched-pattern`: a `CLAUDE.md` link to `AGENTS.md` is skipped, and `pnpm lint:oxfmt`'s glob skips
+links on its own. pre-push then runs `vis affected lint:types:fast` from that same base. The fast type check runs `tsrs`, a Rust port of the compiler
 with TS 7.1 semantics (beta): about 13 s for every project, against 4.5 min for `lint:types`, plus up to a minute when a
 backend change reruns its `codegen`. CI and
 `pnpm lint:types` stay on `tsc` 6, so the hook can report a difference that only TS 7 sees; the CI result decides.
