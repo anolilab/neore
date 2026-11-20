@@ -1113,7 +1113,7 @@ impl DeviceState {
         let dir = self
             .install_root()
             .join(&agent.key)
-            .join(install_dir_name(pin));
+            .join(self.installed_dir_name(agent, pin));
 
         // The interpreter is the person's own Node, not part of the hashed files. When an upgrade or a version
         // manager removed it, say so rather than letting the start fail with an operating-system error.

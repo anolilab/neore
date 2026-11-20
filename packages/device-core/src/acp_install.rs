@@ -465,16 +465,45 @@ impl DeviceState {
         let _committing = lock_installs();
         let settings = self.settings();
 
-        if let Some(pin) = settings
+        if let Some((agent, pin)) = settings
             .acp_agents
             .iter()
             .find(|agent| agent.key == key)
-            .and_then(|agent| agent.install.as_ref())
+            .and_then(|agent| agent.install.as_ref().map(|pin| (agent, pin)))
         {
             if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
-                self.prune_other_versions(&self.install_root().join(key), &install_dir_name(pin));
+                self.prune_other_versions(
+                    &self.install_root().join(key),
+                    &self.installed_dir_name(agent, pin),
+                );
             }
         }
+    }
+
+    /// The folder under `acp-agents/<key>/` that `agent`'s pinned program is in: its first argument (an npm agent runs
+    /// `node <program>`) or its command (a binary one). The program cannot be edited without dropping the pin, so this is
+    /// the folder that was installed, also one named before [`install_dir_name`] took its current form. An agent whose
+    /// program is not under its key's folder has the pin's own name.
+    pub(crate) fn installed_dir_name(&self, agent: &AcpAgent, pin: &AcpInstall) -> String {
+        let key_dir = self.install_root().join(&agent.key);
+
+        agent
+            .args
+            .first()
+            .into_iter()
+            .chain(std::iter::once(&agent.command))
+            .find_map(|program| {
+                match Path::new(program)
+                    .strip_prefix(&key_dir)
+                    .ok()?
+                    .components()
+                    .next()?
+                {
+                    Component::Normal(name) => Some(name.to_string_lossy().into_owned()),
+                    _ => None,
+                }
+            })
+            .unwrap_or_else(|| install_dir_name(pin))
     }
 
     /// An agent registered by hand under this key is not replaced by an install.

@@ -2559,3 +2559,37 @@ fn a_reinstall_drops_the_variables_the_registry_no_longer_sets_and_keeps_the_per
         ]
     );
 }
+
+#[test]
+fn an_install_in_the_older_version_named_folder_still_starts_and_is_kept_by_a_prune() {
+    let (state, dir) = state("legacy-folder");
+    let node = fake_node(&dir);
+    let agent = seed_install(&state, &dir, &node);
+    let current = installed(&dir);
+    let legacy = dir.join("acp-agents/fixture/1.0.0");
+    let program = Path::new(&agent.args[0]);
+
+    // As an install recorded before the folder carried its tree hash: the same files, by the version alone.
+    fs::rename(&current, &legacy).unwrap();
+    state
+        .change_settings(|settings| {
+            settings.acp_agents[0].args[0] = legacy
+                .join(program.strip_prefix(&current).unwrap())
+                .to_string_lossy()
+                .into_owned();
+
+            Ok(())
+        })
+        .unwrap();
+
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+
+    state.acp_install_prune("fixture");
+    std::thread::sleep(Duration::from_millis(100));
+
+    assert!(
+        legacy.exists(),
+        "the folder the program is in is the one kept"
+    );
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+}
