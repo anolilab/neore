@@ -649,7 +649,9 @@ describe("crons", () => {
         // A second run does not select the leased thread, so it queues no second chain.
         await run(async (context) => await context.runMutation(procedureAt("crons", "deleteExpiredTemporaryChats"), {}));
 
-        const chainJobs = () => harness.scheduler.list().filter((job) => (job.args as { threadId?: string }).threadId === threadId);
+        // A chain step carries its page cursor. The last step also queues the grant revocation
+        // (`revokeThreadGrantsJob`, args `{ threadId }` only), which is not a deletion step.
+        const chainJobs = () => harness.scheduler.list().filter((job) => (job.args as { threadId?: string }).threadId === threadId && "cursor" in job.args);
         const chains = chainJobs();
 
         expect(chains).toHaveLength(1);
