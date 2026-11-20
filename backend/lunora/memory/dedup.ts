@@ -226,6 +226,80 @@ export const findSimilarMemoryByJaccard = (newFact: string, existingMemories: Re
     return bestMatch;
 };
 
+/** Score from which a near-match is the same fact stated again: it is confirmed, never revised. */
+const DUPLICATE_SCORE = 0.95;
+
+/** A belief revision's answer, as `runBeliefRevision` returns it. */
+export interface BeliefRevisionAnswer {
+    action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE";
+    mergedMemory?: string;
+}
+
+/**
+ * What to do with a fact, given its near-match: save it as new (`ADD`), confirm the match (`IGNORE`), save it in the
+ * match's place (`SUPERSEDE`), or reword the match (`UPDATE`, with the caller's accepted merge). `failed` marks an `ADD`
+ * that a revision error forced.
+ */
+export type FactDecision<Merge> =
+    | { action: "ADD"; failed?: true }
+    | { action: "IGNORE" | "SUPERSEDE"; similar: SimilarMemoryResult }
+    | { action: "UPDATE"; merge: Merge; similar: SimilarMemoryResult };
+
+/**
+ * The per-fact decision extraction and the import share. No match saves the fact as new; a near-exact match
+ * (`DUPLICATE_SCORE`) confirms it; a pinned match is never revised, and neither is one without a `revise` (no model,
+ * or the caller's budget spent), so the fact is saved beside it. Otherwise belief revision decides. An `UPDATE`
+ * applies only with merged text that `acceptMerge` takes (redacted, held to the caller's rules); without one, or
+ * when the revision fails, the fact is saved as new, so no fact is lost.
+ */
+export const decideFact = async <Merge>(
+    similar: SimilarMemoryResult | null,
+    options: {
+        acceptMerge: (mergedMemory: string) => Merge | undefined;
+        logPrefix: string;
+        revise: ((existingMemory: string) => Promise<BeliefRevisionAnswer>) | undefined;
+    },
+): Promise<FactDecision<Merge>> => {
+    if (!similar) {
+        return { action: "ADD" };
+    }
+
+    if (similar.score >= DUPLICATE_SCORE) {
+        return { action: "IGNORE", similar };
+    }
+
+    if (similar.pinned || !options.revise) {
+        return { action: "ADD" };
+    }
+
+    let revision: BeliefRevisionAnswer;
+
+    try {
+        revision = await options.revise(similar.memory);
+    } catch (error) {
+        console.error(`${options.logPrefix} Belief revision failed, saving as new:`, error);
+
+        return { action: "ADD", failed: true };
+    }
+
+    switch (revision.action) {
+        case "IGNORE":
+        case "SUPERSEDE": {
+            return { action: revision.action, similar };
+        }
+
+        case "UPDATE": {
+            const merge = revision.mergedMemory ? options.acceptMerge(revision.mergedMemory) : undefined;
+
+            return merge === undefined ? { action: "ADD" } : { action: "UPDATE", merge, similar };
+        }
+
+        default: {
+            return { action: "ADD" };
+        }
+    }
+};
+
 /** A vector a row should be linked to, with the text it was computed from. */
 export interface MemoryVectorLink {
     embeddingId: string;

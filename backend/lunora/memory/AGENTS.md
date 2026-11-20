@@ -35,6 +35,9 @@
   belief revisions (1 each) share one budget per save (`IMPORT_DEDUP_CALL_BUDGET`), so a whole save stays under the
   Free plan's 50 subrequests; `import.test.ts` counts a worst-case save. The 1000-row window is widened to 5000 rows
   once, the first time a fact must be matched by words.
+- **One decision per fact** for extraction and the import: `decideFact` (`dedup.ts`) confirms a match at 0.95 or more,
+  never revises a pinned one, and saves the fact as new when a revision fails, is refused or carries no merged text.
+  Callers keep their own match setup (windows, budgets) and writes, and pass their merge rules as `acceptMerge`.
 - **Extraction** never revises a pinned row (a near-match is saved beside it). Its write runs in order: revisions
   (`reviseExtractedMemory`, which re-embeds in the same write and applies only while the row reads as the decided
   text), then confirmations (`confirmMemories`, same check), then ONE save of every new memory, with the fallbacks
