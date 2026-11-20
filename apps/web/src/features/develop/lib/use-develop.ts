@@ -125,6 +125,25 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
 };
 
 /**
+ * What stands between one linked pull request and its merge (failing checks, a conflict, requested changes), for the
+ * chat header. Keyed by account and pull request, so every thread linked to it shares one read; a few minutes stale,
+ * never live and never on focus, so showing a thread does not cost a host call per render.
+ */
+export const usePullRequestStatus = (address: PullRequestAddress | undefined) => {
+    const client = useLunora();
+    const userId = useDevelopUser();
+    const options = createLunoraActionQueryOptions(client, api.source_control.pr_status.getPullRequestStatus, address as PullRequestAddress);
+
+    return useQuery({
+        ...READ,
+        ...options,
+        enabled: address !== undefined && userId !== undefined,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address],
+        staleTime: 5 * MINUTE_MS,
+    });
+};
+
+/**
  * The threads working on one pull request: the one started from here and the ones a coding agent opened it from. Our
  * own rows, not the host's, so this one is live — a run that opens a pull request shows up while the page is open.
  */
