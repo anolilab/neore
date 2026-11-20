@@ -23,7 +23,8 @@
 - The legacy `context` text reads as the first `always` file (`projectRuleFiles`) everywhere: runs, the editor and
   the export. `defineMigration` does not reach `.global()` rows, so nothing rewrites it in bulk: the first
   `setProjectRuleFiles` saves it into the list, marked carried (`carriedContext`, its fingerprint), then clears
-  `context` while it is still that text; a `context` matching the mark is never read a second time if the clear fails; an unchanged one longer
+  `context` while it is still that text; a `context` matching the mark (a failed clear, or the same text written again) is read nowhere, never named
+  `legacyContextId` (`isLegacyContextFile`), and cleared by the next save; an unchanged one longer
   than a rule file may be stays in `context` (`keepContext`); a file sent under its id that differs from it is saved and
   the `context` cleared, never dropped. A project with only a `context` gives a run exactly that text; keep that true
   when changing the rendering.

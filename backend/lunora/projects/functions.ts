@@ -35,7 +35,7 @@ import { projectRowsReadBytes } from "./project-row";
 import { readProjectRuleFiles, ruleFileRow, ruleFilesOf, writeProjectRuleFiles } from "./rule-file-rows";
 import {
     contextFingerprint,
-    isCarriedContext,
+    isLegacyContextFile,
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
     MAX_RULE_GLOB_LENGTH,
@@ -356,11 +356,14 @@ export const listProjectRuleFiles = authQuery
         }
 
         const files = await readProjectRuleFiles(context, project, { primary: true });
+        // Only a `context` the list reads as its own file: one matching `carriedContext` is in the list already, or was
+        // deleted from it, and the next save clears it.
+        const legacy = files.find((file) => isLegacyContextFile(file));
 
         return {
             canEdit: mayEditProject(project, userId),
             files,
-            ...(project.context && { legacyContextId: files[0]!.id }),
+            ...(legacy && { legacyContextId: legacy.id }),
             revision: ruleFilesRevision(files),
         };
     });
@@ -432,8 +435,7 @@ export const setProjectRuleFiles = authMutation
         // id. Kept, a file sent under that id is that file again, left out of the list, unless it was changed. A changed
         // one is saved as an ordinary file, held to its limits, and the `context` cleared, so a change is never reported
         // saved while the old text stays.
-        const pendingContext = project.context && !isCarriedContext(project.context, row?.carriedContext) ? project.context : undefined;
-        const legacy = keepContext && pendingContext ? current[0] : undefined;
+        const legacy = keepContext ? current.find((file) => isLegacyContextFile(file)) : undefined;
         const sent = legacy && ruleFiles.find((file) => file.id === legacy.id);
         const kept = legacy && (!sent || ruleFilesRevision([sent]) === ruleFilesRevision([legacy])) ? legacy.id : undefined;
         const normalized = normalizeRuleFiles(kept ? ruleFiles.filter((file) => file.id !== kept) : ruleFiles);

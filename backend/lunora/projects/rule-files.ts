@@ -45,6 +45,12 @@ const TRUNCATED_NOTE = "\n[…truncated]";
 const LEGACY_CONTEXT_FILES = new WeakSet<RuleFile>();
 
 /**
+ * Whether {@link projectRuleFiles} made `file` from a legacy `context` it read: the one decision the editor's
+ * `legacyContextId` and a run's whole-text rule come from, so a `context` it left out as carried is never named.
+ */
+export const isLegacyContextFile = (file: RuleFile): boolean => LEGACY_CONTEXT_FILES.has(file);
+
+/**
  * The project's rule files in order: a legacy `context` first, as an `always` file, then the saved list. A project
  * whose rule files were saved has no `context` left, unless a client that still writes it set it again since, or the
  * save that carried it into the list failed to clear it: `carriedContext` is that save's {@link contextFingerprint}, and
@@ -234,7 +240,7 @@ export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: Ru
         const blank = file.content.trim().length === 0;
 
         // A blank file renders nothing (`renderRuleFiles`), so it costs nothing.
-        if (LEGACY_CONTEXT_FILES.has(file) || blank) {
+        if (isLegacyContextFile(file) || blank) {
             selected.push(file);
             started ||= !blank;
             continue;

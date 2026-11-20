@@ -40,7 +40,7 @@ import {
 } from "./gdpr";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL } from "./repositories";
 import { readProjectRuleFiles, ruleFileRow, writeProjectRuleFiles } from "./rule-file-rows";
-import { MAX_RULE_TEXT_PER_RUN } from "./rule-files";
+import { contextFingerprint, MAX_RULE_TEXT_PER_RUN } from "./rule-files";
 
 const OWNER = "user-owner";
 const MEMBER = "user-member";
@@ -538,6 +538,34 @@ describe("changing a project's rule files", () => {
 
         await expect(row(projectId)).resolves.not.toHaveProperty("context");
         expect(await contextFor(projectId)).toBe("Old notes");
+    });
+
+    it("names no legacy file for a carried context, the list empty or not, and the next save clears it", async () => {
+        const context = "Old notes";
+        const fingerprinted = { carriedContext: contextFingerprint(context), updatedAt: 0, userId: OWNER, version: 1 };
+        // The owner deleted the carried file and saved; a client that still writes `context` wrote the same text again.
+        const emptied = await insert("projects", { context, createdAt: 0, title: "emptied", userId: OWNER });
+        // The list holds the carried text as an ordinary file, after another one.
+        const kept = await insert("projects", { context, createdAt: 0, title: "kept", userId: OWNER });
+        const carriedFile = { content: context, id: "context", mode: "always" as const, title: "Project context" };
+
+        await insert("projectRuleFiles", { ...fingerprinted, files: [], projectId: emptied });
+        await insert("projectRuleFiles", { ...fingerprinted, files: [sqlRules, carriedFile], projectId: kept });
+
+        const listedEmpty = await list(OWNER, emptied);
+
+        expect(listedEmpty).toMatchObject({ canEdit: true, files: [] });
+        expect(listedEmpty).not.toHaveProperty("legacyContextId");
+
+        const listedKept = await list(OWNER, kept);
+
+        expect(listedKept!.files.map((file) => file.id)).toStrictEqual(["sql", "context"]);
+        expect(listedKept).not.toHaveProperty("legacyContextId");
+
+        await save(OWNER, emptied, []);
+
+        await expect(row(emptied)).resolves.not.toHaveProperty("context");
+        expect(await contextFor(emptied)).toBeNull();
     });
 
     it("keeps a context written after the save's check instead of clearing it unsaved", async () => {
