@@ -255,8 +255,9 @@ desktop). The `headless` feature links the keyring and an HTTPS client; the buil
   at load. The keychain account is `<length of backend>:<backend>|<device id>`.
 - **Commands.** `pair` opens no listener. `run` only decides which signed calls are for this device
   (`envelope::verify_call`, nonces persisted, a damaged history refuses to start) over its own stdin. `pair`, `run`
-  and `unpair` take one lock on the folder; `unpair` asks first (`--yes`, `--dry-run`), removes the keychain entry
-  before the record, and is refused while `run` holds the pairing.
+  and `unpair` take one lock on the folder; `unpair` asks first (`--yes`, `--dry-run`) without holding the lock,
+  then removes the keychain entry, the record and the used-nonce history, and is refused while `run` holds the
+  pairing.
 - **Exit codes of `pair`.** 0 paired, 2 usage, 3 denied, 4 expired, 5 code invalid or used, 6 refused, 7 backend
   unreachable (worth retrying), 8 possibly registered or not stored, 1 other (among them a machine
   with nowhere private to keep the secret, which asks for no code).

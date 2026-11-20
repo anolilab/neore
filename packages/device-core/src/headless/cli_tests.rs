@@ -101,8 +101,13 @@ fn unpair_is_refused_while_a_run_holds_the_pairing_and_nothing_is_asked() {
         "no terminal, no yes"
     );
     assert!(dir.join("host.json").exists());
+
+    // The history kept for this pairing goes with it, so a damaged one cannot stop the next pairing's `run`.
+    std::fs::write(dir.join(NONCE_FILE), "{ damaged").unwrap();
+
     assert_eq!(format!("{:?}", unpair(&vault, true)), success);
     assert!(!dir.join("host.json").exists());
+    assert!(!dir.join(NONCE_FILE).exists());
     assert!(keychain.entries.borrow().is_empty());
 }
 

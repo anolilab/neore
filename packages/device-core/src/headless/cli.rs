@@ -2,12 +2,16 @@
 //! [`serve`](super::serve) and [`vault`](super::vault). Nothing here opens a listener.
 
 use std::io;
+use std::path::Path;
 use std::process::ExitCode;
 
 use super::http::UreqHttp;
 use super::pair::{self, Identity, SystemTimer, Timer};
 use super::serve::{RunLock, Service};
 use super::vault::{default_dir, OsKeychain, Vault};
+
+/// The used-nonce history `run` keeps beside the pairing.
+const NONCE_FILE: &str = "nonces.json";
 
 pub const USAGE: &str = "usage:
   neore-host pair --backend <https-origin> [--name <machine name>]   show a code to approve in the web app
@@ -235,7 +239,7 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
             let mut service = match Service::new(
                 &loaded.record.device_id,
                 &loaded.secret,
-                &vault.dir().join("nonces.json"),
+                &vault.dir().join(NONCE_FILE),
                 timer.now_ms(),
             ) {
                 Ok(service) => service,
@@ -323,42 +327,75 @@ fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
     }
 }
 
+fn hold_unless_running(vault: &Vault<'_>) -> Option<RunLock> {
+    let lock = RunLock::acquire(vault.dir()).ok();
+
+    if lock.is_none() {
+        eprintln!("neore-host: `neore-host run` is using this pairing; stop it first, then unpair");
+    }
+
+    lock
+}
+
 /// Erases the local credential only after a yes: `--yes`, or an answer at a terminal. Refused while `run` holds the
 /// pairing, whose copy of the secret would go on accepting calls.
 fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
-    let _lock = match RunLock::acquire(vault.dir()) {
-        Ok(lock) => lock,
-        Err(_) => {
-            eprintln!(
-                "neore-host: `neore-host run` is using this pairing; stop it first, then unpair"
-            );
-
-            return ExitCode::FAILURE;
-        }
+    let Some(mut lock) = hold_unless_running(vault) else {
+        return ExitCode::FAILURE;
     };
 
     // Nothing paired is already the state `unpair` aims for, so it is a success, not a failure, and asks nothing.
-    match vault.record() {
+    let asked_about = match vault.record() {
         Ok(None) => {
             println!("This machine holds no pairing. Nothing to remove.");
 
             return ExitCode::SUCCESS;
         }
-        Ok(Some(_)) => {}
+        Ok(Some(record)) => record,
         Err(error) => {
             eprintln!("neore-host: {error}");
 
             return ExitCode::FAILURE;
         }
+    };
+
+    if !confirmed {
+        // The question may stay open for as long as the person likes, so `run` is not shut out while it does. The lock
+        // is taken again for the removal, and only the pairing that was asked about is removed.
+        drop(lock);
+
+        if !confirmed_at_terminal(vault) {
+            eprintln!("neore-host: nothing was removed. Run `neore-host unpair --yes` to confirm, or `--dry-run` to see what it would remove.");
+
+            return ExitCode::FAILURE;
+        }
+
+        let Some(again) = hold_unless_running(vault) else {
+            return ExitCode::FAILURE;
+        };
+
+        lock = again;
+
+        match vault.record() {
+            Ok(Some(record)) if record == asked_about => {}
+            Ok(_) => {
+                eprintln!("neore-host: the pairing changed while the question was open; nothing was removed");
+
+                return ExitCode::FAILURE;
+            }
+            Err(error) => {
+                eprintln!("neore-host: {error}");
+
+                return ExitCode::FAILURE;
+            }
+        }
     }
 
-    if !confirmed && !confirmed_at_terminal(vault) {
-        eprintln!("neore-host: nothing was removed. Run `neore-host unpair --yes` to confirm, or `--dry-run` to see what it would remove.");
+    let outcome = vault.forget().and_then(|()| forget_nonces(vault.dir()));
 
-        return ExitCode::FAILURE;
-    }
+    drop(lock);
 
-    match vault.forget() {
+    match outcome {
         Ok(()) => {
             println!("This machine no longer holds a pairing. Remove the device in the web app (Settings, Devices) to end it there.");
 
@@ -369,6 +406,21 @@ fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
 
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The used-nonce history belongs to the pairing it was kept for. After the pairing is gone it protects nothing (the
+/// old secret is erased), and a damaged one would stop the next pairing's `run` from starting.
+fn forget_nonces(dir: &Path) -> Result<(), String> {
+    let path = dir.join(NONCE_FILE);
+
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "the pairing was removed, but its call history {} could not be: {error}. Remove it before pairing again.",
+            path.display()
+        )),
     }
 }
 
