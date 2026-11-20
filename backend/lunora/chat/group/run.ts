@@ -658,6 +658,8 @@ const loadTurnContext = async (
         baseModel: string;
         config: GroupRunConfig;
         customSystemPrompt?: string;
+        /** The files the user's message attaches: the project's rule files applied by pattern match their names. */
+        fileIds?: string[];
         isAnonymous: boolean;
         mcpServerNames?: string[];
         messageReasoningEffort?: number;
@@ -691,6 +693,7 @@ const loadTurnContext = async (
     const runContext = await loadRunContext(ctx, {
         admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
+        fileIds: args.fileIds,
         promptText: args.promptText,
         researchDepth: args.researchDepth,
         threadId,
@@ -747,6 +750,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         baseModel: streamingConfig.model,
         config,
         customSystemPrompt: streamingConfig.customSystemPrompt,
+        fileIds: message?.fileIds,
         isAnonymous: input.isAnonymous,
         mcpServerNames: streamingConfig.mcpServerNames,
         messageReasoningEffort: streamingConfig.reasoningEffort,

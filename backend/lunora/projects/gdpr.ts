@@ -16,6 +16,7 @@ import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
 import { DELETION_MARKER_URL, isRepoRow } from "./repositories";
+import { projectRuleFiles, type RuleFile } from "./rule-files";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
@@ -312,4 +313,49 @@ export const collectOwnedProjectsForExport = internalQuery
         });
 
         return { cursor: result.isDone ? null : result.continueCursor, projects, readBytes };
+    });
+
+/**
+ * The rule files of up to {@link PROJECTS_PER_DETAILS_READ} of the user's projects for the export, a legacy `context`
+ * first (`projectRuleFiles`), and what reading them cost. A separate read from the projects' page, which never reads
+ * these heavy columns, so the export can leave them out past its budget (`attachProjectRuleFiles`) and keep the rest.
+ */
+export const collectProjectRuleFilesForExport = internalQuery
+    .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            projects: v.array(
+                v.object({
+                    projectId: v.string(),
+                    ruleFiles: v.array(
+                        v.object({
+                            content: v.string(),
+                            globs: v.optional(v.array(v.string())),
+                            id: v.string(),
+                            mode: v.union(v.literal("always"), v.literal("glob")),
+                            title: v.string(),
+                        }),
+                    ),
+                }),
+            ),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { projectIds, userId }, ctx }) => {
+        const { page } = await ctx.db.projects.findMany({
+            consistency: "primary",
+            select: ["context", "ruleFiles", "userId"] as const,
+            where: { _id: { in: projectIds } },
+        });
+        // The typed `select` result is a union of one-column picks, which the reads below do not fit.
+        const rows = page as unknown as { _id: string; context?: string; ruleFiles?: RuleFile[]; userId?: string }[];
+        const readBytes = rows.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        const projects = rows
+            .filter((row) => row.userId === userId)
+            .map((row) => {
+                return { projectId: row._id, ruleFiles: projectRuleFiles(row) };
+            })
+            .filter((project) => project.ruleFiles.length > 0);
+
+        return { projects, readBytes };
     });

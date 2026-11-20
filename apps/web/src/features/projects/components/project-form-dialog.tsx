@@ -22,6 +22,7 @@ import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import ProjectKnowledgeCollections from "@/features/knowledge/components/project-knowledge-collections";
 import ProjectRepositories from "@/features/projects/components/project-repositories";
+import ProjectRuleFiles from "@/features/projects/components/project-rule-files";
 import ProjectUsageSummary from "@/features/projects/components/project-usage-summary";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -95,7 +96,8 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                     // (including `organizationId`, which this dialog never edits) must be present.
                     const patch = {
                         color: value.color ?? "", // "" clears the colour on the backend
-                        context: value.context.trim() || undefined,
+                        // An existing project's instructions are its rule files, saved by their own section below.
+                        context: undefined,
                         defaultEnabledFeatures: value.defaultEnabledFeatures.length > 0 ? value.defaultEnabledFeatures : undefined,
                         defaultModel: value.defaultModel || undefined,
                         defaultReasoningEffort: value.defaultReasoningEffort,
@@ -313,29 +315,32 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                     </div>
                                 </div>
 
-                                <form.AppField name="context">
-                                    {(field) => (
-                                        <field.FormItem>
-                                            <field.FormLabel>{t`Context / Instructions`}</field.FormLabel>
-                                            <field.FormControl>
-                                                <Textarea
-                                                    autoComplete="off"
-                                                    expandable
-                                                    expandableDialogTitle={t`Project Context`}
-                                                    name="project-context"
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => field.handleChange(e.target.value)}
-                                                    placeholder={t`This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge.`}
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
-                                            <field.FormDescription>
-                                                {t`This context will be prepended to the system prompt for all chats in this project.`}
-                                            </field.FormDescription>
-                                            <field.FormMessage />
-                                        </field.FormItem>
-                                    )}
-                                </form.AppField>
+                                {/* A new project starts with one text; once saved, its instructions are edited as rule files. */}
+                                {!editingProject && (
+                                    <form.AppField name="context">
+                                        {(field) => (
+                                            <field.FormItem>
+                                                <field.FormLabel>{t`Context / Instructions`}</field.FormLabel>
+                                                <field.FormControl>
+                                                    <Textarea
+                                                        autoComplete="off"
+                                                        expandable
+                                                        expandableDialogTitle={t`Project Context`}
+                                                        name="project-context"
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => field.handleChange(e.target.value)}
+                                                        placeholder={t`This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge.`}
+                                                        value={field.state.value}
+                                                    />
+                                                </field.FormControl>
+                                                <field.FormDescription>
+                                                    {t`This context will be prepended to the system prompt for all chats in this project.`}
+                                                </field.FormDescription>
+                                                <field.FormMessage />
+                                            </field.FormItem>
+                                        )}
+                                    </form.AppField>
+                                )}
                             </div>
 
                             <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
@@ -385,6 +390,8 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                 </div>
                             </div>
                             {/* Links, saved as they change — only a saved project has an id to link to. */}
+                            {/* Keyed: an unsaved draft for one project never stays for the next one edited. */}
+                            {editingProject && <ProjectRuleFiles key={editingProject._id} projectId={editingProject._id} />}
                             {editingProject && <ProjectKnowledgeCollections projectId={editingProject._id} />}
                             {editingProject && <ProjectUsageSummary projectId={editingProject._id} />}
                             {/* Keyed: a draft typed for one project never stays for the next one edited. */}

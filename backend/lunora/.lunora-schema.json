@@ -21753,6 +21753,72 @@
           "optional": true,
           "unique": false
         },
+        "ruleFiles": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "content": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "globs": {
+                "kind": "array",
+                "nullable": false,
+                "optional": true,
+                "unique": false,
+                "of": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false
+                }
+              },
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "mode": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"always\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"glob\""
+                  }
+                ]
+              },
+              "title": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
         "title": {
           "kind": "string",
           "nullable": false,

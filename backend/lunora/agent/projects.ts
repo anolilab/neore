@@ -2,7 +2,7 @@
  * Project operations.
  * Migrated from `@neore/backend-agent` component.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx, type QueryCtx } from "../_generated/server";
@@ -26,6 +26,7 @@ import { changeRefcount } from "./files";
 import { listThreadItem } from "./threads";
 import { eraseProjectRepositories } from "../projects/gdpr";
 import { forViewer } from "../projects/machine-location";
+import { projectRuleFiles, ruleFilesRevision } from "../projects/rule-files";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -237,6 +238,7 @@ export const projectFieldsSupportingPatch = [
     "galleryViewCount" as const,
     "galleryPublishedAt" as const,
     "forkedFromId" as const,
+    "ruleFiles" as const,
 ] as const;
 
 export type ProjectFieldsSupportingPatch = (typeof projectFieldsSupportingPatch)[number];
@@ -245,17 +247,25 @@ export const updateProject = internalMutation
     .input({
         patch: v.object({ ...vProjectPatchFields }),
         projectId: v.id("projects"),
+        /** When set, the rule files' revision the change was made from (`ruleFilesRevision`); another one is refused. */
+        ruleFilesRevision: v.optional(v.string()),
     })
     .output(v.from(vProjectDocument))
     .mutation(async ({ args, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: args.projectId } });
 
         assert(project, `Project ${args.projectId} not found`);
-        // Absent keys stay as they are; an empty colour or icon is the client's
-        // way of saying "remove it", which `patchRow` does for an `undefined`.
+
+        // Read and written in this one transaction: a save from a view older than another save is refused, never applied over it.
+        if (args.ruleFilesRevision !== undefined && args.ruleFilesRevision !== ruleFilesRevision(projectRuleFiles(project))) {
+            throw new LunoraError("CONFLICT", "The rule files were changed meanwhile. Reload them and save again.");
+        }
+
+        // Absent keys stay as they are; an empty colour, icon or context is the
+        // client's way of saying "remove it", which `patchRow` does for an `undefined`.
         const changes: Record<string, unknown> = { ...withoutUndefined(args.patch), updatedAt: ctx.now };
 
-        for (const key of ["color", "icon"] as const) {
+        for (const key of ["color", "context", "icon"] as const) {
             if (args.patch[key] === "") {
                 changes[key] = undefined;
             }

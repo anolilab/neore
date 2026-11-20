@@ -24,6 +24,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
+import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
 import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
 import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 import type { MessageDoc } from "../../agent/validators";
@@ -485,6 +486,8 @@ export const loadRunContext = async (
         /** Set only by a caller whose run was admitted by the stream gate: a locked chat's knowledge scope is empty without it. */
         admittedRun?: boolean;
         customSystemPrompt?: string;
+        /** The files the run's message attaches: the project's rule files applied by pattern match their names. */
+        fileIds?: string[];
         promptText?: string;
         researchDepth?: string;
         threadId: string;
@@ -527,7 +530,11 @@ export const loadRunContext = async (
         retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
             settings?.projectId
-                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: settings.projectId as Id<"projects">, userId })
+                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, {
+                      ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds.slice(0, MAX_ATTACHED_FILES) as Id<"chatFiles">[] }),
+                      projectId: settings.projectId as Id<"projects">,
+                      userId,
+                  })
                 : null,
         ),
         botPromise,

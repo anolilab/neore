@@ -6,7 +6,7 @@ import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
-import { collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
+import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
 import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
 import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
@@ -625,6 +625,19 @@ export const generateExportFile = internalAction
         const triggerReadBytes = triggerReadBudget(
             earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes,
         );
+        // The projects' rule files, read last within what everything above, the triggers' whole budget included, leaves.
+        const ownedWithRules = await attachProjectRuleFiles(
+            // Each is an object `collectOwnedProjectsForExport` returned.
+            ownedProjects.projects as object[],
+            async (projectIds) =>
+                await context.runQuery(internal.projects.gdpr.collectProjectRuleFilesForExport, {
+                    projectIds: projectIds as Id<"projects">[],
+                    userId: args.userId,
+                }),
+            projectDetailsReadBudget(
+                earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes + triggerReadBytes,
+            ),
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -646,7 +659,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             projectRepositories,
-            projects: ownedProjects.projects,
+            projects: ownedWithRules.projects,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },

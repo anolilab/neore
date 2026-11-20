@@ -2172,6 +2172,18 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // The owner's instructions for the project's runs, in order (`projects/rule-files.ts`); `context` is the older single text.
+        ruleFiles: v.optional(
+            v.array(
+                v.object({
+                    content: v.string(),
+                    globs: v.optional(v.array(v.string())),
+                    id: v.string(),
+                    mode: v.union(v.literal("always"), v.literal("glob")),
+                    title: v.string(),
+                }),
+            ),
+        ),
         title: v.string(),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),

@@ -8,6 +8,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { requireOwnedThread } from "../agent/thread-read-access";
+import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
 import { isUniqueViolation, throwForbidden } from "../lib/error-helpers";
@@ -28,6 +29,19 @@ import {
     withDefault,
 } from "./repositories";
 import { forViewer, resolveProjectLocation } from "./machine-location";
+import {
+    MAX_RULE_FILE_LENGTH,
+    MAX_RULE_FILES,
+    MAX_RULE_GLOB_LENGTH,
+    MAX_RULE_GLOBS,
+    MAX_RULE_ID_LENGTH,
+    MAX_RULE_TITLE_LENGTH,
+    normalizeRuleFiles,
+    projectRuleFiles,
+    renderRuleFiles,
+    ruleFilesRevision,
+    selectRuleFiles,
+} from "./rule-files";
 
 /** Whether `userId` is a current member of an organization. */
 type MembershipCheck = (organizationId: string) => Promise<boolean>;
@@ -185,14 +199,138 @@ export const writableProject = async (context: QueryCtx | MutationCtx, projectId
     return project && (!project.userId || project.userId === userId) ? project : null;
 };
 
-/** A project's `context` text for a run on behalf of `userId`, under the same access rule as `createThread` (owner or organization member). */
+/** File names read for one run's pattern match, at most: a message attaches no more (`MAX_ATTACHED_FILES`). */
+const MAX_RUN_FILE_IDS = MAX_ATTACHED_FILES;
+
+/**
+ * A project's instructions for a run on behalf of `userId`, under the same access rule as `createThread` (owner or
+ * organization member): its `always` rule files, and its `glob` files that match the names of `fileIds`, the files the
+ * run's message attaches. Its legacy `context` is the first `always` file, so a project without rule files gives
+ * exactly its `context`. Within the per-run budget (`selectRuleFiles`); only counts are logged, never text.
+ */
 export const getProjectContextForRun = internalQuery
-    .input({ projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_RUN_FILE_IDS)), projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
-    .query(async ({ args: { projectId, userId }, ctx: context }) => {
+    .query(async ({ args: { fileIds, projectId, userId }, ctx: context }) => {
         const project = await readableProject(context, projectId, userId);
 
-        return project?.context ?? null;
+        if (!project) {
+            return null;
+        }
+
+        const files = projectRuleFiles(project);
+        let paths: string[] = [];
+
+        // The names are read only when a file could match one: the rows also hold the files' extracted text, which is not selected.
+        if (fileIds && fileIds.length > 0 && files.some((file) => file.mode === "glob")) {
+            const { page } = await context.db.chatFiles.findMany({ select: ["filename"] as const, where: { _id: { in: fileIds } } });
+
+            paths = (page as unknown as { filename?: string }[]).flatMap((row) => (row.filename ? [row.filename] : []));
+        }
+
+        const selected = selectRuleFiles(files, paths);
+
+        if (selected.omitted > 0 || selected.truncated || selected.matchingCut) {
+            context.log.event("projects.rule_files_over_budget", {
+                matchingCut: selected.matchingCut,
+                omitted: selected.omitted,
+                projectId,
+                truncated: selected.truncated,
+            });
+        }
+
+        return renderRuleFiles(selected.files);
+    });
+
+/**
+ * A project's rule files for its settings, a legacy `context` first (`projectRuleFiles`), and whether the caller may
+ * change them: the rule of `updateProject`, its owner, or any reader of a project nobody owns.
+ */
+export const listProjectRuleFiles = authQuery
+    .input({ projectId: v.id("projects") })
+    .output(
+        v.union(
+            v.null(),
+            v.object({
+                canEdit: v.boolean(),
+                files: v.array(
+                    v.object({
+                        content: v.string(),
+                        globs: v.optional(v.array(v.string())),
+                        id: v.string(),
+                        mode: v.union(v.literal("always"), v.literal("glob")),
+                        title: v.string(),
+                    }),
+                ),
+                revision: v.string(),
+            }),
+        ),
+    )
+    .query(async ({ args: { projectId }, ctx: context }) => {
+        const { userId } = context.user;
+        const project = await readableProject(context, projectId, userId);
+
+        if (!project) {
+            return null;
+        }
+
+        const files = projectRuleFiles(project);
+
+        return { canEdit: !project.userId || project.userId === userId, files, revision: ruleFilesRevision(files) };
+    });
+
+/**
+ * Replaces a project's rule files with `ruleFiles`, in their order: adding, editing, reordering and deleting are one
+ * save of the whole list. The legacy `context` is cleared in the same write, as the list carries it from now on. Who
+ * may: the rule of `updateProject`, decided on the primary. `revision` is the one `listProjectRuleFiles` gave with the
+ * list the editor started from; a list changed since is refused (CONFLICT) in the transaction that writes.
+ */
+export const setProjectRuleFiles = authMutation
+    .use(rateLimit("projects/update"))
+    // Spelled inline: codegen cannot read a const reference (`backend/AGENTS.md`).
+    .input({
+        projectId: v.id("projects"),
+        revision: v.string().max(MAX_LENGTH.short),
+        ruleFiles: v
+            .array(
+                v.object({
+                    content: v.string().max(MAX_RULE_FILE_LENGTH),
+                    globs: v.optional(v.array(v.string().max(MAX_RULE_GLOB_LENGTH)).max(MAX_RULE_GLOBS)),
+                    id: v.string().max(MAX_RULE_ID_LENGTH),
+                    mode: v.union(v.literal("always"), v.literal("glob")),
+                    title: v.string().max(MAX_RULE_TITLE_LENGTH),
+                }),
+            )
+            .max(MAX_RULE_FILES),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { projectId, revision, ruleFiles }, ctx: context }) => {
+        const { userId } = context.user;
+        const project = await readableProject(context, projectId, userId, { primary: true });
+
+        if (!project) {
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
+
+        if (project.userId && project.userId !== userId) {
+            throwForbidden("Cannot update another user's project");
+        }
+
+        const normalized = normalizeRuleFiles(ruleFiles);
+
+        await context.runMutation(internal.agent.projects.updateProject, {
+            patch: { context: "", ruleFiles: normalized },
+            projectId,
+            ruleFilesRevision: revision,
+        });
+
+        context.log.event("projects.set_rule_files", {
+            globFiles: normalized.filter((file) => file.mode === "glob").length,
+            projectId,
+            ruleFiles: normalized.length,
+        });
+
+        return null;
     });
 
 export const getProject = authQuery

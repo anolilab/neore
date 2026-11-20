@@ -142,3 +142,61 @@ export const collectAllOwnedProjects = async (
 
     return { projects, readBytes };
 };
+
+/** What `collectProjectRuleFilesForExport` gives back for up to {@link PROJECTS_PER_DETAILS_READ} projects. */
+interface RuleFilesPage {
+    projects: { projectId: string; ruleFiles: unknown[] }[];
+    readBytes: number;
+}
+
+/**
+ * The user's projects from {@link collectAllOwnedProjects}, each with its rule files (`ruleFiles`), read
+ * {@link PROJECTS_PER_DETAILS_READ} projects to a query. Once the reads reach `maxBytes` the remaining projects' files are
+ * not read and the project says so (`ruleFilesOmitted: true`); the export still completes. A project without rule files
+ * is left as it is.
+ */
+export const attachProjectRuleFiles = async (
+    projects: object[],
+    readRuleFiles: (projectIds: string[]) => Promise<RuleFilesPage>,
+    maxBytes: number,
+): Promise<{ projects: object[]; readBytes: number }> => {
+    const projectIds = projects.map((project) => (project as { projectId: string }).projectId);
+    const ruleFiles = new Map<string, unknown[]>();
+    const omitted = new Set<string>();
+    let readBytes = 0;
+
+    for (let index = 0; index < projectIds.length; index += PROJECTS_PER_DETAILS_READ) {
+        const batch = projectIds.slice(index, index + PROJECTS_PER_DETAILS_READ);
+
+        if (readBytes >= maxBytes) {
+            for (const projectId of batch) {
+                omitted.add(projectId);
+            }
+
+            continue;
+        }
+
+        const page = await readRuleFiles(batch);
+
+        readBytes += page.readBytes;
+
+        for (const project of page.projects) {
+            ruleFiles.set(project.projectId, project.ruleFiles);
+        }
+    }
+
+    return {
+        projects: projects.map((project) => {
+            const { projectId } = project as { projectId: string };
+
+            if (omitted.has(projectId)) {
+                return { ...project, ruleFilesOmitted: true };
+            }
+
+            const files = ruleFiles.get(projectId);
+
+            return files ? { ...project, ruleFiles: files } : project;
+        }),
+        readBytes,
+    };
+};

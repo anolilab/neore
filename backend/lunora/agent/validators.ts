@@ -885,6 +885,17 @@ export const vProjectCreateFields = {
     // Workflow fields
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
     publicAccessToken: v.optional(v.string()),
+    ruleFiles: v.optional(
+        v.array(
+            v.object({
+                content: v.string(),
+                globs: v.optional(v.array(v.string())),
+                id: v.string(),
+                mode: v.union(v.literal("always"), v.literal("glob")),
+                title: v.string(),
+            }),
+        ),
+    ),
     title: v.string(),
     userId: v.optional(v.string()),
     workflowContent: v.optional(vWorkflowContent),
@@ -920,6 +931,17 @@ export const vProjectPatchFields = {
     organizationId: v.optional(v.string()),
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
     publicAccessToken: v.optional(v.string()),
+    ruleFiles: v.optional(
+        v.array(
+            v.object({
+                content: v.string(),
+                globs: v.optional(v.array(v.string())),
+                id: v.string(),
+                mode: v.union(v.literal("always"), v.literal("glob")),
+                title: v.string(),
+            }),
+        ),
+    ),
     title: v.optional(v.string()),
     workflowContent: v.optional(vWorkflowContent),
 };

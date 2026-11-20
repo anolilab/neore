@@ -6,8 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { collectAllOwnedProjects, collectAllRepositories } from "./export-pages";
-import { collectOwnedProjectsForExport, collectProjectDetailsForExport, collectProjectRepositoriesForExport } from "./gdpr";
+import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "./export-pages";
+import { collectOwnedProjectsForExport, collectProjectDetailsForExport, collectProjectRepositoriesForExport, collectProjectRuleFilesForExport } from "./gdpr";
 
 const A = "user-a";
 const SHARE_TOKENS = /share-token|old-token/u;
@@ -230,5 +230,56 @@ describe("owned projects in the GDPR export", () => {
 
         expect(readBytes).toBeLessThan(4096);
         expect(projects).toEqual([expect.not.objectContaining({ detailsOmitted: true })]);
+    });
+});
+
+describe("project rule files in the GDPR export", () => {
+    const sql = { content: "Use snake_case.", globs: ["**/*.sql"], id: "sql", mode: "glob", title: "SQL" };
+    const withRules = async (projects: { projectId: string }[], maxBytes = Infinity) =>
+        await attachProjectRuleFiles(
+            projects,
+            async (projectIds) =>
+                await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport, { projectIds, userId: A })) as never),
+            maxBytes,
+        );
+
+    it("exports each of the user's projects' rule files, a legacy context first, never another user's", async () => {
+        const [mine, plain, theirs] = (await harness.run((async (ctx: any) => [
+            await ctx.db.insert("projects", { context: "Answer briefly.", createdAt: 1, ruleFiles: [sql], title: "rules", userId: A }),
+            await ctx.db.insert("projects", { createdAt: 2, title: "plain", userId: A }),
+            await ctx.db.insert("projects", { context: "secret", createdAt: 3, title: "theirs", userId: B }),
+        ]) as never)) as [string, string, string];
+
+        const { projects } = await withRules([{ projectId: mine }, { projectId: plain }, { projectId: theirs }]);
+
+        expect(projects).toEqual([
+            { projectId: mine, ruleFiles: [{ content: "Answer briefly.", id: "context", mode: "always", title: "Project context" }, sql] },
+            { projectId: plain },
+            { projectId: theirs },
+        ]);
+    });
+
+    it("marks the projects whose rule files it no longer reads past the budget, and keeps them in the export", async () => {
+        const ids = (await harness.run((async (ctx: any) => {
+            const inserted = [];
+
+            for (let index = 0; index < 3; index += 1) {
+                inserted.push(await ctx.db.insert("projects", { context: "x".repeat(1000), createdAt: index, title: `p${index}`, userId: A }));
+            }
+
+            return inserted;
+        }) as never)) as string[];
+
+        const { projects } = await withRules(
+            ids.map((projectId: string) => {
+                return { projectId };
+            }),
+            100,
+        );
+
+        expect(projects).toHaveLength(3);
+        expect(projects[0]).toHaveProperty("ruleFiles");
+        expect(projects[1]).toHaveProperty("ruleFiles");
+        expect(projects[2]).toEqual({ projectId: ids[2], ruleFilesOmitted: true });
     });
 });
