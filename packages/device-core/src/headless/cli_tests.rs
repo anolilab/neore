@@ -83,12 +83,18 @@ fn unpair_is_refused_while_a_run_holds_the_pairing_and_nothing_is_asked() {
 
     let running = RunLock::acquire(&dir).unwrap();
 
+    assert_eq!(
+        format!("{:?}", unpair_dry_run(&vault)),
+        failure,
+        "the preview says what the real command would do"
+    );
     assert_eq!(format!("{:?}", unpair(&vault, true)), failure);
     assert!(dir.join("host.json").exists());
     assert_eq!(keychain.entries.borrow().len(), 1);
 
     drop(running);
 
+    assert_eq!(format!("{:?}", unpair_dry_run(&vault)), success);
     assert_eq!(
         format!("{:?}", unpair(&vault, false)),
         failure,

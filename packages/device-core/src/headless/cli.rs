@@ -290,8 +290,15 @@ fn unpair_request(args: &[String]) -> UnpairRequest {
     }
 }
 
+/// Previews what `unpair --yes` would do, including its refusal while `run` holds the pairing, so a script can use it
+/// as a check before the real command.
 fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
     match vault.record() {
+        Ok(Some(_)) if RunLock::acquire(vault.dir()).is_err() => {
+            eprintln!("neore-host: `neore-host run` is using this pairing, so unpair would be refused; stop it first. Nothing was changed.");
+
+            ExitCode::FAILURE
+        }
         Ok(Some(record)) => {
             println!(
                 "Would forget \"{}\" (device {}) on {}, and remove its secret from {}. Nothing was changed.",
