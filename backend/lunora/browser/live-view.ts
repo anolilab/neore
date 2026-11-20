@@ -17,7 +17,7 @@ import { meetsThreadPermission, resolveThreadReadAccess } from "../agent/thread-
 import { BROWSER_LIVE_VIEW_API_TOKEN, CLOUDFLARE_ACCOUNT_ID } from "../env";
 import { authAction, authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
-import { FETCH_TIMEOUT_LONG_MS, fetchWithDeadline } from "../lib/fetch-timeout";
+import { fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
@@ -26,6 +26,8 @@ import { patchRow } from "../lib/patch";
 import {
     browserAliveUntil,
     CONTROL_IDLE_MS,
+    controlNavigationBudget,
+    controlNavigationHold,
     controlStateOf,
     LIVE_VIEW_CONNECT_DEADLINE_MS,
     liveViewRequest,
@@ -593,24 +595,32 @@ export const navigateInControl = authAction
             return { error: "You do not have control of the browser.", status: "refused" as const };
         }
 
+        const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
         const startedAt = Date.now();
-        const { data } = await browserAction({
-            body: { action: "navigate", sessionId: navigation.providerSessionId, url },
-            client: createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") }),
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
-        }).catch(() => {
-            return { data: undefined };
-        });
+        // The hold was written before this call: one that starts late is cut off before the hold ends, never after it,
+        // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
+        const budget = controlNavigationBudget(navigation.navigatingUntil, startedAt);
+        const { data } =
+            budget === 0
+                ? { data: undefined }
+                : await browserAction({
+                      body: { action: "navigate", sessionId: navigation.providerSessionId, url },
+                      client,
+                      signal: AbortSignal.timeout(budget),
+                  }).catch(() => {
+                      return { data: undefined };
+                  });
         const result = data as BrowserActionResponse | undefined;
 
         // The audit row, on the row the navigation began on, and a browser the renderer replaced or closed (a blocked
-        // redirect closes it and answers no id: nothing is left to watch). Not the page: what the person opens is
-        // theirs, and others who watch the chat read the session's page. Before the lease's hold ends, so the agent
+        // redirect closes it and answers no id: nothing is left to watch). Not the session's page: others who watch the
+        // chat read that, and what the person opens is theirs; only the owner's history shows it, and whether they or a collaborator opened it. Before the lease's hold ends, so the agent
         // never acts on a row that still names a browser that is gone. A failed write never keeps the hold: the agent's
         // next action finds a browser that is gone on its own path, as it does one the provider reaped.
         try {
             await ctx.runMutation(internal.browser.functions.logAction, {
                 action: "navigate",
+                actor: navigation.byOwner ? "owner" : "collaborator",
                 durationMs: Date.now() - startedAt,
                 ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
                 ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
@@ -618,6 +628,7 @@ export const navigateInControl = authAction
                 startedAt,
                 startedWithProviderSessionId: navigation.providerSessionId,
                 success: result?.success === true,
+                target: url,
             });
         } finally {
             await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
@@ -637,8 +648,9 @@ export const navigateInControl = authAction
 /**
  * The person in control starts opening a page: only while they hold the lease (not handed back), may write in the
  * thread, the owner has not turned browsing off or listed the address, and no page they asked for still loads. The
- * lease lasts at least as long as the renderer call, and a hand back meanwhile waits for it ({@link handBack}), so
- * the agent never acts while the page the person asked for loads. `navigatingUntil` names this navigation.
+ * lease lasts at least as long as the renderer call (`controlNavigationHold`: the call may start a little later and is
+ * cut off before the hold ends), and a hand back meanwhile waits for it ({@link handBack}), so the agent never acts
+ * while the page the person asked for loads. `navigatingUntil` names this navigation.
  */
 export const beginControlNavigation = internalMutation
     .input({ threadId: v.id("threads"), url: v.string(), userId: v.string() })
@@ -647,6 +659,8 @@ export const beginControlNavigation = internalMutation
             v.object({ kind: v.union(v.literal("denied"), v.literal("loading"), v.literal("refused")) }),
             v.object({ error: v.string(), kind: v.literal("blocked") }),
             v.object({
+                /** The caller owns the chat (else a collaborator with write access), for the audit row. */
+                byOwner: v.boolean(),
                 kind: v.literal("ok"),
                 navigatingUntil: v.number(),
                 providerSessionId: v.string(),
@@ -682,13 +696,19 @@ export const beginControlNavigation = internalMutation
             return { error: blocked, kind: "blocked" as const };
         }
 
-        const navigatingUntil = ctx.now + FETCH_TIMEOUT_LONG_MS;
+        const navigatingUntil = controlNavigationHold(ctx.now);
 
         await patchRow(ctx.db, "browserSessions", browser.session, {
             control: { ...control, navigatingUntil, until: Math.max(control.until, navigatingUntil) },
         });
 
-        return { kind: "ok" as const, navigatingUntil, providerSessionId: browser.providerSessionId, sessionId: browser.session._id };
+        return {
+            byOwner: browser.session.userId === userId,
+            kind: "ok" as const,
+            navigatingUntil,
+            providerSessionId: browser.providerSessionId,
+            sessionId: browser.session._id,
+        };
     });
 
 /** The person's page loaded (or failed): a lease handed back meanwhile ends now. Only that navigation's own hold ends. */

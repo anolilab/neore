@@ -176,6 +176,8 @@ export const endSessionUse = internalMutation
 export const logAction = internalMutation
     .input({
         action: v.string(),
+        /** The person in control who did this (`navigateInControl`); absent: the agent. */
+        actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
         currentUrl: v.optional(v.string()),
         durationMs: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
@@ -204,6 +206,7 @@ export const logAction = internalMutation
         async ({
             args: {
                 action,
+                actor,
                 currentUrl,
                 durationMs,
                 errorMessage,
@@ -221,6 +224,7 @@ export const logAction = internalMutation
         }) => {
             await ctx.db.insert("browserActions", {
                 action,
+                actor,
                 durationMs,
                 errorMessage,
                 sessionId,

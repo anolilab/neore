@@ -7,9 +7,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
+import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
 import { getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
-import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS } from "./live-view-logic";
+import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, CONTROL_NAVIGATION_SETTLE_MS, controlNavigationHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
 const READER = "user-reader";
@@ -84,8 +85,9 @@ vi.mock("../agent/thread-read-access", async (importOriginal) => {
     };
 });
 
-const { renderer } = vi.hoisted(() => {
-    return { renderer: vi.fn() };
+const { renderer, rendererStart } = vi.hoisted(() => {
+    // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
+    return { renderer: vi.fn(), rendererStart: { hook: undefined as (() => void) | undefined } };
 });
 
 vi.mock("../lib/services", async (importOriginal) => {
@@ -93,7 +95,17 @@ vi.mock("../lib/services", async (importOriginal) => {
 });
 
 vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("@neore/service-sdk/browser-renderer")>()), browserAction: renderer };
+    const original = await importOriginal<typeof import("@neore/service-sdk/browser-renderer")>();
+
+    return {
+        ...original,
+        browserAction: renderer,
+        createBrowserRendererClient: (...options: Parameters<typeof original.createBrowserRendererClient>) => {
+            rendererStart.hook?.();
+
+            return original.createBrowserRendererClient(...options);
+        },
+    };
 });
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
@@ -152,6 +164,8 @@ beforeEach(async () => {
 
 afterEach(() => {
     delete replica.grant;
+    rendererStart.hook = undefined;
+    vi.restoreAllMocks();
     harness.close();
     fetchMock.mockReset();
     renderer.mockReset();
@@ -678,7 +692,7 @@ describe("opening a page while in control", () => {
         await navigate(OWNER);
 
         // Handed back mid-load: the lease still runs until the navigation's deadline, so the agent is still refused.
-        expect(duringLoad).toMatchObject({ ended: "handed_back", navigatingUntil: NOW + 60_000, until: NOW + 60_000 });
+        expect(duringLoad).toMatchObject({ ended: "handed_back", navigatingUntil: controlNavigationHold(NOW), until: controlNavigationHold(NOW) });
         // Loaded: the lease ends now, and the agent's next action hears of the hand back.
         const loaded = await session();
 
@@ -738,7 +752,7 @@ describe("opening a page while in control", () => {
             await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
             fetchMock.mockResolvedValueOnce(answer(500, {}));
             await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
-            await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: NOW + 60_000 } });
+            await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: controlNavigationHold(NOW) } });
 
             return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
         });
@@ -810,5 +824,70 @@ describe("opening a page while in control", () => {
 
         expect(audits.map((row) => row.sessionId)).toEqual([first]);
         expect(second).not.toBe(first);
+    });
+
+    it("shows the owner which page a person in control opened, and whether they or a collaborator opened it", async () => {
+        const sessionId = await addSession();
+        const loaded = { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+
+        // A fresh view answer per claim: a response body is read once.
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockResolvedValue(loaded);
+        await take(WRITER);
+        await navigate(WRITER, "https://example.com/next?q=1");
+        await as(WRITER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+        // Later, so the history's order is not a tie.
+        vi.setSystemTime(NOW + 1000);
+        await take(OWNER);
+        await navigate(OWNER, "https://example.com/mine");
+
+        const history = await as(OWNER).query(getBrowserActions as never, { sessionId } as never);
+
+        expect(history).toEqual([
+            expect.objectContaining({ action: "navigate", actor: "collaborator", success: true, target: "https://example.com/next?q=1" }),
+            expect.objectContaining({ action: "navigate", actor: "owner", success: true, target: "https://example.com/mine" }),
+        ]);
+    });
+
+    it("ends the renderer call before the page's hold, also when the call starts late", async () => {
+        await addSession();
+        await take(OWNER);
+        const timeout = vi.spyOn(AbortSignal, "timeout");
+        let loading: any;
+
+        renderer.mockImplementation(async () => {
+            const current = await session();
+
+            loading = current.control;
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        // On time: the whole request, ending well inside the hold.
+        await navigate(OWNER);
+        expect(timeout).toHaveBeenLastCalledWith(60_000);
+        expect(loading.navigatingUntil).toBe(controlNavigationHold(NOW));
+
+        // Twelve seconds late (a slow round trip after the hold was written): cut so it ends before the hold does.
+        vi.setSystemTime(NOW + 1000);
+        rendererStart.hook = () => vi.setSystemTime(NOW + 13_000);
+        await navigate(OWNER);
+
+        const [budget] = timeout.mock.lastCall ?? [];
+
+        expect(NOW + 13_000 + Number(budget)).toBe(controlNavigationHold(NOW + 1000) - CONTROL_NAVIGATION_SETTLE_MS);
+        expect(renderer).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends no renderer call that starts after its page's hold ran out, and ends the hold", async () => {
+        await addSession();
+        await take(OWNER);
+        rendererStart.hook = () => vi.setSystemTime(controlNavigationHold(NOW));
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: "The page could not be opened.", status: "refused" });
+        expect(renderer).not.toHaveBeenCalled();
+        const after = await session();
+
+        expect(after.control).not.toHaveProperty("navigatingUntil");
     });
 });

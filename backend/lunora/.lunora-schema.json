@@ -4273,6 +4273,28 @@
             }
           ]
         },
+        "actor": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"collaborator\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"owner\""
+            }
+          ]
+        },
         "durationMs": {
           "kind": "number",
           "nullable": false,

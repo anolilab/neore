@@ -396,6 +396,11 @@ export const schema = defineSchema({
 
     browserActions: defineTable({
         action: v.union(v.literal("navigate"), v.literal("screenshot"), v.literal("click"), v.literal("type"), v.literal("extract"), v.literal("scroll")),
+        /**
+         * A person in control of the browser did this: the session's `owner`, or a `collaborator` they shared the chat
+         * with; absent: the agent. A kind, never a user id: a collaborator's id here would outlive their account.
+         */
+        actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
         durationMs: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
         sessionId: v.id("browserSessions"),
