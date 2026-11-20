@@ -1712,7 +1712,13 @@ const ComposerInput = ({
         setConverting(text);
 
         if (await attachGeneratedFile(file, t`Conversion failed`)) {
-            setText("");
+            if (useChatUIStore.getState().composerText === text) {
+                setText("");
+            } else {
+                // The draft was edited during the upload: what was typed stays, and a waiting send compares it with the text
+                // it was pressed on, so it ends with the edit notice instead of sending the file without it.
+                setUploadWait((wait) => (wait === null ? null : { ...wait, text }));
+            }
         }
 
         setConverting(null);
