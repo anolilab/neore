@@ -424,6 +424,37 @@ describe("ComposerInput send during an upload", () => {
         });
     });
 
+    it.each([
+        ["more text", "see notes and more"],
+        ["the whole text deleted", ""],
+    ])("keeps the draft and sends nothing when it is edited (%s) while a conversion uploads", async (_name, edited) => {
+        let finish = (): void => {};
+
+        harness.upload.mockImplementation(
+            async ({ file }) =>
+                await new Promise((resolve) => {
+                    finish = () => resolve({ file, metadata: { fileId: "file-text" }, name: file.name });
+                }),
+        );
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Convert" }));
+        pressSend();
+
+        act(() => {
+            useChatUIStore.getState().setComposerText(edited);
+        });
+        act(() => {
+            finish();
+        });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(useChatUIStore.getState().composerText).toBe(edited);
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
     it("sends only once, however often send is pressed while waiting", async () => {
         const id = addUpload("uploading");
 
