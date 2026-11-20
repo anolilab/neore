@@ -512,6 +512,15 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe(before);
     });
 
+    it("wraps quickly beside many unclosed link destinations", () => {
+        const editor = editorWith(`<p>hello ${"[x](".repeat(10_000)}</p>`);
+
+        select(editor, 1, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(true);
+        expect(text(editor).startsWith("**hello** [x](")).toBe(true);
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 

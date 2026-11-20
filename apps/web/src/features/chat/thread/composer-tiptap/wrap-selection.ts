@@ -105,62 +105,67 @@ const scanBackticks = (text: string): { spans: [number, number][]; unmatched: Un
 };
 
 /**
- * The index of the `)` that closes a link destination starting at `start`, or -1. A backslash escapes the next
+ * A lookup of the `)` that closes a link destination starting at a position, or -1. A backslash escapes the next
  * character, and parentheses inside the destination nest, as CommonMark allows. An angle-bracket destination `<...>`
  * ends at its `>`, so a parenthesis inside it is text.
+ *
+ * Every answer is computed in one pass from the end of the text, so a paragraph with many unclosed `](` costs one pass,
+ * not a scan to its end for each of them. `closeFrom[index]` is what a scan from `index` returns: a `(` there is closed
+ * by the scan from the next position, and the scan goes on after that closer.
  */
-const destinationEnd = (text: string, start: number): number => {
-    let index = start;
+const destinationFinder = (text: string): ((start: number) => number) => {
+    const closeFrom = new Int32Array(text.length + 2).fill(-1);
+    const angleFrom = new Int32Array(text.length + 2).fill(-1);
+    const at = (table: Int32Array, index: number): number => table[index] ?? -1;
 
-    if (text[start] === "<") {
-        index = start + 1;
-
-        while (index < text.length && text[index] !== ">") {
-            index += text[index] === "\\" ? 2 : 1;
-        }
-
-        if (index >= text.length) {
-            return -1;
-        }
-
-        index += 1;
-    }
-
-    let depth = 0;
-
-    while (index < text.length) {
+    for (let index = text.length - 1; index >= 0; index -= 1) {
         switch (text[index]) {
             case "(": {
-                depth += 1;
+                const inner = at(closeFrom, index + 1);
+
+                closeFrom[index] = inner === -1 ? -1 : at(closeFrom, inner + 1);
+                angleFrom[index] = at(angleFrom, index + 1);
 
                 break;
             }
 
             case ")": {
-                if (depth === 0) {
-                    return index;
-                }
+                closeFrom[index] = index;
+                angleFrom[index] = at(angleFrom, index + 1);
 
-                depth -= 1;
+                break;
+            }
+
+            case ">": {
+                closeFrom[index] = at(closeFrom, index + 1);
+                angleFrom[index] = index;
 
                 break;
             }
 
             case "\\": {
-                index += 1;
+                closeFrom[index] = at(closeFrom, index + 2);
+                angleFrom[index] = at(angleFrom, index + 2);
 
                 break;
             }
 
             default: {
-                break;
+                closeFrom[index] = at(closeFrom, index + 1);
+                angleFrom[index] = at(angleFrom, index + 1);
             }
         }
-
-        index += 1;
     }
 
-    return -1;
+    return (start) => {
+        if (text[start] !== "<") {
+            return at(closeFrom, start);
+        }
+
+        const angle = at(angleFrom, start + 1);
+
+        return angle === -1 ? -1 : at(closeFrom, angle + 1);
+    };
 };
 
 /** A link in a paragraph: the whole construct as `[start, end)` indices, and for `[label](...)` its label text. */
@@ -186,6 +191,7 @@ const autolinks = (text: string, spans: ReadonlyArray<[number, number]>): LinkRa
  */
 const linkRanges = (text: string, spans: ReadonlyArray<[number, number]>): LinkRange[] => {
     const codeEnds = new Map(spans);
+    const destinationEnd = destinationFinder(text);
     const links: LinkRange[] = [];
     const labels: number[] = [];
     let index = 0;
@@ -202,7 +208,7 @@ const linkRanges = (text: string, spans: ReadonlyArray<[number, number]>): LinkR
             labels.push(index);
         } else if (current === "]" && labels.length > 0) {
             const labelStart = labels.pop() ?? 0;
-            const end = text[index + 1] === "(" ? destinationEnd(text, index + 2) : -1;
+            const end = text[index + 1] === "(" ? destinationEnd(index + 2) : -1;
 
             if (end !== -1) {
                 links.push({ label: [labelStart + 1, index], whole: [labelStart, end + 1] });
