@@ -106,11 +106,27 @@ const scanBackticks = (text: string): { spans: [number, number][]; unmatched: Un
 
 /**
  * The index of the `)` that closes a link destination starting at `start`, or -1. A backslash escapes the next
- * character, and parentheses inside the destination nest, as CommonMark allows.
+ * character, and parentheses inside the destination nest, as CommonMark allows. An angle-bracket destination `<...>`
+ * ends at its `>`, so a parenthesis inside it is text.
  */
 const destinationEnd = (text: string, start: number): number => {
-    let depth = 0;
     let index = start;
+
+    if (text[start] === "<") {
+        index = start + 1;
+
+        while (index < text.length && text[index] !== ">") {
+            index += text[index] === "\\" ? 2 : 1;
+        }
+
+        if (index >= text.length) {
+            return -1;
+        }
+
+        index += 1;
+    }
+
+    let depth = 0;
 
     while (index < text.length) {
         switch (text[index]) {
@@ -147,14 +163,31 @@ const destinationEnd = (text: string, start: number): number => {
     return -1;
 };
 
+/** A link in a paragraph: the whole construct as `[start, end)` indices, and for `[label](...)` its label text. */
+interface LinkRange {
+    label?: [number, number];
+    whole: [number, number];
+}
+
+/** An autolink `<scheme:...>` or `<name@host>`. */
+const AUTOLINK = /<(?:[a-z][\w+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)>/gi;
+
+/** The autolinks in `text` that are not inside a code span. */
+const autolinks = (text: string, spans: ReadonlyArray<[number, number]>): LinkRange[] =>
+    [...text.matchAll(AUTOLINK)]
+        .filter((match) => spans.every(([start, end]) => match.index < start || match.index >= end))
+        .map((match) => {
+            return { whole: [match.index, match.index + match[0].length] };
+        });
+
 /**
- * The destinations of the links `[label](destination)` in `text`, as `[start, end)` indices. A `]` opens a destination
- * only after an unescaped `[`, and code spans are skipped, because link syntax there is literal text.
+ * The links in `text`: each `[label](destination)` and each autolink. A `]` opens a destination only after an
+ * unescaped `[`, and code spans are skipped, because link syntax there is literal text.
  */
-const linkDestinations = (text: string, spans: ReadonlyArray<[number, number]>): [number, number][] => {
+const linkRanges = (text: string, spans: ReadonlyArray<[number, number]>): LinkRange[] => {
     const codeEnds = new Map(spans);
-    const destinations: [number, number][] = [];
-    let openLabels = 0;
+    const links: LinkRange[] = [];
+    const labels: number[] = [];
     let index = 0;
 
     while (index < text.length) {
@@ -166,14 +199,13 @@ const linkDestinations = (text: string, spans: ReadonlyArray<[number, number]>):
         } else if (current === "\\") {
             next = index + 2;
         } else if (current === "[") {
-            openLabels += 1;
-        } else if (current === "]" && openLabels > 0) {
-            openLabels -= 1;
-
+            labels.push(index);
+        } else if (current === "]" && labels.length > 0) {
+            const labelStart = labels.pop() ?? 0;
             const end = text[index + 1] === "(" ? destinationEnd(text, index + 2) : -1;
 
-            if (end > index + 2) {
-                destinations.push([index + 2, end]);
+            if (end !== -1) {
+                links.push({ label: [labelStart + 1, index], whole: [labelStart, end + 1] });
                 next = end + 1;
             }
         }
@@ -181,13 +213,27 @@ const linkDestinations = (text: string, spans: ReadonlyArray<[number, number]>):
         index = next;
     }
 
-    return destinations;
+    return [...links, ...autolinks(text, spans)];
+};
+
+/**
+ * Whether a wrap of `from`..`to` would break a link: it overlaps the link without holding all of it, and is not inside
+ * the link's label text. Delimiters inside a destination change the URL, and a wrap across the brackets or an autolink's
+ * angle brackets ends the link syntax.
+ */
+const breaksLink = (link: LinkRange, from: number, to: number): boolean => {
+    const [start, end] = link.whole;
+    const overlaps = from < end && to > start;
+    const holdsAll = from <= start && to >= end;
+    const insideLabel = link.label !== undefined && from >= link.label[0] && to <= link.label[1];
+
+    return overlaps && !holdsAll && !insideLabel;
 };
 
 /**
  * What the Markdown already in a paragraph means for a wrap of `from`..`to` (parent offsets). The wrap is `blocked` when
- * an end of the selection is strictly inside a code span, where a delimiter would show literally, or when the selection
- * overlaps a link destination, whose URL it would change. `takenFences` are the lengths of unmatched backtick runs before
+ * an end of the selection is strictly inside a code span, where a delimiter would show literally, or when it would break a
+ * link (`breaksLink`). `takenFences` are the lengths of unmatched backtick runs before
  * the selection: a code fence of such a length would pair with that earlier run instead of its own closer.
  *
  * A line break or other inline node counts as a line ending, so a backslash before it escapes nothing after it.
@@ -210,9 +256,18 @@ const markupAround = (parent: ProseMirrorNode, from: number, to: number): { bloc
     const toOffsets = ([start, end]: [number, number]): [number, number] => [offsets[start] ?? 0, (offsets[end - 1] ?? 0) + 1];
     const { spans, unmatched } = scanBackticks(text);
     const inCode = spans.map((span) => toOffsets(span)).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
-    const inLink = linkDestinations(text, spans)
-        .map((destination) => toOffsets(destination))
-        .some(([start, end]) => from < end && to > start);
+    // Point offsets: `offsets[index]` is where the character at `index` sits, and `end` maps just past its last character.
+    const at = (index: number): number => offsets[index] ?? 0;
+    const inLink = linkRanges(text, spans).some((link) =>
+        breaksLink(
+            {
+                label: link.label && [at(link.label[0]), at(link.label[1])],
+                whole: [at(link.whole[0]), at(link.whole[1] - 1) + 1],
+            },
+            from,
+            to,
+        ),
+    );
 
     return {
         blocked: inCode || inLink,

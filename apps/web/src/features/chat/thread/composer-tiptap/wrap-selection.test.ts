@@ -471,6 +471,47 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe(before);
     });
 
+    it("protects an angle-bracket destination past a parenthesis inside it", () => {
+        const editor = editorWith("<p>see [x](&lt;foo)bar&gt;) now</p>");
+        const before = text(editor);
+
+        select(editor, 14, 17);
+
+        expect(selectedText(editor)).toBe("bar");
+        expect(wrapSelectionOnTextInput(editor.view, 14, 17, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("leaves a link label alone when the selection holds its brackets, which would split it from its URL", () => {
+        const editor = editorWith("<p>see [docs](https://example.com) now</p>");
+
+        select(editor, 5, 11);
+
+        expect(selectedText(editor)).toBe("[docs]");
+        expect(wrapSelectionOnTextInput(editor.view, 5, 11, "*")).toBe(true);
+        expect(text(editor)).toBe("see [docs](https://example.com) now");
+    });
+
+    it("wraps a selection that holds a whole link", () => {
+        const editor = editorWith("<p>see [docs](https://example.com) now</p>");
+
+        select(editor, 5, 32);
+        wrapSelectionOnTextInput(editor.view, 5, 32, "*");
+
+        expect(text(editor)).toBe("see **[docs](https://example.com)** now");
+    });
+
+    it("leaves a wrap alone inside an autolink, whose syntax it would break", () => {
+        const editor = editorWith("<p>go &lt;https://example.com&gt; now</p>");
+        const before = text(editor);
+
+        select(editor, 5, 10);
+
+        expect(selectedText(editor)).toBe("https");
+        expect(wrapSelectionOnTextInput(editor.view, 5, 10, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
