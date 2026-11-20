@@ -31,18 +31,31 @@ const CODE_TYPES: ReadonlySet<string> = new Set(["code", "inlineCode"]);
 /** Blocks whose marker sits at the start of a line: a wrap that starts there would move the marker into the text. */
 const MARKED_BLOCK_TYPES: ReadonlySet<string> = new Set(["blockquote", "heading", "listItem"]);
 
-/** A blockquote marker `>` and the space after it. */
-const QUOTE_MARKER = /^[ \t]{0,3}>[ \t]?/;
+/** A blockquote marker `>` and the space after it, matched at `lastIndex`. */
+const QUOTE_MARKER = /[ \t]{0,3}>[ \t]?/y;
 
-/** A list bullet or number, or heading `#`s, and the spaces after them. */
-const LIST_OR_HEADING_MARKER = /^[ \t]{0,3}(?:[-+*]|\d{1,9}[.)]|#{1,6})(?=[ \t]|$)[ \t]*/;
+/** A list bullet or number, or heading `#`s, and the spaces after them, matched at `lastIndex`. */
+const LIST_OR_HEADING_MARKER = /[ \t]{0,3}(?:[-+*]|\d{1,9}[.)]|#{1,6})(?=[ \t]|$)[ \t]*/y;
 
-/** The length of the block markers at the start of `line`, nested ones included (`> - item`). */
-const markerLength = (line: string, offset = 0): number => {
-    const rest = line.slice(offset);
-    const match = QUOTE_MARKER.exec(rest) ?? LIST_OR_HEADING_MARKER.exec(rest);
+/** The block marker at `offset` in `line`, or an empty string. */
+const markerAt = (line: string, offset: number): string => {
+    QUOTE_MARKER.lastIndex = offset;
+    LIST_OR_HEADING_MARKER.lastIndex = offset;
 
-    return match === null ? offset : markerLength(line, offset + match[0].length);
+    return (QUOTE_MARKER.exec(line) ?? LIST_OR_HEADING_MARKER.exec(line))?.[0] ?? "";
+};
+
+/** The length of the block markers at the start of `line`, nested ones included (`> - item`), read in one pass. */
+const markerLength = (line: string): number => {
+    let offset = 0;
+    let marker = markerAt(line, offset);
+
+    while (marker !== "") {
+        offset += marker.length;
+        marker = markerAt(line, offset);
+    }
+
+    return offset;
 };
 
 const runLength = (text: string, start: number): number => {
@@ -134,8 +147,8 @@ const parser = unified()
     .data("micromarkExtensions", [{ disable: { null: ["attention"] } }]);
 
 /**
- * The longest draft that is parsed. Parsing a 10,000-character draft takes about 5 ms, and at most about 100 ms for a
- * paste built to be slow (thousands of unclosed `[x](`). A longer draft is not wrapped: typing replaces the selection.
+ * The longest draft that is parsed. Parsing a 10,000-character draft takes about 5 ms, and at most about 150 ms for a
+ * paste built to be slow (thousands of nested `>` or unclosed `[x](`). A longer draft is not wrapped: typing replaces the selection.
  */
 export const MAX_WRAP_DRAFT = 10_000;
 
@@ -166,22 +179,39 @@ const labelOf = (node: MarkdownNode, range: [number, number], text: string): [nu
     return start === undefined || end === undefined ? undefined : [start, end];
 };
 
-const collect = (node: MarkdownNode, text: string, constructs: Construct[], blocks: [number, number][]): void => {
-    const range = rangeOf(node);
+/**
+ * The constructs and marked blocks of a syntax tree. An explicit stack walks it, because a deeply nested tree (thousands
+ * of `>`) would overflow recursion.
+ */
+const collect = (root: MarkdownNode, text: string): { blocks: [number, number][]; constructs: Construct[] } => {
+    const blocks: [number, number][] = [];
+    const constructs: Construct[] = [];
+    const pending: MarkdownNode[] = [root];
+    let node = pending.pop();
 
-    if (range !== undefined && MARKED_BLOCK_TYPES.has(node.type)) {
-        blocks.push(range);
+    while (node !== undefined) {
+        const range = rangeOf(node);
+
+        if (range !== undefined && MARKED_BLOCK_TYPES.has(node.type)) {
+            blocks.push(range);
+        }
+
+        if (range !== undefined && (LINK_TYPES.has(node.type) || CODE_TYPES.has(node.type))) {
+            // An inline code span shows its content literally; a code block also ends its fence syntax if anything is put
+            // before it, so like a definition it may not be held whole.
+            constructs.push({
+                code: node.type === "inlineCode",
+                holdable: node.type !== "definition" && node.type !== "code",
+                inner: labelOf(node, range, text),
+                range,
+            });
+        }
+
+        pending.push(...(node.children ?? []));
+        node = pending.pop();
     }
 
-    if (range !== undefined && (LINK_TYPES.has(node.type) || CODE_TYPES.has(node.type))) {
-        constructs.push({ code: CODE_TYPES.has(node.type), holdable: node.type !== "definition", inner: labelOf(node, range, text), range });
-    }
-
-    const children = node.children ?? [];
-
-    for (const child of children) {
-        collect(child, text, constructs, blocks);
-    }
+    return { blocks, constructs };
 };
 
 /**
@@ -256,17 +286,18 @@ export const markupAround = (
         return null;
     }
 
-    const constructs: Construct[] = [];
     const { unmatched } = scanBackticks(text);
 
-    const blocks: [number, number][] = [];
-
-    collect(parser.parse(text) as MarkdownNode, text, constructs, blocks);
+    const { blocks, constructs } = collect(parser.parse(text) as MarkdownNode, text);
 
     const paragraph = text.slice(start, start + parent.content.size);
-    const lineEnd = start + parent.content.size;
+    // The line that holds the selection: a line break inside the textblock starts a new one, where block syntax can begin.
+    const lineStart = from > 0 ? paragraph.lastIndexOf("\n", from - 1) + 1 : 0;
+    const nextBreak = paragraph.indexOf("\n", lineStart);
+    const lineEnd = nextBreak === -1 ? paragraph.length : nextBreak;
     // A blockquote, list item or heading on this line keeps its marker only while the wrap starts after it.
-    const markers = blocks.some(([blockStart, blockEnd]) => blockStart <= lineEnd && blockEnd >= start) ? markerLength(paragraph) : 0;
+    const onBlock = blocks.some(([blockStart, blockEnd]) => blockStart <= start + lineEnd && blockEnd >= start + lineStart);
+    const markers = onBlock ? lineStart + markerLength(paragraph.slice(lineStart, lineEnd)) : 0;
 
     return {
         blocked: from < markers || constructs.some((construct) => breaks(construct, start + from, start + to)),

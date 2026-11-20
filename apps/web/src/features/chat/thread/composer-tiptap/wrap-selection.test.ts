@@ -676,6 +676,47 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("> **foo**");
     });
 
+    it("wraps quickly after thousands of nested quote markers", () => {
+        const quotes = "&gt;".repeat(9000);
+        const editor = editorWith(`<p>${quotes} foo</p>`);
+
+        select(editor, 9002, 9005);
+
+        expect(selectedText(editor)).toBe("foo");
+        expect(wrapSelectionOnTextInput(editor.view, 9002, 9005, "*")).toBe(true);
+        expect(text(editor).endsWith("> **foo**")).toBe(true);
+    });
+
+    it("leaves a heading after a line break alone when the selection holds its #", () => {
+        const editor = editorWith("<p>a<br># heading</p>");
+        const before = text(editor);
+
+        select(editor, 3, 12);
+
+        expect(selectedText(editor)).toBe("# heading");
+        expect(wrapSelectionOnTextInput(editor.view, 3, 12, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("wraps a heading's text after a line break", () => {
+        const editor = editorWith("<p>a<br># heading</p>");
+
+        select(editor, 5, 12);
+        wrapSelectionOnTextInput(editor.view, 5, 12, "*");
+
+        expect(selectedText(editor)).toBe("heading");
+        expect(text(editor)).toContain("# **heading**");
+    });
+
+    it("leaves a whole code fence line alone, which wrapping would end", () => {
+        const editor = editorWith("<p>```foo</p>");
+
+        select(editor, 1, 7);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 7, "*")).toBe(true);
+        expect(text(editor)).toBe("```foo");
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
