@@ -8,8 +8,6 @@ describe(normalizeSiteOrigin, () => {
         ["example.com", "https://example.com"],
         ["https://example.com:443/", "https://example.com"],
         ["https://example.com:8443", "https://example.com:8443"],
-        ["https://example.com./", "https://example.com"],
-        ["https://example.com../", "https://example.com"],
         // A lookalike in another script stays a different origin.
         ["https://exаmple.com", "https://xn--exmple-4nf.com"],
     ])("reads %s as %s", (input, origin) => {
@@ -22,6 +20,9 @@ describe(normalizeSiteOrigin, () => {
         "ftp://example.com",
         "https://user:pw@example.com",
         "https://localhost",
+        // The browser keeps the trailing dot, so `example.com.` is another origin than `example.com`.
+        "https://example.com./",
+        "https://example.com../",
         "https://[::1]",
         "https://10.0.0.1",
         "https://0x7f.1",

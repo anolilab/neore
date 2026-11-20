@@ -48,6 +48,9 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const { default: schema } = await import("../schema");
 const { decryptKey } = await import("../lib/encryption");
+const { ROOT_SHARD_KEY, runInShard } = await import("../lib/shard-context");
+// The `cloudflare:workers` test stub (`test/stubs/cloudflare-workers.ts`); a test sets the shard routing switch on it.
+const { env: workerEnv } = (await import("cloudflare:workers")) as unknown as { env: { ENVIRONMENT?: string; SHARD_ROUTING?: string } };
 const { deleteSiteLogin, listSiteLogins, listUsableSiteLogins, saveSiteLogin, siteLoginForFill } = await import("./site-logins");
 const { eraseVaultForUser } = await import("./gdpr");
 const { collectFiles } = await import("../gdpr/steps");
@@ -182,6 +185,29 @@ describe("saving a site login", () => {
         expect(await rows()).toHaveLength(0);
         expect(await as(OWNER).query(listSiteLogins as never, {} as never)).toStrictEqual([]);
     });
+
+    it("refuses a save on the shared root shard, which the user's export and erasure never read", async () => {
+        await runInShard(ROOT_SHARD_KEY, async () => {
+            await expect(save({ password: PASSWORD })).rejects.toThrow(OWN_ACCOUNT_ONLY);
+            expect(await as(OWNER).query(listSiteLogins as never, {} as never)).toStrictEqual([]);
+        });
+        expect(await rows()).toHaveLength(0);
+    });
+
+    it("saves on the root shard while development runs every user there, where export and erasure read too", async () => {
+        workerEnv.ENVIRONMENT = "development";
+        workerEnv.SHARD_ROUTING = "off";
+
+        try {
+            await runInShard(ROOT_SHARD_KEY, async () => {
+                await save({ password: PASSWORD });
+                expect(await as(OWNER).query(listSiteLogins as never, {} as never)).toHaveLength(1);
+            });
+        } finally {
+            delete workerEnv.ENVIRONMENT;
+            delete workerEnv.SHARD_ROUTING;
+        }
+    });
 });
 
 describe("which chats may use a login", () => {
@@ -260,7 +286,7 @@ describe("which chats may use a login", () => {
     it("the fill matches the saved origin exactly: no subdomain, other port or lookalike", async () => {
         await save({ password: PASSWORD });
 
-        for (const site of ["https://login.example.com", "https://example.com:8443", "https://example.com.evil.test", INSECURE_SITE]) {
+        for (const site of ["https://login.example.com", "https://example.com:8443", "https://example.com.evil.test", "https://example.com.", INSECURE_SITE]) {
             expect(await forFill(plainThread, site)).toBeNull();
         }
 
@@ -271,12 +297,14 @@ describe("which chats may use a login", () => {
 });
 
 describe("GDPR", () => {
-    it("the export lists the site and username, never the password", async () => {
-        await save({ password: PASSWORD });
+    it("the export lists the site, the username and the teammates that may use it, never the password", async () => {
+        await save({ password: PASSWORD, teammateIds: [botId] });
 
         const exported = await harness.run(async (ctx: any) => await ctx.runQuery(collectFiles, { userId: OWNER }));
 
-        expect(exported.siteLogins).toStrictEqual([{ createdAt: expect.any(Number), site: SITE, updatedAt: expect.any(Number), username: "ada@example.com" }]);
+        expect(exported.siteLogins).toStrictEqual([
+            { createdAt: expect.any(Number), site: SITE, teammateIds: [botId], updatedAt: expect.any(Number), username: "ada@example.com" },
+        ]);
         expect(JSON.stringify(exported)).not.toContain(PASSWORD);
         expect(JSON.stringify(exported)).not.toContain("v1:");
     });

@@ -13,7 +13,11 @@ import type { FormEvent } from "react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+/** Bots one login may name; the server's `MAX_SITE_LOGIN_TEAMMATES`. */
+const MAX_TEAMMATES = 20;
 
 interface LoginDraft {
     /** Set while editing a saved login; its site cannot change. */
@@ -29,26 +33,44 @@ const emptyDraft = (): LoginDraft => {
     return { label: "", password: "", site: "", teammateIds: [], username: "" };
 };
 
-/** What the save sends: a trimmed draft, with an empty password meaning "keep the saved one". */
-const saveArgs = (draft: LoginDraft, botName: Map<string, string>) => {
+/**
+ * What the save sends: a trimmed draft, with an empty password meaning "keep the saved one". `botName` is `undefined`
+ * until the bot list has loaded; only then is a deleted teammate dropped, so a list that failed to load never clears them.
+ */
+const saveArgs = (draft: LoginDraft, botName: Map<string, string> | undefined) => {
     return {
         label: draft.label.trim() || undefined,
         loginId: draft.id,
         password: draft.password === "" ? undefined : draft.password,
         site: draft.site.trim(),
-        // Only teammates that still exist: a deleted one is dropped on the next save.
-        teammateIds: draft.teammateIds.filter((id) => botName.has(id)),
+        teammateIds: botName === undefined ? draft.teammateIds : draft.teammateIds.filter((id) => botName.has(id)),
         username: draft.username.trim(),
     };
 };
 
+/**
+ * Empties the form only if it still holds `submitted`. Edits made while that save was in flight were not sent, so they
+ * stay; when the save created the login, they become an edit of it, so saving them again does not create a second one.
+ */
+const afterSave =
+    (submitted: LoginDraft, savedId: Id<"savedSiteLogins">) =>
+    (current: LoginDraft): LoginDraft => {
+        if (current === submitted) {
+            return emptyDraft();
+        }
+
+        return current.id === undefined && current.site === submitted.site ? { ...current, id: savedId } : current;
+    };
+
+/** Empties the form when it is editing the login `id`, which is gone. */
+const clearIfEditing =
+    (id: Id<"savedSiteLogins">) =>
+    (current: LoginDraft): LoginDraft =>
+        current.id === id ? emptyDraft() : current;
+
 const errorText = (error: unknown, fallback: string): string => (error instanceof Error && error.message !== "" ? error.message : fallback);
 
-/**
- * The user's saved site logins, for the agent's browser. The password is write-only: the list shows that one is set,
- * never what it is, and an edit with the field left empty keeps the saved one.
- */
-const SiteLogins = () => {
+const SiteLoginsForm = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -61,7 +83,7 @@ const SiteLogins = () => {
 
     const loginsQuery = crpc.vault.site_logins.listSiteLogins.queryOptions({});
     const { data: logins = [] } = useQuery(loginsQuery);
-    const { data: bots = [] } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
+    const { data: bots = [], isSuccess: botsLoaded } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
     const saveMutation = useMutation(crpc.vault.site_logins.saveSiteLogin.mutationOptions());
     const deleteMutation = useMutation(crpc.vault.site_logins.deleteSiteLogin.mutationOptions());
 
@@ -69,8 +91,10 @@ const SiteLogins = () => {
     const [pendingDelete, setPendingDelete] = useState<{ id: Id<"savedSiteLogins">; site: string } | null>(null);
 
     const isEditing = draft.id !== undefined;
-    const canSave = draft.site.trim() !== "" && draft.username.trim() !== "" && (isEditing || draft.password !== "");
+    // An edit waits for the bot list: saved without it, the login's teammates could not be shown or kept as they are.
+    const canSave = draft.site.trim() !== "" && draft.username.trim() !== "" && (isEditing ? botsLoaded : draft.password !== "");
     const botName = new Map(bots.map((bot) => [bot._id as string, bot.name]));
+    const atTeammateLimit = draft.teammateIds.length >= MAX_TEAMMATES;
 
     const toggleTeammate = (botId: Id<"bots">, checked: boolean) => {
         setDraft((current) => {
@@ -85,13 +109,15 @@ const SiteLogins = () => {
             return;
         }
 
-        const args = saveArgs(draft, botName);
+        const submitted = draft;
+        const args = saveArgs(submitted, botsLoaded ? botName : undefined);
         const saved = isEditing ? t`Login updated` : t`Login saved`;
         const fallback = t`Could not save the login.`;
 
         try {
-            await saveMutation.mutateAsync(args);
-            setDraft(emptyDraft());
+            const savedId = await saveMutation.mutateAsync(args);
+
+            setDraft(afterSave(submitted, savedId));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
             toast.success(saved);
         } catch (error) {
@@ -106,12 +132,10 @@ const SiteLogins = () => {
 
         const { id } = pendingDelete;
 
-        if (draft.id === id) {
-            setDraft(emptyDraft());
-        }
-
         try {
             await deleteMutation.mutateAsync({ loginId: id });
+            // Only once it is gone: a failed delete keeps the edit open.
+            setDraft(clearIfEditing(id));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
             toast.success(t`Login deleted`);
         } catch {
@@ -221,15 +245,21 @@ const SiteLogins = () => {
                         <p className="text-muted-foreground text-xs" id={teammatesId}>
                             {t`Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can.`}
                         </p>
-                        {bots.map((bot) => (
-                            <Label className="flex items-center gap-2 font-normal" key={bot._id}>
-                                <Checkbox
-                                    checked={draft.teammateIds.includes(bot._id as Id<"bots">)}
-                                    onCheckedChange={(checked) => toggleTeammate(bot._id as Id<"bots">, checked)}
-                                />
-                                {bot.name}
-                            </Label>
-                        ))}
+                        {atTeammateLimit && <p className="text-muted-foreground text-xs" role="status">{t`A login can name at most ${MAX_TEAMMATES} bots.`}</p>}
+                        {bots.map((bot) => {
+                            const checked = draft.teammateIds.includes(bot._id as Id<"bots">);
+
+                            return (
+                                <Label className="flex items-center gap-2 font-normal" key={bot._id}>
+                                    <Checkbox
+                                        checked={checked}
+                                        disabled={!checked && atTeammateLimit}
+                                        onCheckedChange={(next) => toggleTeammate(bot._id as Id<"bots">, next)}
+                                    />
+                                    {bot.name}
+                                </Label>
+                            );
+                        })}
                     </fieldset>
                 )}
                 <div className="flex gap-2">
@@ -259,6 +289,18 @@ const SiteLogins = () => {
             />
         </section>
     );
+};
+
+/**
+ * The user's saved site logins, for the agent's browser. The password is write-only: the list shows that one is set,
+ * never what it is, and an edit with the field left empty keeps the saved one. The form lives as long as the signed-in
+ * user: an account switch starts a fresh one and sign-out removes it, so a typed password never outlasts its account.
+ */
+const SiteLogins = () => {
+    const { data: session } = useAuthSession();
+    const userId = session?.user.id;
+
+    return userId ? <SiteLoginsForm key={userId} /> : null;
 };
 
 export default SiteLogins;

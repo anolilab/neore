@@ -1,0 +1,224 @@
+/**
+ * `<SiteLogins>`: a typed password never outlasts its account, a save or a failed delete never discards edits it did
+ * not send, an edit never drops a login's bots while the bot list is missing, and the form stops at the server's limit.
+ */
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createElement } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const SITE = "https://example.com";
+
+const harness = vi.hoisted(() => {
+    return {
+        bots: [] as { _id: string; name: string }[],
+        botsState: "loaded" as "failed" | "loaded" | "pending",
+        deleteSiteLogin: vi.fn(),
+        logins: [] as { hasPassword: true; id: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
+        saveSiteLogin: vi.fn(),
+        userId: "user-a" as string | undefined,
+    };
+});
+
+vi.mock("@lingui/react/macro", () => {
+    return {
+        useLingui: () => {
+            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        },
+    };
+});
+
+vi.mock("sonner", () => {
+    return { toast: { error: vi.fn(), success: vi.fn() } };
+});
+
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: harness.userId ? { user: { id: harness.userId } } : null };
+        },
+    };
+});
+
+vi.mock("@/lib/lunora/crpc", () => {
+    return {
+        useCRPC: () => {
+            return {
+                bots: {
+                    functions: {
+                        listBots: {
+                            queryOptions: () => {
+                                return {
+                                    queryFn: async () => {
+                                        if (harness.botsState === "pending") {
+                                            return await new Promise(() => {});
+                                        }
+
+                                        if (harness.botsState === "failed") {
+                                            throw new Error("bots unavailable");
+                                        }
+
+                                        return harness.bots;
+                                    },
+                                    queryKey: ["bots"],
+                                };
+                            },
+                        },
+                    },
+                },
+                vault: {
+                    site_logins: {
+                        deleteSiteLogin: {
+                            mutationOptions: () => {
+                                return { mutationFn: harness.deleteSiteLogin };
+                            },
+                        },
+                        listSiteLogins: {
+                            queryOptions: () => {
+                                return { queryFn: async () => harness.logins, queryKey: ["site-logins"] };
+                            },
+                        },
+                        saveSiteLogin: {
+                            mutationOptions: () => {
+                                return { mutationFn: harness.saveSiteLogin };
+                            },
+                        },
+                    },
+                },
+            };
+        },
+    };
+});
+
+const { toast } = await import("sonner");
+const { default: SiteLogins } = await import("./site-logins");
+
+// Built at run time, so no secret-shaped literal sits in the source.
+const PASSWORD = ["pw", crypto.randomUUID()].join("-");
+
+const savedLogin = (teammateIds: string[] = []) => {
+    return { hasPassword: true as const, id: "login-1", site: SITE, teammateIds, updatedAt: 1, username: "ada@example.com" };
+};
+
+const mount = () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(SiteLogins));
+    const view = render(tree());
+
+    return { rerender: () => view.rerender(tree()) };
+};
+
+const passwordField = () => screen.getByLabelText("Password") as HTMLInputElement;
+
+const valueOf = (label: string) => (screen.getByLabelText(label) as HTMLInputElement).value;
+
+// A native button carries `disabled`; the checkbox is a `role="checkbox"` element marked `aria-disabled`.
+const isDisabled = (element: Element | undefined) =>
+    element !== undefined && ((element as HTMLButtonElement).disabled === true || element.getAttribute("aria-disabled") === "true");
+
+afterEach(() => {
+    harness.bots = [];
+    harness.botsState = "loaded";
+    harness.logins = [];
+    harness.userId = "user-a";
+    vi.clearAllMocks();
+});
+
+describe("SiteLogins", () => {
+    it("drops a typed password when the account switches or signs out", async () => {
+        const user = userEvent.setup();
+        const view = mount();
+
+        await user.type(passwordField(), PASSWORD);
+        expect(passwordField().value).toBe(PASSWORD);
+
+        harness.userId = "user-b";
+        view.rerender();
+        expect(passwordField().value).toBe("");
+
+        harness.userId = undefined;
+        view.rerender();
+        expect(screen.queryByLabelText("Password")).toBeNull();
+    });
+
+    it("keeps edits made while a save was in flight", async () => {
+        const user = userEvent.setup();
+        let finishSave: (value: string) => void = () => {};
+        // The configured Node range predates `Promise.withResolvers`.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const heldSave = new Promise<string>((resolve) => {
+            finishSave = resolve;
+        });
+
+        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue("login-1");
+        mount();
+
+        await user.type(screen.getByLabelText("Site"), SITE);
+        await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+        await user.type(passwordField(), PASSWORD);
+        await user.click(screen.getByRole("button", { name: "Save login" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+
+        await user.type(screen.getByLabelText("Label (optional)"), "Work");
+        finishSave("login-1");
+
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
+        expect(valueOf("Label (optional)")).toBe("Work");
+        expect(passwordField().value).toBe(PASSWORD);
+
+        // The kept edits now belong to the saved login: saving them again changes it rather than creating a second one.
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+        expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ label: "Work", loginId: "login-1" });
+    });
+
+    it("keeps the open edit when its delete fails", async () => {
+        const user = userEvent.setup();
+
+        harness.logins = [savedLogin()];
+        harness.deleteSiteLogin.mockRejectedValue(new Error("offline"));
+        mount();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+        await user.type(passwordField(), PASSWORD);
+        await user.click(screen.getByRole("button", { name: `Delete login for ${SITE}` }));
+        await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+        await waitFor(() => expect(harness.deleteSiteLogin).toHaveBeenCalledOnce());
+        expect(passwordField().value).toBe(PASSWORD);
+        expect(screen.getByRole("button", { name: "Save changes" })).toBeDefined();
+    });
+
+    it.each(["pending", "failed"] as const)("does not save an edit while the bot list is %s, which would drop the login's bots", async (state) => {
+        const user = userEvent.setup();
+
+        harness.botsState = state;
+        harness.logins = [savedLogin(["bot-1"])];
+        mount();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+
+        expect(isDisabled(screen.getByRole("button", { name: "Save changes" }))).toBe(true);
+    });
+
+    it("stops ticking bots at the most a login may name", async () => {
+        const user = userEvent.setup();
+
+        harness.bots = Array.from({ length: 21 }, (_, index) => {
+            return { _id: `bot-${index}`, name: `Bot ${index}` };
+        });
+        mount();
+
+        const boxes = await screen.findAllByRole("checkbox");
+
+        for (const box of boxes.slice(0, 20)) {
+            await user.click(box);
+        }
+
+        expect(isDisabled(boxes[20])).toBe(true);
+        expect(screen.getByRole("status").textContent).toContain("at most 20 bots");
+        expect(isDisabled(boxes[0])).toBe(false);
+    });
+});

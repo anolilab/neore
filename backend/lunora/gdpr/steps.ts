@@ -378,12 +378,14 @@ export const collectFiles = internalQuery
                     updatedAt: v.number(),
                 }),
             ),
-            // Saved site logins (`vault/site-logins.ts`): the site and the username only; the secret stays out.
+            // Saved site logins (`vault/site-logins.ts`): the site, the username and which teammates may use each; the
+            // secret stays out.
             siteLogins: v.array(
                 v.object({
                     createdAt: v.number(),
                     label: v.optional(v.string()),
                     site: v.string(),
+                    teammateIds: v.array(v.id("bots")),
                     updatedAt: v.number(),
                     username: v.string(),
                 }),
@@ -427,7 +429,14 @@ export const collectFiles = internalQuery
                 };
             }),
             siteLogins: siteLogins.map((login) => {
-                return { createdAt: login.createdAt, label: login.label, site: login.origin, updatedAt: login.updatedAt, username: login.username };
+                return {
+                    createdAt: login.createdAt,
+                    label: login.label,
+                    site: login.origin,
+                    teammateIds: login.teammateIds ?? [],
+                    updatedAt: login.updatedAt,
+                    username: login.username,
+                };
             }),
         };
     });

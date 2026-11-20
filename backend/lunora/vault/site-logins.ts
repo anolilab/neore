@@ -7,6 +7,7 @@
  * login names that teammate (`teammateIds`), which only its owner sets. A run decides from its thread, never from anything
  * the client sends (`usableSiteLogins`).
  */
+import { env } from "cloudflare:workers";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -15,7 +16,8 @@ import { loadEligibleThread } from "../devices/internal";
 import { encryptKey } from "../lib/encryption";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
-import { servesUser } from "../lib/shard-context";
+import { currentShard, ROOT_SHARD_KEY, servesUser } from "../lib/shard-context";
+import { isShardRoutingEnabled } from "../lib/shard-namespace";
 import { normalizeSiteOrigin, SITE_ORIGIN_MAX } from "./lib/site-origin";
 
 /** Logins one user may keep, and the most any read returns. Bounded so every read is complete. */
@@ -46,11 +48,15 @@ const ownLogins = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc
         .take(MAX_SITE_LOGINS);
 
 /**
- * A collaborator reaches every procedure on the shard of a thread shared with them. Logins live only on their owner's own
- * shard, so a write anywhere else is refused: a row stranded there would escape that user's export and erasure.
+ * A collaborator reaches every procedure on the shard of a thread shared with them, and any signed-in caller can name
+ * `__root__`. Logins live only on their owner's own shard, so anywhere else a write is refused and a read finds nothing:
+ * a row stranded there would escape that user's export and erasure. No shard context at all (unit tests) counts as own,
+ * and so does `__root__` while development runs every user on it (`SHARD_ROUTING=off`), where export and erasure do too.
  */
+const onOwnShard = (userId: string): boolean => (currentShard() !== ROOT_SHARD_KEY || !isShardRoutingEnabled(env)) && servesUser(userId);
+
 const assertOwnShard = (userId: string): void => {
-    if (!servesUser(userId)) {
+    if (!onOwnShard(userId)) {
         throw new LunoraError("FORBIDDEN", "Site logins are saved on your own account only");
     }
 };
@@ -78,7 +84,7 @@ const trimmedLabel = (label: string | undefined): string | undefined => {
 
 /** The caller's saved logins: site, username, label and teammates. Never the password or its ciphertext. */
 export const listSiteLogins = authQuery.output(v.array(vSiteLogin)).query(async ({ ctx }) => {
-    if (!servesUser(ctx.user.userId)) {
+    if (!onOwnShard(ctx.user.userId)) {
         return [];
     }
 
