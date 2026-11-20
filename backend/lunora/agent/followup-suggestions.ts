@@ -94,14 +94,19 @@ export const getCachedFollowupSuggestionsHandler = async (context: QueryContext,
     };
 };
 
+/**
+ * Stores the suggestions for one reply. The check and the write run in one mutation, so a run for an older turn that
+ * finishes late is refused when a newer turn's suggestions are already stored.
+ */
 export const cacheFollowupSuggestions = internalMutation
     .input({
         lastMessageId: v.string(),
+        order: v.number(),
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { lastMessageId, suggestions, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { lastMessageId, order, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
 
         const existing = await context.db
@@ -110,8 +115,14 @@ export const cacheFollowupSuggestions = internalMutation
             .first();
 
         if (existing) {
+            // A newer turn's suggestions are already stored: this older run must not replace them.
+            if (existing.order !== undefined && existing.order > order) {
+                return null;
+            }
+
             await context.db.patch("followupSuggestions", existing._id, {
                 lastMessageId,
+                order,
                 suggestions,
                 updatedAt: now,
             });
@@ -119,6 +130,7 @@ export const cacheFollowupSuggestions = internalMutation
             await context.db.insert("followupSuggestions", {
                 createdAt: now,
                 lastMessageId,
+                order,
                 suggestions,
                 threadId,
                 updatedAt: now,

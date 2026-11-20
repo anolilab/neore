@@ -4613,8 +4613,9 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             for (let pages = 0; pages < MAX_TURN_PAGES; pages += 1) {
                 let reachedOlderTurn = false;
+                const pageRows = turnPage.page || [];
 
-                for (const messageDocument of turnPage.page || []) {
+                for (const messageDocument of pageRows) {
                     if (messageDocument.order < newest.order) {
                         reachedOlderTurn = true;
 
@@ -4702,8 +4703,10 @@ export const generateFollowupSuggestionsForThread = internalAction
             }
 
             // Cache the suggestions
+            // The mutation refuses a turn older than the one already cached, so a run that finished late cannot replace a newer cache.
             await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
                 lastMessageId,
+                order: newest.order,
                 suggestions: output.suggestions,
                 threadId,
             });
