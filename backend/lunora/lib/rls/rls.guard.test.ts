@@ -67,6 +67,9 @@ const SYSTEM_DB_IMPORTERS = [
     "notifications/native-push.ts",
     // `notify()` asks whether the RECIPIENT has a phone when another user's request (a grantee's run) writes the row.
     "notifications/notify.ts",
+    // The thread OWNER's running browser, for a caller the thread decision already gave full read access: a status
+    // with no secret columns, never the row.
+    "browser/live-view.ts",
 ].toSorted(byName);
 
 /** `relative()` with POSIX separators, so the keys below hold on Windows too. */

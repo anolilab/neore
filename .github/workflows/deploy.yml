@@ -501,6 +501,8 @@ jobs:
                   VALYU_API_KEY: "${{ secrets.VALYU_API_KEY }}"
                   # Optional backend extras — bound only when non-empty.
                   CONNECTOR_ENCRYPTION_KEY: "${{ secrets.CONNECTOR_ENCRYPTION_KEY }}"
+                  # Read-only live view of the agent's cloud browser; needs CLOUDFLARE_ACCOUNT_ID too.
+                  BROWSER_LIVE_VIEW_API_TOKEN: "${{ secrets.BROWSER_LIVE_VIEW_API_TOKEN }}"
                   # GitHub reserves secret names starting with GITHUB_, hence the swap.
                   GITHUB_CONNECTOR_CLIENT_ID: "${{ secrets.CONNECTOR_GITHUB_CLIENT_ID }}"
                   GITHUB_CONNECTOR_CLIENT_SECRET: "${{ secrets.CONNECTOR_GITHUB_CLIENT_SECRET }}"

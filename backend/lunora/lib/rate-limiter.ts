@@ -114,6 +114,9 @@ export const RATE_LIMIT_CONFIGS = {
 
     "browser/action:premium": Ratelimit.fixedWindow(200, HOUR),
     "browser/action:public": Ratelimit.fixedWindow(5, HOUR),
+    // Each call mints a live view URL at the provider (`browser/live-view.ts`).
+    "browser/liveView:free": Ratelimit.fixedWindow(30, HOUR),
+    "browser/liveView:premium": Ratelimit.fixedWindow(120, HOUR),
 
     "byok/decrypt:free": Ratelimit.fixedWindow(100, MINUTE),
 

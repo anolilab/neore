@@ -135,6 +135,8 @@ export const buildCSPDirectives = (nonce: string, isDevelopment: boolean = impor
             // MCP Apps sandbox proxy — outer iframe that isolates interactive MCP App UIs
             // Must be on a different origin from the host app (security requirement)
             "https://proxy.mcpui.dev",
+            // Read-only live view of the agent's cloud browser (`features/chat/browser-live-view`)
+            "https://live.browser.run",
         ],
 
         // Images — any https host. Chat renders images from anywhere: model

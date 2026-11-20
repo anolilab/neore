@@ -1190,7 +1190,7 @@ msgstr "hace {minutes} min"
 msgid "{minutes}m remaining"
 msgstr "Quedan {minutes} min"
 
-#: src/features/chat/thread/composer.tsx:234
+#: src/features/chat/thread/composer.tsx:235
 msgid "{modeLabel} mode — click to change"
 msgstr "Modo {modeLabel}: haz clic para cambiarlo"
 
@@ -4236,7 +4236,7 @@ msgstr "Pregunta lo que quieras para iniciar un chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Haz la misma pregunta a GPT-4, Claude y Gemini. Ejecuta el mismo prompt en FLUX, Imagen y Stable Diffusion. Quédate con el ganador, no con el predeterminado."
 
-#: src/features/chat/thread/composer.tsx:270
+#: src/features/chat/thread/composer.tsx:271
 msgid "Ask me anything..."
 msgstr "Pregúntame lo que quieras..."
 
@@ -4374,7 +4374,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -5306,6 +5306,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Explora, bifurca y remezcla flujos de trabajo compartidos por la comunidad"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
+#: src/features/chat/browser-live-view/browser-live-view.tsx:188
+#: src/features/chat/browser-live-view/browser-live-view.tsx:251
 msgid "Browser"
 msgstr "Navegador"
 
@@ -9686,7 +9688,7 @@ msgstr "Rondas de debate"
 msgid "Debates for {0} rounds."
 msgstr "Debate durante {0} rondas."
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:277
 msgid "Debug an error or review my code..."
 msgstr "Depura un error o revisa mi código..."
 
@@ -11106,7 +11108,7 @@ msgstr "Borrador"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Redacta una carta de presentación para un puesto de ingeniería de software"
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:275
 msgid "Draft an email, report, or essay..."
 msgstr "Redacta un correo, un informe o un ensayo..."
 
@@ -12907,7 +12909,7 @@ msgstr "Caduca: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Caduca pronto"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:278
 msgid "Explain a concept in simple terms..."
 msgstr "Explica un concepto en términos sencillos..."
 
@@ -15333,7 +15335,7 @@ msgstr "Genera una imagen a partir de un prompt de texto y amplíala a 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Genera una imagen de un rincón de lectura acogedor con luz cálida y plantas."
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:280
 msgid "Generate an image or video..."
 msgstr "Genera una imagen o un video..."
 
@@ -16326,6 +16328,10 @@ msgstr "Ocultar columna"
 msgid "Hide follow-up suggestions"
 msgstr "Ocultar sugerencias de seguimiento"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:192
+msgid "Hide live view"
+msgstr ""
+
 #: src/features/workflow/components/nodes/base-node.tsx:278
 msgid "Hide output"
 msgstr "Ocultar salida"
@@ -16831,7 +16837,7 @@ msgstr "ilustración"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -18967,6 +18973,10 @@ msgstr "Vista previa en vivo: se muestra cuando el componente termina de transmi
 msgid "Live preview — updating as the artifact streams"
 msgstr "Vista previa en vivo: se actualiza mientras se transmite el artefacto"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:228
+msgid "Live view of the agent's browser (read-only)"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:37
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA, Mixtral, Gemma: la inferencia más rápida"
@@ -20586,7 +20596,7 @@ msgid "Mobile app icon"
 msgstr "Icono de app móvil"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:223
+#: src/features/chat/thread/composer.tsx:224
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -21433,7 +21443,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Agente de Neore"
 
-#: src/features/chat/thread/composer.tsx:689
+#: src/features/chat/thread/composer.tsx:690
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore puede cometer errores. Verifica la información importante."
 
@@ -21810,7 +21820,7 @@ msgstr "Coincidencia siguiente"
 msgid "Next option"
 msgstr "Opción siguiente"
 
-#: src/features/chat/thread/composer.tsx:240
+#: src/features/chat/thread/composer.tsx:241
 msgid "Next output mode"
 msgstr "Siguiente modo de salida"
 
@@ -23929,6 +23939,10 @@ msgstr "Abriendo pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Abrir el asistente sin una conversación te lleva a la más reciente en lugar de a un chat en blanco."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:199
+msgid "Opening the live view…"
+msgstr ""
+
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
 msgstr "Abriendo la página compartida…"
@@ -24284,7 +24298,7 @@ msgstr "Formato de salida"
 msgid "Output is not loaded in this view."
 msgstr "La salida no se carga en esta vista."
 
-#: src/features/chat/thread/composer.tsx:251
+#: src/features/chat/thread/composer.tsx:252
 msgid "Output Mode"
 msgstr "Modo de salida"
 
@@ -25102,7 +25116,7 @@ msgstr "plan"
 msgid "Plan"
 msgstr "Plan"
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:274
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Planifica un proyecto o genera ideas..."
 
@@ -25650,7 +25664,7 @@ msgstr "Coincidencia anterior"
 msgid "Previous option"
 msgstr "Opción anterior"
 
-#: src/features/chat/thread/composer.tsx:206
+#: src/features/chat/thread/composer.tsx:207
 msgid "Previous output mode"
 msgstr "Modo de salida anterior"
 
@@ -27770,7 +27784,7 @@ msgstr "Investigación"
 msgid "Research a topic"
 msgstr "Investiga un tema"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:276
 msgid "Research a topic in depth..."
 msgstr "Investiga un tema en profundidad..."
 
@@ -32134,7 +32148,7 @@ msgstr "Resume mis notas de hoy"
 msgid "Summarise my notes in three bullets."
 msgstr "Resume mis notas en tres viñetas."
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:273
 msgid "Summarize a document or URL..."
 msgstr "Resume un documento o una URL..."
 
@@ -32818,7 +32832,7 @@ msgstr "texto"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:128
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33177,6 +33191,10 @@ msgstr "El agente aún está abriendo su sesión. Inténtalo de nuevo en un mome
 #: src/features/chat/host/host-send-errors.ts:24
 msgid "The agent is still working on the last message."
 msgstr "El agente sigue trabajando en el último mensaje."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:189
+msgid "The agent is using a browser"
+msgstr ""
 
 #: src/features/chat/host/diff-comments-draft.tsx:74
 msgid "The agent is working. You can send these when it is done."
@@ -33607,6 +33625,18 @@ msgstr "Puede que el enlace sea incorrecto o que su propietario haya hecho priva
 #: src/features/pages/components/public-page-view.tsx:86
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Puede que el enlace sea incorrecto o que su propietario haya despublicado o eliminado la página."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+msgid "The live view could not be opened."
+msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:223
+#~ msgid "The live view could not be opened. Try again."
+#~ msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:204
+msgid "The live view is not available right now."
+msgstr ""
 
 #. placeholder {0}: info.detail
 #: src/features/local-models/lib/local-errors.ts:195
@@ -35132,6 +35162,10 @@ msgstr "Demasiados intentos. Espera unos segundos y vuelve a intentarlo."
 msgid "too many files"
 msgstr "demasiados archivos"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+msgid "Too many live views were opened. Try again later."
+msgstr ""
+
 #: src/features/chat/guest-links/guest-page.tsx:95
 msgid "Too many messages. Please try again later."
 msgstr "Demasiados mensajes. Inténtalo más tarde."
@@ -35358,7 +35392,7 @@ msgstr "Imagen transformada"
 msgid "Translate"
 msgstr "Traducir"
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:279
 msgid "Translate text to another language..."
 msgstr "Traduce un texto a otro idioma..."
 
@@ -35522,6 +35556,8 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:214
+#: src/features/chat/browser-live-view/browser-live-view.tsx:265
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -37051,7 +37087,7 @@ msgstr "vídeo"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -37590,6 +37626,10 @@ msgstr "¿Quieres continuar desde aquí?"
 msgid "Watch"
 msgstr "Vigilar"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:192
+msgid "Watch live"
+msgstr ""
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:230
 msgid "Watch only this part (optional)"
 msgstr "Vigilar solo esta parte (opcional)"
@@ -37982,6 +38022,10 @@ msgstr "Donde las ideas<0/><1>se convierten en acciones.</1>"
 msgid "Where you stay in control"
 msgstr "Dónde mantienes el control"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:253
+msgid "Whether the agent is using a browser could not be checked."
+msgstr ""
+
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
 msgstr "¿Qué modelos de IA se incluyen?"
@@ -38185,7 +38229,7 @@ msgstr "Escribe contenido extenso junto al chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Escribe contenido extenso en un editor de lienzo lateral. Pasa del chat al documento terminado sin cambiar de herramienta."
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:272
 msgid "Write some code for me..."
 msgstr "Escríbeme algo de código..."
 

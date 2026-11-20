@@ -46,7 +46,9 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
     PERMISSION_LEVELS[granted] >= PERMISSION_LEVELS[required];
 
 /**
- * - `full` — owner (`admin`) or live grantee (the grant's permission): the raw row.
+ * - `full` — owner (`admin`) or live grantee (the grant's permission): the raw row. `expiresAt`: when a
+ *   grantee's grant ends, for a live read that must stop showing the thread then (a cached live query is not
+ *   re-run when only the clock moves).
  * - `redacted` — a live PUBLIC thread and anyone else, including no caller at
  *   all: only what `redactThreadForPublicViewer` / `toPublicThreadMessages`
  *   let through. Never an authorization for anything but that projection.
@@ -57,7 +59,7 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
  *   public view).
  */
 export type ThreadReadAccess =
-    | { kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> }
+    | { expiresAt?: number; kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> }
     | { kind: "locked"; thread: Doc<"threads"> }
     | { kind: "redacted"; thread: Doc<"threads"> }
     | null;
@@ -118,7 +120,7 @@ export const resolveThreadReadAccess = async (
         if (access && hasThreadReadAccess({ access, now: Date.now(), thread, userId })) {
             admitThread(context, threadId, access.permission, userId);
 
-            return { kind: "full", permission: access.permission, thread };
+            return { ...(access.expiresAt !== undefined && { expiresAt: access.expiresAt }), kind: "full", permission: access.permission, thread };
         }
     }
 

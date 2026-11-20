@@ -10,8 +10,10 @@
 import { browserAction, type BrowserActionResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
 import { LunoraError, v } from "lunorash/server";
 
+import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
+import { NO_PROVIDER_SESSION, watchableSessionId } from "../../browser/live-view-logic";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { isServiceBound, serviceFetch } from "../../lib/services";
 import { validateDomain } from "./utilities";
@@ -62,11 +64,22 @@ export const executeBrowserAction = internalAction
             }
 
             const startTime = Date.now();
+            // The session this action holds while it runs, and its hold's deadline; released if the action fails.
+            let held: { sessionId: Id<"browserSessions">; until: number } | undefined;
 
             try {
                 // Check for existing CF session to enable multi-step workflows
                 let sessionDocument = await ctx.runQuery(internal.browser.functions.getActiveSession, { threadId });
-                const cfSessionId = sessionDocument?.providerSessionId === "cf-browser-rendering" ? undefined : sessionDocument?.providerSessionId;
+                // What the row named when this action started: its result is written only if no other action moved it on.
+                let startedWithProviderSessionId = sessionDocument?.providerSessionId ?? null;
+                const cfSessionId = sessionDocument?.providerSessionId === NO_PROVIDER_SESSION ? undefined : sessionDocument?.providerSessionId;
+
+                // A browser still alive is in use from here on, not only once the action returns: a slow action must not
+                // read as idle. A reaped one is not held: its old page must not come back while the renderer replaces it.
+                if (sessionDocument && watchableSessionId(sessionDocument, Date.now()) !== undefined) {
+                    held = { sessionId: sessionDocument._id, until: Date.now() + FETCH_TIMEOUT_LONG_MS };
+                    await ctx.runMutation(internal.browser.functions.beginSessionUse, held);
+                }
 
                 const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
 
@@ -91,8 +104,9 @@ export const executeBrowserAction = internalAction
                 const result = data as BrowserActionResponse;
                 const durationMs = Date.now() - startTime;
 
-                // Store the CF session ID so subsequent actions reuse the same browser
-                const returnedSessionId = result.sessionId ?? "cf-browser-rendering";
+                // Store the CF session ID so subsequent actions reuse the same browser. No id: the renderer kept no
+                // browser (it closed it after a blocked redirect), so there is nothing to reuse or watch.
+                const returnedSessionId = result.sessionId ?? NO_PROVIDER_SESSION;
 
                 if (!sessionDocument) {
                     const newSessionId = await ctx.runMutation(internal.browser.functions.createSession, {
@@ -103,26 +117,38 @@ export const executeBrowserAction = internalAction
                     });
 
                     sessionDocument = { _id: newSessionId } as any;
-                } else if (returnedSessionId !== sessionDocument.providerSessionId) {
-                    // Session was recreated (old one expired) — update the stored ID
-                    await ctx.runMutation(internal.browser.functions.updateSession, {
-                        providerSessionId: returnedSessionId,
-                        sessionId: sessionDocument._id,
-                    });
+                    startedWithProviderSessionId = returnedSessionId;
                 }
 
-                await ctx.runMutation(internal.browser.functions.logAction, {
+                // One write: a replaced browser's id, the page this action left it on, the activity stamp, this action's hold's end.
+                const logged = await ctx.runMutation(internal.browser.functions.logAction, {
                     action,
+                    currentUrl: result.url,
                     durationMs,
                     errorMessage: result.error,
+                    heldUntil: held?.until,
+                    providerSessionId: returnedSessionId,
                     sessionId: sessionDocument!._id,
+                    startedAt: startTime,
+                    startedWithProviderSessionId,
                     success: result.success ?? false,
                     target: args.url ?? args.selector,
                     value: args.text,
                 });
 
+                // Another action at the same time left the thread on another browser: this result's page, content and
+                // screenshot are of a browser the next step will not use, so none of it reaches the model.
+                if (logged.replaced) {
+                    return browserReplacedResult(logged.currentUrl);
+                }
+
                 return result;
             } catch (error) {
+                if (held !== undefined) {
+                    // Whether the browser survived is unknown: the row falls back to its last confirmed activity.
+                    await ctx.runMutation(internal.browser.functions.endSessionUse, held).catch(() => undefined);
+                }
+
                 return {
                     error: `CF Browser Rendering error: ${sanitizeBrowserError(error)}`,
                     success: false,
@@ -143,6 +169,19 @@ export const executeBrowserAction = internalAction
             success: false,
         };
     });
+
+/** What the agent hears from an action whose browser another, concurrent action replaced: look again, on the kept browser. */
+const browserReplacedResult = (keptUrl: string | undefined): { error: string; success: false; url?: string } => {
+    return {
+        error: `Another browser action ran at the same time and the thread now uses its browser, not the one this action ran on, so this action's result was discarded. ${
+            keptUrl === undefined
+                ? "The browser's current page is unknown, and it may have none: navigate to the page you need before the next step."
+                : `The browser is on ${keptUrl}: take a screenshot or extract the page before the next step.`
+        } Repeat this action there if it is still needed.`,
+        success: false,
+        ...(keptUrl !== undefined && { url: keptUrl }),
+    };
+};
 
 const sanitizeBrowserError = (error: unknown): string => {
     const raw = error instanceof Error ? error.message : String(error);

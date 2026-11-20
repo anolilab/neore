@@ -1,4 +1,4 @@
-//! The headless host the desktop drives over a pipe (`device_core::host`). Started as
+//! The headless host. With `--stdio` it is the one a desktop drives over a pipe (`device_core::host`). Started as
 //! `neore-host --stdio [--launch <id> [--desktop <tag>]]`; it opens no listener, and stdout carries frames only.
 //!
 //! `--launch` names this run so the desktop that started it can stop it later, and `--desktop` names that desktop
@@ -12,10 +12,23 @@ use device_core::launch::{self, Launch};
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let usage = || {
+        #[cfg(feature = "headless")]
+        eprintln!("{}", device_core::headless::cli::USAGE);
+        #[cfg(not(feature = "headless"))]
         eprintln!("usage: neore-host --stdio [--launch <id> [--desktop <tag>]]");
 
         ExitCode::from(2)
     };
+
+    // A machine that pairs itself by code (`pair`, `run`, `unpair`): a build with the `headless` feature only.
+    #[cfg(feature = "headless")]
+    {
+        let first = std::env::args().nth(1);
+
+        if let Some(command) = first.as_deref().filter(|command| *command != "--stdio") {
+            return device_core::headless::cli::main(command, args.skip(1));
+        }
+    }
 
     if args.next().as_deref() != Some("--stdio") {
         return usage();
@@ -42,8 +55,8 @@ fn main() -> ExitCode {
         return usage();
     }
 
-    // The host holds no pairing, so a build that links the keyring was packaged wrong (`--no-default-features`).
-    if cfg!(feature = "keychain") {
+    // The pipe host holds no pairing, so a build that links the keyring was packaged wrong (`--no-default-features`).
+    if cfg!(feature = "keychain") && !cfg!(feature = "headless") {
         eprintln!("neore-host: built with the `keychain` feature; it must be built with --no-default-features");
     }
 

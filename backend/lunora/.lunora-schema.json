@@ -4429,6 +4429,12 @@
           "optional": true,
           "unique": false
         },
+        "currentUrlStartedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "errorMessage": {
           "kind": "string",
           "nullable": false,
@@ -4446,6 +4452,18 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "inUseHolds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "number",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         },
         "lastActivityAt": {
           "kind": "number",
