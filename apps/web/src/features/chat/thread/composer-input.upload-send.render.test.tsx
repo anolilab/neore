@@ -20,6 +20,7 @@ const harness = vi.hoisted(() => {
         showError: vi.fn(),
         session: { data: { user: { id: "user-1" } } as { user: { id: string } } | null, isPending: false },
         showInfo: vi.fn(),
+        upload: vi.fn<(state: { file: File }) => Promise<unknown>>(),
     };
 });
 
@@ -107,6 +108,18 @@ vi.mock("@/lib/toast", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("@/lib/toast")>()), showError: harness.showError, showInfo: harness.showInfo };
 });
 
+// Uploads the composer starts itself (a converted text) finish when a test says so.
+vi.mock("@/features/chat/core/adapters/lunora-attachment-adapter", async (importOriginal) => {
+    const original = await importOriginal<typeof import("@/features/chat/core/adapters/lunora-attachment-adapter")>();
+
+    return {
+        ...original,
+        createLunoraAttachmentAdapter: () => {
+            return { accept: "", add: vi.fn(), remove: vi.fn(), send: vi.fn(), upload: harness.upload };
+        },
+    };
+});
+
 vi.mock("@/lib/env", () => {
     return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
 });
@@ -173,12 +186,22 @@ for (const path of [
     "./composer-prompt-queue",
     "./reply-complete-announcement",
     "./turn-step-announcement",
-    "./composer-long-text-prompt",
 ]) {
     vi.doMock(path, () => {
         return { default: () => null };
     });
 }
+
+// The long-text prompt stands in with its contract: a button that converts the draft to a file.
+vi.doMock("./composer-long-text-prompt", () => {
+    return {
+        default: ({ onConvert }: { onConvert: () => void }) => (
+            <button onClick={onConvert} type="button">
+                Convert
+            </button>
+        ),
+    };
+});
 
 const { default: ComposerInput } = await import("./composer-input");
 
@@ -334,6 +357,31 @@ describe("ComposerInput send during an upload", () => {
             expect(sendState()).toBe("ready");
         });
         expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends a converted text once as its file, without the text, when send is pressed while it uploads", async () => {
+        let finish = (): void => {};
+
+        harness.upload.mockImplementation(
+            async ({ file }) =>
+                await new Promise((resolve) => {
+                    finish = () => resolve({ file, metadata: { fileId: "file-text" }, name: file.name });
+                }),
+        );
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Convert" }));
+        pressSend();
+
+        act(() => {
+            finish();
+        });
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledTimes(1);
+        });
+        expect(harness.sendMessage).toHaveBeenCalledWith("", [expect.objectContaining({ fileId: "file-text", status: "complete" })]);
+        expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
     it("sends only once, however often send is pressed while waiting", async () => {

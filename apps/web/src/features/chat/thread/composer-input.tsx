@@ -1699,9 +1699,12 @@ const ComposerInput = ({
         const timestamp = new Date().toISOString().split("T", 1)[0];
         const file = new File([blob], `text-input-${timestamp}.txt`, { type: "text/plain" });
 
-        // Clear the text after successful conversion
-        if (await attachGeneratedFile(file, t`Conversion failed`)) {
-            setText("");
+        // The text leaves the draft before the upload, as `moveDraftToFile` does, so a send pressed meanwhile waits on the file
+        // alone and does not send the text twice. A failed upload puts it back, unless something was typed meanwhile.
+        setText("");
+
+        if (!(await attachGeneratedFile(file, t`Conversion failed`)) && useChatUIStore.getState().composerText === "") {
+            setText(text);
         }
     }, [text, attachGeneratedFile, setText, t]);
 
