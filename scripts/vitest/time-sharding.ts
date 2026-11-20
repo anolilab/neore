@@ -3,7 +3,7 @@
  * together. Vitest's own `--shard` gives each shard an equal count of files, and the backend's files take from
  * 20 milliseconds to almost 20 seconds.
  *
- * Every vitest project spreads `timeSharding(import.meta.url)` into its `test` config. It does nothing
+ * Each project with a `test:coverage` target spreads `timeSharding(import.meta.url)` into its `test` config. It does nothing
  * until one of two variables is set:
  *
  * - `VITEST_SHARD=2/3` runs that shard. Files are dealt out longest first, each to the shard with the least
@@ -39,7 +39,7 @@ const readTimings = (file: string): Timings => {
 };
 
 /** Longest first; equal weights fall back to the id so every shard computes the same order. */
-export const longestFirst = <T>(items: readonly T[], weigh: (item: T) => number, id: (item: T) => string): T[] =>
+const longestFirst = <T>(items: readonly T[], weigh: (item: T) => number, id: (item: T) => string): T[] =>
     [...items].sort((a, b) => weigh(b) - weigh(a) || id(a).localeCompare(id(b)));
 
 /** Deals the items into `count` buckets, each to the lightest so far. Pure, so every shard agrees on the split. */
@@ -57,15 +57,18 @@ export const partition = <T>(items: readonly T[], count: number, weigh: (item: T
     return buckets.map((bucket) => bucket.items);
 };
 
-/** A weigher over recorded milliseconds; an unrecorded file weighs the average of the recorded ones. */
+/**
+ * A weigher over recorded milliseconds; an unrecorded file weighs the average of the recorded ones. Every file
+ * weighs at least 1, so the first files dealt each land in an empty shard and no shard is left without one.
+ */
 export const weigher = (timings: Timings): ((key: string) => number) => {
     const known = Object.values(timings);
     const fallback = known.length > 0 ? known.reduce((sum, ms) => sum + ms, 0) / known.length : 1;
 
-    return (key) => timings[key] ?? fallback;
+    return (key) => Math.max(1, timings[key] ?? fallback);
 };
 
-export class TimeSequencer extends BaseSequencer {
+class TimeSequencer extends BaseSequencer {
     readonly #root = this.ctx.config.root;
 
     readonly #weigh = weigher(readTimings(timingsFile(this.#root)));
@@ -74,15 +77,15 @@ export class TimeSequencer extends BaseSequencer {
 
     readonly #weight = (spec: TestSpecification): number => this.#weigh(this.#key(spec));
 
-    override async shard(specs: TestSpecification[]): Promise<TestSpecification[]> {
+    override shard(specs: TestSpecification[]): Promise<TestSpecification[]> {
         const { count, index } = this.ctx.config.shard!;
 
         // Vitest has already checked that `index` is between 1 and `count`.
-        return partition(specs, count, this.#weight, this.#key)[index - 1] ?? [];
+        return Promise.resolve(partition(specs, count, this.#weight, this.#key)[index - 1] ?? []);
     }
 
-    override async sort(specs: TestSpecification[]): Promise<TestSpecification[]> {
-        return longestFirst(specs, this.#weight, this.#key);
+    override sort(specs: TestSpecification[]): Promise<TestSpecification[]> {
+        return Promise.resolve(longestFirst(specs, this.#weight, this.#key));
     }
 }
 
@@ -124,8 +127,9 @@ export const timeSharding = (configUrl: string) => {
 
     return {
         sequence: { sequencer: TimeSequencer },
-        // A small project can have fewer files than shards; an empty shard is not a failure.
-        ...(shard ? { passWithNoTests: true, shard } : {}),
-        ...(process.env.VITEST_RECORD_TIMINGS ? { reporters: ["default", new TimingsReporter(projectRoot)] } : {}),
+        ...(shard ? { shard } : {}),
+        ...(process.env.VITEST_RECORD_TIMINGS
+            ? { reporters: ["default", ...(process.env.GITHUB_ACTIONS ? ["github-actions"] : []), new TimingsReporter(projectRoot)] }
+            : {}),
     };
 };

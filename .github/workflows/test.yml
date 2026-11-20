@@ -73,7 +73,7 @@ jobs:
     # Three shards: the backend alone took over 8 of the job's 11 test minutes when it ran whole. Each shard runs a third of every
     # project's files, balanced by recorded time (`scripts/vitest/time-sharding.ts`), so the shards end together.
     test:
-        name: "Test (node-24, shard ${{ matrix.shard }}/3)"
+        name: "Test (node-24, shard ${{ matrix.shard }}/${{ strategy.job-total }})"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
@@ -175,6 +175,8 @@ jobs:
             # Run directly rather than through `vis affected`, which would pull in the backend Worker build.
             # The app builds catch a broken bundle, which type checks and unit tests do not.
             - name: "Build the browser extension and mobile app"
+              # A bundle check, not a test input: one shard is enough.
+              if: "matrix.shard == 1"
               shell: "bash"
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
@@ -182,9 +184,6 @@ jobs:
                   pnpm --filter @neore/browser-extension run build
                   pnpm --filter @neore/mobile run build
 
-            # `--parallel 2`: the standard runner is 2-core/7GB and every project's vitest spawns its own
-            # worker pool, so running all of them at once starved the suites (trivial tests timing out at
-            # 5 s, a 50 ms tokenizer taking 5.6 s). Two at a time keeps the run well inside the timeout.
             # The timings `files-changed` picked for this run, recorded on main by `full-test.yml`. With none, every
             # shard uses the committed seed.
             - name: "Restore the test timings"
@@ -195,13 +194,20 @@ jobs:
                   key: "${{ needs.files-changed.outputs.timings-key }}"
                   fail-on-cache-miss: true
 
-            # `--no-cache`: the shard comes from the environment, which is not in the task hash, so a cached
-            # pass could stand in for another shard's files.
-            - name: "Run tests (affected, shard ${{ matrix.shard }}/3)"
+            # `--parallel 2`: the standard runner is 2-core/7GB and every project's vitest spawns its own
+            # worker pool, so running all of them at once starved the suites (trivial tests timing out at
+            # 5 s, a 50 ms tokenizer taking 5.6 s). Two at a time keeps the run well inside the timeout.
+            - name: "Run tests (affected, shard ${{ matrix.shard }}/${{ strategy.job-total }})"
               shell: "bash"
               env:
-                  VITEST_SHARD: "${{ matrix.shard }}/3"
-              run: 'pnpm exec vis affected test:coverage --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2 --no-cache'
+                  VITEST_SHARD: "${{ matrix.shard }}/${{ strategy.job-total }}"
+              run: 'pnpm exec vis affected test:coverage --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
+
+            # The split's own tests. They belong to no project, so `vis` never collects them.
+            - name: "Test the shard split"
+              if: "matrix.shard == 1"
+              shell: "bash"
+              run: "pnpm exec vitest run --root scripts/vitest"
 
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
             # for a pull_request from a fork: secrets are not exposed there, so

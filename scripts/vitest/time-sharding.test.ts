@@ -32,6 +32,14 @@ describe(partition, () => {
         expect(loads).toStrictEqual([900, 800, 700]);
     });
 
+    it("leaves no shard empty when files are recorded at 0 ms", () => {
+        expect.assertions(1);
+
+        const shards = partition(["a", "b", "c"], 3, weigher({ a: 0, b: 0, c: 0 }), id);
+
+        expect(shards.map((shard) => shard.length)).toStrictEqual([1, 1, 1]);
+    });
+
     it("weighs an unrecorded file as the average of the recorded ones", () => {
         expect.assertions(1);
 
