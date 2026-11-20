@@ -2,7 +2,7 @@ import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
+import { internalMutation, internalQuery, type MutationCtx, type QueryCtx as QueryContext } from "../_generated/server";
 
 /**
  * Thread access and invite operations.
@@ -163,6 +163,19 @@ export const updateThreadAccess = internalMutation
 
         return null;
     });
+
+/**
+ * Removes every share grant of a thread: called when the thread is deleted, to the trash or for good, so no collaborator
+ * keeps reading it, or a memory's quote from it (`memory/functions.ts#getMemorySource`, which sees only the grant). A chat
+ * restored from the trash is shared again by hand. Primary: a replica that lags a fresh grant would leave it behind.
+ */
+export const revokeThreadGrants = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<void> => {
+    const { page } = await ctx.db.threadAccess.findMany({ consistency: "primary", where: { threadId } });
+
+    for (const grant of page) {
+        await ctx.db.delete("threadAccess", grant._id);
+    }
+};
 
 export const deleteThreadAccess = internalMutation
     .input({

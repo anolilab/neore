@@ -66,7 +66,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
-const { _deletePageForThreadId, createTemporaryThread, markThreadArchived, softDeleteThread } = await import("../agent/threads");
+const { _deletePageForThreadId, createTemporaryThread, deleteAllForThreadIdAsync, markThreadArchived, softDeleteThread } = await import("../agent/threads");
 const { enableThreadLock } = await import("../agent/thread-lock");
 const { GUEST_ROUTE_BATCH, scheduleGuestLinkRouteDrop, withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
 
@@ -156,6 +156,32 @@ describe("withdrawing a link", () => {
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
         expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+});
+
+describe("a deleted chat's share grants", () => {
+    const deletions: [string, () => Promise<unknown>][] = [
+        ["trashed", async () => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }))],
+        ["deleted for good", async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }))],
+    ];
+
+    it.each(deletions)("are removed when the chat is %s, so no collaborator keeps reading it", async (_label, remove) => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: "collaborator" });
+            await ctx.db.insert("threadAccess", {
+                grantedAt: 0,
+                grantedBy: OWNER,
+                ownerId: OWNER,
+                permission: "read",
+                threadId: "another-thread",
+                userId: "collaborator",
+            });
+        });
+        await remove();
+
+        const grants = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { userId: "collaborator" } }));
+
+        expect(grants.page.map((grant: any) => grant.threadId)).toEqual(["another-thread"]);
     });
 });
 
