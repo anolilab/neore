@@ -39,7 +39,7 @@ const REPLACED_NOTE_FOR_A = /at the same time.*https:\/\/example\.com\/a.*screen
 const NOW = Date.UTC(2026, 10, 20, 12);
 
 interface SessionRow {
-    control?: { by: string; claim: string; ended?: "handed_back" | "left"; since: number; until: number };
+    control?: { by: string; claim: string; ended?: "browser_closed" | "handed_back" | "left"; since: number; until: number };
     currentUrl?: string;
     inUseHolds?: number[];
     lastActivityAt: number;
@@ -395,6 +395,7 @@ describe("a browser a person took control of", () => {
     it.each([
         ["handed_back", "handed it back"],
         ["left", "left the live view"],
+        ["browser_closed", "the browser they drove was closed or replaced"],
         [undefined, "stopped using it"],
     ])("after it ended (%s), looks at the page instead of acting, and says on which page it is", async (ended, reason) => {
         await addSession(NOW - 1000);

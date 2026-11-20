@@ -205,6 +205,8 @@ export const openLiveView = authAction
 
         // Someone else drives the browser and may be typing a password: nobody else watches meanwhile.
         if (browser.kind === "watchable" && browser.controlledByOther) {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "controlled" });
+
             return { status: "controlled" as const };
         }
 
@@ -258,6 +260,8 @@ export const openLiveView = authAction
         }
 
         if (after.controlledByOther) {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "controlled_after_mint" });
+
             return { status: "controlled" as const };
         }
 
@@ -301,11 +305,11 @@ export const claimControl = internalMutation
                 /** `fresh`: this claim started the lease (a renewal by its holder did not), so only it may drop it again. */
                 fresh: v.boolean(),
                 /** This renewal took back a lease its holder handed back while their page loads: a dropped claim hands it back again. */
-                handedBack: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
+                handedBack: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
                 kind: v.literal("ok"),
                 providerSessionId: v.string(),
                 /** An earlier lease ended and the agent was not told yet: a dropped claim puts that note back. */
-                returned: v.optional(v.union(v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+                returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
             }),
         ),
     )
@@ -372,8 +376,8 @@ export const claimControl = internalMutation
 export const dropControlClaim = internalMutation
     .input({
         claim: v.string(),
-        handedBack: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
-        returned: v.optional(v.union(v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+        handedBack: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
+        returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
         threadId: v.id("threads"),
         userId: v.string(),
     })
@@ -602,22 +606,26 @@ export const navigateInControl = authAction
         // The audit row, on the row the navigation began on, and a browser the renderer replaced or closed (a blocked
         // redirect closes it and answers no id: nothing is left to watch). Not the page: what the person opens is
         // theirs, and others who watch the chat read the session's page. Before the lease's hold ends, so the agent
-        // never acts on a row that still names a browser that is gone.
-        await ctx.runMutation(internal.browser.functions.logAction, {
-            action: "navigate",
-            durationMs: Date.now() - startedAt,
-            ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
-            ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
-            sessionId: navigation.sessionId,
-            startedAt,
-            startedWithProviderSessionId: navigation.providerSessionId,
-            success: result?.success === true,
-        });
-        await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
-            navigatingUntil: navigation.navigatingUntil,
-            sessionId: navigation.sessionId,
-            userId,
-        });
+        // never acts on a row that still names a browser that is gone. A failed write never keeps the hold: the agent's
+        // next action finds a browser that is gone on its own path, as it does one the provider reaped.
+        try {
+            await ctx.runMutation(internal.browser.functions.logAction, {
+                action: "navigate",
+                durationMs: Date.now() - startedAt,
+                ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
+                ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
+                sessionId: navigation.sessionId,
+                startedAt,
+                startedWithProviderSessionId: navigation.providerSessionId,
+                success: result?.success === true,
+            });
+        } finally {
+            await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
+                navigatingUntil: navigation.navigatingUntil,
+                sessionId: navigation.sessionId,
+                userId,
+            });
+        }
 
         if (result?.success !== true) {
             return { error: result?.error ?? "The page could not be opened.", status: "refused" as const };

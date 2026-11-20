@@ -425,14 +425,15 @@ export const schema = defineSchema({
         /**
          * A person drives the browser (`browser/live-view.ts#takeControl`): the agent's actions are refused while
          * `until` is ahead. Kept after it ends, until an agent action has looked at the page the person left (told that they drove).
-         * `ended`: how the person gave it back; absent once `until` passed is the idle timeout.
+         * `ended`: how the person gave it back (`browser_closed`: the renderer closed or replaced the browser they drove);
+         * absent once `until` passed is the idle timeout.
          */
         control: v.optional(
             v.object({
                 by: v.string(),
                 /** New on every claim and renewal: a failed claim drops the lease only while it is still this one. */
                 claim: v.string(),
-                ended: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
+                ended: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
                 /** A page the person asked for loads until then: the lease lasts at least as long. */
                 navigatingUntil: v.optional(v.number()),
                 since: v.number(),

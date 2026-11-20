@@ -4452,6 +4452,13 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false,
+                  "literal": "\"browser_closed\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
                   "literal": "\"handed_back\""
                 },
                 {

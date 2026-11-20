@@ -767,8 +767,28 @@ describe("opening a page while in control", () => {
         const after = await session();
 
         expect(after.providerSessionId).toBe("cf-browser-rendering");
-        expect(after.control.until).toBeLessThanOrEqual(NOW);
+        // The agent's next action hears that the person's browser was closed, not that they went idle.
+        expect(after.control).toMatchObject({ ended: "browser_closed", until: NOW });
         await expect(statusFor(OWNER)).resolves.toBeNull();
+    });
+
+    it("ends the page's hold when its audit row could not be written, so a hand back mid-load still ends", async () => {
+        await addSession();
+        await take(OWNER);
+
+        renderer.mockImplementationOnce(async () => {
+            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+
+            // An answer the audit row refuses: its write fails.
+            return { data: { error: 42, success: false }, response: { ok: true } };
+        });
+
+        await expect(navigate(OWNER)).rejects.toThrow();
+
+        const after = await session();
+
+        expect(after.control).toMatchObject({ ended: "handed_back", until: NOW });
+        expect(after.control).not.toHaveProperty("navigatingUntil");
     });
 
     it("audits a navigation on the session it began on, not on one opened while it ran", async () => {

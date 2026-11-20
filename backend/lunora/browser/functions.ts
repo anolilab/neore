@@ -129,7 +129,7 @@ export const beginSessionUse = internalMutation
             controlled: v.boolean(),
             held: v.boolean(),
             inspecting: v.optional(v.string()),
-            returned: v.optional(v.union(v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+            returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
         }),
     )
     .mutation(async ({ args: { sessionId, until }, ctx }) => {
@@ -273,7 +273,8 @@ export const logAction = internalMutation
             // longer names, above: the next action looks again).
             const looked = inspected !== undefined && session.control?.claim === inspected && controlStateOf(session, ctx.now) === "returned";
             // A person's lease is on the browser their view shows: once it is gone, the lease ends with it, and the
-            // agent's next action hears that a person drove.
+            // agent's next action hears that a person drove and that their browser was closed. Also over a hand back
+            // made while the page loaded: what the agent needs to know is that the browser it had is gone.
             const leaseEnds = replaced && session.control !== undefined && controlStateOf(session, ctx.now) === "person";
 
             await patchRow(ctx.db, "browserSessions", session, {
@@ -281,7 +282,10 @@ export const logAction = internalMutation
                 // Never back in time: an older action finishing late must not shorten the window a newer one opened.
                 lastActivityAt: Math.max(session.lastActivityAt, ctx.now),
                 ...page,
-                ...(leaseEnds && session.control !== undefined && { control: { ...session.control, navigatingUntil: undefined, until: ctx.now } }),
+                ...(leaseEnds &&
+                    session.control !== undefined && {
+                        control: { ...session.control, ended: "browser_closed" as const, navigatingUntil: undefined, until: ctx.now },
+                    }),
                 ...(looked && { control: undefined }),
             });
 

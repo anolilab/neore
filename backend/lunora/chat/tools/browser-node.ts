@@ -199,7 +199,7 @@ export const executeBrowserAction = internalAction
         };
     });
 
-type BrowserReturn = "handed_back" | "idle" | "left";
+type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 
 /** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
 export const PERSON_HAS_CONTROL =
@@ -210,6 +210,7 @@ export const BROWSER_CLOSED_DURING_ACTION =
     "The browser session was closed while this action ran, so its result was discarded: it is not about the browser the next action will use. That browser starts empty: navigate to the page you need first.";
 
 const RETURN_REASON: Record<BrowserReturn, string> = {
+    browser_closed: "the browser they drove was closed or replaced (a page they opened was blocked, or the browser had expired), so control returned to you",
     handed_back: "handed it back",
     idle: "stopped using it, so control returned to you",
     left: "left the live view, so control returned to you",
