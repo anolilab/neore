@@ -384,6 +384,46 @@ describe("ComposerInput send during an upload", () => {
         expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
+    it("keeps the text in its composer when a conversion fails while a send waits, and sends nothing", async () => {
+        harness.upload.mockRejectedValue(new Error("offline"));
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Convert" }));
+        pressSend();
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(useChatUIStore.getState().composerText).toBe("see notes");
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("does not send while the session still loads, and sends once the account is known", async () => {
+        harness.session = { data: null, isPending: true };
+
+        const id = addUpload("uploading");
+        const view = renderComposer();
+
+        pressSend();
+
+        await act(async () => {
+            useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+        });
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        harness.session = { data: { user: { id: "user-1" } }, isPending: false };
+        view.rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <ComposerInput />
+            </QueryClientProvider>,
+        );
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it("sends only once, however often send is pressed while waiting", async () => {
         const id = addUpload("uploading");
 
