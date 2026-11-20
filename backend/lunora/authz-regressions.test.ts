@@ -649,7 +649,9 @@ describe("crons", () => {
         // A second run does not select the leased thread, so it queues no second chain.
         await run(async (context) => await context.runMutation(procedureAt("crons", "deleteExpiredTemporaryChats"), {}));
 
-        const chainJobs = () => harness.scheduler.list().filter((job) => (job.args as { threadId?: string }).threadId === threadId);
+        // A chain step carries the paging state. The last step also queues `revokeThreadGrantsJob`
+        // with the same `threadId`: replayed as a step, it deletes nothing and queues another one.
+        const chainJobs = () => harness.scheduler.list().filter((job) => job.args.threadId === threadId && "streamsDone" in job.args);
         const chains = chainJobs();
 
         expect(chains).toHaveLength(1);
@@ -657,7 +659,10 @@ describe("crons", () => {
         // Running the chain to its end removes the thread and, last, its marker.
         // The harness cannot dispatch a job scheduled by reference, so run each queued
         // chain step's body with its own args. A step queues the next one, until the last page.
+        // The loop awaits no timer, so a chain that never ends would starve the test timeout: bound it here.
         for (let ran = 0; ran < chainJobs().length; ran += 1) {
+            expect(ran, "the deletion chain should end within a few steps").toBeLessThan(5);
+
             const { args } = chainJobs()[ran]!;
 
             await run(async (context) => await context.runMutation(procedureAt("agent_threads", "deleteAllForThreadIdAsync"), args as never));
