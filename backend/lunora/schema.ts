@@ -3048,6 +3048,25 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+    // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
+    // once a state is set (by the person, or by share/accept); no row means "off".
+    // Global (D1) like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
+    threadFollows: defineTable({
+        createdAt: v.number(),
+        state: v.union(v.literal("on"), v.literal("off"), v.literal("muted")),
+        threadId: v.id("threads"),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_thread", ["threadId"])
+        .index("by_user_and_thread", ["userId", "threadId"], { unique: true })
+        .relations((r) => {
+            return {
+                thread: r.one("threads", { field: "threadId" }),
+            };
+        }),
+
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.

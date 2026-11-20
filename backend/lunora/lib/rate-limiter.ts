@@ -276,6 +276,8 @@ export const RATE_LIMIT_CONFIGS = {
     // "Send feedback" (`feedback/functions.ts`): enough for a burst of reports, not for a flood.
     "feedback/submit:free": Ratelimit.fixedWindow(10, HOUR),
     "feedback/submit:premium": Ratelimit.fixedWindow(30, HOUR),
+    "follows/update:free": Ratelimit.fixedWindow(30, MINUTE),
+    "follows/update:premium": Ratelimit.fixedWindow(100, MINUTE),
     // General rate limits
     free: Ratelimit.tokenBucket(40, 10 * SECOND, 40),
     // GDPR limits

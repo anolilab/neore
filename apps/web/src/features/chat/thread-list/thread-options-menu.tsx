@@ -11,6 +11,8 @@ import { MoreHorizontal } from "lucide-react";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
+import { useThreadFollow } from "../follows/use-thread-follow";
+
 interface ThreadOptionsMenuProps {
     /** Where this copy of the menu shows: `className` for the wrapper, which is `display: contents` while it shows. */
     className?: string;
@@ -37,11 +39,15 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         networkMode: "always",
         retry: 0,
     });
+    // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
+    const follow = useThreadFollow(threadId, { enabled: open && !isLocked });
 
     // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
     if (isLocked && !onOpenInSplitView) {
         return null;
     }
+
+    const showFollowChoices = !isLocked && follow.error === null && follow.state !== undefined;
 
     // The menu's items are portaled; a click in them bubbles through React to the row, which must not open.
     return (
@@ -89,6 +95,24 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                             }
                         >
                             {t`Regenerate title`}
+                        </DropdownMenuItem>
+                    )}
+                    {!isLocked && follow.error !== null && <DropdownMenuItem disabled>{t`Couldn't load follow state`}</DropdownMenuItem>}
+                    {/* Disabled while a change is in flight: a second choice made then could reach the server first. None while the
+                        lookup fails: a cached state may predate the last change. */}
+                    {showFollowChoices && follow.state !== "on" && (
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("on")}>
+                            {t`Follow thread`}
+                        </DropdownMenuItem>
+                    )}
+                    {showFollowChoices && follow.state !== "off" && (
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("off")}>
+                            {t`Unfollow thread`}
+                        </DropdownMenuItem>
+                    )}
+                    {showFollowChoices && follow.state !== "muted" && (
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("muted")}>
+                            {t`Mute thread`}
                         </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>

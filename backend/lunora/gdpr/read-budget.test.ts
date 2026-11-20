@@ -8,6 +8,8 @@ import {
     REPOSITORIES_READ_FLOOR_BYTES,
     repositoriesReadBudget,
     READ_MARGIN_BYTES,
+    THREAD_FOLLOWS_READ_BYTES,
+    threadFollowsReadBudget,
     TRIGGER_READ_BYTES,
     triggerReadBudget,
 } from "./read-budget";
@@ -40,5 +42,13 @@ describe("export read budget", () => {
         expect(used + feedbackReadBudget(used) + READ_MARGIN_BYTES).toBeLessThanOrEqual(ACTION_READ_BYTES);
         expect(feedbackReadBudget(ACTION_READ_BYTES)).toBe(0);
         expect(feedbackReadBudget(0)).toBe(FEEDBACK_READ_BYTES);
+    });
+
+    it("leaves the follow rows only what the earlier sections did not read, at most their own cap", () => {
+        const used = 23 * MIB;
+
+        expect(used + threadFollowsReadBudget(used) + READ_MARGIN_BYTES).toBeLessThanOrEqual(ACTION_READ_BYTES);
+        expect(threadFollowsReadBudget(ACTION_READ_BYTES)).toBe(0);
+        expect(threadFollowsReadBudget(0)).toBe(THREAD_FOLLOWS_READ_BYTES);
     });
 });

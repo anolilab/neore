@@ -289,6 +289,8 @@ for a schema table that is neither policed nor listed:
 | `chat_custom_providers.listCustomProviders` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.probeCustomProvider` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.saveCustomProvider` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
+| `chat_follows_functions.getThreadFollow` | query | authQuery | threadFollows, threads | thread access (owner/grant, read; `requireThreadPermission`) | ok |
+| `chat_follows_functions.setThreadFollow` | mutation | authMutation + RL | threadFollows, threads | thread access (owner/grant, read); row is the caller's own | ok |
 | `chat_functions.abortStreamByMessageId` | mutation | authMutation | threads | thread access (owner/grant) | ok |
 | `chat_functions.abortThreadStream` | mutation | authMutation + RL | threads | thread access (owner/grant, write) | ok |
 | `chat_functions.branchThread` | action | authAction + RL | threads | row.userId == caller | ok |

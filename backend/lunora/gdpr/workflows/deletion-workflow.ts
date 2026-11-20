@@ -182,6 +182,16 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        await drain(
+            "delete-user-follow-rows",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserFollowRows,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-follow-rows", round) },
+                ),
+        );
+
         await context.run(internal.gdpr.functions.updateRequestProgress, {
             currentStep: "deleting_thread_cascade",
             progress: 10,
@@ -672,6 +682,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         userId: args.userId,
                     },
                     { dedupId: stepDedupId(scope, "delete-auth-records") },
+                ),
+        );
+
+        // A follow write admitted before the sessions were revoked can land after the first drain. Nothing new is admitted
+        // once the auth records are gone, so this drain is the authoritative one.
+        await drain(
+            "delete-user-follow-rows-final",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserFollowRows,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-follow-rows-final", round) },
                 ),
         );
 

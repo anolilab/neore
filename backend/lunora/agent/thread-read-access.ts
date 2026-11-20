@@ -80,6 +80,7 @@ export const resolveThreadReadAccess = async (
     threadId: Id<"threads">,
     userId: string | null | undefined,
     unlockProof?: string | null,
+    options: { primary?: boolean } = {},
 ): Promise<ThreadReadAccess> => {
     // The decision reads past row-level security (a grantee cannot see the
     // owner's row until it is admitted); the admission below is what then lets
@@ -108,7 +109,11 @@ export const resolveThreadReadAccess = async (
 
     if (userId) {
         // `.global()` (D1): a grant is read from whichever shard the caller is on.
-        const access = await context.db.threadAccess.findFirst({ where: { threadId, userId } });
+        // `primary`: a caller about to write on the strength of the grant must not see one a replica still holds.
+        const access = await context.db.threadAccess.findFirst({
+            ...(options.primary === true && { consistency: "primary" as const }),
+            where: { threadId, userId },
+        });
 
         if (access && hasThreadReadAccess({ access, now: Date.now(), thread, userId })) {
             admitThread(context, threadId, access.permission, userId);
@@ -187,8 +192,9 @@ export const requireThreadPermission = async (
     userId: string,
     level: ThreadPermission,
     unlockProof?: string | null,
+    options: { primary?: boolean } = {},
 ): Promise<{ permission: ThreadPermission; thread: Doc<"threads"> }> => {
-    const access = await resolveThreadReadAccess(context, threadId, userId, unlockProof);
+    const access = await resolveThreadReadAccess(context, threadId, userId, unlockProof, options);
 
     if (access?.kind === "locked") {
         return throwThreadLocked();

@@ -26639,6 +26639,89 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "threadFollows": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "state": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"muted\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"off\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"on\""
+            }
+          ]
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_thread": {
+          "fields": [
+            "userId",
+            "threadId"
+          ],
+          "unique": true
+        }
+      },
+      "memory": false,
+      "relations": {
+        "thread": {
+          "field": "threadId",
+          "kind": "one",
+          "table": "threads"
+        }
+      },
+      "shardMode": "global:d1"
+    },
     "threadGoals": {
       "commitOrdered": false,
       "fields": {

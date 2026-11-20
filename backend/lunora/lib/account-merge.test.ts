@@ -7,10 +7,19 @@ import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import { deleteMergedGuest } from "../auth/hooks";
+import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
 import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
-import { GLOBAL_USER_COLUMNS, GLOBAL_USER_TABLES_NOT_REASSIGNED, mergeGuestInto, reassignGlobalRows, rewriteOwner, shardLocalTables } from "./account-merge";
+import {
+    GLOBAL_USER_COLUMNS,
+    GLOBAL_USER_TABLES_NOT_REASSIGNED,
+    mergeGuestInto,
+    reassignGlobalRows,
+    reassignThreadFollowsPage,
+    rewriteOwner,
+    shardLocalTables,
+} from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
 
 const ref = (name: string) => {
@@ -23,13 +32,23 @@ const REFERENCES: MergeReferences = {
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
     listIds: ref("listShardRowIds"),
+    reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
 };
 
 type Row = Record<string, unknown> & { _id: string };
 
-/** Two shards as `shardKey → table → rows`, and a caller that plays the four procedures against them. */
-const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) => {
+/**
+ * Two shards as `shardKey → table → rows`, and a caller that plays the procedures against them. `follows` is how many
+ * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports.
+ */
+const fakeShards = (
+    seed: Record<string, Record<string, Row[]>>,
+    pageSize = 2,
+    { follows = 0, followsRemain = false }: { follows?: number; followsRemain?: boolean } = {},
+) => {
+    let followsLeft = follows;
+    let followPageCalls = 0;
     const shards = new Map(Object.entries(seed).map(([key, tables]) => [key, new Map(Object.entries(tables).map(([table, rows]) => [table, [...rows]]))]));
     const reassigned: { from: string; to: string }[] = [];
     /** Each guest deletion, with how many rows the guest's shard still held at that moment. */
@@ -52,6 +71,10 @@ const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) =
 
         switch (name) {
             case "deleteMergedGuest": {
+                if (followsRemain) {
+                    return { deleted: false, followsRemain: true } as never;
+                }
+
                 const left = [...(shards.get(shardKey)?.values() ?? [])].reduce((count, rows) => count + rows.length, 0);
 
                 deletedGuests.push({ left, shardKey, userId: args.userId as string });
@@ -97,13 +120,21 @@ const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) =
 
                 return { reassigned: 0 } as never;
             }
+            case "reassignThreadFollowsPage": {
+                const moved = Math.min(pageSize, followsLeft);
+
+                followPageCalls += 1;
+                followsLeft -= moved;
+
+                return { hasMore: followsLeft > 0, moved } as never;
+            }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
             }
         }
     };
 
-    return { call, deletedGuests, reassigned, shards };
+    return { call, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
 };
 
 describe("rewriteOwner", () => {
@@ -178,6 +209,31 @@ describe("mergeGuestInto", () => {
         await mergeGuestInto(call, REFERENCES, "guest", "user");
 
         expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
+    });
+
+    it("moves the guest's thread follows a page per call until none are left", async () => {
+        const { call, deletedGuests, followPageCalls } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { follows: 5 });
+
+        const { moved } = await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(followPageCalls()).toBe(3);
+        expect(moved).toBe(1 + 5);
+        expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
+    });
+
+    it("keeps the guest and fails for the queue to redeliver when the round cap leaves thread follows behind", async () => {
+        const { call, deletedGuests, followPageCalls } = fakeShards({ guest: {} }, 2, { follows: Infinity });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("round cap");
+
+        expect(followPageCalls()).toBeGreaterThan(1);
+        expect(deletedGuests).toStrictEqual([]);
+    });
+
+    it("fails, for the queue to redeliver, when a follow still names the guest at its deletion", async () => {
+        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("thread follows");
     });
 
     it("is safe to run twice", async () => {
@@ -265,9 +321,114 @@ describe("reassignGlobalRows", () => {
     });
 });
 
+describe("reassignThreadFollowsPage", () => {
+    const followsHarness = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "threadFollows", "shardActivity"]) as never);
+
+    it("moves a guest's follow row, and keeps the new account's own row where both follow a thread", async () => {
+        const harness = followsHarness();
+
+        try {
+            const seeded = await harness.run(async (context: any) => {
+                const thread = async (title: string) =>
+                    (await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title, userId: "owner" })) as string;
+                const follow = async (userId: string, threadId: string, state: string) =>
+                    (await context.db.insert("threadFollows", { createdAt: 1, state, threadId, updatedAt: 1, userId })) as string;
+                const both = await thread("Both follow");
+                const guestOnly = await thread("Guest follows");
+
+                return {
+                    both,
+                    guestBoth: await follow("guest", both, "muted"),
+                    guestOnly,
+                    guestOnlyRow: await follow("guest", guestOnly, "on"),
+                    userBoth: await follow("user", both, "on"),
+                };
+            });
+
+            const result = await harness.run(async (context: any) => await context.runMutation(reassignThreadFollowsPage, { from: "guest", to: "user" }));
+            const rows = await harness.run(async (context: any) => {
+                const { page } = await context.db.threadFollows.findMany({ where: {} });
+
+                return page.map((row: Record<string, unknown>) => {
+                    return { _id: row._id, state: row.state, threadId: row.threadId, userId: row.userId };
+                });
+            });
+
+            expect(result).toStrictEqual({ hasMore: false, moved: 1 });
+            expect(rows.toSorted((a: { _id: string }, b: { _id: string }) => a._id.localeCompare(b._id))).toStrictEqual(
+                [
+                    { _id: seeded.userBoth, state: "on", threadId: seeded.both, userId: "user" },
+                    { _id: seeded.guestOnlyRow, state: "on", threadId: seeded.guestOnly, userId: "user" },
+                ].toSorted((a, b) => a._id.localeCompare(b._id)),
+            );
+            expect(rows.some((row: { _id: string }) => row._id === seeded.guestBoth)).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("moves at most one page per call and says whether rows remain", async () => {
+        const harness = followsHarness();
+        const follows = FOLLOW_MERGE_PAGE_SIZE + 1;
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < follows; index += 1) {
+                    const threadId = await context.db.insert("threads", {
+                        mode: "text",
+                        model: "gpt-4o",
+                        status: "active",
+                        title: `T${String(index)}`,
+                        userId: "owner",
+                    });
+
+                    await context.db.insert("threadFollows", { createdAt: 1, state: "on", threadId, updatedAt: 1, userId: "guest" });
+                }
+            });
+
+            const page = async () =>
+                await harness.run(async (context: any) => await context.runMutation(reassignThreadFollowsPage, { from: "guest", to: "user" }));
+            const left = async () =>
+                await harness.run(async (context: any) => {
+                    const { page: rows } = await context.db.threadFollows.findMany({ where: { userId: "guest" } });
+
+                    return rows.length;
+                });
+
+            await expect(page()).resolves.toStrictEqual({ hasMore: true, moved: FOLLOW_MERGE_PAGE_SIZE });
+            await expect(left()).resolves.toBe(1);
+            await expect(page()).resolves.toStrictEqual({ hasMore: false, moved: 1 });
+            await expect(left()).resolves.toBe(0);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("is no longer part of reassignGlobalRows, which would run every page in one mutation", async () => {
+        const harness = followsHarness();
+
+        try {
+            await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "owner" });
+
+                await context.db.insert("threadFollows", { createdAt: 1, state: "on", threadId, updatedAt: 1, userId: "guest" });
+            });
+
+            await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+            const left = await harness.run(async (context: any) => await context.db.threadFollows.findMany({ where: { userId: "guest" } }));
+
+            expect(left.page).toHaveLength(1);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
 describe("deleteMergedGuest", () => {
     const harnessWithUsers = () =>
-        lunoraTest(schemaWithShardedTables(["user", "session", "account", "member", "twoFactor", "passkey", "shardRoutes", "shardActivity"]) as never);
+        lunoraTest(
+            schemaWithShardedTables(["user", "session", "account", "member", "twoFactor", "passkey", "shardRoutes", "shardActivity", "threadFollows"]) as never,
+        );
 
     const insertUser = async (harness: ReturnType<typeof harnessWithUsers>, isAnonymous: boolean) =>
         (await harness.run(
@@ -307,6 +468,27 @@ describe("deleteMergedGuest", () => {
             await expect(harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }))).resolves.toStrictEqual({
                 deleted: false,
             });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps a guest that a thread follow still names, and says so", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "owner" });
+
+                await context.db.insert("threadFollows", { createdAt: 1, state: "on", threadId, updatedAt: 1, userId: guest });
+            });
+
+            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
+
+            expect(result).toStrictEqual({ deleted: false, followsRemain: true });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
         } finally {
             harness.close();
         }
