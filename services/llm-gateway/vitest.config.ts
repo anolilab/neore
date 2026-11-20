@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+import { timeSharding } from "../../scripts/vitest/time-sharding";
+
 export default defineConfig({
     resolve: {
         // `src/index.ts` exports the `InternalApi` WorkerEntrypoint; Node has no
@@ -11,6 +13,7 @@ export default defineConfig({
         },
     },
     test: {
+        ...timeSharding(import.meta.url),
         coverage: {
             exclude: ["src/**/*.test.ts", "src/index.ts"],
             include: ["src/**/*.ts"],

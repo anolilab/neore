@@ -1886,6 +1886,10 @@ msgstr "Há uma chave salva. Deixe em branco para mantê-la. Alterar o endpoint,
 msgid "A locked chat cannot have a guest link."
 msgstr "Um chat bloqueado não pode ter um link de convidado."
 
+#: src/features/vault/components/site-logins.tsx:537
+msgid "A login can name at most {MAX_TEAMMATES} bots."
+msgstr "Um login pode indicar no máximo {MAX_TEAMMATES} bots."
+
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
 msgstr "Uma mensagem chega de um app de chat, um ponto desce até o agente, e a resposta aparece no mesmo chat."
@@ -5172,6 +5176,10 @@ msgstr "Token do bot do Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
+#: src/features/vault/components/site-logins.tsx:532
+msgid "Bots that may use it"
+msgstr "Bots que podem usá-lo"
+
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
 msgstr "Inferior"
@@ -5302,8 +5310,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Explore, copie e remixe fluxos de trabalho compartilhados pela comunidade"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:209
-#: src/features/chat/browser-live-view/browser-live-view.tsx:303
+#: src/features/chat/browser-live-view/browser-live-view.tsx:196
+#: src/features/chat/browser-live-view/browser-live-view.tsx:274
 msgid "Browser"
 msgstr "Navegador"
 
@@ -5718,6 +5726,7 @@ msgstr "Canadá"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
+#: src/features/vault/components/site-logins.tsx:561
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8542,6 +8551,10 @@ msgstr "Não foi possível excluir o bot."
 msgid "Could not delete the comment"
 msgstr "Não foi possível excluir o comentário"
 
+#: src/features/vault/components/site-logins.tsx:383
+msgid "Could not delete the login."
+msgstr "Não foi possível excluir o login."
+
 #: src/features/pages/components/pages-sidebar.tsx:134
 msgid "Could not delete the page"
 msgstr "Não foi possível excluir a página"
@@ -8773,6 +8786,10 @@ msgstr "Não foi possível salvar a configuração do Daily Brief."
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
 msgstr "Não foi possível salvar a configuração de e-mail."
+
+#: src/features/vault/components/site-logins.tsx:336
+msgid "Could not save the login."
+msgstr "Não foi possível salvar o login."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:120
 msgid "Could not save the memories"
@@ -9967,6 +9984,7 @@ msgstr "Delegue tarefas ao Devin, o engenheiro de software de IA"
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/vault/components/site-logins.tsx:569
 msgid "Delete"
 msgstr "Excluir"
 
@@ -10079,6 +10097,11 @@ msgstr "Excluir a meta {title}"
 #: src/features/workflow/components/nodes/group-node.tsx:269
 msgid "Delete group and children"
 msgstr "Excluir grupo e filhos"
+
+#. placeholder {0}: login.site
+#: src/features/vault/components/site-logins.tsx:454
+msgid "Delete login for {0}"
+msgstr "Excluir login de {0}"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
@@ -10209,6 +10232,10 @@ msgstr "Exclui a conversa aberta após confirmação ({0})"
 #: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
 msgstr "Excluir este caso?"
+
+#: src/features/vault/components/site-logins.tsx:579
+msgid "Delete this login?"
+msgstr "Excluir este login?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:499
@@ -11505,6 +11532,15 @@ msgstr "editar imagem"
 #: ../../packages/ui/src/components/image-editor.tsx:263
 msgid "Edit Image"
 msgstr "Editar imagem"
+
+#: src/features/vault/components/site-logins.tsx:471
+msgid "Edit login"
+msgstr "Editar login"
+
+#. placeholder {0}: login.site
+#: src/features/vault/components/site-logins.tsx:444
+msgid "Edit login for {0}"
+msgstr "Editar login de {0}"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:165
 msgid "Edit MCP Server"
@@ -16324,7 +16360,7 @@ msgstr "Ocultar coluna"
 msgid "Hide follow-up suggestions"
 msgstr "Ocultar sugestões de continuação"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:227
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
 msgid "Hide live view"
 msgstr ""
 
@@ -18213,6 +18249,10 @@ msgstr "Quirguistão"
 msgid "Label"
 msgstr "Rótulo"
 
+#: src/features/vault/components/site-logins.tsx:509
+msgid "Label (optional)"
+msgstr "Rótulo (opcional)"
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr "Laboratórios ocultos apenas no seletor de modelos. Modelos já selecionados ou definidos como padrão continuam funcionando."
@@ -18626,6 +18666,10 @@ msgstr "Deixe em branco para \"qualquer modelo\"."
 msgid "Leave empty for transparent background"
 msgstr "Deixe vazio para fundo transparente"
 
+#: src/features/vault/components/site-logins.tsx:502
+msgid "Leave empty to keep the saved password"
+msgstr "Deixe vazio para manter a senha salva"
+
 #: src/features/workflow/components/nodes/audio-node.tsx:59
 msgid "Leave empty to use input from connected node"
 msgstr "Deixe vazio para usar a entrada do nó conectado"
@@ -18969,7 +19013,7 @@ msgstr "Pré-visualização ao vivo — renderiza quando o componente terminar d
 msgid "Live preview — updating as the artifact streams"
 msgstr "Pré-visualização ao vivo — atualizando conforme o artefato é transmitido"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:263
+#: src/features/chat/browser-live-view/browser-live-view.tsx:236
 msgid "Live view of the agent's browser (read-only)"
 msgstr ""
 
@@ -19404,13 +19448,29 @@ msgstr "Sair"
 msgid "Login"
 msgstr "Entrar"
 
+#: src/features/vault/components/site-logins.tsx:379
+msgid "Login deleted"
+msgstr "Login excluído"
+
 #: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
 msgstr "login recusado"
 
+#: src/features/vault/components/site-logins.tsx:335
+msgid "Login saved"
+msgstr "Login salvo"
+
+#: src/features/vault/components/site-logins.tsx:335
+msgid "Login updated"
+msgstr "Login atualizado"
+
 #: src/features/develop/components/pull-request-reviewers-action.tsx:142
 msgid "Logins"
 msgstr "Logins"
+
+#: src/features/vault/components/site-logins.tsx:395
+msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
+msgstr "Logins salvos para o navegador do agente. A opção de entrar com eles chega em uma próxima atualização: o servidor digitará a senha no site, e a IA nunca a verá."
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
@@ -21681,6 +21741,10 @@ msgstr "Novo modelo de alta qualidade para fotorrealismo e renderização de tex
 msgid "New line in message"
 msgstr "Nova linha na mensagem"
 
+#: src/features/vault/components/site-logins.tsx:471
+msgid "New login"
+msgstr "Novo login"
+
 #: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
 msgstr "Novo modelo que se destaca em anime"
@@ -23935,7 +23999,7 @@ msgstr "Abrindo pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Abrir o assistente sem uma conversa leva você à mais recente, em vez de um chat em branco."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:234
+#: src/features/chat/browser-live-view/browser-live-view.tsx:207
 msgid "Opening the live view…"
 msgstr ""
 
@@ -24592,6 +24656,7 @@ msgstr "As chaves de acesso permitem entrar com segurança usando a biometria do
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
+#: src/features/vault/components/site-logins.tsx:496
 msgid "Password"
 msgstr "Senha"
 
@@ -24637,6 +24702,10 @@ msgstr "E-mail de redefinição de senha enviado"
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:112
 msgid "Password reset successful"
 msgstr "Senha redefinida com sucesso"
+
+#: src/features/vault/components/site-logins.tsx:438
+msgid "Password set"
+msgstr "Senha definida"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
@@ -28685,6 +28754,7 @@ msgstr "Salvar caso"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
+#: src/features/vault/components/site-logins.tsx:557
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Salvar alterações"
@@ -28700,6 +28770,10 @@ msgstr "Falha ao salvar"
 #: ../../packages/ui/src/components/image-editor.tsx:359
 msgid "Save Image"
 msgstr "Salvar imagem"
+
+#: src/features/vault/components/site-logins.tsx:557
+msgid "Save login"
+msgstr "Salvar login"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -30415,6 +30489,18 @@ msgstr "Cingalês"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Cingalês (Sri Lanka)"
 
+#: src/features/vault/components/site-logins.tsx:473
+msgid "Site"
+msgstr "Site"
+
+#: src/features/vault/components/site-logins.tsx:393
+msgid "Site logins"
+msgstr "Logins de sites"
+
+#: src/features/vault/components/site-logins.tsx:416
+msgid "Site logins can't be saved, changed or deleted while impersonating."
+msgstr "Não é possível salvar, alterar ou excluir logins de sites enquanto representa um usuário."
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:245
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:352
 #: src/features/devices/components/device-tool-call.tsx:119
@@ -30766,7 +30852,7 @@ msgstr "Não foi possível salvar algumas imagens desta execução."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Algumas etapas não tinham dados de preço; o total é um valor mínimo."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:213
+#: src/features/chat/browser-live-view/browser-live-view.tsx:217
 msgid "Someone else has control of this browser."
 msgstr ""
 
@@ -33183,7 +33269,7 @@ msgstr "O agente ainda está abrindo a sessão. Tente novamente em instantes."
 msgid "The agent is still working on the last message."
 msgstr "O agente ainda está trabalhando na última mensagem."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+#: src/features/chat/browser-live-view/browser-live-view.tsx:197
 msgid "The agent is using a browser"
 msgstr ""
 
@@ -33206,6 +33292,11 @@ msgstr "O agente não alterou nenhum arquivo."
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "The agent on your computer is reading the change…"
 msgstr "O agente no seu computador está lendo a alteração…"
+
+#. placeholder {0}: pendingDelete?.site ?? ""
+#: src/features/vault/components/site-logins.tsx:570
+msgid "The agent's browser won't be able to use it to sign in to {0}."
+msgstr "O navegador do agente não poderá usá-lo para entrar em {0}."
 
 #: src/features/chat/thread/host-activity.tsx:89
 msgid "The agent's plan"
@@ -33617,7 +33708,7 @@ msgstr "O link pode estar errado, ou o dono tornou a conversa privada ou a exclu
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "O link pode estar errado, ou o dono despublicou ou excluiu a página."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:245
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
 msgid "The live view could not be opened."
 msgstr ""
 
@@ -33625,7 +33716,7 @@ msgstr ""
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:239
+#: src/features/chat/browser-live-view/browser-live-view.tsx:212
 msgid "The live view is not available right now."
 msgstr ""
 
@@ -34452,6 +34543,14 @@ msgstr "Este link está incompleto. Peça o link completo."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Este link não está aceitando mensagens no momento. Tente novamente mais tarde."
 
+#: src/features/vault/components/site-logins.tsx:302
+msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
+msgstr "Este login foi alterado em outro lugar e foi recarregado. Suas alterações no nome de usuário e no rótulo foram mantidas; confira os bots dele, digite a senha novamente se estava alterando-a e salve de novo."
+
+#: src/features/vault/components/site-logins.tsx:312
+msgid "This login was changed elsewhere. Reload the page to see it before saving again."
+msgstr "Este login foi alterado em outro lugar. Recarregue a página para vê-lo antes de salvar novamente."
+
 #: src/features/projects/components/add-project-dialog.tsx:436
 msgid "This machine is not ready yet."
 msgstr "Esta máquina ainda não está pronta."
@@ -35149,7 +35248,7 @@ msgstr "Muitas tentativas. Aguarde alguns segundos e tente novamente."
 msgid "too many files"
 msgstr "arquivos demais"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:245
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
 msgid "Too many live views were opened. Try again later."
 msgstr ""
 
@@ -35543,8 +35642,8 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:249
-#: src/features/chat/browser-live-view/browser-live-view.tsx:318
+#: src/features/chat/browser-live-view/browser-live-view.tsx:222
+#: src/features/chat/browser-live-view/browser-live-view.tsx:289
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -35554,6 +35653,8 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/tasks/components/task-form-dialog.tsx:459
+#: src/features/vault/components/site-logins.tsx:410
+#: src/features/vault/components/site-logins.tsx:526
 msgid "Try again"
 msgstr "Tentar novamente"
 
@@ -36732,6 +36833,10 @@ msgstr "Nome de usuário"
 msgid "Username is required"
 msgstr "O nome de usuário é obrigatório"
 
+#: src/features/vault/components/site-logins.tsx:485
+msgid "Username or email"
+msgstr "Nome de usuário ou e-mail"
+
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
 msgstr "O nome de usuário ou e-mail é obrigatório"
@@ -37615,7 +37720,7 @@ msgstr "Quer continuar daqui?"
 msgid "Watch"
 msgstr "Monitorar"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:227
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
 msgid "Watch live"
 msgstr ""
 
@@ -38011,7 +38116,7 @@ msgstr "Onde ideias<0/><1>viram ações.</1>"
 msgid "Where you stay in control"
 msgstr "Onde você mantém o controle"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:305
+#: src/features/chat/browser-live-view/browser-live-view.tsx:276
 msgid "Whether the agent is using a browser could not be checked."
 msgstr ""
 
@@ -38658,6 +38763,10 @@ msgstr "Sua formação, preferências ou localização, para ajudar a IA a enten
 msgid "Your bots"
 msgstr "Seus bots"
 
+#: src/features/vault/components/site-logins.tsx:515
+msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
+msgstr "Não foi possível carregar seus bots. As alterações em um login salvo poderão ser salvas quando eles carregarem, para que os bots dele sejam mantidos."
+
 #: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "Seu navegador bloqueou o acesso deste site aos dispositivos da rede local. Permita \"Acesso à rede local\" nas configurações do site (o ícone à esquerda da barra de endereço) e tente novamente."
@@ -38669,6 +38778,15 @@ msgstr "Seu navegador não informa qual processador você tem, então escolha o 
 #: src/features/local-models/components/local-setup-guide.tsx:85
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "Seu navegador se comunica diretamente com o servidor neste computador — o prompt e a resposta nunca passam pelos nossos servidores de IA, e nada é cobrado."
+
+#. placeholder {0}: teammates.join(", ")
+#: src/features/vault/components/site-logins.tsx:427
+msgid "Your chats and {0}"
+msgstr "Suas conversas e {0}"
+
+#: src/features/vault/components/site-logins.tsx:429
+msgid "Your chats and the bots you chose"
+msgstr "Suas conversas e os bots que você escolheu"
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"
@@ -38828,6 +38946,14 @@ msgstr "Não foi possível carregar sua visão geral."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Sua própria chave da Anthropic. Necessária para delegar trabalho ao Claude Code."
 
+#: src/features/vault/components/site-logins.tsx:534
+msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
+msgstr "Suas próprias conversas sempre podem usá-lo. As conversas de um bot só podem usá-lo quando você marca esse bot aqui. Conversas compartilhadas, públicas, de grupo e de mensageiros nunca podem."
+
+#: src/features/vault/components/site-logins.tsx:424
+msgid "Your own chats only"
+msgstr "Somente suas próprias conversas"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:65
 msgid "Your own OpenAI key — used for OpenAI models and required to delegate work to Codex."
 msgstr "Sua própria chave da OpenAI — usada nos modelos da OpenAI e necessária para delegar trabalho ao Codex."
@@ -38877,6 +39003,10 @@ msgstr "Sua revisão foi mantida."
 #: src/features/notifications/lib/notification-labels.ts:58
 msgid "Your review was requested"
 msgstr "Sua revisão foi solicitada"
+
+#: src/features/vault/components/site-logins.tsx:401
+msgid "Your saved logins could not be loaded."
+msgstr "Não foi possível carregar seus logins salvos."
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."

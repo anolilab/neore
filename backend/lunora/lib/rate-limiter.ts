@@ -641,8 +641,10 @@ export const RATE_LIMIT_CONFIGS = {
     "vault/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "vault/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "vault/download:free": Ratelimit.fixedWindow(30, MINUTE),
-
     "vault/download:premium": Ratelimit.fixedWindow(90, MINUTE),
+    // Saving or deleting a site login: a person at the settings page, never a loop.
+    "vault/site-logins:free": Ratelimit.fixedWindow(20, MINUTE),
+    "vault/site-logins:premium": Ratelimit.fixedWindow(40, MINUTE),
     "vault/upload:free": Ratelimit.fixedWindow(10, MINUTE),
     "vault/upload:premium": Ratelimit.fixedWindow(30, MINUTE),
     vercel: Ratelimit.tokenBucket(3, 10 * SECOND, 3),

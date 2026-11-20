@@ -62,6 +62,8 @@ packages: &packages
     - "tools/**"
     - "vis.config.ts"
     - "pnpm-workspace.yaml"
+    # How the unit tests are split across the shards, and the split's own tests.
+    - "scripts/vitest/**"
     # The jobs themselves: a change to how tests run is tested by running them.
     - ".github/workflows/test.yml"
     - ".github/actions/**"

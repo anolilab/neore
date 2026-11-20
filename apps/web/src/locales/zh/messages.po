@@ -1886,6 +1886,10 @@ msgstr "已保存密钥。留空即可保留。更改端点、区域或访问密
 msgid "A locked chat cannot have a guest link."
 msgstr "已锁定的聊天不能有访客链接。"
 
+#: src/features/vault/components/site-logins.tsx:537
+msgid "A login can name at most {MAX_TEAMMATES} bots."
+msgstr "一个登录信息最多可指定 {MAX_TEAMMATES} 个机器人。"
+
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
 msgstr "消息从聊天应用发出，一个小圆点传递给智能体，回复随即出现在同一个聊天中。"
@@ -5172,6 +5176,10 @@ msgstr "来自 Discord Developer Portal 的机器人 token"
 msgid "Bots"
 msgstr "机器人"
 
+#: src/features/vault/components/site-logins.tsx:532
+msgid "Bots that may use it"
+msgstr "可以使用它的机器人"
+
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
 msgstr "底部"
@@ -5302,8 +5310,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:209
-#: src/features/chat/browser-live-view/browser-live-view.tsx:303
+#: src/features/chat/browser-live-view/browser-live-view.tsx:196
+#: src/features/chat/browser-live-view/browser-live-view.tsx:274
 msgid "Browser"
 msgstr "浏览器"
 
@@ -5718,6 +5726,7 @@ msgstr "加拿大"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
+#: src/features/vault/components/site-logins.tsx:561
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8542,6 +8551,10 @@ msgstr "无法删除机器人。"
 msgid "Could not delete the comment"
 msgstr "无法删除评论"
 
+#: src/features/vault/components/site-logins.tsx:383
+msgid "Could not delete the login."
+msgstr "无法删除登录信息。"
+
 #: src/features/pages/components/pages-sidebar.tsx:134
 msgid "Could not delete the page"
 msgstr "无法删除页面"
@@ -8773,6 +8786,10 @@ msgstr "无法保存每日简报设置。"
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
+
+#: src/features/vault/components/site-logins.tsx:336
+msgid "Could not save the login."
+msgstr "无法保存登录信息。"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:120
 msgid "Could not save the memories"
@@ -9967,6 +9984,7 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/vault/components/site-logins.tsx:569
 msgid "Delete"
 msgstr "删除"
 
@@ -10079,6 +10097,11 @@ msgstr "删除目标 {title}"
 #: src/features/workflow/components/nodes/group-node.tsx:269
 msgid "Delete group and children"
 msgstr "删除分组及其子节点"
+
+#. placeholder {0}: login.site
+#: src/features/vault/components/site-logins.tsx:454
+msgid "Delete login for {0}"
+msgstr "删除 {0} 的登录信息"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
@@ -10209,6 +10232,10 @@ msgstr "确认后删除当前对话（{0}）"
 #: src/features/evals/components/dataset-panel.tsx:328
 msgid "Delete this case?"
 msgstr "删除此用例？"
+
+#: src/features/vault/components/site-logins.tsx:579
+msgid "Delete this login?"
+msgstr "删除此登录信息？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:499
@@ -11505,6 +11532,15 @@ msgstr "编辑图片"
 #: ../../packages/ui/src/components/image-editor.tsx:263
 msgid "Edit Image"
 msgstr "编辑图片"
+
+#: src/features/vault/components/site-logins.tsx:471
+msgid "Edit login"
+msgstr "编辑登录信息"
+
+#. placeholder {0}: login.site
+#: src/features/vault/components/site-logins.tsx:444
+msgid "Edit login for {0}"
+msgstr "编辑 {0} 的登录信息"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:165
 msgid "Edit MCP Server"
@@ -16324,7 +16360,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:227
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
 msgid "Hide live view"
 msgstr ""
 
@@ -18213,6 +18249,10 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
+#: src/features/vault/components/site-logins.tsx:509
+msgid "Label (optional)"
+msgstr "标签（可选）"
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
 msgstr "仅在模型选择器中隐藏的实验室。已选择或已设为默认的模型仍可正常使用。"
@@ -18626,6 +18666,10 @@ msgstr "留空表示“任意模型”。"
 msgid "Leave empty for transparent background"
 msgstr "留空则使用透明背景"
 
+#: src/features/vault/components/site-logins.tsx:502
+msgid "Leave empty to keep the saved password"
+msgstr "留空以保留已保存的密码"
+
 #: src/features/workflow/components/nodes/audio-node.tsx:59
 msgid "Leave empty to use input from connected node"
 msgstr "留空则使用已连接节点的输入"
@@ -18969,7 +19013,7 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:263
+#: src/features/chat/browser-live-view/browser-live-view.tsx:236
 msgid "Live view of the agent's browser (read-only)"
 msgstr ""
 
@@ -19404,13 +19448,29 @@ msgstr "退出登录"
 msgid "Login"
 msgstr "登录"
 
+#: src/features/vault/components/site-logins.tsx:379
+msgid "Login deleted"
+msgstr "登录信息已删除"
+
 #: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
 msgstr "登录被拒绝"
 
+#: src/features/vault/components/site-logins.tsx:335
+msgid "Login saved"
+msgstr "登录信息已保存"
+
+#: src/features/vault/components/site-logins.tsx:335
+msgid "Login updated"
+msgstr "登录信息已更新"
+
 #: src/features/develop/components/pull-request-reviewers-action.tsx:142
 msgid "Logins"
 msgstr "登录名"
+
+#: src/features/vault/components/site-logins.tsx:395
+msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
+msgstr "为智能体浏览器保存的登录信息。使用它们登录将在后续更新中提供：届时由服务器在网站上输入密码，AI 永远看不到它。"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
@@ -21681,6 +21741,10 @@ msgstr "擅长照片级写实和文字渲染的新款高质量模型"
 msgid "New line in message"
 msgstr "消息中换行"
 
+#: src/features/vault/components/site-logins.tsx:471
+msgid "New login"
+msgstr "新建登录信息"
+
 #: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
 msgstr "擅长动漫的新模型"
@@ -23935,7 +23999,7 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:234
+#: src/features/chat/browser-live-view/browser-live-view.tsx:207
 msgid "Opening the live view…"
 msgstr ""
 
@@ -24592,6 +24656,7 @@ msgstr "通行密钥让你可以使用设备的生物识别或安全密钥安全
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
+#: src/features/vault/components/site-logins.tsx:496
 msgid "Password"
 msgstr "密码"
 
@@ -24637,6 +24702,10 @@ msgstr "重置密码邮件已发送"
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:112
 msgid "Password reset successful"
 msgstr "密码重置成功"
+
+#: src/features/vault/components/site-logins.tsx:438
+msgid "Password set"
+msgstr "已设置密码"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
@@ -28685,6 +28754,7 @@ msgstr "保存用例"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
+#: src/features/vault/components/site-logins.tsx:557
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "保存更改"
@@ -28700,6 +28770,10 @@ msgstr "保存失败"
 #: ../../packages/ui/src/components/image-editor.tsx:359
 msgid "Save Image"
 msgstr "保存图像"
+
+#: src/features/vault/components/site-logins.tsx:557
+msgid "Save login"
+msgstr "保存登录信息"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -30415,6 +30489,18 @@ msgstr "僧伽罗语"
 msgid "Sinhala (Sri Lanka)"
 msgstr "僧伽罗语（斯里兰卡）"
 
+#: src/features/vault/components/site-logins.tsx:473
+msgid "Site"
+msgstr "网站"
+
+#: src/features/vault/components/site-logins.tsx:393
+msgid "Site logins"
+msgstr "网站登录信息"
+
+#: src/features/vault/components/site-logins.tsx:416
+msgid "Site logins can't be saved, changed or deleted while impersonating."
+msgstr "模拟用户期间无法保存、更改或删除网站登录信息。"
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:245
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:352
 #: src/features/devices/components/device-tool-call.tsx:119
@@ -30766,7 +30852,7 @@ msgstr "此次运行中的部分图像无法保存。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:213
+#: src/features/chat/browser-live-view/browser-live-view.tsx:217
 msgid "Someone else has control of this browser."
 msgstr ""
 
@@ -33183,7 +33269,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+#: src/features/chat/browser-live-view/browser-live-view.tsx:197
 msgid "The agent is using a browser"
 msgstr ""
 
@@ -33206,6 +33292,11 @@ msgstr "智能体未更改任何文件。"
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
+
+#. placeholder {0}: pendingDelete?.site ?? ""
+#: src/features/vault/components/site-logins.tsx:570
+msgid "The agent's browser won't be able to use it to sign in to {0}."
+msgstr "智能体的浏览器将无法用它登录 {0}。"
 
 #: src/features/chat/thread/host-activity.tsx:89
 msgid "The agent's plan"
@@ -33617,7 +33708,7 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:245
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
 msgid "The live view could not be opened."
 msgstr ""
 
@@ -33625,7 +33716,7 @@ msgstr ""
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:239
+#: src/features/chat/browser-live-view/browser-live-view.tsx:212
 msgid "The live view is not available right now."
 msgstr ""
 
@@ -34452,6 +34543,14 @@ msgstr "此链接不完整。请索取完整链接。"
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
+#: src/features/vault/components/site-logins.tsx:302
+msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
+msgstr "此登录信息已在别处更改，并已重新加载。你对用户名和标签的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
+
+#: src/features/vault/components/site-logins.tsx:312
+msgid "This login was changed elsewhere. Reload the page to see it before saving again."
+msgstr "此登录信息已在别处更改。请先刷新页面查看，再重新保存。"
+
 #: src/features/projects/components/add-project-dialog.tsx:436
 msgid "This machine is not ready yet."
 msgstr "此设备尚未就绪。"
@@ -35149,7 +35248,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:245
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
 msgid "Too many live views were opened. Try again later."
 msgstr ""
 
@@ -35543,8 +35642,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:249
-#: src/features/chat/browser-live-view/browser-live-view.tsx:318
+#: src/features/chat/browser-live-view/browser-live-view.tsx:222
+#: src/features/chat/browser-live-view/browser-live-view.tsx:289
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -35554,6 +35653,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/tasks/components/task-form-dialog.tsx:459
+#: src/features/vault/components/site-logins.tsx:410
+#: src/features/vault/components/site-logins.tsx:526
 msgid "Try again"
 msgstr "重试"
 
@@ -36732,6 +36833,10 @@ msgstr "用户名"
 msgid "Username is required"
 msgstr "请输入用户名"
 
+#: src/features/vault/components/site-logins.tsx:485
+msgid "Username or email"
+msgstr "用户名或邮箱"
+
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
 msgstr "请输入用户名或邮箱"
@@ -37615,7 +37720,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:227
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
 msgid "Watch live"
 msgstr ""
 
@@ -38011,7 +38116,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:305
+#: src/features/chat/browser-live-view/browser-live-view.tsx:276
 msgid "Whether the agent is using a browser could not be checked."
 msgstr ""
 
@@ -38658,6 +38763,10 @@ msgstr "你的背景、偏好或所在地，帮助 AI 更好地了解你"
 msgid "Your bots"
 msgstr "你的机器人"
 
+#: src/features/vault/components/site-logins.tsx:515
+msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
+msgstr "无法加载你的机器人。加载完成后才能保存对已保存登录信息的更改，以便保留其机器人。"
+
 #: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "你的浏览器阻止了此网站访问本地网络设备。请在网站设置（地址栏左侧的图标）中允许“本地网络访问”，然后重试。"
@@ -38669,6 +38778,15 @@ msgstr "你的浏览器无法识别处理器类型，请从下方选择对应的
 #: src/features/local-models/components/local-setup-guide.tsx:85
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "你的浏览器直接与此电脑上的服务器通信——提示词和回复绝不会经过我们的 AI 服务器，也不会产生费用。"
+
+#. placeholder {0}: teammates.join(", ")
+#: src/features/vault/components/site-logins.tsx:427
+msgid "Your chats and {0}"
+msgstr "你的聊天和 {0}"
+
+#: src/features/vault/components/site-logins.tsx:429
+msgid "Your chats and the bots you chose"
+msgstr "你的聊天和你选择的机器人"
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"
@@ -38828,6 +38946,14 @@ msgstr "无法加载你的概览。"
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "你自己的 Anthropic 密钥。将工作委派给 Claude Code 时必需。"
 
+#: src/features/vault/components/site-logins.tsx:534
+msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
+msgstr "你自己的聊天始终可以使用它。机器人的聊天只有在你在此勾选该机器人时才能使用。共享、公开、群组和消息应用聊天永远不能使用。"
+
+#: src/features/vault/components/site-logins.tsx:424
+msgid "Your own chats only"
+msgstr "仅限你自己的聊天"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:65
 msgid "Your own OpenAI key — used for OpenAI models and required to delegate work to Codex."
 msgstr "你自己的 OpenAI 密钥——用于 OpenAI 模型，将工作委派给 Codex 时必需。"
@@ -38877,6 +39003,10 @@ msgstr "你的审查已保留。"
 #: src/features/notifications/lib/notification-labels.ts:58
 msgid "Your review was requested"
 msgstr "有人请求了你的审查"
+
+#: src/features/vault/components/site-logins.tsx:401
+msgid "Your saved logins could not be loaded."
+msgstr "无法加载你保存的登录信息。"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."

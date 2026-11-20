@@ -284,6 +284,8 @@ describe("fetchContextWithPrompt from a run's own first turn (fromOrder)", () =>
         );
 
         expect((messages as { content: unknown }[]).map((m) => m.content)).toStrictEqual(["another chat", "find it"]);
+        // The hit carries its mark, so the text in front of the model is told apart from the path (`site-login-turn.ts`).
+        expect((messages as { providerOptions?: unknown }[]).map((m) => m.providerOptions)).toStrictEqual([{ neore: { searchHit: true } }, undefined]);
     });
 });
 
