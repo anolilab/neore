@@ -11,8 +11,10 @@
 //!    with a scrubbed environment, so no `PATH` lookup, user `.npmrc` or `NODE_OPTIONS` reaches them;
 //! 3. the installed package must be the name and version that was pinned, and its program is resolved INSIDE it;
 //! 4. every file, folder and link of the prefix is hashed ([`tree_hash`]) and the hash recorded in the pin next
-//!    to the index's integrity, the folder is renamed to `acp-agents/<key>/<version>` and the agent is recorded
-//!    to run `node <program>`: the command is never `npx`, and nothing is resolved at launch.
+//!    to the index's integrity, the folder is renamed to `acp-agents/<key>/<version>-<tree hash prefix>` and the
+//!    agent is recorded to run `node <program>`: the command is never `npx`, and nothing is resolved at launch.
+//!    The folder is named by its content, so a reinstall with other bytes never replaces files a plan already
+//!    verified: it lands in a folder of its own, and the old one goes only when the desktop prunes it.
 //!
 //! Only the package's own dependencies are checked before npm runs (`refuse_unverified_dependencies`): what the
 //! registry's packages depend on in turn is still left to npm, so one hop through a registry package can reach a
@@ -36,8 +38,8 @@ use sha2::{Digest, Sha256, Sha512};
 
 use crate::acp::{validate_agent, AcpAgent, AcpInstall, AcpView, EnvVars};
 use crate::acp_install::{
-    create_private_dir, run_id, safe_relative, sha256_reader, validate_provenance, INSTALLING_DIR,
-    UNPACKED_DIR,
+    create_private_dir, install_dir_name, run_id, safe_relative, sha256_reader,
+    validate_provenance, INSTALLING_DIR, UNPACKED_DIR,
 };
 use crate::engine::{now_ms, DeviceState, Event};
 use crate::hmac::to_hex;
@@ -1045,10 +1047,18 @@ impl DeviceState {
         }
 
         let tree = tree_hash(&prefix)?;
+        let pin = AcpInstall {
+            index_integrity: Some(request.integrity.clone()),
+            publisher: request.publisher.clone(),
+            sha256,
+            source: request.source.clone(),
+            tree_sha256: Some(tree.clone()),
+            version: request.version.clone(),
+        };
         let final_dir = self
             .install_root()
             .join(&request.key)
-            .join(&request.version);
+            .join(install_dir_name(&pin));
         let in_final = final_dir
             .join("node_modules")
             .join(&request.package)
@@ -1064,14 +1074,7 @@ impl DeviceState {
             // identity was checked in `validate`; a link that is re-pointed later is the person's own change.
             command: node.to_string_lossy().into_owned(),
             env: EnvVars(request.env.clone()),
-            install: Some(AcpInstall {
-                index_integrity: Some(request.integrity.clone()),
-                publisher: request.publisher.clone(),
-                sha256,
-                source: request.source.clone(),
-                tree_sha256: Some(tree.clone()),
-                version: request.version.clone(),
-            }),
+            install: Some(pin),
             key: request.key.clone(),
             label: request.label.trim().to_owned(),
         };
@@ -1100,7 +1103,10 @@ impl DeviceState {
         let Some(expected) = &pin.tree_sha256 else {
             return Ok(());
         };
-        let dir = self.install_root().join(&agent.key).join(&pin.version);
+        let dir = self
+            .install_root()
+            .join(&agent.key)
+            .join(install_dir_name(pin));
 
         // The interpreter is the person's own Node, not part of the hashed files. When an upgrade or a version
         // manager removed it, say so rather than letting the start fail with an operating-system error.

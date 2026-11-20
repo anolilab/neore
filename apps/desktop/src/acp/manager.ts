@@ -72,7 +72,7 @@ export interface ManagerOptions {
     /** Told that the window should read the sessions again. */
     onChange: () => void;
     /** `device-core`'s `acpSpawnPlan`, parsed. Throws when the agent or folder is not allowed. */
-    plan: (agentKey: string, folder: string | null) => SpawnPlan;
+    plan: (agentKey: string, folder: string | null) => Promise<SpawnPlan> | SpawnPlan;
     /** Held while any of this manager's turns runs, so the computer does not sleep mid-turn (`keep-awake.ts`). */
     sleepLock?: SleepLock;
     spawn: Spawner;
@@ -105,6 +105,18 @@ export class AcpManager {
 
     /** Set when the manager is dropped with its server: no start may spawn on it from then on. */
     private retired = false;
+
+    /** Starts that have asked for a plan and not yet registered a session; they hold a place under `MAX_SESSIONS`. */
+    private starting = 0;
+
+    /** What each agent's approval and program looked like at the last `closeUnapproved`, by key. */
+    private readonly approvalState = new Map<string, string>();
+
+    /** Bumped for an agent whose approval or installed program may have changed: a plan of it made across a bump is made again. */
+    private readonly revocations = new Map<string, number>();
+
+    /** Agents with a plan being made now; an agent not seen before counts as changed for them. */
+    private readonly planning = new Map<string, number>();
 
     /** The hook runner of each session that has one; it lives and dies with the session. */
     private readonly runners = new Map<string, HookRunner>();
@@ -148,7 +160,7 @@ export class AcpManager {
     ): Promise<Result> {
         requireSupported();
 
-        const plan = this.options.plan(agentKey, folder);
+        const plan = await this.planCurrent(agentKey, folder);
         let child: AgentProcess;
 
         try {
@@ -251,8 +263,20 @@ export class AcpManager {
 
         this.refuseStart(agentKey);
 
-        // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
-        const plan = this.options.plan(agentKey, folder);
+        // The slot is held while the plan is made, so starts that overlap cannot all pass the check in `refuseStart`.
+        this.starting += 1;
+
+        let plan: SpawnPlan;
+
+        try {
+            plan = await this.planCurrent(agentKey, folder);
+        } finally {
+            this.starting -= 1;
+        }
+
+        // The plan is made off the main thread: a sign-out or the server's removal can have begun meanwhile.
+        this.refuseStart(agentKey);
+
         const child = this.spawn(plan, agentKey);
         const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
         const { hooks } = this.options;
@@ -452,6 +476,8 @@ export class AcpManager {
      * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).
      */
     public async closeUnapproved(view: Pick<AcpView, "agents" | "consents">): Promise<void> {
+        this.noteApprovalChanges(view);
+
         const covered = (agentKey: string, folder: string): boolean => {
             const hasAgent = view.agents.some((agent) => agent.key === agentKey);
 
@@ -485,6 +511,19 @@ export class AcpManager {
     /** Ends one listening server of the session and its own descendants; never the agent (`ports/ports.ts`). */
     public async stopPort(sessionId: string, target: StopTarget): Promise<StopResult> {
         return await this.portsService.stop(this.require(sessionId).agentPid, target);
+    }
+
+    /**
+     * The variables of `agentKey` (or of every agent) changed. The view carries their names only, so a replaced
+     * value cannot be seen in it: a plan made before the edit holds the old values (a removed credential among
+     * them) and is made again.
+     */
+    public environmentChanged(agentKey?: string): void {
+        const keys = agentKey === undefined ? new Set([...this.approvalState.keys(), ...this.planning.keys()]) : [agentKey];
+
+        for (const key of keys) {
+            this.revocations.set(key, (this.revocations.get(key) ?? 0) + 1);
+        }
     }
 
     /** Forgets an ended session. */
@@ -577,8 +616,86 @@ export class AcpManager {
             throw new Error("that server is being removed");
         }
 
-        if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
+        if (this.summaries().filter((session) => session.status !== "ended").length + this.starting >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
+        }
+    }
+
+    /**
+     * The core's plan, made again when approvals were revoked while it was being made (an install replaced the
+     * agent): the plan that was in flight may belong to files or a folder consent that no longer exist, and the
+     * session it would become is not yet there for `closeUnapproved` to close. Nothing awaits between the last
+     * check and the spawn that follows.
+     */
+    private async planCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
+        this.planning.set(agentKey, (this.planning.get(agentKey) ?? 0) + 1);
+
+        try {
+            return await this.planUntilCurrent(agentKey, folder);
+        } finally {
+            const left = (this.planning.get(agentKey) ?? 1) - 1;
+
+            if (left > 0) {
+                this.planning.set(agentKey, left);
+            } else {
+                this.planning.delete(agentKey);
+            }
+        }
+    }
+
+    private async planUntilCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
+        for (let attempt = 0; ; attempt += 1) {
+            const before = this.revocations.get(agentKey) ?? 0;
+            // eslint-disable-next-line no-await-in-loop -- each plan depends on the approvals as they are now
+            const plan = await this.options.plan(agentKey, folder);
+
+            if (before === (this.revocations.get(agentKey) ?? 0)) {
+                return plan;
+            }
+
+            // The plan is dropped, and with it the scratch folder a probe plan made for itself.
+            if (plan.scratch) {
+                // eslint-disable-next-line no-await-in-loop -- the folder goes before the next plan makes another
+                await removeQuietly(plan.cwd);
+            }
+
+            if (attempt >= 3) {
+                throw new Error("The agent's approvals changed while it started. Try again.");
+            }
+        }
+    }
+
+    /**
+     * Bumps the counter of every agent whose approval, program or install differs from the last view (or that
+     * was not seen before, or is gone). Edits of other agents, and of this one's name or variables, bump nothing.
+     */
+    private noteApprovalChanges(view: Pick<AcpView, "agents" | "consents">): void {
+        const next = new Map<string, string>();
+
+        for (const agent of view.agents) {
+            const folders = view.consents
+                .filter((consent) => consent.agentKey === agent.key)
+                .map((consent) => consent.folderPath);
+
+            folders.sort((left, right) => left.localeCompare(right));
+
+            next.set(agent.key, JSON.stringify([agent.command, agent.args, agent.install?.version ?? null, agent.install?.sha256 ?? null, agent.install?.treeSha256 ?? null, folders]));
+        }
+
+        const keys = new Set([...this.approvalState.keys(), ...this.planning.keys(), ...next.keys()]);
+
+        for (const key of keys) {
+            const prior = this.approvalState.get(key);
+
+            if (prior !== next.get(key) || (prior === undefined && (this.planning.get(key) ?? 0) > 0)) {
+                this.revocations.set(key, (this.revocations.get(key) ?? 0) + 1);
+            }
+        }
+
+        this.approvalState.clear();
+
+        for (const [key, state] of next) {
+            this.approvalState.set(key, state);
         }
     }
 

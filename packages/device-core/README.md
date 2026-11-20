@@ -215,11 +215,15 @@ the pinned program keeps it.
 The check reads files after a type check, so it guards against changes made at rest, not against someone who can
 write to the folder while the agent is starting (a known limit).
 
+The installed folder is `acp-agents/<key>/<version>-<16 hex of the tree hash>` (`install_dir_name`): a reinstall with
+other bytes lands beside the old folder, so a plan already verified never runs files it did not hash. The old folder
+goes when the desktop calls `acpInstallPrune`, after it closed the sessions started from it.
+
 An install, a removal and a prune of old versions run one at a time (`lock_installs`). Deleting an install or a
 staging folder renames it into `acp-agents/.trash` under that lock and deletes it on a thread; trash names carry a
 per-run id, and the sweep at the next install stage removes the entries of other runs only.
 
-`acp_install_npm` (addon only; no desktop caller yet) installs a downloaded tarball: its SHA-512 must equal the
+`acp_install_npm` (called by the desktop's `acp/install.ts`) installs a downloaded tarball: its SHA-512 must equal the
 package index's integrity before and after npm runs, npm runs with `--ignore-scripts` and a scrubbed environment by
 the absolute `node` and `npm` the desktop found (refused if either resolves elsewhere than when the person
 confirmed), the installed package must be the pinned name and version, and its program (a JavaScript file, picked

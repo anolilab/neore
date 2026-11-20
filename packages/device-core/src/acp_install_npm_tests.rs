@@ -1,4 +1,5 @@
 use super::*;
+use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -32,8 +33,20 @@ fn fake_node(dir: &Path) -> PathBuf {
     node
 }
 
+/// The installed 1.0.0 folder of `fixture` (named by its version and tree hash), or where a seed writes it first.
 fn installed(dir: &Path) -> PathBuf {
-    dir.join("acp-agents/fixture/1.0.0")
+    let key_dir = dir.join("acp-agents/fixture");
+
+    fs::read_dir(&key_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with("1.0.0-"))
+        })
+        .unwrap_or_else(|| key_dir.join("1.0.0"))
 }
 
 fn script(dir: &Path) -> PathBuf {
@@ -43,14 +56,23 @@ fn script(dir: &Path) -> PathBuf {
         .join("cli.js")
 }
 
-/// What an npm install leaves behind: the files under `acp-agents/fixture/1.0.0` and an agent recorded to run
-/// `node <program>`, pinned with the hash of that folder. Returns the agent as recorded.
+/// What an npm install leaves behind: the files under `acp-agents/fixture/1.0.0-<tree hash prefix>` and an agent
+/// recorded to run `node <program>`, pinned with the hash of that folder. Returns the agent as recorded.
 fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
+    let written = script(dir);
+
+    fs::create_dir_all(written.parent().unwrap()).unwrap();
+    fs::write(&written, PROGRAM).unwrap();
+
+    let tree = tree_hash(&installed(dir)).unwrap();
+
+    fs::rename(
+        installed(dir),
+        dir.join(format!("acp-agents/fixture/1.0.0-{}", &tree[..16])),
+    )
+    .unwrap();
+
     let program = script(dir);
-
-    fs::create_dir_all(program.parent().unwrap()).unwrap();
-    fs::write(&program, PROGRAM).unwrap();
-
     let agent = AcpAgent {
         args: vec![program.to_string_lossy().into_owned(), "--acp".into()],
         command: node.to_string_lossy().into_owned(),
@@ -60,7 +82,7 @@ fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
             publisher: "Example Inc.".into(),
             sha256: "0".repeat(64),
             source: "https://registry.npmjs.org/fixture-agent/-/fixture-agent-1.0.0.tgz".into(),
-            tree_sha256: Some(tree_hash(&installed(dir)).unwrap()),
+            tree_sha256: Some(tree),
             version: "1.0.0".into(),
         }),
         key: "fixture".into(),
@@ -2414,4 +2436,64 @@ fn a_plan_is_built_from_the_settings_as_they_are_after_the_check_not_before() {
         .unwrap_err();
 
     assert!(error.contains("is not approved for that folder"), "{error}");
+}
+
+#[test]
+fn a_reinstall_with_other_bytes_leaves_the_files_a_plan_verified_in_place() {
+    let (state, scratch) = state("plan-reinstall");
+    let dir = scratch.0.clone();
+    let (node, npm, _) = fake_tools(&dir);
+    let first = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &first, integrity(&first)))
+        .unwrap();
+
+    let plan = state.acp_spawn_plan("fixture", None).unwrap();
+    let verified = installed(&dir);
+    let verified_hash = tree_hash(&verified).unwrap();
+
+    // The same version republished with other bytes, installed after the plan was made and before it is spawned.
+    let second = tarball(&manifest(), &[("extra.js", "console.log('new');\n")]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &second, integrity(&second)))
+        .unwrap();
+
+    let program = Path::new(&plan.args[0]);
+
+    assert!(
+        program.starts_with(&verified),
+        "the plan runs from the folder it verified"
+    );
+    assert!(program.is_file(), "which is still there until a prune");
+    assert_eq!(
+        tree_hash(&verified).unwrap(),
+        verified_hash,
+        "with the files it verified"
+    );
+
+    let pin = state.acp_view().agents[0].install.clone().unwrap();
+    let current = dir
+        .join("acp-agents/fixture")
+        .join(crate::acp_install::install_dir_name(&pin));
+
+    assert_ne!(
+        current, verified,
+        "the new bytes went to a folder of their own"
+    );
+    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+
+    state.acp_install_prune("fixture");
+
+    let gone = (0..100).any(|_| {
+        if verified.exists() {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        !verified.exists()
+    });
+
+    assert!(gone, "the prune takes the old folder");
+    assert!(current.exists(), "and keeps the pinned one");
 }
