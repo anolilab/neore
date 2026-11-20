@@ -4,6 +4,7 @@
 use std::time::Duration;
 
 use serde_json::Value;
+use zeroize::Zeroizing;
 
 /// Every request has a deadline: pairing runs on a person's terminal and must not hang on a dead connection.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
@@ -107,12 +108,16 @@ impl Http for UreqHttp {
             .send(body.to_string())
             .map_err(|error| error.to_string())?;
         let status = response.status().as_u16();
-        let text = response
-            .body_mut()
-            .with_config()
-            .limit(MAX_BODY_BYTES)
-            .read_to_string()
-            .unwrap_or_default();
+        // An answer cut off on its way is a transport failure: for an approved poll it may carry the secret, and
+        // the next poll gets the same device again. Wiped once parsed, since it may hold the secret.
+        let text = Zeroizing::new(
+            response
+                .body_mut()
+                .with_config()
+                .limit(MAX_BODY_BYTES)
+                .read_to_string()
+                .map_err(|error| format!("the answer could not be read: {error}"))?,
+        );
 
         Ok(Reply {
             status,

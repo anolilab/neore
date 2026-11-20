@@ -7,10 +7,12 @@
 
 use std::fmt;
 use std::io::Write;
+use std::sync::OnceLock;
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
+use zeroize::Zeroize;
 
 use super::http::{validate_backend, Http, Reply};
 use super::vault::{NewPairing, Storage, Vault};
@@ -38,14 +40,14 @@ pub trait Timer {
     fn sleep(&self, duration: Duration);
 }
 
+/// A monotonic clock: the code's life is a duration, so a wall-clock change while waiting must not end it early.
 pub struct SystemTimer;
 
 impl Timer for SystemTimer {
     fn now_ms(&self) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|age| age.as_millis() as u64)
-            .unwrap_or_default()
+        static START: OnceLock<Instant> = OnceLock::new();
+
+        START.get_or_init(Instant::now).elapsed().as_millis() as u64
     }
 
     fn sleep(&self, duration: Duration) {
@@ -72,6 +74,8 @@ pub enum PairError {
     Output(String),
     /// This machine has nowhere safe to keep a secret, so no code was asked for.
     NoStorage(String),
+    /// This machine already holds a pairing, which the vault would not replace, so no code was asked for.
+    AlreadyPaired,
     /// The backend could not be reached, or kept failing.
     Unreachable(String),
 }
@@ -95,6 +99,9 @@ impl fmt::Display for PairError {
                 "the pairing code could not be shown ({reason}); nothing was paired"
             ),
             PairError::NoStorage(reason) => write!(formatter, "{reason}; nothing was paired"),
+            PairError::AlreadyPaired => formatter.write_str(
+                "this machine is already paired; run `neore-host unpair` first, then pair again",
+            ),
             PairError::Unreachable(reason) => write!(formatter, "the backend could not be reached: {reason}"),
         }
     }
@@ -113,7 +120,7 @@ impl PairError {
             PairError::Refused(_) => 6,
             PairError::Unreachable(_) => 7,
             PairError::NotStored { .. } | PairError::PossiblyRegistered => 8,
-            PairError::Output(_) | PairError::NoStorage(_) => 1,
+            PairError::Output(_) | PairError::NoStorage(_) | PairError::AlreadyPaired => 1,
         }
     }
 }
@@ -160,6 +167,15 @@ fn describe(reply: &Reply) -> String {
             || format!("the backend answered {}", reply.status),
             str::to_owned,
         )
+}
+
+/// Backend text as it may reach the terminal: control characters (escape sequences, carriage returns) could rewrite
+/// what the person reads before approving, so they are dropped.
+fn printable(value: &str) -> String {
+    value
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect()
 }
 
 /// "ABCD-EFGH" for an eight character code, as the web page shows it.
@@ -232,12 +248,13 @@ fn request_code(
     let expires_in = number(&reply.body, "expires_in").unwrap_or(600).min(3600);
     let interval = Duration::from_secs(number(&reply.body, "interval").unwrap_or(5))
         .clamp(MIN_INTERVAL, MAX_INTERVAL);
-    let complete = text(&reply.body, "verification_uri_complete").unwrap_or(uri);
+    let complete = printable(text(&reply.body, "verification_uri_complete").unwrap_or(uri));
+    let uri = printable(uri);
 
     // One write, flushed: if the person cannot be shown the code, no approval can come, so do not wait for one.
     let shown = format!(
         "To pair this machine, open:  {uri}\nand enter the code:          {}\n(or open {complete} directly)\n\nSigned in as the owner, check that the machine is \"{}\" and the code matches, then approve.\nThe device secret will be kept in {}.\nWaiting for approval...\n",
-        spaced(user_code),
+        spaced(&printable(user_code)),
         identity.hostname,
         storage.describe()
     );
@@ -264,6 +281,13 @@ pub fn pair(
     out: &mut dyn Write,
 ) -> Result<Paired, PairError> {
     let backend = validate_backend(backend).map_err(PairError::Refused)?;
+
+    // `save` refuses to replace a pairing, so a code approved now would register a device whose secret has nowhere
+    // to go.
+    if vault.record().map_err(PairError::NoStorage)?.is_some() {
+        return Err(PairError::AlreadyPaired);
+    }
+
     // Announced with the code, so the owner sees where the secret will live before approving.
     let storage = vault.probe().map_err(PairError::NoStorage)?;
 
@@ -292,8 +316,14 @@ pub fn pair(
             &format!("{backend}{HOST_PATH}"),
             &json!({ "client_id": CLIENT_ID, "device_code": code.device_code }),
         );
+        // A 200 whose body could not be read as JSON is a lost answer, not a refusal: the backend hands the same device
+        // to the next poll.
         let reply = match answered {
-            Ok(reply) if reply.status != 429 && reply.status < 500 => {
+            Ok(reply)
+                if reply.status != 429
+                    && reply.status < 500
+                    && !(reply.status == 200 && reply.body.is_null()) =>
+            {
                 failures = 0;
 
                 reply
@@ -302,7 +332,7 @@ pub fn pair(
                 failures += 1;
                 lost_answer = true;
 
-                if failures > MAX_CONSECUTIVE_FAILURES {
+                if failures >= MAX_CONSECUTIVE_FAILURES {
                     return Err(PairError::Unreachable(describe(&reply)));
                 }
 
@@ -312,7 +342,7 @@ pub fn pair(
                 failures += 1;
                 lost_answer = true;
 
-                if failures > MAX_CONSECUTIVE_FAILURES {
+                if failures >= MAX_CONSECUTIVE_FAILURES {
                     return Err(PairError::Unreachable(reason));
                 }
 
@@ -323,7 +353,15 @@ pub fn pair(
         let after_lost_answer = std::mem::take(&mut lost_answer);
 
         if reply.status == 200 {
-            return store(vault, &backend, storage, &reply);
+            let mut reply = reply;
+            let stored = store(vault, &backend, storage, &reply);
+
+            // The parsed answer holds a copy of the secret; wipe it rather than leave it to the allocator.
+            if let Some(Value::String(secret)) = reply.body.get_mut("secret") {
+                secret.zeroize();
+            }
+
+            return stored;
         }
 
         match text(&reply.body, "error") {
@@ -372,24 +410,28 @@ fn store(
         ));
     };
 
-    if device_id.is_empty() || device_id.len() > 128 || !is_device_secret(secret) {
+    if device_id.is_empty()
+        || device_id.len() > 128
+        || device_id.chars().any(char::is_control)
+        || !is_device_secret(secret)
+    {
         return Err(PairError::Refused(
             "the backend's answer was not a device".into(),
         ));
     }
 
-    let name = text(&reply.body, "name").unwrap_or("this machine");
-    let account = text(&reply.body, "account").unwrap_or_default();
+    let name = printable(text(&reply.body, "name").unwrap_or("this machine"));
+    let account = printable(text(&reply.body, "account").unwrap_or_default());
 
     // Where the owner was told it would go, not wherever works now: a different place needs a new code, which
     // shows its own choice.
     vault
         .save(
             &NewPairing {
-                account,
+                account: &account,
                 backend,
                 device_id,
-                name,
+                name: &name,
                 secret,
             },
             storage,
@@ -400,9 +442,9 @@ fn store(
         })?;
 
     Ok(Paired {
-        account: account.to_owned(),
+        account,
         device_id: device_id.to_owned(),
-        name: name.to_owned(),
+        name,
         storage,
     })
 }

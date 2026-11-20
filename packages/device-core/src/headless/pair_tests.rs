@@ -347,7 +347,7 @@ fn a_backend_that_keeps_failing_is_polled_a_bounded_number_of_times_each_after_i
         let polls = backend.requests.borrow().len() - 1;
 
         assert!(matches!(outcome, Err(PairError::Unreachable(_))));
-        assert_eq!(polls, (MAX_CONSECUTIVE_FAILURES + 1) as usize);
+        assert_eq!(polls, MAX_CONSECUTIVE_FAILURES as usize);
         assert_eq!(timer.slept.borrow().len(), polls);
     }
 
@@ -578,4 +578,76 @@ fn a_machine_with_nowhere_to_keep_the_secret_asks_for_no_code() {
     );
     assert_eq!(outcome.unwrap_err().exit_code(), 1);
     assert!(backend.requests.borrow().is_empty());
+}
+
+#[test]
+fn an_already_paired_machine_asks_for_no_code() {
+    let backend = FakeBackend::new(vec![approved()]);
+    let keychain = FakeKeychain::default();
+    let dir = scratch("pair-already");
+    let vault = Vault::new(dir.to_path_buf(), &keychain);
+
+    vault
+        .save(
+            &NewPairing {
+                account: "",
+                backend: "https://neore.ai",
+                device_id: "device-1",
+                name: "box",
+                secret: SECRET,
+            },
+            Storage::Keychain,
+        )
+        .unwrap();
+
+    let outcome = pair(
+        &backend,
+        &FakeTimer::default(),
+        &vault,
+        "https://neore.ai",
+        &Identity {
+            hostname: "x",
+            platform: "linux",
+        },
+        &mut Vec::new(),
+    );
+
+    assert_eq!(outcome, Err(PairError::AlreadyPaired));
+    assert!(backend.requests.borrow().is_empty());
+}
+
+#[test]
+fn an_approved_answer_that_arrives_unreadable_is_polled_again() {
+    // The backend gives the same device to the next poll, so a damaged 200 is retried, not taken as a refusal.
+    let backend = FakeBackend::new(vec![Ok(reply(200, Value::Null)), approved()]);
+    let keychain = FakeKeychain::default();
+    let (outcome, _, _) = run(&backend, &keychain, "unreadable");
+
+    assert_eq!(outcome.unwrap().device_id, "device-9");
+    assert_eq!(keychain.entries.borrow().len(), 1);
+}
+
+#[test]
+fn control_characters_from_the_backend_never_reach_the_terminal() {
+    let mut backend = FakeBackend::new(vec![Ok(reply(
+        200,
+        json!({ "account": "o***@example.com\u{1b}[2K", "device_id": "device-9", "name": "box\r\u{1b}]0;x\u{7}", "secret": SECRET }),
+    ))]);
+
+    backend.code.body["verification_uri"] = json!("https://neore.ai/auth/device\u{1b}[1A\r");
+    backend.code.body["user_code"] = json!("ABCD\u{1b}2345");
+
+    let keychain = FakeKeychain::default();
+    let (outcome, shown, _) = run(&backend, &keychain, "control");
+    let paired = outcome.unwrap();
+
+    assert!(
+        !shown
+            .chars()
+            .any(|character| character.is_control() && character != '\n'),
+        "{shown:?}"
+    );
+    assert!(shown.contains("https://neore.ai/auth/device[1A"));
+    assert_eq!(paired.name, "box]0;x");
+    assert_eq!(paired.account, "o***@example.com[2K");
 }
