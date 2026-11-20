@@ -378,6 +378,16 @@ export const collectFiles = internalQuery
                     updatedAt: v.number(),
                 }),
             ),
+            // Saved site logins (`vault/site-logins.ts`): the site and the username only; the secret stays out.
+            siteLogins: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    label: v.optional(v.string()),
+                    site: v.string(),
+                    updatedAt: v.number(),
+                    username: v.string(),
+                }),
+            ),
         }),
     )
     .query(async ({ args: { userId }, ctx: context }) => {
@@ -389,6 +399,11 @@ export const collectFiles = internalQuery
         const folders = await context.db
             .query("folders")
             .withIndex("by_user_and_parent", (q) => q.eq("userId", userId))
+            .collect();
+
+        const siteLogins = await context.db
+            .query("savedSiteLogins")
+            .withIndex("by_userId_origin", (q) => q.eq("userId", userId))
             .collect();
 
         return {
@@ -410,6 +425,9 @@ export const collectFiles = internalQuery
                     name: f.name,
                     updatedAt: f.updatedAt,
                 };
+            }),
+            siteLogins: siteLogins.map((login) => {
+                return { createdAt: login.createdAt, label: login.label, site: login.origin, updatedAt: login.updatedAt, username: login.username };
             }),
         };
     });

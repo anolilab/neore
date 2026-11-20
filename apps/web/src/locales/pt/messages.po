@@ -39047,3 +39047,104 @@ msgstr "Zurique"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ pontos"
+
+#: src/features/vault/components/site-logins.tsx:220
+msgid "Bots that may use it"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:241
+#: src/features/vault/components/site-logins.tsx:118
+msgid "Could not delete the login."
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:90
+msgid "Could not save the login."
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:248
+#. placeholder {0}: login.site
+#: src/features/vault/components/site-logins.tsx:166
+msgid "Delete login for {0}"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:258
+msgid "Delete this login?"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:180
+msgid "Edit login"
+msgstr ""
+
+#. placeholder {0}: login.site
+#: src/features/vault/components/site-logins.tsx:149
+msgid "Edit login for {0}"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:215
+msgid "Label (optional)"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:209
+msgid "Leave empty to keep the saved password"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:116
+msgid "Login deleted"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:89
+msgid "Login saved"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:89
+msgid "Login updated"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:129
+msgid "Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it."
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:180
+msgid "New login"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:203
+#: src/features/vault/components/site-logins.tsx:144
+msgid "Password set"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:237
+#: src/features/vault/components/site-logins.tsx:237
+msgid "Save login"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:182
+msgid "Site"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:127
+msgid "Site logins"
+msgstr ""
+
+#. placeholder {0}: pendingDelete?.site ?? ""
+#: src/features/vault/components/site-logins.tsx:249
+msgid "The agent can no longer sign in to {0} with it."
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:193
+msgid "Username or email"
+msgstr ""
+
+#. placeholder {0}: teammates.join(", ")
+#: src/features/vault/components/site-logins.tsx:145
+msgid "Your chats and {0}"
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:222
+msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
+msgstr ""
+
+#: src/features/vault/components/site-logins.tsx:145
+msgid "Your own chats only"
+msgstr ""
+
