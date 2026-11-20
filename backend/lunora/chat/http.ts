@@ -810,6 +810,7 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         projectId: body.projectId,
         quality: body.quality,
         reasoningEffort: body.reasoningEffort,
+        referenceIds: body.referenceIds,
         referenceImages: body.referenceImages,
         researchDepth: body.researchDepth,
         retentionHours: body.retentionHours,

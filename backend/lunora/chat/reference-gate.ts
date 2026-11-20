@@ -35,7 +35,8 @@ const rowChecked = async (
     const [, kind = "", rowId = ""] = match;
 
     if (kind === "file") {
-        const file = await ctx.db.get("files", rowId as Id<"files">);
+        const fileId = ctx.db.normalizeId("files", rowId);
+        const file = fileId === null ? null : await ctx.db.get("files", fileId);
 
         if (!file || file.userId !== userId || file.url !== referenceUrl) {
             return { chatId: undefined, refused: true };
@@ -44,7 +45,8 @@ const rowChecked = async (
         return { chatId: file.chatId, refused: false };
     }
 
-    const document = await ctx.db.get("documents", rowId as Id<"documents">);
+    const documentId = ctx.db.normalizeId("documents", rowId);
+    const document = documentId === null ? null : await ctx.db.get("documents", documentId);
 
     if (!document || document.userId !== userId || document.content !== referenceUrl) {
         return { chatId: undefined, refused: true };

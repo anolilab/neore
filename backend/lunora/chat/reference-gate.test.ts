@@ -159,6 +159,11 @@ describe("a media request's references: the rows on the caller's shard", () => {
         await expect(refusedFor(OWNER, [{ id: "not-an-id", url: OPEN_URL }], ownerOpenId)).resolves.toBe(true);
     });
 
+    it("refuses a well-formed id that names no row, without a lookup error", async () => {
+        await expect(refusedFor(OWNER, [{ id: "file:not-a-real-id", url: OPEN_URL }], ownerOpenId)).resolves.toBe(true);
+        await expect(refusedFor(OWNER, [{ id: "doc:not-a-real-id", url: DOC_URL }], ownerOpenId)).resolves.toBe(true);
+    });
+
     it("refuses a list longer than the media cap, before any row is read", async () => {
         const repeated = Array.from({ length: REFERENCE_MEDIA_CAPS.images + 1 }, () => {
             return { id: `file:${openFileId}`, url: OPEN_URL };
