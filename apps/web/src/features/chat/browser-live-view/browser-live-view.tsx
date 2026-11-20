@@ -254,7 +254,10 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     }, [accessEnded]);
 
     // The status could not be read: a running browser must not look like no browser, so the card says so and can ask again.
-    if (threadId !== undefined && browser === undefined && status.isError) {
+    // This holds after an earlier answer too: the cached browser may be one the person can no longer see, so its page and
+    // any open view go (the frame unmounts, ending the connection). `isError` follows the query client's retry policy: a
+    // network failure is retried with backoff before the card changes, an error the backend answered with is not.
+    if (threadId !== undefined && status.isError) {
         return (
             <section aria-labelledby={headingId} className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
                 <div className="flex items-center gap-2">

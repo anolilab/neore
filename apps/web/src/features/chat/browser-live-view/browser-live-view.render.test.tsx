@@ -340,6 +340,32 @@ describe("BrowserLiveView", () => {
         expect(screen.queryByRole("alert")).toBeNull();
     });
 
+    it("closes an open view and offers a retry when a later status read fails", async () => {
+        backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
+        backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+        const queryClient = mountCard();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
+        await screen.findByTitle(LIVE_VIEW);
+
+        backend.statusError = new Error("network");
+        await act(async () => {
+            await queryClient.refetchQueries();
+        });
+
+        const alert = await screen.findByRole("alert");
+
+        expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+        expect(screen.queryByText("https://example.com/login")).toBeNull();
+        expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
+
+        backend.statusError = undefined;
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+        expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+    });
+
     it("renews a frame that loaded only after its deadline, and offers a retry once the renewal does not connect either", async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
