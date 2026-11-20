@@ -24,8 +24,9 @@ vi.mock("ai", async (importOriginal) => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
+        // The default utility model, which reasons before it answers.
         getUtilityModelForUser: async () => {
-            return {};
+            return { modelId: "cf-gpt-oss-20b" };
         },
         loadModelFilterRules: async () => {
             return {};

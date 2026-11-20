@@ -91,10 +91,15 @@ export const buildReasoningProviderOptions = (
     }
 };
 
+/** Workers AI models that reason before they answer and take a `reasoning_effort` ("low" | "medium" | "high"). */
+const WORKERS_AI_REASONING_MODELS: ReadonlySet<string> = new Set(["cf-gpt-oss-20b", "cf-gpt-oss-120b"]);
+
 /**
- * `providerOptions` for a small structured utility call with an output cap (belief revision, labelling an import).
- * The default utility model (`cf-gpt-oss-20b` on Workers AI) reasons before it answers, the adapter sends the cap as
- * `max_tokens`, and nothing in the gateway reserves room for reasoning, so low effort keeps the cap for the answer.
- * Only the Workers AI adapter reads this key; the fallback models on other providers ignore it.
+ * `providerOptions` for a small structured utility call with an output cap (belief revision, labelling an import),
+ * or `undefined` for a model that does not reason. The default utility model (`cf-gpt-oss-20b`) reasons before it
+ * answers, the Workers AI adapter sends the cap as `max_tokens`, and nothing in the gateway reserves room for the
+ * reasoning, so low effort keeps the cap for the answer. The adapter sends `reasoning_effort` to every Workers AI
+ * model it is given, so it is set only for the models listed: the other utility fallbacks do not reason.
  */
-export const LOW_REASONING_UTILITY_OPTIONS = { "workers-ai": { reasoning_effort: "low" } } as const;
+export const lowReasoningUtilityOptions = (model: { modelId: string }): { "workers-ai": { reasoning_effort: "low" } } | undefined =>
+    WORKERS_AI_REASONING_MODELS.has(model.modelId) ? { "workers-ai": { reasoning_effort: "low" } } : undefined;

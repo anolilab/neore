@@ -13,7 +13,7 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { getUtilityModelForUser, loadModelFilterRules } from "../chat/lib/model-filter-rules";
-import { LOW_REASONING_UTILITY_OPTIONS } from "../chat/lib/reasoning-options";
+import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
 import {
@@ -368,7 +368,7 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
             }),
         }),
         prompt: buildImportLabelPrompt(lines),
-        providerOptions: LOW_REASONING_UTILITY_OPTIONS,
+        providerOptions: lowReasoningUtilityOptions(model),
         system: IMPORT_LABEL_SYSTEM_PROMPT,
     });
     const facts = applyImportLabels(lines, output?.keep ?? []);
