@@ -79,6 +79,10 @@ pub struct AcpInstall {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_integrity: Option<String>,
     pub publisher: String,
+    /// The names of the variables the registry set at this install. A reinstall drops those the registry no longer
+    /// sets and keeps the agent's other variables (the person's own).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub registry_env: Vec<String>,
     /// SHA-256 of the archive that was verified, lowercase hex.
     pub sha256: String,
     /// The archive's URL, as the registry gave it.
@@ -107,6 +111,23 @@ fn keeps_program_pin(before: &AcpAgent, command: &str, args: &[String]) -> bool 
 /// `NODE_*` setting (`NODE_OPTIONS` with `--require` or `--import`, `NODE_PATH`).
 fn changes_node(name: &str) -> bool {
     changes_program(name) || name.to_ascii_uppercase().starts_with("NODE_")
+}
+
+/// A variable of `agent_key` the person set is theirs from now on, even under a name the registry set at install: a
+/// reinstall that no longer sets it keeps their value. A global variable is not in any agent's own set.
+fn disown_registry_var(settings: &mut crate::store::Settings, agent_key: Option<&str>, name: &str) {
+    let Some(key) = agent_key else {
+        return;
+    };
+
+    if let Some(pin) = settings
+        .acp_agents
+        .iter_mut()
+        .find(|agent| agent.key == key)
+        .and_then(|agent| agent.install.as_mut())
+    {
+        pin.registry_env.retain(|owned| owned != name);
+    }
 }
 
 /// Drops the pin of the npm agents a changed variable reaches (`agent_key`, or all of them for a global one): they
@@ -570,7 +591,11 @@ impl DeviceState {
                     let moved = changes_program(&name) && changed;
                     let node = changes_node(&name) && changed;
 
-                    scope.0.insert(name, value);
+                    scope.0.insert(name.clone(), value);
+
+                    if changed {
+                        disown_registry_var(settings, agent_key.as_deref(), &name);
+                    }
 
                     if moved {
                         drop_path_consents(settings, agent_key.as_deref());
