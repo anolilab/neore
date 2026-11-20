@@ -42,6 +42,7 @@ import {
     SUB_AGENT_TOOL_NAME,
     WORKER_SYSTEM,
 } from "./logic";
+import { isRoleModelAllowed, roleSystemText } from "./roles";
 
 /** A failure this run raised itself, whose message is written for the user. */
 class SubAgentRunError extends Error {}
@@ -87,13 +88,25 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
 
         const skill = skillRun?.invocation ? { config: skillRun.invocation.config, instructions: skillRun.invocation.instructions } : undefined;
         const worker = claim.mode === "worker" && claim.childThreadId !== undefined ? claim.childThreadId : undefined;
-        // A worker keeps its own model: the thread's, not the lead's and not a skill's.
-        const model = resolveSubAgentModel({
-            defaultModel: DEFAULT_CHAT_MODEL,
-            isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
-            parentModel: worker ? claim.model : claim.parentModel,
-            preferredModel: worker ? undefined : skill?.config?.preferredModel,
-        });
+        const { role } = claim;
+
+        // A one-shot role run is on the role's model or does not run: no other model stands in for it quietly.
+        if (role && !worker && !isRoleModelAllowed(role.model)) {
+            throw new SubAgentRunError(
+                `The ${role.name} role's model (${role.model}) can no longer run sub-agents. Pick another one in Settings → Sub-agent roles.`,
+            );
+        }
+
+        // A worker keeps its own model: the thread's, not the lead's and not a skill's. A role's model wins over a skill's.
+        const model =
+            role && !worker
+                ? role.model
+                : resolveSubAgentModel({
+                      defaultModel: DEFAULT_CHAT_MODEL,
+                      isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
+                      parentModel: worker ? claim.model : claim.parentModel,
+                      preferredModel: worker ? undefined : skill?.config?.preferredModel,
+                  });
         // An account deletion may have started since the claim; a thread created now would land behind the
         // step that erased the threads, and a worker's thread is about to be written to.
         const assertCanRun = async () => {
@@ -158,9 +171,10 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
 
                     return false;
                 }),
+            ...(role?.reasoningEffort !== undefined && { reasoningEffort: role.reasoningEffort }),
             skill,
             skipUnread: true,
-            system: worker ? WORKER_SYSTEM : SUB_AGENT_SYSTEM,
+            system: [worker ? WORKER_SYSTEM : SUB_AGENT_SYSTEM, ...(role ? [roleSystemText(role)] : [])].join("\n\n"),
             thread: worker ? { threadId: worker } : { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },
             toolAllowlist: claim.toolAllowlist,
             tools: "headless",

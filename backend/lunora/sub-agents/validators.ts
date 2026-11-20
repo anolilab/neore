@@ -36,3 +36,46 @@ export const vWorkerPolicy = v.object({
 
 /** A new host worker's runner as a caller asks for it: the computer and the (agent, folder) pair it offered. */
 export const vHostRunnerRequest = v.object({ agentKey: v.string().max(128), deviceId: v.string().max(128), folderId: v.string().max(128) });
+
+/** The kinds of delegated work a user can give a model of its own (`sub-agents/roles.ts`). */
+export const vSubAgentRoleName = v.union(
+    v.literal("architecture"),
+    v.literal("implementation"),
+    v.literal("research"),
+    v.literal("review"),
+    v.literal("security"),
+    v.literal("design"),
+    v.literal("test"),
+    v.literal("general"),
+);
+
+/**
+ * One role as a scope stores it. Every field is optional: an absent one inherits from the scope above (a project from
+ * the user, the user from the built-in default). `instructions: ""` turns the role's extra instructions off.
+ */
+export const vSubAgentRoleConfig = v.object({
+    instructions: v.optional(v.string().max(4000)),
+    mode: v.optional(v.union(v.literal("prefer"), v.literal("always"))),
+    model: v.optional(v.string().max(256)),
+    reasoningEffort: v.optional(v.number()),
+});
+
+/** The roles one scope (the user, or a project) sets; an absent role inherits whole. */
+export const vSubAgentRoles = v.object({
+    architecture: v.optional(vSubAgentRoleConfig),
+    design: v.optional(vSubAgentRoleConfig),
+    general: v.optional(vSubAgentRoleConfig),
+    implementation: v.optional(vSubAgentRoleConfig),
+    research: v.optional(vSubAgentRoleConfig),
+    review: v.optional(vSubAgentRoleConfig),
+    security: v.optional(vSubAgentRoleConfig),
+    test: v.optional(vSubAgentRoleConfig),
+});
+
+/** The role a run launched with, resolved at admission and kept on the row: a later settings change never reaches it. */
+export const vSubAgentRunRole = v.object({
+    instructions: v.optional(v.string()),
+    model: v.string(),
+    name: vSubAgentRoleName,
+    reasoningEffort: v.optional(v.number()),
+});

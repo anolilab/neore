@@ -43,6 +43,9 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
             case internal.projects.functions.getProjectContextForRun: {
                 return project;
             }
+            case internal.sub_agents.role_settings.getRoleCatalogForRun: {
+                return null;
+            }
             default: {
                 throw new Error("unexpected query");
             }
@@ -167,6 +170,17 @@ describe(loadRunContext, () => {
         expect(result.projectInstructions).toStrictEqual(instructions);
         expect(result.contextParts.join("\n")).not.toContain("Deploy");
         expect(result.untrustedContext).toBe(true);
+    });
+
+    it("reads the sub-agent role catalog only when the run asks for it", async () => {
+        const without = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve(null));
+        const asked = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve({ projectId: "p1" }));
+
+        await loadRunContext(without.ctx, args);
+        await loadRunContext(asked.ctx, { ...args, roleCatalog: true });
+
+        expect(without.runQuery).not.toHaveBeenCalledWith(internal.sub_agents.role_settings.getRoleCatalogForRun, expect.anything());
+        expect(asked.runQuery).toHaveBeenCalledWith(internal.sub_agents.role_settings.getRoleCatalogForRun, { projectId: "p1", userId: "u1" });
     });
 
     it("reports none when nothing was retrieved", async () => {
