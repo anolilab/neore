@@ -4692,6 +4692,13 @@ export const generateFollowupSuggestionsForThread = internalAction
             // The reply is still the newest of the thread. A newer message has its own run, which pays for its own reply. Checked before
             // the claim, so a superseded reply never takes its paid claim.
             const isStillNewest = async (): Promise<boolean> => {
+                // A `/clear` since the job began ends the context this reply belongs to: its prompt is no longer shown, so nothing is paid for it.
+                const currentReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
+
+                if (currentReset?.order !== contextReset?.order) {
+                    return false;
+                }
+
                 const page = await agent.listMessages(context, {
                     paginationOpts: { cursor: null, numItems: 10 },
                     threadId,
