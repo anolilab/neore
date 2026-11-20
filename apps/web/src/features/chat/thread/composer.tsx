@@ -303,7 +303,9 @@ const ComposerInputWrapper: FC<{
     onSubmit: () => void;
     onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
-}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder }) => {
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
+}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder, suggestPrompt = true }) => {
     const cyclingPlaceholder = useCyclingPlaceholder();
 
     return (
@@ -318,6 +320,7 @@ const ComposerInputWrapper: FC<{
             onSubmitOverride={onSubmitOverride}
             placeholder={placeholder ?? cyclingPlaceholder}
             ref={inputRef}
+            suggestPrompt={suggestPrompt}
         />
     );
 };
@@ -859,6 +862,7 @@ const Composer: FC<ComposerProps> = ({
                         onSubmit={() => {}}
                         onSubmitOverride={onSubmitOverride}
                         placeholder={placeholder}
+                        suggestPrompt={composerMode === "text"}
                     />
                 </ComposerBase>
             </div>

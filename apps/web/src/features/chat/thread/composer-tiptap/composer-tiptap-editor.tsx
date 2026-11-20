@@ -93,6 +93,9 @@ export interface ComposerTiptapEditorProps {
     /** Max height in rows (approximate) */
     maxRows?: number;
 
+    /** The chat the suggestion belongs to: the same text in another chat is placed again. */
+    nextPromptScope?: string | null;
+
     /**
      * The suggested next prompt after a reply, shown as ghost text in an empty composer: Tab inserts it, Escape or typing
      * dismisses it. Set once per reply; `null` clears it.
@@ -201,6 +204,7 @@ const ComposerTiptapEditor = ({
     onSelectVaultFile,
     onSubmit,
     placeholder: placeholderProp,
+    nextPromptScope = null,
     nextPromptSuggestion = null,
     ref,
     requestCompletion,
@@ -657,7 +661,7 @@ const ComposerTiptapEditor = ({
     // The suggested next prompt is its own ghost source: the as-you-type controller clears what it does not own (on focus,
     // for instance). It is placed when the suggestion arrives, once: typing dismisses it, and clearing the draft does not
     // bring it back, because this runs only when the suggestion changes.
-    const promptAnnouncementText = t`Suggested next prompt, press Tab to insert`;
+    const promptAnnouncementText = nextPromptSuggestion ? t`Suggested next prompt: ${nextPromptSuggestion}. Press Tab to insert.` : "";
 
     useEffect(() => {
         if (!editor || editor.isDestroyed) {
@@ -676,7 +680,7 @@ const ComposerTiptapEditor = ({
         const clearAnnouncement = setTimeout(setGhostAnnouncement, ANNOUNCEMENT_CLEAR_MS, "");
 
         return () => clearTimeout(clearAnnouncement);
-    }, [editor, nextPromptSuggestion, promptAnnouncementText]);
+    }, [editor, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
         if (!editor || !hasCompletionSource) {

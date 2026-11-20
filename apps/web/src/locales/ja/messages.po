@@ -40311,5 +40311,5 @@ msgid "Δ points"
 msgstr "Δ ポイント"
 
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:654
-msgid "Suggested next prompt, press Tab to insert"
-msgstr ""
+msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
+msgstr "次のプロンプトの提案: {nextPromptSuggestion}。Tab キーで挿入します。"
