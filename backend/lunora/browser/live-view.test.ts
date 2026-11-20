@@ -612,6 +612,19 @@ describe("taking control of the browser", () => {
         await expect(control()).resolves.toMatchObject({ by: WRITER, ended: "left", until: NOW });
     });
 
+    it("returns no URL when the lease lapsed on the server's clock while the provider minted it, though nothing ended it", async () => {
+        await addSession();
+        fetchMock.mockImplementationOnce(async () => {
+            vi.setSystemTime(NOW + CONTROL_IDLE_MS);
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        // The lapsed claim is dropped: the agent was never stopped by a view the person never got.
+        await expect(control()).resolves.toBeUndefined();
+    });
+
     it("keeps a lease its holder renewed while their first claim's mint failed", async () => {
         await addSession();
         fetchMock

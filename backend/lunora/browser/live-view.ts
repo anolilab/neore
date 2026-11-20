@@ -149,9 +149,13 @@ export const getThreadBrowser = authQuery
         };
     });
 
-/** {@link readerBrowser} for the action, which reaches the database only through `runQuery`; the grant from the primary. */
+/**
+ * {@link readerBrowser} for the action, which reaches the database only through `runQuery`; the grant from the primary.
+ * `at`: the action's clock after a provider call. The lease is judged at the later of it and `ctx.now`, so one that
+ * lapsed while the provider minted is over even where a nested call still reads the time its action started at.
+ */
 export const getReaderBrowser = internalQuery
-    .input({ threadId: v.id("threads"), userId: v.string() })
+    .input({ at: v.optional(v.number()), threadId: v.id("threads"), userId: v.string() })
     .output(
         v.union(
             v.object({ kind: v.literal("denied") }),
@@ -167,8 +171,8 @@ export const getReaderBrowser = internalQuery
             }),
         ),
     )
-    .query(async ({ args: { threadId, userId }, ctx }) => {
-        const browser = await readerBrowser(ctx, threadId, userId, ctx.now, { primary: true });
+    .query(async ({ args: { at, threadId, userId }, ctx }) => {
+        const browser = await readerBrowser(ctx, threadId, userId, Math.max(ctx.now, at ?? 0), { primary: true });
 
         if (browser.kind !== "watchable") {
             return browser;
@@ -247,7 +251,7 @@ export const openLiveView = authAction
         }
 
         // The provider call takes time: a grant removed, or a chat locked or trashed, while it ran gets no URL either.
-        const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { threadId, userId: ctx.user.userId });
+        const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { at: Date.now(), threadId, userId: ctx.user.userId });
 
         if (after.kind === "denied") {
             ctx.log.event("browser.live_view_opened", { ok: false, reason: "denied_after_mint" });
@@ -486,7 +490,7 @@ export const takeControl = authAction
 
         // The provider call takes time: a grant removed or lowered, a chat locked or trashed, a lease handed back, taken
         // over or lapsed, or a browser replaced while it ran gets no URL.
-        const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { threadId, userId });
+        const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { at: Date.now(), threadId, userId });
 
         if (after.kind === "denied") {
             await refuse("ended", "denied_after_mint");

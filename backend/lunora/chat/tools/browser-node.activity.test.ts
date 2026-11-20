@@ -453,6 +453,23 @@ describe("a browser a person took control of", () => {
         expect(renderer.mock.calls.map(([request]) => (request as { body: { action: string } }).body.action)).toEqual(["screenshot", "screenshot"]);
     });
 
+    it.each([
+        ["browser_closed", "navigate"],
+        ["handed_back", "screenshot"],
+    ] as const)("after it ended (%s), sends a navigate to the renderer as %s", async (ended, sent) => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended, until: NOW - 1 });
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/" }));
+
+        const result = (await act("navigate")) as Record<string, unknown>;
+
+        // A closed browser has no page left to look at: the navigate that reopens one runs, and the agent still hears why.
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: sent } });
+        expect(result.success).toBe(sent === "navigate");
+        expect(result.error).toContain("The person had control of the browser");
+        await expect(row()).resolves.not.toHaveProperty("control");
+    });
+
     it("runs a look at the page as asked after a hand back, with the note", async () => {
         await addSession(NOW - 1000);
         await giveControl({ ended: "handed_back", until: NOW - 1 });

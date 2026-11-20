@@ -98,8 +98,10 @@ export const executeBrowserAction = internalAction
                     return { error: "Browser automation rate limit exceeded.", success: false };
                 }
 
-                // After a hand back the page is not the one the agent planned against: it looks before it acts.
-                const looksFirst = returned !== undefined && action !== "screenshot" && action !== "extract";
+                // After a hand back the page is not the one the agent planned against: it looks before it acts. A
+                // navigate to a browser that was closed runs as asked: there is no page left to look at.
+                const reopens = action === "navigate" && (returned === "browser_closed" || cfSessionId === undefined);
+                const looksFirst = returned !== undefined && action !== "screenshot" && action !== "extract" && !reopens;
 
                 const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
 
