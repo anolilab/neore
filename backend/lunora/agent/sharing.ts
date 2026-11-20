@@ -165,15 +165,35 @@ export const updateThreadAccess = internalMutation
     });
 
 /**
- * Removes every share grant of a thread: called when the thread is deleted, to the trash or for good, so no collaborator
- * keeps reading it, or a memory's quote from it (`memory/functions.ts#getMemorySource`, which sees only the grant). A chat
- * restored from the trash is shared again by hand. Primary: a replica that lags a fresh grant would leave it behind.
+ * Removes every share grant of a thread and revokes its pending invites: called when the thread is deleted, to the trash
+ * or for good, so no collaborator keeps reading it, or a memory's quote from it (`memory/functions.ts#getMemorySource`,
+ * which sees only the grant), and no invite redeemed later grants it again. A chat restored from the trash is shared again
+ * by hand. Primary reads: a replica that lags a fresh grant would leave it behind, and each delete moves a row out of the
+ * filter, so reading again until none is left ends.
  */
 export const revokeThreadGrants = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<void> => {
-    const { page } = await ctx.db.threadAccess.findMany({ consistency: "primary", where: { threadId } });
+    for (;;) {
+        const { page } = await ctx.db.threadAccess.findMany({ consistency: "primary", limit: 100, where: { threadId } });
 
-    for (const grant of page) {
-        await ctx.db.delete("threadAccess", grant._id);
+        if (page.length === 0) {
+            break;
+        }
+
+        for (const grant of page) {
+            await ctx.db.delete("threadAccess", grant._id);
+        }
+    }
+
+    for (;;) {
+        const { page } = await ctx.db.threadInvites.findMany({ consistency: "primary", limit: 100, where: { status: "pending", threadId } });
+
+        if (page.length === 0) {
+            break;
+        }
+
+        for (const invite of page) {
+            await ctx.db.patch("threadInvites", invite._id, { status: "revoked" });
+        }
     }
 };
 

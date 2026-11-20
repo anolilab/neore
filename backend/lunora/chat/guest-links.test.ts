@@ -167,7 +167,22 @@ describe("a deleted chat's share grants", () => {
 
     it.each(deletions)("are removed when the chat is %s, so no collaborator keeps reading it", async (_label, remove) => {
         await harness.run(async (ctx: any) => {
+            // More grants than one page reads, so every page must go.
+            for (let index = 0; index < 120; index += 1) {
+                await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: `guest-${index}` });
+            }
+
             await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: "collaborator" });
+            await ctx.db.insert("threadInvites", {
+                expiresAt: NOW + 60_000,
+                invitedBy: OWNER,
+                invitedEmail: "someone@example.com",
+                inviteToken: "token-1",
+                ownerId: OWNER,
+                permission: "read",
+                status: "pending",
+                threadId,
+            });
             await ctx.db.insert("threadAccess", {
                 grantedAt: 0,
                 grantedBy: OWNER,
@@ -180,8 +195,13 @@ describe("a deleted chat's share grants", () => {
         await remove();
 
         const grants = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { userId: "collaborator" } }));
+        const invites = await harness.run(async (ctx: any) => await ctx.db.threadInvites.findMany({ where: { threadId } }));
 
+        const left = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { threadId } }));
+
+        expect(left.page).toHaveLength(0);
         expect(grants.page.map((grant: any) => grant.threadId)).toEqual(["another-thread"]);
+        expect(invites.page.map((invite: any) => invite.status)).toEqual(["revoked"]);
     });
 });
 
