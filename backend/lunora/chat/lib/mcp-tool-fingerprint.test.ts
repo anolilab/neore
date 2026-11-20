@@ -1,7 +1,7 @@
 import { dynamicTool, jsonSchema, type JSONSchema7, type ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift } from "./mcp-tool-fingerprint";
+import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 
 /** An MCP tool shaped like the ones the MCP client builds from a `tools/list` entry. */
 const mcpTool = (schema: JSONSchema7 | PromiseLike<JSONSchema7>): ToolSet[string] =>
@@ -192,5 +192,25 @@ describe(mcpToolDrift, () => {
     it("is unchanged for a tool the snapshot did not fingerprint, or a snapshot that predates fingerprints", () => {
         expect(mcpToolDrift(saved, {}, "webSearch", false)).toBe("unchanged");
         expect(mcpToolDrift(undefined, {}, "mcp_Docs__search", false)).toBe("unchanged");
+    });
+});
+
+describe(mcpToolOriginDrift, () => {
+    const saved = { mcp_Docs__search: "aaa" };
+
+    it("is unchanged when the name still stands for the same origin", () => {
+        expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "aaa" }, "mcp_Docs__search", true)).toBe("unchanged");
+    });
+
+    it("is replaced when the name now stands for another origin", () => {
+        expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "bbb" }, "mcp_Docs__search", true)).toBe("replaced");
+    });
+
+    // Two saved entries of one name and address share an origin: it cannot say which entry the approval was for.
+    it("is replaced when either run lists the origin under two names", () => {
+        expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "aaa", mcp_Docs__search_2: "aaa" }, "mcp_Docs__search", true)).toBe("replaced");
+        expect(mcpToolOriginDrift({ mcp_Docs__search: "aaa", mcp_Docs__search_2: "aaa" }, { mcp_Docs__search: "aaa" }, "mcp_Docs__search", true)).toBe(
+            "replaced",
+        );
     });
 });

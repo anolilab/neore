@@ -1804,7 +1804,7 @@ msgstr "Le titre d’un(e) {requestNoun} compte au plus {0} caractères."
 msgid "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
 msgstr "Une exécution en arrière-plan ne s’arrête jamais pour vous attendre. Les questions qui lui seraient adressées sont écartées : elle se termine seule ou échoue."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:375
+#: src/features/settings/components/chat/bot-tool-selection.tsx:427
 msgid "A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*."
 msgstr "Un outil intégré par son nom, l'outil d'un serveur sous la forme server:tool, ou un serveur entier sous la forme server:*."
 
@@ -1885,7 +1885,7 @@ msgstr "Une clé est enregistrée. Laissez vide pour la conserver."
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "Une clé est enregistrée. Laissez vide pour la conserver. Si vous modifiez le point de terminaison, la région ou l'ID de clé d'accès, vous devrez la saisir à nouveau."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:244
+#: src/features/settings/components/chat/bot-tool-selection.tsx:282
 msgid "A listed built-in tool no longer exists. Remove it before saving."
 msgstr "Un outil intégré de la liste n’existe plus. Retirez-le avant d’enregistrer."
 
@@ -2000,7 +2000,7 @@ msgstr "Une exécution n’écrit jamais dans une conversation verrouillée ou p
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "Le fil d'une exécution est classé dans ce projet. Déplacer la tâche vers un autre projet démarre un nouveau fil."
 
-#: src/features/settings/components/chat/bots-settings.tsx:300
+#: src/features/settings/components/chat/bots-settings.tsx:314
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Un bac à sable que le bot conserve entre les chats. Mis en pause quand il est inactif, non facturé pendant la pause."
 
@@ -2052,8 +2052,8 @@ msgstr "Un outil ne peut pas être à la fois ajouté et désactivé"
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "Un outil qui nécessite votre approbation met le tour en pause avec une carte. Seul le propriétaire répond, puis les intervenants en file continuent."
 
-#: src/features/settings/components/chat/bots-settings.tsx:148
-#: src/features/settings/components/chat/bots-settings.tsx:200
+#: src/features/settings/components/chat/bots-settings.tsx:150
+#: src/features/settings/components/chat/bots-settings.tsx:202
 msgid "A tool you typed was not added. Add it or clear the field first."
 msgstr "{'de': 'Ein eingegebenes Tool wurde nicht hinzugefügt. Füge es hinzu oder leere das Feld zuerst.', 'es': 'Una herramienta que escribiste no se añadió. Añádela o vacía el campo primero.', 'fr': 'Un outil que vous avez saisi n’a pas été ajouté. Ajoutez-le ou videz d’abord le champ.', 'it': 'Uno strumento che hai digitato non è stato aggiunto. Aggiungilo o svuota prima il campo.', 'ja': '入力したツールが追加されていません。先に追加するか、入力欄を空にしてください。', 'pl': 'Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść pole.', 'pt': 'Uma ferramenta que você digitou não foi adicionada. Adicione-a ou limpe o campo primeiro.', 'zh': '你输入的工具尚未添加。请先添加它或清空输入框。'}"
 
@@ -2299,7 +2299,7 @@ msgstr "Activité par mois"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
 #: src/features/projects/components/project-repositories.tsx:425
-#: src/features/settings/components/chat/bot-tool-selection.tsx:234
+#: src/features/settings/components/chat/bot-tool-selection.tsx:272
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -3398,7 +3398,7 @@ msgstr "Tous les shards ont été mesurés."
 msgid "All tasks"
 msgstr "Toutes les tâches"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:347
+#: src/features/settings/components/chat/bot-tool-selection.tsx:386
 msgid "All tools"
 msgstr "Tous les outils"
 
@@ -3469,7 +3469,7 @@ msgstr "Fournisseurs autorisés"
 msgid "Allowed Regions"
 msgstr "Régions autorisées"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:377
+#: src/features/settings/components/chat/bot-tool-selection.tsx:429
 msgid "Allowed tools"
 msgstr "Outils autorisés"
 
@@ -3586,7 +3586,7 @@ msgstr "Une erreur s’est produite lors du chargement de la page {routeName}."
 msgid "An event cannot end before it starts."
 msgstr "Un événement ne peut pas se terminer avant de commencer."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:390
+#: src/features/settings/components/chat/bot-tool-selection.tsx:442
 msgid "An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools."
 msgstr "Un serveur exclu a été supprimé ou son adresse a changé. Tant que tu ne le retires pas ici, le bot ne reçoit aucun outil de tes propres serveurs."
 
@@ -5170,11 +5170,11 @@ msgstr "Bosnien"
 msgid "Bosnian (Bosnia)"
 msgstr "Bosnien (Bosnie)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:168
+#: src/features/settings/components/chat/bots-settings.tsx:170
 msgid "Bot created"
 msgstr "Bot créé"
 
-#: src/features/settings/components/chat/bots-settings.tsx:238
+#: src/features/settings/components/chat/bots-settings.tsx:240
 msgid "Bot deleted"
 msgstr "Bot supprimé"
 
@@ -5720,7 +5720,7 @@ msgstr "Canada"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:439
-#: src/features/settings/components/chat/bots-settings.tsx:402
+#: src/features/settings/components/chat/bots-settings.tsx:417
 #: src/features/settings/components/chat/custom-providers-settings.tsx:638
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:709
@@ -6074,7 +6074,7 @@ msgstr "chat"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:341
-#: src/features/settings/components/chat/bots-settings.tsx:352
+#: src/features/settings/components/chat/bots-settings.tsx:367
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
 msgid "Chat"
@@ -7453,7 +7453,7 @@ msgid "Compressing context..."
 msgstr "Compression du contexte..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/settings/components/chat/bots-settings.tsx:299
+#: src/features/settings/components/chat/bots-settings.tsx:313
 msgid "Computer"
 msgstr "Ordinateur"
 
@@ -8461,7 +8461,7 @@ msgstr "Impossible de modifier Auto. Réessayez."
 msgid "Could not change push notifications. Try again."
 msgstr "Impossible de modifier les notifications push. Réessayez."
 
-#: src/features/settings/components/chat/bots-settings.tsx:190
+#: src/features/settings/components/chat/bots-settings.tsx:192
 msgid "Could not change the bot's permission mode."
 msgstr "Impossible de modifier le mode d'autorisation du bot."
 
@@ -8546,7 +8546,7 @@ msgstr "Copie impossible ; sélectionnez plutôt le texte"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Impossible de créer une collection pour cette importation. Réessayez."
 
-#: src/features/settings/components/chat/bots-settings.tsx:170
+#: src/features/settings/components/chat/bots-settings.tsx:172
 msgid "Could not create the bot."
 msgstr "Impossible de créer le bot."
 
@@ -8559,7 +8559,7 @@ msgstr "Impossible de créer le chat de groupe"
 msgid "Could not create the page"
 msgstr "Impossible de créer la page"
 
-#: src/features/settings/components/chat/bots-settings.tsx:240
+#: src/features/settings/components/chat/bots-settings.tsx:242
 msgid "Could not delete the bot."
 msgstr "Impossible de supprimer le bot."
 
@@ -8791,7 +8791,7 @@ msgstr "Impossible de réessayer. Veuillez réessayer."
 msgid "Could not save that choice. Try again."
 msgstr "Impossible d’enregistrer ce choix. Réessayez."
 
-#: src/features/settings/components/chat/bots-settings.tsx:226
+#: src/features/settings/components/chat/bots-settings.tsx:228
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Impossible d'enregistrer les outils du bot. Ses outils restent inchangés."
 
@@ -8859,7 +8859,7 @@ msgstr "Impossible de se déconnecter"
 msgid "Could not snooze the thread. Please try again."
 msgstr "Impossible de reporter le fil. Veuillez réessayer."
 
-#: src/features/settings/components/chat/bots-settings.tsx:180
+#: src/features/settings/components/chat/bots-settings.tsx:182
 msgid "Could not start a chat with this bot."
 msgstr "Impossible de démarrer un chat avec ce bot."
 
@@ -9054,7 +9054,7 @@ msgstr "Créez et gérez des clés API pour accéder à votre compte de manière
 msgid "Create API Key"
 msgstr "Créer une clé API"
 
-#: src/features/settings/components/chat/bots-settings.tsx:309
+#: src/features/settings/components/chat/bots-settings.tsx:324
 msgid "Create bot"
 msgstr "Créer un bot"
 
@@ -9416,7 +9416,7 @@ msgstr "Actuellement restreints"
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
-#: src/features/settings/components/chat/bot-tool-selection.tsx:351
+#: src/features/settings/components/chat/bot-tool-selection.tsx:390
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
 msgstr "Personnalisé"
@@ -9480,7 +9480,7 @@ msgstr "styles personnalisés"
 msgid "Custom System Prompt"
 msgstr "Prompt système personnalisé"
 
-#: src/features/settings/components/chat/bots-settings.tsx:328
+#: src/features/settings/components/chat/bots-settings.tsx:343
 msgid "Custom tools"
 msgstr "Outils personnalisés"
 
@@ -9993,8 +9993,8 @@ msgstr "Déléguez des tâches à Devin, l’ingénieur logiciel IA"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:709
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:848
-#: src/features/settings/components/chat/bots-settings.tsx:361
-#: src/features/settings/components/chat/bots-settings.tsx:412
+#: src/features/settings/components/chat/bots-settings.tsx:376
+#: src/features/settings/components/chat/bots-settings.tsx:427
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:307
@@ -10021,7 +10021,7 @@ msgstr "Supprimer « {pendingDeleteTitle} » ?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:355
+#: src/features/settings/components/chat/bots-settings.tsx:370
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -10035,7 +10035,7 @@ msgstr "Supprimer {0} utilisateurs"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:422
+#: src/features/settings/components/chat/bots-settings.tsx:437
 msgid "Delete {0}?"
 msgstr "Supprimer {0} ?"
 
@@ -10506,7 +10506,7 @@ msgstr "Décrivez votre workflow... par ex. « Générer une image à partir d�
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:255
+#: src/features/settings/components/chat/bots-settings.tsx:263
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -12562,7 +12562,7 @@ msgstr "L’événement se termine le"
 msgid "Every 6 hours"
 msgstr "Toutes les 6 heures"
 
-#: src/features/settings/components/chat/bots-settings.tsx:380
+#: src/features/settings/components/chat/bots-settings.tsx:395
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "Chaque chat et chaque exécution planifiée de ce bot ne reçoit que ces outils. Vos autorisations d'outils s'appliquent toujours."
 
@@ -12725,7 +12725,7 @@ msgstr "Rendu exceptionnel du texte dans les images"
 msgid "Exceptionally sharp detail and clarity"
 msgstr "Détails et clarté d’une netteté exceptionnelle"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:387
+#: src/features/settings/components/chat/bot-tool-selection.tsx:439
 msgid "Excluded tools"
 msgstr "Outils exclus"
 
@@ -16256,7 +16256,7 @@ msgstr "Voix du mode mains libres mise à jour"
 msgid "Happens on"
 msgstr "A lieu le"
 
-#: src/features/settings/components/chat/bots-settings.tsx:327
+#: src/features/settings/components/chat/bots-settings.tsx:342
 msgid "Has a computer"
 msgstr "A un ordinateur"
 
@@ -17568,7 +17568,7 @@ msgstr "instruct"
 msgid "instructions"
 msgstr "instructions"
 
-#: src/features/settings/components/chat/bots-settings.tsx:264
+#: src/features/settings/components/chat/bots-settings.tsx:273
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -19318,6 +19318,10 @@ msgstr "Chargement de votre aperçu…"
 msgid "Loading your projects…"
 msgstr "Chargement de vos projets…"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:398
+msgid "Loading your servers, connectors and computers…"
+msgstr "Chargement de vos serveurs, connecteurs et ordinateurs…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
@@ -19344,7 +19348,7 @@ msgstr "Chargement..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:317
+#: src/features/settings/components/chat/bots-settings.tsx:332
 #: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
@@ -20648,7 +20652,7 @@ msgstr "Mode :"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:273
+#: src/features/settings/components/chat/bots-settings.tsx:283
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21247,7 +21251,7 @@ msgstr "nom"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:251
+#: src/features/settings/components/chat/bots-settings.tsx:253
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21609,7 +21613,7 @@ msgstr "Jamais ne couvre un outil que vous réglez vous-même sur Demander, les 
 msgid "Never expires"
 msgstr "N’expire jamais"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:385
+#: src/features/settings/components/chat/bot-tool-selection.tsx:437
 msgid "Never given to the bot, even when allowed above."
 msgstr "Jamais donnés au bot, même s'ils sont autorisés ci-dessus."
 
@@ -21628,7 +21632,7 @@ msgstr "Nouveau"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "Les nouveaux Azure Bots sont à locataire unique : définissez la clé Teams Tenant ID, sinon les réponses ne pourront pas s’authentifier."
 
-#: src/features/settings/components/chat/bots-settings.tsx:249
+#: src/features/settings/components/chat/bots-settings.tsx:251
 msgid "New bot"
 msgstr "Nouveau bot"
 
@@ -21673,7 +21677,7 @@ msgstr "Les nouveaux chats sont permanents"
 msgid "New chats start temporary"
 msgstr "Les nouveaux chats sont temporaires"
 
-#: src/features/settings/components/chat/bots-settings.tsx:188
+#: src/features/settings/components/chat/bots-settings.tsx:190
 msgid "New chats with this bot start in the chosen mode"
 msgstr "Les nouvelles discussions avec ce bot démarrent dans le mode choisi"
 
@@ -21992,7 +21996,7 @@ msgstr "Aucun journal d’audit trouvé"
 msgid "No bot"
 msgstr "Aucun bot"
 
-#: src/features/settings/components/chat/bots-settings.tsx:320
+#: src/features/settings/components/chat/bots-settings.tsx:335
 msgid "No bots yet."
 msgstr "Aucun bot pour l’instant."
 
@@ -22000,8 +22004,7 @@ msgstr "Aucun bot pour l’instant."
 msgid "No budget alerts configured."
 msgstr "Aucune alerte de budget configurée."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:120
-#: src/features/settings/components/chat/bot-tool-selection.tsx:122
+#: src/features/settings/components/chat/bot-tool-selection.tsx:139
 msgid "No built-in tool is named {unknownBuiltIn}."
 msgstr "Aucun outil intégré ne s’appelle {unknownBuiltIn}."
 
@@ -22461,7 +22464,7 @@ msgstr "Aucun résultat trouvé."
 msgid "No runs yet. Start one to score every case."
 msgstr "Aucune exécution pour l’instant. Lancez-en une pour noter chaque cas."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:238
+#: src/features/settings/components/chat/bot-tool-selection.tsx:149
 msgid "No server, connector or computer matches {unknownServer}."
 msgstr "Aucun serveur, connecteur ou ordinateur ne correspond à {unknownServer}."
 
@@ -23274,7 +23277,7 @@ msgstr "Continuez seulement si vous venez de lancer `neore-host pair` sur un ord
 msgid "Only in one run"
 msgstr "Dans une seule exécution"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:359
+#: src/features/settings/components/chat/bot-tool-selection.tsx:411
 msgid "Only listed tools"
 msgstr "Uniquement les outils listés"
 
@@ -24898,12 +24901,12 @@ msgid "Permission Level"
 msgstr "Niveau d’autorisation"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
-#: src/features/settings/components/chat/bots-settings.tsx:277
+#: src/features/settings/components/chat/bots-settings.tsx:291
 msgid "Permission mode"
 msgstr "Mode d’autorisation"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:332
+#: src/features/settings/components/chat/bots-settings.tsx:347
 msgid "Permission mode for {0}"
 msgstr "Mode d'autorisation de {0}"
 
@@ -27388,7 +27391,7 @@ msgstr "Retirer {modelId} de la liste des modèles bloqués"
 msgid "Remove {name}"
 msgstr "Retirer {name}"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:261
+#: src/features/settings/components/chat/bot-tool-selection.tsx:300
 msgid "Remove {shown}"
 msgstr "Retirer {shown}"
 
@@ -27583,7 +27586,7 @@ msgstr "Supprimé"
 msgid "Removed from favorites"
 msgstr "Retiré des favoris"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:134
+#: src/features/settings/components/chat/bot-tool-selection.tsx:172
 msgid "Removed server"
 msgstr "Serveur supprimé"
 
@@ -28080,6 +28083,7 @@ msgstr "réessayer"
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/bot-tool-selection.tsx:405
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -28776,7 +28780,7 @@ msgstr "Enregistrer la compétence"
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "Conservez ces codes de secours en lieu sûr. Ils vous permettent d’accéder à votre compte si vous perdez votre appareil d’authentification à deux facteurs."
 
-#: src/features/settings/components/chat/bots-settings.tsx:405
+#: src/features/settings/components/chat/bots-settings.tsx:420
 msgid "Save tools"
 msgstr "Enregistrer les outils"
 
@@ -29420,7 +29424,7 @@ msgstr "Sélectionner le modèle"
 msgid "Select Model"
 msgstr "Sélectionner un modèle"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:42
+#: src/features/prompts/components/prompt-model-selector.tsx:44
 msgid "Select model (optional)"
 msgstr "Sélectionner un modèle (facultatif)"
 
@@ -33303,11 +33307,11 @@ msgstr "L’assistant demande un secret"
 msgid "The assistant needs a secret"
 msgstr "L’assistant a besoin d’un secret"
 
-#: src/features/settings/components/chat/bots-settings.tsx:413
+#: src/features/settings/components/chat/bots-settings.tsx:428
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "Le bot et son ordinateur sont supprimés. Ses chats restent, comme de simples chats."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:361
+#: src/features/settings/components/chat/bot-tool-selection.tsx:413
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "Le bot ne reçoit que les outils que vous autorisez. Sans aucun outil autorisé, il n'en reçoit aucun."
 
@@ -33315,7 +33319,7 @@ msgstr "Le bot ne reçoit que les outils que vous autorisez. Sans aucun outil au
 msgid "The bot sets the model for this chat."
 msgstr "Le bot définit le modèle de ce chat."
 
-#: src/features/settings/components/chat/bots-settings.tsx:222
+#: src/features/settings/components/chat/bots-settings.tsx:224
 msgid "The bot's tools were saved"
 msgstr "Les outils du bot ont été enregistrés"
 
@@ -33327,11 +33331,11 @@ msgstr "Le navigateur ne peut pas lire cette vidéo pour capturer une image"
 msgid "The builder could not answer. Try again."
 msgstr "Le créateur n’a pas pu répondre. Réessayez."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:121
+#: src/features/settings/components/chat/bot-tool-selection.tsx:138
 msgid "The built-in tools are still loading. Try again in a moment."
 msgstr "Les outils intégrés sont encore en cours de chargement. Réessayez dans un instant."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:117
+#: src/features/settings/components/chat/bot-tool-selection.tsx:134
 msgid "The built-in tools could not be loaded. Reload the page to add one."
 msgstr "Impossible de charger les outils intégrés. Rechargez la page pour en ajouter un."
 
@@ -33732,7 +33736,7 @@ msgstr "Le registre MCP est indisponible pour le moment. Affichage des serveurs 
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Le message n’a pas pu être envoyé. Vérifiez votre connexion et réessayez."
 
-#: src/features/settings/components/chat/bots-settings.tsx:279
+#: src/features/settings/components/chat/bots-settings.tsx:293
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "Le mode dans lequel démarre chaque nouvelle discussion avec ce bot. Vous pouvez toujours le modifier par discussion. Les exécutions planifiées ne l'utilisent que s'il demande davantage de confirmations."
 
@@ -34507,7 +34511,7 @@ msgstr "Ce lien est incomplet. Demandez le lien complet."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Ce lien n’accepte pas de messages pour le moment. Réessayez plus tard."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:240
+#: src/features/settings/components/chat/bot-tool-selection.tsx:278
 msgid "This list is full: remove a tool before adding another."
 msgstr "{'de': 'Diese Liste ist voll: Entferne ein Tool, bevor du ein weiteres hinzufügst.', 'es': 'Esta lista está llena: quita una herramienta antes de añadir otra.', 'fr': 'Cette liste est pleine : retirez un outil avant d’en ajouter un autre.', 'it': 'Questo elenco è pieno: rimuovi uno strumento prima di aggiungerne un altro.', 'ja': 'このリストは上限に達しています。別のツールを追加する前に、ツールを1つ削除してください。', 'pl': 'Ta lista jest pełna: usuń narzędzie, zanim dodasz kolejne.', 'pt': 'Esta lista está cheia: remova uma ferramenta antes de adicionar outra.', 'zh': '此列表已满：请先移除一个工具，再添加新的。'}"
 
@@ -35263,8 +35267,8 @@ msgstr "Autorisations des outils"
 msgid "Tool Provider Keys"
 msgstr "Clés des fournisseurs d’outils"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:338
-#: src/features/settings/components/chat/bots-settings.tsx:349
+#: src/features/settings/components/chat/bot-tool-selection.tsx:377
+#: src/features/settings/components/chat/bots-settings.tsx:364
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
@@ -35274,8 +35278,8 @@ msgstr "Outils"
 
 #. placeholder {0}: bot.name
 #. placeholder {0}: editingTools?.name ?? ""
-#: src/features/settings/components/chat/bots-settings.tsx:338
-#: src/features/settings/components/chat/bots-settings.tsx:379
+#: src/features/settings/components/chat/bots-settings.tsx:353
+#: src/features/settings/components/chat/bots-settings.tsx:394
 msgid "Tools for {0}"
 msgstr "Outils de {0}"
 
@@ -37788,7 +37792,7 @@ msgstr "URL du webhook copiée dans le presse-papiers"
 msgid "WebP (Smaller)"
 msgstr "WebP (plus léger)"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:221
+#: src/features/settings/components/chat/bot-tool-selection.tsx:259
 msgid "webSearch or server:tool"
 msgstr "webSearch ou server:tool"
 
@@ -38712,7 +38716,7 @@ msgstr "Votre ressource Azure OpenAI : point de terminaison, version de l'API et
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Votre parcours, vos préférences ou votre localisation, pour aider l’IA à mieux vous comprendre"
 
-#: src/features/settings/components/chat/bots-settings.tsx:314
+#: src/features/settings/components/chat/bots-settings.tsx:329
 msgid "Your bots"
 msgstr "Vos bots"
 
@@ -38939,6 +38943,18 @@ msgstr "Votre revue a été demandée"
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr "Vos serveurs MCP enregistrés n’ont pas pu être chargés, ceci ne peut donc pas encore être enregistré."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:148
+msgid "Your servers, connectors and computers are still loading. Try again in a moment."
+msgstr "Vos serveurs, connecteurs et ordinateurs sont encore en cours de chargement. Réessayez dans un instant."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:403
+msgid "Your servers, connectors and computers could not be loaded."
+msgstr "Impossible de charger vos serveurs, connecteurs et ordinateurs."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:144
+msgid "Your servers, connectors and computers could not be loaded. Retry above to add one by name."
+msgstr "Impossible de charger vos serveurs, connecteurs et ordinateurs. Réessayez ci-dessus pour en ajouter un par son nom."
 
 #: src/lib/toast.ts:236
 msgid "Your session has expired"

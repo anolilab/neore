@@ -36,15 +36,31 @@ export interface ToolCatalog {
     /** The built-in tools could not be read, so a bare name cannot be checked. */
     builtInNamesFailed?: boolean;
     builtIns: string[];
+    /** Reads again whichever server lists failed. */
+    retryServers?: () => void;
     servers: KnownToolServer[];
+    /** Whether `servers` is complete: until every list is read, a selector naming an unlisted server is not known to be removed. */
+    serversState: "error" | "loading" | "ready";
 }
 
 export const useToolCatalog = (): ToolCatalog => {
     const crpc = useCRPC();
     const { data: settings, isError: settingsFailed } = useQuery(crpc.chat.tool_permissions.getToolPermissionSettings.queryOptions({}));
-    const { data: preferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
-    const { data: connectors } = useQuery(crpc.connectors.user_connectors.listConnectorCatalog.queryOptions({}));
-    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const preferencesQuery = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const connectorsQuery = useQuery(crpc.connectors.user_connectors.listConnectorCatalog.queryOptions({}));
+    const devicesQuery = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const { data: preferences } = preferencesQuery;
+    const { data: connectors } = connectorsQuery;
+    const { data: devices } = devicesQuery;
+    const serverQueries = [preferencesQuery, connectorsQuery, devicesQuery];
+    const failed = serverQueries.filter((query) => query.data === undefined && query.isError);
+    const loading = serverQueries.some((query) => query.data === undefined && !query.isError);
+    // A failed list counts over one still loading: its retry is what the person can do.
+    let serversState: ToolCatalog["serversState"] = loading ? "loading" : "ready";
+
+    if (failed.length > 0) {
+        serversState = "error";
+    }
 
     return {
         builtIns: (settings?.builtIn ?? []).flatMap((tool) => (tool.available ? [tool.name] : [])),
@@ -59,6 +75,12 @@ export const useToolCatalog = (): ToolCatalog => {
                 return { key: deviceServerKey(device._id), name: device.name };
             }),
         ].flatMap((server) => (server.key === undefined ? [] : [{ key: server.key, name: server.name }])),
+        retryServers: () => {
+            for (const query of failed) {
+                void query.refetch();
+            }
+        },
+        serversState,
     };
 };
 
@@ -109,7 +131,14 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
     const [unknownBuiltIn, setUnknownBuiltIn] = useState<string | null>(null);
     const [overCap, setOverCap] = useState(false);
     const full = values.length >= BOT_TOOL_SELECTOR_MAX_COUNT;
-    const invalid = unknownServer !== null || unknownBuiltIn !== null || overCap;
+    const staleId = useId();
+    // A stored built-in that is no longer one: the server refuses the save until it is removed.
+    const stale =
+        catalog.builtInNames !== undefined &&
+        values.some((selector) => parseServerSelector(selector) === undefined && catalog.builtInNames?.has(selector) !== true);
+    // What was typed could not be added.
+    const entryRefused = unknownServer !== null || unknownBuiltIn !== null || overCap;
+    const describedBy = [descriptionId, entryRefused && errorId, stale && staleId].filter(Boolean).join(" ");
 
     /** Why a bare name was not added: not a built-in, or the built-ins are not read (yet, or at all). */
     const unknownBuiltInMessage = (): string => {
@@ -121,6 +150,16 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             ? t`The built-in tools are still loading. Try again in a moment.`
             : t`No built-in tool is named ${unknownBuiltIn}.`;
     };
+    /** Why a server's name matched nothing: no such server, or the servers are not read (yet, or at all). */
+    const unknownServerMessage = (): string => {
+        if (catalog.serversState === "error") {
+            return t`Your servers, connectors and computers could not be loaded. Retry above to add one by name.`;
+        }
+
+        return catalog.serversState === "loading"
+            ? t`Your servers, connectors and computers are still loading. Try again in a moment.`
+            : t`No server, connector or computer matches ${unknownServer}.`;
+    };
     const suggestions = [...catalog.builtIns, ...catalog.servers.map((server) => `${server.name}:*`)];
 
     /** A selector as the user reads it: a server's current name in place of its key. */
@@ -131,9 +170,20 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             return selector;
         }
 
-        const name = catalog.servers.find((server) => server.key === parsed.server)?.name ?? t`Removed server`;
+        const name = catalog.servers.find((server) => server.key === parsed.server)?.name;
 
-        return `${name}:${parsed.tool}`;
+        if (name !== undefined) {
+            return `${name}:${parsed.tool}`;
+        }
+
+        // Unlisted only means removed once every list was read; until then the stored key is all that is known.
+        if (catalog.serversState !== "ready") {
+            return selector;
+        }
+
+        const removed = t`Removed server`;
+
+        return `${removed}:${parsed.tool}`;
     };
 
     // Typed text counts once the field is left too. Text that cannot be added stays in the field, reported as pending, so a
@@ -198,8 +248,8 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             </p>
             <div className="flex gap-2">
                 <Input
-                    aria-describedby={invalid ? `${descriptionId} ${errorId}` : descriptionId}
-                    aria-invalid={invalid}
+                    aria-describedby={describedBy}
+                    aria-invalid={entryRefused || stale}
                     disabled={disabled || (full && entry === "")}
                     id={inputId}
                     list={listId}
@@ -235,15 +285,15 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
                 </Button>
             </div>
             <p aria-live="polite" className="text-destructive text-xs" id={errorId}>
-                {unknownServer !== null && t`No server, connector or computer matches ${unknownServer}.`}
+                {unknownServer !== null && unknownServerMessage()}
                 {unknownBuiltIn !== null && unknownBuiltInMessage()}
                 {overCap && t`This list is full: remove a tool before adding another.`}
             </p>
-            {catalog.builtInNames !== undefined &&
-                values.some((selector) => parseServerSelector(selector) === undefined && catalog.builtInNames?.has(selector) !== true) && (
-                    <p className="text-destructive text-xs">{t`A listed built-in tool no longer exists. Remove it before saving.`}</p>
-                )}
+            <p aria-live="polite" className="text-destructive text-xs empty:hidden" id={staleId}>
+                {stale && t`A listed built-in tool no longer exists. Remove it before saving.`}
+            </p>
             {removedServerWarning !== undefined &&
+                catalog.serversState === "ready" &&
                 values.some((selector) => {
                     const server = parseServerSelector(selector)?.server;
 
@@ -354,6 +404,19 @@ export const BotToolSelectionFields: FC<BotToolSelectionFieldsProps> = ({ catalo
             </div>
             {value !== null && (
                 <div className="border-border space-y-4 border-l-2 pl-4">
+                    {catalog.serversState === "loading" && (
+                        <p className="text-muted-foreground text-xs" role="status">
+                            {t`Loading your servers, connectors and computers…`}
+                        </p>
+                    )}
+                    {catalog.serversState === "error" && (
+                        <div className="flex flex-wrap items-center gap-2" role="alert">
+                            <p className="text-destructive text-xs">{t`Your servers, connectors and computers could not be loaded.`}</p>
+                            <Button onClick={catalog.retryServers} size="sm" type="button" variant="outline">
+                                {t`Retry`}
+                            </Button>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between gap-4">
                         <div>
                             <Label htmlFor={onlyListedId}>{t`Only listed tools`}</Label>

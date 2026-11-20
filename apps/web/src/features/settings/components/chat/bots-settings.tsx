@@ -136,6 +136,8 @@ const BotsSettings = () => {
     const toolCatalog = useToolCatalog();
 
     const canCreate = draft.name.trim().length > 0 && draft.instructions.trim().length > 0;
+    // The create sends the draft as it was when clicked and then clears the form: a change made meanwhile would be lost.
+    const creating = createMutation.isPending;
 
     const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -249,11 +251,18 @@ const BotsSettings = () => {
                 <h2 className="text-lg font-semibold">{t`New bot`}</h2>
                 <div className="space-y-2">
                     <Label htmlFor={nameId}>{t`Name`}</Label>
-                    <Input id={nameId} maxLength={120} onChange={(event) => setDraft({ ...draft, name: event.target.value })} value={draft.name} />
+                    <Input
+                        disabled={creating}
+                        id={nameId}
+                        maxLength={120}
+                        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                        value={draft.name}
+                    />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor={descriptionId}>{t`Description`}</Label>
                     <Input
+                        disabled={creating}
                         id={descriptionId}
                         maxLength={500}
                         onChange={(event) => setDraft({ ...draft, description: event.target.value })}
@@ -263,6 +272,7 @@ const BotsSettings = () => {
                 <div className="space-y-2">
                     <Label htmlFor={instructionsId}>{t`Instructions`}</Label>
                     <Textarea
+                        disabled={creating}
                         id={instructionsId}
                         maxLength={20_000}
                         onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
@@ -271,7 +281,11 @@ const BotsSettings = () => {
                 </div>
                 <div aria-labelledby={modelLabelId} className="space-y-2" role="group">
                     <Label id={modelLabelId}>{t`Model`}</Label>
-                    <PromptModelSelector onChange={(model) => setDraft({ ...draft, model: model ?? DEFAULT_CHAT_MODEL })} value={draft.model} />
+                    <PromptModelSelector
+                        disabled={creating}
+                        onChange={(model) => setDraft({ ...draft, model: model ?? DEFAULT_CHAT_MODEL })}
+                        value={draft.model}
+                    />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor={modeId}>{t`Permission mode`}</Label>
@@ -280,7 +294,7 @@ const BotsSettings = () => {
                     </p>
                     <PermissionModeSelect
                         aria-describedby={modeDescriptionId}
-                        disabled={impersonating}
+                        disabled={impersonating || creating}
                         id={modeId}
                         onChange={(permissionMode) => setDraft({ ...draft, permissionMode })}
                         value={draft.permissionMode}
@@ -288,7 +302,7 @@ const BotsSettings = () => {
                 </div>
                 <BotToolSelectionFields
                     catalog={toolCatalog}
-                    disabled={impersonating}
+                    disabled={impersonating || creating}
                     key={createdCount}
                     onChange={(toolSelection) => setDraft({ ...draft, toolSelection })}
                     onPendingChange={setCreateToolsPending}
@@ -301,11 +315,12 @@ const BotsSettings = () => {
                     </div>
                     <Switch
                         checked={draft.computerEnabled}
+                        disabled={creating}
                         id={computerId}
                         onCheckedChange={(checked: boolean) => setDraft({ ...draft, computerEnabled: checked })}
                     />
                 </div>
-                <Button disabled={!canCreate || createMutation.isPending} type="submit">
+                <Button disabled={!canCreate || creating} type="submit">
                     {t`Create bot`}
                 </Button>
             </form>

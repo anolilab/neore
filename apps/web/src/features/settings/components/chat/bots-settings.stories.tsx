@@ -5,7 +5,8 @@ import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import { ago, DAY } from "@/storybook/clock";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
+import type { LunoraFixture } from "@/storybook/lunora";
+import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle, lunoraPending } from "@/storybook/lunora";
 
 import BotsSettings from "./bots-settings";
 
@@ -345,5 +346,133 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
 
         await expect(screen.getByRole("dialog")).toBeVisible();
         await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "All tools" })).toBeChecked();
+    },
+};
+
+/** Lets the slow create below finish once the story checked the form is locked. */
+const slowCreate: { finish?: () => void } = {};
+
+/** The create sends the form as it was when clicked, so the form is locked until it ends and then starts empty. */
+export const CreateLocksForm: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunora(
+                        api.bots.functions.createBot,
+                        async () =>
+                            await new Promise<string>((resolve) => {
+                                slowCreate.finish = () => resolve("bot-2");
+                            }),
+                    ),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await userEvent.type(canvas.getByRole("textbox", { name: "Name" }), "Researcher");
+        await userEvent.type(canvas.getByRole("textbox", { name: "Instructions" }), "Cite sources.");
+        await userEvent.click(canvas.getByRole("button", { name: "Create bot" }));
+
+        await waitFor(async () => await expect(canvas.getByRole("textbox", { name: "Name" })).toBeDisabled());
+        await expect(canvas.getByRole("textbox", { name: "Instructions" })).toBeDisabled();
+        await expect(canvas.getByRole("radio", { name: "Custom" })).toHaveAttribute("aria-disabled", "true");
+        await expect(canvas.getByRole("switch", { name: "Computer" })).toHaveAttribute("aria-disabled", "true");
+
+        slowCreate.finish?.();
+        await waitFor(async () => await expect(canvas.getByRole("textbox", { name: "Name" })).toBeEnabled());
+        await expect(canvas.getByRole("textbox", { name: "Name" })).toHaveValue("");
+        await expect(canvas.getByRole("radio", { name: "Custom" })).not.toHaveAttribute("aria-disabled", "true");
+    },
+};
+
+/** Until the user's servers are read, a selector naming one is shown by its key, never as a removed server. */
+export const ServersLoading: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...botFixtures(), lunoraPending(api.auth.functions.getAIUserPreferences)),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
+
+        const dialog = await screen.findByRole("dialog");
+
+        await waitFor(async () => await expect(within(dialog).getByText("Loading your servers, connectors and computers…")).toBeVisible());
+        await expect(within(dialog).getByRole("button", { name: `Remove ${DOCS}:delete` })).toBeVisible();
+        await expect(within(dialog).queryByText(/Removed server/u)).toBeNull();
+        await expect(within(dialog).queryByText(/the bot gets none of your own servers' tools/u)).toBeNull();
+    },
+};
+
+/** Whether the read of the user's servers below fails: until the story is about to retry. */
+const preferencesRead = { fails: true };
+/** The user's servers: failing to read until `preferencesRead.fails` is cleared. */
+const failingPreferences = (): LunoraFixture => {
+    const failed = lunoraError(api.auth.functions.getAIUserPreferences, "INTERNAL_ERROR", "Read failed", 500);
+    const read = botFixtures().find((fixture) => fixture.functionPath === failed.functionPath);
+
+    return {
+        answer: async (args) => (read === undefined || preferencesRead.fails ? await failed.answer(args) : await read.answer(args)),
+        functionPath: failed.functionPath,
+    };
+};
+
+/** A failed read of the user's servers says so, offers a retry, and shows no selector as removed meanwhile. */
+export const ServersLoadFails: Story = {
+    beforeEach: () => {
+        preferencesRead.fails = true;
+    },
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...botFixtures(), failingPreferences()),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
+
+        const dialog = await screen.findByRole("dialog");
+
+        await waitFor(async () => await expect(within(dialog).getByText("Your servers, connectors and computers could not be loaded.")).toBeVisible());
+        await expect(within(dialog).getByRole("button", { name: `Remove ${DOCS}:delete` })).toBeVisible();
+        await expect(within(dialog).queryByText(/Removed server/u)).toBeNull();
+
+        preferencesRead.fails = false;
+        await userEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
+
+        await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs:delete" })).toBeVisible());
+        await expect(within(dialog).queryByText("Your servers, connectors and computers could not be loaded.")).toBeNull();
+    },
+};
+
+/** A stored built-in that is no longer one marks the list's field invalid and says why, so a screen reader hears it too. */
+export const StaleBuiltIn: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...botFixtures(), lunora(api.bots.functions.listBots, [{ ...BOT, toolSelection: { exclude: ["oldTool"] } }])),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
+        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
+
+        const dialog = await screen.findByRole("dialog");
+
+        await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
+        const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
+
+        await expect(excluded).toHaveAttribute("aria-invalid", "true");
+        await expect(excluded).toHaveAccessibleDescription(/A listed built-in tool no longer exists/u);
     },
 };

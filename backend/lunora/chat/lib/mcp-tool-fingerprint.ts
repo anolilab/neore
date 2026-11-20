@@ -182,10 +182,15 @@ export const mcpToolDrift = (
     return current[name] === before ? "unchanged" : "changed";
 };
 
+/** How many runtime names `origins` lists under `origin`. */
+const originNamesIn = (origins: Readonly<Record<string, string>> | undefined, origin: string): number =>
+    Object.values(origins ?? {}).filter((value) => value === origin).length;
+
 /**
  * How the origin of the tool `name` stands against the run that paused ({@link mcpToolOrigin}). `unchanged` for a name the
  * snapshot recorded no origin for (not an MCP tool, or a snapshot written before origins were). A name the rebuilt run
- * still offers under another origin, or as no MCP tool at all, is `replaced`.
+ * still offers under another origin, or as no MCP tool at all, is `replaced`; so is one whose origin either run lists under two
+ * names, as two saved entries of one name and address do.
  */
 export const mcpToolOriginDrift = (
     saved: Readonly<Record<string, string>> | undefined,
@@ -201,6 +206,12 @@ export const mcpToolOriginDrift = (
 
     if (!offered) {
         return "removed";
+    }
+
+    // Two saved entries of one name and address (each with its own headers) share an origin, so it cannot tell which one the
+    // call was approved for: denied when either run lists the origin under more than one name.
+    if (originNamesIn(saved, before) > 1 || originNamesIn(current, before) > 1) {
+        return "replaced";
     }
 
     return Object.hasOwn(current, name) && current[name] === before ? "unchanged" : "replaced";
