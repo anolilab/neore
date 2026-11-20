@@ -255,9 +255,16 @@ const MAX_RUN_FILE_IDS = MAX_ATTACHED_FILES;
 export const RUN_FILE_NAMES_READ_BYTES = 4 * 1024 * 1024;
 
 /**
- * The names of `fileIds` for a run's pattern match, one row per read, each charged whole (`projectRowsReadBytes`).
- * Once {@link RUN_FILE_NAMES_READ_BYTES} is spent the rest are not read (`skipped`), so the most a run's setup reads
- * here is that budget plus one row, which the attachment path reads anyway.
+ * Attachment rows one read for a run's names takes. A row is charged whole and holds at most D1's 2 MB, so a read that
+ * starts just under {@link RUN_FILE_NAMES_READ_BYTES} passes it by at most this many rows: a few queries for a message's
+ * files rather than one each, and never all of them at once past the transaction's read limit.
+ */
+export const RUN_FILE_NAMES_PER_READ = 2;
+
+/**
+ * The names of `fileIds` for a run's pattern match, {@link RUN_FILE_NAMES_PER_READ} rows per read, each charged whole
+ * (`projectRowsReadBytes`). Once {@link RUN_FILE_NAMES_READ_BYTES} is spent the rest are not read (`skipped`), so the most
+ * a run's setup reads here is that budget plus one read, which the attachment path reads anyway.
  */
 const attachmentNamesForRun = async (context: QueryCtx, fileIds: ReadonlyArray<Id<"chatFiles">>): Promise<{ paths: string[]; skipped: number }> => {
     const paths: string[] = [];
@@ -265,19 +272,24 @@ const attachmentNamesForRun = async (context: QueryCtx, fileIds: ReadonlyArray<I
     const unique = [...new Set(fileIds)];
     let readBytes = 0;
 
-    for (const [index, fileId] of unique.entries()) {
+    for (let start = 0; start < unique.length; start += RUN_FILE_NAMES_PER_READ) {
         if (readBytes >= RUN_FILE_NAMES_READ_BYTES) {
-            return { paths, skipped: unique.length - index };
+            return { paths, skipped: unique.length - start };
         }
 
+        const batch = unique.slice(start, start + RUN_FILE_NAMES_PER_READ);
         // On the primary: a run sent right after its upload must see the file a replica may not have yet.
-        const row = await context.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } });
+        const { page } = await context.db.chatFiles.findMany({ consistency: "primary", where: { _id: { in: batch } } });
+        const names = new Map(page.map((row) => [row._id, row.filename] as const));
 
-        if (row) {
-            readBytes += projectRowsReadBytes([row]);
+        readBytes += projectRowsReadBytes(page);
 
-            if (row.filename) {
-                paths.push(row.filename);
+        // In the message's order, whatever order the read returns them in.
+        for (const fileId of batch) {
+            const name = names.get(fileId);
+
+            if (name) {
+                paths.push(name);
             }
         }
     }
@@ -439,7 +451,13 @@ export const setProjectRuleFiles = authMutation
         const legacy = keepContext ? current.find((file) => isLegacyContextFile(file)) : undefined;
         const sent = legacy && ruleFiles.find((file) => file.id === legacy.id);
         const kept = legacy && (!sent || ruleFilesRevision([sent]) === ruleFilesRevision([legacy])) ? legacy.id : undefined;
-        const normalized = normalizeRuleFiles(kept ? ruleFiles.filter((file) => file.id !== kept) : ruleFiles);
+        // A kept `context` is still one of the project's files, so it counts toward the limit.
+        const normalized = kept
+            ? normalizeRuleFiles(
+                  ruleFiles.filter((file) => file.id !== kept),
+                  { alongside: 1 },
+              )
+            : normalizeRuleFiles(ruleFiles);
         // The `context` text this save carries into the list, marked carried in the same write, so one the clear below
         // fails to remove is not read a second time.
         const carried = kept ? undefined : project.context;

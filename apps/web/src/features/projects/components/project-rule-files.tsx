@@ -24,7 +24,7 @@ import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -177,9 +177,10 @@ const withSavedFiles = (
 /**
  * One file's fields; every control is named after the file, so a list of them stays told apart. `invalid` names the
  * field a save was refused for: it is marked invalid, described by the error (`errorId`) and focused on each refused
- * save (`focusRequest`).
+ * save (`focusRequest`). `deleteFocusRequest` moves focus to its Delete button, where a deleted file's focus lands.
  */
 const RuleFileFields: FC<{
+    deleteFocusRequest: number;
     errorId: string;
     file: RuleFileDraft;
     focusRequest: number;
@@ -191,7 +192,7 @@ const RuleFileFields: FC<{
     onMove: (offset: -1 | 1) => void;
     onRemove: () => void;
     onSave: () => void;
-}> = ({ errorId, file, focusRequest, index, invalid, isFirst, isLast, onChange, onMove, onRemove, onSave }) => {
+}> = ({ deleteFocusRequest, errorId, file, focusRequest, index, invalid, isFirst, isLast, onChange, onMove, onRemove, onSave }) => {
     const { t } = useLingui();
     const id = useId();
     const name = file.title.trim() || t`Rule file ${index + 1}`;
@@ -203,6 +204,21 @@ const RuleFileFields: FC<{
             document.querySelector<HTMLElement>(`#${CSS.escape(`${id}-${invalid}`)}`)?.focus();
         }
     }, [focusRequest, id, invalid]);
+
+    // The request this row was mounted with is not its own: a row mounted again keeps focus where it is.
+    const handledDelete = useRef(deleteFocusRequest);
+
+    useEffect(() => {
+        if (deleteFocusRequest === handledDelete.current) {
+            return;
+        }
+
+        handledDelete.current = deleteFocusRequest;
+
+        if (deleteFocusRequest > 0) {
+            document.querySelector<HTMLElement>(`#${CSS.escape(`${id}-delete`)}`)?.focus();
+        }
+    }, [deleteFocusRequest, id]);
 
     return (
         <li aria-label={name} className="space-y-3 rounded-md border p-3">
@@ -238,7 +254,7 @@ const RuleFileFields: FC<{
                 <Button aria-label={t`Move ${name} down`} disabled={isLast} onClick={() => onMove(1)} size="icon" type="button" variant="ghost">
                     <ArrowDown aria-hidden="true" className="size-4" />
                 </Button>
-                <Button aria-label={t`Delete ${name}`} onClick={onRemove} size="icon" type="button" variant="ghost">
+                <Button aria-label={t`Delete ${name}`} id={`${id}-delete`} onClick={onRemove} size="icon" type="button" variant="ghost">
                     <Trash2 aria-hidden="true" className="size-4" />
                 </Button>
             </div>
@@ -324,6 +340,10 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     // The field the last refused save named, and how many times one was refused, so each refusal moves focus there again.
     const [invalid, setInvalid] = useState<{ field: RuleFileField; fileId: string } | undefined>(undefined);
     const [focusRequest, setFocusRequest] = useState(0);
+    // Where focus goes after a Delete: the file now in the deleted one's place, else the one before it, else the Add
+    // button (`null`); counted, so each Delete moves it again.
+    const [afterRemove, setAfterRemove] = useState<{ count: number; fileId: string | null }>({ count: 0, fileId: null });
+    const addId = useId();
     const legacyTitle = t`Project context`;
     const savedFiles = (data?.files ?? []).map((file) =>
         // The older single context arrives under the backend's English name; it shows in the person's language.
@@ -457,11 +477,12 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
             }
         }
 
-        const ruleFiles = sentFiles();
-
-        if (ruleFiles.length > MAX_RULE_FILES) {
+        // A kept legacy context is one of the project's files too, though it is not sent: `files` counts it.
+        if (files.length > MAX_RULE_FILES) {
             return problemOf(RULE_FILE_REFUSALS.TOO_MANY, undefined);
         }
+
+        const ruleFiles = sentFiles();
 
         // Measured as the backend stores them, so the editor and the save agree to the byte.
         return ruleFilesStoredBytes(ruleFiles) > MAX_RULE_FILES_BYTES ? problemOf(RULE_FILE_REFUSALS.TOO_LARGE, undefined) : undefined;
@@ -473,6 +494,22 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
         setError(refusal.message);
         setFocusRequest((count) => count + 1);
     };
+
+    /** Deletes the file at `index`, and moves focus to the file in its place, the one before it, or the Add button. */
+    const remove = (index: number) => {
+        const next = files[index + 1] ?? files[index - 1];
+
+        change(files.filter((_, position) => position !== index));
+        setAfterRemove((current) => {
+            return { count: current.count + 1, fileId: next?.id ?? null };
+        });
+    };
+
+    useEffect(() => {
+        if (afterRemove.count > 0 && afterRemove.fileId === null) {
+            document.querySelector<HTMLElement>(`#${CSS.escape(addId)}`)?.focus();
+        }
+    }, [addId, afterRemove]);
 
     const save = async () => {
         const refusal = problem();
@@ -544,6 +581,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                         <ol className="space-y-3">
                             {files.map((file, index) => (
                                 <RuleFileFields
+                                    deleteFocusRequest={afterRemove.fileId === file.id ? afterRemove.count : 0}
                                     errorId={errorId}
                                     file={file}
                                     focusRequest={focusRequest}
@@ -554,7 +592,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                                     key={file.id}
                                     onChange={(next) => change(files.map((current) => (current.id === file.id ? next : current)))}
                                     onMove={(offset) => change(moved(files, index, offset))}
-                                    onRemove={() => change(files.filter((current) => current.id !== file.id))}
+                                    onRemove={() => remove(index)}
                                     onSave={() => {
                                         if (draft && !isSaving) {
                                             save().catch(() => undefined);
@@ -567,6 +605,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                     <div className="flex flex-wrap items-center gap-2">
                         <Button
                             disabled={files.length >= MAX_RULE_FILES}
+                            id={addId}
                             onClick={() => change([...files, { content: "", id: crypto.randomUUID(), mode: "always", patterns: "", title: "" }])}
                             size="sm"
                             type="button"

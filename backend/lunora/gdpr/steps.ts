@@ -656,10 +656,11 @@ export const generateExportFile = internalAction
         const ownedWithRules = await attachProjectRuleFiles(
             // Each is an object `collectOwnedProjectsForExport` returned.
             ownedProjects.projects as object[],
+            ownedProjects.contexts,
             async (projectIds) =>
                 await context.runQuery(internal.projects.gdpr.collectProjectRuleFilesForExport, {
+                    // The ids of the owned projects' pages, read for this user: the check the rule files follow.
                     projectIds: projectIds as Id<"projects">[],
-                    userId: args.userId,
                 }),
             projectDetailsReadBudget(
                 earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes + triggerReadBytes,

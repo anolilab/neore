@@ -35,7 +35,7 @@
   `tasks/internal.ts#runProjectFor` with no paths. A filter, budget or log change goes there, not in one caller. Both
   read the project and its rule-file row on the primary: replicas at different points around a first save would give
   a run neither. A group turn's pause keeps the message's file ids (`GroupRunSnapshot.fileIds`) for later speakers.
-  `glob` files match the names of the run message's attachments (`chatFiles.filename`), read one row at a time:
+  `glob` files match the names of the run message's attachments (`chatFiles.filename`), read `RUN_FILE_NAMES_PER_READ` rows at a time:
   `chatFiles` is `.global()`, each row charged whole with its `extractedText`, so past `RUN_FILE_NAMES_READ_BYTES` the
   rest go unmatched rather than the run failing. The rendered text past
   `MAX_RULE_TEXT_PER_RUN`, separators and the cut marker counted, is cut (marked) and later files left out, except a
@@ -54,5 +54,6 @@
   that checked the same revision the second is refused too.
 - A metered `.global()` read is charged the whole row whatever it `select`s (Lunora drops the `select`, charges, then
   projects), so a read that budgets its cost measures whole rows: `findProjectRowsMeasured` / `projectRowsReadBytes`.
-  The export returns rule files only from their own pass (`attachProjectRuleFiles`, which counts both the project and
-  the rule-file rows it reads), after the owned-projects page; past the budget a project is marked `ruleFilesOmitted`.
+  The export returns rule files only from their own pass (`attachProjectRuleFiles`, which reads and counts only the
+  rule-file rows: each legacy `context` comes from the owned-projects page, which read the project rows), after that
+  page; past the budget a project is marked `ruleFilesOmitted`.

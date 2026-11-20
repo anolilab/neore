@@ -1,5 +1,7 @@
 import { LunoraError } from "lunorash/server";
 
+import { projectRuleFiles, type RuleFile } from "./rule-files";
+
 /** One page of `collectProjectRepositoriesForExport`: its rows, and where the next page starts (`null` after the last). */
 interface RepositoriesPage {
     cursor?: string | null;
@@ -97,7 +99,7 @@ export const collectAllRepositories = async (
 /** One page of `collectOwnedProjectsForExport`: its projects, where the next page starts, and what reading them cost. */
 interface OwnedProjectsPage {
     cursor?: string | null;
-    projects?: object[];
+    projects?: { context?: string; projectId: string }[];
     readBytes?: number;
 }
 
@@ -105,12 +107,14 @@ interface OwnedProjectsPage {
  * Every project the user owns, one page per query, reported only after the last page. A project is never left out:
  * every page is read, each costing its whole rows (`findProjectRowsMeasured`), and a page that takes the reads past
  * `maxBytes` has its projects' sharing flag dropped and marked `{ detailsOmitted: true }`, the same way the
- * repositories' project details are. The id, title, machine and folder stay on every row.
+ * repositories' project details are. The id, title, machine and folder stay on every row. A project's legacy `context`
+ * is not one of its exported fields: it comes back apart (`contexts`, by project id), for {@link attachProjectRuleFiles}.
  */
 export const collectAllOwnedProjects = async (
     readPage: (cursor: string | null) => Promise<unknown>,
     maxBytes: number,
-): Promise<{ projects: unknown[]; readBytes: number }> => {
+): Promise<{ contexts: Map<string, string>; projects: unknown[]; readBytes: number }> => {
+    const contexts = new Map<string, string>();
     const projects: unknown[] = [];
     let cursor: string | null = null;
     let readBytes = 0;
@@ -122,7 +126,11 @@ export const collectAllOwnedProjects = async (
 
         const pageProjects = result.projects ?? [];
 
-        for (const project of pageProjects) {
+        for (const { context, ...project } of pageProjects) {
+            if (context) {
+                contexts.set(project.projectId, context);
+            }
+
             if (readBytes > maxBytes) {
                 const kept: Record<string, unknown> = { ...project, detailsOmitted: true };
 
@@ -140,23 +148,25 @@ export const collectAllOwnedProjects = async (
         cursor = result.cursor;
     }
 
-    return { projects, readBytes };
+    return { contexts, projects, readBytes };
 };
 
-/** What `collectProjectRuleFilesForExport` gives back for up to {@link PROJECTS_PER_DETAILS_READ} projects. */
+/** What `collectProjectRuleFilesForExport` gives back for up to {@link PROJECTS_PER_DETAILS_READ} projects: their saved rows. */
 interface RuleFilesPage {
-    projects: { projectId: string; ruleFiles: unknown[] }[];
+    projects: { carriedContext?: string; files: RuleFile[]; projectId: string }[];
     readBytes: number;
 }
 
 /**
- * The user's projects from {@link collectAllOwnedProjects}, each with its rule files (`ruleFiles`), read
+ * The user's projects from {@link collectAllOwnedProjects}, each with its rule files (`ruleFiles`), a legacy `context`
+ * first (`projectRuleFiles`, from `contexts`, the project rows already read), the saved rows read
  * {@link PROJECTS_PER_DETAILS_READ} projects to a query. Once the reads reach `maxBytes` the remaining projects' files are
  * not read and the project says so (`ruleFilesOmitted: true`); the export still completes. A project without rule files
  * is left as it is.
  */
 export const attachProjectRuleFiles = async (
     projects: object[],
+    contexts: ReadonlyMap<string, string>,
     readRuleFiles: (projectIds: string[]) => Promise<RuleFilesPage>,
     maxBytes: number,
 ): Promise<{ projects: object[]; readBytes: number }> => {
@@ -177,11 +187,17 @@ export const attachProjectRuleFiles = async (
         }
 
         const page = await readRuleFiles(batch);
+        const rows = new Map(page.projects.map((row) => [row.projectId, row] as const));
 
         readBytes += page.readBytes;
 
-        for (const project of page.projects) {
-            ruleFiles.set(project.projectId, project.ruleFiles);
+        for (const projectId of batch) {
+            const row = rows.get(projectId);
+            const files = projectRuleFiles({ carriedContext: row?.carriedContext, context: contexts.get(projectId), ruleFiles: row?.files });
+
+            if (files.length > 0) {
+                ruleFiles.set(projectId, files);
+            }
         }
     }
 

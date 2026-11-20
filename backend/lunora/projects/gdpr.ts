@@ -17,7 +17,6 @@ import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL, isRepoRow } from "./repositories";
-import { ruleFilesOf } from "./rule-file-rows";
 import { findProjectRowsMeasured, projectRowsReadBytes } from "./project-row";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
@@ -283,6 +282,9 @@ export const collectOwnedProjectsForExport = internalQuery
             cursor: v.union(v.string(), v.null()),
             projects: v.array(
                 v.object({
+                    // Its legacy context, for the rule files' pass (`attachProjectRuleFiles`), which so reads no project
+                    // row again; never exported as a project's own field.
+                    context: v.optional(v.string()),
                     machineId: v.optional(v.string()),
                     path: v.optional(v.string()),
                     projectId: v.string(),
@@ -304,6 +306,7 @@ export const collectOwnedProjectsForExport = internalQuery
         const { readBytes } = result;
         const projects = result.page.map((row) => {
             return {
+                ...(row.context && { context: row.context }),
                 ...(row.machineId !== undefined && { machineId: row.machineId }),
                 ...(row.path !== undefined && { path: row.path }),
                 projectId: row._id,
@@ -316,19 +319,20 @@ export const collectOwnedProjectsForExport = internalQuery
     });
 
 /**
- * The rule files of up to {@link PROJECTS_PER_DETAILS_READ} of the user's projects for the export, a legacy `context`
- * first (`projectRuleFiles`), and what reading them cost: the whole project rows, for their owner and `context`
- * ({@link findProjectRowsMeasured}), and the whole rule-file rows. A separate read from the projects' page, so the
- * export can leave them out past its budget (`attachProjectRuleFiles`) and keep the rest.
+ * The saved rule-file rows of up to {@link PROJECTS_PER_DETAILS_READ} of the user's projects for the export, and what
+ * reading them cost, each row whole. Only the rows: the projects' page (`collectOwnedProjectsForExport`) already read
+ * the project rows, their owner and legacy `context` with them, and `attachProjectRuleFiles` puts the two together.
+ * Access follows the project, never the row's `userId` (a copy for erasure): pass only ids that page gave for `userId`.
+ * A separate read from the projects' page, so the export can leave them out past its budget and keep the rest.
  */
 export const collectProjectRuleFilesForExport = internalQuery
-    .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ) })
     .output(
         v.object({
             projects: v.array(
                 v.object({
-                    projectId: v.string(),
-                    ruleFiles: v.array(
+                    carriedContext: v.optional(v.string()),
+                    files: v.array(
                         v.object({
                             content: v.string(),
                             globs: v.optional(v.array(v.string())),
@@ -337,26 +341,20 @@ export const collectProjectRuleFilesForExport = internalQuery
                             title: v.string(),
                         }),
                     ),
+                    projectId: v.string(),
                 }),
             ),
             readBytes: v.number(),
         }),
     )
-    .query(async ({ args: { projectIds, userId }, ctx }) => {
-        const measured = await findProjectRowsMeasured(ctx.db.projects, { consistency: "primary", where: { _id: { in: projectIds } } });
-        const owned = measured.page.filter((row) => row.userId === userId);
+    .query(async ({ args: { projectIds }, ctx }) => {
         const { page: rows } =
-            owned.length > 0
-                ? await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: owned.map((row) => row._id) } } })
-                : { page: [] };
-        const saved = new Map(rows.map((row) => [row.projectId as string, row] as const));
-        const projects = owned
-            .map((row) => {
-                return { projectId: row._id, ruleFiles: ruleFilesOf(row, saved.get(row._id)) };
-            })
-            .filter((project) => project.ruleFiles.length > 0);
+            projectIds.length > 0 ? await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: projectIds } } }) : { page: [] };
+        const projects = rows.map((row) => {
+            return { ...(row.carriedContext && { carriedContext: row.carriedContext }), files: row.files, projectId: row.projectId as string };
+        });
 
-        return { projects, readBytes: measured.readBytes + projectRowsReadBytes(rows) };
+        return { projects, readBytes: projectRowsReadBytes(rows) };
     });
 
 /**

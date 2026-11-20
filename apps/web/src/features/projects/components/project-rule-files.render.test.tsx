@@ -143,6 +143,28 @@ describe("project rule files", () => {
         });
     });
 
+    it("moves focus after a Delete to the file in its place, else the one before, else Add rule file", async () => {
+        const user = userEvent.setup();
+
+        backend.listed = {
+            ...backend.listed,
+            files: ["A", "B", "C"].map((title) => {
+                return { content: "", id: title, mode: "always", title };
+            }),
+        };
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Delete B" }));
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Delete C" }));
+        await user.keyboard("{Enter}");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Delete A" }));
+        await user.keyboard("{Enter}");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add rule file" }));
+    });
+
     it("saves the rule files on Enter in a file's name, never submitting the project form around it", async () => {
         const user = userEvent.setup();
         const submitProject = vi.fn((event: FormEvent) => event.preventDefault());
@@ -433,6 +455,28 @@ describe("project rule files", () => {
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
         expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ keepContext: true, ruleFiles: [{ id: "sql", title: "SQL!" }] });
+    });
+
+    it("counts a kept older context toward the rule files a project holds", async () => {
+        const user = userEvent.setup();
+
+        backend.listed = {
+            ...backend.listed,
+            files: [
+                { content: "x".repeat(100_001), id: "context", mode: "always", title: "Project context" },
+                ...Array.from({ length: 20 }, (_, index) => {
+                    return { content: "y", id: `f${index}`, mode: "always", title: `F${index}` };
+                }),
+            ],
+            legacyContextId: "context",
+        };
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move F0 down" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert").textContent).toContain("at most 20 rule files");
     });
 
     it("holds an older context longer than a rule file to the limits once it was changed", async () => {

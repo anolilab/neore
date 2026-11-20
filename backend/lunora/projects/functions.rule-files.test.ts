@@ -26,6 +26,7 @@ import {
     listPinnedProjects,
     listProjectRuleFiles,
     listProjects,
+    RUN_FILE_NAMES_PER_READ,
     RUN_FILE_NAMES_READ_BYTES,
     setProjectRuleFiles,
     updateProject,
@@ -42,7 +43,7 @@ import {
 } from "./gdpr";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL } from "./repositories";
 import { readProjectRuleFiles, ruleFileRow, writeProjectRuleFiles } from "./rule-file-rows";
-import { MAX_RULE_GLOB_LENGTH, MAX_RULE_GLOBS, MAX_RULE_TITLE_LENGTH, RULE_FILE_REFUSALS } from "./rule-file-limits";
+import { MAX_RULE_FILES, MAX_RULE_GLOB_LENGTH, MAX_RULE_GLOBS, MAX_RULE_TITLE_LENGTH, RULE_FILE_REFUSALS } from "./rule-file-limits";
 import { contextFingerprint, MAX_RULE_TEXT_PER_RUN } from "./rule-files";
 
 const OWNER = "user-owner";
@@ -189,9 +190,46 @@ describe("a project's rule files in a run", () => {
             storageId: "large",
         });
         const sql = await chatFile("migrations/002_orders.sql");
+        // Read with the large one, so its read is the one that spends the budget.
+        const beside = await Promise.all(Array.from({ length: RUN_FILE_NAMES_PER_READ - 1 }, async (_, index) => await chatFile(`notes-${index}.txt`)));
 
         expect(await contextFor(projectId, [sql, large])).toBe("Be brief.\n\nUse snake_case columns.");
-        expect(await contextFor(projectId, [large, sql])).toBe("Be brief.");
+        // In the read that passed the budget: still matched.
+        expect(await contextFor(projectId, [large, sql])).toBe("Be brief.\n\nUse snake_case columns.");
+        // In a read after it: left unmatched, the run still made.
+        expect(await contextFor(projectId, [large, ...beside, sql])).toBe("Be brief.");
+    });
+
+    it("matches every attachment of a message across several reads, in the message's order", async () => {
+        const projectId = await project({
+            createdAt: 0,
+            ruleFiles: [
+                { content: "Docs.", globs: ["**/*.md"], id: "md", mode: "glob", title: "MD" },
+                { content: "Use snake_case columns.", globs: ["**/*.sql"], id: "sql", mode: "glob", title: "SQL" },
+            ],
+            title: "p",
+            userId: OWNER,
+        });
+        const notes = await Promise.all(Array.from({ length: RUN_FILE_NAMES_PER_READ * 2 }, async (_, index) => await chatFile(`notes-${index}.txt`)));
+        const sql = await chatFile("db/schema.sql");
+        const md = await chatFile("docs/README.md");
+        const reads = vi.fn();
+
+        const result = await harness.run(async (ctx: any) => {
+            const findMany = async (query: unknown) => {
+                reads(query);
+
+                return await ctx.db.chatFiles.findMany(query);
+            };
+            const chatFiles = new Proxy(ctx.db.chatFiles, { get: (target, key) => (key === "findMany" ? findMany : target[key]) });
+            const db = new Proxy(ctx.db, { get: (target, key) => (key === "chatFiles" ? chatFiles : target[key]) });
+
+            return await (getProjectContextForRun as any).handler({ ...ctx, db }, { fileIds: [md, ...notes, sql, md], projectId, userId: OWNER });
+        });
+
+        expect(result).toBe("Docs.\n\nUse snake_case columns.");
+        // Ten files, the repeated one read once: a read per RUN_FILE_NAMES_PER_READ of them, not one each.
+        expect(reads).toHaveBeenCalledTimes(Math.ceil((notes.length + 2) / RUN_FILE_NAMES_PER_READ));
     });
 
     it("reads attachment names on the primary, so a file uploaded just before the run still matches", async () => {
@@ -200,8 +238,9 @@ describe("a project's rule files in a run", () => {
 
         // A replica that has not seen the upload yet: only the primary has the row.
         const result = await harness.run(async (ctx: any) => {
-            const findFirst = async (query: { consistency?: string }) => (query.consistency === "primary" ? await ctx.db.chatFiles.findFirst(query) : null);
-            const chatFiles = new Proxy(ctx.db.chatFiles, { get: (target, key) => (key === "findFirst" ? findFirst : target[key]) });
+            const findMany = async (query: { consistency?: string }) =>
+                query.consistency === "primary" ? await ctx.db.chatFiles.findMany(query) : { continueCursor: "", isDone: true, page: [] };
+            const chatFiles = new Proxy(ctx.db.chatFiles, { get: (target, key) => (key === "findMany" ? findMany : target[key]) });
             const db = new Proxy(ctx.db, { get: (target, key) => (key === "chatFiles" ? chatFiles : target[key]) });
 
             return await (getProjectContextForRun as any).handler({ ...ctx, db }, { fileIds: [sql], projectId, userId: OWNER });
@@ -346,6 +385,22 @@ describe("changing a project's rule files", () => {
         expect(await row(projectId)).toMatchObject({ context });
         await expect(savedFiles(projectId)).resolves.toStrictEqual([sqlRules]);
         await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }], revision });
+    });
+
+    it("counts a kept context toward the limit: it and the full list beside it are refused", async () => {
+        const projectId = await insert("projects", { context: "x".repeat(150_000), createdAt: 0, title: "p", userId: OWNER });
+        const others = (count: number) =>
+            Array.from({ length: count }, (_, index) => {
+                return { content: "y", id: `f${index}`, mode: "always" as const, title: `F${index}` };
+            });
+
+        await expect(save(OWNER, projectId, others(MAX_RULE_FILES), undefined, { keepContext: true })).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+            data: { code: RULE_FILE_REFUSALS.TOO_MANY },
+        });
+        await expect(savedFiles(projectId)).resolves.toBeUndefined();
+        await save(OWNER, projectId, others(MAX_RULE_FILES - 1), undefined, { keepContext: true });
+        await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: { length: MAX_RULE_FILES } });
     });
 
     it("saves a changed context sent with keepContext instead of dropping it, and clears the old one", async () => {
@@ -561,15 +616,15 @@ describe("changing a project's rule files", () => {
         await expect(row(projectId)).resolves.not.toMatchObject({ updatedAt: 0 });
     });
 
-    it("exports the saved files of the user's own projects only, and counts the rule-file rows it read", async () => {
+    it("exports the saved files of the projects it is given, and counts the rule-file rows it read", async () => {
         const mine = await project({ createdAt: 0, ruleFiles: [{ ...sqlRules, content: "z".repeat(50_000) }], title: "mine", userId: OWNER });
-        const theirs = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "theirs", userId: STRANGER });
+        const plain = await project({ createdAt: 0, title: "plain", userId: OWNER });
         const exported = (await harness.run(
-            async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport as never, { projectIds: [mine, theirs], userId: OWNER }),
-        )) as { projects: { projectId: string; ruleFiles: { content: string }[] }[]; readBytes: number };
+            async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport as never, { projectIds: [mine, plain] }),
+        )) as { projects: { files: { content: string }[]; projectId: string }[]; readBytes: number };
 
         expect(exported.projects).toHaveLength(1);
-        expect(exported.projects[0]).toMatchObject({ projectId: mine, ruleFiles: [{ content: "z".repeat(50_000) }] });
+        expect(exported.projects[0]).toMatchObject({ files: [{ content: "z".repeat(50_000) }], projectId: mine });
         expect(exported.readBytes).toBeGreaterThan(50_000);
     });
 

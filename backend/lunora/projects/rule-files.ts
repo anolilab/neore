@@ -317,10 +317,11 @@ const assertGlob = (glob: string, fileId: string): void => {
 
 /**
  * The list as it is saved: trimmed titles and patterns, no patterns on an `always` file. Refuses a list past the
- * caps, a repeated id, an empty title, or a `glob` file without a pattern.
+ * caps, a repeated id, an empty title, or a `glob` file without a pattern. `alongside` counts the files the project
+ * keeps outside the list (a kept legacy `context`), so the project still holds at most {@link MAX_RULE_FILES}.
  */
-export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
-    if (files.length > MAX_RULE_FILES) {
+export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): RuleFile[] => {
+    if (files.length + alongside > MAX_RULE_FILES) {
         throw refuse(`A project holds at most ${MAX_RULE_FILES} rule files`, RULE_FILE_REFUSALS.TOO_MANY);
     }
 

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "./export-pages";
+import { contextFingerprint } from "./rule-files";
 import { collectOwnedProjectsForExport, collectProjectDetailsForExport, collectProjectRepositoriesForExport, collectProjectRuleFilesForExport } from "./gdpr";
 
 const A = "user-a";
@@ -241,82 +242,103 @@ describe("owned projects in the GDPR export", () => {
 
 describe("project rule files in the GDPR export", () => {
     const sql = { content: "Use snake_case.", globs: ["**/*.sql"], id: "sql", mode: "glob", title: "SQL" };
-    const withRules = async (projects: { projectId: string }[], maxBytes = Infinity) =>
-        await attachProjectRuleFiles(
-            projects,
+    /** As the export runs it: the owned projects' pages, then their rule files within `maxBytes`, counting each read. */
+    const withRules = async (maxBytes = Infinity) => {
+        const reads: string[] = [];
+        const harnessRead = async (query: string, run: (ctx: any) => Promise<unknown>) => {
+            reads.push(query);
+
+            return await harness.run(run as never);
+        };
+        const owned = await collectAllOwnedProjects(
+            async (cursor) => await harnessRead("owned", async (ctx) => await ctx.runQuery(collectOwnedProjectsForExport, { cursor, userId: A })),
+            Infinity,
+        );
+        const result = await attachProjectRuleFiles(
+            owned.projects as object[],
+            owned.contexts,
             async (projectIds) =>
-                await harness.run((async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport, { projectIds, userId: A })) as never),
+                (await harnessRead("ruleFiles", async (ctx) => await ctx.runQuery(collectProjectRuleFilesForExport, { projectIds }))) as never,
             maxBytes,
         );
 
+        return { ...result, reads };
+    };
+    const byTitle = (projects: object[]) => new Map(projects.map((project) => [(project as { title: string }).title, project]));
+
     it("exports each of the user's projects' rule files, a legacy context first, never another user's", async () => {
-        const [mine, plain, theirs] = (await harness.run((async (ctx: any) => {
+        await harness.run((async (ctx: any) => {
             const ids = [
                 await ctx.db.insert("projects", { context: "Answer briefly.", createdAt: 1, title: "rules", userId: A }),
                 await ctx.db.insert("projects", { createdAt: 2, title: "plain", userId: A }),
-                await ctx.db.insert("projects", { context: "secret", createdAt: 3, title: "theirs", userId: B }),
+                await ctx.db.insert("projects", { context: "Only context.", createdAt: 3, title: "context only", userId: A }),
+                await ctx.db.insert("projects", { context: "secret", createdAt: 4, title: "theirs", userId: B }),
             ];
 
-            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId: ids[0], updatedAt: 0 });
-            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId: ids[2], updatedAt: 0 });
+            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId: ids[0], updatedAt: 0, userId: A });
+            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId: ids[3], updatedAt: 0, userId: B });
+        }) as never);
 
-            return ids;
-        }) as never)) as [string, string, string];
+        const { projects: exported } = await withRules();
+        const projects = byTitle(exported);
 
-        const { projects } = await withRules([{ projectId: mine }, { projectId: plain }, { projectId: theirs }]);
+        expect(projects.size).toBe(3);
+        expect(projects.get("rules")).toMatchObject({
+            ruleFiles: [{ content: "Answer briefly.", id: "context", mode: "always", title: "Project context" }, sql],
+        });
+        expect(projects.get("plain")).not.toHaveProperty("ruleFiles");
+        expect(projects.get("context only")).toMatchObject({ ruleFiles: [{ content: "Only context.", id: "context" }] });
 
-        expect(projects).toEqual([
-            { projectId: mine, ruleFiles: [{ content: "Answer briefly.", id: "context", mode: "always", title: "Project context" }, sql] },
-            { projectId: plain },
-            { projectId: theirs },
-        ]);
+        for (const project of projects.values()) {
+            expect(project).not.toHaveProperty("context");
+        }
+    });
+
+    it("leaves a context the saved list carries already out, so it is exported once", async () => {
+        await harness.run((async (ctx: any) => {
+            const projectId = await ctx.db.insert("projects", { context: "Carried.", createdAt: 1, title: "carried", userId: A });
+            const carried = { content: "Carried.", id: "context", mode: "always", title: "Project context" };
+
+            await ctx.db.insert("projectRuleFiles", { carriedContext: contextFingerprint("Carried."), files: [carried], projectId, updatedAt: 0, userId: A });
+        }) as never);
+
+        const { projects } = await withRules();
+
+        expect(projects).toMatchObject([{ ruleFiles: [{ content: "Carried." }] }]);
+        expect((projects[0] as { ruleFiles: unknown[] }).ruleFiles).toHaveLength(1);
     });
 
     it("marks the projects whose rule files it no longer reads past the budget, and keeps them in the export", async () => {
-        const ids = (await harness.run((async (ctx: any) => {
-            const inserted = [];
-
+        await harness.run((async (ctx: any) => {
             for (let index = 0; index < 3; index += 1) {
-                inserted.push(await ctx.db.insert("projects", { context: "x".repeat(1000), createdAt: index, title: `p${index}`, userId: A }));
+                const projectId = await ctx.db.insert("projects", { createdAt: index, title: `p${index}`, userId: A });
+
+                await ctx.db.insert("projectRuleFiles", { files: [{ ...sql, content: "x".repeat(1000) }], projectId, updatedAt: 0, userId: A });
             }
+        }) as never);
 
-            return inserted;
-        }) as never)) as string[];
-
-        const { projects } = await withRules(
-            ids.map((projectId: string) => {
-                return { projectId };
-            }),
-            100,
-        );
+        const { projects } = await withRules(100);
 
         expect(projects).toHaveLength(3);
-        expect(projects[0]).toHaveProperty("ruleFiles");
-        expect(projects[1]).toHaveProperty("ruleFiles");
-        expect(projects[2]).toEqual({ projectId: ids[2], ruleFilesOmitted: true });
+        // Two to a read: the first read passes the budget, so the third project's files are not read.
+        expect(projects.filter((project) => "ruleFiles" in project)).toHaveLength(2);
+        expect(projects.filter((project) => "ruleFilesOmitted" in project)).toEqual([expect.objectContaining({ ruleFilesOmitted: true })]);
     });
 
-    it("counts a project's whole row, its workflow too, so large rows stop the pass and mark the rest omitted", async () => {
+    it("reads no project row again: large rows cost the projects' page only, not the rule files' budget", async () => {
         const workflowContent = { edges: [], nodes: [{ data: { text: "w".repeat(50_000) }, id: "n", position: { x: 0, y: 0 }, type: "note" }] };
-        const ids = (await harness.run((async (ctx: any) => {
-            const inserted = [];
 
+        await harness.run((async (ctx: any) => {
             for (let index = 0; index < 3; index += 1) {
-                inserted.push(await ctx.db.insert("projects", { context: "Be brief.", createdAt: index, title: `p${index}`, userId: A, workflowContent }));
+                await ctx.db.insert("projects", { context: "Be brief.", createdAt: index, title: `p${index}`, userId: A, workflowContent });
             }
+        }) as never);
 
-            return inserted;
-        }) as never)) as string[];
+        const { projects, readBytes, reads } = await withRules(1000);
 
-        const { projects, readBytes } = await withRules(
-            ids.map((projectId: string) => {
-                return { projectId };
-            }),
-            60_000,
-        );
-
-        expect(readBytes).toBeGreaterThan(100_000);
-        expect(projects[0]).toHaveProperty("ruleFiles");
-        expect(projects[2]).toEqual({ projectId: ids[2], ruleFilesOmitted: true });
+        expect(readBytes).toBe(0);
+        expect(projects).toEqual(Array.from({ length: 3 }, () => expect.objectContaining({ ruleFiles: [expect.objectContaining({ content: "Be brief." })] })));
+        // Two pages of projects, then two reads of rule-file rows, each project row read once.
+        expect(reads).toStrictEqual(["owned", "owned", "ruleFiles", "ruleFiles"]);
     });
 });
