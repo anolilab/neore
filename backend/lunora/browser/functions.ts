@@ -6,8 +6,8 @@
  */
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 // ── Utility ─────────────────────────────────────────────────────────────
@@ -27,17 +27,22 @@ const generatePairingCode = (): string => {
     return code;
 };
 
+/**
+ * The thread's one active browser session: the agent's actions and the live view both read this row, so a viewer
+ * always watches the browser the agent drives. {@link createSession} never adds a second one; were there two, both
+ * readers still agree on the oldest.
+ */
+export const activeThreadSession = async (db: QueryCtx["db"], threadId: Id<"threads">): Promise<Doc<"browserSessions"> | null> =>
+    await db
+        .query("browserSessions")
+        .withIndex("by_threadId_status", (q) => q.eq("threadId", threadId).eq("status", "active"))
+        .first();
+
 export const getActiveSession = internalQuery
     .input({
         threadId: v.id("threads"),
     })
-    .query(
-        async ({ args: { threadId }, ctx }) =>
-            await ctx.db
-                .query("browserSessions")
-                .withIndex("by_threadId_status", (q) => q.eq("threadId", threadId).eq("status", "active"))
-                .first(),
-    );
+    .query(async ({ args: { threadId }, ctx }) => await activeThreadSession(ctx.db, threadId));
 
 export const createSession = internalMutation
     .input({
@@ -49,6 +54,13 @@ export const createSession = internalMutation
     })
     .mutation(async ({ args: { connectUrl, providerSessionId, source, threadId, userId }, ctx }) => {
         const { now } = ctx;
+        // Two first actions at once both found no row: the second gets the first's row, whose browser stays the
+        // thread's. Its own result names another browser, so `logAction` keeps only its audit row.
+        const existing = await activeThreadSession(ctx.db, threadId);
+
+        if (existing) {
+            return existing._id;
+        }
 
         // Encrypt the CDP connect URL before persisting — it contains session credentials
         const encryptedConnectUrl = connectUrl ? await encryptKey(connectUrl, "tool-keys") : undefined;

@@ -2,7 +2,7 @@
  * Watching the agent's cloud browser while it works (read-only).
  *
  * `getThreadBrowser` is the live, secret-free status a thread page subscribes to: whether a browser is running for
- * the thread, the page it is on, and when it will be reaped if the agent stops using it. `openLiveView` asks the
+ * the thread, an opaque name for it, the page it is on, and when it will be reaped if the agent stops using it. `openLiveView` asks the
  * provider, with the platform token, for a short-lived read-only view URL of that browser. The URL is a credential:
  * it comes only from this action, only to a caller with full read access to the thread, and is never stored. A
  * locked thread shows neither (no passcode proof reaches either procedure), and neither does a trashed one.
@@ -18,9 +18,23 @@ import { authAction, authQuery, internalQuery, rateLimit } from "../lib/crpc";
 import { throwThreadNotFound } from "../lib/error-helpers";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
+import { activeThreadSession } from "./functions";
 import { browserAliveUntil, LIVE_VIEW_CONNECT_DEADLINE_MS, liveViewRequest, liveViewUrlFrom, watchableSessionId } from "./live-view-logic";
 
-type ReaderBrowser = { currentUrl?: string; idleUntil: number; kind: "watchable"; providerSessionId: string } | { kind: "denied" } | { kind: "none" };
+type ReaderBrowser =
+    | { browserId: string; currentUrl?: string; idleUntil: number; kind: "watchable"; providerSessionId: string }
+    | { kind: "denied" }
+    | { kind: "none" };
+
+/**
+ * Names one browser without revealing it: it changes when the renderer replaces the browser on the same row, so an
+ * open view knows its URL is for a browser that is gone. A digest, so the provider's session id never reaches a client.
+ */
+const browserIdOf = async (sessionId: Id<"browserSessions">, providerSessionId: string): Promise<string> => {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${sessionId}:${providerSessionId}`));
+
+    return [...new Uint8Array(digest).slice(0, 12)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 
 /**
  * The ONE decision both procedures make, at the moment of the call: the caller reads the thread right now (owner or
@@ -38,27 +52,31 @@ const readerBrowser = async (ctx: QueryCtx, threadId: Id<"threads">, userId: str
         return { kind: "none" };
     }
 
-    const session = await systemDb(ctx)
-        .query("browserSessions")
-        .withIndex("by_threadId_status", (q) => q.eq("threadId", threadId).eq("status", "active"))
-        .first();
+    // The same row the agent's next action uses (`getActiveSession`), so the view is of the browser the agent drives.
+    const session = await activeThreadSession(systemDb(ctx), threadId);
     const providerSessionId = watchableSessionId(session, now);
 
     if (session === null || providerSessionId === undefined) {
         return { kind: "none" };
     }
 
-    return { currentUrl: session.currentUrl, idleUntil: browserAliveUntil(session), kind: "watchable", providerSessionId };
+    return {
+        browserId: await browserIdOf(session._id, providerSessionId),
+        currentUrl: session.currentUrl,
+        idleUntil: browserAliveUntil(session),
+        kind: "watchable",
+        providerSessionId,
+    };
 };
 
 /** The thread's running cloud browser, or `null`. A grantee's read goes through the thread decision, then past row-level security. */
 export const getThreadBrowser = authQuery
     .input({ threadId: v.id("threads") })
-    .output(v.union(v.null(), v.object({ currentUrl: v.optional(v.string()), idleUntil: v.number() })))
+    .output(v.union(v.null(), v.object({ browserId: v.string(), currentUrl: v.optional(v.string()), idleUntil: v.number() })))
     .query(async ({ args: { threadId }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now);
 
-        return browser.kind === "watchable" ? { currentUrl: browser.currentUrl, idleUntil: browser.idleUntil } : null;
+        return browser.kind === "watchable" ? { browserId: browser.browserId, currentUrl: browser.currentUrl, idleUntil: browser.idleUntil } : null;
     });
 
 /** {@link readerBrowser} for the action, which reaches the database only through `runQuery`. */

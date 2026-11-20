@@ -11,7 +11,11 @@ import BrowserLiveView from "./browser-live-view";
 /** What the live view shows in a story: a stand-in page, so no story reaches the provider. */
 const STAND_IN_VIEW = `data:text/html,${encodeURIComponent("<!doctype html><title>Sign in</title><body style='font:14px system-ui;padding:24px'><h1>Sign in</h1><p>Read-only view</p>")}`;
 
-const running = lunora(api.browser.live_view.getThreadBrowser, { currentUrl: "https://example.com/account/login", idleUntil: STORY_NOW + 60_000 });
+const running = lunora(api.browser.live_view.getThreadBrowser, {
+    browserId: "browser-1",
+    currentUrl: "https://example.com/account/login",
+    idleUntil: STORY_NOW + 60_000,
+});
 
 const meta = {
     args: { threadId: "thread-1" as never },

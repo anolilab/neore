@@ -16,6 +16,8 @@ const READER = "user-reader";
 const STRANGER = "user-stranger";
 /** The frozen clock every test reads, in the code and in the assertions alike. */
 const NOW = Date.UTC(2026, 10, 20, 12);
+/** The provider session ids the tests use: a browser name a client sees must hold neither. */
+const PROVIDER_SESSION_ID = /s-[12]/u;
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
 
 const { config, registry, sessionFrom } = vi.hoisted(() => {
@@ -159,7 +161,7 @@ describe("a running browser", () => {
 
         await addSession({ inUseHolds: [heldUntil], lastActivityAt: NOW - BROWSER_IDLE_REAP_MS - 1000 });
 
-        await expect(statusFor(OWNER)).resolves.toEqual({ currentUrl: "https://example.com/login", idleUntil: heldUntil });
+        await expect(statusFor(OWNER)).resolves.toEqual({ browserId: expect.any(String), currentUrl: "https://example.com/login", idleUntil: heldUntil });
         await expect(open(OWNER)).resolves.toMatchObject({ status: "ok" });
     });
 
@@ -217,6 +219,17 @@ describe("an agent action", () => {
 
         expect(row.providerSessionId).toBe("s-2");
         expect(row.currentUrl).toBeUndefined();
+    });
+
+    it("names the replacement as another browser, without the provider's session id, so an open view asks again", async () => {
+        const sessionId = await addSession();
+        const before = (await statusFor(READER)) as { browserId: string };
+
+        await log({ action: "navigate", providerSessionId: "s-2", sessionId });
+        const after = (await statusFor(READER)) as { browserId: string };
+
+        expect(after.browserId).not.toBe(before.browserId);
+        expect([before.browserId, after.browserId].join(" ")).not.toMatch(PROVIDER_SESSION_ID);
     });
 
     it("does not bring back the old browser when an older action finishes after a newer one replaced it", async () => {

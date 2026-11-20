@@ -242,6 +242,33 @@ describe("two browser actions at once", () => {
     });
 });
 
+describe("two first browser actions at once", () => {
+    it("keep one browser row for the thread, the one the live view and the next action both use", async () => {
+        const first = pendingAnswer();
+        const second = pendingAnswer();
+
+        // Both start before either has created the thread's row.
+        const firstRun = act();
+
+        await first.reached;
+        const secondRun = act("click");
+
+        await second.reached;
+        first.release(answered({ sessionId: "s-a", success: true, url: "https://example.com/a" }));
+        await firstRun;
+        second.release(answered({ sessionId: "s-b", success: true, url: "https://example.com/b" }));
+        await secondRun;
+
+        const rows = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").collect())) as SessionRow[];
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ currentUrl: "https://example.com/a", providerSessionId: "s-a", status: "active" });
+        const actions = (await harness.run(async (ctx: any) => await ctx.db.query("browserActions").collect())) as unknown[];
+
+        expect(actions).toHaveLength(2);
+    });
+});
+
 describe("a browser action after the provider reaped the browser", () => {
     it("does not bring the reaped browser back while the renderer replaces it", async () => {
         await addSession(NOW - BROWSER_IDLE_REAP_MS - 1000);

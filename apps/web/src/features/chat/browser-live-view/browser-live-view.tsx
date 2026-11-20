@@ -11,16 +11,27 @@ import { Button } from "@neore/ui/components/button";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Globe, Loader2 } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
-/** `opening` carries the attempt it waits for: only that attempt's answer may fill the view. */
+/**
+ * How long a new view URL may take to connect (the backend's `LIVE_VIEW_CONNECT_DEADLINE_MS`). The answer's `connectBy`
+ * is on the server's clock, so the card measures the same window on its own, from the moment it asked: never later
+ * than the provider's deadline, whatever the two clocks say.
+ */
+const CONNECT_WINDOW_MS = 60_000;
+
+/**
+ * `opening` and `open` carry the attempt they belong to (only that attempt's answer may fill the view), the browser it
+ * was asked for (a replaced browser asks again), and whether it is already the one automatic renewal of an expired URL.
+ * `stale`: the answer came after its connect deadline (a sleeping tab), so its URL is never framed.
+ */
 type View =
     | { kind: "closed" }
     | { kind: "failed"; reason: FailureReason }
-    | { attempt: number; kind: "opening" }
-    | { kind: "open"; url: string }
+    | { attempt: number; browserId: string; kind: "opening"; renewed: boolean }
+    | { attempt: number; browserId: string; connectBy: number; connected: boolean; kind: "open"; renewed: boolean; stale: boolean; url: string }
     | { kind: "unavailable" };
 
 /** Why asking for the view failed: the hourly limit is not fixed by asking again at once. */
@@ -52,12 +63,14 @@ const usePassed = (until: number | undefined): boolean => {
     return until !== undefined && until <= now;
 };
 
+type Asked = { attempt: number; browserId: string; connectBy: number; renewed: boolean };
+
 /**
  * What the view becomes after the person asked for it. `ended` reads as unavailable too: the browser may be gone before the
  * status read drops the card, or the provider may not see it at all, and either way the click must not do nothing.
  */
-const viewFrom = (result: { status: "ended" | "unavailable" } | { status: "ok"; url: string }): View =>
-    result.status === "ok" ? { kind: "open", url: result.url } : { kind: "unavailable" };
+const viewFrom = (asked: Asked, result: { status: "ended" | "unavailable" } | { status: "ok"; url: string }, now: number): View =>
+    result.status === "ok" ? { ...asked, connected: false, kind: "open", stale: now >= asked.connectBy, url: result.url } : { kind: "unavailable" };
 
 /** The answer to `attempt`, applied only while the view still waits for that attempt. */
 const answerFor =
@@ -65,8 +78,17 @@ const answerFor =
     (current: View): View =>
         current.kind === "opening" && current.attempt === attempt ? next : current;
 
-/** The card for one running browser. It unmounts when the browser stops, so its view and the view's credential go with it. */
-const BrowserCard: FC<{ currentUrl: string | undefined; threadId: Id<"threads"> }> = ({ currentUrl, threadId }) => {
+/** The view of `attempt` connected: its deadline no longer matters. */
+const connectedFor =
+    (attempt: number) =>
+    (current: View): View =>
+        current.kind === "open" && current.attempt === attempt ? { ...current, connected: true } : current;
+
+/** The view (or the request) is for a browser the thread no longer runs. */
+const isForOtherBrowser = (view: View, browserId: string): boolean => (view.kind === "open" || view.kind === "opening") && view.browserId !== browserId;
+
+/** The card for one thread's browser. It unmounts when the browser stops, so its view and the view's credential go with it. */
+const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threadId: Id<"threads"> }> = ({ browserId, currentUrl, threadId }) => {
     const { t } = useLingui();
     const headingId = useId();
     const viewId = useId();
@@ -75,6 +97,66 @@ const BrowserCard: FC<{ currentUrl: string | undefined; threadId: Id<"threads"> 
     const attempts = useRef(0);
     const expanded = view.kind !== "closed";
 
+    const ask = (renewed: boolean): void => {
+        attempts.current += 1;
+        const asked: Asked = { attempt: attempts.current, browserId, connectBy: Date.now() + CONNECT_WINDOW_MS, renewed };
+        const answered = (result: Parameters<typeof viewFrom>[1]): ((current: View) => View) => answerFor(asked.attempt, viewFrom(asked, result, Date.now()));
+
+        setView({ attempt: asked.attempt, browserId, kind: "opening", renewed });
+        // Hidden again, or hidden and opened again, while it was asked for: that older answer (and its credential) is
+        // dropped, whatever order the answers arrive in.
+        void openLiveView({ threadId })
+            .then((result) => setView(answered(result)))
+            .catch((error: unknown) => setView(answerFor(asked.attempt, { kind: "failed", reason: failureReasonOf(error) })));
+    };
+
+    // A URL that did not connect in time is dead: ask once more, while someone looks (a hidden tab waits until shown).
+    // Asking again and again would spend the hourly limit on a view that cannot connect.
+    const renewIfExpired = useEffectEvent((attempt: number): void => {
+        if (view.kind !== "open" || view.attempt !== attempt || view.connected || document.visibilityState !== "visible" || Date.now() < view.connectBy) {
+            return;
+        }
+
+        if (view.renewed) {
+            setView({ kind: "failed", reason: "other" });
+
+            return;
+        }
+
+        ask(true);
+    });
+
+    const pendingDeadline = view.kind === "open" && !view.connected ? view.connectBy : undefined;
+    const pendingAttempt = view.kind === "open" ? view.attempt : undefined;
+
+    useEffect(() => {
+        if (pendingDeadline === undefined || pendingAttempt === undefined) {
+            return undefined;
+        }
+
+        const check = (): void => renewIfExpired(pendingAttempt);
+        // A little past the deadline: a timer may fire a moment early by `Date.now()`, and the check would then wait.
+        const timer = setTimeout(check, Math.max(0, pendingDeadline - Date.now()) + 50);
+
+        document.addEventListener("visibilitychange", check);
+
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener("visibilitychange", check);
+        };
+    }, [pendingAttempt, pendingDeadline]);
+
+    // The renderer replaced the browser while the view was open: its URL shows a browser that is gone.
+    const askForReplacement = useEffectEvent((): void => {
+        if (isForOtherBrowser(view, browserId)) {
+            ask(false);
+        }
+    });
+
+    useEffect(() => {
+        askForReplacement();
+    }, [browserId]);
+
     const toggle = (): void => {
         if (expanded) {
             setView(CLOSED);
@@ -82,16 +164,10 @@ const BrowserCard: FC<{ currentUrl: string | undefined; threadId: Id<"threads"> 
             return;
         }
 
-        attempts.current += 1;
-        const attempt = attempts.current;
-
-        setView({ attempt, kind: "opening" });
-        // Hidden again, or hidden and opened again, while it was asked for: that older answer (and its credential) is
-        // dropped, whatever order the answers arrive in.
-        void openLiveView({ threadId })
-            .then((result) => setView(answerFor(attempt, viewFrom(result))))
-            .catch((error: unknown) => setView(answerFor(attempt, { kind: "failed", reason: failureReasonOf(error) })));
+        ask(false);
     };
+
+    const framed = view.kind === "open" && !view.stale && !isForOtherBrowser(view, browserId) ? view : undefined;
 
     return (
         <section aria-labelledby={headingId} className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
@@ -106,7 +182,7 @@ const BrowserCard: FC<{ currentUrl: string | undefined; threadId: Id<"threads"> 
                 </Button>
             </div>
             <div hidden={!expanded} id={viewId}>
-                {view.kind === "opening" && (
+                {(view.kind === "opening" || (view.kind === "open" && framed === undefined)) && (
                     <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs" role="status">
                         <Loader2 aria-hidden="true" className="size-3 animate-spin motion-reduce:animate-none" />
                         {t`Opening the live view…`}
@@ -124,13 +200,15 @@ const BrowserCard: FC<{ currentUrl: string | undefined; threadId: Id<"threads"> 
                             : t`The live view could not be opened. Try again.`}
                     </p>
                 )}
-                {view.kind === "open" && (
+                {framed !== undefined && (
                     // Read-only: the view refuses input, so the person watches without steering the agent's page.
                     <iframe
                         className="ph-no-capture mt-2 aspect-video w-full rounded-md border border-gray-200 bg-white dark:border-gray-700"
+                        key={framed.attempt}
+                        onLoad={() => setView(connectedFor(framed.attempt))}
                         referrerPolicy="no-referrer"
                         sandbox="allow-scripts allow-same-origin"
-                        src={view.url}
+                        src={framed.url}
                         title={t`Live view of the agent's browser (read-only)`}
                     />
                 )}
@@ -148,7 +226,7 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         return null;
     }
 
-    return <BrowserCard currentUrl={browser.currentUrl} key={threadId} threadId={threadId} />;
+    return <BrowserCard browserId={browser.browserId} currentUrl={browser.currentUrl} key={threadId} threadId={threadId} />;
 };
 
 export default BrowserLiveView;
