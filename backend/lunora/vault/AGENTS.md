@@ -48,4 +48,6 @@
   impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
   `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.
   Rows, steers, bot instructions and personalization an impersonating admin wrote carry no mark yet either: mark them
-  (and refuse them here) before the fill ships.
+  (and refuse them here) before the fill ships. The allowlist refuses a step holding a page's result or an approval's
+  request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
+  only for that call's id, added here on purpose.

@@ -62,6 +62,7 @@ const { eraseVaultForUser } = await import("./gdpr");
 const { ASIDE_AGENT_NAME } = await import("../chat/lib/aside");
 const { GOAL_CONTINUATION_AGENT } = await import("../chat/goals/shared");
 const { SUB_AGENT_NAME } = await import("../sub-agents/logic");
+const { CODING_AGENTS } = await import("../coding-agents/commands");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
 const { MODEL_LOOKUP } = await import("@neore/ai/models");
 const { isLeadAgentName } = await import("./site-login-turn");
@@ -857,7 +858,7 @@ describe("the prompt's path is an allowlist", () => {
         expect(isLeadAgentName(LEAD_MODEL)).toBe(true);
         expect(isLeadAgentName(undefined)).toBe(true);
 
-        for (const name of [SUB_AGENT_NAME, ASIDE_AGENT_NAME, GOAL_CONTINUATION_AGENT, "Claude Code", "Ada"]) {
+        for (const name of [SUB_AGENT_NAME, ASIDE_AGENT_NAME, GOAL_CONTINUATION_AGENT, ...Object.values(CODING_AGENTS).map((agent) => agent.label), "Ada"]) {
             expect(isLeadAgentName(name), name).toBe(false);
         }
     });
