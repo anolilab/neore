@@ -191,7 +191,8 @@ export const updateBot = authMutation
             toolSelection: v.optional(v.union(vToolSelectionInput, v.null())),
         }),
     })
-    .output(v.null())
+    // The bot's tool selection as stored after the patch (`null` = every tool), so the client can show it before its list refreshes.
+    .output(v.object({ toolSelection: v.union(vToolSelection, v.null()) }))
     .mutation(async ({ args: { botId, patch }, ctx: context }) => {
         const { userId } = context.user;
         const bot = await context.db.get("bots", botId as Id<"bots">);
@@ -248,7 +249,7 @@ export const updateBot = authMutation
             });
         }
 
-        return null;
+        return { toolSelection: nextSelection ?? null };
     });
 
 export const deleteBot = authMutation

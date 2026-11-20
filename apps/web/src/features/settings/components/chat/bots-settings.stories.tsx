@@ -64,6 +64,19 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Clicks the bot's Tools button once it takes clicks: while a dialog opens or closes (a sheet on a phone) the page under it
+ * has `pointer-events: none`, and a click then would fail instead of opening the dialog.
+ */
+const openTools = async (canvas: ReturnType<typeof within>): Promise<HTMLElement> => {
+    const button = await canvas.findByRole("button", { name: "Tools for Docs helper" });
+
+    await waitFor(async () => await expect(getComputedStyle(button).pointerEvents).not.toBe("none"));
+    await userEvent.click(button);
+
+    return await screen.findByRole("dialog");
+};
+
 /** A bot with a custom tool pick; the new-bot form starts on all tools and opens the lists under Custom. */
 export const CustomTools: Story = {
     play: async ({ canvas }) => {
@@ -91,9 +104,7 @@ export const SaveFails: Story = {
     },
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         // The dialog opens with an animation (a sheet on a phone).
         await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs:*" })).toBeVisible());
@@ -119,7 +130,7 @@ export const SavesTypedName: Story = {
                     lunora(api.bots.functions.updateBot, (args) => {
                         savedPatches.push(args.patch);
 
-                        return null;
+                        return { toolSelection: args.patch.toolSelection ?? null };
                     }),
                 ),
             },
@@ -129,9 +140,7 @@ export const SavesTypedName: Story = {
         savedPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
         await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
         const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
@@ -169,9 +178,7 @@ export const RemovedServer: Story = {
     },
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove Removed server:*" })).toBeVisible());
         await expect(within(dialog).getByText(/the bot gets none of your own servers' tools/u)).toBeVisible();
@@ -191,7 +198,7 @@ export const TogglesKeepLists: Story = {
                     lunora(api.bots.functions.updateBot, (args) => {
                         toggledPatches.push(args.patch);
 
-                        return null;
+                        return { toolSelection: args.patch.toolSelection ?? null };
                     }),
                 ),
             },
@@ -200,9 +207,7 @@ export const TogglesKeepLists: Story = {
     play: async ({ canvas }) => {
         toggledPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs:*" })).toBeVisible());
 
@@ -235,7 +240,7 @@ export const RefusesUnaddedTool: Story = {
                     lunora(api.bots.functions.updateBot, (args) => {
                         refusedPatches.push(args.patch);
 
-                        return null;
+                        return { toolSelection: args.patch.toolSelection ?? null };
                     }),
                 ),
             },
@@ -244,9 +249,7 @@ export const RefusesUnaddedTool: Story = {
     play: async ({ canvas }) => {
         refusedPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
         await userEvent.type(within(dialog).getByRole("combobox", { name: "Excluded tools" }), "nowhere:run");
@@ -271,7 +274,7 @@ export const RefusesUnknownBuiltIn: Story = {
                     lunora(api.bots.functions.updateBot, (args) => {
                         unknownBuiltInPatches.push(args.patch);
 
-                        return null;
+                        return { toolSelection: args.patch.toolSelection ?? null };
                     }),
                 ),
             },
@@ -282,9 +285,7 @@ export const RefusesUnknownBuiltIn: Story = {
         await lunoraAnswered(api.bots.functions.listBots);
         // The field checks a bare name against the built-in tools once they are read.
         await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
         const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
@@ -316,8 +317,8 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
                     lunora(
                         api.bots.functions.updateBot,
                         async () =>
-                            await new Promise<null>((resolve) => {
-                                slowSave.finish = () => resolve(null);
+                            await new Promise<{ toolSelection: null }>((resolve) => {
+                                slowSave.finish = () => resolve({ toolSelection: null });
                             }),
                     ),
                 ),
@@ -326,9 +327,7 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
     },
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const first = await screen.findByRole("dialog");
+        const first = await openTools(canvas);
 
         await waitFor(async () => await expect(within(first).getByRole("button", { name: "Save tools" })).toBeVisible());
         await userEvent.click(within(first).getByRole("radio", { name: "All tools" }));
@@ -336,7 +335,7 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
         await userEvent.click(within(first).getByRole("button", { name: "Cancel" }));
         await waitFor(async () => await expect(screen.queryByRole("dialog")).toBeNull());
 
-        await userEvent.click(canvas.getByRole("button", { name: "Tools for Docs helper" }));
+        await openTools(canvas);
         await waitFor(async () => await expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Save tools" })).toBeVisible());
         await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "Custom" })).toBeChecked();
         slowSave.finish?.();
@@ -346,6 +345,74 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
 
         await expect(screen.getByRole("dialog")).toBeVisible();
         await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "All tools" })).toBeChecked();
+    },
+};
+
+/** The bots list after the save below: held until the story released it, then the server's stored bot. */
+const heldList: { held: boolean; waiting: (() => void)[] } = { held: false, waiting: [] };
+/** The patches the reopen story below sent. */
+const reopenedPatches: unknown[] = [];
+
+/** A dialog reopened before the bots list refreshed starts from the pick just saved, and saving it again keeps that pick. */
+export const ReopenBeforeRefresh: Story = {
+    beforeEach: () => {
+        // Reads a failed run left held are answered, so they do not keep the mock backend busy.
+        for (const release of heldList.waiting) {
+            release();
+        }
+
+        heldList.held = false;
+        heldList.waiting = [];
+        reopenedPatches.length = 0;
+    },
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunora(api.bots.functions.listBots, async () => {
+                        if (heldList.held) {
+                            await new Promise<void>((resolve) => {
+                                heldList.waiting.push(resolve);
+                            });
+
+                            return [{ ...BOT, toolSelection: undefined }];
+                        }
+
+                        return [BOT];
+                    }),
+                    lunora(api.bots.functions.updateBot, (args) => {
+                        reopenedPatches.push(args.patch);
+                        heldList.held = true;
+
+                        return { toolSelection: args.patch.toolSelection ?? null };
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+
+        const first = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(first).getByRole("radio", { name: "Custom" })).toBeChecked());
+        await userEvent.click(within(first).getByRole("radio", { name: "All tools" }));
+        await userEvent.click(within(first).getByRole("button", { name: "Save tools" }));
+        await waitFor(async () => await expect(screen.queryByRole("dialog")).toBeNull());
+
+        // The list refresh is still held: the reopened dialog reads the pick the save stored.
+        const reopened = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(reopened).getByRole("radio", { name: "All tools" })).toBeChecked());
+        await userEvent.click(within(reopened).getByRole("button", { name: "Save tools" }));
+        await waitFor(async () => await expect(reopenedPatches).toStrictEqual([{ toolSelection: null }, { toolSelection: null }]));
+
+        heldList.held = false;
+
+        for (const release of heldList.waiting) {
+            release();
+        }
     },
 };
 
@@ -399,9 +466,7 @@ export const ServersLoading: Story = {
     },
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByText("Loading your servers, connectors and computers…")).toBeVisible());
         await expect(within(dialog).getByRole("button", { name: `Remove ${DOCS}:delete` })).toBeVisible();
@@ -437,9 +502,7 @@ export const ServersLoadFails: Story = {
     },
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByText("Your servers, connectors and computers could not be loaded.")).toBeVisible());
         await expect(within(dialog).getByRole("button", { name: `Remove ${DOCS}:delete` })).toBeVisible();
@@ -474,9 +537,7 @@ export const StaleBuiltIn: Story = {
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
         await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
-        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
-
-        const dialog = await screen.findByRole("dialog");
+        const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
         const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });

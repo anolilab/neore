@@ -102,11 +102,17 @@ describe("a bot's tool selection", () => {
         expect(await selectionOf(botId)).toStrictEqual({ allow: ["webSearch"], exclude: [`${DOCS}:*`] });
         expect(await selectionOf(await created())).toBeUndefined();
 
+        // The update answers with the selection as stored, which the settings page shows before its list refreshes.
+        await expect(
+            as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: { allow: [" webSearch "], exclude: [] } } } as never),
+        ).resolves.toStrictEqual({ toolSelection: { allow: ["webSearch"], exclude: [] } });
         await as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: { allow: [], exclude: [] } } } as never);
 
         expect(await selectionOf(botId)).toStrictEqual({ allow: [], exclude: [] });
 
-        await as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: null } } as never);
+        await expect(as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: null } } as never)).resolves.toStrictEqual({
+            toolSelection: null,
+        });
 
         expect(await selectionOf(botId)).toBeUndefined();
     });

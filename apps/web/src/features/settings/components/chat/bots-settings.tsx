@@ -47,6 +47,13 @@ const emptyDraft = (): BotDraft => {
     };
 };
 
+/** The bots list with one bot's tool selection replaced by the one the server stored (`null`: every tool, stored as none). */
+const withStoredSelection = <T extends { _id: string; toolSelection?: BotToolSelection }>(
+    bots: T[] | undefined,
+    botId: string,
+    stored: BotToolSelection | null,
+): T[] | undefined => bots?.map((bot) => (bot._id === botId ? { ...bot, toolSelection: stored ?? undefined } : bot));
+
 interface PermissionModeSelectProps {
     "aria-describedby"?: string;
     "aria-label"?: string;
@@ -208,7 +215,12 @@ const BotsSettings = () => {
         const { id: savedId, selection: saved } = editingTools;
 
         try {
-            await updateMutation.mutateAsync({ botId: savedId as Id<"bots">, patch: { toolSelection: saved } });
+            const { toolSelection: stored } = await updateMutation.mutateAsync({ botId: savedId as Id<"bots">, patch: { toolSelection: saved } });
+
+            // The list takes the stored pick before the dialog closes, so a reopen before the refresh starts from it, never from the old one.
+            // A read already in flight is dropped first: it left before the save and would put the old pick back.
+            await queryClient.cancelQueries({ queryKey: botsQuery.queryKey });
+            queryClient.setQueryData<typeof bots>(botsQuery.queryKey, (current) => withStoredSelection(current, savedId, stored));
 
             // Settled as soon as the save landed, before the list refresh: a reopened copy must not be saved back meanwhile.
             if (toolsDialogSession.current === session) {
@@ -217,7 +229,7 @@ const BotsSettings = () => {
                 // Reopened meanwhile: an untouched copy of this bot was read before this save landed, so it takes the saved pick
                 // rather than writing the old one back on its own save.
                 setEditingTools((current) =>
-                    current?.id === savedId && !current.touched ? { ...current, revision: current.revision + 1, selection: saved } : current,
+                    current?.id === savedId && !current.touched ? { ...current, revision: current.revision + 1, selection: stored } : current,
                 );
             }
 
