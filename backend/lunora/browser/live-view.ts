@@ -172,5 +172,16 @@ export const openLiveView = authAction
             return { status: "unavailable" as const };
         }
 
+        // The provider call takes time: a grant removed, or a chat locked or trashed, while it ran gets no URL either.
+        const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { threadId, userId: ctx.user.userId });
+
+        if (after.kind === "denied") {
+            return throwThreadNotFound();
+        }
+
+        if (after.kind === "none") {
+            return { status: "ended" as const };
+        }
+
         return { connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, url };
     });

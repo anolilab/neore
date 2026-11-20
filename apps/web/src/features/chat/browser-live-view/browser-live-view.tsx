@@ -22,6 +22,9 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
  */
 const CONNECT_WINDOW_MS = 60_000;
 
+/** `size="sm"` is 24 px tall: on a touch screen the card's buttons grow to 44 px. */
+const TOUCH_TARGET = "pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+
 /**
  * `opening` and `open` carry the attempt they belong to (only that attempt's answer may fill the view), the browser it
  * was asked for (a replaced browser asks again), and whether it is already the one automatic renewal of an expired URL.
@@ -188,7 +191,7 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
                     <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300" id={headingId}>{t`Browser`}</h3>
                     <p className="text-muted-foreground truncate text-xs">{currentUrl ?? t`The agent is using a browser`}</p>
                 </div>
-                <Button aria-controls={viewId} aria-expanded={expanded} onClick={toggle} size="sm" type="button" variant="outline">
+                <Button aria-controls={viewId} aria-expanded={expanded} className={TOUCH_TARGET} onClick={toggle} size="sm" type="button" variant="outline">
                     {expanded ? t`Hide live view` : t`Watch live`}
                 </Button>
             </div>
@@ -210,7 +213,7 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
                             {view.reason === "rate-limited" ? t`Too many live views were opened. Try again later.` : t`The live view could not be opened.`}
                         </p>
                         {view.reason === "other" && (
-                            <Button onClick={() => ask(false)} size="sm" type="button" variant="outline">
+                            <Button className={TOUCH_TARGET} onClick={() => ask(false)} size="sm" type="button" variant="outline">
                                 {t`Try again`}
                             </Button>
                         )}
@@ -269,6 +272,7 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
                         </p>
                     </div>
                     <Button
+                        className={TOUCH_TARGET}
                         disabled={status.isFetching}
                         onClick={() => {
                             status.refetch().catch(() => undefined);

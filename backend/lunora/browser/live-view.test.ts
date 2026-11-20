@@ -228,6 +228,44 @@ describe("a running browser", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("returns no URL to a reader whose grant was removed while the provider minted it", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => {
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+                await ctx.db.delete("threadAccess", grant._id);
+            });
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(open(READER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns no URL when the chat was trashed while the provider minted it", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
+    });
+
+    it("returns no URL when the chat was locked while the provider minted it", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(open(OWNER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
     it("refuses a view URL that does not point at the live view host", async () => {
         await addSession();
         fetchMock.mockResolvedValue(answer(200, { devtoolsFrontendUrl: "https://evil.example/ui/view" }));

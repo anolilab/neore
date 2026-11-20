@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../../test/registered-api";
 import schema from "../../schema";
 import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, browserAliveUntil, watchableSessionId } from "../../browser/live-view-logic";
+import { logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { executeBrowserAction } from "./browser-node";
 
@@ -231,15 +232,46 @@ describe("two browser actions at once", () => {
         await newer.reached;
         newer.release(answered({ sessionId: "s-1", success: true, url: "https://example.com/new" }));
         await newerRun;
-        vi.setSystemTime(NOW + 2000);
         older.release(answered({ sessionId: "s-1", success: true, url: "https://example.com/old" }));
         await olderRun;
 
         const after = await row();
 
-        // The older result's page and activity are older than the newer one's: neither goes back.
+        // The harness gives every function inside one `harness.action` the `ctx.now` of that call's start, so the older
+        // action records its activity at NOW, before the newer one's NOW + 1000: the window does not go back. (When it
+        // finishes later than the newer one in production, its own later time is kept: see the `logAction` test below.)
         expect(after).toMatchObject({ currentUrl: "https://example.com/new", lastActivityAt: NOW + 1000, providerSessionId: "s-1" });
         expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it("moves the activity to an older action's completion when it finishes last, and never back, keeping the newer page", async () => {
+        await addSession(NOW + 1000);
+        await harness.run(
+            async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { currentUrl: "https://example.com/new", currentUrlStartedAt: NOW + 1000 }),
+        );
+        // The older action's completion, written at the clock's time: each `harness.action` starts its own `ctx.now`.
+        const olderFinishes = async (): Promise<unknown> =>
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(logAction, {
+                        action: "click",
+                        currentUrl: "https://example.com/old",
+                        sessionId,
+                        startedAt: NOW,
+                        startedWithProviderSessionId: "s-1",
+                        success: true,
+                    }),
+            );
+
+        // Completed before the newer action's activity (clock skew between isolates): the window stays where it was.
+        vi.setSystemTime(NOW + 500);
+        await olderFinishes();
+        expect(await row()).toMatchObject({ currentUrl: "https://example.com/new", lastActivityAt: NOW + 1000 });
+
+        // Completed after it: the browser was used until then, so the window moves forward; the page stays the newer one's.
+        vi.setSystemTime(NOW + 2000);
+        await olderFinishes();
+        expect(await row()).toMatchObject({ currentUrl: "https://example.com/new", lastActivityAt: NOW + 2000 });
     });
 
     it("keeps the hold of an action still running when another one fails", async () => {

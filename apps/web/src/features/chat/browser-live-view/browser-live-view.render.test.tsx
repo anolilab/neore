@@ -340,6 +340,33 @@ describe("BrowserLiveView", () => {
         expect(screen.queryByRole("alert")).toBeNull();
     });
 
+    it("says the status could not be read when a refetch fails after an answer of no browser", async () => {
+        const queryClient = mountCard();
+
+        // The first answer (no browser) has arrived; a refetch while it runs would only join it.
+        await vi.waitFor(() => {
+            expect(queryClient.isFetching()).toBe(0);
+        });
+        expect(backend.statusReads).toBe(1);
+        expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+
+        backend.statusError = new Error("network");
+        await act(async () => {
+            await queryClient.refetchQueries();
+        });
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
+
+        backend.statusError = undefined;
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        await vi.waitFor(() => {
+            expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+        });
+    });
+
     it("closes an open view and offers a retry when a later status read fails", async () => {
         backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
         backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
