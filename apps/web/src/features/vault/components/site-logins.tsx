@@ -2,13 +2,14 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { SITE_LOGIN_CHANGED } from "@neore/backend/vault/site-login-shape";
 import { normalizeSiteOrigin } from "@neore/backend/vault/site-origin";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import type { Mutation } from "@tanstack/react-query";
+import type { FetchQueryOptions, Mutation, QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -22,18 +23,49 @@ import { useCRPC } from "@/lib/lunora/crpc";
 /** Bots one login may name; the server's `MAX_SITE_LOGIN_TEAMMATES`. */
 const MAX_TEAMMATES = 20;
 
+/** A saved login as this form last knew it: what an edit was opened from, or what its last save wrote. */
+interface OpenedLogin {
+    label: string;
+    teammateIds: Id<"bots">[];
+    /** The server's version of the login; a save of an older one is refused (`SITE_LOGIN_CHANGED`). */
+    updatedAt: number;
+    username: string;
+}
+
 interface LoginDraft {
     /** Set while editing a saved login; its site cannot change. */
     id?: Id<"savedSiteLogins">;
     label: string;
+    /** Set with `id`. */
+    opened?: OpenedLogin;
     password: string;
     site: string;
     teammateIds: Id<"bots">[];
     username: string;
 }
 
+interface ListedLogin {
+    id: Id<"savedSiteLogins">;
+    label?: string;
+    site: string;
+    teammateIds: Id<"bots">[];
+    updatedAt: number;
+    username: string;
+}
+
 const emptyDraft = (): LoginDraft => {
     return { label: "", password: "", site: "", teammateIds: [], username: "" };
+};
+
+/**
+ * An edit of `login`. `savedHere` is the version a save from this form wrote, when the listed row may predate it; the
+ * fields are the listed ones either way, as a save here writes what the form shows.
+ */
+const editDraft = (login: ListedLogin, savedHere?: number): LoginDraft => {
+    const updatedAt = Math.max(login.updatedAt, savedHere ?? 0);
+    const opened = { label: login.label ?? "", teammateIds: login.teammateIds, updatedAt, username: login.username };
+
+    return { id: login.id, label: opened.label, opened, password: "", site: login.site, teammateIds: opened.teammateIds, username: opened.username };
 };
 
 /**
@@ -43,6 +75,7 @@ const emptyDraft = (): LoginDraft => {
  */
 const saveArgs = (draft: LoginDraft) => {
     return {
+        expectedUpdatedAt: draft.opened?.updatedAt,
         label: draft.label.trim() || undefined,
         loginId: draft.id,
         password: draft.password === "" ? undefined : draft.password,
@@ -62,10 +95,11 @@ const sameSite = (a: string, b: string): boolean => {
 /**
  * Empties the form only if it still holds `submitted`. Edits made while that save was in flight were not sent, so they
  * stay; when the save created the login, they become an edit of it, so saving them again does not create a second one.
- * The password just saved never stays: kept, it would be sent again with the later edit. One typed since the submit stays.
+ * Either way they now edit the version just saved. The password just saved never stays: kept, it would be sent again
+ * with the later edit. One typed since the submit stays.
  */
 const afterSave =
-    (submitted: LoginDraft, savedId: Id<"savedSiteLogins">) =>
+    (submitted: LoginDraft, saved: { id: Id<"savedSiteLogins">; updatedAt: number }) =>
     (current: LoginDraft): LoginDraft => {
         if (current === submitted) {
             return emptyDraft();
@@ -77,9 +111,46 @@ const afterSave =
             return current;
         }
 
-        const kept = current.password === submitted.password ? { ...current, password: "" } : current;
+        const opened = { label: submitted.label.trim(), teammateIds: submitted.teammateIds, updatedAt: saved.updatedAt, username: submitted.username.trim() };
+        const password = current.password === submitted.password ? "" : current.password;
 
-        return becameEdit ? { ...kept, id: savedId } : kept;
+        return { ...current, id: saved.id, opened, password };
+    };
+
+/** Whether a save was refused because the login changed after this form read it. */
+const changedElsewhere = (error: unknown): boolean => {
+    const { data } = (typeof error === "object" && error !== null ? error : {}) as { data?: { code?: unknown } };
+
+    return data?.code === SITE_LOGIN_CHANGED;
+};
+
+/**
+ * After a save of `submitted` was refused as stale: the edit, if the form still holds it, moved onto `fresh`, the login as
+ * the server now has it (gone: the form empties). Username and label keep what the person changed since opening it, and
+ * otherwise take the saved one. The bots are the saved ones, less any the person unticked: a bot removed elsewhere is
+ * never written back, and none ticked here is added without being seen again. The password is never kept.
+ */
+const reloadAfterConflict =
+    (submitted: LoginDraft, fresh: ListedLogin | undefined) =>
+    (current: LoginDraft): LoginDraft => {
+        if (current.id === undefined || current.id !== submitted.id) {
+            return current;
+        }
+
+        if (fresh === undefined) {
+            return emptyDraft();
+        }
+
+        const { opened } = current;
+        const reloaded = editDraft(fresh);
+        const unticked = new Set((opened?.teammateIds ?? []).filter((id) => !current.teammateIds.includes(id)));
+
+        return {
+            ...reloaded,
+            label: opened !== undefined && current.label !== opened.label ? current.label : reloaded.label,
+            teammateIds: reloaded.teammateIds.filter((id) => !unticked.has(id)),
+            username: opened !== undefined && current.username !== opened.username ? current.username : reloaded.username,
+        };
     };
 
 /** Empties the form when it is editing the login `id`, which is gone. */
@@ -87,6 +158,23 @@ const clearIfEditing =
     (id: Id<"savedSiteLogins">) =>
     (current: LoginDraft): LoginDraft =>
         current.id === id ? emptyDraft() : current;
+
+/** Keeps an edit of `submitted` that could not be reloaded, without the password its refused save carried. */
+const dropPasswordIfEditing =
+    (submitted: LoginDraft) =>
+    (current: LoginDraft): LoginDraft =>
+        current.id !== undefined && current.id === submitted.id ? { ...current, password: "" } : current;
+
+type ListRead = { logins: ListedLogin[]; userId: string };
+
+/** The list as the server has it now, or `undefined` when it could not be read. */
+const readLoginsNow = async (queryClient: QueryClient, options: FetchQueryOptions<ListRead>): Promise<ListRead | undefined> => {
+    try {
+        return await queryClient.fetchQuery({ ...options, staleTime: 0 });
+    } catch {
+        return undefined;
+    }
+};
 
 const errorText = (error: unknown, fallback: string): string => (error instanceof Error && error.message !== "" ? error.message : fallback);
 
@@ -180,6 +268,9 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const deleteMutation = useMutation(crpc.vault.site_logins.deleteSiteLogin.mutationOptions({ networkMode: "always", retry: 0 }, { onlineOnly: true }));
     // A save or delete that ends after an account switch (this form unmounts) does not report to the next account.
     const mounted = useRef(true);
+    // The version each save here wrote: the live list may not show it yet, and an edit opened from the older one would be
+    // refused as changed elsewhere. A newer version in the list (another tab) still wins.
+    const savedVersions = useRef(new Map<Id<"savedSiteLogins">, number>());
 
     useEffect(() => {
         mounted.current = true;
@@ -205,6 +296,33 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
         });
     };
 
+    // The login changed elsewhere since this edit opened it: read it again from the server and move the edit onto it. A
+    // one-shot read: the live list answers from its subscription, which may not have the other tab's change yet.
+    const reloadLogin = async (submitted: LoginDraft) => {
+        const changed = t`This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again.`;
+        const read = await readLoginsNow(queryClient, crpc.vault.site_logins.listSiteLogins.queryOptions({}, { live: false }));
+
+        if (!mounted.current) {
+            return;
+        }
+
+        if (read === undefined || read.userId !== userId) {
+            // Not reloaded: the edit stays, without the password, and its next save is refused again.
+            setDraft(dropPasswordIfEditing(submitted));
+            toast.error(t`This login was changed elsewhere. Reload the page to see it before saving again.`);
+
+            return;
+        }
+
+        setDraft(
+            reloadAfterConflict(
+                submitted,
+                read.logins.find((login) => login.id === submitted.id),
+            ),
+        );
+        toast.error(changed);
+    };
+
     const handleSave = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
@@ -219,10 +337,11 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
 
         // `reset` after each outcome: the hook would otherwise keep the call, password included, until the next save.
         try {
-            const savedId = await saveMutation.mutateAsync(args);
+            const written = await saveMutation.mutateAsync(args);
 
             saveMutation.reset();
-            setDraft(afterSave(submitted, savedId));
+            savedVersions.current.set(written.id, written.updatedAt);
+            setDraft(afterSave(submitted, written));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
 
             if (mounted.current) {
@@ -230,6 +349,12 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             }
         } catch (error) {
             saveMutation.reset();
+
+            if (changedElsewhere(error)) {
+                await reloadLogin(submitted);
+
+                return;
+            }
 
             if (mounted.current) {
                 toast.error(errorText(error, fallback));
@@ -318,14 +443,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                                         <Button
                                             aria-label={t`Edit login for ${login.site}`}
                                             onClick={() => {
-                                                setDraft({
-                                                    id: login.id,
-                                                    label: login.label ?? "",
-                                                    password: "",
-                                                    site: login.site,
-                                                    teammateIds: login.teammateIds,
-                                                    username: login.username,
-                                                });
+                                                setDraft(editDraft(login, savedVersions.current.get(login.id)));
                                             }}
                                             size="icon"
                                             variant="ghost"

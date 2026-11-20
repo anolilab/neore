@@ -66,6 +66,7 @@ const { CODING_AGENTS } = await import("../coding-agents/commands");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
 const { MODEL_LOOKUP } = await import("@neore/ai/models");
 const { isLeadAgentName } = await import("./site-login-turn");
+const { SITE_LOGIN_CHANGED } = await import("./lib/site-login-shape");
 
 // The model a lead run is named for.
 const LEAD_MODEL = DEFAULT_CHAT_MODEL;
@@ -86,6 +87,8 @@ const AT_MOST_BOTS = /at most 20 bots/;
 const OWN_ACCOUNT_ONLY = /own account only/;
 const SAVE_WHILE_IMPERSONATING = /cannot be saved while impersonating/;
 const DELETE_WHILE_IMPERSONATING = /cannot be deleted while impersonating/;
+const CHANGED_ELSEWHERE = /changed elsewhere/;
+const NAMES_NO_VERSION = /which version/;
 
 // Built at run time, so no secret-shaped literal sits in the source.
 const PASSWORD = ["pw", crypto.randomUUID(), "x"].join("-");
@@ -108,10 +111,34 @@ const insertBot = async (userId: string, name: string) =>
 const listLogins = async (userId: string) =>
     (await as(userId).query(listSiteLogins as never, {} as never)) as { logins: Record<string, unknown>[]; userId: string };
 
-const save = async (args: Record<string, unknown>, userId = OWNER) =>
-    (await as(userId).mutation(saveSiteLogin as never, { site: SITE, teammateIds: [], username: "ada@example.com", ...args } as never)) as string;
-
 const rows = async () => (await harness.run(async (ctx: any) => await ctx.db.query("savedSiteLogins").collect())) as Record<string, unknown>[];
+
+const updatedAtOf = async (id: unknown) => {
+    const all = await rows();
+
+    return all.find((row) => row["_id"] === id)?.["updatedAt"];
+};
+
+const firstRow = async () => {
+    const [row] = await rows();
+
+    return row;
+};
+
+// An edit is opened from the login as it is now, unless a test names the version it was opened from.
+const save = async (args: Record<string, unknown>, userId = OWNER) => {
+    const opened = args["loginId"] !== undefined && !("expectedUpdatedAt" in args) ? { expectedUpdatedAt: await updatedAtOf(args["loginId"]) } : {};
+
+    const saved = (await as(userId).mutation(
+        saveSiteLogin as never,
+        { site: SITE, teammateIds: [], username: "ada@example.com", ...opened, ...args } as never,
+    )) as {
+        id: string;
+        updatedAt: number;
+    };
+
+    return saved.id;
+};
 
 type Turn = {
     headless: boolean;
@@ -246,6 +273,45 @@ describe("saving a site login", () => {
         const [unmoved] = await rows();
 
         expect(unmoved?.["origin"]).toBe(SITE);
+    });
+
+    it("refuses an edit opened before the login changed elsewhere, so a removed bot is not written back", async () => {
+        const id = await save({ password: PASSWORD, teammateIds: [botId, otherBotId] });
+        const opened = await updatedAtOf(id);
+
+        // Another tab removes Bo; the version moves on even within the same millisecond.
+        await save({ loginId: id, teammateIds: [botId] });
+        const removed = await updatedAtOf(id);
+
+        expect(removed).toBeGreaterThan(opened as number);
+
+        // The stale edit still holds Bo: refused with the code the form reloads on, and nothing is written.
+        await expect(save({ expectedUpdatedAt: opened, label: "Renamed", loginId: id, teammateIds: [botId, otherBotId] })).rejects.toMatchObject({
+            code: "CONFLICT",
+            data: { code: SITE_LOGIN_CHANGED },
+        });
+        await expect(save({ expectedUpdatedAt: opened, loginId: id, teammateIds: [botId, otherBotId] })).rejects.toThrow(CHANGED_ELSEWHERE);
+
+        const [row] = await rows();
+
+        expect(row?.["teammateIds"]).toStrictEqual([botId]);
+        expect(row?.["label"]).toBeUndefined();
+        expect(row?.["updatedAt"]).toBe(removed);
+
+        // Reloaded from the login as it is now, the same change saves.
+        await save({ expectedUpdatedAt: removed, label: "Renamed", loginId: id, teammateIds: [botId] });
+        const renamed = await firstRow();
+
+        expect(renamed?.["label"]).toBe("Renamed");
+    });
+
+    it("refuses an edit that names no version", async () => {
+        const id = await save({ password: PASSWORD, teammateIds: [botId] });
+
+        await expect(save({ expectedUpdatedAt: undefined, loginId: id, teammateIds: [botId, otherBotId] })).rejects.toThrow(NAMES_NO_VERSION);
+        const unchanged = await firstRow();
+
+        expect(unchanged?.["teammateIds"]).toStrictEqual([botId]);
     });
 
     it("refuses a second login for the same site", async () => {

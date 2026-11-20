@@ -1886,7 +1886,7 @@ msgstr "キーは保存済みです。そのままにするには空欄のまま
 msgid "A locked chat cannot have a guest link."
 msgstr "ロックされたチャットにはゲストリンクを作成できません。"
 
-#: src/features/vault/components/site-logins.tsx:419
+#: src/features/vault/components/site-logins.tsx:537
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "1 つのログインに指定できるボットは最大 {MAX_TEAMMATES} 個です。"
 
@@ -5176,7 +5176,7 @@ msgstr "Discord Developer Portal で取得したボットトークン"
 msgid "Bots"
 msgstr "ボット"
 
-#: src/features/vault/components/site-logins.tsx:414
+#: src/features/vault/components/site-logins.tsx:532
 msgid "Bots that may use it"
 msgstr "使用できるボット"
 
@@ -5310,8 +5310,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:188
-#: src/features/chat/browser-live-view/browser-live-view.tsx:251
+#: src/features/chat/browser-live-view/browser-live-view.tsx:196
+#: src/features/chat/browser-live-view/browser-live-view.tsx:274
 msgid "Browser"
 msgstr "ブラウザー"
 
@@ -5726,7 +5726,7 @@ msgstr "カナダ"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:443
+#: src/features/vault/components/site-logins.tsx:561
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8551,7 +8551,7 @@ msgstr "ボットを削除できませんでした。"
 msgid "Could not delete the comment"
 msgstr "コメントを削除できませんでした"
 
-#: src/features/vault/components/site-logins.tsx:258
+#: src/features/vault/components/site-logins.tsx:383
 msgid "Could not delete the login."
 msgstr "ログインを削除できませんでした。"
 
@@ -8787,7 +8787,7 @@ msgstr "Daily Brief の設定を保存できませんでした。"
 msgid "Could not save the email setting."
 msgstr "メール設定を保存できませんでした。"
 
-#: src/features/vault/components/site-logins.tsx:218
+#: src/features/vault/components/site-logins.tsx:336
 msgid "Could not save the login."
 msgstr "ログインを保存できませんでした。"
 
@@ -8821,7 +8821,7 @@ msgstr "回答を保存できませんでした。もう一度お試しくださ
 msgid "Could not send the change."
 msgstr "変更を送信できませんでした。"
 
-#: src/features/sub-agents/components/worker-composer.tsx:69
+#: src/features/sub-agents/components/worker-composer.tsx:70
 msgid "Could not send the message."
 msgstr "メッセージを送信できませんでした。"
 
@@ -9984,7 +9984,7 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:451
+#: src/features/vault/components/site-logins.tsx:569
 msgid "Delete"
 msgstr "削除"
 
@@ -10099,7 +10099,7 @@ msgid "Delete group and children"
 msgstr "グループと子要素を削除"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:336
+#: src/features/vault/components/site-logins.tsx:454
 msgid "Delete login for {0}"
 msgstr "{0} のログインを削除"
 
@@ -10233,7 +10233,7 @@ msgstr "確認後に開いているスレッドを削除します（{0}）"
 msgid "Delete this case?"
 msgstr "このケースを削除しますか？"
 
-#: src/features/vault/components/site-logins.tsx:461
+#: src/features/vault/components/site-logins.tsx:579
 msgid "Delete this login?"
 msgstr "このログインを削除しますか？"
 
@@ -11533,12 +11533,12 @@ msgstr "画像を編集"
 msgid "Edit Image"
 msgstr "画像を編集"
 
-#: src/features/vault/components/site-logins.tsx:353
+#: src/features/vault/components/site-logins.tsx:471
 msgid "Edit login"
 msgstr "ログインを編集"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:319
+#: src/features/vault/components/site-logins.tsx:444
 msgid "Edit login for {0}"
 msgstr "{0} のログインを編集"
 
@@ -16360,7 +16360,7 @@ msgstr "列を非表示"
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:192
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
 msgid "Hide live view"
 msgstr ""
 
@@ -18249,7 +18249,7 @@ msgstr "キルギス"
 msgid "Label"
 msgstr "ラベル"
 
-#: src/features/vault/components/site-logins.tsx:391
+#: src/features/vault/components/site-logins.tsx:509
 msgid "Label (optional)"
 msgstr "ラベル（任意）"
 
@@ -18666,7 +18666,7 @@ msgstr "「任意のモデル」にする場合は空欄のままにしてくだ
 msgid "Leave empty for transparent background"
 msgstr "透明な背景にする場合は空欄のままにしてください"
 
-#: src/features/vault/components/site-logins.tsx:384
+#: src/features/vault/components/site-logins.tsx:502
 msgid "Leave empty to keep the saved password"
 msgstr "保存済みのパスワードを維持するには空のままにしてください"
 
@@ -19013,7 +19013,7 @@ msgstr "ライブプレビュー — コンポーネントのストリーミン�
 msgid "Live preview — updating as the artifact streams"
 msgstr "ライブプレビュー — アーティファクトのストリーミングに合わせて更新中"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:228
+#: src/features/chat/browser-live-view/browser-live-view.tsx:236
 msgid "Live view of the agent's browser (read-only)"
 msgstr ""
 
@@ -19448,7 +19448,7 @@ msgstr "サインアウト"
 msgid "Login"
 msgstr "サインイン"
 
-#: src/features/vault/components/site-logins.tsx:254
+#: src/features/vault/components/site-logins.tsx:379
 msgid "Login deleted"
 msgstr "ログインを削除しました"
 
@@ -19456,11 +19456,11 @@ msgstr "ログインを削除しました"
 msgid "login refused"
 msgstr "ログインが拒否されました"
 
-#: src/features/vault/components/site-logins.tsx:217
+#: src/features/vault/components/site-logins.tsx:335
 msgid "Login saved"
 msgstr "ログインを保存しました"
 
-#: src/features/vault/components/site-logins.tsx:217
+#: src/features/vault/components/site-logins.tsx:335
 msgid "Login updated"
 msgstr "ログインを更新しました"
 
@@ -19468,7 +19468,7 @@ msgstr "ログインを更新しました"
 msgid "Logins"
 msgstr "ログイン名"
 
-#: src/features/vault/components/site-logins.tsx:270
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "エージェントのブラウザー用に保存されたログインです。これらを使ったサインインは今後のアップデートで提供されます。パスワードはサーバーがサイトに入力し、AI が目にすることはありません。"
 
@@ -20331,11 +20331,11 @@ msgstr "メッセージの選択"
 msgid "Message the agent on your computer"
 msgstr "お使いのコンピュータ上のエージェントにメッセージを送る"
 
-#: src/features/sub-agents/components/worker-composer.tsx:103
+#: src/features/sub-agents/components/worker-composer.tsx:106
 msgid "Message the worker"
 msgstr "ワーカーにメッセージを送る"
 
-#: src/features/sub-agents/components/worker-composer.tsx:115
+#: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Message the worker..."
 msgstr "ワーカーにメッセージを送る..."
 
@@ -21741,7 +21741,7 @@ msgstr "フォトリアリズムとテキスト描画に優れた新しい高品
 msgid "New line in message"
 msgstr "メッセージ内で改行"
 
-#: src/features/vault/components/site-logins.tsx:353
+#: src/features/vault/components/site-logins.tsx:471
 msgid "New login"
 msgstr "新しいログイン"
 
@@ -23999,7 +23999,7 @@ msgstr "プルリクエストを作成しています…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "会話なしでアシスタントを開くと、空のチャットではなく最新の会話に移動します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:199
+#: src/features/chat/browser-live-view/browser-live-view.tsx:207
 msgid "Opening the live view…"
 msgstr ""
 
@@ -24656,7 +24656,7 @@ msgstr "パスキーを使うと、デバイスの生体認証やセキュリテ
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:378
+#: src/features/vault/components/site-logins.tsx:496
 msgid "Password"
 msgstr "パスワード"
 
@@ -24703,7 +24703,7 @@ msgstr "パスワードリセットのメールを送信しました"
 msgid "Password reset successful"
 msgstr "パスワードをリセットしました"
 
-#: src/features/vault/components/site-logins.tsx:313
+#: src/features/vault/components/site-logins.tsx:438
 msgid "Password set"
 msgstr "パスワード設定済み"
 
@@ -28754,7 +28754,7 @@ msgstr "ケースを保存"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:439
+#: src/features/vault/components/site-logins.tsx:557
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "変更を保存"
@@ -28771,7 +28771,7 @@ msgstr "保存に失敗しました"
 msgid "Save Image"
 msgstr "画像を保存"
 
-#: src/features/vault/components/site-logins.tsx:439
+#: src/features/vault/components/site-logins.tsx:557
 msgid "Save login"
 msgstr "ログインを保存"
 
@@ -29570,7 +29570,7 @@ msgstr "セミリアルなビジュアルスタイル"
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
 #: src/features/feedback/components/send-feedback-dialog.tsx:389
-#: src/features/sub-agents/components/worker-composer.tsx:118
+#: src/features/sub-agents/components/worker-composer.tsx:121
 msgid "Send"
 msgstr "送信"
 
@@ -30489,15 +30489,15 @@ msgstr "シンハラ語"
 msgid "Sinhala (Sri Lanka)"
 msgstr "シンハラ語（スリランカ）"
 
-#: src/features/vault/components/site-logins.tsx:355
+#: src/features/vault/components/site-logins.tsx:473
 msgid "Site"
 msgstr "サイト"
 
-#: src/features/vault/components/site-logins.tsx:268
+#: src/features/vault/components/site-logins.tsx:393
 msgid "Site logins"
 msgstr "サイトのログイン"
 
-#: src/features/vault/components/site-logins.tsx:291
+#: src/features/vault/components/site-logins.tsx:416
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "なりすまし中はサイトのログインを保存、変更、削除できません。"
 
@@ -33265,7 +33265,7 @@ msgstr "エージェントはまだセッションを開いています。しば
 msgid "The agent is still working on the last message."
 msgstr "エージェントはまだ最後のメッセージを処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:189
+#: src/features/chat/browser-live-view/browser-live-view.tsx:197
 msgid "The agent is using a browser"
 msgstr ""
 
@@ -33290,7 +33290,7 @@ msgid "The agent on your computer is reading the change…"
 msgstr "お使いのコンピュータ上のエージェントが変更を読み取っています…"
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:452
+#: src/features/vault/components/site-logins.tsx:570
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "エージェントのブラウザーはこのログインで {0} にサインインできなくなります。"
 
@@ -33704,7 +33704,7 @@ msgstr "リンクが間違っているか、所有者が会話を非公開にし
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "リンクが間違っているか、所有者がページの公開を停止したか削除した可能性があります。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
 msgid "The live view could not be opened."
 msgstr ""
 
@@ -33712,7 +33712,7 @@ msgstr ""
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:204
+#: src/features/chat/browser-live-view/browser-live-view.tsx:212
 msgid "The live view is not available right now."
 msgstr ""
 
@@ -34033,11 +34033,11 @@ msgstr "ハンズフリーモードが返信を読み上げる音声です。独
 msgid "The whole answer, exactly"
 msgstr "回答全体が完全に一致"
 
-#: src/features/sub-agents/components/worker-composer.tsx:53
+#: src/features/sub-agents/components/worker-composer.tsx:54
 msgid "The worker is busy. Your message runs after the earlier ones."
 msgstr "ワーカーはビジー状態です。メッセージは先のメッセージの後に実行されます。"
 
-#: src/features/sub-agents/components/worker-composer.tsx:53
+#: src/features/sub-agents/components/worker-composer.tsx:54
 msgid "The worker is working on an earlier message."
 msgstr "ワーカーは先のメッセージを処理中です。"
 
@@ -34539,6 +34539,14 @@ msgstr "このリンクは不完全です。完全なリンクを依頼してく
 msgid "This link is not taking messages right now. Try again later."
 msgstr "このリンクは現在メッセージを受け付けていません。後でもう一度お試しください。"
 
+#: src/features/vault/components/site-logins.tsx:302
+msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
+msgstr "このログインは別の場所で変更されたため、再読み込みしました。ユーザー名とラベルの編集はそのまま残っています。ボットを確認し、パスワードを変更していた場合はもう一度入力してから、再度保存してください。"
+
+#: src/features/vault/components/site-logins.tsx:312
+msgid "This login was changed elsewhere. Reload the page to see it before saving again."
+msgstr "このログインは別の場所で変更されました。再度保存する前に、ページを再読み込みして確認してください。"
+
 #: src/features/projects/components/add-project-dialog.tsx:436
 msgid "This machine is not ready yet."
 msgstr "このコンピューターはまだ準備ができていません。"
@@ -34846,7 +34854,7 @@ msgstr "これら {0} 件のファイルとインデックス済みの内容が�
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "このブックには {sheetCount} 枚のシートがあります。インポートされたのは最初のシートのみです。"
 
-#: src/features/sub-agents/components/worker-composer.tsx:51
+#: src/features/sub-agents/components/worker-composer.tsx:52
 msgid "This worker is archived. Restore it to message it again."
 msgstr "このワーカーはアーカイブされています。再びメッセージを送るには、復元してください。"
 
@@ -35236,7 +35244,7 @@ msgstr "試行回数が多すぎます。数秒待ってから、もう一度お
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
 msgid "Too many live views were opened. Try again later."
 msgstr ""
 
@@ -35630,8 +35638,8 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:214
-#: src/features/chat/browser-live-view/browser-live-view.tsx:265
+#: src/features/chat/browser-live-view/browser-live-view.tsx:222
+#: src/features/chat/browser-live-view/browser-live-view.tsx:289
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -35641,8 +35649,8 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:285
-#: src/features/vault/components/site-logins.tsx:408
+#: src/features/vault/components/site-logins.tsx:410
+#: src/features/vault/components/site-logins.tsx:526
 msgid "Try again"
 msgstr "再試行"
 
@@ -36821,7 +36829,7 @@ msgstr "ユーザー名"
 msgid "Username is required"
 msgstr "ユーザー名は必須です"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:485
 msgid "Username or email"
 msgstr "ユーザー名またはメール"
 
@@ -37708,7 +37716,7 @@ msgstr "ここから続けますか？"
 msgid "Watch"
 msgstr "監視"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:192
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
 msgid "Watch live"
 msgstr ""
 
@@ -38104,7 +38112,7 @@ msgstr "思考が<0/><1>行動に変わる場所。</1>"
 msgid "Where you stay in control"
 msgstr "コントロールを保てる場面"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:253
+#: src/features/chat/browser-live-view/browser-live-view.tsx:276
 msgid "Whether the agent is using a browser could not be checked."
 msgstr ""
 
@@ -38751,7 +38759,7 @@ msgstr "AI があなたをより理解できるよう、経歴、好み、所在
 msgid "Your bots"
 msgstr "自分のボット"
 
-#: src/features/vault/components/site-logins.tsx:397
+#: src/features/vault/components/site-logins.tsx:515
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "ボットを読み込めませんでした。保存済みログインのボットを維持するため、変更は読み込み後に保存できます。"
 
@@ -38768,11 +38776,11 @@ msgid "Your browser talks to the server on this computer directly — the prompt
 msgstr "ブラウザーがこのコンピューター上のサーバーと直接通信します。プロンプトと返信が当社の AI サーバーを経由することはなく、課金もされません。"
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:302
+#: src/features/vault/components/site-logins.tsx:427
 msgid "Your chats and {0}"
 msgstr "自分のチャットと {0}"
 
-#: src/features/vault/components/site-logins.tsx:304
+#: src/features/vault/components/site-logins.tsx:429
 msgid "Your chats and the bots you chose"
 msgstr "自分のチャットと選択したボット"
 
@@ -38934,11 +38942,11 @@ msgstr "概要を読み込めませんでした。"
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "ご自身の Anthropic キー。Claude Code に作業を任せるために必要です。"
 
-#: src/features/vault/components/site-logins.tsx:416
+#: src/features/vault/components/site-logins.tsx:534
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "自分のチャットは常に使用できます。ボットのチャットは、ここでそのボットにチェックを入れた場合のみ使用できます。共有、公開、グループ、メッセンジャーのチャットでは使用できません。"
 
-#: src/features/vault/components/site-logins.tsx:299
+#: src/features/vault/components/site-logins.tsx:424
 msgid "Your own chats only"
 msgstr "自分のチャットのみ"
 
@@ -38992,7 +39000,7 @@ msgstr "レビューは保持されています。"
 msgid "Your review was requested"
 msgstr "あなたのレビューがリクエストされました"
 
-#: src/features/vault/components/site-logins.tsx:276
+#: src/features/vault/components/site-logins.tsx:401
 msgid "Your saved logins could not be loaded."
 msgstr "保存済みのログインを読み込めませんでした。"
 

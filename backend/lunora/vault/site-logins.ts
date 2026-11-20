@@ -17,6 +17,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { currentShard, ROOT_SHARD_KEY, servesUser } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
+import { SITE_LOGIN_CHANGED } from "./lib/site-login-shape";
 import { normalizeSiteOrigin, SITE_ORIGIN_MAX } from "./lib/site-origin";
 import { type SiteLoginTurn, siteLoginTurnVerdict } from "./site-login-turn";
 
@@ -96,6 +97,36 @@ const assertOwnTeammates = async (ctx: Pick<MutationCtx, "db">, userId: string, 
     return kept;
 };
 
+/**
+ * The caller's login `loginId`, for a change opened from its version `expectedUpdatedAt` on `origin`. Refused when it is
+ * not theirs, when it changed since (`CONFLICT`, `SITE_LOGIN_CHANGED`: an edit opened before a bot was removed elsewhere
+ * would write it back), or when the change names another site.
+ */
+const loginToChange = async (
+    ctx: Pick<MutationCtx, "db">,
+    args: { expectedUpdatedAt: number | undefined; loginId: Id<"savedSiteLogins">; origin: string; userId: string },
+): Promise<Doc<"savedSiteLogins">> => {
+    if (args.expectedUpdatedAt === undefined) {
+        throw new LunoraError("BAD_REQUEST", "A change to a saved login must say which version it changes");
+    }
+
+    const row = await ctx.db.get("savedSiteLogins", args.loginId);
+
+    if (!row || row.userId !== args.userId) {
+        throw new LunoraError("NOT_FOUND", "Login not found");
+    }
+
+    if (row.updatedAt !== args.expectedUpdatedAt) {
+        throw new LunoraError("CONFLICT", "This login was changed elsewhere", { data: { code: SITE_LOGIN_CHANGED } });
+    }
+
+    if (row.origin !== args.origin) {
+        throw new LunoraError("BAD_REQUEST", "The site of a saved login cannot change; save a new login for the other site");
+    }
+
+    return row;
+};
+
 const trimmedLabel = (label: string | undefined): string | undefined => {
     const value = label?.trim();
 
@@ -138,11 +169,15 @@ export const listSiteLogins = authQuery.output(v.object({ logins: v.array(vSiteL
 /**
  * Saves a new login, or changes one of the caller's (`loginId`). A new one needs a password; a change without one keeps the
  * saved password. The site of a saved login does not change: a password typed for one site never moves to another. One
- * login per site.
+ * login per site. A change carries the `updatedAt` of the login as it was read (`expectedUpdatedAt`) and is refused with
+ * `CONFLICT` (`SITE_LOGIN_CHANGED`) when the login moved since: an edit opened before a bot was removed elsewhere would
+ * otherwise write that bot back.
  */
 export const saveSiteLogin = authMutation
     .use(rateLimit("vault/site-logins"))
     .input({
+        // Required with `loginId`: the `updatedAt` of the login the edit was opened from.
+        expectedUpdatedAt: v.optional(v.number()),
         label: v.optional(v.string().max(LABEL_MAX)),
         loginId: v.optional(v.id("savedSiteLogins")),
         // Sensitive: the runtime keeps it out of request logs and validation errors.
@@ -153,7 +188,8 @@ export const saveSiteLogin = authMutation
         teammateIds: v.array(v.id("bots")).max(MAX_SITE_LOGIN_TEAMMATES * 2),
         username: v.string().max(USERNAME_MAX),
     })
-    .output(v.id("savedSiteLogins"))
+    // The version saved, so the form can keep editing the login without refusing its own next save.
+    .output(v.object({ id: v.id("savedSiteLogins"), updatedAt: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
@@ -181,21 +217,15 @@ export const saveSiteLogin = authMutation
         const fields = { label: trimmedLabel(args.label), teammateIds, updatedAt: ctx.now, username };
 
         if (args.loginId !== undefined) {
-            const row = await ctx.db.get("savedSiteLogins", args.loginId);
+            const row = await loginToChange(ctx, { expectedUpdatedAt: args.expectedUpdatedAt, loginId: args.loginId, origin, userId });
+            // A cleared label removes the column (`patchRow`); an absent password keeps the saved one. The version is always
+            // later than the one read, so two saves in one millisecond still tell apart.
+            const updatedAt = Math.max(ctx.now, row.updatedAt + 1);
 
-            if (!row || row.userId !== userId) {
-                throw new LunoraError("NOT_FOUND", "Login not found");
-            }
-
-            if (row.origin !== origin) {
-                throw new LunoraError("BAD_REQUEST", "The site of a saved login cannot change; save a new login for the other site");
-            }
-
-            // A cleared label removes the column (`patchRow`); an absent password keeps the saved one.
-            await patchRow(ctx.db, "savedSiteLogins", row, { ...fields, ...withoutUndefined({ encryptedPassword }) });
+            await patchRow(ctx.db, "savedSiteLogins", row, { ...fields, updatedAt, ...withoutUndefined({ encryptedPassword }) });
             ctx.log.event("vault.site_login_saved", { created: false, passwordChanged: encryptedPassword !== undefined });
 
-            return row._id;
+            return { id: row._id, updatedAt };
         }
 
         if (encryptedPassword === undefined) {
@@ -221,7 +251,7 @@ export const saveSiteLogin = authMutation
 
         ctx.log.event("vault.site_login_saved", { created: true, passwordChanged: true });
 
-        return id;
+        return { id, updatedAt: fields.updatedAt };
     });
 
 export const deleteSiteLogin = authMutation

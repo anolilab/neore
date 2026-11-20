@@ -24,7 +24,7 @@ const harness = vi.hoisted(() => {
         deleteSiteLogin: vi.fn(),
         // Set while an admin acts as the signed-in user: the session's `impersonatedBy` mark.
         impersonatedBy: undefined as string | undefined,
-        logins: [] as { hasPassword: true; id: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
+        logins: [] as { hasPassword: true; id: string; label?: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
         loginsFailed: false,
         loginsPending: false,
         saveSiteLogin: vi.fn(),
@@ -129,6 +129,9 @@ const { default: SiteLogins } = await import("./site-logins");
 // Built at run time, so no secret-shaped literal sits in the source.
 const PASSWORD = ["pw", crypto.randomUUID()].join("-");
 
+// What a save returns: the login and the version it wrote.
+const SAVED = { id: "login-1", updatedAt: 2 };
+
 const savedLogin = (teammateIds: string[] = []) => {
     return { hasPassword: true as const, id: "login-1", site: SITE, teammateIds, updatedAt: 1, username: "ada@example.com" };
 };
@@ -199,7 +202,7 @@ describe("SiteLogins", () => {
     it("keeps no typed password in the mutation cache once a save settles", async () => {
         const user = userEvent.setup();
 
-        harness.saveSiteLogin.mockResolvedValueOnce("login-1");
+        harness.saveSiteLogin.mockResolvedValueOnce(SAVED);
         const view = mount();
         const cachedPasswords = () =>
             view.queryClient
@@ -219,9 +222,9 @@ describe("SiteLogins", () => {
 
     it("does not report a save that ends after the account switched", async () => {
         const user = userEvent.setup();
-        let finishSave: (value: string) => void = () => {};
+        let finishSave: (value: typeof SAVED) => void = () => {};
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
-        const heldSave = new Promise<string>((resolve) => {
+        const heldSave = new Promise<typeof SAVED>((resolve) => {
             finishSave = resolve;
         });
 
@@ -241,7 +244,7 @@ describe("SiteLogins", () => {
         const invalidate = vi.spyOn(view.queryClient, "invalidateQueries");
         const loginRefetches = () => invalidate.mock.results.filter((_, index) => invalidate.mock.calls[index]?.[0]?.queryKey?.[0] === "site-logins");
 
-        finishSave("login-1");
+        finishSave(SAVED);
         await waitFor(() => expect(loginRefetches()).toHaveLength(1));
         await Promise.all(loginRefetches().map(async (result) => await result.value));
 
@@ -251,14 +254,14 @@ describe("SiteLogins", () => {
 
     it("keeps edits made while a save was in flight", async () => {
         const user = userEvent.setup();
-        let finishSave: (value: string) => void = () => {};
+        let finishSave: (value: typeof SAVED) => void = () => {};
         // The configured Node range predates `Promise.withResolvers`.
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
-        const heldSave = new Promise<string>((resolve) => {
+        const heldSave = new Promise<typeof SAVED>((resolve) => {
             finishSave = resolve;
         });
 
-        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue("login-1");
+        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue(SAVED);
         mount();
 
         await user.type(screen.getByLabelText("Site"), SITE);
@@ -270,7 +273,7 @@ describe("SiteLogins", () => {
         await user.type(screen.getByLabelText("Label (optional)"), "Work");
         // Still the same origin to the server, so still the login being saved.
         await user.type(screen.getByLabelText("Site"), "/");
-        finishSave("login-1");
+        finishSave(SAVED);
 
         await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
         expect(valueOf("Label (optional)")).toBe("Work");
@@ -286,13 +289,13 @@ describe("SiteLogins", () => {
 
     it("keeps a password typed while a save was in flight, and only that one", async () => {
         const user = userEvent.setup();
-        let finishSave: (value: string) => void = () => {};
+        let finishSave: (value: typeof SAVED) => void = () => {};
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
-        const heldSave = new Promise<string>((resolve) => {
+        const heldSave = new Promise<typeof SAVED>((resolve) => {
             finishSave = resolve;
         });
 
-        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue("login-1");
+        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue(SAVED);
         mount();
 
         await user.type(screen.getByLabelText("Site"), SITE);
@@ -302,7 +305,7 @@ describe("SiteLogins", () => {
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
 
         await user.type(passwordField(), "!");
-        finishSave("login-1");
+        finishSave(SAVED);
 
         await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
         expect(passwordField().value).toBe(`${PASSWORD}!`);
@@ -402,7 +405,7 @@ describe("SiteLogins", () => {
         harness.bots = botsOf("user-a", 1);
         // A bot made in another session: the login already names it, the cached list does not have it yet.
         harness.logins = [savedLogin(["bot-0", "bot-new"])];
-        harness.saveSiteLogin.mockResolvedValue("login-1");
+        harness.saveSiteLogin.mockResolvedValue(SAVED);
         mount();
 
         await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
@@ -458,7 +461,7 @@ describe("SiteLogins", () => {
         harness.userId = "user-b";
         harness.botsState = "pending";
         harness.logins = [savedLogin(["bot-0"])];
-        harness.saveSiteLogin.mockResolvedValue("login-1");
+        harness.saveSiteLogin.mockResolvedValue(SAVED);
         view.rerender();
 
         await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
@@ -522,7 +525,7 @@ describe("SiteLogins", () => {
 
         harness.botsState = "failed";
         harness.logins = [savedLogin(["bot-0"])];
-        harness.saveSiteLogin.mockResolvedValue("login-1");
+        harness.saveSiteLogin.mockResolvedValue(SAVED);
         mount();
 
         await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
@@ -550,7 +553,7 @@ describe("SiteLogins", () => {
 
         harness.bots = botsOf("user-a", 1);
         harness.logins = [savedLogin(["bot-0"])];
-        harness.saveSiteLogin.mockResolvedValue("login-1");
+        harness.saveSiteLogin.mockResolvedValue(SAVED);
         const view = mount();
 
         await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
@@ -565,5 +568,141 @@ describe("SiteLogins", () => {
 
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
         expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0"] });
+    });
+
+    describe("a login changed elsewhere", () => {
+        const changedElsewhere = () => Object.assign(new Error("This login was changed elsewhere"), { code: "CONFLICT", data: { code: "SITE_LOGIN_CHANGED" } });
+
+        it("sends the version the edit was opened from, then the one its own save wrote", async () => {
+            const user = userEvent.setup();
+
+            harness.bots = botsOf("user-a", 1);
+            harness.logins = [savedLogin(["bot-0"])];
+            harness.saveSiteLogin.mockResolvedValue(SAVED);
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await screen.findByText("Bot 0");
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+            expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ expectedUpdatedAt: 1, loginId: "login-1" });
+        });
+
+        it("reloads the login: a bot removed elsewhere stays removed, typed edits stay, the password goes", async () => {
+            const user = userEvent.setup();
+
+            harness.bots = botsOf("user-a", 3);
+            harness.logins = [savedLogin(["bot-0", "bot-1"])];
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await screen.findByText("Bot 2");
+            await user.type(screen.getByLabelText("Label (optional)"), "Work");
+            await user.type(passwordField(), PASSWORD);
+            // Ticked here, but never saved: the reload drops it rather than widen the reloaded login.
+            await user.click(screen.getByRole("checkbox", { name: "Bot 2" }));
+
+            // Meanwhile another tab removed Bot 1 and changed the username.
+            harness.logins = [{ ...savedLogin(["bot-0"]), updatedAt: 5, username: "grace@example.com" }];
+            harness.saveSiteLogin.mockRejectedValueOnce(changedElsewhere()).mockResolvedValue({ id: "login-1", updatedAt: 6 });
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("changed elsewhere and has been reloaded")));
+            expect(valueOf("Username or email")).toBe("grace@example.com");
+            expect(valueOf("Label (optional)")).toBe("Work");
+            expect(passwordField().value).toBe("");
+            expect(screen.getByRole("checkbox", { name: "Bot 0" }).getAttribute("aria-checked")).toBe("true");
+            expect(screen.getByRole("checkbox", { name: "Bot 1" }).getAttribute("aria-checked")).toBe("false");
+            expect(screen.getByRole("checkbox", { name: "Bot 2" }).getAttribute("aria-checked")).toBe("false");
+
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+            expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({
+                expectedUpdatedAt: 5,
+                label: "Work",
+                loginId: "login-1",
+                password: undefined,
+                teammateIds: ["bot-0"],
+                username: "grace@example.com",
+            });
+        });
+
+        it("keeps a bot unticked here unticked after the reload", async () => {
+            const user = userEvent.setup();
+
+            harness.bots = botsOf("user-a", 2);
+            harness.logins = [savedLogin(["bot-0", "bot-1"])];
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await screen.findByText("Bot 1");
+            await user.click(screen.getByRole("checkbox", { name: "Bot 0" }));
+
+            harness.logins = [{ ...savedLogin(["bot-0", "bot-1"]), label: "Home", updatedAt: 5 }];
+            harness.saveSiteLogin.mockRejectedValueOnce(changedElsewhere());
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(toast.error).toHaveBeenCalledOnce());
+            expect(valueOf("Label (optional)")).toBe("Home");
+            expect(screen.getByRole("checkbox", { name: "Bot 0" }).getAttribute("aria-checked")).toBe("false");
+            expect(screen.getByRole("checkbox", { name: "Bot 1" }).getAttribute("aria-checked")).toBe("true");
+        });
+
+        it("empties the form when the login was deleted elsewhere", async () => {
+            const user = userEvent.setup();
+
+            harness.logins = [savedLogin()];
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.type(passwordField(), PASSWORD);
+
+            harness.logins = [];
+            harness.saveSiteLogin.mockRejectedValueOnce(changedElsewhere());
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            expect(await screen.findByRole("heading", { name: "New login" })).toBeDefined();
+            expect(passwordField().value).toBe("");
+            expect(valueOf("Site")).toBe("");
+        });
+
+        it("keeps the edit without its password when the login cannot be read again", async () => {
+            const user = userEvent.setup();
+
+            harness.logins = [savedLogin()];
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.type(screen.getByLabelText("Label (optional)"), "Work");
+            await user.type(passwordField(), PASSWORD);
+
+            harness.loginsFailed = true;
+            harness.saveSiteLogin.mockRejectedValueOnce(changedElsewhere());
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Reload the page")));
+            expect(valueOf("Label (optional)")).toBe("Work");
+            expect(passwordField().value).toBe("");
+        });
+
+        it("opens an edit right after its own save from the version that save wrote, while the list still shows the older one", async () => {
+            const user = userEvent.setup();
+
+            harness.logins = [savedLogin()];
+            harness.saveSiteLogin.mockResolvedValue({ id: "login-1", updatedAt: 7 });
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login updated"));
+
+            // The list has not caught up: it still holds version 1.
+            await user.click(screen.getByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+            expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ expectedUpdatedAt: 7 });
+        });
     });
 });

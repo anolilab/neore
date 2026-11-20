@@ -31,6 +31,10 @@
   shared thread's shard). Dev `SHARD_ROUTING=off` puts everyone on root, so root is allowed there. A save keeps only
   the caller's own existing teammate ids (a deleted one is dropped) and checks the 20-bot limit on what it keeps, so the
   web form always sends a login's ids unfiltered: its cached bot list cannot tell a deleted bot from a new one.
+- An edit carries the `updatedAt` it was opened from (`expectedUpdatedAt`, required with `loginId`); a moved row refuses
+  with `CONFLICT` + `SITE_LOGIN_CHANGED` (`lib/site-login-shape.ts`), and every edit moves `updatedAt` forward. On it the
+  form reloads the login and keeps typed username/label, the saved bots minus ones unticked here (never one ticked here),
+  and no password: a stale edit must never write a removed bot back.
 - An admin acting as the owner saves, changes and deletes no login (`refuseImpersonation`, `FORBIDDEN` "… while
   impersonating"): the agent types a login in the owner's own turns, so a planted one would outlive the impersonation.
   The list stays readable (no secret in it, as the API key list); the web form hides save, edit and delete until the
