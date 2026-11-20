@@ -19,6 +19,8 @@ const { backend } = vi.hoisted(() => {
     return {
         backend: {
             browser: null as { browserId: string; currentUrl?: string; idleUntil: number } | null,
+            /** When set, the status read fails with it. */
+            statusError: undefined as Error | undefined,
             open: vi.fn(),
         },
     };
@@ -33,7 +35,16 @@ vi.mock("@/lib/lunora/crpc", () => {
                     live_view: {
                         getThreadBrowser: {
                             queryOptions: (args: unknown) => {
-                                return { queryFn: async () => backend.browser, queryKey: ["browser", args] };
+                                return {
+                                    queryFn: async () => {
+                                        if (backend.statusError !== undefined) {
+                                            throw backend.statusError;
+                                        }
+
+                                        return backend.browser;
+                                    },
+                                    queryKey: ["browser", args],
+                                };
                             },
                         },
                     },
@@ -71,6 +82,7 @@ afterEach(() => {
     vi.useRealTimers();
     setVisibility("visible");
     backend.browser = null;
+    backend.statusError = undefined;
     backend.open.mockReset();
 });
 
@@ -192,7 +204,7 @@ describe("BrowserLiveView", () => {
 
     it.each([
         [{ code: "TOO_MANY_REQUESTS" }, "Too many live views were opened. Try again later."],
-        [new Error("network"), "The live view could not be opened. Try again."],
+        [new Error("network"), "The live view could not be opened."],
     ])("shows a failed request as an error, not as an unavailable view (%o)", async (error, message) => {
         backend.browser = { browserId: "b-1", idleUntil: Date.now() + 60_000 };
         backend.open.mockRejectedValue(error);
@@ -284,5 +296,63 @@ describe("BrowserLiveView", () => {
             expect(frameSource()).toBe(OTHER_URL);
         });
         expect(backend.open).toHaveBeenCalledTimes(2);
+    });
+
+    it("says the browser status could not be read, instead of hiding the card, and reads it again on request", async () => {
+        backend.statusError = new Error("network");
+        backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
+        mountCard();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
+        expect(screen.getByRole("region", { name: "Browser" })).toBeTruthy();
+
+        backend.statusError = undefined;
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("renews a frame that loaded only after its deadline, and offers a retry once the renewal does not connect either", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        backend.open
+            .mockResolvedValueOnce({ connectBy: Date.now() + 60_000, status: "ok", url: URL })
+            .mockResolvedValueOnce({ connectBy: Date.now() + 60_000, status: "ok", url: OTHER_URL })
+            .mockResolvedValueOnce({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+        mountCard();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
+        const frame = await screen.findByTitle(LIVE_VIEW);
+
+        // Backgrounded: the frame's load is held back past the deadline, so what loaded is the provider's refusal.
+        setVisibility("hidden");
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(61_000);
+        });
+        fireEvent.load(frame);
+        expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+        expect(backend.open).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            setVisibility("visible");
+        });
+        expect(backend.open).toHaveBeenCalledTimes(2);
+        expect(frameSource()).toBe(OTHER_URL);
+
+        // The renewal does not connect either: no third request on its own, an error with a retry instead.
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(61_000);
+        });
+        expect(backend.open).toHaveBeenCalledTimes(2);
+        expect(screen.getByRole("alert").textContent).toBe("The live view could not be opened.");
+
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+        await vi.waitFor(() => {
+            expect(frameSource()).toBe(URL);
+        });
+        expect(backend.open).toHaveBeenCalledTimes(3);
     });
 });

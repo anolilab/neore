@@ -5302,7 +5302,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:101
+#: src/features/chat/browser-live-view/browser-live-view.tsx:188
+#: src/features/chat/browser-live-view/browser-live-view.tsx:251
 msgid "Browser"
 msgstr "浏览器"
 
@@ -16323,7 +16324,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:105
+#: src/features/chat/browser-live-view/browser-live-view.tsx:192
 msgid "Hide live view"
 msgstr ""
 
@@ -18968,7 +18969,7 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:134
+#: src/features/chat/browser-live-view/browser-live-view.tsx:228
 msgid "Live view of the agent's browser (read-only)"
 msgstr ""
 
@@ -23934,7 +23935,7 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:112
+#: src/features/chat/browser-live-view/browser-live-view.tsx:199
 msgid "Opening the live view…"
 msgstr ""
 
@@ -33178,7 +33179,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:102
+#: src/features/chat/browser-live-view/browser-live-view.tsx:189
 msgid "The agent is using a browser"
 msgstr ""
 
@@ -33612,11 +33613,15 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:124
-msgid "The live view could not be opened. Try again."
+#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+msgid "The live view could not be opened."
 msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:117
+#: src/features/chat/browser-live-view/browser-live-view.tsx:223
+#~ msgid "The live view could not be opened. Try again."
+#~ msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:204
 msgid "The live view is not available right now."
 msgstr ""
 
@@ -35140,7 +35145,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:123
+#: src/features/chat/browser-live-view/browser-live-view.tsx:210
 msgid "Too many live views were opened. Try again later."
 msgstr ""
 
@@ -35534,6 +35539,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:214
+#: src/features/chat/browser-live-view/browser-live-view.tsx:265
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -37604,7 +37611,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:105
+#: src/features/chat/browser-live-view/browser-live-view.tsx:192
 msgid "Watch live"
 msgstr ""
 
@@ -37999,6 +38006,10 @@ msgstr "让想法<0/><1>化为行动。</1>"
 #: src/features/marketing/use-cases/use-case-page.tsx:60
 msgid "Where you stay in control"
 msgstr "你始终掌控"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:253
+msgid "Whether the agent is using a browser could not be checked."
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"

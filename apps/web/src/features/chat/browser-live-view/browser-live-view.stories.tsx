@@ -105,3 +105,34 @@ export const NoBrowser: Story = {
         await expect(canvas.queryByRole("button", { name: "Watch live" })).toBeNull();
     },
 };
+
+/** The browser status could not be read: the card says so and can ask again, rather than looking like no browser. */
+export const StatusFailed: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...userFixtures(), lunoraError(api.browser.live_view.getThreadBrowser, "INTERNAL", "Status read failed", 500)),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("Whether the agent is using a browser could not be checked.");
+        await expect(canvas.getByRole("button", { name: "Try again" })).toBeVisible();
+    },
+};
+
+/** Opening the view failed (or its one renewal did not connect either): an error with a retry, never a dead view. */
+export const OpenFailed: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...userFixtures(), running, lunoraError(api.browser.live_view.openLiveView, "INTERNAL", "Provider failed", 500)),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await userEvent.click(await canvas.findByRole("button", { name: "Watch live" }));
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("The live view could not be opened.");
+        await expect(canvas.getByRole("button", { name: "Try again" })).toBeVisible();
+    },
+};

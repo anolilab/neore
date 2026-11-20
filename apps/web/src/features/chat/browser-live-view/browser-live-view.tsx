@@ -78,11 +78,22 @@ const answerFor =
     (current: View): View =>
         current.kind === "opening" && current.attempt === attempt ? next : current;
 
-/** The view of `attempt` connected: its deadline no longer matters. */
-const connectedFor =
-    (attempt: number) =>
-    (current: View): View =>
-        current.kind === "open" && current.attempt === attempt ? { ...current, connected: true } : current;
+/**
+ * The frame of `attempt` loaded. Before its connect deadline that is taken as the view connecting, and the deadline no
+ * longer matters. After it (a background tab holds the load back), the provider has refused the URL, and the frame is
+ * its error page. The cross-origin page cannot be read, and browsers fire `load`, not `error`, for a failed page, so the
+ * deadline is the only signal. Such a frame is no longer shown and takes the same single renewal as a URL that never
+ * loaded.
+ */
+const loadedFor =
+    (attempt: number, now: number) =>
+    (current: View): View => {
+        if (current.kind !== "open" || current.attempt !== attempt) {
+            return current;
+        }
+
+        return now < current.connectBy ? { ...current, connected: true } : { ...current, stale: true };
+    };
 
 /** The view (or the request) is for a browser the thread no longer runs. */
 const isForOtherBrowser = (view: View, browserId: string): boolean => (view.kind === "open" || view.kind === "opening") && view.browserId !== browserId;
@@ -194,18 +205,23 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
                     </p>
                 )}
                 {view.kind === "failed" && (
-                    <p className="text-destructive mt-2 text-xs" role="alert">
-                        {view.reason === "rate-limited"
-                            ? t`Too many live views were opened. Try again later.`
-                            : t`The live view could not be opened. Try again.`}
-                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                        <p className="text-destructive flex-1 text-xs" role="alert">
+                            {view.reason === "rate-limited" ? t`Too many live views were opened. Try again later.` : t`The live view could not be opened.`}
+                        </p>
+                        {view.reason === "other" && (
+                            <Button onClick={() => ask(false)} size="sm" type="button" variant="outline">
+                                {t`Try again`}
+                            </Button>
+                        )}
+                    </div>
                 )}
                 {framed !== undefined && (
                     // Read-only: the view refuses input, so the person watches without steering the agent's page.
                     <iframe
                         className="ph-no-capture mt-2 aspect-video w-full rounded-md border border-gray-200 bg-white dark:border-gray-700"
                         key={framed.attempt}
-                        onLoad={() => setView(connectedFor(framed.attempt))}
+                        onLoad={() => setView(loadedFor(framed.attempt, Date.now()))}
                         referrerPolicy="no-referrer"
                         sandbox="allow-scripts allow-same-origin"
                         src={framed.url}
@@ -218,9 +234,40 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
 };
 
 const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId }) => {
+    const { t } = useLingui();
     const crpc = useCRPC();
-    const { data: browser } = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
+    const headingId = useId();
+    const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
+    const browser = status.data;
     const idle = usePassed(browser?.idleUntil);
+
+    // The status could not be read: a running browser must not look like no browser, so the card says so and can ask again.
+    if (threadId !== undefined && browser === undefined && status.isError) {
+        return (
+            <section aria-labelledby={headingId} className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
+                <div className="flex items-center gap-2">
+                    <Globe aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300" id={headingId}>{t`Browser`}</h3>
+                        <p className="text-destructive text-xs" role="alert">
+                            {t`Whether the agent is using a browser could not be checked.`}
+                        </p>
+                    </div>
+                    <Button
+                        disabled={status.isFetching}
+                        onClick={() => {
+                            status.refetch().catch(() => undefined);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                    >
+                        {t`Try again`}
+                    </Button>
+                </div>
+            </section>
+        );
+    }
 
     if (threadId === undefined || browser === undefined || browser === null || idle) {
         return null;
