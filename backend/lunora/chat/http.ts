@@ -2308,9 +2308,11 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
     // Every reference must be the caller's own row, under its own URL, in a chat the caller may read here, checked on the caller's
     // shard (`chat/reference-gate.ts`). A reference without its id, or with a count that differs, is refused the same way.
     const references = streamingConfig.referenceImages ?? [];
+    const referenceIds = streamingConfig.referenceIds ?? [];
+    // Taken before the check: a lock applied after this instant refuses the job's own recheck.
+    const referenceCheckedAt = Date.now();
 
     if (references.length > 0) {
-        const referenceIds = streamingConfig.referenceIds ?? [];
         const rows =
             referenceIds.length === references.length
                 ? await context.forShard(authenticatedUserId).runQuery(internal.chat.reference_gate.gateReferenceRowsOnCallerShard, {
@@ -2384,6 +2386,9 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
                 prompt,
                 // A reply to this prompt: a regenerate lands beside the earlier reply.
                 promptMessageId: messageId as Id<"messages">,
+                // Checked again when the job runs (`chat/reference-recheck.ts`): the ids pair with the URLs by position.
+                referenceCheckedAt: references.length > 0 ? referenceCheckedAt : undefined,
+                referenceIds: references.length > 0 ? referenceIds : undefined,
                 referenceImages,
                 seed,
                 threadId,

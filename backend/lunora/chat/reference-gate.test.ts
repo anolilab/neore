@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { gateReferenceRowsOnCallerShard, threadReadableOnShard } from "./reference-gate";
+import { chatHeldOnShard, gateReferenceRowsOnCallerShard, threadReadableOnShard } from "./reference-gate";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "reference-owner";
@@ -216,5 +216,33 @@ describe("a media request's references: each chat on its owner's shard", () => {
         const proof = await proofFor(ownerLockedId, OWNER);
 
         await expect(refusedFor(OWNER, [{ id: `file:${lockedFileId}`, url: LOCKED_URL }], ownerLockedId, proof)).resolves.toBe(false);
+    });
+});
+
+describe("a queued media job rechecks each referenced chat on its owner's shard", () => {
+    const heldFor = async (threadId: string, userId: string, requestedAt: number): Promise<boolean> => {
+        const { held } = await run(async (ctx) => await ctx.runQuery(chatHeldOnShard as never, { requestedAt, threadId, userId }));
+
+        return held as boolean;
+    };
+
+    it("holds an unlocked chat the caller owns", async () => {
+        await expect(heldFor(ownerOpenId, OWNER, 1)).resolves.toBe(true);
+    });
+
+    it("holds a chat locked before the check, for its owner", async () => {
+        await expect(heldFor(ownerLockedId, OWNER, 3)).resolves.toBe(true);
+    });
+
+    it("does not hold a chat locked after the check", async () => {
+        await expect(heldFor(ownerLockedId, OWNER, 1)).resolves.toBe(false);
+    });
+
+    it("does not hold a locked chat for a collaborator", async () => {
+        await expect(heldFor(ownerLockedId, COLLAB, 3)).resolves.toBe(false);
+    });
+
+    it("does not hold an unlocked chat a collaborator has no grant to", async () => {
+        await expect(heldFor(ownerOpenId, COLLAB, 1)).resolves.toBe(false);
     });
 });

@@ -110,6 +110,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
 import { savePromptInTransaction } from "./lib/save-prompt";
+import { referencesStillHeld } from "./reference-recheck";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -5061,6 +5062,10 @@ export const generateImage = internalAction
         prompt: v.string(),
         /** The prompt this is a reply to. Set by `/chat/media`, so a regenerate becomes a sibling reply (`agent/branch-tree.ts`). */
         promptMessageId: v.optional(v.id("messages")),
+        /** When the request's references were checked (`/chat/media`): a lock or grant change after it refuses the job. */
+        referenceCheckedAt: v.optional(v.number()),
+        /** The picker's id for each reference image, paired by position (`chat/reference-recheck.ts`). */
+        referenceIds: v.optional(v.array(v.string())),
         referenceImages: v.optional(v.array(v.string())),
         seed: v.optional(v.number()),
         threadId: v.string(),
@@ -5090,6 +5095,8 @@ export const generateImage = internalAction
                 numImages: numberImages = 1,
                 prompt,
                 promptMessageId,
+                referenceCheckedAt,
+                referenceIds,
                 referenceImages,
                 seed,
                 threadId,
@@ -5151,6 +5158,19 @@ export const generateImage = internalAction
             });
 
             try {
+                // Checked again here, after the queue delivered the job: a lock or grant change since the request must not reach the
+                // provider. A job with references but no ids or check time is refused too (the route always sends both).
+                if (referenceImages !== undefined && referenceImages.length > 0) {
+                    const held =
+                        referenceIds !== undefined &&
+                        referenceCheckedAt !== undefined &&
+                        (await referencesStillHeld(context, { referenceIds, referenceImages, requestedAt: referenceCheckedAt, userId }));
+
+                    if (!held) {
+                        throw new LunoraError("NOT_FOUND", "File not found");
+                    }
+                }
+
                 let images: { mimeType?: string; uint8Array: Uint8Array }[] = [];
                 let warnings: any[] | undefined;
                 let providerMetadata: any;

@@ -13,8 +13,9 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
-import { threadGateOutcome } from "./lib/thread-gate";
+import { lockedAfterCreation, threadGateOutcome } from "./lib/thread-gate";
 
 const REFERENCE_ID = /^(file|doc):([\w-]+)$/u;
 
@@ -101,4 +102,33 @@ export const threadReadableOnShard = internalQuery
         });
 
         return { readable: outcome === "ok" };
+    });
+
+/**
+ * The job-time recheck of one referenced chat, on its owner's shard, for a reference checked at `requestedAt`. The job carries no
+ * unlock proof. A chat locked when the request was checked was read with that request's proof, so it is still held only while the
+ * caller owns it and the lock predates the check. A chat locked since the check is not held, and an unlocked one is held only
+ * while the caller may still read it.
+ */
+export const chatHeldOnShard = internalQuery
+    .input({
+        requestedAt: v.number(),
+        threadId: v.string().max(MAX_LENGTH.id),
+        userId: v.string(),
+    })
+    .output(v.object({ held: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+        if (!thread) {
+            return { held: false };
+        }
+
+        if (isThreadLocked(thread)) {
+            return { held: thread.userId === args.userId && !lockedAfterCreation(thread, args.requestedAt) };
+        }
+
+        const outcome = await threadGateOutcome(ctx, { level: "read", threadId: args.threadId as Id<"threads">, userId: args.userId });
+
+        return { held: outcome === "ok" };
     });
