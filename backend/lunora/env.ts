@@ -38,6 +38,10 @@ export const TRUSTED_EXTENSION_ORIGINS = read("TRUSTED_EXTENSION_ORIGINS");
 export const TRUSTED_EXTENSION_REDIRECT_URIS = read("TRUSTED_EXTENSION_REDIRECT_URIS");
 export const ENCRYPTION_KEY = read("ENCRYPTION_KEY");
 
+/** Watching the agent's cloud browser (`browser/live-view.ts`): the account and a token with Browser Rendering Write. Either empty = off. */
+export const CLOUDFLARE_ACCOUNT_ID = read("CLOUDFLARE_ACCOUNT_ID");
+export const BROWSER_LIVE_VIEW_API_TOKEN = read("BROWSER_LIVE_VIEW_API_TOKEN");
+
 export const GROQ_API_KEY = read("GROQ_API_KEY");
 export const FAL_API_KEY = read("FAL_API_KEY");
 export const OPENROUTER_API_KEY = read("OPENROUTER_API_KEY");

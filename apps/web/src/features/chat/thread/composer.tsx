@@ -33,6 +33,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
+import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import CompactionChip from "@/features/chat/compaction/compaction-chip";
 import { CinemaPanel } from "@/features/chat/components/cinema-studio";
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
@@ -688,6 +689,9 @@ const Composer: FC<ComposerProps> = ({
                 {!minimal && (
                     <div className="text-foreground absolute top-full w-full pt-2 text-center text-xs">{t`Neore can make mistakes. Check important information.`}</div>
                 )}
+
+                {/* The agent's cloud browser while one runs for this thread: watch it live, read-only */}
+                {!minimal && <BrowserLiveView threadId={validThreadId} />}
 
                 {/* Mode-specific content above composer with animations */}
                 <AnimatePresence initial={animateEntrance} mode="popLayout">
