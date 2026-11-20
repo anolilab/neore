@@ -186,6 +186,22 @@ describe("a project's rule files in a run", () => {
         expect(await contextFor(projectId, [large, sql])).toBe("Be brief.");
     });
 
+    it("reads attachment names on the primary, so a file uploaded just before the run still matches", async () => {
+        const projectId = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "p", userId: OWNER });
+        const sql = await chatFile("migrations/003_fresh.sql");
+
+        // A replica that has not seen the upload yet: only the primary has the row.
+        const result = await harness.run(async (ctx: any) => {
+            const findFirst = async (query: { consistency?: string }) => (query.consistency === "primary" ? await ctx.db.chatFiles.findFirst(query) : null);
+            const chatFiles = new Proxy(ctx.db.chatFiles, { get: (target, key) => (key === "findFirst" ? findFirst : target[key]) });
+            const db = new Proxy(ctx.db, { get: (target, key) => (key === "chatFiles" ? chatFiles : target[key]) });
+
+            return await (getProjectContextForRun as any).handler({ ...ctx, db }, { fileIds: [sql], projectId, userId: OWNER });
+        });
+
+        expect(result).toBe("Use snake_case columns.");
+    });
+
     it("gives a task's run its project's always files, read on the primary as a chat's are", async () => {
         const projectId = await project({
             createdAt: 0,

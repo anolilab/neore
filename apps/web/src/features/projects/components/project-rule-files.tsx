@@ -163,8 +163,14 @@ const RuleFileFields: FC<{
         <li aria-label={name} className="space-y-3 rounded-md border p-3">
             <div className="flex items-end gap-2">
                 <div className="flex-1 space-y-1">
-                    <Label htmlFor={`${id}-title`}>{t`Name`}</Label>
+                    <Label htmlFor={`${id}-title`}>
+                        {t`Name`}
+                        <span aria-hidden="true" className="text-destructive">
+                            *
+                        </span>
+                    </Label>
                     <Input
+                        aria-required="true"
                         autoComplete="off"
                         id={`${id}-title`}
                         onChange={(event) => onChange({ ...file, title: event.target.value })}
@@ -197,8 +203,14 @@ const RuleFileFields: FC<{
             </div>
             {file.mode === "glob" && (
                 <div className="space-y-1">
-                    <Label htmlFor={`${id}-patterns`}>{t`File patterns, one per line`}</Label>
+                    <Label htmlFor={`${id}-patterns`}>
+                        {t`File patterns, one per line`}
+                        <span aria-hidden="true" className="text-destructive">
+                            *
+                        </span>
+                    </Label>
                     <Textarea
+                        aria-required="true"
                         autoComplete="off"
                         className="min-h-14 font-mono text-xs"
                         id={`${id}-patterns`}
@@ -248,7 +260,8 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
         refetchOnWindowFocus: true,
         staleTime: 0,
     });
-    const saved = useMutation(crpc.projects.functions.setProjectRuleFiles.mutationOptions());
+    // Sent even offline: Lunora's client queues it, where a paused TanStack mutation would be lost with the tab.
+    const saved = useMutation({ ...crpc.projects.functions.setProjectRuleFiles.mutationOptions(), networkMode: "always" });
     const [draft, setDraft] = useState<RuleFileDraft[] | null>(null);
     // The revision of the list the draft started from: a save from it is refused once another save landed.
     const [baseRevision, setBaseRevision] = useState("");

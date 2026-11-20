@@ -1,7 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectRuleFiles from "./project-rule-files";
 
@@ -89,7 +89,32 @@ beforeEach(() => {
     };
 });
 
+afterEach(() => {
+    onlineManager.setOnline(true);
+});
+
 describe("project rule files", () => {
+    it("tells a screen reader a file's name and, for a pattern file, its patterns are required", async () => {
+        renderEditor();
+
+        const sql = within(await screen.findByRole("listitem", { name: "SQL" }));
+
+        expect(sql.getByRole("textbox", { name: "Name" }).getAttribute("aria-required")).toBe("true");
+        expect(sql.getByRole("textbox", { name: "File patterns, one per line" }).getAttribute("aria-required")).toBe("true");
+        expect(sql.getByRole("textbox", { name: "Instructions" }).hasAttribute("aria-required")).toBe(false);
+    });
+
+    it("hands a save made offline to the client at once, which queues it, instead of pausing it", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        onlineManager.setOnline(false);
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        await waitFor(() => expect(backend.save).toHaveBeenCalledOnce());
+    });
+
     it("reorders, deletes and adds a pattern file, then saves the whole list in its new order", async () => {
         const user = userEvent.setup();
 
@@ -101,9 +126,9 @@ describe("project rule files", () => {
 
         const added = screen.getByRole("listitem", { name: "Rule file 2" });
 
-        await user.type(within(added).getByLabelText("Name"), "Docs");
+        await user.type(within(added).getByRole("textbox", { name: "Name" }), "Docs");
         await user.click(within(added).getByRole("radio", { name: "When files match" }));
-        await user.type(within(added).getByLabelText("File patterns, one per line"), "docs/**{enter}*.md");
+        await user.type(within(added).getByRole("textbox", { name: "File patterns, one per line" }), "docs/**{enter}*.md");
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
         expect(backend.save).toHaveBeenCalledOnce();
@@ -123,7 +148,7 @@ describe("project rule files", () => {
         renderEditor();
 
         await user.click(await screen.findByRole("button", { name: "Add rule file" }));
-        await user.type(within(screen.getByRole("listitem", { name: "Rule file 3" })).getByLabelText("Name"), "Empty");
+        await user.type(within(screen.getByRole("listitem", { name: "Rule file 3" })).getByRole("textbox", { name: "Name" }), "Empty");
         await user.click(within(screen.getByRole("listitem", { name: "Empty" })).getByRole("radio", { name: "When files match" }));
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
@@ -141,7 +166,7 @@ describe("project rule files", () => {
         expect(document.activeElement).toBe(patterns);
         expect(
             within(screen.getByRole("listitem", { name: "SQL" }))
-                .getByLabelText("File patterns, one per line")
+                .getByRole("textbox", { name: "File patterns, one per line" })
                 .hasAttribute("aria-invalid"),
         ).toBe(false);
     });
@@ -263,7 +288,7 @@ describe("project rule files", () => {
         };
         renderEditor();
 
-        await user.type(within(await screen.findByRole("listitem", { name: "SQL" })).getByLabelText("Name"), "!");
+        await user.type(within(await screen.findByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Name" }), "!");
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
         expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ keepContext: true, ruleFiles: [{ id: "sql", title: "SQL!" }] });

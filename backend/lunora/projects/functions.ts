@@ -272,7 +272,8 @@ const attachmentNamesForRun = async (context: QueryCtx, fileIds: ReadonlyArray<I
             return { paths, skipped: unique.length - index };
         }
 
-        const row = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
+        // On the primary: a run sent right after its upload must see the file a replica may not have yet.
+        const row = await context.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } });
 
         if (row) {
             readBytes += projectRowsReadBytes([row]);
