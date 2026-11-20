@@ -2,6 +2,18 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import type { RuleFileRefusal } from "@neore/backend/rule-file-limits";
+import {
+    isRuleGlobValid,
+    MAX_RULE_FILE_LENGTH,
+    MAX_RULE_FILES,
+    MAX_RULE_FILES_BYTES,
+    MAX_RULE_GLOB_LENGTH,
+    MAX_RULE_GLOBS,
+    MAX_RULE_TITLE_LENGTH,
+    RULE_FILE_REFUSALS,
+    ruleFilesStoredBytes,
+} from "@neore/backend/rule-file-limits";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
@@ -17,9 +29,6 @@ import { useEffect, useId, useState } from "react";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-/** Rule files one project holds, and characters one file holds; mirror the backend's limits (`projects/rule-files.ts`). */
-const MAX_RULE_FILES = 20;
-const MAX_RULE_FILE_LENGTH = 100_000;
 /** The id and name the backend gives a project's older single context (`LEGACY_CONTEXT_RULE_ID`). */
 const LEGACY_CONTEXT_ID = "context";
 const LEGACY_CONTEXT_TITLE = "Project context";
@@ -31,16 +40,51 @@ const errorCode = (error: unknown): unknown => {
     return data?.code ?? code;
 };
 
+const REFUSAL_CODES = new Set<unknown>(Object.values(RULE_FILE_REFUSALS));
+
+/**
+ * A save the backend refused at a rule-file limit: its code and the file of `files` it names, if it names one. A file it
+ * names that the editor no longer holds gives nothing, and the refusal reads as any other.
+ */
+const limitRefusal = (error: unknown, files: RuleFileDraft[]): { code: RuleFileRefusal; file?: RuleFileDraft } | undefined => {
+    const code = errorCode(error);
+
+    if (!REFUSAL_CODES.has(code)) {
+        return undefined;
+    }
+
+    const fileId = (error as { data?: { fileId?: unknown } }).data?.fileId;
+
+    if (typeof fileId !== "string") {
+        return { code: code as RuleFileRefusal };
+    }
+
+    const file = files.find((current) => current.id === fileId);
+
+    return file && { code: code as RuleFileRefusal, file };
+};
+
 type RuleFileMode = "always" | "glob";
 
 /** A file's field a save was refused for: marked invalid, described by the error and focused. */
 type RuleFileField = "content" | "patterns" | "title";
 
+/** What a save is refused for: a file's field, or (no field) the list as a whole, which only the error names. */
 interface RuleFileProblem {
-    field: RuleFileField;
-    fileId: string;
+    field?: RuleFileField;
+    fileId?: string;
     message: string;
 }
+
+/** The field each refusal names. */
+const REFUSAL_FIELDS: Partial<Record<RuleFileRefusal, RuleFileField>> = {
+    [RULE_FILE_REFUSALS.CONTENT_TOO_LONG]: "content",
+    [RULE_FILE_REFUSALS.PATTERN_INVALID]: "patterns",
+    [RULE_FILE_REFUSALS.PATTERNS_MISSING]: "patterns",
+    [RULE_FILE_REFUSALS.PATTERNS_TOO_MANY]: "patterns",
+    [RULE_FILE_REFUSALS.TITLE_MISSING]: "title",
+    [RULE_FILE_REFUSALS.TITLE_TOO_LONG]: "title",
+};
 
 /** A rule file as the editor holds it: its patterns as typed, one per line. */
 interface RuleFileDraft {
@@ -268,7 +312,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     const [error, setError] = useState<string | undefined>(undefined);
     const [status, setStatus] = useState("");
     // The field the last refused save named, and how many times one was refused, so each refusal moves focus there again.
-    const [invalid, setInvalid] = useState<Pick<RuleFileProblem, "field" | "fileId"> | undefined>(undefined);
+    const [invalid, setInvalid] = useState<{ field: RuleFileField; fileId: string } | undefined>(undefined);
     const [focusRequest, setFocusRequest] = useState(0);
     const legacyTitle = t`Project context`;
     const savedFiles = (data?.files ?? []).map((file) =>
@@ -305,46 +349,134 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
         setStatus("");
     };
 
-    /** The first file and field a save would be refused for, in the order the list shows them. */
-    const problem = (): RuleFileProblem | undefined => {
-        const unnamed = files.find((file) => !file.title.trim());
+    /** How a refusal reads, for `file` when it names one; the editor's own check and the backend's word it alike. */
+    const refusalText = (code: RuleFileRefusal, file: RuleFileDraft | undefined): string => {
+        const name = file?.title.trim() ?? "";
+        const numberOf = (value: number) => formatNumber(value, i18n.locale);
+        const texts: Record<RuleFileRefusal, () => string> = {
+            [RULE_FILE_REFUSALS.CONTENT_TOO_LONG]: () => {
+                const limit = numberOf(MAX_RULE_FILE_LENGTH);
 
-        if (unnamed) {
-            return { field: "title", fileId: unnamed.id, message: t`Give every rule file a name.` };
+                return t`"${name}" is longer than ${limit} characters. Shorten it or split it into several files.`;
+            },
+            [RULE_FILE_REFUSALS.PATTERN_INVALID]: () => {
+                const limit = numberOf(MAX_RULE_GLOB_LENGTH);
+
+                return t`Each file pattern in "${name}" must be at most ${limit} characters on one line.`;
+            },
+            [RULE_FILE_REFUSALS.PATTERNS_MISSING]: () => t`A file applied when files match needs at least one pattern.`,
+            [RULE_FILE_REFUSALS.PATTERNS_TOO_MANY]: () => {
+                const limit = numberOf(MAX_RULE_GLOBS);
+
+                return t`"${name}" has more than ${limit} file patterns. Remove some, or move them into another file.`;
+            },
+            [RULE_FILE_REFUSALS.TITLE_MISSING]: () => t`Give every rule file a name.`,
+            [RULE_FILE_REFUSALS.TITLE_TOO_LONG]: () => {
+                const limit = numberOf(MAX_RULE_TITLE_LENGTH);
+
+                return t`A rule file's name may be at most ${limit} characters.`;
+            },
+            [RULE_FILE_REFUSALS.TOO_LARGE]: () => {
+                const limit = numberOf(MAX_RULE_FILES_BYTES / 1_000_000);
+
+                return t`Together these rule files are larger than ${limit} MB. Shorten or remove some of them.`;
+            },
+            [RULE_FILE_REFUSALS.TOO_MANY]: () => {
+                const limit = numberOf(MAX_RULE_FILES);
+
+                return t`A project holds at most ${limit} rule files. Remove one first.`;
+            },
+        };
+
+        return texts[code]();
+    };
+
+    /** The problem a refusal names, its field on the file it names, or the list as a whole. */
+    const problemOf = (code: RuleFileRefusal, file: RuleFileDraft | undefined): RuleFileProblem => {
+        const field = file && REFUSAL_FIELDS[code];
+
+        return { ...(file && field && { field, fileId: file.id }), message: refusalText(code, file) };
+    };
+
+    /** What a save would refuse `file` for first, field by field as the editor shows them. */
+    const fileRefusal = (file: RuleFileDraft): RuleFileRefusal | undefined => {
+        const title = file.title.trim();
+
+        if (!title) {
+            return RULE_FILE_REFUSALS.TITLE_MISSING;
         }
 
-        const unmatched = files.find((file) => file.mode === "glob" && patternsOf(file.patterns).length === 0);
-
-        if (unmatched) {
-            return { field: "patterns", fileId: unmatched.id, message: t`A file applied when files match needs at least one pattern.` };
+        if (title.length > MAX_RULE_TITLE_LENGTH) {
+            return RULE_FILE_REFUSALS.TITLE_TOO_LONG;
         }
 
-        const long = files.find((file) => file.id !== keptLegacyId && file.content.length > MAX_RULE_FILE_LENGTH);
+        // In the backend's order, so a file past two limits is refused for the same one either way.
+        if (file.id !== keptLegacyId && file.content.length > MAX_RULE_FILE_LENGTH) {
+            return RULE_FILE_REFUSALS.CONTENT_TOO_LONG;
+        }
 
-        if (long) {
-            const limit = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
-            const name = long.title.trim();
+        if (file.mode === "glob") {
+            const patterns = patternsOf(file.patterns);
 
-            return { field: "content", fileId: long.id, message: t`"${name}" is longer than ${limit} characters. Shorten it or split it into several files.` };
+            if (patterns.length === 0) {
+                return RULE_FILE_REFUSALS.PATTERNS_MISSING;
+            }
+
+            if (patterns.length > MAX_RULE_GLOBS) {
+                return RULE_FILE_REFUSALS.PATTERNS_TOO_MANY;
+            }
+
+            if (patterns.some((pattern) => !isRuleGlobValid(pattern))) {
+                return RULE_FILE_REFUSALS.PATTERN_INVALID;
+            }
         }
 
         return undefined;
     };
 
+    /** The list a save sends: a kept legacy context stays out of it. */
+    const sentFiles = () => toSaved(keptLegacyId === undefined ? files : files.filter((file) => file.id !== keptLegacyId), legacyTitle);
+
+    /** The first file and field a save would be refused for, in the order the list shows them, then the list's own limits. */
+    const problem = (): RuleFileProblem | undefined => {
+        for (const file of files) {
+            const code = fileRefusal(file);
+
+            if (code) {
+                return problemOf(code, file);
+            }
+        }
+
+        const ruleFiles = sentFiles();
+
+        if (ruleFiles.length > MAX_RULE_FILES) {
+            return problemOf(RULE_FILE_REFUSALS.TOO_MANY, undefined);
+        }
+
+        // Measured as the backend stores them, so the editor and the save agree to the byte.
+        return ruleFilesStoredBytes(ruleFiles) > MAX_RULE_FILES_BYTES ? problemOf(RULE_FILE_REFUSALS.TOO_LARGE, undefined) : undefined;
+    };
+
+    /** Shows `refusal`: the error, its field marked invalid and focused when it names one. */
+    const showProblem = (refusal: RuleFileProblem) => {
+        setInvalid(refusal.field && refusal.fileId !== undefined ? { field: refusal.field, fileId: refusal.fileId } : undefined);
+        setError(refusal.message);
+        setFocusRequest((count) => count + 1);
+    };
+
     const save = async () => {
         const refusal = problem();
 
-        setInvalid(refusal && { field: refusal.field, fileId: refusal.fileId });
-
         if (refusal) {
-            setError(refusal.message);
-            setFocusRequest((count) => count + 1);
+            showProblem(refusal);
 
             return;
         }
 
+        setInvalid(undefined);
+
         const submitted = draft;
-        const ruleFiles = toSaved(keptLegacyId === undefined ? files : files.filter((file) => file.id !== keptLegacyId), legacyTitle);
+        const ruleFiles = sentFiles();
         const keep = keptLegacyId === undefined ? {} : { keepContext: true };
 
         try {
@@ -359,7 +491,14 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
             setStatus(t`Rule files saved.`);
             refetch().catch(() => undefined);
         } catch (saveError) {
-            setError(refusalMessage(saveError, conflictMessage, t));
+            // A limit the backend holds that this editor did not (an older client): worded and placed as the editor's own.
+            const atLimit = limitRefusal(saveError, files);
+
+            if (atLimit) {
+                showProblem(problemOf(atLimit.code, atLimit.file));
+            } else {
+                setError(refusalMessage(saveError, conflictMessage, t));
+            }
         }
     };
 
@@ -424,6 +563,8 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                         {draft && (
                             <>
                                 <Button
+                                    // A refusal of the whole list names no field: it describes the button that was refused.
+                                    aria-describedby={error && !invalid ? errorId : undefined}
                                     disabled={saved.isPending}
                                     onClick={() => {
                                         save().catch(() => undefined);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES, MAX_RULE_GLOB_LENGTH, MAX_RULE_GLOBS, MAX_RULE_TITLE_LENGTH, RULE_FILE_REFUSALS } from "./rule-file-limits";
 import {
-    MAX_RULE_FILES,
     MAX_RULE_TEXT_PER_RUN,
     matchesGlob,
     normalizeRuleFiles,
@@ -164,16 +164,39 @@ describe("normalizeRuleFiles", () => {
     });
 
     it.each([
-        ["too many files", Array.from({ length: MAX_RULE_FILES + 1 }, (_, index) => always(`f${index}`, "x"))],
-        ["a repeated id", [always("a", "x"), always("a", "y")]],
-        ["an empty title", [{ ...always("a", "x"), title: " " }]],
-        ["a glob file without a pattern", [{ ...sql, globs: [] }]],
-        ["a pattern with a line break", [{ ...sql, globs: ["*.sql\n*.md"] }]],
-        ["a file past its size", [always("a", "x".repeat(100_001))]],
-        ["files past their size together", Array.from({ length: 11 }, (_, index) => always(`f${index}`, "x".repeat(99_999)))],
+        ["too many files", Array.from({ length: MAX_RULE_FILES + 1 }, (_, index) => always(`f${index}`, "x")), RULE_FILE_REFUSALS.TOO_MANY, undefined],
+        ["an empty title", [{ ...always("a", "x"), title: " " }], RULE_FILE_REFUSALS.TITLE_MISSING, "a"],
+        ["a title past its length", [{ ...always("a", "x"), title: "t".repeat(MAX_RULE_TITLE_LENGTH + 1) }], RULE_FILE_REFUSALS.TITLE_TOO_LONG, "a"],
+        ["a glob file without a pattern", [{ ...sql, globs: [] }], RULE_FILE_REFUSALS.PATTERNS_MISSING, "sql"],
+        [
+            "a glob file past its patterns",
+            [{ ...sql, globs: Array.from({ length: MAX_RULE_GLOBS + 1 }, (_, index) => `${index}.sql`) }],
+            RULE_FILE_REFUSALS.PATTERNS_TOO_MANY,
+            "sql",
+        ],
+        ["a pattern past its length", [{ ...sql, globs: ["p".repeat(MAX_RULE_GLOB_LENGTH + 1)] }], RULE_FILE_REFUSALS.PATTERN_INVALID, "sql"],
+        ["a pattern with a line break", [{ ...sql, globs: ["*.sql\n*.md"] }], RULE_FILE_REFUSALS.PATTERN_INVALID, "sql"],
+        ["a file past its size", [always("a", "x".repeat(MAX_RULE_FILE_LENGTH + 1))], RULE_FILE_REFUSALS.CONTENT_TOO_LONG, "a"],
+        [
+            "files past their size together",
+            Array.from({ length: 11 }, (_, index) => always(`f${index}`, "x".repeat(99_999))),
+            RULE_FILE_REFUSALS.TOO_LARGE,
+            undefined,
+        ],
         // 600,000 characters, but twice that once stored: each backslash is written escaped.
-        ["files past their size as stored", Array.from({ length: 6 }, (_, index) => always(`f${index}`, "\\".repeat(99_999)))],
-    ])("refuses %s", (_, files) => {
-        expect(() => normalizeRuleFiles(files)).toThrow();
+        [
+            "files past their size as stored",
+            Array.from({ length: 6 }, (_, index) => always(`f${index}`, "\\".repeat(99_999))),
+            RULE_FILE_REFUSALS.TOO_LARGE,
+            undefined,
+        ],
+    ])("refuses %s, naming the limit and the file", (_, files, code, fileId) => {
+        expect(() => normalizeRuleFiles(files)).toThrow(
+            expect.objectContaining({ code: "BAD_REQUEST", data: fileId === undefined ? { code } : { code, fileId } }),
+        );
+    });
+
+    it("refuses a repeated id", () => {
+        expect(() => normalizeRuleFiles([always("a", "x"), always("a", "y")])).toThrow();
     });
 });

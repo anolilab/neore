@@ -81,7 +81,11 @@ msgstr "« {fileName} » est trop volumineux. Les documents ne peuvent pas dépa
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "« {fileName} » est trop volumineux. Les fichiers de ce type ne peuvent pas dépasser {maxMegabytes} Mo."
 
-#: src/features/projects/components/project-rule-files.tsx:274
+#: src/features/projects/components/project-rule-files.tsx:371
+msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
+msgstr "« {name} » a plus de {limit} motifs de fichier. Supprimez-en quelques-uns ou déplacez-les dans un autre fichier."
+
+#: src/features/projects/components/project-rule-files.tsx:360
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr ""
 
@@ -1845,7 +1849,7 @@ msgstr "Un éditeur de documents qui réfléchit avec vous."
 msgid "A few questions first"
 msgstr "Quelques questions d’abord"
 
-#: src/features/projects/components/project-rule-files.tsx:265
+#: src/features/projects/components/project-rule-files.tsx:367
 msgid "A file applied when files match needs at least one pattern."
 msgstr ""
 
@@ -1958,6 +1962,10 @@ msgstr "Un marqueur ou une @mention hors guillemets est lu comme null ici ; cett
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "Un projet peut lister au plus {MAX_REPOSITORIES} dépôts."
 
+#: src/features/projects/components/project-rule-files.tsx:387
+msgid "A project holds at most {limit} rule files. Remove one first."
+msgstr "Un projet contient au maximum {limit} fichiers de règles. Supprimez-en un d’abord."
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:227
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "Une adresse http ou https publique. La première vérification enregistre seulement l’apparence de la page. Seul le premier 1 Mio d’une page est lu."
@@ -1991,6 +1999,10 @@ msgstr "Une réponse qui a utilisé des souvenirs affiche la liste « Souvenirs 
 #: src/features/marketing/use-cases/use-case-data.ts:89
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "Un tour acheminé ou mentionné compte au plus trois intervenants. Un tour parallèle donne jusqu’à quatre réponses et une synthèse, et un débat va jusqu’à trois tours."
+
+#: src/features/projects/components/project-rule-files.tsx:377
+msgid "A rule file's name may be at most {limit} characters."
+msgstr "Le nom d’un fichier de règles peut comporter au maximum {limit} caractères."
 
 #: src/features/marketing/use-cases/use-case-data.ts:25
 msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
@@ -2546,7 +2558,7 @@ msgstr "Ajoutez des images de référence pour garantir la cohérence"
 msgid "Add row"
 msgstr "Ajouter une ligne"
 
-#: src/features/projects/components/project-rule-files.tsx:362
+#: src/features/projects/components/project-rule-files.tsx:561
 msgid "Add rule file"
 msgstr ""
 
@@ -3483,8 +3495,8 @@ msgstr "Déjà lié à ce fil."
 msgid "Also viewing"
 msgstr "Consultent aussi"
 
-#: src/features/projects/components/project-rule-files.tsx:160
-#: src/features/projects/components/project-rule-files.tsx:328
+#: src/features/projects/components/project-rule-files.tsx:240
+#: src/features/projects/components/project-rule-files.tsx:524
 msgid "Always"
 msgstr ""
 
@@ -3887,7 +3899,7 @@ msgstr "AppID depuis la configuration de base de votre compte officiel"
 msgid "Application Error"
 msgstr "Erreur de l’application"
 
-#: src/features/projects/components/project-rule-files.tsx:156
+#: src/features/projects/components/project-rule-files.tsx:236
 msgid "Applies"
 msgstr ""
 
@@ -10032,7 +10044,7 @@ msgstr "Supprimer {fileName}"
 msgid "Delete {itemName}"
 msgstr "Supprimer {itemName}"
 
-#: src/features/projects/components/project-rule-files.tsx:151
+#: src/features/projects/components/project-rule-files.tsx:231
 msgid "Delete {name}"
 msgstr ""
 
@@ -10746,7 +10758,7 @@ msgid "Discard"
 msgstr "Ignorer"
 
 #: src/features/projects/components/project-form-dialog.tsx:512
-#: src/features/projects/components/project-rule-files.tsx:389
+#: src/features/projects/components/project-rule-files.tsx:591
 msgid "Discard changes"
 msgstr ""
 
@@ -11374,6 +11386,10 @@ msgstr "Chaque connexion a sa propre adresse de webhook, et l’application lui 
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:29
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Chaque canal Discord crée une conversation distincte dans Neore Chat. L’IA répondra automatiquement dans le canal."
+
+#: src/features/projects/components/project-rule-files.tsx:365
+msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
+msgstr "Chaque motif de fichier de « {name} » doit comporter au maximum {limit} caractères, sur une seule ligne."
 
 #: src/features/marketing/use-cases/use-case-data.ts:80
 msgid "Each message is checked for freshness and duplicates, rate limited per sender, then handed to the agent."
@@ -14385,7 +14401,7 @@ msgstr "Classer dans un autre projet"
 msgid "File input"
 msgstr "Entrée de fichier"
 
-#: src/features/projects/components/project-rule-files.tsx:170
+#: src/features/projects/components/project-rule-files.tsx:251
 msgid "File patterns, one per line"
 msgstr ""
 
@@ -15622,7 +15638,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "Jeton secret GitLab (X-Gitlab-Token)"
 
-#: src/features/projects/components/project-rule-files.tsx:261
+#: src/features/projects/components/project-rule-files.tsx:373
 msgid "Give every rule file a name."
 msgstr ""
 
@@ -17566,7 +17582,7 @@ msgstr "instruct"
 msgid "instructions"
 msgstr "instructions"
 
-#: src/features/projects/components/project-rule-files.tsx:182
+#: src/features/projects/components/project-rule-files.tsx:269
 #: src/features/settings/components/chat/bots-settings.tsx:197
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17579,7 +17595,7 @@ msgstr "instructions"
 msgid "Instructions"
 msgstr "Instructions"
 
-#: src/features/projects/components/project-rule-files.tsx:314
+#: src/features/projects/components/project-rule-files.tsx:510
 msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
 msgstr ""
 
@@ -21028,11 +21044,11 @@ msgstr "Descendre {label} parmi les étoilés"
 msgid "Move {label} up in starred"
 msgstr "Monter {label} parmi les étoilés"
 
-#: src/features/projects/components/project-rule-files.tsx:148
+#: src/features/projects/components/project-rule-files.tsx:228
 msgid "Move {name} down"
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:145
+#: src/features/projects/components/project-rule-files.tsx:225
 msgid "Move {name} up"
 msgstr ""
 
@@ -21259,7 +21275,7 @@ msgstr "nom"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:142
+#: src/features/projects/components/project-rule-files.tsx:211
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -26014,7 +26030,7 @@ msgstr "Projet"
 msgid "Project actions"
 msgstr "Actions du projet"
 
-#: src/features/projects/components/project-rule-files.tsx:224
+#: src/features/projects/components/project-rule-files.tsx:317
 msgid "Project context"
 msgstr ""
 
@@ -28428,15 +28444,15 @@ msgid "Rubric"
 msgstr "Grille d’évaluation"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:136
+#: src/features/projects/components/project-rule-files.tsx:196
 msgid "Rule file {0}"
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:312
+#: src/features/projects/components/project-rule-files.tsx:508
 msgid "Rule files"
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:302
+#: src/features/projects/components/project-rule-files.tsx:491
 msgid "Rule files saved."
 msgstr ""
 
@@ -28776,7 +28792,7 @@ msgstr "Enregistrer le préréglage"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Enregistrez des prompts système réutilisables et associez-les à des modèles spécifiques. Utilisez le bouton Optimiser pour affiner chaque préréglage avec l’optimiseur de prompts."
 
-#: src/features/projects/components/project-rule-files.tsx:374
+#: src/features/projects/components/project-rule-files.tsx:575
 msgid "Save rule files"
 msgstr ""
 
@@ -28845,7 +28861,7 @@ msgstr "Enregistré dans « {0} »"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:488
-#: src/features/projects/components/project-rule-files.tsx:374
+#: src/features/projects/components/project-rule-files.tsx:575
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -33901,7 +33917,7 @@ msgstr "La nouvelle tentative prend plus de temps que prévu"
 msgid "The right model, every time."
 msgstr "Le bon modèle, à chaque fois."
 
-#: src/features/projects/components/project-rule-files.tsx:319
+#: src/features/projects/components/project-rule-files.tsx:515
 msgid "The rule files could not be loaded."
 msgstr ""
 
@@ -34066,7 +34082,7 @@ msgstr "Ces souvenirs ont été ajoutés au contexte de l’IA pour cette répon
 msgid "These providers will never be used for your requests."
 msgstr "Ces fournisseurs ne seront jamais utilisés pour vos requêtes."
 
-#: src/features/projects/components/project-rule-files.tsx:248
+#: src/features/projects/components/project-rule-files.tsx:341
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr ""
 
@@ -35070,6 +35086,10 @@ msgstr "Aujourd’hui"
 #: ../../packages/ui/src/components/calendar.tsx:127
 msgid "Today, {label}"
 msgstr "Aujourd’hui, {label}"
+
+#: src/features/projects/components/project-rule-files.tsx:382
+msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
+msgstr "Ensemble, ces fichiers de règles dépassent {limit} Mo. Raccourcissez-en ou supprimez-en certains."
 
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
@@ -38025,7 +38045,7 @@ msgstr "Quand un nouveau fait contredit un ancien, l’ancien souvenir est mis �
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Quand une réponse est coupée par une mise à jour ou une panne, elle reprend à sa dernière étape terminée, jusqu’à 3 fois. Une réponse interrompue pendant l’exécution d’un outil n’est jamais reprise."
 
-#: src/features/projects/components/project-rule-files.tsx:164
+#: src/features/projects/components/project-rule-files.tsx:244
 msgid "When files match"
 msgstr ""
 

@@ -45,6 +45,7 @@
         "./package.json": "./package.json",
         "./public-api/mcp-client-config": "./lunora/public-api/mcp-client-config.ts",
         "./public-api/scopes": "./lunora/public-api/scopes.ts",
+        "./rule-file-limits": "./lunora/projects/rule-file-limits.ts",
         "./schema": "./lunora/schema.ts",
         "./server": "./lunora/_generated/server.ts",
         "./skills/markdown": "./lunora/skills/markdown.ts",

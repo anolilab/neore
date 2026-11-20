@@ -6,6 +6,20 @@
  */
 import { LunoraError } from "lunorash/server";
 
+import {
+    MAX_RULE_FILE_LENGTH,
+    MAX_RULE_FILES,
+    MAX_RULE_FILES_BYTES,
+    isRuleGlobValid,
+    MAX_RULE_GLOB_LENGTH,
+    MAX_RULE_GLOBS,
+    MAX_RULE_ID_LENGTH,
+    MAX_RULE_TITLE_LENGTH,
+    RULE_FILE_REFUSALS,
+    type RuleFileRefusal,
+    ruleFilesStoredBytes,
+} from "./rule-file-limits";
+
 export type RuleFileMode = "always" | "glob";
 
 export interface RuleFile {
@@ -16,21 +30,8 @@ export interface RuleFile {
     title: string;
 }
 
-/** Rule files one project holds. */
-export const MAX_RULE_FILES = 20;
-/** Characters one rule file holds. */
-export const MAX_RULE_FILE_LENGTH = 100_000;
-/**
- * UTF-8 bytes all of a project's rule files take together as stored, JSON-encoded (escapes included): their row lives in
- * D1, whose rows stay under 2 MB.
- */
-export const MAX_RULE_FILES_BYTES = 1_000_000;
 /** Characters of rule-file text one run takes; the rest is left out ({@link selectRuleFiles}). */
 export const MAX_RULE_TEXT_PER_RUN = 200_000;
-export const MAX_RULE_TITLE_LENGTH = 200;
-export const MAX_RULE_ID_LENGTH = 64;
-export const MAX_RULE_GLOBS = 10;
-export const MAX_RULE_GLOB_LENGTH = 200;
 
 /** The id the legacy `context` text reads under; the editor sends it back as an ordinary file. */
 export const LEGACY_CONTEXT_RULE_ID = "context";
@@ -303,14 +304,14 @@ export const renderRuleFiles = (files: RuleFile[]): string | null => {
     return parts.length > 0 ? parts.join(RULE_FILE_SEPARATOR) : null;
 };
 
-const utf8Bytes = (value: string): number => new TextEncoder().encode(value).byteLength;
-
-const LINE_BREAK_OR_NUL = /[\0\n\r]/u;
+/** A save refused at a limit: its code ({@link RULE_FILE_REFUSALS}) and the file it names, for the editor to word. */
+const refuse = (message: string, code: RuleFileRefusal, fileId?: string): LunoraError =>
+    new LunoraError("BAD_REQUEST", message, { data: { code, ...(fileId !== undefined && { fileId }) } });
 
 /** Refuses a glob a person could not have meant: empty, too long, or with a line break or a NUL. */
-const assertGlob = (glob: string): void => {
-    if (!glob.trim() || glob.length > MAX_RULE_GLOB_LENGTH || LINE_BREAK_OR_NUL.test(glob)) {
-        throw new LunoraError("BAD_REQUEST", `A file pattern must be 1 to ${MAX_RULE_GLOB_LENGTH} characters on one line`);
+const assertGlob = (glob: string, fileId: string): void => {
+    if (!isRuleGlobValid(glob)) {
+        throw refuse(`A file pattern must be 1 to ${MAX_RULE_GLOB_LENGTH} characters on one line`, RULE_FILE_REFUSALS.PATTERN_INVALID, fileId);
     }
 };
 
@@ -320,7 +321,7 @@ const assertGlob = (glob: string): void => {
  */
 export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
     if (files.length > MAX_RULE_FILES) {
-        throw new LunoraError("BAD_REQUEST", `A project holds at most ${MAX_RULE_FILES} rule files`);
+        throw refuse(`A project holds at most ${MAX_RULE_FILES} rule files`, RULE_FILE_REFUSALS.TOO_MANY);
     }
 
     const ids = new Set<string>();
@@ -335,11 +336,15 @@ export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
         ids.add(file.id);
 
         if (!title || title.length > MAX_RULE_TITLE_LENGTH) {
-            throw new LunoraError("BAD_REQUEST", `A rule file's name must be 1 to ${MAX_RULE_TITLE_LENGTH} characters`);
+            throw refuse(
+                `A rule file's name must be 1 to ${MAX_RULE_TITLE_LENGTH} characters`,
+                title ? RULE_FILE_REFUSALS.TITLE_TOO_LONG : RULE_FILE_REFUSALS.TITLE_MISSING,
+                file.id,
+            );
         }
 
         if (file.content.length > MAX_RULE_FILE_LENGTH) {
-            throw new LunoraError("BAD_REQUEST", `A rule file holds at most ${MAX_RULE_FILE_LENGTH} characters`);
+            throw refuse(`A rule file holds at most ${MAX_RULE_FILE_LENGTH} characters`, RULE_FILE_REFUSALS.CONTENT_TOO_LONG, file.id);
         }
 
         if (file.mode === "always") {
@@ -349,18 +354,22 @@ export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
         const globs = (file.globs ?? []).map((glob) => glob.trim());
 
         if (globs.length === 0 || globs.length > MAX_RULE_GLOBS) {
-            throw new LunoraError("BAD_REQUEST", `A rule file applied by pattern needs 1 to ${MAX_RULE_GLOBS} patterns`);
+            throw refuse(
+                `A rule file applied by pattern needs 1 to ${MAX_RULE_GLOBS} patterns`,
+                globs.length === 0 ? RULE_FILE_REFUSALS.PATTERNS_MISSING : RULE_FILE_REFUSALS.PATTERNS_TOO_MANY,
+                file.id,
+            );
         }
 
         for (const glob of globs) {
-            assertGlob(glob);
+            assertGlob(glob, file.id);
         }
 
         return { content: file.content, globs, id: file.id, mode: file.mode, title };
     });
 
-    if (utf8Bytes(JSON.stringify(normalized)) > MAX_RULE_FILES_BYTES) {
-        throw new LunoraError("BAD_REQUEST", "The project's rule files are too large together");
+    if (ruleFilesStoredBytes(normalized) > MAX_RULE_FILES_BYTES) {
+        throw refuse("The project's rule files are too large together", RULE_FILE_REFUSALS.TOO_LARGE);
     }
 
     return normalized;

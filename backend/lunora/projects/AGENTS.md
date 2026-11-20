@@ -43,6 +43,9 @@
   position, spent from a per-run budget (`GLOB_MATCH_STEPS_PER_RUN`); past it nothing more matches.
 - Size: `normalizeRuleFiles` caps the list at `MAX_RULE_FILES_BYTES` of stored JSON, which keeps the rule-file row
   under D1's 2 MB; the project row is not grown by a save.
+- The save limits live in `rule-file-limits.ts` (imports nothing; the editor imports it as
+  `@neore/backend/rule-file-limits`). A refusal at one carries `data.code` (`RULE_FILE_REFUSALS`) and the `fileId`, and
+  the editor words it as its own check; the argument validator bounds names and patterns loosely so these reach it.
 - A save names the revision of the list it started from (`ruleFilesRevision`, over the list a legacy `context` first);
   `setProjectRuleFiles` reads the rule-file row on the primary and refuses a stale one (CONFLICT). The write is guarded
   on that row (`writeProjectRuleFiles`: `patchIf` on its `version`, an insert on the unique index), so of two saves

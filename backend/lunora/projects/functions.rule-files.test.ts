@@ -40,6 +40,7 @@ import {
 } from "./gdpr";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL } from "./repositories";
 import { readProjectRuleFiles, ruleFileRow, writeProjectRuleFiles } from "./rule-file-rows";
+import { MAX_RULE_GLOB_LENGTH, MAX_RULE_GLOBS, MAX_RULE_TITLE_LENGTH, RULE_FILE_REFUSALS } from "./rule-file-limits";
 import { contextFingerprint, MAX_RULE_TEXT_PER_RUN } from "./rule-files";
 
 const OWNER = "user-owner";
@@ -657,6 +658,29 @@ describe("changing a project's rule files", () => {
         const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
 
         await expect(save(OWNER, projectId, [{ ...sqlRules, globs: [] }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it.each([
+        ["a name past its length", { ...sqlRules, title: "t".repeat(MAX_RULE_TITLE_LENGTH + 1) }, RULE_FILE_REFUSALS.TITLE_TOO_LONG],
+        [
+            "too many patterns",
+            { ...sqlRules, globs: Array.from({ length: MAX_RULE_GLOBS + 1 }, (_, index) => `${index}.sql`) },
+            RULE_FILE_REFUSALS.PATTERNS_TOO_MANY,
+        ],
+        ["a pattern past its length", { ...sqlRules, globs: ["p".repeat(MAX_RULE_GLOB_LENGTH + 1)] }, RULE_FILE_REFUSALS.PATTERN_INVALID],
+    ])("refuses %s naming the file and the limit, past the argument check", async (_, file, code) => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+
+        await expect(save(OWNER, projectId, [file])).rejects.toMatchObject({ code: "BAD_REQUEST", data: { code, fileId: sqlRules.id } });
+    });
+
+    it("refuses a list past its stored size as a whole", async () => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+        const files = Array.from({ length: 6 }, (_, index) => {
+            return { content: "\\".repeat(99_999), id: `f${index}`, mode: "always", title: `f${index}` };
+        });
+
+        await expect(save(OWNER, projectId, files)).rejects.toMatchObject({ code: "BAD_REQUEST", data: { code: RULE_FILE_REFUSALS.TOO_LARGE } });
     });
 });
 

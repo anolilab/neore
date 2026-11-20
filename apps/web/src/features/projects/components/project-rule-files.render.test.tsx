@@ -194,6 +194,103 @@ describe("project rule files", () => {
         expect(document.activeElement).toBe(name);
     });
 
+    it.each([
+        ["a name past its length", { title: "t".repeat(201) }, "Name", "may be at most 200 characters"],
+        [
+            "more patterns than a file holds",
+            { globs: Array.from({ length: 11 }, (_, index) => `${index}.sql`) },
+            "File patterns, one per line",
+            "more than 10 file patterns",
+        ],
+        ["a pattern past its length", { globs: ["p".repeat(201)] }, "File patterns, one per line", "at most 200 characters on one line"],
+        ["a pattern with a NUL", { globs: ["a\0b.sql"] }, "File patterns, one per line", "at most 200 characters on one line"],
+    ])("refuses %s before saving, on the field it names", async (_, change, field, message) => {
+        const user = userEvent.setup();
+
+        backend.listed = { ...backend.listed, files: [backend.listed.files[0], { ...(backend.listed.files[1] as Record<string, unknown>), ...change }] };
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move Project context down" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert").textContent).toContain(message);
+
+        const [first] = screen.getAllByRole("listitem");
+        const input = within(first as HTMLElement).getByRole("textbox", { name: field });
+
+        expect(input.getAttribute("aria-invalid")).toBe("true");
+        expect(input.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(input);
+    });
+
+    it("refuses a list larger than it may be stored before saving, measured as stored, naming the whole list", async () => {
+        const user = userEvent.setup();
+
+        // 600,000 characters, but twice that once stored: each backslash is written escaped.
+        backend.listed = {
+            ...backend.listed,
+            files: Array.from({ length: 6 }, (_, index) => {
+                return { content: "\\".repeat(99_999), id: `f${index}`, mode: "always", title: `F${index}` };
+            }),
+        };
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move F0 down" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert").textContent).toContain("larger than 1 MB");
+        expect(screen.queryAllByRole("textbox").some((input) => input.hasAttribute("aria-invalid"))).toBe(false);
+        expect(screen.getByRole("button", { name: "Save rule files" }).getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+    });
+
+    it("words and places a limit the backend refused as its own check would", async () => {
+        const user = userEvent.setup();
+
+        backend.save.mockRejectedValue(
+            Object.assign(new Error("A rule file's name must be 1 to 200 characters"), {
+                code: "BAD_REQUEST",
+                data: { code: "RULE_FILE_TITLE_TOO_LONG", fileId: "sql" },
+            }),
+        );
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        const name = within(screen.getByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Name" });
+
+        await waitFor(() => expect(name.getAttribute("aria-invalid")).toBe("true"));
+        expect(screen.getByRole("alert").textContent).toBe("A rule file's name may be at most 200 characters.");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(name);
+    });
+
+    it("words a list the backend refused as too large, and a refusal naming a file no longer shown as any other", async () => {
+        const user = userEvent.setup();
+
+        backend.save.mockRejectedValueOnce(Object.assign(new Error("too large"), { code: "BAD_REQUEST", data: { code: "RULE_FILES_TOO_LARGE" } }));
+        backend.save.mockRejectedValueOnce(
+            Object.assign(new Error("A rule file holds at most 100000 characters"), {
+                code: "BAD_REQUEST",
+                data: { code: "RULE_FILE_CONTENT_TOO_LONG", fileId: "gone" },
+            }),
+        );
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("larger than 1 MB"));
+
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("A rule file holds at most 100000 characters"));
+        expect(screen.queryAllByRole("textbox").some((input) => input.hasAttribute("aria-invalid"))).toBe(false);
+    });
+
     it("keeps the draft and says what to do when the files were saved elsewhere meanwhile", async () => {
         const user = userEvent.setup();
 

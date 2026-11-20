@@ -32,16 +32,11 @@ import {
 import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
 import { projectRowsReadBytes } from "./project-row";
+import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES, MAX_RULE_ID_LENGTH } from "./rule-file-limits";
 import { readProjectRuleFiles, ruleFileRow, ruleFilesOf, writeProjectRuleFiles } from "./rule-file-rows";
 import {
     contextFingerprint,
     isLegacyContextFile,
-    MAX_RULE_FILE_LENGTH,
-    MAX_RULE_FILES,
-    MAX_RULE_GLOB_LENGTH,
-    MAX_RULE_GLOBS,
-    MAX_RULE_ID_LENGTH,
-    MAX_RULE_TITLE_LENGTH,
     normalizeRuleFiles,
     projectRuleFiles,
     renderRuleFiles,
@@ -49,6 +44,9 @@ import {
     ruleFilesRevision,
     selectRuleFiles,
 } from "./rule-files";
+
+/** Patterns one file may carry into `setProjectRuleFiles`: past `MAX_RULE_GLOBS`, so `normalizeRuleFiles` names it. */
+const RULE_GLOBS_INPUT_MAX = 50;
 
 /** Whether `userId` is a current member of an organization. */
 type MembershipCheck = (organizationId: string) => Promise<boolean>;
@@ -380,7 +378,9 @@ export const listProjectRuleFiles = authQuery
  */
 export const setProjectRuleFiles = authMutation
     .use(rateLimit("projects/update"))
-    // Spelled inline: codegen cannot read a const reference (`backend/AGENTS.md`).
+    // Spelled inline: codegen cannot read a const reference (`backend/AGENTS.md`). A name's and a pattern's length and a
+    // file's pattern count are bounded loosely here and held to their limits by `normalizeRuleFiles`, whose refusal names
+    // the file and the limit (`RULE_FILE_REFUSALS`) where this one would be a generic invalid argument.
     .input({
         keepContext: v.optional(v.boolean()),
         projectId: v.id("projects"),
@@ -389,10 +389,10 @@ export const setProjectRuleFiles = authMutation
             .array(
                 v.object({
                     content: v.string().max(MAX_RULE_FILE_LENGTH),
-                    globs: v.optional(v.array(v.string().max(MAX_RULE_GLOB_LENGTH)).max(MAX_RULE_GLOBS)),
+                    globs: v.optional(v.array(v.string().max(MAX_LENGTH.short)).max(RULE_GLOBS_INPUT_MAX)),
                     id: v.string().max(MAX_RULE_ID_LENGTH),
                     mode: v.union(v.literal("always"), v.literal("glob")),
-                    title: v.string().max(MAX_RULE_TITLE_LENGTH),
+                    title: v.string().max(MAX_LENGTH.short),
                 }),
             )
             .max(MAX_RULE_FILES),
