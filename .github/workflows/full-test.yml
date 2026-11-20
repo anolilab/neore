@@ -90,7 +90,7 @@ jobs:
               uses: "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
               with:
                   path: "scripts/vitest/timings"
-                  key: "test-timings-${{ github.run_id }}"
+                  key: "test-timings-${{ github.run_id }}-${{ github.run_attempt }}"
 
             # The one project with a `test` target and no `test:coverage`.
             - name: "Run the Rust Worker tests"
