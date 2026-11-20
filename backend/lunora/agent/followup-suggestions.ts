@@ -15,6 +15,34 @@ export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
 /** A reply is paid for once, so its claim outlives any retry of its job: a retry after a failed call is not charged again. */
 const FOLLOWUP_CLAIM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** The fields of a message row that decide which row a reply is keyed by. */
+export interface ReplyAnchorRow {
+    message?: { role?: string } | null;
+    order: number;
+    stepOrder: number;
+}
+
+/**
+ * The row a reply is keyed by: the first row of the last assistant group the composer shows. The UI closes a group at
+ * every user or system row of the turn (ui-messages.ts), so only rows after the last of those belong to the reply on
+ * screen. A switch divider (a system row) is never the anchor, because the composer never shows it.
+ */
+export const replyAnchorRow = <Row extends ReplyAnchorRow>(turnRows: ReadonlyArray<Row>, newest: Row): Row => {
+    const isBoundary = (row: Row) => row.message?.role === "user" || row.message?.role === "system";
+    const turn = turnRows.filter((row) => row.order === newest.order);
+    const boundary = Math.max(-Infinity, ...turn.filter((row) => isBoundary(row)).map((row) => row.stepOrder));
+
+    let anchor = newest;
+
+    for (const row of turn) {
+        if (row.stepOrder > boundary && !isBoundary(row) && row.stepOrder < anchor.stepOrder) {
+            anchor = row;
+        }
+    }
+
+    return anchor;
+};
+
 /**
  * Whether a reply gets a suggestion for this user: the setting is on (absent = on) and the user is not a guest.
  * Read before any model is picked, so a user who switched the setting off costs no call.

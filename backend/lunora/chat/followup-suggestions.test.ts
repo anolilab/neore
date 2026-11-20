@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { admitFollowupSuggestions, cacheFollowupSuggestions, getCachedFollowupSuggestionsHandler } from "../agent/followup-suggestions";
+import { admitFollowupSuggestions, cacheFollowupSuggestions, getCachedFollowupSuggestionsHandler, replyAnchorRow } from "../agent/followup-suggestions";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
 
@@ -130,5 +130,31 @@ describe("a late run cannot replace a newer cache", () => {
         await cache("reply-new", 5, ["newer?"]);
 
         await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
+    });
+});
+
+describe("the row a reply is keyed by", () => {
+    type Row = { _id: string; message: { role: string } | null; order: number; stepOrder: number };
+    const row = (_id: string, role: string, stepOrder: number, order = 2): Row => {
+        return { _id, message: { role }, order, stepOrder };
+    };
+
+    it("a turn that starts with an agent-switch divider is keyed by the reply after it, not the divider", () => {
+        const turn = [row("switch", "system", 0), row("text", "assistant", 1), row("tool", "tool", 2), row("final", "assistant", 3)];
+
+        expect(replyAnchorRow(turn, turn[3]!)._id).toBe("text");
+    });
+
+    it("a divider in the middle of a turn keys the reply after it, the composer's last group", () => {
+        const turn = [row("first", "assistant", 1), row("switch", "system", 2), row("second", "assistant", 3)];
+
+        expect(replyAnchorRow(turn, turn[2]!)._id).toBe("second");
+    });
+
+    it("a plain turn is keyed by its first assistant row, not a row from an older turn", () => {
+        const turn = [row("user", "user", 0, 1), row("text", "assistant", 1), row("final", "assistant", 2)];
+        const older = row("older", "assistant", 5, 0);
+
+        expect(replyAnchorRow([...turn, older], turn[2]!)._id).toBe("text");
     });
 });
