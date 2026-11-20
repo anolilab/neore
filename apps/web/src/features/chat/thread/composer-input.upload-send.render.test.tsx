@@ -265,6 +265,22 @@ describe("ComposerInput send during an upload", () => {
         expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
+    it("says why when the draft grows too large to send while the uploads run, and sends nothing", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().updateAttachment(id, { file: new File(["x".repeat(400_001)], "notes.txt", { type: "text/plain" }) });
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showError).toHaveBeenCalledWith(expect.stringContaining("too large"));
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(sendState()).toBe("ready");
+    });
+
     it("sends only once, however often send is pressed while waiting", async () => {
         const id = addUpload("uploading");
 

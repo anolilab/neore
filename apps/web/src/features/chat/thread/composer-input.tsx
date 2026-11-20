@@ -1444,7 +1444,11 @@ const ComposerInput = ({
                     threadId,
                 });
 
-                if (disabled || useChatUIStore.getState().isSubmitting || intent === "wait") {
+                if (contextWarning?.level === "error") {
+                    // Too large for the model (a fetched file can grow the draft while it uploads): `handleSubmit` would
+                    // refuse it without a word, so the reason is given here.
+                    showError(contextWarning.message);
+                } else if (disabled || useChatUIStore.getState().isSubmitting || intent === "wait") {
                     showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
                 } else {
                     handleSubmit();
@@ -1462,6 +1466,7 @@ const ComposerInput = ({
         accountId,
         attachedReferences,
         attachments,
+        contextWarning,
         disabled,
         handleSubmit,
         isComparisonValid,
