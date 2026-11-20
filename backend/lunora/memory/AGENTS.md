@@ -31,9 +31,10 @@
   and a merged text that fails the paste's rules saves the fact as new. Rows are `source: "imported"` with
   `importedFrom`; both actions refuse while memory is off. The whole save is ONE write: a confirmation that
   cannot apply is inserted by that write, and a row the save confirmed or reworded is never superseded by a later
-  fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups are capped per
-  save (`IMPORT_MAX_VECTOR_LOOKUPS`); the 1000-row window is widened to 5000 rows once, the first time a fact must
-  be matched by words.
+  fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups (2 calls each) and
+  belief revisions (1 each) share one budget per save (`IMPORT_DEDUP_CALL_BUDGET`), so a whole save stays under the
+  Free plan's 50 subrequests; `import.test.ts` counts a worst-case save. The 1000-row window is widened to 5000 rows
+  once, the first time a fact must be matched by words.
 - **Extraction** never revises a pinned row (a near-match is saved beside it). Its write runs in order: revisions
   (`reviseExtractedMemory`, which re-embeds in the same write and applies only while the row reads as the decided
   text), then confirmations (`confirmMemories`, same check), then ONE save of every new memory, with the fallbacks

@@ -36,11 +36,17 @@ export const IMPORT_MAX_FACTS = 100;
 export const IMPORT_WIDE_WINDOW_ROWS = 5000;
 
 /**
- * Vector lookups one save makes. Each is a vector query and a row read, so this bounds a save's subrequests. Facts
- * past it are matched by words over the wide window. Not a measured figure: a save with the full revision cap can
- * still exceed the Free plan's 50 subrequests, which is the deploy plan's decision.
+ * Vector and model calls one save may spend on dedup. Workers cap the subrequests of a request (50 on the Free plan),
+ * and the rest of a save makes about a dozen fixed calls (the session and rate-limit checks, the memory setting, the
+ * filter rules, the one embedding call, the window reads, the model lookup, the one write and the vector link), so
+ * this keeps a whole save under the cap with room to spare. `import.test.ts` counts the calls of a worst-case save.
+ * A vector lookup costs {@link IMPORT_LOOKUP_CALLS}, a belief revision one model call. Past the budget a fact is
+ * matched by words and not revised: a near-match is saved beside its row, as for a failed revision.
  */
-export const IMPORT_MAX_VECTOR_LOOKUPS = 10;
+export const IMPORT_DEDUP_CALL_BUDGET = 24;
+
+/** A vector lookup: the vector query, and the read of a hit past the window. */
+export const IMPORT_LOOKUP_CALLS = 2;
 
 /** Longest single fact kept. */
 export const IMPORT_MAX_FACT_CHARS = 500;

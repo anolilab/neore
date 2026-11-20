@@ -26,7 +26,8 @@ import {
     IMPORT_MAX_FACT_CHARS,
     IMPORT_MAX_FACTS,
     IMPORT_MAX_INPUT_CHARS,
-    IMPORT_MAX_VECTOR_LOOKUPS,
+    IMPORT_DEDUP_CALL_BUDGET,
+    IMPORT_LOOKUP_CALLS,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     isLongEnoughFact,
@@ -47,11 +48,6 @@ import { MEMORY_TYPES, vMemoryType } from "./taxonomy";
  */
 const IMPORT_DEDUP_WINDOW = 1000;
 
-/**
- * Belief-revision calls one save may make. Past it a near-match is saved as new, as a failed
- * revision is: the client chooses the facts, so this bounds what one save can spend.
- */
-const IMPORT_MAX_REVISIONS = 20;
 /** Reasoning utility models spend output tokens before they answer: the caps leave room for that. */
 const REVISION_MAX_OUTPUT_TOKENS = REFLECTION_LIMITS.maxOutputTokensPerCall;
 const LABEL_MAX_OUTPUT_TOKENS = 8000;
@@ -150,16 +146,16 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     };
 
     const planned: PlannedFact[] = [];
-    let revisions = 0;
-    let lookups = 0;
+    // Vector and model calls spent on dedup so far, against `IMPORT_DEDUP_CALL_BUDGET`.
+    let spent = 0;
 
     for (const [index, fact] of facts.entries()) {
         const embedding = embeddings[index] ?? null;
-        const vectorAllowed = embedding !== null && lookups < IMPORT_MAX_VECTOR_LOOKUPS;
+        const vectorAllowed = embedding !== null && spent + IMPORT_LOOKUP_CALLS <= IMPORT_DEDUP_CALL_BUDGET;
         let byVector: Awaited<ReturnType<typeof findSimilarMemoryByVector>> = null;
 
         if (embedding && vectorAllowed) {
-            lookups += 1;
+            spent += IMPORT_LOOKUP_CALLS;
             byVector = await findSimilarMemoryByVector(ctx, { activeOn, botId: undefined, embedding, existing, retired, userId: args.userId }).catch(
                 (error: unknown) => {
                     console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
@@ -191,9 +187,9 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
         if (similar && similar.score >= 0.95) {
             action = "IGNORE";
-        } else if (similar && !modelUnavailable && revisions < IMPORT_MAX_REVISIONS && !match?.pinned) {
+        } else if (similar && !modelUnavailable && spent < IMPORT_DEDUP_CALL_BUDGET && !match?.pinned) {
             // A pinned row is never reworded or replaced by an import; the fact is saved beside it.
-            revisions += 1;
+            spent += 1;
 
             try {
                 model ??= await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: args.userId });

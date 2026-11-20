@@ -11,6 +11,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { REDACTED } from "../lib/secret-redaction";
 import { importFacts, labelImportedText } from "./import";
+import { IMPORT_DEDUP_CALL_BUDGET, IMPORT_LOOKUP_CALLS, IMPORT_MAX_FACTS } from "./import-logic";
 
 const { embedMany, generateText, registry, searchVectors } = vi.hoisted(() => {
     return { embedMany: vi.fn(), generateText: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
@@ -1084,17 +1085,56 @@ describe("import limits", () => {
         expect(row?.lastConfirmedAt).toBeTypeOf("number");
     });
 
-    it("looks up at most ten facts by vector in one save", async () => {
-        expect.assertions(2);
+    it("keeps a worst-case save under the Free plan's 50 subrequests", async () => {
+        expect.assertions(3);
 
         await setMemoryEnabled(true);
         useFakeVectors();
+        // Every fact is a near-match of its own row by vector (0.9) and by words, so each one would go to belief revision.
+        await harness.run(async (ctx: any) => {
+            for (let item = 0; item < IMPORT_MAX_FACTS; item += 1) {
+                const embeddingId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: nearVectorOf(item) });
 
-        const facts = FACTS.slice(0, 30);
+                await ctx.db.insert("memories", {
+                    embeddingId,
+                    memory: `The user owns collection item ${String(item)} at home`,
+                    type: "context",
+                    userId: USER,
+                });
+            }
+        });
+        generateText.mockResolvedValue({ output: { action: "ADD" } });
 
-        expect(await save(facts)).toStrictEqual({ added: 30, alreadyKnown: 0, updated: 0 });
-        // Each lookup is a vector query plus a row read, so the count bounds a save's subrequests.
-        expect(searchVectors.mock.calls.length).toBeLessThanOrEqual(10);
+        const calls = { mutation: 0, query: 0 };
+        const facts = Array.from({ length: IMPORT_MAX_FACTS }, (_, item) => {
+            return { memory: `The user owns collection item ${String(item)} at home now`, type: "context" as const };
+        });
+
+        await harness.action(async (ctx: any) => {
+            const counted = {
+                ...ctx,
+                runMutation: async (...args: unknown[]) => {
+                    calls.mutation += 1;
+
+                    return await ctx.runMutation(...args);
+                },
+                runQuery: async (...args: unknown[]) => {
+                    calls.query += 1;
+
+                    return await ctx.runQuery(...args);
+                },
+            };
+
+            return await importFacts(counted, { app: "gemini", facts, userId: USER });
+        });
+
+        // Outside `importFacts`: the session and rate-limit checks, the model filter rules and the utility model lookup.
+        const outside = 4;
+        const total = outside + calls.query + calls.mutation + embedMany.mock.calls.length + searchVectors.mock.calls.length + generateText.mock.calls.length;
+
+        expect(searchVectors.mock.calls.length * IMPORT_LOOKUP_CALLS + generateText.mock.calls.length).toBeLessThanOrEqual(IMPORT_DEDUP_CALL_BUDGET);
+        expect(generateText.mock.calls.length).toBeGreaterThan(0);
+        expect(total).toBeLessThanOrEqual(40);
     });
 
     it("does not revise a pinned row, and saves the fact beside it", async () => {
