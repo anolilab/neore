@@ -17,11 +17,15 @@ const state = vi.hoisted(() => {
         acceptedToken: "fresh",
         access: [] as { connectorSlug: string; level: string }[],
         accessFails: false,
+        /** Whether one of the caller's bots has a tool selection (`bots_functions:hasBotWithToolSelection`); `"fail"` throws. */
+        botWithSelection: false as "fail" | boolean,
         cap: "auto" as "auto" | "ask" | "off",
         config: null as MCPServerConfig | null,
         connects: 0,
         crossed: [] as string[],
         overrides: {} as Record<string, string>,
+        /** The caller's own saved servers (`auth_functions:getMCPServersQuery`). */
+        savedServers: [] as { name: string; url: string }[],
         seenTokens: [] as string[],
         shard: "alice",
         thread: { allowed: true, mode: null, organizationId: null } as {
@@ -29,6 +33,8 @@ const state = vi.hoisted(() => {
             connectorAccess?: { connectorSlug: string; level: string }[];
             mode: string | null;
             organizationId?: string | null;
+            /** The selection of the chat's bot and the bot's owner, read with the thread on its own shard. */
+            toolSelection?: { ownerId: string; ownerServerKeys: string[]; selection: { allow?: string[]; exclude: string[] } } | null;
         },
         /** The cap of the organization the chat is filed in (its policy); read only for a chat that names one. */
         threadCap: "auto" as "auto" | "ask" | "off",
@@ -152,6 +158,18 @@ const context = {
             return state.threadCap;
         }
 
+        if (ref.__lunoraRef === "auth_functions:getMCPServersQuery") {
+            return state.savedServers;
+        }
+
+        if (ref.__lunoraRef === "bots_functions:hasBotWithToolSelection") {
+            if (state.botWithSelection === "fail") {
+                throw new Error("bots unavailable");
+            }
+
+            return state.botWithSelection;
+        }
+
         if (ref.__lunoraRef === "connectors_access:listUserConnectorAccessForSlug") {
             if (state.accessFails) {
                 throw new Error("access unavailable");
@@ -208,6 +226,8 @@ beforeEach(() => {
     state.seenTokens = [];
     state.access = [];
     state.accessFails = false;
+    state.botWithSelection = false;
+    state.savedServers = [];
 });
 
 describe("MCP Apps proxy with an OAuth grant", () => {
@@ -517,6 +537,108 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
         expect(response.status).toBe(403);
         expect(state.connects).toBe(0);
+    });
+
+    it("runs an app's call only for a tool the chat's bot keeps, by the connector's key, before connecting", async () => {
+        oauthConfig("fresh");
+        state.overrides = { "connector:notion:create_page": "auto" };
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "alice", ownerServerKeys: [], selection: { allow: ["connector=notion:*"], exclude: ["connector=notion:create_page"] } },
+        };
+
+        const kept = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const connectsBefore = state.connects;
+        const excluded = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(kept.status).toBe(200);
+        expect(excluded.status).toBe(403);
+        expect(state.connects).toBe(connectsBefore);
+    });
+
+    it("holds a collaborator's app call in the owner's bot chat to the bot's selection, read on the owner's shard", async () => {
+        oauthConfig("fresh");
+        state.overrides = { "connector:notion:create_page": "auto" };
+        state.shard = "bob";
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "bob", ownerServerKeys: [], selection: { exclude: ["connector=notion:create_page"] } },
+        };
+
+        const excluded = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(excluded.status).toBe(403);
+        expect(state.crossed).toStrictEqual(["bob"]);
+    });
+
+    it("strips a user server's tools for an owner's edited exclusion in the owner's call, and in a collaborator's only for a server the owner also saved", async () => {
+        const url = "https://docs.example/mcp";
+        const statusOf = async (toolName: string): Promise<number> => {
+            const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Docs", toolName }));
+
+            return response.status;
+        };
+
+        state.config = { enabled: true, headers: [{ key: "Authorization", value: "Bearer fresh" }], name: "Docs", protocol: "http", url };
+        state.overrides = { "mcp:Docs:search": "auto" };
+        state.savedServers = [{ name: "Docs", url }];
+
+        const edited = { exclude: ["mcp=https%3A%2F%2Fdocs.example%2Fold:*"] };
+
+        // The bot is someone else's: its owner's edited address says nothing about the caller's own server.
+        state.thread = { allowed: true, mode: null, organizationId: null, toolSelection: { ownerId: "bob", ownerServerKeys: [], selection: edited } };
+
+        expect(await statusOf("search")).toBe(200);
+
+        // The owner saved the caller's address too: it may be the server they excluded and then moved.
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "bob", ownerServerKeys: ["mcp=https%3A%2F%2Fdocs.example%2Fmcp"], selection: edited },
+        };
+
+        expect(await statusOf("search")).toBe(403);
+
+        // The caller owns the bot: which of their servers the exclusion meant cannot be told, so none is trusted.
+        state.thread = { allowed: true, mode: null, organizationId: null, toolSelection: { ownerId: "alice", ownerServerKeys: [], selection: edited } };
+
+        expect(await statusOf("search")).toBe(403);
+
+        // An exact key still names the collaborator's server.
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "bob", ownerServerKeys: [], selection: { exclude: ["mcp=https%3A%2F%2Fdocs.example%2Fmcp:search"] } },
+        };
+
+        expect(await statusOf("search")).toBe(403);
+    });
+
+    it("refuses a call that names no chat when any of the caller's bots has a selection, or when that cannot be read", async () => {
+        oauthConfig("fresh");
+
+        const allowed = await callMCPToolFromAppHttpAction(context, bare("search"));
+
+        expect(allowed.status).toBe(200);
+
+        state.botWithSelection = true;
+
+        const refused = await callMCPToolFromAppHttpAction(context, bare("search"));
+
+        expect(refused.status).toBe(403);
+        expect(await refused.json()).toStrictEqual({ error: expect.stringContaining("needs the chat") });
+
+        state.botWithSelection = "fail";
+
+        const unreadable = await callMCPToolFromAppHttpAction(context, bare("search"));
+
+        expect(unreadable.status).toBe(403);
     });
 
     it("offers a read-only connection only the tools the server marks read only, even one the user allowed to write", async () => {

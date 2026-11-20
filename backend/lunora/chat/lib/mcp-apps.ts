@@ -3,6 +3,8 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
+import type { RunToolSelection } from "../../bots/run-tool-selection";
+import { selectionKeeps, selectionServerKey } from "../../bots/tool-selectors";
 import { type ConnectorAccessLevel, levelOfConnection, strictestLevel, toolOfferedAt } from "../../connectors/access-levels";
 import { findUserMcpServer, findUserMcpServerIdentity } from "../../connectors/lib/user-mcp-servers";
 import { callOnShard } from "../../lib/cross-shard";
@@ -105,6 +107,8 @@ interface ThreadAppAccess {
     connectorAccess: { connectorSlug: string; level: ConnectorAccessLevel }[];
     mode: ThreadPermissionMode | undefined;
     organizationId: string | null;
+    /** The selection of the bot the chat runs as (`bots/tool-selectors.ts`) and the bot's owner, read on the thread's own shard. */
+    toolSelection: RunToolSelection | null;
 }
 
 const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadAppAccess | "denied"> => {
@@ -132,7 +136,50 @@ const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: s
         connectorAccess: found.connectorAccess,
         mode: found.mode === "full" ? undefined : (found.mode ?? undefined),
         organizationId: found.organizationId,
+        toolSelection: found.toolSelection,
     };
+};
+
+/**
+ * Whether the bot an app call runs under keeps the tool (`bots/tool-selectors.ts`). The chat's bot when the call names the chat.
+ * A call that names none (a client from before the chat was sent) cannot tell which bot it is under, so it is refused when
+ * any of the caller's bots has a selection; a failed read refuses it too. Never more tools than the bot chose.
+ */
+const botKeepsAppTool = async (
+    context: HttpActionCtx,
+    userId: string,
+    thread: ThreadAppAccess | undefined,
+    serverConfig: Pick<MCPServerConfig, "connectorSlug" | "url">,
+    toolName: string,
+): Promise<boolean> => {
+    try {
+        if (!thread) {
+            return !(await context.runQuery(internal.bots.functions.hasBotWithToolSelection, { userId }));
+        }
+
+        if (!thread.toolSelection) {
+            return true;
+        }
+
+        // The caller's saved servers tell whether the key stands for this server alone, as in the run (`selectionServerKey`); for
+        // a collaborator, an owner's edited address strips only a server the owner also saved.
+        const saved = (await context.runQuery(internal.auth.functions.getMCPServersQuery, { userId })) as Pick<MCPServerConfig, "url">[];
+        const { ownerId, ownerServerKeys, selection } = thread.toolSelection;
+
+        return selectionKeeps(selection, toolName, {
+            server: selectionServerKey(
+                selection,
+                serverConfig,
+                saved.map((server) => server.url),
+                { runs: ownerId === userId, serverKeys: ownerServerKeys },
+            ),
+            tool: toolName,
+        });
+    } catch (error: unknown) {
+        toolsLogger.warn("[MCP] Bot tool selection lookup failed for an app call; denied:", error, { userId });
+
+        return false;
+    }
 };
 
 /**
@@ -401,7 +448,8 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     // Both are read before the server is resolved: an app call runs only at `auto`, so under any lower cap every call is
     // refused, and no credential is refreshed and no server is contacted for it. The chat the app is shown in gives its mode
     // and the organization it is filed or was started in; the session gives the space the caller is in. A call that names
-    // no chat (a client from before the chat was sent) is capped by the session alone, as before, so it keeps working.
+    // no chat (a client from before the chat was sent) is capped by the session alone, as before, so it keeps working unless
+    // one of the caller's bots has a tool selection (`botKeepsAppTool`).
     const [thread, { cap: requestCap, unresolved }] = await Promise.all([
         threadId ? threadModeFor(context, user._id, threadId) : undefined,
         readRequestPermissionCap(context, user._id),
@@ -450,6 +498,18 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     if (access === "none") {
         return Response.json({ error: `Your teammate's access to ${serverConfig.name} is set to none` }, { status: 403 });
+    }
+
+    // The bot the chat runs as narrows what its apps may call, as it narrows the model's tools.
+    if (!(await botKeepsAppTool(context, user._id, thread, serverConfig, toolName))) {
+        return Response.json(
+            {
+                error: thread
+                    ? `Tool "${toolName}" is not among this bot's tools`
+                    : `Tool "${toolName}" needs the chat it was opened in: update the app and try again`,
+            },
+            { status: 403 },
+        );
     }
 
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;

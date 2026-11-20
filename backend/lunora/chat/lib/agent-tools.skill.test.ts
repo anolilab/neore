@@ -91,13 +91,20 @@ vi.mock("../../connectors/lib/grant-runtime", () => {
 
 let overrides: Record<string, string>;
 
+/** A ctx whose run belongs to no bot: the bot's selection is answered here, so the ordered answers below stay in step. */
+const noBot = (runQuery: (reference: unknown, args: never) => unknown): ActionCtx =>
+    ({
+        runQuery: async (reference: unknown, args: never) =>
+            reference === internal.bots.functions.getBotToolSelectionForRun ? null : await runQuery(reference, args),
+    }) as unknown as ActionCtx;
+
 const fakeCtx = (): ActionCtx => {
     const runQuery = vi.fn();
 
     // `buildAgentTools` asks for MCP servers first, then permission overrides.
     runQuery.mockResolvedValueOnce([]).mockResolvedValueOnce(overrides);
 
-    return { runQuery } as unknown as ActionCtx;
+    return noBot(runQuery);
 };
 
 const toolNames = async (skillTools?: { additionalTools?: string[]; disabledTools?: string[] }): Promise<string[]> => {
@@ -133,7 +140,7 @@ describe("buildAgentTools under an ask cap", () => {
 
         runQuery.mockResolvedValueOnce(null).mockResolvedValue({ complete: true, links: [] });
 
-        return await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        return await buildAgentTools(noBot(runQuery), {
             headless,
             ...(headlessCanAsk && { headlessCanAsk }),
             model: "test-model",
@@ -212,7 +219,7 @@ describe("buildAgentTools under an organization's policy", () => {
             tools: { mcp_docs__search: fakeTool("search") },
         };
 
-        const result = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        const result = await buildAgentTools(noBot(runQuery), {
             headless,
             model: "test-model",
             // The run was started from no organization: the thread's own is the one that caps it.
@@ -424,7 +431,7 @@ describe("buildAgentTools connector tools", () => {
             "threadId" in args ? [{ connectorSlug: "notion", level: "read_only" }] : [],
         );
 
-        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        const { tools } = await buildAgentTools(noBot(runQuery), {
             model: "test-model",
             organizationId: null,
             permissionModeThreadId: "owner-thread",
@@ -513,7 +520,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(null)
             .mockResolvedValueOnce(trusted);
 
-        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        const { tools } = await buildAgentTools(noBot(runQuery), {
             model: "test-model",
             organizationId: null,
             searchMode: "web",
@@ -563,7 +570,7 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(null)
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
-        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        const { tools } = await buildAgentTools(noBot(runQuery), {
             model: "test-model",
             organizationId: null,
             searchMode: "web",
@@ -591,7 +598,7 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce({ complete: true, links: linked })
             .mockResolvedValueOnce(null);
 
-        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        const { tools } = await buildAgentTools(noBot(runQuery), {
             model: "test-model",
             organizationId: null,
             searchMode: "web",
@@ -621,7 +628,7 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce({ complete: true, links: [] })
             .mockResolvedValueOnce(null);
 
-        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+        const { tools } = await buildAgentTools(noBot(runQuery), {
             model: "test-model",
             organizationId: null,
             searchMode: "web",

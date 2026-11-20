@@ -4,6 +4,7 @@
     "add-agent-commands-acp-sessions",
     "add-agent-commands-persistent-chunks",
     "add-approval-chain-source",
+    "add-approval-tool-origins",
     "add-headless-approved",
     "add-headless-resume-bounds",
     "add-steer-text-length",
@@ -4160,6 +4161,38 @@
               "literal": "\"supervised\""
             }
           ]
+        },
+        "toolSelection": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "allow": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
+            "exclude": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
         },
         "updatedAt": {
           "kind": "number",
@@ -29021,6 +29054,24 @@
               }
             },
             "mcpToolFingerprints": {
+              "kind": "record",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "key": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
+            "mcpToolOrigins": {
               "kind": "record",
               "nullable": false,
               "optional": true,

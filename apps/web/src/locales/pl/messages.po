@@ -415,7 +415,7 @@ msgstr "{0, plural, one {Nieobsługiwany parametr zapytania} few {Nieobsługiwan
 
 #. placeholder {0}: day(memory.eventStart)
 #. placeholder {1}: day(memory.eventEnd)
-#: src/features/settings/components/personalization/memory-item.tsx:168
+#: src/features/settings/components/personalization/memory-item.tsx:178
 msgid "{0} – {1}"
 msgstr "{0} – {1}"
 
@@ -571,7 +571,7 @@ msgid "{0} lines"
 msgstr "Wiersze: {0}"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:185
+#: src/features/settings/components/personalization/memory-settings.tsx:186
 msgid "{0} memories"
 msgstr "Wspomnienia: {0}"
 
@@ -661,7 +661,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} na {1}, w {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "{0} pinned"
 msgstr "Przypięte: {0}"
 
@@ -1804,6 +1804,10 @@ msgstr "Tytuł {requestNoun} może mieć co najwyżej {0} znaków."
 msgid "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
 msgstr "Uruchomienie w tle nigdy nie czeka na Ciebie. Pytania do Ciebie są z niego usuwane, więc kończy się samodzielnie albo się nie udaje."
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:336
+msgid "A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*."
+msgstr "Wbudowane narzędzie po nazwie, narzędzie serwera jako server:tool lub cały serwer jako server:*."
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr "zmiana czeka na przeczytanie"
@@ -1992,7 +1996,7 @@ msgstr "Uruchomienie nigdy nie zapisuje do czatu zablokowanego lub udostępnione
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "Wątek uruchomienia trafia do tego projektu. Przeniesienie zadania do innego projektu zaczyna nowy wątek."
 
-#: src/features/settings/components/chat/bots-settings.tsx:225
+#: src/features/settings/components/chat/bots-settings.tsx:277
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Piaskownica, którą bot zachowuje między czatami. Wstrzymywana, gdy jest bezczynna, w czasie wstrzymania nie jest rozliczana."
 
@@ -2043,6 +2047,11 @@ msgstr "Narzędzie nie może być jednocześnie dodane i wyłączone"
 #: src/features/marketing/use-cases/use-case-data.ts:91
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "Narzędzie wymagające zatwierdzenia wstrzymuje turę kartą. Odpowiada tylko właściciel, a mówcy w kolejce kontynuują potem."
+
+#: src/features/settings/components/chat/bots-settings.tsx:139
+#: src/features/settings/components/chat/bots-settings.tsx:191
+msgid "A tool you typed was not added. Add it or clear the field first."
+msgstr "{'de': 'Ein eingegebenes Tool wurde nicht hinzugefügt. Füge es hinzu oder leere das Feld zuerst.', 'es': 'Una herramienta que escribiste no se añadió. Añádela o vacía el campo primero.', 'fr': 'Un outil que vous avez saisi n’a pas été ajouté. Ajoutez-le ou videz d’abord le champ.', 'it': 'Uno strumento che hai digitato non è stato aggiunto. Aggiungilo o svuota prima il campo.', 'ja': '入力したツールが追加されていません。先に追加するか、入力欄を空にしてください。', 'pl': 'Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść pole.', 'pt': 'Uma ferramenta que você digitou não foi adicionada. Adicione-a ou limpe o campo primeiro.', 'zh': '你输入的工具尚未添加。请先添加它或清空输入框。'}"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:344
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
@@ -2286,6 +2295,7 @@ msgstr "Aktywność w miesiącu"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
 #: src/features/projects/components/project-repositories.tsx:425
+#: src/features/settings/components/chat/bot-tool-selection.tsx:200
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -3226,7 +3236,7 @@ msgid "All"
 msgstr "Wszystkie"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:207
+#: src/features/settings/components/personalization/memory-settings.tsx:208
 msgid "All ({0})"
 msgstr "Wszystkie ({0})"
 
@@ -3384,6 +3394,10 @@ msgstr "Zmierzono wszystkie shardy."
 msgid "All tasks"
 msgstr "Wszystkie zadania"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:308
+msgid "All tools"
+msgstr "Wszystkie narzędzia"
+
 #: src/features/admin/components/users-management-card.tsx:141
 msgid "All Types"
 msgstr "Wszystkie typy"
@@ -3450,6 +3464,10 @@ msgstr "Dozwoleni dostawcy"
 #: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "Dozwolone regiony"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:338
+msgid "Allowed tools"
+msgstr "Dozwolone narzędzia"
 
 #: src/features/workflow/components/nodes/audio-node.tsx:17
 msgid "Alloy (Neutral)"
@@ -3560,9 +3578,13 @@ msgstr "Podczas generowania odpowiedzi wystąpił błąd."
 msgid "An error occurred while loading the {routeName} page."
 msgstr "Wystąpił błąd podczas ładowania strony {routeName}."
 
-#: src/features/settings/components/personalization/memory-item.tsx:336
+#: src/features/settings/components/personalization/memory-item.tsx:347
 msgid "An event cannot end before it starts."
 msgstr "Wydarzenie nie może się skończyć przed rozpoczęciem."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:351
+msgid "An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools."
+msgstr "Wykluczony serwer został usunięty lub zmienił adres. Dopóki go tu nie usuniesz, bot nie dostanie żadnych narzędzi z twoich serwerów."
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:358
 msgid "An IAM user's secret access key with bedrock:InvokeModel. Encrypted at rest and never shown again."
@@ -4436,7 +4458,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/bots-settings.tsx:58
+#: src/features/settings/components/chat/bots-settings.tsx:63
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "Auto"
@@ -5144,11 +5166,11 @@ msgstr "Bośniacki"
 msgid "Bosnian (Bosnia)"
 msgstr "Bośniacki (Bośnia)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:137
+#: src/features/settings/components/chat/bots-settings.tsx:159
 msgid "Bot created"
 msgstr "Utworzono bota"
 
-#: src/features/settings/components/chat/bots-settings.tsx:171
+#: src/features/settings/components/chat/bots-settings.tsx:215
 msgid "Bot deleted"
 msgstr "Usunięto bota"
 
@@ -5694,6 +5716,7 @@ msgstr "Kanada"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:439
+#: src/features/settings/components/chat/bots-settings.tsx:371
 #: src/features/settings/components/chat/custom-providers-settings.tsx:638
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:709
@@ -5703,8 +5726,8 @@ msgstr "Kanada"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:340
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-item.tsx:351
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6047,7 +6070,7 @@ msgstr "czat"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:341
-#: src/features/settings/components/chat/bots-settings.tsx:262
+#: src/features/settings/components/chat/bots-settings.tsx:328
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
 msgid "Chat"
@@ -6523,11 +6546,11 @@ msgstr "Wyczyść wszystko"
 msgid "Clear All"
 msgstr "Wyczyść wszystko"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear All Memories"
 msgstr "Wyczyść wszystkie wspomnienia"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:250
+#: src/features/settings/components/personalization/memory-settings.tsx:251
 msgid "Clear all memories?"
 msgstr "Wyczyścić wszystkie wspomnienia?"
 
@@ -6574,7 +6597,7 @@ msgstr "Wyczyść filtr tagów"
 msgid "Clear the queue"
 msgstr "Wyczyść kolejkę"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:136
+#: src/features/settings/components/personalization/memory-settings.tsx:137
 msgid "Cleared {count} memories"
 msgstr "Wyczyszczone wspomnienia: {count}"
 
@@ -7426,7 +7449,7 @@ msgid "Compressing context..."
 msgstr "Kompresowanie kontekstu..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/settings/components/chat/bots-settings.tsx:224
+#: src/features/settings/components/chat/bots-settings.tsx:276
 msgid "Computer"
 msgstr "Komputer"
 
@@ -8434,7 +8457,7 @@ msgstr "Nie udało się zmienić ustawienia Auto. Spróbuj ponownie."
 msgid "Could not change push notifications. Try again."
 msgstr "Nie udało się zmienić powiadomień push. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:159
+#: src/features/settings/components/chat/bots-settings.tsx:181
 msgid "Could not change the bot's permission mode."
 msgstr "Nie udało się zmienić trybu uprawnień bota."
 
@@ -8519,7 +8542,7 @@ msgstr "Nie udało się skopiować; zaznacz tekst ręcznie"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Nie udało się utworzyć kolekcji dla tego importu. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:139
+#: src/features/settings/components/chat/bots-settings.tsx:161
 msgid "Could not create the bot."
 msgstr "Nie udało się utworzyć bota."
 
@@ -8532,7 +8555,7 @@ msgstr "Nie udało się utworzyć czatu grupowego"
 msgid "Could not create the page"
 msgstr "Nie udało się utworzyć strony"
 
-#: src/features/settings/components/chat/bots-settings.tsx:173
+#: src/features/settings/components/chat/bots-settings.tsx:217
 msgid "Could not delete the bot."
 msgstr "Nie udało się usunąć bota."
 
@@ -8639,7 +8662,7 @@ msgstr "Nie udało się wczytać użycia tego projektu."
 msgid "Could not load tools: {error}"
 msgstr "Nie udało się wczytać narzędzi: {error}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:122
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Could not load where this memory came from."
 msgstr "Nie udało się wczytać, skąd pochodzi to wspomnienie."
 
@@ -8764,6 +8787,10 @@ msgstr "Nie udało się ponowić próby. Spróbuj ponownie."
 msgid "Could not save that choice. Try again."
 msgstr "Nie udało się zapisać tego wyboru. Spróbuj ponownie."
 
+#: src/features/settings/components/chat/bots-settings.tsx:203
+msgid "Could not save the bot's tools. Its tools are unchanged."
+msgstr "Nie udało się zapisać narzędzi bota. Jego narzędzia pozostają bez zmian."
+
 #: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "Nie udało się zapisać ustawienia Daily Brief."
@@ -8828,7 +8855,7 @@ msgstr "Nie udało się wylogować"
 msgid "Could not snooze the thread. Please try again."
 msgstr "Nie udało się odłożyć wątku. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:149
+#: src/features/settings/components/chat/bots-settings.tsx:171
 msgid "Could not start a chat with this bot."
 msgstr "Nie udało się rozpocząć czatu z tym botem."
 
@@ -8889,6 +8916,10 @@ msgstr "Nie udało się zaktualizować komentarza"
 #: src/features/chat/group/group-participant-bar.tsx:72
 msgid "Could not update the participants"
 msgstr "Nie udało się zaktualizować uczestników"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:100
+msgid "Couldn't load follow state"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -9019,7 +9050,7 @@ msgstr "Twórz klucze API do programowego dostępu do konta i zarządzaj nimi."
 msgid "Create API Key"
 msgstr "Utwórz klucz API"
 
-#: src/features/settings/components/chat/bots-settings.tsx:234
+#: src/features/settings/components/chat/bots-settings.tsx:286
 msgid "Create bot"
 msgstr "Utwórz bota"
 
@@ -9381,6 +9412,7 @@ msgstr "Obecnie ograniczeni"
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
+#: src/features/settings/components/chat/bot-tool-selection.tsx:312
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
 msgstr "Niestandardowe"
@@ -9443,6 +9475,10 @@ msgstr "własne style"
 #: src/features/chat/sidebar/thread-sidebar.tsx:186
 msgid "Custom System Prompt"
 msgstr "Własny prompt systemowy"
+
+#: src/features/settings/components/chat/bots-settings.tsx:305
+msgid "Custom tools"
+msgstr "Własny wybór narzędzi"
 
 #: src/features/marketing/data/models-data.ts:445
 msgid "Custom-style video generation with LoRA support at the lowest possible cost and fastest speed"
@@ -9953,8 +9989,8 @@ msgstr "Deleguj zadania do Devina, inżyniera oprogramowania AI"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:709
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:848
-#: src/features/settings/components/chat/bots-settings.tsx:271
-#: src/features/settings/components/chat/bots-settings.tsx:280
+#: src/features/settings/components/chat/bots-settings.tsx:337
+#: src/features/settings/components/chat/bots-settings.tsx:381
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:307
@@ -9981,7 +10017,7 @@ msgstr "Usunąć „{pendingDeleteTitle}”?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:265
+#: src/features/settings/components/chat/bots-settings.tsx:331
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -9995,7 +10031,7 @@ msgstr "Usuń użytkowników: {0}"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:290
+#: src/features/settings/components/chat/bots-settings.tsx:391
 msgid "Delete {0}?"
 msgstr "Usunąć {0}?"
 
@@ -10022,7 +10058,7 @@ msgstr "Usuń konto"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Usuń alert „{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:258
 msgid "Delete All"
 msgstr "Usuń wszystko"
 
@@ -10079,7 +10115,7 @@ msgstr "Usuń grupę i elementy podrzędne"
 msgid "Delete Logo"
 msgstr "Usuń logo"
 
-#: src/features/settings/components/personalization/memory-item.tsx:294
+#: src/features/settings/components/personalization/memory-item.tsx:305
 msgid "Delete memory"
 msgstr "Usuń wspomnienie"
 
@@ -10466,7 +10502,7 @@ msgstr "Opisz swój przepływ pracy... np. „Wygeneruj obraz z tekstu, powięks
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:188
+#: src/features/settings/components/chat/bots-settings.tsx:232
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -11508,7 +11544,7 @@ msgstr "Edytuj serwer MCP"
 msgid "Edit me"
 msgstr "Edytuj mnie"
 
-#: src/features/settings/components/personalization/memory-item.tsx:290
+#: src/features/settings/components/personalization/memory-item.tsx:301
 msgid "Edit memory"
 msgstr "Edytuj wspomnienie"
 
@@ -11905,7 +11941,7 @@ msgstr "Włącz sugestie kolejnych pytań"
 msgid "Enable for Next Chat"
 msgstr "Włącz dla następnego czatu"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:170
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "Enable memory"
 msgstr "Włącz pamięć"
 
@@ -12514,13 +12550,17 @@ msgstr "Wykonaj JS"
 msgid "Event"
 msgstr "Zdarzenie"
 
-#: src/features/settings/components/personalization/memory-item.tsx:196
+#: src/features/settings/components/personalization/memory-item.tsx:207
 msgid "Event ends on"
 msgstr "Wydarzenie kończy się"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "Co 6 godzin"
+
+#: src/features/settings/components/chat/bots-settings.tsx:356
+msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
+msgstr "Każdy czat i zaplanowane uruchomienie tego bota dostaje tylko te narzędzia. Twoje uprawnienia narzędzi nadal obowiązują."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -12680,6 +12720,10 @@ msgstr "Wyjątkowe renderowanie tekstu wewnątrz obrazów"
 #: src/features/marketing/data/models-data.ts:174
 msgid "Exceptionally sharp detail and clarity"
 msgstr "Wyjątkowo ostre detale i wyrazistość"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:348
+msgid "Excluded tools"
+msgstr "Wykluczone narzędzia"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:329
 msgid "Execute"
@@ -13182,7 +13226,7 @@ msgstr "Nie udało się zmienić koloru tagu"
 msgid "Failed to clear filter rules"
 msgstr "Nie udało się wyczyścić reguł filtrowania"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Failed to clear memories"
 msgstr "Nie udało się wyczyścić wspomnień"
 
@@ -13275,7 +13319,7 @@ msgstr "Nie udało się usunąć pliku. Spróbuj ponownie."
 msgid "Failed to delete files"
 msgstr "Nie udało się usunąć plików"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Failed to delete memory"
 msgstr "Nie udało się usunąć wspomnienia"
 
@@ -13789,8 +13833,8 @@ msgstr "Nie udało się zaktualizować skrótów klawiszowych"
 msgid "Failed to update MCP server"
 msgstr "Nie udało się zaktualizować serwera MCP"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:115
-#: src/features/settings/components/personalization/memory-settings.tsx:123
+#: src/features/settings/components/personalization/memory-settings.tsx:116
+#: src/features/settings/components/personalization/memory-settings.tsx:124
 msgid "Failed to update memory"
 msgstr "Nie udało się zaktualizować wspomnienia"
 
@@ -13818,7 +13862,7 @@ msgstr "Nie udało się zaktualizować ustawień pull requestów"
 msgid "Failed to update reply tools"
 msgstr "Nie udało się zaktualizować narzędzi odpowiedzi"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Failed to update setting"
 msgstr "Nie udało się zaktualizować ustawienia"
 
@@ -14487,7 +14531,7 @@ msgstr "Filtruj według typu"
 msgid "Filter condition"
 msgstr "Warunek filtra"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:193
+#: src/features/settings/components/personalization/memory-settings.tsx:194
 msgid "Filter memories by type"
 msgstr "Filtruj wspomnienia według typu"
 
@@ -14706,6 +14750,10 @@ msgstr "Zgodnie z systemem (domyślnie)"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:130
 msgid "Follow these steps to connect your {platform} account."
 msgstr "Wykonaj te kroki, aby połączyć konto {platform}."
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:105
+msgid "Follow thread"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -15152,7 +15200,7 @@ msgstr "Pełne wideo w wysokiej rozdzielczości 1080p"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
-#: src/features/settings/components/chat/bots-settings.tsx:59
+#: src/features/settings/components/chat/bots-settings.tsx:64
 msgid "Full access"
 msgstr "Pełny dostęp"
 
@@ -16200,11 +16248,11 @@ msgstr "Tryb głosowy bez użycia rąk — mów, a odpowiedzi zostaną odczytane
 msgid "Hands-free voice updated"
 msgstr "Zaktualizowano głos trybu bez użycia rąk"
 
-#: src/features/settings/components/personalization/memory-item.tsx:195
+#: src/features/settings/components/personalization/memory-item.tsx:206
 msgid "Happens on"
 msgstr "Odbywa się"
 
-#: src/features/settings/components/chat/bots-settings.tsx:252
+#: src/features/settings/components/chat/bots-settings.tsx:304
 msgid "Has a computer"
 msgstr "Ma komputer"
 
@@ -16554,7 +16602,7 @@ msgstr "Współczynnik trafień"
 msgid "HLS playback is not supported in this browser."
 msgstr "Odtwarzanie HLS nie jest obsługiwane w tej przeglądarce."
 
-#: src/features/settings/components/personalization/memory-item.tsx:197
+#: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Obowiązuje do"
 
@@ -17129,7 +17177,7 @@ msgstr "Zaimportowano strony z Notion: {added}."
 msgid "Imported as /{0}."
 msgstr "Zaimportowano jako /{0}."
 
-#: src/features/settings/components/personalization/memory-item.tsx:264
+#: src/features/settings/components/personalization/memory-item.tsx:275
 msgid "Imported from {importedFromLabel}"
 msgstr "Zaimportowano z: {importedFromLabel}"
 
@@ -17516,7 +17564,7 @@ msgstr "instrukcyjny"
 msgid "instructions"
 msgstr "instrukcje"
 
-#: src/features/settings/components/chat/bots-settings.tsx:197
+#: src/features/settings/components/chat/bots-settings.tsx:241
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -18314,7 +18362,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "Ostatnia aktywność {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:263
+#: src/features/settings/components/personalization/memory-item.tsx:274
 msgid "Last confirmed {0}"
 msgstr "Ostatnio potwierdzono {0}"
 
@@ -19292,8 +19340,8 @@ msgstr "Wczytywanie..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:242
-#: src/features/settings/components/personalization/memory-item.tsx:128
+#: src/features/settings/components/chat/bots-settings.tsx:294
+#: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "Wczytywanie…"
@@ -20102,7 +20150,7 @@ msgid "memories"
 msgstr "wspomnienia"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:219
+#: src/features/settings/components/personalization/memory-settings.tsx:220
 msgid "Memories"
 msgstr "Wspomnienia"
 
@@ -20120,7 +20168,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Wspomnienia użyte w tej odpowiedzi ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Pamięć"
@@ -20129,15 +20177,15 @@ msgstr "Pamięć"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Pamięć — co agent zapamiętuje między czatami"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:108
+#: src/features/settings/components/personalization/memory-settings.tsx:109
 msgid "Memory deleted"
 msgstr "Usunięto wspomnienie"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory disabled"
 msgstr "Wyłączono pamięć"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory enabled"
 msgstr "Włączono pamięć"
 
@@ -20153,7 +20201,7 @@ msgstr "Pamięć jest wyłączona, dopóki jej nie włączysz. Czaty tymczasowe 
 msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
 msgstr "Pamięć jest wyłączona. Włącz ją, aby importować wspomnienia; gdy jest wyłączona, nic nie jest zapisywane."
 
-#: src/features/settings/components/personalization/memory-item.tsx:302
+#: src/features/settings/components/personalization/memory-item.tsx:313
 msgid "Memory text"
 msgstr "Treść wspomnienia"
 
@@ -20161,7 +20209,7 @@ msgstr "Treść wspomnienia"
 msgid "Memory the agent keeps across chats"
 msgstr "Pamięć, którą agent zachowuje między czatami"
 
-#: src/features/settings/components/personalization/memory-item.tsx:249
+#: src/features/settings/components/personalization/memory-item.tsx:260
 msgid "Memory type"
 msgstr "Typ wspomnienia"
 
@@ -20596,7 +20644,7 @@ msgstr "Tryb:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:206
+#: src/features/settings/components/chat/bots-settings.tsx:250
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21139,6 +21187,10 @@ msgstr "Muzyka"
 msgid "Mute"
 msgstr "Wycisz"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:115
+msgid "Mute thread"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:105
 msgid "my data"
 msgstr "moje dane"
@@ -21191,7 +21243,7 @@ msgstr "nazwa"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:184
+#: src/features/settings/components/chat/bots-settings.tsx:228
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21553,6 +21605,10 @@ msgstr "Nigdy nie obejmuje narzędzia, które sam ustawisz na Pytaj, narzędzi w
 msgid "Never expires"
 msgstr "Nigdy nie wygasa"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:346
+msgid "Never given to the bot, even when allowed above."
+msgstr "Nigdy nie trafiają do bota, nawet jeśli są dozwolone powyżej."
+
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:46
 msgid "Never used"
 msgstr "Nigdy nie użyto"
@@ -21568,7 +21624,7 @@ msgstr "Nowy"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "Nowe boty Azure są single-tenant: ustaw klucz Teams Tenant ID, w przeciwnym razie odpowiedzi nie przejdą uwierzytelnienia."
 
-#: src/features/settings/components/chat/bots-settings.tsx:182
+#: src/features/settings/components/chat/bots-settings.tsx:226
 msgid "New bot"
 msgstr "Nowy bot"
 
@@ -21613,7 +21669,7 @@ msgstr "Nowe czaty są domyślnie trwałe"
 msgid "New chats start temporary"
 msgstr "Nowe czaty są domyślnie tymczasowe"
 
-#: src/features/settings/components/chat/bots-settings.tsx:157
+#: src/features/settings/components/chat/bots-settings.tsx:179
 msgid "New chats with this bot start in the chosen mode"
 msgstr "Nowe czaty z tym botem zaczynają się w wybranym trybie"
 
@@ -21932,7 +21988,7 @@ msgstr "Nie znaleziono wpisów dziennika audytu"
 msgid "No bot"
 msgstr "Brak bota"
 
-#: src/features/settings/components/chat/bots-settings.tsx:245
+#: src/features/settings/components/chat/bots-settings.tsx:297
 msgid "No bots yet."
 msgstr "Brak botów."
 
@@ -22180,11 +22236,11 @@ msgstr "Nie skonfigurowano serwerów MCP. Dodaj serwer, aby rozszerzyć możliwo
 msgid "No members in this team yet"
 msgstr "W tym zespole nie ma jeszcze członków"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:235
+#: src/features/settings/components/personalization/memory-settings.tsx:236
 msgid "No memories of this type."
 msgstr "Brak wspomnień tego typu."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:237
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Nie ma jeszcze wspomnień. AI zacznie automatycznie uczyć się z twoich rozmów."
 
@@ -22344,7 +22400,7 @@ msgstr "Żadne publiczne umiejętności nie pasują do wyszukiwania."
 msgid "No public skills yet. Publish one by setting a skill's visibility to Public."
 msgstr "Nie ma jeszcze publicznych umiejętności. Opublikuj jedną, ustawiając jej widoczność na Publiczna."
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "No quote was kept for this memory."
 msgstr "Dla tego wspomnienia nie zachowano cytatu."
 
@@ -22395,6 +22451,10 @@ msgstr "Nie znaleziono wyników."
 #: src/features/evals/components/dataset-panel.tsx:215
 msgid "No runs yet. Start one to score every case."
 msgstr "Nie ma jeszcze przebiegów. Uruchom jeden, aby ocenić każdy przypadek."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:204
+msgid "No server, connector or computer matches {unknownServer}."
+msgstr "Żaden serwer, konektor ani komputer nie pasuje do {unknownServer}."
 
 #: src/features/admin/components/user-sessions-dialog.tsx:134
 msgid "No sessions found"
@@ -23036,7 +23096,7 @@ msgid "Ollama or LM Studio on localhost, called by your browser. Text only, not 
 msgstr "Ollama lub LM Studio na localhost, wywoływane przez twoją przeglądarkę. Tylko tekst, bez opłat."
 
 #. placeholder {0}: day(memory.eventStart)
-#: src/features/settings/components/personalization/memory-item.tsx:170
+#: src/features/settings/components/personalization/memory-item.tsx:180
 msgid "On {0}"
 msgstr "{0}"
 
@@ -23205,6 +23265,10 @@ msgstr "Kontynuuj tylko wtedy, gdy właśnie uruchomiono to poleceniem `neore-ho
 msgid "Only in one run"
 msgstr "Tylko w jednym przebiegu"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:320
+msgid "Only listed tools"
+msgstr "Tylko wymienione narzędzia"
+
 #: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
 msgstr "Tylko właściciele organizacji mogą zarządzać ustawieniami rozliczeń"
@@ -23362,7 +23426,7 @@ msgstr "Otworzyć cofnięcie tego {requestNoun}?"
 msgid "Open as page"
 msgstr "Otwórz jako stronę"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open chat"
 msgstr "Otwórz czat"
 
@@ -23425,7 +23489,7 @@ msgid "Open in new window"
 msgstr "Otwórz w nowym oknie"
 
 #: src/features/chat/thread-list/thread-node.tsx:590
-#: src/features/chat/thread-list/thread-options-menu.tsx:73
+#: src/features/chat/thread-list/thread-options-menu.tsx:79
 msgid "Open in split view"
 msgstr "Otwórz w widoku podzielonym"
 
@@ -23445,7 +23509,7 @@ msgstr "Otwieranie linków"
 msgid "Open menu"
 msgstr "Otwórz menu"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open message"
 msgstr "Otwórz wiadomość"
 
@@ -24825,12 +24889,12 @@ msgid "Permission Level"
 msgstr "Poziom uprawnień"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
-#: src/features/settings/components/chat/bots-settings.tsx:210
+#: src/features/settings/components/chat/bots-settings.tsx:254
 msgid "Permission mode"
 msgstr "Tryb uprawnień"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:256
+#: src/features/settings/components/chat/bots-settings.tsx:309
 msgid "Permission mode for {0}"
 msgstr "Tryb uprawnień dla {0}"
 
@@ -25013,7 +25077,7 @@ msgstr "Przypnij"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Przypnij wspomnienie, aby nie zanikło, nie zostało scalone ani awansowane. Tylko wspomnienia aktywności zanikają same."
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
 msgstr "Przypnij wspomnienie"
 
@@ -27080,12 +27144,12 @@ msgstr "Wygeneruj ponownie"
 msgid "Regenerate response"
 msgstr "Wygeneruj odpowiedź ponownie"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:97
 msgid "Regenerate title"
 msgstr "Wygeneruj tytuł ponownie"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:85
-#: src/features/chat/thread-list/thread-options-menu.tsx:98
+#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:122
 msgid "Regenerating the title"
 msgstr "Ponowne generowanie tytułu"
 
@@ -27315,6 +27379,10 @@ msgstr "Usuń {modelId} z listy zablokowanych"
 msgid "Remove {name}"
 msgstr "Usuń {name}"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:222
+msgid "Remove {shown}"
+msgstr "Usuń {shown}"
+
 #: src/features/admin/components/update-user-role-dialog.tsx:64
 #: src/features/admin/components/user-cell.tsx:110
 msgid "Remove Admin"
@@ -27506,11 +27574,15 @@ msgstr "Usunięte"
 msgid "Removed from favorites"
 msgstr "Usunięto z ulubionych"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:114
+msgid "Removed server"
+msgstr "Usunięty serwer"
+
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Removed:"
 msgstr "Usunięto:"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:72
+#: src/features/chat/thread-list/thread-options-menu.tsx:78
 msgid "Rename"
 msgstr "Zmień nazwę"
 
@@ -28614,7 +28686,7 @@ msgstr "Arabia Saudyjska"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:344
+#: src/features/settings/components/personalization/memory-item.tsx:355
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -28694,6 +28766,10 @@ msgstr "Zapisz umiejętność"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:56
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "Zapisz te kody zapasowe w bezpiecznym miejscu. Możesz ich użyć, aby uzyskać dostęp do konta, jeśli stracisz urządzenie do uwierzytelniania dwuskładnikowego."
+
+#: src/features/settings/components/chat/bots-settings.tsx:374
+msgid "Save tools"
+msgstr "Zapisz narzędzia"
 
 #: src/features/prompts/components/thread-variables-config.tsx:263
 msgid "Save Variables"
@@ -32167,7 +32243,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "Znakomite rozumienie złożonych koncepcji wizualnych"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
-#: src/features/settings/components/chat/bots-settings.tsx:60
+#: src/features/settings/components/chat/bots-settings.tsx:65
 msgid "Supervised"
 msgstr "Nadzorowany"
 
@@ -33181,7 +33257,7 @@ msgstr "Plan agenta"
 msgid "The agent's tool calls"
 msgstr "Wywołania narzędzi agenta"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:162
+#: src/features/settings/components/personalization/memory-settings.tsx:163
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI uczy się z twoich rozmów, aby personalizować odpowiedzi, a każdej nocy analizuje to, czego się nauczyło. Wszystko, co pamięta, jest wymienione tutaj — możesz to edytować, zmienić typ, przypiąć lub usunąć."
 
@@ -33218,13 +33294,21 @@ msgstr "Asystent prosi o sekret"
 msgid "The assistant needs a secret"
 msgstr "Asystent potrzebuje sekretu"
 
-#: src/features/settings/components/chat/bots-settings.tsx:281
+#: src/features/settings/components/chat/bots-settings.tsx:382
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "Bot i jego komputer zostaną usunięte. Jego czaty pozostaną jako zwykłe czaty."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:322
+msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
+msgstr "Bot dostaje tylko narzędzia, na które pozwolisz. Bez żadnego dozwolonego nie dostaje żadnych narzędzi."
 
 #: src/features/chat/thread/composer-model-selector.tsx:137
 msgid "The bot sets the model for this chat."
 msgstr "Bot ustawia model dla tego czatu."
+
+#: src/features/settings/components/chat/bots-settings.tsx:200
+msgid "The bot's tools were saved"
+msgstr "Zapisano narzędzia bota"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
@@ -33631,7 +33715,7 @@ msgstr "Rejestr MCP jest teraz niedostępny. Zamiast tego wyświetlane są popul
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Nie udało się wysłać wiadomości. Sprawdź połączenie i spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:212
+#: src/features/settings/components/chat/bots-settings.tsx:256
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "Tryb, w którym zaczyna się każdy nowy czat z tym botem. Nadal możesz go zmienić w każdym czacie. Zaplanowane uruchomienia używają go tylko wtedy, gdy wymaga więcej potwierdzeń."
 
@@ -33747,7 +33831,7 @@ msgstr "Kolejka jest wstrzymana. Wybierz „Wyślij następną”, aby kontynuow
 msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
 msgstr "Szybka kontrola obejmuje tylko narzędzia z serwerów, którym ufasz. Opisy narzędzi zaufanego serwera trafiają do modelu, więc mogą wpływać na to, które wywołania są zatwierdzane automatycznie. Zmiana adresu serwera kończy to zaufanie."
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "The quote stays hidden while you can't open its chat."
 msgstr "Cytat pozostaje ukryty, dopóki nie możesz otworzyć jego czatu."
 
@@ -34406,6 +34490,10 @@ msgstr "Ten link jest niekompletny. Poproś o pełny link."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Ten link nie przyjmuje teraz wiadomości. Spróbuj ponownie później."
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:205
+msgid "This list is full: remove a tool before adding another."
+msgstr "{'de': 'Diese Liste ist voll: Entferne ein Tool, bevor du ein weiteres hinzufügst.', 'es': 'Esta lista está llena: quita una herramienta antes de añadir otra.', 'fr': 'Cette liste est pleine : retirez un outil avant d’en ajouter un autre.', 'it': 'Questo elenco è pieno: rimuovi uno strumento prima di aggiungerne un altro.', 'ja': 'このリストは上限に達しています。別のツールを追加する前に、ツールを1つ削除してください。', 'pl': 'Ta lista jest pełna: usuń narzędzie, zanim dodasz kolejne.', 'pt': 'Esta lista está cheia: remova uma ferramenta antes de adicionar outra.', 'zh': '此列表已满：请先移除一个工具，再添加新的。'}"
+
 #: src/features/projects/components/add-project-dialog.tsx:436
 msgid "This machine is not ready yet."
 msgstr "Ta maszyna nie jest jeszcze gotowa."
@@ -34688,7 +34776,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Anonimowe konta użytkowników ({0}) i wszystkie ich dane zostaną trwale usunięte. Tej operacji nie można cofnąć."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:252
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Wszystkie wspomnienia ({0}) i ich dzienne podsumowania zostaną trwale usunięte. AI zacznie uczyć się od nowa od twojej następnej rozmowy."
 
@@ -34789,11 +34877,11 @@ msgstr "Zarządzanie wątkami"
 msgid "Thread not found or you don't have access to it"
 msgstr "Nie znaleziono wątku lub nie masz do niego dostępu"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:69
+#: src/features/chat/thread-list/thread-options-menu.tsx:75
 msgid "Thread options"
 msgstr "Opcje wątku"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:57
+#: src/features/chat/thread-list/thread-options-menu.tsx:63
 msgid "Thread options: {label}"
 msgstr "Opcje wątku: {label}"
 
@@ -35158,12 +35246,21 @@ msgstr "Uprawnienia narzędzi"
 msgid "Tool Provider Keys"
 msgstr "Klucze dostawców narzędzi"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:299
+#: src/features/settings/components/chat/bots-settings.tsx:325
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "Narzędzia"
+
+#. placeholder {0}: bot.name
+#. placeholder {0}: editingTools?.name ?? ""
+#: src/features/settings/components/chat/bots-settings.tsx:315
+#: src/features/settings/components/chat/bots-settings.tsx:355
+msgid "Tools for {0}"
+msgstr "Narzędzia dla {0}"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
@@ -35867,6 +35964,10 @@ msgstr "Cofnij"
 msgid "Undo (Ctrl+Z)"
 msgstr "Cofnij (Ctrl+Z)"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:110
+msgid "Unfollow thread"
+msgstr ""
+
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
 msgid "Unfreeze case {0}"
@@ -35997,7 +36098,7 @@ msgstr "Odepnij od lewej"
 msgid "Unpin from right"
 msgstr "Odepnij od prawej"
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Unpin memory"
 msgstr "Odepnij wspomnienie"
 
@@ -36041,7 +36142,7 @@ msgid "until {0}"
 msgstr "do {0}"
 
 #. placeholder {0}: day(memory.validUntil)
-#: src/features/settings/components/personalization/memory-item.tsx:173
+#: src/features/settings/components/personalization/memory-item.tsx:183
 msgid "Until {0}"
 msgstr "Do {0}"
 
@@ -37670,6 +37771,10 @@ msgstr "URL webhooka skopiowany do schowka"
 msgid "WebP (Smaller)"
 msgstr "WebP (mniejszy)"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:187
+msgid "webSearch or server:tool"
+msgstr "webSearch lub server:tool"
+
 #: src/features/canvas/components/design-preset-selector.tsx:69
 msgid "Website Banner"
 msgstr "Baner witryny"
@@ -37977,11 +38082,11 @@ msgstr "Dlaczego {0}"
 msgid "Why <0>Neore.</0>"
 msgstr "Dlaczego <0>Neore.</0>"
 
-#: src/features/settings/components/personalization/memory-item.tsx:269
+#: src/features/settings/components/personalization/memory-item.tsx:280
 msgid "Why was this remembered?"
 msgstr "Dlaczego to zostało zapamiętane?"
 
-#: src/features/settings/components/personalization/memory-item.tsx:274
+#: src/features/settings/components/personalization/memory-item.tsx:285
 msgid "Why?"
 msgstr "Dlaczego?"
 
@@ -38590,7 +38695,7 @@ msgstr "Twój zasób Azure OpenAI: punkt końcowy, wersja API i nazwy wdrożeń.
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Twoje doświadczenie, preferencje lub lokalizacja, aby AI lepiej cię rozumiało"
 
-#: src/features/settings/components/chat/bots-settings.tsx:239
+#: src/features/settings/components/chat/bots-settings.tsx:291
 msgid "Your bots"
 msgstr "Twoje boty"
 

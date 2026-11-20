@@ -51,6 +51,11 @@ export const vToolRunConfig = v.object({
      */
     mcpToolFingerprints: v.optional(v.record(v.string(), v.string())),
     /**
+     * Runtime name -> origin of each MCP tool the run offered (`mcpToolOrigin`): which server's which tool the name stood
+     * for. A continuation does not run an approved call whose name now stands for another. Absent on an older snapshot: no check.
+     */
+    mcpToolOrigins: v.optional(v.record(v.string(), v.string())),
+    /**
      * Set when the run that paused fed memory extraction (it extracted its own prompt
      * and steers at the pause). The continuation then extracts only what it adds: the
      * messages steered into it after the pause.

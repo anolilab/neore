@@ -45,7 +45,7 @@ import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
-import { mcpToolDrift, mcpToolDriftReason } from "./mcp-tool-fingerprint";
+import { mcpToolDrift, mcpToolDriftReason, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
@@ -1383,10 +1383,16 @@ export const resumeApprovedRun = async (
 
         // The approval was given for the MCP tool as the paused run offered it. One that changed or went away since is not
         // run under it: the call is answered as denied with the reason, so the model can call the tool again, which asks again.
-        const drift =
+        // Nor is one whose name now stands for another server's tool (`mcpToolOriginDrift`), fingerprinted or not.
+        const offered = pending.toolName !== null && Object.hasOwn(toolResult.tools, pending.toolName);
+        const fingerprintDrift =
             approved && pending.toolName !== null
-                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
+                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, offered)
                 : "unchanged";
+        const drift =
+            fingerprintDrift === "unchanged" && approved && pending.toolName !== null
+                ? mcpToolOriginDrift(config.mcpToolOrigins, toolResult.mcpToolOrigins, pending.toolName, offered)
+                : fingerprintDrift;
         let runApproved = approved && drift === "unchanged";
         let runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
 
@@ -1674,6 +1680,7 @@ export const resumeApprovedRun = async (
                     ...config,
                     ...(stepsLeft !== undefined && { stepsLeft }),
                     mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                    mcpToolOrigins: toolResult.mcpToolOrigins,
                     toolPermissionKeys: toolResult.permissionKeys,
                 },
                 streamId,

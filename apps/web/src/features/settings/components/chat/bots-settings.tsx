@@ -2,11 +2,13 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import type { BotToolSelection } from "@neore/backend/bots/tool-selectors";
 import type { ThreadPermissionMode } from "@neore/backend/chat/permission-mode";
 import { DEFAULT_THREAD_PERMISSION_MODE, isThreadPermissionMode, THREAD_PERMISSION_MODES } from "@neore/backend/chat/permission-mode";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
@@ -20,6 +22,7 @@ import { toast } from "sonner";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
+import { BotToolSelectionFields, useToolCatalog } from "@/features/settings/components/chat/bot-tool-selection";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 interface BotDraft {
@@ -29,6 +32,7 @@ interface BotDraft {
     model: string;
     name: string;
     permissionMode: ThreadPermissionMode;
+    toolSelection: BotToolSelection | null;
 }
 
 const emptyDraft = (): BotDraft => {
@@ -39,6 +43,7 @@ const emptyDraft = (): BotDraft => {
         model: DEFAULT_CHAT_MODEL,
         name: "",
         permissionMode: DEFAULT_THREAD_PERMISSION_MODE,
+        toolSelection: null,
     };
 };
 
@@ -111,7 +116,15 @@ const BotsSettings = () => {
     const impersonating = useImpersonating();
 
     const [draft, setDraft] = useState<BotDraft>(emptyDraft);
+    // Bumped on each create, so the next bot's tool fields start fresh instead of bringing back the last bot's lists.
+    const [createdCount, setCreatedCount] = useState(0);
+    // A tool typed into a list but not added (an unknown name, a full list): the save is refused until it is added or cleared.
+    const [createToolsPending, setCreateToolsPending] = useState(false);
+    const [editToolsPending, setEditToolsPending] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+    // The tools dialog edits a copy: the bot's stored selection changes only once the server took the save.
+    const [editingTools, setEditingTools] = useState<{ id: string; name: string; selection: BotToolSelection | null } | null>(null);
+    const toolCatalog = useToolCatalog();
 
     const canCreate = draft.name.trim().length > 0 && draft.instructions.trim().length > 0;
 
@@ -119,6 +132,12 @@ const BotsSettings = () => {
         event.preventDefault();
 
         if (!canCreate) {
+            return;
+        }
+
+        if (createToolsPending) {
+            toast.error(t`A tool you typed was not added. Add it or clear the field first.`);
+
             return;
         }
 
@@ -131,8 +150,11 @@ const BotsSettings = () => {
                 name: draft.name.trim(),
                 // Auto is stored as nothing: a bot with no mode runs exactly as one set to auto.
                 ...(draft.permissionMode !== DEFAULT_THREAD_PERMISSION_MODE && { permissionMode: draft.permissionMode }),
+                ...(draft.toolSelection !== null && { toolSelection: draft.toolSelection }),
             });
             setDraft(emptyDraft());
+            setCreatedCount((count) => count + 1);
+            setCreateToolsPending(false);
             await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey });
             toast.success(t`Bot created`);
         } catch {
@@ -157,6 +179,28 @@ const BotsSettings = () => {
             toast.success(t`New chats with this bot start in the chosen mode`);
         } catch {
             toast.error(t`Could not change the bot's permission mode.`);
+        }
+    };
+
+    const handleToolsSave = async () => {
+        if (!editingTools) {
+            return;
+        }
+
+        if (editToolsPending) {
+            toast.error(t`A tool you typed was not added. Add it or clear the field first.`);
+
+            return;
+        }
+
+        try {
+            await updateMutation.mutateAsync({ botId: editingTools.id as Id<"bots">, patch: { toolSelection: editingTools.selection } });
+            await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey });
+            setEditingTools(null);
+            toast.success(t`The bot's tools were saved`);
+        } catch {
+            // The dialog stays open with the unsaved pick; the bot keeps the tools it had.
+            toast.error(t`Could not save the bot's tools. Its tools are unchanged.`);
         }
     };
 
@@ -219,6 +263,14 @@ const BotsSettings = () => {
                         value={draft.permissionMode}
                     />
                 </div>
+                <BotToolSelectionFields
+                    catalog={toolCatalog}
+                    disabled={impersonating}
+                    key={createdCount}
+                    onChange={(toolSelection) => setDraft({ ...draft, toolSelection })}
+                    onPendingChange={setCreateToolsPending}
+                    value={draft.toolSelection}
+                />
                 <div className="flex items-center justify-between gap-4">
                     <div>
                         <Label htmlFor={computerId}>{t`Computer`}</Label>
@@ -250,6 +302,7 @@ const BotsSettings = () => {
                                 <p className="truncate font-medium">{bot.name}</p>
                                 {bot.description && <p className="text-muted-foreground truncate text-sm">{bot.description}</p>}
                                 {bot.computerEnabled && <p className="text-muted-foreground text-xs">{t`Has a computer`}</p>}
+                                {bot.toolSelection && <p className="text-muted-foreground text-xs">{t`Custom tools`}</p>}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <PermissionModeSelect
@@ -258,6 +311,19 @@ const BotsSettings = () => {
                                     onChange={(permissionMode) => handleModeChange(bot._id, permissionMode)}
                                     value={bot.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE}
                                 />
+                                <Button
+                                    aria-label={t`Tools for ${bot.name}`}
+                                    disabled={impersonating}
+                                    onClick={() => {
+                                        setEditToolsPending(false);
+                                        setEditingTools({ id: bot._id, name: bot.name, selection: bot.toolSelection ?? null });
+                                    }}
+                                    size="sm"
+                                    type="button"
+                                    variant="outline"
+                                >
+                                    {t`Tools`}
+                                </Button>
                                 <Button onClick={() => handleChat(bot)} size="sm" type="button" variant="outline">
                                     {t`Chat`}
                                 </Button>
@@ -275,6 +341,41 @@ const BotsSettings = () => {
                     ))}
                 </ul>
             </div>
+
+            <Dialog
+                onOpenChange={(open: boolean) => {
+                    if (!open) {
+                        setEditingTools(null);
+                    }
+                }}
+                open={editingTools !== null}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t`Tools for ${editingTools?.name ?? ""}`}</DialogTitle>
+                        <DialogDescription>{t`Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply.`}</DialogDescription>
+                    </DialogHeader>
+                    <DialogPanel>
+                        {editingTools && (
+                            <BotToolSelectionFields
+                                catalog={toolCatalog}
+                                disabled={updateMutation.isPending}
+                                onChange={(selection) => setEditingTools({ ...editingTools, selection })}
+                                onPendingChange={setEditToolsPending}
+                                value={editingTools.selection}
+                            />
+                        )}
+                    </DialogPanel>
+                    <DialogFooter>
+                        <Button onClick={() => setEditingTools(null)} type="button" variant="outline">
+                            {t`Cancel`}
+                        </Button>
+                        <Button disabled={updateMutation.isPending} onClick={handleToolsSave} type="button">
+                            {t`Save tools`}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <ConfirmDialog
                 confirmLabel={t`Delete`}

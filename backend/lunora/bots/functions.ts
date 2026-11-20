@@ -3,6 +3,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
+import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { DEFAULT_THREAD_PERMISSION_MODE, type ThreadPermissionMode } from "../chat/lib/thread-permission-mode";
 import { deleteBotConnectorAccess } from "../connectors/access";
@@ -12,8 +13,19 @@ import { MAX_LENGTH } from "../lib/validators";
 import { SUB_AGENT_MAX_DEPTH } from "../sub-agents/logic";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { markBotOwnerDeleted } from "./owner";
+import type { BotToolSelection } from "./tool-selectors";
+import { readRunToolSelection } from "./run-tool-selection";
+import { BOT_TOOL_SELECTOR_MAX_COUNT, BOT_TOOL_SELECTOR_MAX_LENGTH, normalizeBotToolSelection } from "./tool-selectors";
 
 const vPermissionMode = v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"));
+
+const vToolSelection = v.object({ allow: v.optional(v.array(v.string())), exclude: v.array(v.string()) });
+
+/** A selection as a client sends it: capped here, normalized by `normalizeBotToolSelection`. */
+const vToolSelectionInput = v.object({
+    allow: v.optional(v.array(v.string().max(BOT_TOOL_SELECTOR_MAX_LENGTH)).max(BOT_TOOL_SELECTOR_MAX_COUNT)),
+    exclude: v.array(v.string().max(BOT_TOOL_SELECTOR_MAX_LENGTH)).max(BOT_TOOL_SELECTOR_MAX_COUNT),
+});
 
 const vBot = v.object({
     _creationTime: v.number(),
@@ -25,6 +37,7 @@ const vBot = v.object({
     model: v.string(),
     name: v.string(),
     permissionMode: v.optional(vPermissionMode),
+    toolSelection: v.optional(vToolSelection),
     updatedAt: v.number(),
     userId: v.string(),
 });
@@ -37,6 +50,35 @@ const assertModeChangeAllowed = (context: { user: { impersonatedBy?: string | nu
     if (mode !== undefined && context.user.impersonatedBy) {
         throw new LunoraError("FORBIDDEN", "The permission mode cannot be changed while impersonating");
     }
+};
+
+/** Clearing a selection or an exclusion gives the bot's runs more tools: like `full`, the owner's to give, never an admin acting as them. */
+const assertToolSelectionChangeAllowed = (context: { user: { impersonatedBy?: string | null } }, selection: BotToolSelection | null | undefined): void => {
+    if (selection !== undefined && context.user.impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "The tool selection cannot be changed while impersonating");
+    }
+};
+
+/** How big a selection is, for the audit event: counts only, never the selectors, which carry server addresses. */
+const selectionCounts = (selection: BotToolSelection | undefined): { allowed: number | "all"; excluded: number } => {
+    return { allowed: selection?.allow?.length ?? "all", excluded: selection?.exclude.length ?? 0 };
+};
+
+const sameSelection = (a: BotToolSelection | undefined, b: BotToolSelection | undefined): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** `null` = every tool, stored as no selection; anything else is normalized, or refused when it breaks a cap. */
+const storedToolSelection = (selection: BotToolSelection | null): BotToolSelection | undefined => {
+    if (selection === null) {
+        return undefined;
+    }
+
+    const normalized = normalizeBotToolSelection(selection);
+
+    if ("error" in normalized) {
+        throw new LunoraError("INVALID_ARGUMENT", normalized.error);
+    }
+
+    return normalized.selection ?? undefined;
 };
 
 const assertUsableModel = (model: string): void => {
@@ -64,6 +106,7 @@ export const createBot = authMutation
         model: v.string().max(MAX_LENGTH.short),
         name: v.string().max(MAX_LENGTH.short),
         permissionMode: v.optional(vPermissionMode),
+        toolSelection: v.optional(vToolSelectionInput),
     })
     .output(v.string())
     .mutation(async ({ args, ctx: context }) => {
@@ -72,6 +115,9 @@ export const createBot = authMutation
 
         assertUsableModel(args.model);
         assertModeChangeAllowed(context, args.permissionMode);
+        assertToolSelectionChangeAllowed(context, args.toolSelection);
+
+        const toolSelection = args.toolSelection && storedToolSelection(args.toolSelection);
 
         // The web form trims its fields, but an API caller sends them raw: a blank name or instruction is refused here.
         if (args.name.trim() === "" || args.instructions.trim() === "") {
@@ -95,6 +141,7 @@ export const createBot = authMutation
             model: args.model,
             name: args.name,
             ...(args.permissionMode && args.permissionMode !== DEFAULT_THREAD_PERMISSION_MODE && { permissionMode: args.permissionMode }),
+            ...(toolSelection && { toolSelection }),
             updatedAt: now,
             userId,
         });
@@ -106,7 +153,21 @@ export const createBot = authMutation
             botId,
             computerEnabled: args.computerEnabled,
             permissionMode: args.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE,
+            toolSelection: toolSelection !== undefined,
         });
+
+        if (toolSelection !== undefined) {
+            // Which bot was limited to which tools, and by whom: counts in the request log for a later investigation.
+            const to = selectionCounts(toolSelection);
+
+            context.log.event("bots.bot_tool_selection_changed", {
+                botId,
+                fromAllowed: "all",
+                fromExcluded: 0,
+                toAllowed: to.allowed,
+                toExcluded: to.excluded,
+            });
+        }
 
         return botId as string;
     });
@@ -122,6 +183,8 @@ export const updateBot = authMutation
             model: v.optional(v.string().max(MAX_LENGTH.short)),
             name: v.optional(v.string().max(MAX_LENGTH.short)),
             permissionMode: v.optional(vPermissionMode),
+            // `null` = back to every tool.
+            toolSelection: v.optional(v.union(vToolSelectionInput, v.null())),
         }),
     })
     .output(v.null())
@@ -143,15 +206,34 @@ export const updateBot = authMutation
             throw new LunoraError("INVALID_ARGUMENT", "A bot needs a name and instructions.");
         }
 
-        const { permissionMode, ...rest } = patch;
+        const { permissionMode, toolSelection, ...rest } = patch;
+
+        assertToolSelectionChangeAllowed(context, toolSelection);
+
+        const nextSelection = toolSelection === undefined ? bot.toolSelection : storedToolSelection(toolSelection);
 
         await patchRow(context.db, "bots", bot, {
             ...withoutUndefined({ ...rest, updatedAt: context.now }),
             // The default is stored as no mode, as on create, so the bot keeps following the default.
             ...(permissionMode !== undefined && { permissionMode: permissionMode === DEFAULT_THREAD_PERMISSION_MODE ? undefined : permissionMode }),
+            ...(toolSelection !== undefined && { toolSelection: nextSelection }),
         });
 
-        context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled });
+        context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled, toolSelectionChanged: toolSelection !== undefined });
+
+        if (!sameSelection(bot.toolSelection, nextSelection)) {
+            // Which bot gained or lost tools: counts before and after, never the selectors (they carry server addresses).
+            const from = selectionCounts(bot.toolSelection);
+            const to = selectionCounts(nextSelection);
+
+            context.log.event("bots.bot_tool_selection_changed", {
+                botId: bot._id,
+                fromAllowed: from.allowed,
+                fromExcluded: from.excluded,
+                toAllowed: to.allowed,
+                toExcluded: to.excluded,
+            });
+        }
 
         if (permissionMode !== undefined && permissionMode !== (bot.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE)) {
             // Who changed which bot's default tool permissions, and from what: kept in the request log for a later investigation.
@@ -246,40 +328,69 @@ export const getBotForRun = internalQuery
     });
 
 /**
- * The permission mode of the bot an unattended run belongs to: the bot it names, else the bot of the thread it continues (a task's
- * round on a bot's chat), or `null` when neither leads to a bot of the caller's. A sub-agent child's thread names no bot, so the
- * chain is followed up to its lead, at most one step per nesting level. Internal: `chat/lib/headless-run.ts`, `chat/lib/agent-run.ts`.
+ * The bot a run belongs to: the bot it names, else the bot of the thread it continues (a task's round on a bot's
+ * chat), or `null` when neither leads to a bot of the caller's. A sub-agent child's thread names no bot, so the chain is followed
+ * up to its lead, at most one step per nesting level.
  */
+const findRunBot = async (ctx: QueryCtx, { botId, threadId, userId }: { botId?: string; threadId?: string; userId: string }) => {
+    let id = botId;
+    let next = id === undefined ? threadId : undefined;
+
+    for (let step = 0; next !== undefined && step <= SUB_AGENT_MAX_DEPTH; step += 1) {
+        const normalized = ctx.db.normalizeId("threads", next);
+        const thread = normalized ? await ctx.db.get("threads", normalized) : null;
+
+        if (thread?.userId !== userId) {
+            break;
+        }
+
+        id = thread.botId;
+
+        const childOf: string = next;
+        const run =
+            id === undefined
+                ? await ctx.db
+                      .query("subAgentRuns")
+                      .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childOf))
+                      .first()
+                : null;
+
+        next = run?.userId === userId ? run.parentThreadId : undefined;
+    }
+
+    const bot = id === undefined ? null : await ctx.db.get("bots", id as Id<"bots">);
+
+    return bot?.userId === userId ? bot : null;
+};
+
+/** The permission mode of the bot a run belongs to ({@link findRunBot}). Internal: `chat/lib/headless-run.ts`, `chat/lib/agent-run.ts`. */
 export const getBotPermissionModeForRun = internalQuery
     .input({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(vPermissionMode, v.null()))
-    .query(async ({ args: { botId, threadId, userId }, ctx }) => {
-        let id = botId;
-        let next = id === undefined ? threadId : undefined;
+    .query(async ({ args, ctx }) => {
+        const bot = await findRunBot(ctx, args);
 
-        for (let step = 0; next !== undefined && step <= SUB_AGENT_MAX_DEPTH; step += 1) {
-            const normalized = ctx.db.normalizeId("threads", next);
-            const thread = normalized ? await ctx.db.get("threads", normalized) : null;
+        return bot?.permissionMode ?? null;
+    });
 
-            if (thread?.userId !== userId) {
-                break;
-            }
+/** `readRunToolSelection` (`run-tool-selection.ts`) for an action. Internal: `chat/lib/agent-tools.ts`, which applies it to every run's tools. */
+export const getBotToolSelectionForRun = internalQuery
+    .input({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })
+    .output(v.union(v.object({ ownerId: v.string(), ownerServerKeys: v.array(v.string()), selection: vToolSelection }), v.null()))
+    .query(async ({ args, ctx }) => await readRunToolSelection(ctx, args));
 
-            id = thread.botId;
+/**
+ * Whether any of the user's bots has a tool selection. Internal: `chat/lib/mcp-apps.ts`, which refuses an app call that names
+ * no chat for such a user, since without the chat it cannot tell which bot's selection holds.
+ */
+export const hasBotWithToolSelection = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args: { userId }, ctx }) => {
+        const bots = await ctx.db
+            .query("bots")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .take(MAX_BOTS_PER_USER);
 
-            const childOf: string = next;
-            const run =
-                id === undefined
-                    ? await ctx.db
-                          .query("subAgentRuns")
-                          .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childOf))
-                          .first()
-                    : null;
-
-            next = run?.userId === userId ? run.parentThreadId : undefined;
-        }
-
-        const bot = id === undefined ? null : await ctx.db.get("bots", id as Id<"bots">);
-
-        return bot?.userId === userId ? (bot.permissionMode ?? null) : null;
+        return bots.some((bot) => bot.toolSelection !== undefined);
     });

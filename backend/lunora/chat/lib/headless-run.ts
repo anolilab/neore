@@ -289,6 +289,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             : null;
     const toolResult = buildsTools
         ? await buildAgentTools(ctx, {
+              // The same bot whose mode applies: its tool selection narrows the run like a chat with it.
+              botLookup: { botId: options.botId, threadId: modeThreadId },
               headless: true,
               ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
               ...(options.approvedTools && { headlessApproved: options.approvedTools }),
@@ -305,6 +307,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
               mcpLabels: {},
               mcpServerNames: [],
               mcpToolFingerprints: NO_PERMISSION_KEYS,
+              mcpToolOrigins: {},
               permissionKeys: NO_PERMISSION_KEYS,
               requiresApproval: [],
               tools: {},
@@ -477,6 +480,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 mcpServerNames: toolResult.mcpServerNames,
                 // The baseline the approved call is checked against (`mcpToolDrift`): a tool changed meanwhile is refused.
                 mcpToolFingerprints: Object.fromEntries(Object.entries(toolResult.mcpToolFingerprints).filter(([name]) => Object.hasOwn(runTools, name))),
+                // Which server's tool each name stood for (`mcpToolOriginDrift`): a name that passed to another server's tool is refused.
+                mcpToolOrigins: Object.fromEntries(Object.entries(toolResult.mcpToolOrigins).filter(([name]) => Object.hasOwn(runTools, name))),
                 // The pause extracted the prompt; the continuation extracts only what is steered into it, as an interactive run's does.
                 ...(extractMemory && prompt && { memory: { ...(options.botId && { botId: options.botId }) } }),
                 model,

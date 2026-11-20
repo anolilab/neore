@@ -210,3 +210,15 @@ export const addSteerTextLength = defineMigration({
     table: "persistentStreams",
     up: () => undefined,
 });
+
+/**
+ * The stored config gained an optional `mcpToolOrigins` (`chat/lib/tool-run-config.ts`): which server's tool each runtime name
+ * stood for. Nothing to fill: a row without it is not held to an origin, as before it, and an origin cannot be told after
+ * the fact. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addApprovalToolOrigins = defineMigration({
+    id: "add-approval-tool-origins",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

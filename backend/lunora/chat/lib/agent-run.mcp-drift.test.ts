@@ -18,6 +18,9 @@ vi.mock("./agent-tools", () => {
 
 const TOOL = "mcp_Docs__search";
 
+/** Which server's tool `TOOL` stood for when the run paused. */
+const DOCS_ORIGIN: Record<string, string> = { [TOOL]: "docs" };
+
 /** Thrown by the agent's approve/deny, so the run ends right where this suite looks. */
 const STOP = new Error("stop");
 
@@ -32,13 +35,14 @@ const agent = {
 };
 
 /** The continuation's rebuilt tools: `fingerprint` absent means the server no longer offers the tool, unless `offered`. */
-const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== undefined) => {
+const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== undefined, origins: Record<string, string> = offered ? DOCS_ORIGIN : {}) => {
     vi.mocked(buildAgentTools).mockResolvedValue({
         autoApprovals: {},
         mcpClients: [],
         mcpLabels: {},
         mcpServerNames: ["Docs"],
         mcpToolFingerprints: fingerprint === undefined ? {} : { [TOOL]: fingerprint },
+        mcpToolOrigins: origins,
         permissionKeys: {},
         repeatable: [],
         requiresApproval: [],
@@ -46,7 +50,12 @@ const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== 
     });
 };
 
-const resume = async (savedFingerprints: Record<string, string> | undefined, decision?: { approved: boolean; denyReason?: string }) => {
+const resume = async (
+    savedFingerprints: Record<string, string> | undefined,
+    decision?: { approved: boolean; denyReason?: string },
+    // `null`: a snapshot written before origins were recorded.
+    savedOrigins: Record<string, string> | null = DOCS_ORIGIN,
+) => {
     const ctx = {
         // Every read answers like the approval lookup: the request is still the open one, for `TOOL`.
         runQuery: vi.fn(async () => {
@@ -57,6 +66,7 @@ const resume = async (savedFingerprints: Record<string, string> | undefined, dec
         autoMediaEnrichment: false,
         mcpServerNames: ["Docs"],
         ...(savedFingerprints && { mcpToolFingerprints: savedFingerprints }),
+        ...(savedOrigins && { mcpToolOrigins: savedOrigins }),
         model: "gpt-4o",
         researchDepth: "balanced",
         searchMode: "chat",
@@ -145,7 +155,7 @@ describe("an approved MCP call after a pause", () => {
     it("answers a call whose tool is gone as denied for a snapshot written before fingerprints", async () => {
         rebuiltWith(undefined);
 
-        expect(await resume(undefined)).toBe(STOP);
+        expect(await resume(undefined, undefined, null)).toBe(STOP);
         expect(agent.approveToolCall).not.toHaveBeenCalled();
         expect(agent.denyToolCall).toHaveBeenCalledWith(
             expect.anything(),
@@ -153,6 +163,35 @@ describe("an approved MCP call after a pause", () => {
             expect.anything(),
             expect.anything(),
         );
+    });
+
+    // Runtime names are given in listing order: once the servers listed change (a bot's selection, a server switched off), the
+    // approved name can pass to another server's tool. Fingerprinted or not, that tool is not run under the approval.
+    it("is not run when the approved name now stands for another server's tool, even with no fingerprint", async () => {
+        rebuiltWith(undefined, true, { [TOOL]: "other-server" });
+
+        expect(await resume(undefined)).toBe(STOP);
+        expect(agent.approveToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ reason: expect.stringContaining("another server's tool") }),
+            expect.anything(),
+            expect.anything(),
+        );
+
+        agent.denyToolCall.mockClear();
+        rebuiltWith("aaa", true, { [TOOL]: "other-server" });
+
+        expect(await resume({ [TOOL]: "aaa" })).toBe(STOP);
+        expect(agent.approveToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledOnce();
+    });
+
+    it("runs a snapshot written before origins as before when the tool is unchanged", async () => {
+        rebuiltWith("aaa", true, { [TOOL]: "other-server" });
+
+        expect(await resume({ [TOOL]: "aaa" }, undefined, null)).toBe(STOP);
+        expect(agent.approveToolCall).toHaveBeenCalledOnce();
     });
 
     it("runs a snapshot written before fingerprints as before when the tool is still there", async () => {

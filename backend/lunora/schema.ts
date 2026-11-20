@@ -386,6 +386,8 @@ export const schema = defineSchema({
         // The mode a new chat with this bot starts in (`chat/lib/thread-permission-mode.ts`); absent = the default. A run
         // nobody watches takes it only when it asks more (`unattendedMode` in `chat/lib/tool-permissions.ts`).
         permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
+        // Which tools the bot's runs keep (`bots/tool-selection.ts`); absent = every tool. It only removes tools.
+        toolSelection: v.optional(v.object({ allow: v.optional(v.array(v.string())), exclude: v.array(v.string()) })),
         updatedAt: v.number(),
         userId: v.string(),
     })

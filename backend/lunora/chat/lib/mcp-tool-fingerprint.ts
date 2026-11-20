@@ -136,7 +136,26 @@ export const fingerprintMcpTool = async (tool: ToolSet[string], source: Fingerpr
     return toHex(digest).slice(0, FINGERPRINT_HEX_LENGTH);
 };
 
-export type McpToolDrift = "changed" | "removed" | "unchanged" | "unverified";
+/**
+ * Which server's which tool a runtime name stood for: the server's identity (a connector's slug, else its name and address) and the
+ * tool's own name, hashed. Runtime names are given in listing order (`mcpRuntimeToolName`), so when the servers a run lists
+ * change between a pause and its continuation (a bot's selection, a server switched off), a name can pass to another
+ * server's tool. The continuation runs an approved call only under the same origin. Unlike the fingerprint it never fails:
+ * nothing in it resolves lazily. Only the hash is stored, never the address.
+ */
+export const mcpToolOrigin = async (source: { connectorSlug?: string; serverName: string; toolName: string; url?: string }): Promise<string> => {
+    // A user's server by its name AND address: two saved under one address are two servers (their own credentials), and a
+    // rename between the pause and the continuation denies the call, the safe way.
+    const identity = canonicalJson({
+        server: source.connectorSlug === undefined ? { name: source.serverName, url: source.url ?? null } : { connector: source.connectorSlug },
+        tool: source.toolName,
+    });
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
+
+    return toHex(digest).slice(0, FINGERPRINT_HEX_LENGTH);
+};
+
+export type McpToolDrift = "changed" | "removed" | "replaced" | "unchanged" | "unverified";
 
 /**
  * How the MCP tool `name` stands now against the run that paused. `unchanged` also covers a tool the snapshot did not
@@ -163,11 +182,38 @@ export const mcpToolDrift = (
     return current[name] === before ? "unchanged" : "changed";
 };
 
+/**
+ * How the origin of the tool `name` stands against the run that paused ({@link mcpToolOrigin}). `unchanged` for a name the
+ * snapshot recorded no origin for (not an MCP tool, or a snapshot written before origins were). A name the rebuilt run
+ * still offers under another origin, or as no MCP tool at all, is `replaced`.
+ */
+export const mcpToolOriginDrift = (
+    saved: Readonly<Record<string, string>> | undefined,
+    current: Readonly<Record<string, string>>,
+    name: string,
+    offered: boolean,
+): "removed" | "replaced" | "unchanged" => {
+    const before = saved && Object.hasOwn(saved, name) ? saved[name] : undefined;
+
+    if (before === undefined) {
+        return "unchanged";
+    }
+
+    if (!offered) {
+        return "removed";
+    }
+
+    return Object.hasOwn(current, name) && current[name] === before ? "unchanged" : "replaced";
+};
+
 /** What the model reads in place of the result of an approved call whose tool changed, went away or could not be checked. */
 export const mcpToolDriftReason = (drift: Exclude<McpToolDrift, "unchanged">): string => {
     switch (drift) {
         case "changed": {
             return "This call was not run: the tool's definition changed on its server after the call was approved. Read the tool's current inputs and call it again if it is still needed.";
+        }
+        case "replaced": {
+            return "This call was not run: the tool's name now stands for another server's tool than the one the call was approved for. Call the tool again if it is still needed.";
         }
         case "unverified": {
             return "This call was not run: the tool could not be checked against the definition it was approved for. It is still available; call it again if it is still needed.";

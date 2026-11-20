@@ -1,0 +1,358 @@
+"use client";
+
+import { useLingui } from "@lingui/react/macro";
+import type { BotToolSelection } from "@neore/backend/bots/tool-selectors";
+import {
+    BOT_TOOL_SELECTOR_MAX_COUNT,
+    BOT_TOOL_SELECTOR_MAX_LENGTH,
+    connectorServerKey,
+    deviceServerKey,
+    mcpServerKey,
+    parseServerSelector,
+} from "@neore/backend/bots/tool-selectors";
+import { Button } from "@neore/ui/components/button";
+import { Input } from "@neore/ui/components/input";
+import { Label } from "@neore/ui/components/label";
+import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
+import { Switch } from "@neore/ui/components/switch";
+import { useQuery } from "@tanstack/react-query";
+import { X } from "lucide-react";
+import type { FC, FormEvent } from "react";
+import { useId, useRef, useState } from "react";
+
+import { useCRPC } from "@/lib/lunora/crpc";
+
+/** A server the user can name in a selector: its display name, and the stable key the selector stores. */
+export interface KnownToolServer {
+    key: string;
+    name: string;
+}
+
+/** What the lists offer and resolve against: every available built-in, and the user's servers, connectors and computers. */
+export interface ToolCatalog {
+    builtIns: string[];
+    servers: KnownToolServer[];
+}
+
+export const useToolCatalog = (): ToolCatalog => {
+    const crpc = useCRPC();
+    const { data: settings } = useQuery(crpc.chat.tool_permissions.getToolPermissionSettings.queryOptions({}));
+    const { data: preferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const { data: connectors } = useQuery(crpc.connectors.user_connectors.listConnectorCatalog.queryOptions({}));
+    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+
+    return {
+        builtIns: (settings?.builtIn ?? []).flatMap((tool) => (tool.available ? [tool.name] : [])),
+        servers: [
+            ...(preferences?.mcpServers ?? []).map((server) => {
+                return { key: mcpServerKey(server.url), name: server.name };
+            }),
+            ...(connectors ?? []).flatMap((connector) => (connector.connection ? [{ key: connectorServerKey(connector.slug), name: connector.name }] : [])),
+            ...(devices ?? []).map((device) => {
+                return { key: deviceServerKey(device._id), name: device.name };
+            }),
+        ].flatMap((server) => (server.key === undefined ? [] : [{ key: server.key, name: server.name }])),
+    };
+};
+
+/**
+ * The stored selectors for what was typed: a built-in's name as is, and `name:tool` with the server's name swapped for its
+ * stable key, so renaming the server later keeps the selector matching. Every server of that name is named. `null` = no
+ * server of that name.
+ */
+export const resolveTypedSelector = (typed: string, servers: ReadonlyArray<KnownToolServer>): string[] | null => {
+    const parsed = parseServerSelector(typed);
+
+    if (parsed === undefined || servers.some((server) => server.key === parsed.server)) {
+        return [typed];
+    }
+
+    // The longest name that the text starts with, so a server name may hold a colon.
+    const named = servers
+        .filter((server) => typed.startsWith(`${server.name}:`) && typed.length > server.name.length + 1)
+        .toSorted((a, b) => b.name.length - a.name.length);
+    const longest = named[0]?.name.length;
+    const matches = named.filter((server) => server.name.length === longest);
+
+    return matches.length === 0 ? null : matches.map((server) => `${server.key}:${typed.slice(server.name.length + 1)}`);
+};
+
+interface SelectorListProps {
+    catalog: ToolCatalog;
+    description: string;
+    disabled?: boolean;
+    label: string;
+    onChange: (selectors: string[]) => void;
+    /** Whether the field holds text that is not in the list: a save then refuses, so a typed name is never silently dropped. */
+    onPendingChange: (pending: boolean) => void;
+    /** Shown when the list names one of the user's own servers that no longer exists (`selectionServerKey` on the server). */
+    removedServerWarning?: string;
+    values: string[];
+}
+
+/** One list of selectors: a field to add one (with the known names offered) and a remove button per entry. */
+const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, label, onChange, onPendingChange, removedServerWarning, values }) => {
+    const { t } = useLingui();
+    const inputId = useId();
+    const descriptionId = useId();
+    const errorId = useId();
+    const listId = useId();
+    const [entry, setEntry] = useState("");
+    const [unknownServer, setUnknownServer] = useState<string | null>(null);
+    const [overCap, setOverCap] = useState(false);
+    const full = values.length >= BOT_TOOL_SELECTOR_MAX_COUNT;
+    const suggestions = [...catalog.builtIns, ...catalog.servers.map((server) => `${server.name}:*`)];
+
+    /** A selector as the user reads it: a server's current name in place of its key. */
+    const labelOf = (selector: string): string => {
+        const parsed = parseServerSelector(selector);
+
+        if (parsed === undefined) {
+            return selector;
+        }
+
+        const name = catalog.servers.find((server) => server.key === parsed.server)?.name ?? t`Removed server`;
+
+        return `${name}:${parsed.tool}`;
+    };
+
+    // Typed text counts once the field is left too. Text that cannot be added stays in the field, reported as pending, so a
+    // save never drops a name that was typed but not added.
+    const commit = () => {
+        const typed = entry.trim();
+
+        if (typed === "") {
+            return;
+        }
+
+        const resolved = resolveTypedSelector(typed, catalog.servers);
+
+        // Kept in the field with the reason, never saved by name: a name stops matching when the server is renamed.
+        if (resolved === null) {
+            setUnknownServer(typed);
+
+            return;
+        }
+
+        const added = resolved.filter((selector) => !values.includes(selector));
+
+        if (values.length + added.length > BOT_TOOL_SELECTOR_MAX_COUNT) {
+            setOverCap(true);
+
+            return;
+        }
+
+        if (added.length > 0) {
+            onChange([...values, ...added]);
+        }
+
+        setUnknownServer(null);
+        setOverCap(false);
+        setEntry("");
+        onPendingChange(false);
+    };
+
+    const add = (event: FormEvent) => {
+        event.preventDefault();
+        commit();
+    };
+
+    return (
+        <div className="space-y-2">
+            <Label htmlFor={inputId}>{label}</Label>
+            <p className="text-muted-foreground text-xs" id={descriptionId}>
+                {description}
+            </p>
+            <div className="flex gap-2">
+                <Input
+                    aria-describedby={unknownServer === null && !overCap ? descriptionId : `${descriptionId} ${errorId}`}
+                    aria-invalid={unknownServer !== null || overCap}
+                    disabled={disabled || (full && entry === "")}
+                    id={inputId}
+                    list={listId}
+                    maxLength={BOT_TOOL_SELECTOR_MAX_LENGTH}
+                    onBlur={commit}
+                    onChange={(event) => {
+                        setEntry(event.target.value);
+                        setUnknownServer(null);
+                        setOverCap(false);
+                        onPendingChange(event.target.value.trim() !== "");
+                    }}
+                    onKeyDown={(event) => {
+                        // Enter while an input method composes a word picks the word, not the entry.
+                        if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                            add(event);
+                        }
+                    }}
+                    placeholder={t`webSearch or server:tool`}
+                    value={entry}
+                />
+                <datalist id={listId}>
+                    {suggestions
+                        .filter((name) => values.every((selector) => labelOf(selector) !== name))
+                        .map((name) => (
+                            <option key={name} value={name}>
+                                {name}
+                            </option>
+                        ))}
+                </datalist>
+                <Button disabled={disabled || full || entry.trim() === ""} onClick={add} type="button" variant="outline">
+                    {t`Add`}
+                </Button>
+            </div>
+            <p aria-live="polite" className="text-destructive text-xs" id={errorId}>
+                {unknownServer !== null && t`No server, connector or computer matches ${unknownServer}.`}
+                {overCap && t`This list is full: remove a tool before adding another.`}
+            </p>
+            {removedServerWarning !== undefined &&
+                values.some((selector) => {
+                    const server = parseServerSelector(selector)?.server;
+
+                    return server?.startsWith("mcp=") === true && catalog.servers.every((known) => known.key !== server);
+                }) && <p className="text-muted-foreground text-xs">{removedServerWarning}</p>}
+            {values.length > 0 && (
+                <ul aria-label={label} className="flex flex-wrap gap-2">
+                    {values.map((selector) => {
+                        const shown = labelOf(selector);
+
+                        return (
+                            <li className="bg-muted flex items-center gap-1 rounded-md py-0.5 pr-0.5 pl-2 font-mono text-xs" key={selector}>
+                                {shown}
+                                <Button
+                                    aria-label={t`Remove ${shown}`}
+                                    className="pointer-coarse:size-11"
+                                    disabled={disabled}
+                                    onClick={() => onChange(values.filter((value) => value !== selector))}
+                                    size="icon-xs"
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    <X aria-hidden="true" />
+                                </Button>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+};
+
+interface BotToolSelectionFieldsProps {
+    catalog: ToolCatalog;
+    disabled?: boolean;
+    onChange: (selection: BotToolSelection | null) => void;
+    /** Whether a list holds typed text it has not added (`SelectorList`): the caller refuses to save meanwhile. */
+    onPendingChange: (pending: boolean) => void;
+    value: BotToolSelection | null;
+}
+
+/** All tools, or a custom pick: an optional allow list ("only listed tools") and an exclude list, which always wins. */
+export const BotToolSelectionFields: FC<BotToolSelectionFieldsProps> = ({ catalog, disabled, onChange, onPendingChange, value }) => {
+    const { t } = useLingui();
+    const groupLabelId = useId();
+    const allId = useId();
+    const customId = useId();
+    const onlyListedId = useId();
+    const onlyListedDescriptionId = useId();
+    // What a toggle switched off held, so switching it on again within the dialog brings the lists back rather than empty ones.
+    const lastCustom = useRef<BotToolSelection>(value ?? { exclude: [] });
+    const lastAllow = useRef<string[]>(value?.allow ?? []);
+    // Typed text not yet added, per list. A list that is hidden takes its text with it, so it stops counting.
+    const [pending, setPending] = useState({ allow: false, exclude: false });
+
+    const reportPending = (next: { allow: boolean; exclude: boolean }): void => {
+        setPending(next);
+        onPendingChange(next.allow || next.exclude);
+    };
+
+    const pickAll = (all: boolean): void => {
+        if (all) {
+            if (value !== null) {
+                lastCustom.current = value;
+            }
+
+            reportPending({ allow: false, exclude: false });
+            onChange(null);
+        } else {
+            onChange(value ?? lastCustom.current);
+        }
+    };
+
+    const listOnly = (on: boolean): void => {
+        if (value === null) {
+            return;
+        }
+
+        if (on) {
+            onChange({ ...value, allow: value.allow ?? lastAllow.current });
+        } else {
+            lastAllow.current = value.allow ?? lastAllow.current;
+            reportPending({ ...pending, allow: false });
+            onChange({ exclude: value.exclude });
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="space-y-2">
+                <Label id={groupLabelId}>{t`Tools`}</Label>
+                <RadioGroup
+                    aria-labelledby={groupLabelId}
+                    disabled={disabled}
+                    onValueChange={(next: unknown) => pickAll(next !== "custom")}
+                    value={value === null ? "all" : "custom"}
+                >
+                    <div className="flex items-center gap-2">
+                        <RadioGroupItem id={allId} value="all" />
+                        <Label htmlFor={allId}>{t`All tools`}</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <RadioGroupItem id={customId} value="custom" />
+                        <Label htmlFor={customId}>{t`Custom`}</Label>
+                    </div>
+                </RadioGroup>
+            </div>
+            {value !== null && (
+                <div className="border-border space-y-4 border-l-2 pl-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <Label htmlFor={onlyListedId}>{t`Only listed tools`}</Label>
+                            <p className="text-muted-foreground text-xs" id={onlyListedDescriptionId}>
+                                {t`The bot gets only the tools you allow. With none allowed, it gets no tools.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby={onlyListedDescriptionId}
+                            checked={value.allow !== undefined}
+                            disabled={disabled}
+                            id={onlyListedId}
+                            onCheckedChange={listOnly}
+                        />
+                    </div>
+                    {value.allow !== undefined && (
+                        <SelectorList
+                            catalog={catalog}
+                            description={t`A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*.`}
+                            disabled={disabled}
+                            label={t`Allowed tools`}
+                            onChange={(allow) => onChange({ ...value, allow })}
+                            onPendingChange={(allow) => reportPending({ ...pending, allow })}
+                            values={value.allow}
+                        />
+                    )}
+                    <SelectorList
+                        catalog={catalog}
+                        description={t`Never given to the bot, even when allowed above.`}
+                        disabled={disabled}
+                        label={t`Excluded tools`}
+                        onChange={(exclude) => onChange({ ...value, exclude })}
+                        onPendingChange={(exclude) => reportPending({ ...pending, exclude })}
+                        removedServerWarning={t`An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools.`}
+                        values={value.exclude}
+                    />
+                </div>
+            )}
+        </div>
+    );
+};
