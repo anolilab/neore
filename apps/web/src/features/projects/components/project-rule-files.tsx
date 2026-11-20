@@ -190,7 +190,8 @@ const RuleFileFields: FC<{
     onChange: (file: RuleFileDraft) => void;
     onMove: (offset: -1 | 1) => void;
     onRemove: () => void;
-}> = ({ errorId, file, focusRequest, index, invalid, isFirst, isLast, onChange, onMove, onRemove }) => {
+    onSave: () => void;
+}> = ({ errorId, file, focusRequest, index, invalid, isFirst, isLast, onChange, onMove, onRemove, onSave }) => {
     const { t } = useLingui();
     const id = useId();
     const name = file.title.trim() || t`Rule file ${index + 1}`;
@@ -218,6 +219,15 @@ const RuleFileFields: FC<{
                         autoComplete="off"
                         id={`${id}-title`}
                         onChange={(event) => onChange({ ...file, title: event.target.value })}
+                        onKeyDown={(event) => {
+                            // Inside the project's form: Enter saves the rule files, the editor's own action, never the project.
+                            if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+                                return;
+                            }
+
+                            event.preventDefault();
+                            onSave();
+                        }}
                         value={file.title}
                         {...invalidProps("title")}
                     />
@@ -545,6 +555,11 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                                     onChange={(next) => change(files.map((current) => (current.id === file.id ? next : current)))}
                                     onMove={(offset) => change(moved(files, index, offset))}
                                     onRemove={() => change(files.filter((current) => current.id !== file.id))}
+                                    onSave={() => {
+                                        if (draft && !isSaving) {
+                                            save().catch(() => undefined);
+                                        }
+                                    }}
                                 />
                             ))}
                         </ol>

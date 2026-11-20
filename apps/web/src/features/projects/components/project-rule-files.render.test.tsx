@@ -1,6 +1,7 @@
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { FormEvent } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectRuleFiles from "./project-rule-files";
@@ -140,6 +141,49 @@ describe("project rule files", () => {
                 { content: "", globs: ["docs/**", "*.md"], id: expect.any(String), mode: "glob", title: "Docs" },
             ],
         });
+    });
+
+    it("saves the rule files on Enter in a file's name, never submitting the project form around it", async () => {
+        const user = userEvent.setup();
+        const submitProject = vi.fn((event: FormEvent) => event.preventDefault());
+
+        // As in the project dialog: a submit button makes Enter in a field submit the form.
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <form onSubmit={submitProject}>
+                    <ProjectRuleFiles projectId="p1" />
+                    <button type="submit">Save project</button>
+                </form>
+            </QueryClientProvider>,
+        );
+
+        const name = within(await screen.findByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Name" });
+
+        // Unchanged: nothing to save, and still no project submit.
+        await user.type(name, "{Enter}");
+
+        expect(backend.save).not.toHaveBeenCalled();
+
+        await user.type(name, " rules{Enter}");
+
+        await waitFor(() => expect(backend.save).toHaveBeenCalledOnce());
+        expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ ruleFiles: [expect.anything(), expect.objectContaining({ title: "SQL rules" })] });
+        expect(submitProject).not.toHaveBeenCalled();
+    });
+
+    it("keeps Enter in a file's patterns and instructions for a new line, without saving", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+
+        const sql = within(await screen.findByRole("listitem", { name: "SQL" }));
+
+        await user.type(sql.getByRole("textbox", { name: "File patterns, one per line" }), "{Enter}*.psql");
+        await user.type(sql.getByRole("textbox", { name: "Instructions" }), "{Enter}Quote names.");
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect((sql.getByRole("textbox", { name: "File patterns, one per line" }) as HTMLTextAreaElement).value).toBe("**/*.sql\n*.psql");
+        expect((sql.getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value).toBe("Use snake_case.\nQuote names.");
     });
 
     it("refuses to save a pattern file without a pattern, and says why", async () => {
