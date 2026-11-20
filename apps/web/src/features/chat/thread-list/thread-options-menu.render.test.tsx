@@ -175,6 +175,16 @@ describe("ThreadOptionsMenu", () => {
             expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
         });
 
+        it("offers no follow choice from a cached state while the refetch fails", () => {
+            follow.state = "off";
+            follow.error = new Error("network");
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Couldn't load follow state" })).toBeTruthy();
+            expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
+            expect(screen.queryByRole("menuitem", { name: "Mute thread" })).toBeNull();
+        });
+
         it("disables the follow items while a change is in flight", () => {
             follow.state = "off";
             follow.isPending = true;

@@ -5,8 +5,11 @@
 import type { MutationCtx } from "../../_generated/server";
 import { isUniqueViolation } from "../../lib/error-helpers";
 
-/** Guest rows moved per call of {@link mergeThreadFollowsPage}: one page per mutation keeps it far below the Worker's subrequest ceiling. */
-export const FOLLOW_MERGE_PAGE_SIZE = 100;
+/**
+ * Guest rows moved per call of {@link mergeThreadFollowsPage}. A row costs up to three D1 queries (the new account's
+ * lookup, then the patch's or delete's read and write), and a Workers Free invocation may run 50.
+ */
+export const FOLLOW_MERGE_PAGE_SIZE = 12;
 
 /**
  * One page of an account merge: each of the guest's follow rows read moves to the new account, unless the new account
@@ -27,6 +30,8 @@ export const mergeThreadFollowsPage = async (db: MutationCtx["db"], from: string
             continue;
         }
 
+        // TODO(anolilab/lunora#1631): the patch and the deletes read the row on a replica. A lagging one fails the patch,
+        // and the queue redelivers the merge; a delete it skips leaves the row for the next page to handle again.
         try {
             await db.patch("threadFollows", row._id, { userId: to });
             moved += 1;

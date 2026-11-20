@@ -23,8 +23,14 @@ export type ThreadFollowState = "on" | "off" | "muted";
 /** The size a row read costs the request's read budget. */
 const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
-/** Rows read or deleted per call of a bounded follow-row cleanup. */
+/** Rows read per call of the export. */
 const FOLLOW_BATCH = 100;
+
+/**
+ * Rows deleted per call of a bounded follow-row cleanup. Each delete is two D1 queries (the row's read, then the delete),
+ * and a Workers Free invocation may run 50, so a call stays below that with the page read.
+ */
+const FOLLOW_DELETE_BATCH = 20;
 
 /**
  * Writes a person's follow state, creating the row when there is none. Two first writes that race cannot both insert:
@@ -106,7 +112,7 @@ export const deleteThreadFollowRow = async (ctx: Pick<MutationCtx, "db">, { thre
  * (TODO(anolilab/lunora#1631)), and the next round deletes it again.
  */
 export const deleteFollowRowsOfThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<boolean> => {
-    const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_BATCH, where: { threadId } });
+    const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_DELETE_BATCH, where: { threadId } });
 
     await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 
@@ -115,7 +121,7 @@ export const deleteFollowRowsOfThread = async (ctx: Pick<MutationCtx, "db">, thr
 
 /** Deletes one batch of a person's follow rows; `true` when none are left, as {@link deleteFollowRowsOfThread} decides it. */
 export const deleteFollowRowsOfUserBatch = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<boolean> => {
-    const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_BATCH, where: { userId } });
+    const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_DELETE_BATCH, where: { userId } });
 
     await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 

@@ -47,6 +47,8 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         return null;
     }
 
+    const showFollowChoices = !isLocked && follow.error === null && follow.state !== undefined;
+
     // The menu's items are portaled; a click in them bubbles through React to the row, which must not open.
     return (
         <span className={cn("contents", className)} onClick={(event) => event.stopPropagation()} role="presentation">
@@ -96,18 +98,19 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                         </DropdownMenuItem>
                     )}
                     {!isLocked && follow.error !== null && <DropdownMenuItem disabled>{t`Couldn't load follow state`}</DropdownMenuItem>}
-                    {/* Disabled while a change is in flight: a second choice made then could reach the server first. */}
-                    {!isLocked && follow.state !== undefined && follow.state !== "on" && (
+                    {/* Disabled while a change is in flight: a second choice made then could reach the server first. None while the
+                        lookup fails: a cached state may predate the last change. */}
+                    {showFollowChoices && follow.state !== "on" && (
                         <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("on")}>
                             {t`Follow thread`}
                         </DropdownMenuItem>
                     )}
-                    {!isLocked && follow.state !== undefined && follow.state !== "off" && (
+                    {showFollowChoices && follow.state !== "off" && (
                         <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("off")}>
                             {t`Unfollow thread`}
                         </DropdownMenuItem>
                     )}
-                    {!isLocked && follow.state !== undefined && follow.state !== "muted" && (
+                    {showFollowChoices && follow.state !== "muted" && (
                         <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("muted")}>
                             {t`Mute thread`}
                         </DropdownMenuItem>
