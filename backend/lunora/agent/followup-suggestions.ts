@@ -75,7 +75,8 @@ export const admitFollowupSuggestions = internalMutation
     .mutation(async ({ args: { lastMessageId, threadId, userId }, ctx: context }) => {
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
-        if (!thread || thread.deletedAt || isThreadLocked(thread)) {
+        // A hard delete marks `deletingAt` while its rows are still readable, so that window is closed too.
+        if (!thread || thread.deletedAt || thread.deletingAt !== undefined || isThreadLocked(thread)) {
             return false;
         }
 
@@ -103,7 +104,7 @@ export const beginFollowupDispatch = internalMutation
     .mutation(async ({ args: { requestId, threadId }, ctx: context }) => {
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
-        if (!thread || thread.deletedAt || isThreadLocked(thread)) {
+        if (!thread || thread.deletedAt || thread.deletingAt !== undefined || isThreadLocked(thread)) {
             return null;
         }
 

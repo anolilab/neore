@@ -647,6 +647,8 @@ const ComposerTiptapEditor = ({
     const ghostPropsRef = useRef({ disabled, isStreaming, popupOpen: false });
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
+    // The prompt last placed, by chat and text: the same text for another chat is said again.
+    const lastPlacedPromptRef = useRef<{ scope: string | null; text: string } | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
     // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed. A bare
     // colon, or the colon that closes a finished `:dog:`, has an empty query and is not typing one.
@@ -673,12 +675,27 @@ const ComposerTiptapEditor = ({
             editor.commands.setSuggestedPrompt(null);
             // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
             setGhostAnnouncement("");
+            lastPlacedPromptRef.current = null;
 
             return undefined;
         }
 
         editor.commands.setSuggestedPrompt(nextPromptSuggestion);
-        setGhostAnnouncement(promptAnnouncementText);
+
+        // The same text for another chat is already what the live region holds, so it would not be said again: it is cleared, and said
+        // in a later task.
+        const sameTextForAnotherChat = lastPlacedPromptRef.current?.text === promptAnnouncementText && lastPlacedPromptRef.current.scope !== nextPromptScope;
+
+        lastPlacedPromptRef.current = { scope: nextPromptScope, text: promptAnnouncementText };
+
+        let restoreAnnouncement: ReturnType<typeof setTimeout> | undefined;
+
+        if (sameTextForAnotherChat) {
+            setGhostAnnouncement("");
+            restoreAnnouncement = setTimeout(setGhostAnnouncement, 0, promptAnnouncementText);
+        } else {
+            setGhostAnnouncement(promptAnnouncementText);
+        }
 
         const clearAnnouncement = setTimeout(setGhostAnnouncement, ANNOUNCEMENT_CLEAR_MS, "");
 
@@ -699,6 +716,7 @@ const ComposerTiptapEditor = ({
         return () => {
             editor.off("transaction", onTransaction);
             clearTimeout(clearAnnouncement);
+            clearTimeout(restoreAnnouncement);
         };
     }, [disabled, editor, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 

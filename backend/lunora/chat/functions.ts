@@ -4544,6 +4544,18 @@ export const generateFollowupSuggestionsForThread = internalAction
         // The reply's paid claim, once taken. A failure before its cache lands gives the claim back (see the catch).
         let paid: { cached: boolean; lastMessageId: string } | null = null;
 
+        // Gives the reply's paid claim back, at most once per run: a run that cached, or that already gave it back, does not again.
+        const giveBackPaidClaim = async (): Promise<void> => {
+            if (paid === null || paid.cached) {
+                return;
+            }
+
+            const { lastMessageId } = paid;
+
+            paid = null;
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+        };
+
         try {
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
                 threadId: threadId as Id<"threads">, // Cast to any for component query compatibility
@@ -4625,6 +4637,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
+            // In a shared thread the newest reply may be another member's: that member's own run pays for it, so this run must not
+            // charge the member who scheduled it. Rows that hide their user id are not compared.
+            if (newest.userId !== undefined && newest.userId !== userId) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] The newest reply is another member's, skipping: ${threadId}`);
+
+                return;
+            }
+
             // The composer keys a reply by the first row of its last group (ui-messages closes a group at a user or system row), so cache under that id.
             // A long tool turn can run past one page, so the turn's pages are read until the rows of an older turn appear.
             const turnRows: (typeof newest)[] = [];
@@ -4652,7 +4672,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                     break;
                 }
 
-                if (!turnPage.continueCursor) {
+                if (!turnPage.continueCursor || pages === MAX_TURN_PAGES - 1) {
                     break;
                 }
 
@@ -4732,7 +4752,7 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             if (dispatchedAt === null) {
                 // The chat was locked since admission: nothing was sent, so the reply's claim is given back.
-                await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+                await giveBackPaidClaim();
 
                 return;
             }
@@ -4740,7 +4760,7 @@ export const generateFollowupSuggestionsForThread = internalAction
             try {
                 // A newer message landed since the check above: nothing is paid for this reply.
                 if (!(await isStillNewest())) {
-                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+                    await giveBackPaidClaim();
 
                     return;
                 }
@@ -4756,7 +4776,7 @@ export const generateFollowupSuggestionsForThread = internalAction
 
                 if (!charged) {
                     // Nothing was paid for, so the reply's claim is given back and a later run can ask again.
-                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+                    await giveBackPaidClaim();
 
                     return;
                 }
@@ -4770,7 +4790,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                 // The charge and the freshness read took part of the claim's life: a call that cannot finish inside what is left is not started.
                 if (modelBudgetMs(dispatchedAt) < MIN_MODEL_BUDGET_MS) {
                     chatLogger.debug(`[generateFollowupSuggestionsForThread] The claim is too close to lapsing to call the model: ${threadId}`);
-                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+                    await giveBackPaidClaim();
 
                     return;
                 }
@@ -4817,16 +4837,10 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             // A paid reply whose cache never landed gives its claim back, so a later run can finish it. The charge is keyed per reply,
             // so that run is not charged twice.
-            if (paid && !paid.cached) {
-                try {
-                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
-                        lastMessageId: paid.lastMessageId,
-                        threadId,
-                        userId,
-                    });
-                } catch (releaseError) {
-                    chatLogger.error(`[generateFollowupSuggestionsForThread] Could not give the reply's claim back:`, releaseError);
-                }
+            try {
+                await giveBackPaidClaim();
+            } catch (releaseError) {
+                chatLogger.error(`[generateFollowupSuggestionsForThread] Could not give the reply's claim back:`, releaseError);
             }
         }
     });

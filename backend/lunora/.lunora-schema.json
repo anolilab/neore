@@ -9296,6 +9296,18 @@
           "optional": false,
           "unique": false
         },
+        "order": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "replyAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "suggestions": {
           "kind": "array",
           "nullable": false,

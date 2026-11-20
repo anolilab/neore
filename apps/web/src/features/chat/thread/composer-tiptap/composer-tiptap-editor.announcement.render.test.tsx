@@ -160,6 +160,23 @@ describe("the suggested next prompt announcement", () => {
         expect(announcedText()).toBeNull();
     });
 
+    it("the same prompt for another chat is said again: cleared at once, then restored in a later task", () => {
+        const chat = (scope: string) => (
+            <ComposerTiptapEditor nextPromptScope={scope} nextPromptSuggestion="Same" onChange={() => {}} onSubmit={() => {}} value="" />
+        );
+        const view = render(chat("thread-1"));
+
+        expect(announcedText()).toBe("Suggested next prompt: Same. Press Tab to insert.");
+
+        view.rerender(chat("thread-2"));
+
+        expect(announcedText()).toBeNull();
+
+        tick(0);
+
+        expect(announcedText()).toBe("Suggested next prompt: Same. Press Tab to insert.");
+    });
+
     // A prompt the person dismisses is gone, so its line goes with it: it is not left to run out on the timer.
     describe("a prompt the person dismisses", () => {
         const mountEditor = (nextPromptSuggestion: string) => {
