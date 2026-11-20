@@ -51,6 +51,8 @@ import type {
     VideoGenerationSettings,
 } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import { markComposerDraft, prefillDraftFrom } from "@/features/chat/core/utils/draft-origin";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
@@ -115,7 +117,7 @@ interface ComposerProps {
      * Override submit to fan-out to all child threads (used by comparison parent).
      * When set, normal sendMessage/sendComparisonMessage are bypassed.
      */
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     /** Custom placeholder for the text input (e.g. "Ask 2 models anything...") */
     placeholder?: string;
     /** A split pane's composer remounts on every focus change, so its initial message is written once per chat. */
@@ -299,7 +301,7 @@ const ComposerInputWrapper: FC<{
     inputRef?: RefObject<ComposerInputRef | null>;
     onOpenDraw?: () => void;
     onSubmit: () => void;
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
 }> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder }) => {
     const cyclingPlaceholder = useCyclingPlaceholder();
@@ -594,6 +596,13 @@ const Composer: FC<ComposerProps> = ({
                 // Untouched, it is not stored over the chat's saved draft (`stored-drafts.ts`).
                 draftOwnership.prefill = initialMessage;
                 ui.setComposerText(initialMessage);
+
+                // A link's prefill is not the person's own words.
+                const origin = prefillDraftFrom(threadId);
+
+                if (origin !== undefined) {
+                    markComposerDraft(origin);
+                }
             }
 
             ui.setAppliedInitialMessageKey(key);

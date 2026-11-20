@@ -6,7 +6,12 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import usePromptLoader from "./use-prompt-loader";
 
 /** Saved prompts the query cache already holds, by id: a cache hit answers in the same render as the id change. */
-const cached = vi.hoisted(() => new Map<string, { content: string }>());
+const cached = vi.hoisted(() => new Map<string, { content: string; contentBy?: string; contentByImpersonator?: boolean; userId?: string }>());
+
+/** The session read: pending until a test lets it load. */
+const session = vi.hoisted(() => {
+    return { data: null as { user: { id: string } } | null, isPending: false };
+});
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
     return {
@@ -46,7 +51,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
                         return { data: null };
                     },
                     useSession: () => {
-                        return { data: null };
+                        return { ...session };
                     },
                 },
             };
@@ -77,6 +82,8 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
 
 beforeEach(() => {
     cached.clear();
+    session.data = null;
+    session.isPending = false;
     catalog.settled = true;
     useChatUIStore.getState().clearComposer();
 });
@@ -128,5 +135,38 @@ describe(usePromptLoader, () => {
         rerender({ promptId: "prompt-a" });
 
         expect(useChatUIStore.getState().composerText).toBe("First prompt");
+    });
+
+    it("waits for the session before telling whose words a saved prompt holds, so the viewer's own is not marked", () => {
+        cached.set("prompt-a", { content: "My own words", contentBy: "user-a", contentByImpersonator: false, userId: "user-a" });
+        session.isPending = true;
+
+        const { rerender } = renderHook(({ promptId }: { promptId: string | undefined }) => usePromptLoader(promptId), {
+            initialProps: { promptId: "prompt-a" as string | undefined },
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        session.data = { user: { id: "user-a" } };
+        session.isPending = false;
+        rerender({ promptId: "prompt-a" });
+
+        expect(useChatUIStore.getState().composerText).toBe("My own words");
+        expect(useChatUIStore.getState().composerDraftFrom).toBeUndefined();
+    });
+
+    it("marks a saved prompt when the session loads signed out", () => {
+        cached.set("prompt-a", { content: "Some words", contentBy: "user-a", contentByImpersonator: false, userId: "user-a" });
+        session.isPending = true;
+
+        const { rerender } = renderHook(({ promptId }: { promptId: string | undefined }) => usePromptLoader(promptId), {
+            initialProps: { promptId: "prompt-a" as string | undefined },
+        });
+
+        session.isPending = false;
+        rerender({ promptId: "prompt-a" });
+
+        expect(useChatUIStore.getState().composerText).toBe("Some words");
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("sharedPrompt");
     });
 });

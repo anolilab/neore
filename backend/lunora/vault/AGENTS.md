@@ -53,9 +53,19 @@
   read of the turn is a refusal. No turn records
   impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
   `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.
-  Rows, steers, bot instructions and personalization an impersonating admin wrote carry no mark yet either: mark them
-  (and refuse them here) before the fill ships. So must a draft the owner did not write: a prompt link
-  (`?prompt=`), a desktop `neore://new?text=` link and an org member's saved prompt fill the composer unmarked, and one
-  Enter saves them as typed text; mark them in the composer and refuse them here. A plain-text paste stays unseen. The allowlist refuses a step holding a page's result or an approval's
+  Text the owner did not type is marked where it is saved (`lib/not-typed-text.ts`, `neore.notTyped`) and refused by
+  name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=` or
+  `?initialMessage=` link, anything the desktop shell hands over (a `neore://new?text=` link, a share, the Quick
+  Composer) or a saved prompt whose words (content, variable defaults) not all the viewer wrote, unimpersonated (`isOwnPromptContent`;
+  `prompts/content-author.ts` records them from the session, never `userId`, and only grows: another writer or an
+  impersonated write of any part stays on the row until a restore). `usePromptLoader` waits for the session first. The web client marks the draft itself, never matches text: the mark stays
+  through edits, pane switches, a reload, the queue and a failed send, and goes when the draft is sent or emptied
+  (`features/chat/core/utils/draft-origin.ts`); each send names it as `draftFrom`. An edit keeps the original's mark;
+  a steer's lives in `persistentStreams.notTypedSteers` until delivery. A stateless run saves its prompt again: pass it
+  through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
+  admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. Still unmarked, to mark (a draft
+  kind the verdict names) before the fill ships: forwarded messages, Generate image/video (the reply's text sent as a
+  prompt), follow-up and welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt, an organization's variable defaults filled into a prompt (`getResolvedVariables`), the organization's name a loaded prompt fills in (`getAutoPopulatedVariables`); and bot instructions and personalization an impersonating admin wrote (a
+  `systemContext` kind that refuses). The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

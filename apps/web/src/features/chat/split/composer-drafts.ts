@@ -1,3 +1,4 @@
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { create } from "zustand";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -13,6 +14,8 @@ import type { ParkedModelState } from "@/features/chat/core/stores/model-store";
 export interface ComposerDraft {
     attachedReferences: ReferenceSelection[];
     composerAttachments: PendingAttachment[];
+    /** The draft's not-typed mark (`chat-ui-store.ts`), parked and stored with it. */
+    composerDraftFrom?: DraftFrom;
     composerText: string;
 }
 
@@ -158,12 +161,12 @@ const syncParked = (): void => {
 
 /** Parks a draft. A draft with nothing in it is forgotten. */
 export const saveComposerDraft = (threadId: string, draft: Partial<ComposerDraft>): void => {
-    const { attachedReferences = [], composerAttachments = [], composerText = "" } = draft;
+    const { attachedReferences = [], composerAttachments = [], composerDraftFrom, composerText = "" } = draft;
 
     if (composerText === "" && composerAttachments.length === 0 && attachedReferences.length === 0) {
         drafts.delete(threadId);
     } else {
-        drafts.set(threadId, { attachedReferences, composerAttachments, composerText });
+        drafts.set(threadId, { attachedReferences, composerAttachments, ...(composerDraftFrom !== undefined && { composerDraftFrom }), composerText });
     }
 
     syncParked();

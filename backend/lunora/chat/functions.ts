@@ -66,6 +66,8 @@ import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { statelessPrompt } from "../lib/not-typed-text";
+import { vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { readableProject } from "../projects/functions";
@@ -4770,6 +4772,8 @@ export const streamAsync = internalAction
         jobId: v.optional(v.string()),
         messageId: v.string(),
         model: v.string(),
+        /** The edited prompt's not-typed marks (`lib/not-typed-text.ts`): a stateless reply saves its prompt again, marked. */
+        notTyped: v.optional(vNotTypedMarks),
         parentId: v.optional(v.string()),
         prompt: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -4787,7 +4791,7 @@ export const streamAsync = internalAction
             timestamp: streamAsyncStartTime,
         });
 
-        const { customSystemPrompt, messageId, model, prompt, reasoningEffort, statelessMode, threadId } = args;
+        const { customSystemPrompt, messageId, model, notTyped, prompt, reasoningEffort, statelessMode, threadId } = args;
 
         // Get thread to find userId
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -4861,7 +4865,7 @@ export const streamAsync = internalAction
         const streamTextArgs: any = Object.keys(providerOptions).length > 0 ? { providerOptions } : {};
 
         if (threadStatelessMode) {
-            streamTextArgs.prompt = prompt;
+            streamTextArgs.prompt = statelessPrompt(prompt ?? "", notTyped ?? {});
         } else {
             streamTextArgs.promptMessageId = messageId;
         }

@@ -7,7 +7,8 @@
  *
  * Safe, and nothing else:
  * - the owner's own typed text: a user row of theirs, text parts only, with no mark, attachment, note or blockquote (a
- *   forward, a quoted reply and a pasted quote carry no mark, so any `>` line is not theirs);
+ *   forward, a quoted reply and a pasted quote carry no mark, so any `>` line is not theirs). A draft from a link or
+ *   someone else's saved prompt, and anything an admin acting as the owner wrote, is marked (`lib/not-typed-text.ts`);
  * - the lead model's own replies in this thread: assistant text, reasoning and tool calls, with no mark, sources,
  *   memories or file;
  * - rows named by the lead's model id only (`agentName`): a sub-agent's result, a side question, a goal round, a group
@@ -28,6 +29,7 @@ import { carriesQuotedLines, messageCarriesGuestText, messageCarriesOutsideAgent
 import { readCompressedHistory } from "../chat/lib/compressed-history";
 import { loadEligibleThread } from "../devices/internal";
 import { computeTaint } from "../devices/lib/taint";
+import { notTypedMarksOfMessage } from "../lib/not-typed-text";
 
 /** A model message as the AI SDK holds it: a saved row's `message`, or one of `ToolExecutionOptions.messages`. */
 export type SiteLoginMessage = { content?: unknown; providerOptions?: unknown; role?: unknown };
@@ -94,6 +96,18 @@ const textOf = (content: unknown): string[] =>
 
 const userMessageRefusal = (message: SiteLoginMessage): string | null => {
     const { content } = message;
+    // Named before the generic `neore` mark below refuses them too: the composer's draft from a link or someone else's
+    // saved prompt, and anything an admin acting as the owner wrote (`lib/not-typed-text.ts`).
+    const notTyped = notTypedMarksOfMessage(message);
+
+    if (notTyped.impersonated === true) {
+        return "impersonated";
+    }
+
+    if (notTyped.draft !== undefined) {
+        return `draft-${notTyped.draft}`;
+    }
+
     const typedOnly =
         typeof content === "string" ||
         (Array.isArray(content) &&

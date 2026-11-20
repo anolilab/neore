@@ -4,12 +4,14 @@ import { useEffect, useEffectEvent } from "react";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import type { PendingSend } from "@/features/chat/core/utils/pending-send";
 import { currentPath, savePendingSend, takePendingSend } from "@/features/chat/core/utils/pending-send";
 import { useLunoraAuth } from "@/lib/lunora/crpc";
 
-/** Hold `text` for after sign-in and ask the visitor to sign in; nothing is sent. */
-export const holdForSignIn = (text: string): void => {
-    savePendingSend(text);
+/** Hold `text` (and its draft's not-typed mark) for after sign-in and ask the visitor to sign in; nothing is sent. */
+export const holdForSignIn = (text: string, draftFrom?: DraftOrigin): void => {
+    savePendingSend(text, undefined, undefined, draftFrom);
     openLoginPrompt();
 };
 
@@ -51,7 +53,7 @@ export const useCanTakePendingSend = (): boolean => {
  * it was typed in (not another thread, nor the landing page's composer).
  * Taking it removes it, so a second composer or effect run finds nothing.
  */
-const usePendingSend = (enabled: boolean, send: (text: string) => void): void => {
+const usePendingSend = (enabled: boolean, send: (pending: Pick<PendingSend, "draftFrom" | "text">) => void): void => {
     const canTake = useCanTakePendingSend();
     const onSend = useEffectEvent(send);
 

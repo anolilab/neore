@@ -173,7 +173,7 @@ describe("runSendMessage with a held guest note", () => {
         holdSendForSignIn("my own words");
 
         expect(useChatUIStore.getState().composerText).toBe("my own words");
-        expect(holdForSignIn).toHaveBeenCalledWith("my own words");
+        expect(holdForSignIn).toHaveBeenCalledWith("my own words", undefined);
     });
 
     it.each([
