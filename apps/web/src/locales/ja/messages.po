@@ -1888,7 +1888,7 @@ msgstr "ロックされたチャットにはゲストリンクを作成できま
 
 #: src/features/vault/components/site-logins.tsx:366
 msgid "A login can name at most {MAX_TEAMMATES} bots."
-msgstr ""
+msgstr "1 つのログインに指定できるボットは最大 {MAX_TEAMMATES} 個です。"
 
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
@@ -5178,7 +5178,7 @@ msgstr "ボット"
 
 #: src/features/vault/components/site-logins.tsx:361
 msgid "Bots that may use it"
-msgstr ""
+msgstr "使用できるボット"
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
@@ -8553,7 +8553,7 @@ msgstr "コメントを削除できませんでした"
 
 #: src/features/vault/components/site-logins.tsx:213
 msgid "Could not delete the login."
-msgstr ""
+msgstr "ログインを削除できませんでした。"
 
 #: src/features/pages/components/pages-sidebar.tsx:134
 msgid "Could not delete the page"
@@ -8789,7 +8789,7 @@ msgstr "メール設定を保存できませんでした。"
 
 #: src/features/vault/components/site-logins.tsx:177
 msgid "Could not save the login."
-msgstr ""
+msgstr "ログインを保存できませんでした。"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:120
 msgid "Could not save the memories"
@@ -10101,7 +10101,7 @@ msgstr "グループと子要素を削除"
 #. placeholder {0}: login.site
 #: src/features/vault/components/site-logins.tsx:285
 msgid "Delete login for {0}"
-msgstr ""
+msgstr "{0} のログインを削除"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
@@ -10235,7 +10235,7 @@ msgstr "このケースを削除しますか？"
 
 #: src/features/vault/components/site-logins.tsx:408
 msgid "Delete this login?"
-msgstr ""
+msgstr "このログインを削除しますか？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:499
@@ -11535,12 +11535,12 @@ msgstr "画像を編集"
 
 #: src/features/vault/components/site-logins.tsx:300
 msgid "Edit login"
-msgstr ""
+msgstr "ログインを編集"
 
 #. placeholder {0}: login.site
 #: src/features/vault/components/site-logins.tsx:268
 msgid "Edit login for {0}"
-msgstr ""
+msgstr "{0} のログインを編集"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:165
 msgid "Edit MCP Server"
@@ -18251,7 +18251,7 @@ msgstr "ラベル"
 
 #: src/features/vault/components/site-logins.tsx:338
 msgid "Label (optional)"
-msgstr ""
+msgstr "ラベル（任意）"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
@@ -18668,7 +18668,7 @@ msgstr "透明な背景にする場合は空欄のままにしてください"
 
 #: src/features/vault/components/site-logins.tsx:331
 msgid "Leave empty to keep the saved password"
-msgstr ""
+msgstr "保存済みのパスワードを維持するには空のままにしてください"
 
 #: src/features/workflow/components/nodes/audio-node.tsx:59
 msgid "Leave empty to use input from connected node"
@@ -19450,7 +19450,7 @@ msgstr "サインイン"
 
 #: src/features/vault/components/site-logins.tsx:209
 msgid "Login deleted"
-msgstr ""
+msgstr "ログインを削除しました"
 
 #: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
@@ -19458,11 +19458,11 @@ msgstr "ログインが拒否されました"
 
 #: src/features/vault/components/site-logins.tsx:176
 msgid "Login saved"
-msgstr ""
+msgstr "ログインを保存しました"
 
 #: src/features/vault/components/site-logins.tsx:176
 msgid "Login updated"
-msgstr ""
+msgstr "ログインを更新しました"
 
 #: src/features/develop/components/pull-request-reviewers-action.tsx:142
 msgid "Logins"
@@ -19470,7 +19470,7 @@ msgstr "ログイン名"
 
 #: src/features/vault/components/site-logins.tsx:225
 msgid "Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it."
-msgstr ""
+msgstr "エージェントのブラウザーがサインインに使えるログインです。パスワードはサーバーがサイトに入力し、AI が目にすることはありません。"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
@@ -21743,7 +21743,7 @@ msgstr "メッセージ内で改行"
 
 #: src/features/vault/components/site-logins.tsx:300
 msgid "New login"
-msgstr ""
+msgstr "新しいログイン"
 
 #: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
@@ -24705,7 +24705,7 @@ msgstr "パスワードをリセットしました"
 
 #: src/features/vault/components/site-logins.tsx:264
 msgid "Password set"
-msgstr ""
+msgstr "パスワード設定済み"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
@@ -28773,7 +28773,7 @@ msgstr "画像を保存"
 
 #: src/features/vault/components/site-logins.tsx:386
 msgid "Save login"
-msgstr ""
+msgstr "ログインを保存"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -30491,11 +30491,11 @@ msgstr "シンハラ語（スリランカ）"
 
 #: src/features/vault/components/site-logins.tsx:302
 msgid "Site"
-msgstr ""
+msgstr "サイト"
 
 #: src/features/vault/components/site-logins.tsx:223
 msgid "Site logins"
-msgstr ""
+msgstr "サイトのログイン"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:245
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:352
@@ -33205,7 +33205,7 @@ msgstr "エージェントはこのデバイスに何も要求できなくなり
 #. placeholder {0}: pendingDelete?.site ?? ""
 #: src/features/vault/components/site-logins.tsx:399
 msgid "The agent can no longer sign in to {0} with it."
-msgstr ""
+msgstr "エージェントはこのログインで {0} にサインインできなくなります。"
 
 #. placeholder {0}: nameOfValue(changed, answered.valueId)
 #. placeholder {1}: changed.name
@@ -36819,7 +36819,7 @@ msgstr "ユーザー名は必須です"
 
 #: src/features/vault/components/site-logins.tsx:314
 msgid "Username or email"
-msgstr ""
+msgstr "ユーザー名またはメール"
 
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
@@ -38749,7 +38749,7 @@ msgstr "自分のボット"
 
 #: src/features/vault/components/site-logins.tsx:344
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
-msgstr ""
+msgstr "ボットを読み込めませんでした。保存済みログインのボットを維持するため、変更は読み込み後に保存できます。"
 
 #: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
@@ -38766,11 +38766,11 @@ msgstr "ブラウザーがこのコンピューター上のサーバーと直接
 #. placeholder {0}: teammates.join(", ")
 #: src/features/vault/components/site-logins.tsx:253
 msgid "Your chats and {0}"
-msgstr ""
+msgstr "自分のチャットと {0}"
 
 #: src/features/vault/components/site-logins.tsx:255
 msgid "Your chats and the bots you chose"
-msgstr ""
+msgstr "自分のチャットと選択したボット"
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"
@@ -38932,11 +38932,11 @@ msgstr "ご自身の Anthropic キー。Claude Code に作業を任せるため�
 
 #: src/features/vault/components/site-logins.tsx:363
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
-msgstr ""
+msgstr "自分のチャットは常に使用できます。ボットのチャットは、ここでそのボットにチェックを入れた場合のみ使用できます。共有、公開、グループ、メッセンジャーのチャットでは使用できません。"
 
 #: src/features/vault/components/site-logins.tsx:250
 msgid "Your own chats only"
-msgstr ""
+msgstr "自分のチャットのみ"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:65
 msgid "Your own OpenAI key — used for OpenAI models and required to delegate work to Codex."
@@ -38990,7 +38990,7 @@ msgstr "あなたのレビューがリクエストされました"
 
 #: src/features/vault/components/site-logins.tsx:231
 msgid "Your saved logins could not be loaded."
-msgstr ""
+msgstr "保存済みのログインを読み込めませんでした。"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."

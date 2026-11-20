@@ -1888,7 +1888,7 @@ msgstr "Un chat bloqueado no puede tener un enlace de invitado."
 
 #: src/features/vault/components/site-logins.tsx:366
 msgid "A login can name at most {MAX_TEAMMATES} bots."
-msgstr ""
+msgstr "Un inicio de sesión puede indicar como máximo {MAX_TEAMMATES} bots."
 
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
@@ -5178,7 +5178,7 @@ msgstr "Bots"
 
 #: src/features/vault/components/site-logins.tsx:361
 msgid "Bots that may use it"
-msgstr ""
+msgstr "Bots que pueden usarlo"
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
@@ -8553,7 +8553,7 @@ msgstr "No se pudo eliminar el comentario"
 
 #: src/features/vault/components/site-logins.tsx:213
 msgid "Could not delete the login."
-msgstr ""
+msgstr "No se pudo eliminar el inicio de sesión."
 
 #: src/features/pages/components/pages-sidebar.tsx:134
 msgid "Could not delete the page"
@@ -8789,7 +8789,7 @@ msgstr "No se pudo guardar la configuración del correo."
 
 #: src/features/vault/components/site-logins.tsx:177
 msgid "Could not save the login."
-msgstr ""
+msgstr "No se pudo guardar el inicio de sesión."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:120
 msgid "Could not save the memories"
@@ -10101,7 +10101,7 @@ msgstr "Eliminar grupo y su contenido"
 #. placeholder {0}: login.site
 #: src/features/vault/components/site-logins.tsx:285
 msgid "Delete login for {0}"
-msgstr ""
+msgstr "Eliminar el inicio de sesión de {0}"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
@@ -10235,7 +10235,7 @@ msgstr "¿Eliminar este caso?"
 
 #: src/features/vault/components/site-logins.tsx:408
 msgid "Delete this login?"
-msgstr ""
+msgstr "¿Eliminar este inicio de sesión?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:499
@@ -11535,12 +11535,12 @@ msgstr "Editar imagen"
 
 #: src/features/vault/components/site-logins.tsx:300
 msgid "Edit login"
-msgstr ""
+msgstr "Editar inicio de sesión"
 
 #. placeholder {0}: login.site
 #: src/features/vault/components/site-logins.tsx:268
 msgid "Edit login for {0}"
-msgstr ""
+msgstr "Editar el inicio de sesión de {0}"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:165
 msgid "Edit MCP Server"
@@ -18251,7 +18251,7 @@ msgstr "Etiqueta"
 
 #: src/features/vault/components/site-logins.tsx:338
 msgid "Label (optional)"
-msgstr ""
+msgstr "Etiqueta (opcional)"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
@@ -18668,7 +18668,7 @@ msgstr "Déjalo vacío para un fondo transparente"
 
 #: src/features/vault/components/site-logins.tsx:331
 msgid "Leave empty to keep the saved password"
-msgstr ""
+msgstr "Déjalo vacío para conservar la contraseña guardada"
 
 #: src/features/workflow/components/nodes/audio-node.tsx:59
 msgid "Leave empty to use input from connected node"
@@ -19450,7 +19450,7 @@ msgstr "Iniciar sesión"
 
 #: src/features/vault/components/site-logins.tsx:209
 msgid "Login deleted"
-msgstr ""
+msgstr "Inicio de sesión eliminado"
 
 #: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
@@ -19458,11 +19458,11 @@ msgstr "inicio de sesión rechazado"
 
 #: src/features/vault/components/site-logins.tsx:176
 msgid "Login saved"
-msgstr ""
+msgstr "Inicio de sesión guardado"
 
 #: src/features/vault/components/site-logins.tsx:176
 msgid "Login updated"
-msgstr ""
+msgstr "Inicio de sesión actualizado"
 
 #: src/features/develop/components/pull-request-reviewers-action.tsx:142
 msgid "Logins"
@@ -19470,7 +19470,7 @@ msgstr "Nombres de usuario"
 
 #: src/features/vault/components/site-logins.tsx:225
 msgid "Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it."
-msgstr ""
+msgstr "Inicios de sesión con los que el navegador del agente puede entrar. El servidor escribe la contraseña en el sitio; la IA nunca la ve."
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
@@ -21743,7 +21743,7 @@ msgstr "Nueva línea en el mensaje"
 
 #: src/features/vault/components/site-logins.tsx:300
 msgid "New login"
-msgstr ""
+msgstr "Nuevo inicio de sesión"
 
 #: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
@@ -24705,7 +24705,7 @@ msgstr "Contraseña restablecida correctamente"
 
 #: src/features/vault/components/site-logins.tsx:264
 msgid "Password set"
-msgstr ""
+msgstr "Contraseña guardada"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
@@ -28773,7 +28773,7 @@ msgstr "Guardar imagen"
 
 #: src/features/vault/components/site-logins.tsx:386
 msgid "Save login"
-msgstr ""
+msgstr "Guardar inicio de sesión"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -30491,11 +30491,11 @@ msgstr "Cingalés (Sri Lanka)"
 
 #: src/features/vault/components/site-logins.tsx:302
 msgid "Site"
-msgstr ""
+msgstr "Sitio"
 
 #: src/features/vault/components/site-logins.tsx:223
 msgid "Site logins"
-msgstr ""
+msgstr "Inicios de sesión en sitios"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:245
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:352
@@ -33205,7 +33205,7 @@ msgstr "El agente ya no podrá pedirle nada a este dispositivo. Su registro de a
 #. placeholder {0}: pendingDelete?.site ?? ""
 #: src/features/vault/components/site-logins.tsx:399
 msgid "The agent can no longer sign in to {0} with it."
-msgstr ""
+msgstr "El agente ya no puede iniciar sesión en {0} con él."
 
 #. placeholder {0}: nameOfValue(changed, answered.valueId)
 #. placeholder {1}: changed.name
@@ -36819,7 +36819,7 @@ msgstr "El nombre de usuario es obligatorio"
 
 #: src/features/vault/components/site-logins.tsx:314
 msgid "Username or email"
-msgstr ""
+msgstr "Nombre de usuario o correo electrónico"
 
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
@@ -38749,7 +38749,7 @@ msgstr "Tus bots"
 
 #: src/features/vault/components/site-logins.tsx:344
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
-msgstr ""
+msgstr "No se pudieron cargar tus bots. Los cambios en un inicio de sesión guardado se podrán guardar cuando carguen, para que se conserven sus bots."
 
 #: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
@@ -38766,11 +38766,11 @@ msgstr "Tu navegador se comunica directamente con el servidor de este ordenador:
 #. placeholder {0}: teammates.join(", ")
 #: src/features/vault/components/site-logins.tsx:253
 msgid "Your chats and {0}"
-msgstr ""
+msgstr "Tus chats y {0}"
 
 #: src/features/vault/components/site-logins.tsx:255
 msgid "Your chats and the bots you chose"
-msgstr ""
+msgstr "Tus chats y los bots que elegiste"
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"
@@ -38932,11 +38932,11 @@ msgstr "Tu propia clave de Anthropic. Necesaria para delegar trabajo en Claude C
 
 #: src/features/vault/components/site-logins.tsx:363
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
-msgstr ""
+msgstr "Tus propios chats siempre pueden usarlo. Los chats de un bot solo pueden usarlo si marcas ese bot aquí. Los chats compartidos, públicos, de grupo y de mensajería nunca pueden."
 
 #: src/features/vault/components/site-logins.tsx:250
 msgid "Your own chats only"
-msgstr ""
+msgstr "Solo tus propios chats"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:65
 msgid "Your own OpenAI key — used for OpenAI models and required to delegate work to Codex."
@@ -38990,7 +38990,7 @@ msgstr "Se solicitó tu revisión"
 
 #: src/features/vault/components/site-logins.tsx:231
 msgid "Your saved logins could not be loaded."
-msgstr ""
+msgstr "No se pudieron cargar tus inicios de sesión guardados."
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."

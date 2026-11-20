@@ -1888,7 +1888,7 @@ msgstr "已锁定的聊天不能有访客链接。"
 
 #: src/features/vault/components/site-logins.tsx:366
 msgid "A login can name at most {MAX_TEAMMATES} bots."
-msgstr ""
+msgstr "一个登录信息最多可指定 {MAX_TEAMMATES} 个机器人。"
 
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
@@ -5178,7 +5178,7 @@ msgstr "机器人"
 
 #: src/features/vault/components/site-logins.tsx:361
 msgid "Bots that may use it"
-msgstr ""
+msgstr "可以使用它的机器人"
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:28
 msgid "Bottom"
@@ -8553,7 +8553,7 @@ msgstr "无法删除评论"
 
 #: src/features/vault/components/site-logins.tsx:213
 msgid "Could not delete the login."
-msgstr ""
+msgstr "无法删除登录信息。"
 
 #: src/features/pages/components/pages-sidebar.tsx:134
 msgid "Could not delete the page"
@@ -8789,7 +8789,7 @@ msgstr "无法保存邮件设置。"
 
 #: src/features/vault/components/site-logins.tsx:177
 msgid "Could not save the login."
-msgstr ""
+msgstr "无法保存登录信息。"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:120
 msgid "Could not save the memories"
@@ -10101,7 +10101,7 @@ msgstr "删除分组及其子节点"
 #. placeholder {0}: login.site
 #: src/features/vault/components/site-logins.tsx:285
 msgid "Delete login for {0}"
-msgstr ""
+msgstr "删除 {0} 的登录信息"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:249
 #: src/features/auth/components/organization/organization-logo-card.tsx:162
@@ -10235,7 +10235,7 @@ msgstr "删除此用例？"
 
 #: src/features/vault/components/site-logins.tsx:408
 msgid "Delete this login?"
-msgstr ""
+msgstr "删除此登录信息？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:499
@@ -11535,12 +11535,12 @@ msgstr "编辑图片"
 
 #: src/features/vault/components/site-logins.tsx:300
 msgid "Edit login"
-msgstr ""
+msgstr "编辑登录信息"
 
 #. placeholder {0}: login.site
 #: src/features/vault/components/site-logins.tsx:268
 msgid "Edit login for {0}"
-msgstr ""
+msgstr "编辑 {0} 的登录信息"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:165
 msgid "Edit MCP Server"
@@ -18251,7 +18251,7 @@ msgstr "标签"
 
 #: src/features/vault/components/site-logins.tsx:338
 msgid "Label (optional)"
-msgstr ""
+msgstr "标签（可选）"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:279
 msgid "Labs hidden from the model picker only. Models already selected or set as defaults keep working."
@@ -18668,7 +18668,7 @@ msgstr "留空则使用透明背景"
 
 #: src/features/vault/components/site-logins.tsx:331
 msgid "Leave empty to keep the saved password"
-msgstr ""
+msgstr "留空以保留已保存的密码"
 
 #: src/features/workflow/components/nodes/audio-node.tsx:59
 msgid "Leave empty to use input from connected node"
@@ -19450,7 +19450,7 @@ msgstr "登录"
 
 #: src/features/vault/components/site-logins.tsx:209
 msgid "Login deleted"
-msgstr ""
+msgstr "登录信息已删除"
 
 #: src/features/devices/lib/device-diagnostics.ts:42
 msgid "login refused"
@@ -19458,11 +19458,11 @@ msgstr "登录被拒绝"
 
 #: src/features/vault/components/site-logins.tsx:176
 msgid "Login saved"
-msgstr ""
+msgstr "登录信息已保存"
 
 #: src/features/vault/components/site-logins.tsx:176
 msgid "Login updated"
-msgstr ""
+msgstr "登录信息已更新"
 
 #: src/features/develop/components/pull-request-reviewers-action.tsx:142
 msgid "Logins"
@@ -19470,7 +19470,7 @@ msgstr "登录名"
 
 #: src/features/vault/components/site-logins.tsx:225
 msgid "Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it."
-msgstr ""
+msgstr "智能体的浏览器可用于登录的账号信息。密码由服务器输入到网站中，AI 永远看不到。"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
@@ -21743,7 +21743,7 @@ msgstr "消息中换行"
 
 #: src/features/vault/components/site-logins.tsx:300
 msgid "New login"
-msgstr ""
+msgstr "新建登录信息"
 
 #: src/lib/model-descriptions.ts:175
 msgid "New model excelling at anime"
@@ -24705,7 +24705,7 @@ msgstr "密码重置成功"
 
 #: src/features/vault/components/site-logins.tsx:264
 msgid "Password set"
-msgstr ""
+msgstr "已设置密码"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
@@ -28773,7 +28773,7 @@ msgstr "保存图像"
 
 #: src/features/vault/components/site-logins.tsx:386
 msgid "Save login"
-msgstr ""
+msgstr "保存登录信息"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -30491,11 +30491,11 @@ msgstr "僧伽罗语（斯里兰卡）"
 
 #: src/features/vault/components/site-logins.tsx:302
 msgid "Site"
-msgstr ""
+msgstr "网站"
 
 #: src/features/vault/components/site-logins.tsx:223
 msgid "Site logins"
-msgstr ""
+msgstr "网站登录信息"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:245
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:352
@@ -33205,7 +33205,7 @@ msgstr "智能体将无法再向此设备请求任何操作。其活动日志会
 #. placeholder {0}: pendingDelete?.site ?? ""
 #: src/features/vault/components/site-logins.tsx:399
 msgid "The agent can no longer sign in to {0} with it."
-msgstr ""
+msgstr "智能体将无法再用它登录 {0}。"
 
 #. placeholder {0}: nameOfValue(changed, answered.valueId)
 #. placeholder {1}: changed.name
@@ -36819,7 +36819,7 @@ msgstr "请输入用户名"
 
 #: src/features/vault/components/site-logins.tsx:314
 msgid "Username or email"
-msgstr ""
+msgstr "用户名或邮箱"
 
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:121
 msgid "Username or email is required"
@@ -38749,7 +38749,7 @@ msgstr "你的机器人"
 
 #: src/features/vault/components/site-logins.tsx:344
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
-msgstr ""
+msgstr "无法加载你的机器人。加载完成后才能保存对已保存登录信息的更改，以便保留其机器人。"
 
 #: src/features/local-models/lib/local-errors.ts:192
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
@@ -38766,11 +38766,11 @@ msgstr "你的浏览器直接与此电脑上的服务器通信——提示词和
 #. placeholder {0}: teammates.join(", ")
 #: src/features/vault/components/site-logins.tsx:253
 msgid "Your chats and {0}"
-msgstr ""
+msgstr "你的聊天和 {0}"
 
 #: src/features/vault/components/site-logins.tsx:255
 msgid "Your chats and the bots you chose"
-msgstr ""
+msgstr "你的聊天和你选择的机器人"
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"
@@ -38932,11 +38932,11 @@ msgstr "你自己的 Anthropic 密钥。将工作委派给 Claude Code 时必需
 
 #: src/features/vault/components/site-logins.tsx:363
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
-msgstr ""
+msgstr "你自己的聊天始终可以使用它。机器人的聊天只有在你在此勾选该机器人时才能使用。共享、公开、群组和消息应用聊天永远不能使用。"
 
 #: src/features/vault/components/site-logins.tsx:250
 msgid "Your own chats only"
-msgstr ""
+msgstr "仅限你自己的聊天"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:65
 msgid "Your own OpenAI key — used for OpenAI models and required to delegate work to Codex."
@@ -38990,7 +38990,7 @@ msgstr "有人请求了你的审查"
 
 #: src/features/vault/components/site-logins.tsx:231
 msgid "Your saved logins could not be loaded."
-msgstr ""
+msgstr "无法加载你保存的登录信息。"
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
