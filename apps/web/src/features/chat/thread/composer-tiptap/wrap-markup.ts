@@ -1,3 +1,4 @@
+import { getTextSerializersFromSchema } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
@@ -316,40 +317,101 @@ const collect = (root: MarkdownNode, text: string): { blocks: [number, number][]
     return { blocks, constructs };
 };
 
+/** A child of the selected textblock: its parent offset and size, and where its text starts and how long it is in the draft. */
+interface ChildText {
+    draftStart: number;
+    length: number;
+    offset: number;
+    size: number;
+}
+
 /**
- * The draft as the composer sends it: its blocks joined by line breaks, with a line break for each inline node that is
- * not text. `start` is where the textblock `parent` begins in it; a parent offset `p` is at `start + p`, because every
- * character and every inline node takes one offset and one position.
+ * The draft as the composer sends it, read the way Tiptap's `getText` reads it (`readComposerText`): a line break before
+ * every block after the first, a node's own text serialiser where it has one (a quote chip, a hard break) and nothing
+ * inside it, and the text of text nodes. `toDraft` maps a parent offset in the textblock `parent` to its draft index;
+ * a quote chip's text can hold Markdown the parse needs, such as a reference definition.
  */
-const draftText = (doc: ProseMirrorNode, parent: ProseMirrorNode): { start: number; text: string } => {
+const draftText = (doc: ProseMirrorNode, parent: ProseMirrorNode): { text: string; toDraft: (offset: number) => number } => {
+    const serializers = getTextSerializersFromSchema(doc.type.schema);
+    const range = { from: 0, to: doc.content.size };
+    const children: ChildText[] = [];
+    let parentPos = -1;
+    let parentStart = 0;
     let text = "";
-    let start = 0;
-    let first = true;
 
-    doc.descendants((node) => {
-        if (!node.isTextblock) {
-            return true;
-        }
-
-        if (!first) {
+    doc.nodesBetween(range.from, range.to, (node, pos, nodeParent, index) => {
+        if (node.isBlock && pos > range.from) {
             text += "\n";
         }
 
-        first = false;
-
         if (node === parent) {
-            start = text.length;
+            parentPos = pos;
+            parentStart = text.length;
         }
 
-        node.forEach((child) => {
-            text += child.isText ? (child.text ?? "") : "\n";
-        });
+        const draftStart = text.length;
+        const serialize = serializers[node.type.name];
 
-        return false;
+        if (serialize) {
+            text += nodeParent ? serialize({ index, node, parent: nodeParent, pos, range }) : "";
+        } else if (node.isText) {
+            text += node.text ?? "";
+        }
+
+        if (nodeParent === parent && parentPos !== -1) {
+            children.push({ draftStart, length: text.length - draftStart, offset: pos - parentPos - 1, size: node.nodeSize });
+        }
+
+        return serialize === undefined;
     });
 
-    return { start, text };
+    const toDraft = (offset: number): number => {
+        const child = children.find((candidate) => offset >= candidate.offset && offset < candidate.offset + candidate.size);
+
+        if (child !== undefined) {
+            return child.draftStart + Math.min(offset - child.offset, child.length);
+        }
+
+        const last = children.at(-1);
+
+        return last === undefined ? parentStart : last.draftStart + last.length;
+    };
+
+    return { text, toDraft };
 };
+
+/** The textblock's text with a line break for each inline node that is not text, so its indices are parent offsets. */
+const offsetText = (parent: ProseMirrorNode): string => {
+    let text = "";
+
+    parent.forEach((child) => {
+        text += child.isText ? (child.text ?? "") : "\n";
+    });
+
+    return text;
+};
+
+/** A character reference (`&amp;`, `&#93;`, `&#x5D;`): a wrap inside one changes the character it stands for. */
+const CHARACTER_REFERENCE = /&(?:#\d{1,7}|#x[\da-f]{1,6}|[a-z][\da-z]{1,31});/gi;
+
+/** The number of backslashes right before `index`. */
+const trailingBackslashCount = (text: string, index: number): number => {
+    let count = 0;
+
+    while (count < index && text[index - count - 1] === "\\") {
+        count += 1;
+    }
+
+    return count;
+};
+
+/** The character references in `text` that no odd run of backslashes escapes, as constructs a wrap may hold whole. */
+const characterReferences = (text: string): Construct[] =>
+    [...text.matchAll(CHARACTER_REFERENCE)]
+        .filter((match) => trailingBackslashCount(text, match.index) % 2 === 0)
+        .map((match) => {
+            return { code: false, holdable: true, range: [match.index, match.index + match[0].length] };
+        });
 
 /**
  * Whether a wrap of `from`..`to` (indices into the draft text) would break a construct: an end strictly inside code,
@@ -382,28 +444,31 @@ export const markupAround = (
     from: number,
     to: number,
 ): { blocked: boolean; paragraph: string; takenFences: ReadonlySet<number> } | null => {
-    const { start, text } = draftText(doc, parent);
+    const { text, toDraft } = draftText(doc, parent);
 
     if (text.length > MAX_WRAP_DRAFT) {
         return null;
     }
 
     const { unmatched } = scanBackticks(text);
-
     const { blocks, constructs } = collect(parser.parse(text) as MarkdownNode, text);
-
-    const paragraph = text.slice(start, start + parent.content.size);
+    const paragraph = offsetText(parent);
+    const draftFrom = toDraft(from);
+    const draftTo = toDraft(to);
     // The line that holds the selection: a line break inside the textblock starts a new one, where block syntax can begin.
     const lineStart = from > 0 ? paragraph.lastIndexOf("\n", from - 1) + 1 : 0;
     const nextBreak = paragraph.indexOf("\n", lineStart);
     const lineEnd = nextBreak === -1 ? paragraph.length : nextBreak;
     // A blockquote, list item or heading on this line keeps its marker only while the wrap starts after it.
-    const onBlock = blocks.some(([blockStart, blockEnd]) => blockStart <= start + lineEnd && blockEnd >= start + lineStart);
+    const onBlock = blocks.some(([blockStart, blockEnd]) => blockStart <= toDraft(lineEnd) && blockEnd >= toDraft(lineStart));
     const markers = onBlock ? lineStart + markerLength(paragraph.slice(lineStart, lineEnd)) : 0;
 
     return {
-        blocked: from < markers || breaksTable(text, start + from, start + to) || constructs.some((construct) => breaks(construct, start + from, start + to)),
+        blocked:
+            from < markers ||
+            breaksTable(text, draftFrom, draftTo) ||
+            [...constructs, ...characterReferences(text)].some((construct) => breaks(construct, draftFrom, draftTo)),
         paragraph,
-        takenFences: new Set(unmatched.filter((run) => run.start < start + from).map((run) => run.length)),
+        takenFences: new Set(unmatched.filter((run) => run.start < draftFrom).map((run) => run.length)),
     };
 };

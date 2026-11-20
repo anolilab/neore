@@ -5,6 +5,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import StarterKitExtension from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 
+import QuoteChip from "./extensions/quote-chip";
 import VimMode from "./extensions/vim-mode";
 import { composerCoreExtensionOptions } from "./paste-plain-text";
 import { WrapSelection, wrapSelection, wrapSelectionOnTextInput } from "./wrap-selection";
@@ -791,6 +792,34 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(selectedText(editor)).toBe(`c${BACKSLASH}|d`);
         expect(wrapSelectionOnTextInput(editor.view, 29, 33, "*")).toBe(true);
         expect(text(editor)).toBe(`| a | b |\n| --- | --- |\n| **c${BACKSLASH}|d** | e |`);
+    });
+
+    it("reads a quote chip's text, so a reference defined in the quote keeps its identifier", () => {
+        const editor = new Editor({
+            content: '<div data-quote-chip data-message-id="m"><blockquote><p>[ref]: https://example.test</p></blockquote></div><p>see [x][ref] now</p>',
+            coreExtensionOptions: composerCoreExtensionOptions,
+            extensions: [StarterKitExtension, QuoteChip],
+        });
+
+        editors.push(editor);
+
+        const before = text(editor);
+
+        select(editor, 10, 13);
+
+        expect(selectedText(editor)).toBe("ref");
+        expect(wrapSelectionOnTextInput(editor.view, 10, 13, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("leaves part of a character reference alone, which would change the character", () => {
+        const editor = editorWith("<p>see [a&amp;#93;b](url)</p>");
+
+        select(editor, 8, 11);
+
+        expect(selectedText(editor)).toBe("#93");
+        expect(wrapSelectionOnTextInput(editor.view, 8, 11, "*")).toBe(true);
+        expect(text(editor)).toBe("see [a&#93;b](url)");
     });
 
     it("wraps literal ](url) text that has no link label before it", () => {
