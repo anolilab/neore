@@ -147,6 +147,14 @@ fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
     std::fs::write(dir.join(NONCE_FILE), "{ damaged").unwrap();
     std::fs::write(dir.join("host.json.tmp"), "{ \"secret\": \"x\" }").unwrap();
 
+    // The preview leaves them in place.
+    assert_eq!(
+        format!("{:?}", unpair_dry_run(&vault)),
+        format!("{:?}", ExitCode::SUCCESS)
+    );
+    assert!(dir.join(NONCE_FILE).exists());
+    assert!(dir.join("host.json.tmp").exists());
+
     assert_eq!(
         format!("{:?}", unpair(&vault, false)),
         format!("{:?}", ExitCode::SUCCESS)
@@ -159,4 +167,13 @@ fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
 fn run_compares_signed_expiry_with_the_date_not_the_uptime() {
     // 2020-01-01 in milliseconds: any date-based clock is past it, a clock counting from process start is not.
     assert!(wall_now_ms() > 1_577_836_800_000);
+}
+
+#[test]
+fn the_name_shown_is_the_name_the_backend_stores() {
+    assert_eq!(stored_name("build-box.local"), "build-box.local");
+    assert_eq!(stored_name("Office Mac (2)"), "OfficeMac2");
+    assert_eq!(stored_name("über"), "ber");
+    assert_eq!(stored_name("  "), "unknown-host");
+    assert_eq!(stored_name(&"a".repeat(100)).len(), 64);
 }

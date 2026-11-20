@@ -40,8 +40,16 @@ impl RunLock {
             .open(&path)
             .map_err(|error| format!("{} could not be opened: {error}", path.display()))?;
 
-        file.try_lock().map_err(|_| {
-            "another `neore-host run` already holds this pairing; stop it first".to_owned()
+        // `pair`, `run` and `unpair` all hold this lock, and `pair` holds it while it waits for approval, so a held lock
+        // does not say which one has it.
+        file.try_lock().map_err(|error| match error {
+            std::fs::TryLockError::WouldBlock => {
+                "another neore-host command (pair, run or unpair) is using this pairing; let it finish or stop it first"
+                    .to_owned()
+            }
+            std::fs::TryLockError::Error(error) => {
+                format!("{} could not be locked: {error}", path.display())
+            }
         })?;
 
         Ok(RunLock { _file: file })

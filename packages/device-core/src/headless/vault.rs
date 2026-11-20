@@ -235,6 +235,11 @@ impl<'a> Vault<'a> {
         self.dir.join(FILE_NAME)
     }
 
+    /// Where a save that died before its rename leaves its temporary record, which `forget` removes.
+    pub(super) fn temporary_record(&self) -> PathBuf {
+        temporary_of(&self.file())
+    }
+
     /// Where a secret would go right now: the keychain if it round-trips a value, else the file. Announced with the
     /// code, so the owner sees the choice before approving. The probe entry is removed. An error when neither can
     /// hold it, or when the folder the pairing would be saved in is not one the vault accepts (created owner-only if

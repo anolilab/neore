@@ -10,6 +10,24 @@ use super::pair::{self, Identity, SystemTimer};
 use super::serve::{RunLock, Service};
 use super::vault::{default_dir, OsKeychain, Vault};
 
+/// A host name reduced as the backend reduces it (`cleanHostname` in `backend/lunora/auth/cli-device-auth.ts`):
+/// letters, digits, `_`, `.` and `-` only, at most 64 characters, `unknown-host` when nothing is left.
+fn stored_name(raw: &str) -> String {
+    let name: String = raw
+        .chars()
+        .filter(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | '-')
+        })
+        .take(64)
+        .collect();
+
+    if name.is_empty() {
+        "unknown-host".into()
+    } else {
+        name
+    }
+}
+
 /// Wall-clock milliseconds since the epoch: a signed call's `expiresAt` is a date, so `run` compares it with this,
 /// never with `SystemTimer`, which only measures durations.
 fn wall_now_ms() -> u64 {
@@ -30,7 +48,7 @@ pub const USAGE: &str = "usage:
 
 The backend can also be given as NEORE_BACKEND_URL. Files live in NEORE_HOST_DIR when set.";
 
-/// This machine's name, reduced the way the backend reduces it. Never an error: a pairing can use a typed name.
+/// This machine's name as the system reports it. Never an error: a pairing can use a typed name.
 fn machine_name() -> String {
     #[cfg(unix)]
     {
@@ -156,7 +174,8 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
                 }
             }
 
-            let hostname = name.unwrap_or_else(machine_name);
+            // Shown to the person as the name to look for on the approval page, so it is the name the backend stores.
+            let hostname = stored_name(&name.unwrap_or_else(machine_name));
             let outcome = pair::pair(
                 &UreqHttp::new(),
                 &SystemTimer,
@@ -319,7 +338,7 @@ fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
                 ExitCode::SUCCESS
             }
             Ok(true) => {
-                eprintln!("neore-host: `neore-host run` is using this pairing, so unpair would be refused; stop it first. Nothing was changed.");
+                eprintln!("neore-host: another neore-host command (pair, run or unpair) is using this pairing, so unpair would be refused; let it finish or stop it first. Nothing was changed.");
 
                 ExitCode::FAILURE
             }
@@ -330,7 +349,21 @@ fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
             }
         },
         Ok(None) => {
-            println!("This machine holds no pairing. Nothing to remove.");
+            // The real unpair also removes what an interrupted pairing or clean-up left, so the preview names it.
+            let leftovers: Vec<String> = [vault.temporary_record(), vault.dir().join(NONCE_FILE)]
+                .into_iter()
+                .filter(|path| path.exists())
+                .map(|path| path.display().to_string())
+                .collect();
+
+            if leftovers.is_empty() {
+                println!("This machine holds no pairing. Nothing to remove.");
+            } else {
+                println!(
+                    "This machine holds no pairing. Would remove what an interrupted pairing or clean-up left: {}. Nothing was changed.",
+                    leftovers.join(", ")
+                );
+            }
 
             ExitCode::SUCCESS
         }

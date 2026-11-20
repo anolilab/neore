@@ -238,7 +238,7 @@ fn a_second_run_on_the_same_pairing_is_refused_until_the_first_ends() {
     assert!(RunLock::acquire(&dir)
         .err()
         .unwrap()
-        .contains("already holds"));
+        .contains("another neore-host command"));
 
     drop(first);
 
