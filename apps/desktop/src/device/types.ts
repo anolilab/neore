@@ -247,7 +247,6 @@ export interface DeviceCore {
     /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */
     acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
     acpSign: (envelope: string, signature: string, outcome: string) => string;
-    acpSpawnPlan: (agentKey: string, folder: string | null) => string;
     acpSpawnPlanAsync: (agentKey: string, folder: string | null) => Promise<string>;
     /** A coding agent's terminals (`acp/terminals.ts`), run by Rust in the shell sandbox; JSON strings. */
     acpTerminalAvailable: (folder: string) => boolean;

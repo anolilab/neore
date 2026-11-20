@@ -47,8 +47,11 @@ use crate::hmac::to_hex;
 const MAX_TREE_ENTRIES: usize = 200_000;
 const TARBALL: &str = "package.tgz";
 const HOME_DIR: &str = "home";
-/// How often the staging folder is measured while npm runs, in 100 ms polls.
-const STAGE_CHECK_EVERY: u32 = 5;
+/// When the staging folder is first measured while npm runs. The wait doubles after each measurement, up to
+/// [`STAGE_CHECK_MAX`]: a measurement walks the whole folder, which on a large dependency tree is hundreds of
+/// thousands of `stat` calls competing with npm for the disk.
+const STAGE_CHECK_FIRST: Duration = Duration::from_millis(500);
+const STAGE_CHECK_MAX: Duration = Duration::from_secs(8);
 /// Variables the install passes on: a proxy and certificate settings decide whether the network is reachable behind
 /// a corporate proxy. None of them names a program to run. Everything else is left out.
 const PASSED_ENV: [&str; 7] = [
@@ -688,15 +691,15 @@ fn run_npm(
     let mut child = spawn_retrying_busy(&mut command)
         .map_err(|error| format!("npm could not be started: {error}"))?;
     let deadline = Instant::now() + limits.npm_timeout;
-    let mut until_check = STAGE_CHECK_EVERY;
+    let mut check_every = STAGE_CHECK_FIRST;
+    let mut next_check = Instant::now() + check_every;
 
     loop {
-        until_check -= 1;
-
         // A package and its dependencies can expand far beyond the tarball that was verified: stop npm while it
         // runs, not after it has filled the disk.
-        if until_check == 0 {
-            until_check = STAGE_CHECK_EVERY;
+        if Instant::now() >= next_check {
+            check_every = (check_every * 2).min(STAGE_CHECK_MAX);
+            next_check = Instant::now() + check_every;
 
             if stage_over(stage, limits.stage_bytes) {
                 stop_npm(&mut child);

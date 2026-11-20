@@ -3,7 +3,7 @@
  * Everything in a transcript came from an agent: the window renders it with `textContent` only.
  */
 
-/** What the Rust core returns for `acpSpawnPlan`; the environment holds secrets and stays in the main process. */
+/** What the Rust core returns for `acpSpawnPlanAsync`; the environment holds secrets and stays in the main process. */
 export interface SpawnPlan {
     args: string[];
     command: string;

@@ -71,7 +71,7 @@ export interface ManagerOptions {
     observer?: SessionObserver;
     /** Told that the window should read the sessions again. */
     onChange: () => void;
-    /** `device-core`'s `acpSpawnPlan`, parsed. Throws when the agent or folder is not allowed. */
+    /** `device-core`'s `acpSpawnPlanAsync`, parsed. Throws when the agent or folder is not allowed. */
     plan: (agentKey: string, folder: string | null) => Promise<SpawnPlan> | SpawnPlan;
     /** Held while any of this manager's turns runs, so the computer does not sleep mid-turn (`keep-awake.ts`). */
     sleepLock?: SleepLock;
