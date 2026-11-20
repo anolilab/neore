@@ -2,6 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { normalizeSiteOrigin } from "@neore/backend/vault/site-origin";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
@@ -10,7 +11,7 @@ import { Label } from "@neore/ui/components/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
@@ -49,6 +50,13 @@ const saveArgs = (draft: LoginDraft, botName: Map<string, string> | undefined) =
     };
 };
 
+/** Whether two typed sites name the same login: the server keys a login by its normalised origin, not the text typed. */
+const sameSite = (a: string, b: string): boolean => {
+    const origin = normalizeSiteOrigin(a);
+
+    return origin !== null && origin === normalizeSiteOrigin(b);
+};
+
 /**
  * Empties the form only if it still holds `submitted`. Edits made while that save was in flight were not sent, so they
  * stay; when the save created the login, they become an edit of it, so saving them again does not create a second one.
@@ -60,7 +68,7 @@ const afterSave =
             return emptyDraft();
         }
 
-        return current.id === undefined && current.site === submitted.site ? { ...current, id: savedId } : current;
+        return current.id === undefined && sameSite(current.site, submitted.site) ? { ...current, id: savedId } : current;
     };
 
 /** Empties the form when it is editing the login `id`, which is gone. */
@@ -125,8 +133,20 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
 
     // An empty list could be the last account's cached one, so only a non-empty one may drop a deleted teammate here.
     const knownBots = botsLoaded && bots.length > 0;
-    const saveMutation = useMutation(crpc.vault.site_logins.saveSiteLogin.mutationOptions());
-    const deleteMutation = useMutation(crpc.vault.site_logins.deleteSiteLogin.mutationOptions());
+    // Offline, the default network mode pauses a write and sends it on reconnect, by then perhaps under another account
+    // with the typed password still in it. These fail at once instead.
+    const saveMutation = useMutation(crpc.vault.site_logins.saveSiteLogin.mutationOptions({ networkMode: "always", retry: 0 }, { onlineOnly: true }));
+    const deleteMutation = useMutation(crpc.vault.site_logins.deleteSiteLogin.mutationOptions({ networkMode: "always", retry: 0 }, { onlineOnly: true }));
+    // A save or delete that ends after an account switch (this form unmounts) does not report to the next account.
+    const mounted = useRef(true);
+
+    useEffect(() => {
+        mounted.current = true;
+
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     const [draft, setDraft] = useState<LoginDraft>(emptyDraft);
     const [pendingDelete, setPendingDelete] = useState<{ id: Id<"savedSiteLogins">; site: string } | null>(null);
@@ -161,9 +181,14 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
 
             setDraft(afterSave(submitted, savedId));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
-            toast.success(saved);
+
+            if (mounted.current) {
+                toast.success(saved);
+            }
         } catch (error) {
-            toast.error(errorText(error, fallback));
+            if (mounted.current) {
+                toast.error(errorText(error, fallback));
+            }
         }
     };
 
@@ -179,9 +204,14 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             // Only once it is gone: a failed delete keeps the edit open.
             setDraft(clearIfEditing(id));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
-            toast.success(t`Login deleted`);
+
+            if (mounted.current) {
+                toast.success(t`Login deleted`);
+            }
         } catch {
-            toast.error(t`Could not delete the login.`);
+            if (mounted.current) {
+                toast.error(t`Could not delete the login.`);
+            }
         }
 
         setPendingDelete(null);
@@ -216,6 +246,14 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                 <ul className="divide-border divide-y rounded-md border">
                     {logins.map((login) => {
                         const teammates = login.teammateIds.map((id) => botName.get(id)).filter((name): name is string => name !== undefined);
+                        // Until this user's bots load, a login naming bots cannot be called owner-only.
+                        let access = t`Your own chats only`;
+
+                        if (teammates.length > 0) {
+                            access = t`Your chats and ${teammates.join(", ")}`;
+                        } else if (!knownBots && login.teammateIds.length > 0) {
+                            access = t`Your chats and the bots you chose`;
+                        }
 
                         return (
                             <li className="flex items-center gap-3 p-3" key={login.id}>
@@ -223,8 +261,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium">{login.label ? `${login.label} · ${login.site}` : login.site}</p>
                                     <p className="text-muted-foreground truncate text-xs">
-                                        {login.username} · {t`Password set`} ·{" "}
-                                        {teammates.length > 0 ? t`Your chats and ${teammates.join(", ")}` : t`Your own chats only`}
+                                        {login.username} · {t`Password set`} · {access}
                                     </p>
                                 </div>
                                 <Button
@@ -269,6 +306,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                             inputMode="url"
                             onChange={(event) => setDraft({ ...draft, site: event.target.value })}
                             placeholder="https://example.com"
+                            required
                             value={draft.site}
                         />
                     </div>
@@ -279,6 +317,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                             id={usernameId}
                             maxLength={320}
                             onChange={(event) => setDraft({ ...draft, username: event.target.value })}
+                            required
                             value={draft.username}
                         />
                     </div>
@@ -290,6 +329,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                             maxLength={1024}
                             onChange={(event) => setDraft({ ...draft, password: event.target.value })}
                             placeholder={isEditing ? t`Leave empty to keep the saved password` : undefined}
+                            required={!isEditing}
                             type="password"
                             value={draft.password}
                         />

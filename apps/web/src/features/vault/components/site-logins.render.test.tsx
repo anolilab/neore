@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const SITE = "https://example.com";
 const USERNAME_TEXT = /ada@example\.com/u;
+const CHOSEN_BOTS_TEXT = /the bots you chose/u;
 
 const harness = vi.hoisted(() => {
     return {
@@ -171,6 +172,38 @@ describe("SiteLogins", () => {
         expect(screen.queryByLabelText("Password")).toBeNull();
     });
 
+    it("does not report a save that ends after the account switched", async () => {
+        const user = userEvent.setup();
+        let finishSave: (value: string) => void = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const heldSave = new Promise<string>((resolve) => {
+            finishSave = resolve;
+        });
+
+        harness.saveSiteLogin.mockReturnValueOnce(heldSave);
+        const view = mount();
+
+        await user.type(screen.getByLabelText("Site"), SITE);
+        await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+        await user.type(passwordField(), PASSWORD);
+        await user.click(screen.getByRole("button", { name: "Save login" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+
+        harness.userId = "user-b";
+        view.rerender();
+
+        // The save's last step before its toast is the list refetch; once that has settled, the toast would have shown.
+        const invalidate = vi.spyOn(view.queryClient, "invalidateQueries");
+        const loginRefetches = () => invalidate.mock.results.filter((_, index) => invalidate.mock.calls[index]?.[0]?.queryKey?.[0] === "site-logins");
+
+        finishSave("login-1");
+        await waitFor(() => expect(loginRefetches()).toHaveLength(1));
+        await Promise.all(loginRefetches().map(async (result) => await result.value));
+
+        expect(toast.success).not.toHaveBeenCalled();
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
     it("keeps edits made while a save was in flight", async () => {
         const user = userEvent.setup();
         let finishSave: (value: string) => void = () => {};
@@ -190,6 +223,8 @@ describe("SiteLogins", () => {
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
 
         await user.type(screen.getByLabelText("Label (optional)"), "Work");
+        // Still the same origin to the server, so still the login being saved.
+        await user.type(screen.getByLabelText("Site"), "/");
         finishSave("login-1");
 
         await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
@@ -350,6 +385,8 @@ describe("SiteLogins", () => {
         const alert = await screen.findByRole("alert");
 
         expect(alert.textContent).toContain("Your bots could not be loaded.");
+        // Its bots may still use it: the row does not call it owner-only while their names are missing.
+        expect(screen.getByText(CHOSEN_BOTS_TEXT)).toBeDefined();
         expect(isDisabled(screen.getByRole("button", { name: "Save changes" }))).toBe(true);
 
         harness.botsState = "loaded";
