@@ -6,7 +6,7 @@ export type ClientOptions = {
 
 export type BrowserLoginRequest = {
     /**
-     * The time the caller gives the whole call; nothing is typed once too little of it is left
+     * The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left
      */
     budgetMs?: number;
     /**
@@ -34,9 +34,13 @@ export type BrowserLoginResponse = {
     url?: string;
     title?: string;
     /**
-     * The sign-in went out to the login's origin: the form's own POST, or a script's fetch or XHR carrying the username and password. It can be true on a failure (the step after it failed): do not send it again. False when no sign-in request was seen
+     * The form's own POST went out to the login's origin with the password. It can be true on a failure (the step after it failed): do not send it again. False when it was not sent
      */
     submitted?: boolean;
+    /**
+     * The site signs in from a script that reads the password field, which only ever holds a stand-in: nothing was sent, and trying again cannot help
+     */
+    scriptSignIn?: boolean;
     /**
      * The password could not be cleared from the page within the hold, so the page and the browser session were closed and no sessionId is returned
      */
@@ -170,9 +174,17 @@ export type BrowserLoginErrors = {
      */
     400: ErrorResponse;
     /**
+     * The browser session is busy with another call; nothing was typed
+     */
+    409: ErrorResponse;
+    /**
      * Internal server error
      */
     500: ErrorResponse;
+    /**
+     * The browser did not start within the budget; nothing was typed
+     */
+    504: ErrorResponse;
 };
 
 export type BrowserLoginError = BrowserLoginErrors[keyof BrowserLoginErrors];

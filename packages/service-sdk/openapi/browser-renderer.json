@@ -90,8 +90,24 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The browser session is busy with another call; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "504": {
+                        "description": "The browser did not start within the budget; nothing was typed",
                         "content": {
                             "application/json": {
                                 "schema": { "$ref": "#/components/schemas/ErrorResponse" }
@@ -129,7 +145,9 @@
                 "properties": {
                     "budgetMs": {
                         "type": "integer",
-                        "description": "The time the caller gives the whole call; nothing is typed once too little of it is left"
+                        "minimum": 20000,
+                        "maximum": 120000,
+                        "description": "The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left"
                     },
                     "url": { "type": "string", "description": "The login page; must be on `origin`" },
                     "origin": { "type": "string", "description": "The exact origin the login was saved for; nothing is typed on any other" },
@@ -147,7 +165,11 @@
                     "title": { "type": "string" },
                     "submitted": {
                         "type": "boolean",
-                        "description": "The sign-in went out to the login's origin: the form's own POST, or a script's fetch or XHR carrying the username and password. It can be true on a failure (the step after it failed): do not send it again. False when no sign-in request was seen"
+                        "description": "The form's own POST went out to the login's origin with the password. It can be true on a failure (the step after it failed): do not send it again. False when it was not sent"
+                    },
+                    "scriptSignIn": {
+                        "type": "boolean",
+                        "description": "The site signs in from a script that reads the password field, which only ever holds a stand-in: nothing was sent, and trying again cannot help"
                     },
                     "sessionClosed": {
                         "type": "boolean",
