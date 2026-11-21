@@ -148,6 +148,8 @@ export const humanCheckMessages = {
     clearedOnItsOwn: (site: string): string =>
         `${siteName(site)} showed a check page, which cleared on its own after a short wait. This is the page now: look at it before you act.`,
     lookBudgetSpent: "The page could not be looked at again during this browser action. Look at it yourself before you act.",
+    movedOn: (site: string): string =>
+        `The browser moved on from ${siteName(site)} while it waited for the check to clear, so nobody was asked about it. Look at the page it is on now before you act.`,
     navigationUnchecked:
         "The action worked and the page moved on, but the new page could not be read to see whether it shows a check that needs a person. Look at it before you act.",
     recheckFailed: (reason: string): string => `The page could not be looked at again after the wait: ${reason}`,
@@ -246,6 +248,13 @@ const CLEAR_EVIDENCE: Record<HumanCheckMarker, ReadonlyArray<keyof PageSignals>>
  * its showing no check in the text says nothing, so it is neither clear nor a check for one found in the text.
  */
 const tooLongToRead = (page: LadderResult): boolean => page.truncated === true || (page.content?.length ?? 0) > SHORT_PAGE_CHARS;
+
+/** A look whose page is on a known site other than `site`: the check asked about is not what it shows. */
+const movedOff = (page: LadderResult, site: string): boolean => {
+    const now = humanCheckSite(page.url);
+
+    return site !== "" && now !== "" && now !== site;
+};
 
 /** A successful read on `site` that shows no check only because its text is {@link tooLongToRead}. */
 const unreadableOnSite = (page: LadderResult, site: string): boolean =>
@@ -447,6 +456,12 @@ const afterWait = async <R extends LadderResult>(
         // A person took control during the wait and handed back the check still showing, after an earlier reply's ask.
         if (page.handedBack === true && (await askedToClearRecently(dependencies, site))) {
             return stillShowsAfterHandBack(page, site);
+        }
+
+        // Another action moved the shared browser to another site during the wait: a card naming `site` would show that
+        // page, so nobody is asked; a check there is found on the agent's next look at it.
+        if (movedOff(page, site)) {
+            return withNote(page, humanCheckMessages.movedOn(site));
         }
     }
 

@@ -18,6 +18,7 @@ import {
     HUMAN_CHECK_WAIT_MS,
     humanCheckLadder,
     type HumanCheckAskKind,
+    humanCheckMessages,
     humanCheckSite,
     type LadderDependencies,
     type LadderResult,
@@ -194,6 +195,17 @@ describe("humanCheckLadder", () => {
             expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
             expect(result.screenshot).toBeUndefined();
         }
+    });
+
+    it("step 1: asks nobody when another action moved the browser to another site during the wait", async () => {
+        const elsewhere = { success: true, title: "Other shop", url: "https://other.example.org/cart" };
+        const { dependencies } = dependenciesFor([elsewhere]);
+        const result = await humanCheckLadder(CHECK_PAGE, dependencies);
+
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
+        expect(result.humanCheck).toBeUndefined();
+        expect(result).toMatchObject({ success: true, url: elsewhere.url });
+        expect(result.error).toBe(humanCheckMessages.movedOn(humanCheckSite(CHECK_PAGE.url)));
     });
 
     it("step 1: a failed screenshot for the card still asks, with no image", async () => {
@@ -465,18 +477,23 @@ describe("humanCheckLadder", () => {
         expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "asked" }, success: false });
     });
 
-    it("step 1: a blank or clean page on another host after the wait is not clear, and the ask names the site the check was on", async () => {
-        for (const look of [
-            { content: "", success: true, title: "", url: "about:blank" },
-            { content: "Welcome back.", success: true, title: "Account", url: "https://login.example.net/" },
-        ]) {
-            const { asked, dependencies } = dependenciesFor([look]);
-            const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+    it("step 1: a blank page after the wait is not clear, and the ask names the site the check was on", async () => {
+        const { asked, dependencies } = dependenciesFor([{ content: "", success: true, title: "", url: "about:blank" }]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
 
-            expect(result.error).not.toMatch(CLEARED_NOTE);
-            expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
-            expect(asked).toEqual(new Set(["shop.example.com"]));
-        }
+        expect(result.error).not.toMatch(CLEARED_NOTE);
+        expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
+        expect(asked).toEqual(new Set(["shop.example.com"]));
+    });
+
+    it("step 1: a clean page on another host after the wait is not clear, and asks nobody about a page it no longer shows", async () => {
+        const { asked, dependencies } = dependenciesFor([{ content: "Welcome back.", success: true, title: "Account", url: "https://login.example.net/" }]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+        expect(result.error).not.toMatch(CLEARED_NOTE);
+        expect(result.error).toBe(humanCheckMessages.movedOn("shop.example.com"));
+        expect(result.humanCheck).toBeUndefined();
+        expect(asked).toEqual(new Set());
     });
 
     it("step 1: a person who took control during the wait and handed back an empty browser, a blank read or another site is not asked", async () => {
