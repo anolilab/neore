@@ -22,6 +22,7 @@ import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import type { ToolCtx } from "../agent/client/create-tool";
 import { HOST_PROVIDER } from "../acp/lib/reply";
 import { walkPath } from "../agent/branch-rows";
 import { parseGoalReviewNote } from "../chat/goals/shared";
@@ -60,11 +61,13 @@ export const SAFE_RESULT_TOOLS: ReadonlySet<string> = new Set(["dateTime", "list
 
 /**
  * The kinds of system-prompt text a login turn may run with: the app's own instructions (required, so an empty list is
- * no answer), the owner's personalization, and the instructions of the teammate the thread runs as (a login reaches a
- * teammate's thread only when the owner named that teammate on it). Knowledge, memories, project context, the thread's
- * stored or the request's instructions, skills, thread notes and anything else refuse.
+ * no answer), the owner's personalization, the instructions of the teammate the thread runs as (a login reaches a
+ * teammate's thread only when the owner named that teammate on it), our own agent and search mode text, and the task
+ * plan, which quotes only the prompt checked below (`chat/lib/system-context-kinds.ts#agentPromptKinds`). Knowledge,
+ * memories, project context, the thread's stored or the request's instructions, skills, thread notes and anything else
+ * refuse.
  */
-export const SAFE_SYSTEM_CONTEXT: ReadonlySet<string> = new Set(["instructions", "personalization", "teammate"]);
+export const SAFE_SYSTEM_CONTEXT: ReadonlySet<string> = new Set(["agent-mode", "instructions", "personalization", "search-mode", "task-plan", "teammate"]);
 
 /** Tools whose description and schema are ours: an MCP server, a connector or a device writes its own. */
 const SAFE_TOOL_SOURCES: ReadonlySet<string> = new Set(["builtin"]);
@@ -249,6 +252,32 @@ const threadVerdict = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">,
         .first();
 
     return summary ? { allowed: false, reason: "thread-summary" } : { allowed: true, thread };
+};
+
+/**
+ * The turn a tool call belongs to, from its tool context (`ToolCtx`) and the call's own `messages` and offered tools, or
+ * `null` when the run recorded no turn (`runTurn` unset: a run path or snapshot without it), which refuses.
+ */
+export const siteLoginTurnOf = (
+    context: Pick<ToolCtx, "dispatchOrigin" | "headless" | "runTurn" | "startedBy">,
+    call: { stepMessages: ReadonlyArray<SiteLoginMessage>; toolSources: ReadonlyArray<string> },
+): SiteLoginTurn | null => {
+    const { runTurn } = context;
+
+    if (runTurn === undefined || context.startedBy === undefined || context.dispatchOrigin === undefined) {
+        return null;
+    }
+
+    return {
+        headless: context.headless === true,
+        impersonated: runTurn.impersonated,
+        origin: context.dispatchOrigin,
+        promptMessageId: runTurn.promptMessageId as Id<"messages">,
+        startedBy: context.startedBy,
+        stepMessages: call.stepMessages,
+        systemContext: runTurn.systemContext,
+        toolSources: call.toolSources,
+    };
 };
 
 /** The owner's own turn at the app: they started it, signed in as themselves, in the lead chat, with somebody watching. */

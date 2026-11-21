@@ -115,6 +115,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: modelState.threadStateless ? { statelessMode: true } : null,
                 userProviderKeys: undefined,
             };

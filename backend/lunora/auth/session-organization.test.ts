@@ -13,13 +13,19 @@ const HOUR_MS = 60 * 60 * 1000;
 
 let harness: ReturnType<typeof lunoraTest>;
 
-const insertSession = async (fields: { activeOrganizationId?: string; expiresAt: number; impersonatedBy?: string; userId?: string }): Promise<string> =>
+const insertSession = async (fields: {
+    activeOrganizationId?: string;
+    clientGrant?: string;
+    expiresAt: number;
+    impersonatedBy?: string;
+    userId?: string;
+}): Promise<string> =>
     await harness.run(
         async (ctx: any) => await ctx.db.insert("session", { createdAt: 0, token: `token-${String(Math.random())}`, updatedAt: 0, userId: USER, ...fields }),
     );
 
-const read = async (sessionId: string, userId = USER): Promise<unknown> =>
-    await harness.run(async (ctx: any) => await ctx.runQuery(getSessionOrganizationForCap, { sessionId, userId }));
+const read = async (sessionId: string, userId = USER, viaGrant = false): Promise<unknown> =>
+    await harness.run(async (ctx: any) => await ctx.runQuery(getSessionOrganizationForCap, { sessionId, userId, viaGrant }));
 
 beforeEach(() => {
     harness = lunoraTest(schema as never);
@@ -45,6 +51,25 @@ describe("getSessionOrganizationForCap", () => {
     it("marks a session an admin opened to act as the user", async () => {
         expect(await read(await insertSession({ expiresAt: Date.now() + HOUR_MS, impersonatedBy: "admin-1" }))).toStrictEqual({
             impersonating: true,
+            organizationId: null,
+        });
+    });
+
+    it.each([
+        ["the desktop app's grant", "desktop", {}],
+        ["the phone app's grant", "mobile", {}],
+        ["a browser extension's grant", "extension", { extension: true }],
+        ["a grant whose app was never recorded", undefined, { extension: true }],
+        ["a grant naming an app nobody classified", "watch", { extension: true }],
+    ])("reads %s from its session row, never the request", async (_name, clientGrant, marks) => {
+        const sessionId = await insertSession({ expiresAt: Date.now() + HOUR_MS, ...(clientGrant !== undefined && { clientGrant }) });
+
+        expect(await read(sessionId, USER, true)).toStrictEqual({ ...marks, organizationId: null });
+    });
+
+    it("marks an extension's session reached as a web session too", async () => {
+        expect(await read(await insertSession({ clientGrant: "extension", expiresAt: Date.now() + HOUR_MS }), USER, false)).toStrictEqual({
+            extension: true,
             organizationId: null,
         });
     });

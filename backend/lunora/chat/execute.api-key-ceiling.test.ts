@@ -143,7 +143,14 @@ const pause = async (
 /** The person approves, and the continuation runs with the claimed snapshot. */
 const approve = async (ids: { streamId: string; threadId: string }) => {
     const claim = (await harness.run(
-        async (ctx: any) => await claimToolApproval(ctx, { approvalId: "ap1", callerId: OWNER, decision: "approve", threadId: ids.threadId as never }),
+        async (ctx: any) =>
+            await claimToolApproval(ctx, {
+                answeredByImpersonator: false,
+                approvalId: "ap1",
+                callerId: OWNER,
+                decision: "approve",
+                threadId: ids.threadId as never,
+            }),
     )) as { config?: typeof baseConfig & { dispatchOrigin?: "outside_agent" }; kind: string };
 
     expect(claim.kind).toBe("claimed");

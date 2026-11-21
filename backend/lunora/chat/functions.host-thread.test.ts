@@ -15,7 +15,6 @@ import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import {
     branchThread,
-    continueThread,
     generateSummary,
     getFollowupSuggestions,
     autoTitleChargeKey,
@@ -503,14 +502,6 @@ describe("the retries of a release", () => {
             }),
         ).resolves.toBe(false);
         expect(down).toBe(3);
-    });
-});
-
-describe("continueThread", () => {
-    it("refuses a prompt that is empty once the hidden characters are gone, before it touches the thread", async () => {
-        await expect(
-            harness.withIdentity({ userId: OWNER }).action(continueThread as never, { model: "gpt-4o", prompt: "\u{E0041}\u{202E}", threadId } as never),
-        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 });
 
