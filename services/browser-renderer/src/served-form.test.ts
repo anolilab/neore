@@ -81,13 +81,28 @@ describe(servedTarget, () => {
         expect(servedTarget(two, { ...LIVE, action: "https://id.example/session" })).toBeNull();
     });
 
-    it("refuses a page with a form whose submit buttons send it to different places, wherever that form is", () => {
+    it("refuses a page with a password form whose submit buttons send it to different places, wherever that form is, and no other form", () => {
         const html = `<button form="f" formaction="/comments">x</button><form id="f" action="/session">${FIELDS}<button>Go</button></form>`;
         const later = servedForms(`<form action="/session">${FIELDS}</form>${html.replace(">x<", ">y<")}`, URL_OF_PAGE);
+        const search = servedForms(
+            `<form action="/search"><input name="q"><button>Go</button><button formaction="/advanced">More</button></form><form action="/session">${FIELDS}</form>`,
+            URL_OF_PAGE,
+        );
+        const session = { ...LIVE, action: "https://id.example/session" };
 
         expect(servedForms(html, URL_OF_PAGE)).toStrictEqual([AMBIGUOUS]);
-        expect(later).toStrictEqual([{ ...LIVE, action: "https://id.example/session" }, AMBIGUOUS]);
-        expect(servedTarget(later, { ...LIVE, action: "https://id.example/session" })).toBeNull();
+        expect(later).toStrictEqual([session, AMBIGUOUS]);
+        expect(servedTarget(later, session)).toBeNull();
+        expect(servedTarget(search, session)).toStrictEqual(session);
+    });
+
+    it("checks every one of a form's many submit buttons, the last included", () => {
+        const buttons = "<button>Go</button>".repeat(20_000);
+        const agreeing = servedForms(`<form action="/session">${FIELDS}${buttons}</form>`, URL_OF_PAGE);
+        const lastDisagrees = servedForms(`<form action="/session">${FIELDS}${buttons}<button formaction="/comments">x</button></form>`, URL_OF_PAGE);
+
+        expect(agreeing).toStrictEqual([{ ...LIVE, action: "https://id.example/session" }]);
+        expect(lastDisagrees).toStrictEqual([AMBIGUOUS]);
     });
 
     it("accepts another password field of that same form, and refuses a page whose first one is in no form", () => {

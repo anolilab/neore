@@ -136,7 +136,11 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
         const form = isSubmit && !isDisabled(entry.element, entry.ancestors) ? ownerOf(entry) : null;
 
         if (form) {
-            submitters.set(form, [...(submitters.get(form) ?? []), entry.element]);
+            // Appended in place: a copy for each button would be quadratic in a form's buttons.
+            const known = submitters.get(form) ?? [];
+
+            known.push(entry.element);
+            submitters.set(form, known);
         }
     }
 

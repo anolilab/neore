@@ -1,8 +1,13 @@
+import type { Page } from "@cloudflare/playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { standIn, withoutSecret, withPassword } from "./login";
+import { signIn, standIn, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
+
+const NEVER = new Promise<never>(() => {
+    // Never settles.
+});
 
 const PERCENT_ESCAPE_RE = /%[0-9A-F]{2}/g;
 
@@ -91,5 +96,48 @@ describe(standIn, () => {
         });
 
         expect(standIn(4, "secret")).toBe("AAAA");
+    });
+});
+
+describe(signIn, () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("closes the session when the lock's setup does not settle in time", async () => {
+        vi.useFakeTimers();
+
+        const close = vi.fn(async () => undefined);
+        // The socket gate's route, the setup's first step, never settles.
+        const page = {
+            close,
+            context: () => {
+                return { routeWebSocket: async () => NEVER };
+            },
+            url: () => "https://id.example/login",
+        } as unknown as Page;
+        const signedIn = signIn(page, {
+            deadline: Date.now() + 30_000,
+            navTimeout: 10_000,
+            origin: "https://id.example",
+            pageTimeout: 5000,
+            password: SECRET,
+            url: "https://id.example/login",
+            username: "ann",
+        });
+
+        await vi.advanceTimersByTimeAsync(4999);
+
+        expect(close).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+
+        await expect(signedIn).resolves.toMatchObject({
+            error: expect.stringContaining("could not be locked"),
+            sessionClosed: true,
+            submitted: false,
+            success: false,
+        });
+        expect(close).toHaveBeenCalledOnce();
     });
 });

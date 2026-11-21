@@ -1245,22 +1245,26 @@ describe(signIn, () => {
     it("closes the session when turning the scripts off for the cleanup stalls past the hold", async () => {
         const deadline = Date.now() + 30_000;
         let offset = 0;
+        let cleanupLeft: number | undefined;
 
-        // The send's command answers; the cleanup's never does.
-        scriptsOff(async (call, send) => (call === 1 ? send() : NEVER));
-        fixture.page = loginForm();
-        // The site's answer leaves the cleanup a second and a half.
-        Object.defineProperty(fixture, "home", {
-            configurable: true,
-            get: () => {
-                offset = deadline - 2500 - Date.now();
+        // The send's command answers; the cleanup's never does. The clock jumps from that command, which the cleanup
+        // sends only with time left: a cleanup that ran out of time first would never reach it. The jump lands before the
+        // cleanup sets its wait, as the command is sent synchronously inside the shield call.
+        scriptsOff(async (call, send) => {
+            if (call === 1) {
+                return send();
+            }
 
-                return "<h1>Home</h1>";
-            },
+            cleanupLeft = deadline - (Date.now() + offset);
+            offset = deadline - 1300 - Date.now();
+
+            return NEVER;
         });
+        fixture.page = loginForm();
 
-        const result = await run(() => Date.now() + offset, undefined, deadline).finally(() => Reflect.deleteProperty(fixture, "home"));
+        const result = await run(() => Date.now() + offset, undefined, deadline);
 
+        expect(cleanupLeft).toBeGreaterThan(20_000);
         expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
         expect(page.isClosed()).toBe(true);
     });
@@ -1311,13 +1315,24 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([]);
     });
 
-    it("closes the session when the lock's setup does not settle in time", async () => {
-        context.routeWebSocket = async () => NEVER;
-        fixture.page = loginForm();
+    it("closes the session when the lock lets go too slowly after a refusal, rather than hand on a tab it may still hold", async () => {
+        const { newBrowserCDPSession } = browser;
 
-        const result = await run();
+        // The lock's browser-wide session is the one only the lock opens: letting go of it never ends.
+        browser.newBrowserCDPSession = async () => {
+            const session = await newBrowserCDPSession.call(browser);
 
-        expect(result).toMatchObject({ error: expect.stringContaining("could not be locked"), sessionClosed: true, submitted: false, success: false });
+            session.detach = async () => NEVER;
+
+            return session;
+        };
+        fixture.page = '<input name="pw" type="password">';
+
+        const result = await run().finally(() => {
+            browser.newBrowserCDPSession = newBrowserCDPSession;
+        });
+
+        expect(result).toMatchObject({ error: expect.stringContaining("not in a form"), sessionClosed: true, submitted: false, success: false });
         expect(page.isClosed()).toBe(true);
     });
 

@@ -1273,18 +1273,24 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return { ...result, sessionClosed: true };
         }
 
-        if (isLocking) {
-            await within(lock?.release() ?? Promise.resolve(), 1000, undefined);
-
-            // The document loaded under the lock keeps its locked APIs: the session goes on from a blank page, or none.
-            const isBlank = await within(
-                page
-                    .goto("about:blank", { timeout: 1000 })
-                    .then(() => true)
-                    .catch(() => false),
-                1000,
+        if (isLocking && !result.success) {
+            // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
+            const isReleased = await within(
+                (lock?.release() ?? Promise.resolve()).then(() => true),
+                CLOSE_MS,
                 false,
             );
+            // The document loaded under the lock keeps its locked APIs: the session goes on from a blank page, or none.
+            const isBlank =
+                isReleased &&
+                (await within(
+                    page
+                        .goto("about:blank", { timeout: 1000 })
+                        .then(() => true)
+                        .catch(() => false),
+                    1000,
+                    false,
+                ));
 
             if (!isBlank) {
                 await within(
@@ -1292,6 +1298,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                     1000,
                     undefined,
                 );
+
+                return { ...result, sessionClosed: true };
             }
         }
 

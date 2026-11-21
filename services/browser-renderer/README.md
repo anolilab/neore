@@ -73,7 +73,8 @@ From before `/login` loads the login page until the password is cleared, the tab
 window, has no WebRTC, WebTransport, `WebSocketStream`, `fetchLater`, keepalive fetch or beacon, and cannot reach a
 service worker (`src/channels.ts`). Other tabs of the session are closed when it starts. A login page that needs any of
 these fails rather than signs in; a sign-in that stops before anything is typed leaves the tab on `about:blank`, so the
-session goes on from a page loaded without the lock. Speculation rules, whose
+session goes on from a page loaded without the lock; when the lock does not let go within a second, or the tab cannot be
+moved there, the session is closed instead. Speculation rules, whose
 prefetches and prerenders the browser sends past request interception, are taken out too: a `Speculation-Rules` header
 is dropped from the tab's documents, and each `<script type="speculationrules">` is removed as it is added, in the
 document and in every shadow root a script makes or reaches, including one whose type a script changes after it is in.
@@ -101,7 +102,7 @@ body, a service worker's answer, not `text/html`, over 2 MB, or bytes the browse
 not for Shift_JIS or an undeclared charset with non-ASCII bytes), when a redirect of the load passed through another
 site, or when the site's first password field is in no form parse5 sees (a form inside a table, which the browser's
 parser ties to its fields without holding them). A page with password forms to more than one place (a sign-up form
-beside the login form), a form (any of the page's) whose submit buttons go to different places, a login form only in a declarative shadow root,
+beside the login form), one of the page's password forms whose submit buttons go to different places (a search form without a password field may have buttons that disagree), a login form only in a declarative shadow root,
 and a `url` that differs from the tab's address only by its fragment are refused too. The capture has been run
 against Playwright's Chromium only, not yet on Browser Rendering; there, a body it does not hand back refuses every
 sign-in rather than allow one. Not covered: a script can still change the other fields of the body (a hidden field, or the username), as the site's own scripts do, or send a form of its own with the stand-in in the password field's name to the same action; a site where such a field alone picks what the password signs into would take the password for the
