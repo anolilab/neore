@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
@@ -26,6 +27,37 @@ const formatBytes = (bytes: number, locale: string): string => {
 
 const formatShare = (part: number, whole: number, locale: string): string =>
     whole === 0 ? "—" : formatNumber(part / whole, locale, { maximumFractionDigits: 1, style: "percent" });
+
+/**
+ * What a failed page offers: "Try again" re-measures it, and, once past the first page, "Start over" measures from the
+ * first page (a cursor from before a deploy is one the backend no longer takes, so retrying it fails again).
+ */
+const FailedPageActions = ({
+    busy,
+    canStartOver,
+    onRetry,
+    onStartOver,
+}: {
+    busy: boolean;
+    canStartOver: boolean;
+    onRetry: () => void;
+    onStartOver: () => void;
+}) => {
+    const { t } = useLingui();
+
+    return (
+        <>
+            <Button disabled={busy} onClick={onRetry} type="button" variant="outline">
+                {t`Try again`}
+            </Button>
+            {canStartOver ? (
+                <Button disabled={busy} onClick={onStartOver} type="button" variant="ghost">
+                    {t`Start over`}
+                </Button>
+            ) : null}
+        </>
+    );
+};
 
 /**
  * Totals of the user shards' stored conversation data. Shows the shards measured so far; each
@@ -58,6 +90,12 @@ const AdminShardFootprintRow = () => {
     // Re-measures the page that failed; the measured pages before it are kept.
     const retryPage = () => {
         page.refetch();
+    };
+
+    // Drops the measured pages and the cursor, so the first page is measured again.
+    const startOver = () => {
+        setMeasured([]);
+        setCursor(undefined);
     };
 
     return (
@@ -138,21 +176,21 @@ const AdminShardFootprintRow = () => {
                         <dd className="font-semibold">{formatShare(readings.kept.toolBytes + readings.other.toolBytes, totals.approxBytes, locale)}</dd>
                     </div>
                     <div>
-                        <dt className="text-muted-foreground">{t`Tool rows of 64 KB or more, in threads idle at least ${formatNumber(COMPACT_AFTER_DAYS, locale)} days`}</dt>
+                        <dt className="text-muted-foreground">{t`Tool results of 64 KB or more, in threads idle at least ${formatNumber(COMPACT_AFTER_DAYS, locale)} days`}</dt>
                         <dd className="font-semibold">
-                            {t`${formatNumber(readings.compactable.largeToolRows, locale)} rows, ${formatBytes(readings.compactable.largeToolBytes, locale)}`}
+                            {t`${plural(readings.compactable.largeToolRows, { one: "# result", other: "# results" })}, ${formatBytes(readings.compactable.largeToolBytes, locale)}`}
                         </dd>
                     </div>
                     <div>
                         <dt className="text-muted-foreground">{t`Pinned threads`}</dt>
                         <dd className="font-semibold">
-                            {t`${formatNumber(readings.pinned.threads, locale)} threads, ${formatBytes(readings.pinned.approxBytes, locale)}`}
+                            {t`${plural(readings.pinned.threads, { one: "# thread", other: "# threads" })}, ${formatBytes(readings.pinned.approxBytes, locale)}`}
                         </dd>
                     </div>
                     <div>
-                        <dt className="text-muted-foreground">{t`Trashed, temporary or orphaned`}</dt>
+                        <dt className="text-muted-foreground">{t`Trashed, temporary, being deleted or orphaned`}</dt>
                         <dd className="font-semibold">
-                            {t`${formatNumber(readings.other.threads, locale)} threads, ${formatBytes(readings.other.approxBytes, locale)}`}
+                            {t`${plural(readings.other.threads, { one: "# thread", other: "# threads" })}, ${formatBytes(readings.other.approxBytes, locale)}`}
                         </dd>
                     </div>
                     <div>
@@ -187,9 +225,7 @@ const AdminShardFootprintRow = () => {
                         </Button>
                     ) : null}
                     {page.isError ? (
-                        <Button disabled={page.isFetching} onClick={retryPage} type="button" variant="outline">
-                            {t`Try again`}
-                        </Button>
+                        <FailedPageActions busy={page.isFetching} canStartOver={cursor !== undefined} onRetry={retryPage} onStartOver={startOver} />
                     ) : null}
                     {finished && totals.abandonedShards === 0 ? <p className="text-muted-foreground text-sm">{t`All shards measured.`}</p> : null}
                 </div>

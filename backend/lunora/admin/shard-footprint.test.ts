@@ -79,8 +79,11 @@ const seedShard = (harness: Harness, rowsPerThread: number[]) =>
         return threadIds;
     });
 
-/** Calls the measurement page by page, as a caller does, and records the rows each call read. */
-const measureShard = (harness: Harness) =>
+/**
+ * Calls the measurement page by page, as a caller does, and records the rows each call read. With `throughCursor`, every
+ * page's state goes through the browser cursor's form first, as if each page were its own admin call.
+ */
+const measureShard = (harness: Harness, { throughCursor = false } = {}) =>
     harness.run(async (ctx: any) => {
         const pageRows: number[] = [];
         let state: unknown;
@@ -89,7 +92,7 @@ const measureShard = (harness: Harness) =>
             const result: any = await ctx.runQuery(measureShardPage, state ? { now: NOW, state } : { now: NOW });
 
             pageRows.push(result.pageRows);
-            state = result.state;
+            state = throughCursor ? forCursor(result.state) : result.state;
 
             if (result.done) {
                 return { pageRows, state: result.state };
@@ -125,6 +128,12 @@ describe("measureShardPage on a shard with a 10,000-row thread", () => {
         expect(state.messageRows).toBe(BIG_THREAD_ROWS + SMALL_THREAD_COUNT * SMALL_THREAD_ROWS);
         expect(state.threads).toBe(SMALL_THREAD_COUNT + 1);
         expect(state.approxBytes).toBeGreaterThan(state.messageRows);
+    });
+
+    it("counts the 10,000-row thread whole when each page is its own admin call", async () => {
+        const { state } = await measureShard(harness, { throughCursor: true });
+
+        expect(largestRowsOf(state)[0]).toBe(BIG_THREAD_ROWS);
     });
 
     it("reads at most one page per call and continues by cursor until done", () => {
@@ -189,7 +198,7 @@ describe("measureShardPage breakdown by thread group and age band", () => {
         harness.close();
     });
 
-    it("counts each thread and row in its group and age band, with tool and large tool rows apart", async () => {
+    it("counts each thread and row in its group and age band, with tool results and large tool results apart", async () => {
         await harness.run(async (ctx: any) => {
             const thread = (fields: Record<string, unknown>) =>
                 ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "t", userId: OWNER, ...fields });
@@ -207,12 +216,26 @@ describe("measureShardPage breakdown by thread group and age band", () => {
 
             const archived = await thread({ status: "archived", updatedAt: NOW - 100 * DAY_MS });
 
+            const toolResult = (output: string) => {
+                return { message: { content: [{ output, type: "tool-result" }], role: "tool" }, tool: true };
+            };
+
             await message(archived, 0, {});
-            await message(archived, 1, { text: "small tool output", tool: true });
-            await message(archived, 2, { text: "x".repeat(LARGE_TOOL_ROW_BYTES), tool: true });
+            await message(archived, 1, toolResult("small tool output"));
+            await message(archived, 2, toolResult("x".repeat(LARGE_TOOL_ROW_BYTES)));
+            // A large call request is a tool row, but not tool output.
+            await message(archived, 3, {
+                message: { content: [{ input: "y".repeat(LARGE_TOOL_ROW_BYTES), type: "tool-call" }], role: "assistant" },
+                tool: true,
+            });
 
             await thread({ pinnedAt: NOW, status: "archived", updatedAt: NOW - 400 * DAY_MS });
             await thread({ deleted: true, deletedAt: NOW, updatedAt: NOW - 5 * DAY_MS });
+
+            // A running thread is active now, however long ago it was last updated.
+            const running = await thread({ status: "running", updatedAt: NOW - 40 * DAY_MS });
+
+            await message(running, 0, {});
 
             // A message whose thread is gone counts as `other`, in the newest band.
             const gone = await thread({ updatedAt: NOW });
@@ -224,11 +247,18 @@ describe("measureShardPage breakdown by thread group and age band", () => {
         const { state } = await measureShard(harness);
         const { breakdown } = state as { breakdown: BreakdownEntry[] };
 
-        expect(entryOf(breakdown, "active", 0)).toMatchObject({ messageRows: 2, threads: 1, toolBytes: 0 });
+        expect(entryOf(breakdown, "active", 0)).toMatchObject({ messageRows: 3, threads: 2, toolBytes: 0 });
+        expect(entryOf(breakdown, "active", 30)).toBeUndefined();
         expect(entryOf(breakdown, "active", 7)).toMatchObject({ messageRows: 1, threads: 1 });
-        expect(entryOf(breakdown, "archived", 90)).toMatchObject({ largeToolRows: 1, messageRows: 3, threads: 1 });
-        expect(entryOf(breakdown, "archived", 90)?.largeToolBytes).toBeGreaterThanOrEqual(LARGE_TOOL_ROW_BYTES);
-        expect(entryOf(breakdown, "archived", 90)?.toolBytes).toBeGreaterThan(entryOf(breakdown, "archived", 90)?.largeToolBytes ?? 0);
+
+        const archivedEntry = entryOf(breakdown, "archived", 90);
+
+        expect(archivedEntry).toMatchObject({ largeToolRows: 1, messageRows: 4, threads: 1 });
+        expect(archivedEntry?.largeToolBytes).toBeGreaterThanOrEqual(LARGE_TOOL_ROW_BYTES);
+        expect(archivedEntry?.toolBytes).toBeGreaterThan(archivedEntry?.largeToolBytes ?? 0);
+        // The call request's bytes count in the size, not in the tool output.
+        expect(archivedEntry?.toolBytes).toBeLessThan(2 * LARGE_TOOL_ROW_BYTES);
+        expect(archivedEntry?.approxBytes).toBeGreaterThan(2 * LARGE_TOOL_ROW_BYTES);
         expect(entryOf(breakdown, "pinned", 365)).toMatchObject({ messageRows: 0, threads: 1 });
         expect(entryOf(breakdown, "other", 3)).toMatchObject({ threads: 1 });
         expect(entryOf(breakdown, "other", 0)).toMatchObject({ messageRows: 1, threads: 0 });
@@ -258,9 +288,14 @@ describe("thread classes and merges", () => {
         expect(classifyThread({ ...base, updatedAt: NOW + DAY_MS }, NOW)).toEqual({ group: "active", sinceDays: 0 });
     });
 
-    it("puts trashed and temporary threads in other, and pinned before archived", () => {
+    it("puts a running thread in the first band, whatever its updatedAt", () => {
+        expect(classifyThread({ ...base, status: "running", updatedAt: NOW - 100 * DAY_MS }, NOW)).toEqual({ group: "active", sinceDays: 0 });
+    });
+
+    it("puts trashed, temporary and deleting threads in other, and pinned before archived", () => {
         expect(classifyThread({ ...base, deleted: true, pinnedAt: NOW, updatedAt: NOW }, NOW).group).toBe("other");
         expect(classifyThread({ ...base, isTemporary: true, updatedAt: NOW }, NOW).group).toBe("other");
+        expect(classifyThread({ ...base, deletingAt: NOW, status: "archived", updatedAt: NOW }, NOW).group).toBe("other");
         expect(classifyThread({ ...base, pinnedAt: NOW, status: "archived", updatedAt: NOW }, NOW).group).toBe("pinned");
         expect(classifyThread({ ...base, status: "archived", updatedAt: NOW }, NOW).group).toBe("archived");
         expect(classifyThread(null, NOW)).toEqual({ group: "other", sinceDays: 0 });
@@ -281,9 +316,10 @@ describe("thread classes and merges", () => {
 });
 
 describe("scan state", () => {
-    it("drops thread ids from the cursor but keeps the counts", () => {
+    it("drops the largest list's ids from the cursor, and keeps the thread the scan is in", () => {
         const state = {
             ...startFootprint(),
+            currentClass: ACTIVE_NEW,
             currentRows: 4,
             currentThreadId: "thread-x",
             largest: [{ rows: 9, threadId: "thread-y" }],
@@ -292,17 +328,24 @@ describe("scan state", () => {
         };
         const carried = forCursor(state);
 
-        expect(JSON.stringify(carried)).not.toContain("thread-");
-        expect(carried).toMatchObject({ carriedLargestRows: [9], messageRows: 13, threads: 2 });
+        expect(JSON.stringify(carried)).not.toContain("thread-y");
+        expect(carried).toMatchObject({
+            carriedLargestRows: [9],
+            currentClass: ACTIVE_NEW,
+            currentRows: 4,
+            currentThreadId: "thread-x",
+            messageRows: 13,
+            threads: 2,
+        });
         expect(largestRowsOf({ ...carried, largest: [{ rows: 12, threadId: "thread-z" }] })).toEqual([12, 9]);
     });
 
     it("carries a thread's row count across pages", () => {
         let state = startFootprint();
 
-        state = addMessageRow(state, { bytes: 10, threadClass: ACTIVE_NEW, threadId: "thread-a", tool: false });
-        state = addMessageRow(state, { bytes: 10, threadClass: ACTIVE_NEW, threadId: "thread-a", tool: false });
-        state = addMessageRow(state, { bytes: 5, threadClass: ACTIVE_NEW, threadId: "thread-b", tool: false });
+        state = addMessageRow(state, { bytes: 10, threadClass: ACTIVE_NEW, threadId: "thread-a", toolOutput: false });
+        state = addMessageRow(state, { bytes: 10, threadClass: ACTIVE_NEW, threadId: "thread-a", toolOutput: false });
+        state = addMessageRow(state, { bytes: 5, threadClass: ACTIVE_NEW, threadId: "thread-b", toolOutput: false });
 
         expect(state.messageRows).toBe(3);
         expect(state.approxBytes).toBe(25);
@@ -398,29 +441,36 @@ describe("census scheduling", () => {
             census: "census-cursor",
             censusDone: false,
             pending: [{ shardKey: "user-1", state: { ...startFootprint(), largest: [{ rows: 2, threadId: "thread-1" }], threads: 3 } }],
+            startedAt: NOW,
         };
 
-        // The thread ids in each pending state are dropped on the way out; the counts survive.
+        // The largest list's ids are dropped on the way out; the counts and the census clock survive.
         const encoded = encodeCensusCursor(cursor);
 
-        expect(decodeCensusCursor(encoded)).toMatchObject({ census: "census-cursor", pending: [{ shardKey: "user-1", state: { threads: 3 } }] });
+        expect(decodeCensusCursor(encoded)).toMatchObject({
+            census: "census-cursor",
+            pending: [{ shardKey: "user-1", state: { threads: 3 } }],
+            startedAt: NOW,
+        });
         expect(decodeCensusCursor(encoded)?.pending[0]?.state.largest).toEqual([]);
         expect(decodeCensusCursor("not a cursor!")).toBeUndefined();
         expect(decodeCensusCursor(btoa(JSON.stringify({ census: 1 })))).toBeUndefined();
+        // A cursor written before the census carried its clock is not one; the page starts over.
+        expect(decodeCensusCursor(btoa(JSON.stringify({ census: null, censusDone: false, pending: [] })))).toBeUndefined();
     });
 
     it("seeds the root shard into the first call only, so anonymous conversations are measured once", () => {
-        const first = withRootShard(startCensus(), "__root__");
+        const first = withRootShard(startCensus(NOW), "__root__");
 
         expect(first.pending).toEqual([{ shardKey: "__root__", state: startFootprint() }]);
         expect(withRootShard(first, "__root__")).toEqual(first);
-        expect(withRootShard({ census: "next-page", censusDone: false, pending: [] }, "__root__").pending).toEqual([]);
+        expect(withRootShard({ census: "next-page", censusDone: false, pending: [], startedAt: NOW }, "__root__").pending).toEqual([]);
     });
 
     it("measures the root shard once when routing is collapsed, however often it is asked", () => {
-        const once = rootOnlyCensus(startCensus(), "__root__");
+        const once = rootOnlyCensus(startCensus(NOW), "__root__");
 
-        expect(once).toEqual({ census: null, censusDone: true, pending: [{ shardKey: "__root__", state: startFootprint() }] });
+        expect(once).toEqual({ census: null, censusDone: true, pending: [{ shardKey: "__root__", state: startFootprint() }], startedAt: NOW });
         expect(rootOnlyCensus(once, "__root__")).toEqual(once);
     });
 });

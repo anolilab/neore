@@ -349,6 +349,12 @@ msgstr "{0, plural, other {# 件の必須または不明なチェックが失敗
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 件の必須または不明なチェックがまだ実行中です}}"
 
+#. placeholder {0}: readings.compactable.largeToolRows
+#. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:181
+msgid "{0, plural, one {# result} other {# results}}, {1}"
+msgstr "{0, plural, other {# 件の結果}}、{1}"
+
 #. placeholder {0}: added.length
 #: src/features/projects/components/project-rule-files.tsx:534
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
@@ -378,6 +384,15 @@ msgstr "{0, plural, other {# 枚のスライド}}"
 #: src/features/develop/components/files-tab.tsx:240
 msgid "{0, plural, one {# thread} other {# threads}}"
 msgstr "{0, plural, other {# 件のスレッド}}"
+
+#. placeholder {0}: readings.other.threads
+#. placeholder {0}: readings.pinned.threads
+#. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
+#. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:187
+#: src/features/admin/components/admin-shard-footprint-row.tsx:193
+msgid "{0, plural, one {# thread} other {# threads}}, {1}"
+msgstr "{0, plural, other {# 件のスレッド}}、{1}"
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -532,10 +547,10 @@ msgid "{0} custom headers"
 msgstr "カスタムヘッダー {0} 件"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:108
-#: src/features/admin/components/admin-shard-footprint-row.tsx:128
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
 msgid "{0} days"
-msgstr ""
+msgstr "{0} 日"
 
 #. placeholder {0}: deleting.name
 #: src/features/local-models/components/ollama-model-manager.tsx:150
@@ -703,12 +718,6 @@ msgstr "ピン留め {0} 件"
 msgid "{0} regressed · {1} improved · {2} unchanged"
 msgstr "悪化 {0} · 改善 {1} · 変化なし {2}"
 
-#. placeholder {0}: formatNumber(readings.compactable.largeToolRows, locale)
-#. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:143
-msgid "{0} rows, {1}"
-msgstr ""
-
 #. placeholder {0}: String(summary.scored)
 #. placeholder {1}: String(summary.errored)
 #. placeholder {2}: String(summary.skipped)
@@ -716,15 +725,6 @@ msgstr ""
 #: src/features/evals/components/eval-summary-stats.tsx:34
 msgid "{0} scored · {1} errors · {2} skipped of {3}"
 msgstr "{3} 件中 採点 {0} · エラー {1} · スキップ {2}"
-
-#. placeholder {0}: formatNumber(readings.other.threads, locale)
-#. placeholder {0}: formatNumber(readings.pinned.threads, locale)
-#. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
-#. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:149
-#: src/features/admin/components/admin-shard-footprint-row.tsx:155
-msgid "{0} threads, {1}"
-msgstr ""
 
 #. placeholder {0}: skill.usageCount
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:128
@@ -2363,9 +2363,9 @@ msgstr "アクティブなセッション（{0}）"
 msgid "Active Threads"
 msgstr "アクティブなスレッド"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:117
+#: src/features/admin/components/admin-shard-footprint-row.tsx:155
 msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
-msgstr ""
+msgstr "アクティブなスレッド（最後のアクティビティからの日数別）。人の対応を待っているスレッドも含みます。"
 
 #: src/features/settings/components/personalization/memory-types.ts:25
 msgid "Activities"
@@ -3487,7 +3487,7 @@ msgstr "すべてのロール"
 msgid "All Servers"
 msgstr "すべてのサーバー"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:194
+#: src/features/admin/components/admin-shard-footprint-row.tsx:230
 msgid "All shards measured."
 msgstr "すべてのシャードの測定が完了しました。"
 
@@ -3906,9 +3906,9 @@ msgstr ""
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意の文字列を指定し、Meta アプリの Webhook Verify token にも同じ値を入力してください"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:108
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
 msgid "Any time"
-msgstr ""
+msgstr "期間を問わず"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:348
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
@@ -4132,9 +4132,9 @@ msgstr "自動承認済み — 低リスク"
 msgid "Approving…"
 msgstr "承認しています…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:91
-#: src/features/admin/components/admin-shard-footprint-row.tsx:102
-#: src/features/admin/components/admin-shard-footprint-row.tsx:122
+#: src/features/admin/components/admin-shard-footprint-row.tsx:129
+#: src/features/admin/components/admin-shard-footprint-row.tsx:140
+#: src/features/admin/components/admin-shard-footprint-row.tsx:160
 msgid "Approximate size"
 msgstr "おおよそのサイズ"
 
@@ -4215,17 +4215,17 @@ msgstr "スレッドをアーカイブ"
 msgid "Archived"
 msgstr "アーカイブ済み"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:99
+#: src/features/admin/components/admin-shard-footprint-row.tsx:137
 msgid "Archived for at least"
-msgstr ""
+msgstr "アーカイブ後の経過期間（以上）"
 
 #: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "アーカイブ済みのスレッド"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:96
+#: src/features/admin/components/admin-shard-footprint-row.tsx:134
 msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
-msgstr ""
+msgstr "アーカイブ済みのスレッド（アーカイブしてからの期間別）。ピン留めしたスレッドは削除されないため、別に数えます。"
 
 #: src/components/delete-confirmation-dialog.tsx:47
 msgid "Are you sure you want to delete \"{itemName}\"? This action cannot be undone."
@@ -17123,9 +17123,9 @@ msgstr "アイデンティティ"
 msgid "Idle"
 msgstr "待機中"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:120
+#: src/features/admin/components/admin-shard-footprint-row.tsx:158
 msgid "Idle for at least"
-msgstr ""
+msgstr "非アクティブの期間（以上）"
 
 #: src/features/develop/components/review-panel.tsx:148
 msgid "If it kept the review as pending, submit or delete it there first."
@@ -20394,11 +20394,11 @@ msgstr "MCP サーバーは、AI が会話中に使える追加のツールを�
 msgid "MCP tools"
 msgstr "MCP ツール"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:186
+#: src/features/admin/components/admin-shard-footprint-row.tsx:224
 msgid "Measure more shards"
 msgstr "さらに多くのシャードを測定"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:182
+#: src/features/admin/components/admin-shard-footprint-row.tsx:220
 msgid "Measuring…"
 msgstr "測定しています…"
 
@@ -20658,14 +20658,14 @@ msgstr "メッセージのブランチ"
 msgid "Message input"
 msgstr "メッセージ入力"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:87
-#: src/features/admin/components/admin-shard-footprint-row.tsx:101
+#: src/features/admin/components/admin-shard-footprint-row.tsx:125
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Message rows"
 msgstr "メッセージ行"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:159
+#: src/features/admin/components/admin-shard-footprint-row.tsx:197
 msgid "Message rows of the largest threads"
-msgstr ""
+msgstr "最大のスレッドのメッセージ行"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:65
 msgid "Message selection"
@@ -25549,9 +25549,9 @@ msgstr "ピン留め済み"
 msgid "Pinned project"
 msgstr "ピン留めしたプロジェクト"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:147
+#: src/features/admin/components/admin-shard-footprint-row.tsx:185
 msgid "Pinned threads"
-msgstr ""
+msgstr "ピン留めしたスレッド"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:363
 msgid "Pins"
@@ -30414,21 +30414,21 @@ msgstr "上海"
 msgid "Shapes"
 msgstr "図形"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:66
+#: src/features/admin/components/admin-shard-footprint-row.tsx:104
 msgid "Shard footprint"
 msgstr "シャードの使用量"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:79
+#: src/features/admin/components/admin-shard-footprint-row.tsx:117
 msgid "Shards"
 msgstr "シャード"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:173
+#: src/features/admin/components/admin-shard-footprint-row.tsx:211
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "測定中のシャード: {0}。完了させるには、さらにシャードを測定してください。"
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:177
+#: src/features/admin/components/admin-shard-footprint-row.tsx:215
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "測定できなかったシャードは合計から除外されています: {0}。"
 
@@ -30993,9 +30993,9 @@ msgstr "サイズ上限に達しました"
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "チャットメッセージの文字サイズです。サイドバーとアプリのその他の部分のサイズは変わりません。"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:165
+#: src/features/admin/components/admin-shard-footprint-row.tsx:203
 msgid "Sizes of the largest shards"
-msgstr ""
+msgstr "最大のシャードのサイズ"
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
@@ -31899,6 +31899,10 @@ msgstr "新しいチャットを一時チャットとして開始"
 msgid "Start Ollama for this site"
 msgstr "このサイト用に Ollama を起動"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:55
+msgid "Start over"
+msgstr "最初からやり直す"
+
 #: src/features/evals/components/run-dialog.tsx:285
 msgid "Start run"
 msgstr "実行を開始"
@@ -32217,13 +32221,9 @@ msgstr "停止しました。"
 msgid "Stopping…"
 msgstr "停止中…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:68
+#: src/features/admin/components/admin-shard-footprint-row.tsx:106
 msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
-msgstr ""
-
-#: src/features/admin/components/admin-shard-footprint-row.tsx:84
-#~ msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size. Counts only; no thread is listed."
-#~ msgstr "ユーザーシャード全体に保存された会話データ: スレッド、メッセージ行、およびそのサイズの推定値。件数のみで、スレッドは一覧表示されません。"
+msgstr "ユーザーシャード全体に保存された会話データ: スレッド、メッセージ行、およびそのサイズの推定値を、スレッドのグループと経過期間別に示します。件数のみで、スレッドやシャードは一覧表示されません。"
 
 #: src/features/canvas/components/design-preset-selector.tsx:134
 msgid "Story Promo"
@@ -34517,7 +34517,7 @@ msgstr "スクリーンショットを保存できませんでした。"
 msgid "The server lists no models yet — pull or load one first"
 msgstr "サーバーにはまだモデルがありません — 先にモデルを取得または読み込んでください"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:74
+#: src/features/admin/components/admin-shard-footprint-row.tsx:112
 msgid "The shard footprint could not be measured."
 msgstr "シャードの使用量を測定できませんでした。"
 
@@ -35579,9 +35579,9 @@ msgstr "スレッド変数"
 msgid "Thread will auto-delete in {0}"
 msgstr "スレッドは {0} 後に自動削除されます"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:83
-#: src/features/admin/components/admin-shard-footprint-row.tsx:100
 #: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:159
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/search-bar.tsx:47
 msgid "Threads"
@@ -35900,9 +35900,9 @@ msgstr "ツール呼び出し"
 msgid "Tool Calling"
 msgstr "ツール呼び出し"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:137
+#: src/features/admin/components/admin-shard-footprint-row.tsx:175
 msgid "Tool output's share of the stored size"
-msgstr ""
+msgstr "保存サイズに占めるツール出力の割合"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:354
 #: src/features/settings/lib/settings-navigation.ts:96
@@ -35915,9 +35915,9 @@ msgid "Tool Provider Keys"
 msgstr "ツールプロバイダーキー"
 
 #. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:141
-msgid "Tool rows of 64 KB or more, in threads idle at least {0} days"
-msgstr ""
+#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
+msgstr "{0} 日以上非アクティブなスレッド内の 64 KB 以上のツール結果"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
 #: src/features/settings/components/chat/bots-settings.tsx:496
@@ -36156,9 +36156,9 @@ msgstr "視覚入力に対する透明な推論"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "法務、財務、技術タスクのための透明な思考"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:153
-msgid "Trashed, temporary or orphaned"
-msgstr ""
+#: src/features/admin/components/admin-shard-footprint-row.tsx:191
+msgid "Trashed, temporary, being deleted or orphaned"
+msgstr "ゴミ箱内、一時的、削除中、または孤立"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:101
 msgid "Triangle"
@@ -36264,7 +36264,7 @@ msgstr "検索キーワードを変えてみてください。"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:454
 #: src/components/error-component.tsx:40
-#: src/features/admin/components/admin-shard-footprint-row.tsx:191
+#: src/features/admin/components/admin-shard-footprint-row.tsx:51
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1039

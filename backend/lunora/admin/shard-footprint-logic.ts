@@ -7,8 +7,8 @@
  * threads it has finished. The state a call returns is bounded however large the shard.
  *
  * Each thread and each message row also counts in a breakdown by thread group (active, archived,
- * pinned, other) and age band (days since the thread's last activity), with tool rows and large tool
- * rows counted apart. The breakdown is sparse and has at most groups × bands entries.
+ * pinned, other) and age band (days since the thread's last activity), with tool results and large tool
+ * results counted apart. The breakdown is sparse and has at most groups × bands entries.
  *
  * An admin call measures several shards at once, one page of each per round, and stops
  * when its call budget is spent. A shard that is not finished carries its state in the
@@ -34,7 +34,7 @@ export const LARGEST_SHARD_COUNT = 10;
  * weighs: settle after 3, 7, 14 or 30 days, delete archived threads after 30, 90 or 365.
  */
 export const AGE_BAND_START_DAYS = [0, 3, 7, 14, 30, 90, 365] as const;
-/** A tool row of at least this many bytes counts as one that compacting old tool output would move to a file. */
+/** A tool result of at least this many bytes counts as one that compacting old tool output would move to a file. */
 export const LARGE_TOOL_ROW_BYTES = 64 * 1024;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,7 +46,8 @@ export interface LargestThread {
 
 /**
  * Which rule a thread falls under: `pinned` is never deleted, `archived` is what a retention window would delete, `active`
- * is what settling would quiet, and `other` is trashed, temporary (already expiring) or a message whose thread is gone.
+ * is what settling would quiet, and `other` is trashed, temporary (already expiring), being deleted, or a message whose
+ * thread is gone.
  */
 export type ThreadGroup = "active" | "archived" | "other" | "pinned";
 
@@ -57,7 +58,10 @@ export interface ThreadClass {
     sinceDays: number;
 }
 
-/** The counts of one group and age band. Thread row bytes and message row bytes both count in `approxBytes`. */
+/**
+ * The counts of one group and age band. Thread row bytes and message row bytes both count in `approxBytes`; `toolBytes`
+ * and the large counts cover tool results only (`role: "tool"` rows), not the assistant rows that request a call.
+ */
 export interface BreakdownEntry extends ThreadClass {
     approxBytes: number;
     largeToolBytes: number;
@@ -71,7 +75,7 @@ export interface FootprintState {
     approxBytes: number;
     /** Counts by group and age band. Sparse: a band with nothing in it has no entry. */
     breakdown: BreakdownEntry[];
-    /** Row counts of the largest threads closed before the state last went into a browser cursor, ids dropped. */
+    /** Row counts of the largest threads closed before the state last went into a cursor, ids dropped. */
     carriedLargestRows: number[];
     /** The class of the thread the scan is in, so its next rows need no second read of the thread. */
     currentClass: ThreadClass | null;
@@ -106,6 +110,8 @@ export interface CensusCursor {
     /** True once the census has been read to its end. */
     censusDone: boolean;
     pending: PendingShard[];
+    /** The clock every page of this census classifies by, set by its first call, so a census never mixes age bands. */
+    startedAt: number;
 }
 
 export const startFootprint = (): FootprintState => {
@@ -125,20 +131,13 @@ export const startFootprint = (): FootprintState => {
 };
 
 /**
- * A scan state as an admin call's cursor carries it. The cursor reaches the browser, so the thread ids
- * in it (the largest list and the thread the scan is in) are dropped; the largest list's row counts are kept in
- * `carriedLargestRows`. The partial thread's rows still count toward the totals; only its place in the largest
- * list is lost.
+ * A scan state as an admin call's cursor carries it. The cursor is opaque to the page but not secret: the message
+ * page's own position already holds the id of the thread the scan is in, so that thread, its class and its running
+ * count stay, and a thread split across admin calls is counted whole. The largest list's ids, which nothing else in
+ * the cursor holds, are dropped; its row counts are kept in `carriedLargestRows`.
  */
 export const forCursor = (state: FootprintState): FootprintState => {
-    return {
-        ...state,
-        carriedLargestRows: largestRowsOf(state),
-        currentClass: null,
-        currentRows: 0,
-        currentThreadId: null,
-        largest: [],
-    };
+    return { ...state, carriedLargestRows: largestRowsOf(state), largest: [] };
 };
 
 /** The row counts of the shard's largest threads so far, largest first: the carried ones and the current list. */
@@ -150,6 +149,7 @@ export interface ClassifiedThread {
     _creationTime: number;
     createdAt?: number;
     deleted?: boolean;
+    deletingAt?: number;
     isTemporary?: boolean;
     pinnedAt?: number;
     status: string;
@@ -172,17 +172,18 @@ export const ageBandStart = (days: number): number => {
 /**
  * A thread's group and age band at `now`. Its age is the days since `updatedAt`, which moves on every activity and on
  * archiving itself, so for an archived thread it is the time since it was archived (no thread stores an archive time).
- * A row from before `updatedAt` existed falls back to its creation time. A missing thread (`null`) is `other`.
+ * A row from before `updatedAt` existed falls back to its creation time. A running thread is active now, so it is in the
+ * first band whatever its `updatedAt`. A missing thread (`null`) is `other`.
  */
 export const classifyThread = (thread: ClassifiedThread | null, now: number): ThreadClass => {
     if (thread === null) {
         return { group: "other", sinceDays: 0 };
     }
 
-    const lastActivity = thread.updatedAt ?? thread.createdAt ?? thread._creationTime;
+    const lastActivity = thread.status === "running" ? now : (thread.updatedAt ?? thread.createdAt ?? thread._creationTime);
     const sinceDays = ageBandStart(Math.max(0, Math.floor((now - lastActivity) / DAY_MS)));
 
-    if (thread.deleted === true || thread.isTemporary === true) {
+    if (thread.deleted === true || thread.isTemporary === true || thread.deletingAt !== undefined) {
         return { group: "other", sinceDays };
     }
 
@@ -226,8 +227,9 @@ export const mergeBreakdowns = (first: BreakdownEntry[], second: BreakdownEntry[
 /** The `count` largest of `values`, largest first. */
 export const keepTop = (values: number[], count: number): number[] => values.toSorted((a, b) => b - a).slice(0, count);
 
-export const startCensus = (): CensusCursor => {
-    return { census: null, censusDone: false, pending: [] };
+/** A new census that classifies every thread at `now`. */
+export const startCensus = (now: number): CensusCursor => {
+    return { census: null, censusDone: false, pending: [], startedAt: now };
 };
 
 /**
@@ -239,7 +241,7 @@ export const rootOnlyCensus = (carried: CensusCursor, rootShardKey: string): Cen
         return carried;
     }
 
-    return { census: null, censusDone: true, pending: [...carried.pending, { shardKey: rootShardKey, state: startFootprint() }] };
+    return { ...carried, census: null, censusDone: true, pending: [...carried.pending, { shardKey: rootShardKey, state: startFootprint() }] };
 };
 
 /**
@@ -312,14 +314,14 @@ export interface MessageRowInput {
     /** The class of the row's thread. */
     threadClass: ThreadClass;
     threadId: string;
-    /** True for a tool row (a call and its output). */
-    tool: boolean;
+    /** True for a tool result (`role: "tool"`). An assistant row that requests a call is not one. */
+    toolOutput: boolean;
 }
 
 /** Adds one message row. Rows arrive grouped by thread, so a new thread id closes the previous one. */
 export const addMessageRow = (state: FootprintState, row: MessageRowInput): FootprintState => {
     const base = state.currentThreadId === row.threadId ? state : finishCurrentThread(state);
-    const large = row.tool && row.bytes >= LARGE_TOOL_ROW_BYTES;
+    const large = row.toolOutput && row.bytes >= LARGE_TOOL_ROW_BYTES;
 
     return {
         ...base,
@@ -329,7 +331,7 @@ export const addMessageRow = (state: FootprintState, row: MessageRowInput): Foot
             largeToolBytes: large ? row.bytes : 0,
             largeToolRows: large ? 1 : 0,
             messageRows: 1,
-            toolBytes: row.tool ? row.bytes : 0,
+            toolBytes: row.toolOutput ? row.bytes : 0,
         }),
         currentClass: row.threadClass,
         currentRows: base.currentRows + 1,

@@ -123,7 +123,7 @@ export const countsSince = (breakdown: BreakdownEntry[], groups: ThreadGroup[], 
 export interface FootprintReadings {
     /** Archived threads, not pinned, archived at least `sinceDays` ago: what a retention window would delete. */
     archived: (GroupCounts & { sinceDays: number })[];
-    /** Tool rows in threads idle at least {@link COMPACT_AFTER_DAYS} days: what compacting old tool output would act on. */
+    /** Tool results in threads idle at least {@link COMPACT_AFTER_DAYS} days: what compacting old tool output would act on. */
     compactable: GroupCounts;
     /** Active threads idle at least `sinceDays`: what settling would quiet. */
     idle: (GroupCounts & { sinceDays: number })[];

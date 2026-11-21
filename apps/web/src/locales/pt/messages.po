@@ -349,6 +349,12 @@ msgstr "{0, plural, one {# verificação obrigatória ou desconhecida está falh
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, one {# verificação obrigatória ou desconhecida ainda está em execução} other {# verificações obrigatórias ou desconhecidas ainda estão em execução}}"
 
+#. placeholder {0}: readings.compactable.largeToolRows
+#. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:181
+msgid "{0, plural, one {# result} other {# results}}, {1}"
+msgstr "{0, plural, one {# resultado} other {# resultados}}, {1}"
+
 #. placeholder {0}: added.length
 #: src/features/projects/components/project-rule-files.tsx:534
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
@@ -378,6 +384,15 @@ msgstr "{0, plural, one {# slide} other {# slides}}"
 #: src/features/develop/components/files-tab.tsx:240
 msgid "{0, plural, one {# thread} other {# threads}}"
 msgstr "{0, plural, one {# conversa} other {# conversas}}"
+
+#. placeholder {0}: readings.other.threads
+#. placeholder {0}: readings.pinned.threads
+#. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
+#. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:187
+#: src/features/admin/components/admin-shard-footprint-row.tsx:193
+msgid "{0, plural, one {# thread} other {# threads}}, {1}"
+msgstr "{0, plural, one {# conversa} other {# conversas}}, {1}"
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -532,10 +547,10 @@ msgid "{0} custom headers"
 msgstr "{0} cabeçalhos personalizados"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:108
-#: src/features/admin/components/admin-shard-footprint-row.tsx:128
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
 msgid "{0} days"
-msgstr ""
+msgstr "{0} dias"
 
 #. placeholder {0}: deleting.name
 #: src/features/local-models/components/ollama-model-manager.tsx:150
@@ -703,12 +718,6 @@ msgstr "{0} fixadas"
 msgid "{0} regressed · {1} improved · {2} unchanged"
 msgstr "{0} pioraram · {1} melhoraram · {2} sem alteração"
 
-#. placeholder {0}: formatNumber(readings.compactable.largeToolRows, locale)
-#. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:143
-msgid "{0} rows, {1}"
-msgstr ""
-
 #. placeholder {0}: String(summary.scored)
 #. placeholder {1}: String(summary.errored)
 #. placeholder {2}: String(summary.skipped)
@@ -716,15 +725,6 @@ msgstr ""
 #: src/features/evals/components/eval-summary-stats.tsx:34
 msgid "{0} scored · {1} errors · {2} skipped of {3}"
 msgstr "{0} pontuados · {1} erros · {2} ignorados de {3}"
-
-#. placeholder {0}: formatNumber(readings.other.threads, locale)
-#. placeholder {0}: formatNumber(readings.pinned.threads, locale)
-#. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
-#. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:149
-#: src/features/admin/components/admin-shard-footprint-row.tsx:155
-msgid "{0} threads, {1}"
-msgstr ""
 
 #. placeholder {0}: skill.usageCount
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:128
@@ -2363,9 +2363,9 @@ msgstr "Sessões ativas ({0})"
 msgid "Active Threads"
 msgstr "Conversas ativas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:117
+#: src/features/admin/components/admin-shard-footprint-row.tsx:155
 msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
-msgstr ""
+msgstr "Conversas ativas, por dias desde a última atividade. As que aguardam uma pessoa estão incluídas."
 
 #: src/features/settings/components/personalization/memory-types.ts:25
 msgid "Activities"
@@ -3487,7 +3487,7 @@ msgstr "Todas as funções"
 msgid "All Servers"
 msgstr "Todos os servidores"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:194
+#: src/features/admin/components/admin-shard-footprint-row.tsx:230
 msgid "All shards measured."
 msgstr "Todos os shards medidos."
 
@@ -3906,9 +3906,9 @@ msgstr ""
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Qualquer texto que você escolher; informe o mesmo valor como Verify token do webhook no app da Meta"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:108
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
 msgid "Any time"
-msgstr ""
+msgstr "Qualquer duração"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:348
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
@@ -4132,9 +4132,9 @@ msgstr "Aprovado automaticamente — baixo risco"
 msgid "Approving…"
 msgstr "Aprovando…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:91
-#: src/features/admin/components/admin-shard-footprint-row.tsx:102
-#: src/features/admin/components/admin-shard-footprint-row.tsx:122
+#: src/features/admin/components/admin-shard-footprint-row.tsx:129
+#: src/features/admin/components/admin-shard-footprint-row.tsx:140
+#: src/features/admin/components/admin-shard-footprint-row.tsx:160
 msgid "Approximate size"
 msgstr "Tamanho aproximado"
 
@@ -4215,17 +4215,17 @@ msgstr "Arquivar conversa"
 msgid "Archived"
 msgstr "Arquivado"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:99
+#: src/features/admin/components/admin-shard-footprint-row.tsx:137
 msgid "Archived for at least"
-msgstr ""
+msgstr "Arquivadas há pelo menos"
 
 #: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "Conversas arquivadas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:96
+#: src/features/admin/components/admin-shard-footprint-row.tsx:134
 msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
-msgstr ""
+msgstr "Conversas arquivadas, por há quanto tempo foram arquivadas. As fixadas são contadas à parte: nunca são excluídas."
 
 #: src/components/delete-confirmation-dialog.tsx:47
 msgid "Are you sure you want to delete \"{itemName}\"? This action cannot be undone."
@@ -17123,9 +17123,9 @@ msgstr "Identidade"
 msgid "Idle"
 msgstr "Ocioso"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:120
+#: src/features/admin/components/admin-shard-footprint-row.tsx:158
 msgid "Idle for at least"
-msgstr ""
+msgstr "Inativas há pelo menos"
 
 #: src/features/develop/components/review-panel.tsx:148
 msgid "If it kept the review as pending, submit or delete it there first."
@@ -20394,11 +20394,11 @@ msgstr "Servidores MCP oferecem ferramentas extras que a IA pode usar durante as
 msgid "MCP tools"
 msgstr "Ferramentas MCP"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:186
+#: src/features/admin/components/admin-shard-footprint-row.tsx:224
 msgid "Measure more shards"
 msgstr "Medir mais shards"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:182
+#: src/features/admin/components/admin-shard-footprint-row.tsx:220
 msgid "Measuring…"
 msgstr "Medindo…"
 
@@ -20658,14 +20658,14 @@ msgstr "Ramificação de mensagens"
 msgid "Message input"
 msgstr "Entrada de mensagem"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:87
-#: src/features/admin/components/admin-shard-footprint-row.tsx:101
+#: src/features/admin/components/admin-shard-footprint-row.tsx:125
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Message rows"
 msgstr "Linhas de mensagens"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:159
+#: src/features/admin/components/admin-shard-footprint-row.tsx:197
 msgid "Message rows of the largest threads"
-msgstr ""
+msgstr "Linhas de mensagens das maiores conversas"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:65
 msgid "Message selection"
@@ -25549,9 +25549,9 @@ msgstr "Fixadas"
 msgid "Pinned project"
 msgstr "Projeto fixado"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:147
+#: src/features/admin/components/admin-shard-footprint-row.tsx:185
 msgid "Pinned threads"
-msgstr ""
+msgstr "Conversas fixadas"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:363
 msgid "Pins"
@@ -30414,21 +30414,21 @@ msgstr "Xangai"
 msgid "Shapes"
 msgstr "Formas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:66
+#: src/features/admin/components/admin-shard-footprint-row.tsx:104
 msgid "Shard footprint"
 msgstr "Ocupação do shard"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:79
+#: src/features/admin/components/admin-shard-footprint-row.tsx:117
 msgid "Shards"
 msgstr "Shards"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:173
+#: src/features/admin/components/admin-shard-footprint-row.tsx:211
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "Shards ainda sendo medidos: {0}. Meça mais shards para concluí-los."
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:177
+#: src/features/admin/components/admin-shard-footprint-row.tsx:215
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "Shards que não puderam ser medidos ficam fora dos totais: {0}."
 
@@ -30993,9 +30993,9 @@ msgstr "limite de tamanho atingido"
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "Tamanho do texto nas mensagens do chat. A barra lateral e o restante do app mantêm o tamanho."
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:165
+#: src/features/admin/components/admin-shard-footprint-row.tsx:203
 msgid "Sizes of the largest shards"
-msgstr ""
+msgstr "Tamanhos dos maiores shards"
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
@@ -31899,6 +31899,10 @@ msgstr "Iniciar novos chats como temporários"
 msgid "Start Ollama for this site"
 msgstr "Inicie o Ollama para este site"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:55
+msgid "Start over"
+msgstr "Recomeçar"
+
 #: src/features/evals/components/run-dialog.tsx:285
 msgid "Start run"
 msgstr "Iniciar execução"
@@ -32217,13 +32221,9 @@ msgstr "Interrompido."
 msgid "Stopping…"
 msgstr "Parando…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:68
+#: src/features/admin/components/admin-shard-footprint-row.tsx:106
 msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
-msgstr ""
-
-#: src/features/admin/components/admin-shard-footprint-row.tsx:84
-#~ msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size. Counts only; no thread is listed."
-#~ msgstr "Dados de conversas armazenados entre os shards de usuários: threads, linhas de mensagens e uma estimativa do tamanho. Apenas contagens; nenhuma thread é listada."
+msgstr "Dados de conversas armazenados nos shards de usuários: conversas, linhas de mensagens e uma estimativa do tamanho, por grupo e idade. Apenas contagens; nenhuma conversa ou shard é listado."
 
 #: src/features/canvas/components/design-preset-selector.tsx:134
 msgid "Story Promo"
@@ -34517,7 +34517,7 @@ msgstr "Não foi possível salvar a captura de tela."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "O servidor ainda não lista nenhum modelo — baixe ou carregue um primeiro"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:74
+#: src/features/admin/components/admin-shard-footprint-row.tsx:112
 msgid "The shard footprint could not be measured."
 msgstr "Não foi possível medir a ocupação do shard."
 
@@ -35579,9 +35579,9 @@ msgstr "Variáveis da conversa"
 msgid "Thread will auto-delete in {0}"
 msgstr "A conversa será excluída automaticamente em {0}"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:83
-#: src/features/admin/components/admin-shard-footprint-row.tsx:100
 #: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:159
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/search-bar.tsx:47
 msgid "Threads"
@@ -35900,9 +35900,9 @@ msgstr "chamada de ferramentas"
 msgid "Tool Calling"
 msgstr "Chamada de ferramentas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:137
+#: src/features/admin/components/admin-shard-footprint-row.tsx:175
 msgid "Tool output's share of the stored size"
-msgstr ""
+msgstr "Participação da saída de ferramentas no tamanho armazenado"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:354
 #: src/features/settings/lib/settings-navigation.ts:96
@@ -35915,9 +35915,9 @@ msgid "Tool Provider Keys"
 msgstr "Chaves de provedores de ferramentas"
 
 #. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:141
-msgid "Tool rows of 64 KB or more, in threads idle at least {0} days"
-msgstr ""
+#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
+msgstr "Resultados de ferramentas de 64 KB ou mais, em conversas inativas há pelo menos {0} dias"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
 #: src/features/settings/components/chat/bots-settings.tsx:496
@@ -36156,9 +36156,9 @@ msgstr "Raciocínio transparente sobre entradas visuais"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "Pensamento transparente para tarefas jurídicas, financeiras e técnicas"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:153
-msgid "Trashed, temporary or orphaned"
-msgstr ""
+#: src/features/admin/components/admin-shard-footprint-row.tsx:191
+msgid "Trashed, temporary, being deleted or orphaned"
+msgstr "Na lixeira, temporárias, em exclusão ou órfãs"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:101
 msgid "Triangle"
@@ -36264,7 +36264,7 @@ msgstr "Tente ajustar os termos da pesquisa."
 
 #: ../../packages/ui/src/components/icon-picker.tsx:454
 #: src/components/error-component.tsx:40
-#: src/features/admin/components/admin-shard-footprint-row.tsx:191
+#: src/features/admin/components/admin-shard-footprint-row.tsx:51
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1039
