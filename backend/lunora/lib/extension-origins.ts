@@ -133,6 +133,14 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
     return [...new Set(uris)];
 };
 
+/**
+ * For `pnpm dev:setup`: whether a `TRUSTED_EXTENSION_REDIRECT_URIS` value lets a
+ * Chrome build sign in, read the way the backend reads it, so a bare id or a
+ * `chrome-extension://<id>` counts as its `https://<id>.chromiumapp.org/`.
+ */
+export const listsChromeRedirect = (raw: string | undefined): boolean =>
+    parseTrustedExtensionRedirectUris(raw).some((uri) => new URL(uri).hostname.endsWith(".chromiumapp.org"));
+
 /** The entries a `TRUSTED_EXTENSION_REDIRECT_URIS` value lists, as written; unset is the default. */
 const listedRedirectUris = (raw: string | undefined): string[] => {
     const trimmed = raw?.trim() ?? "";

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { OPTIONAL_ENV_KEYS } from "./env-validation";
 import {
     carryRetiredExtensionOrigins,
+    listsChromeRedirect,
     MOBILE_REDIRECT_URI,
     NATIVE_REDIRECT_URI,
     parseTrustedExtensionRedirectUris,
@@ -158,5 +159,32 @@ describe("carryRetiredExtensionOrigins", () => {
 
     it("keeps a switched-off sign-in off, naming the URI it did not move", () => {
         expect(carryRetiredExtensionOrigins(`chrome-extension://${ID}`, "none")).toEqual({ added: [], value: "none", withheld: [CHROME] });
+    });
+});
+
+describe("listsChromeRedirect", () => {
+    const ID = "d".repeat(32);
+
+    it.each([
+        ["a redirect URI", `https://${ID}.chromiumapp.org/`],
+        ["a redirect URI without its slash", `https://${ID}.chromiumapp.org`],
+        ["a bare id", ID],
+        ["a chrome-extension:// origin", `chrome-extension://${ID}`],
+        ["an id among other entries", `${NATIVE_REDIRECT_URI}, ${ID} ,${SHIPPED_FIREFOX_REDIRECT_URI}`],
+    ])("counts %s", (_label, raw) => {
+        expect(listsChromeRedirect(raw)).toBe(true);
+    });
+
+    it.each([
+        ["an unset list, the Firefox default", undefined],
+        ["a switched-off sign-in", "none"],
+        ["only the app callbacks", `${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI}`],
+        ["a look-alike host", `https://${ID}.chromiumapp.org.example.com/`],
+        ["a host that only ends in the name", "https://evilchromiumapp.org/"],
+        ["an id with letters past p", "z".repeat(32)],
+    ])("does not count %s", (_label, raw) => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        expect(listsChromeRedirect(raw)).toBe(false);
     });
 });

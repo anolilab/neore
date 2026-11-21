@@ -212,7 +212,7 @@ const main = async () => {
 
     console.log(`Node.js ${nodeVersion}`);
 
-    const { carryRetiredExtensionOrigins } = await import("../backend/lunora/lib/extension-origins.ts");
+    const { carryRetiredExtensionOrigins, listsChromeRedirect } = await import("../backend/lunora/lib/extension-origins.ts");
 
     // 2. Check pnpm install
     if (!fs.existsSync(path.join(rootDir, "node_modules"))) {
@@ -500,24 +500,18 @@ const main = async () => {
     // what is there (an unset list starts from the shipped Firefox add-on, the
     // backend's default), and `none` (sign-in off on purpose) is left alone.
     const redirectUris = backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"];
-    const hasChromeRedirect = (redirectUris ?? "").split(",").some((entry) => {
-        try {
-            return new URL(entry.trim()).hostname.endsWith(".chromiumapp.org");
-        } catch {
-            return false;
-        }
-    });
 
-    if (process.stdin.isTTY && redirectUris?.trim().toLowerCase() !== "none" && !hasChromeRedirect) {
+    if (process.stdin.isTTY && redirectUris?.trim().toLowerCase() !== "none" && !listsChromeRedirect(redirectUris)) {
         const extensionId = await ask("\n  Unpacked browser extension ID (chrome://extensions, leave blank to skip)");
 
         if (/^[a-p]{32}$/.test(extensionId)) {
-            backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] = carryRetiredExtensionOrigins(
-                `chrome-extension://${extensionId}`,
-                redirectUris?.trim() || undefined,
-            ).value;
-            backendChanged = true;
-            console.log("  [set]   TRUSTED_EXTENSION_REDIRECT_URIS");
+            const { added, value } = carryRetiredExtensionOrigins(`chrome-extension://${extensionId}`, redirectUris?.trim() || undefined);
+
+            if (added.length > 0) {
+                backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] = value;
+                backendChanged = true;
+                console.log("  [set]   TRUSTED_EXTENSION_REDIRECT_URIS");
+            }
         } else if (extensionId) {
             console.log("  [skip]  TRUSTED_EXTENSION_REDIRECT_URIS — an extension id is 32 letters a–p");
         }
