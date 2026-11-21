@@ -17,9 +17,11 @@ import useThreadImages from "./use-thread-images";
 const ThreadImagesButton: FC<{ threadId: string | undefined }> = ({ threadId }) => {
     const { t } = useLingui();
     const openAt = useImageGalleryStore((state) => state.openAt);
+    // Image and video mode show their own grid of the chat's media, with its own preview, and no message to go to.
+    const listShown = useImageGalleryStore((state) => (threadId ? (state.listShown[threadId] ?? true) : true));
     const images = useThreadImages();
 
-    if (!threadId || images.length === 0) {
+    if (!threadId || images.length === 0 || !listShown) {
         return null;
     }
 

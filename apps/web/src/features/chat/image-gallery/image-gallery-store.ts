@@ -9,6 +9,8 @@ interface ImageGalleryState {
     close: () => void;
     /** Closes only while the selection is still this one: a pane forgetting its gone image never closes another's newer. */
     closeIf: (threadId: string, key: string | null) => void;
+    /** Per thread, whether its message list is showing (not the image or video mode's grid): Go to message needs it. */
+    listShown: Record<string, boolean>;
 
     /**
      * Opens the gallery of `threadId` at `key`, or at its first image when `key` is `null`. `opener` is the clicked control:
@@ -21,6 +23,8 @@ interface ImageGalleryState {
      * hand focus back to it once it has closed.
      */
     opener: HTMLElement | null;
+
+    setListShown: (threadId: string, shown: boolean) => void;
     shown: { key: string | null; threadId: string } | null;
 }
 
@@ -31,6 +35,12 @@ const focusedControl = (): HTMLElement | null =>
 export const useImageGalleryStore = create<ImageGalleryState>()((set, get) => {
     return {
         close: () => set({ shown: null }),
+        listShown: {},
+        setListShown: (threadId, shown) => {
+            if (get().listShown[threadId] !== shown) {
+                set({ listShown: { ...get().listShown, [threadId]: shown } });
+            }
+        },
         closeIf: (threadId, key) => {
             const { shown } = get();
 
