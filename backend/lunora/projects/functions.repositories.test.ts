@@ -795,7 +795,15 @@ describe("a repository for a rule-file import", () => {
         await expect(list(MEMBER, onGithub)).rejects.toMatchObject({ code: "NOT_FOUND" });
         await expect(list(OWNER, elsewhere)).resolves.toStrictEqual({ status: "unsupported_host" });
         await expect(
-            harness.withIdentity({ userId: OWNER }).action(readRepoRuleFiles as never, { paths: ["src/index.ts"], projectId, repoId: onGithub } as never),
+            harness
+                .withIdentity({ userId: OWNER })
+                .action(readRepoRuleFiles as never, { commit: "a".repeat(40), paths: ["src/index.ts"], projectId, repoId: onGithub } as never),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        // A branch name in place of the listing's commit: the read would take whatever the branch holds now.
+        await expect(
+            harness
+                .withIdentity({ userId: OWNER })
+                .action(readRepoRuleFiles as never, { commit: "main", paths: ["AGENTS.md"], projectId, repoId: onGithub } as never),
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 });

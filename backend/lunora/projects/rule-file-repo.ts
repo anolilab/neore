@@ -1,6 +1,6 @@
 /**
- * Rule files imported from one of the project's repositories: what its root and rules folder hold
- * (`listRepoRuleFiles`), then the text of the files the person picked (`readRepoRuleFiles`). Actions, because they
+ * Rule files imported from one of the project's repositories: what its root and rules folder hold at one commit
+ * (`listRepoRuleFiles`), then the text of the files the person picked, at that commit (`readRepoRuleFiles`). Actions, because they
  * call the host; with the person's own connector token, so the host decides what they may read. Only whoever may save
  * the project's rule files may import, for a repository the project lists (`repoForRuleFileImport`). Nothing is
  * stored: the editor turns the text into unsaved drafts with the upload import's rules. Only counts are logged.
@@ -14,7 +14,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "../source-control/develop-driver";
 import { readFromHost } from "../source-control/read-host";
-import { isImportablePath, listRepoRuleFiles as listFiles, readRepoRuleFiles as readFiles } from "../source-control/repo-rule-files";
+import { COMMIT_SHA, isImportablePath, listRepoRuleFiles as listFiles, readRepoRuleFiles as readFiles } from "../source-control/repo-rule-files";
 import type { RepoAddress } from "../source-control/repo-rule-files";
 import { vFailed } from "../source-control/validators";
 import type { Id } from "../_generated/dataModel";
@@ -43,15 +43,17 @@ const addressFor = async (
     return github ? { name: github.repo, owner: github.owner, ...(repo.defaultBranch && { ref: repo.defaultBranch }) } : null;
 };
 
-/** The instruction files the repository holds, by path and size; none read yet. */
+/** The instruction files the repository holds at one commit, by path and size, and whether a tree was cut; none read yet. */
 export const listRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
     .input(vRepoArgs)
     .output(
         v.union(
             v.object({
+                commit: v.optional(v.string()),
                 files: v.array(v.object({ path: v.string().max(MAX_LENGTH.long), size: v.number(), tooLarge: v.boolean() })),
                 status: v.literal("ok"),
+                truncated: v.boolean(),
             }),
             vFailed,
             vUnsupported,
@@ -65,19 +67,24 @@ export const listRepoRuleFiles = authAction
         }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
-            return { files: await listFiles(request, address) };
-        });
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(request, address));
 
-        ctx.log.event("projects.rule_files.repo_list", { count: outcome.status === "ok" ? outcome.files.length : 0, status: outcome.status });
+        ctx.log.event("projects.rule_files.repo_list", {
+            count: outcome.status === "ok" ? outcome.files.length : 0,
+            status: outcome.status,
+            truncated: outcome.status === "ok" && outcome.truncated,
+        });
 
         return outcome;
     });
 
-/** The text of the picked files, at most a project's worth; a file that is gone or too large says so instead. */
+/**
+ * The text of the picked files at the commit their listing read (`commit`), at most a project's worth; a file that is
+ * gone or too large says so instead.
+ */
 export const readRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
-    .input({ ...vRepoArgs, paths: v.array(v.string().max(MAX_LENGTH.long)).max(MAX_RULE_FILES) })
+    .input({ ...vRepoArgs, commit: v.string().max(64), paths: v.array(v.string().max(MAX_LENGTH.long)).max(MAX_RULE_FILES) })
     .output(
         v.union(
             v.object({
@@ -99,6 +106,11 @@ export const readRepoRuleFiles = authAction
             throw new LunoraError("BAD_REQUEST", "Only a repository's instruction files can be imported");
         }
 
+        // A commit SHA only, never a branch: the read takes the files the listing listed.
+        if (!COMMIT_SHA.test(args.commit)) {
+            throw new LunoraError("BAD_REQUEST", "A commit SHA is required");
+        }
+
         const address = await addressFor(ctx, ctx.user.userId, args);
 
         if (!address) {
@@ -107,7 +119,7 @@ export const readRepoRuleFiles = authAction
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
-            return { files: await readFiles(request, address, [...new Set(args.paths)]) };
+            return { files: await readFiles(request, address, args.commit, [...new Set(args.paths)]) };
         });
 
         ctx.log.event("projects.rule_files.repo_read", {

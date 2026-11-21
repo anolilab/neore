@@ -28,6 +28,14 @@ export interface RepoImportResult {
 
 type FoundFile = { path: string; size: number; tooLarge: boolean };
 
+/** One listing: the repository and commit it read, so the import reads those files there and nowhere else. */
+interface Listing {
+    commit: string | undefined;
+    files: FoundFile[];
+    repoId: string;
+    truncated: boolean;
+}
+
 type Failure = "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "unsupported_host";
 
 const HOST_PREFIX = /^https:\/\/[^/]+\//u;
@@ -60,7 +68,7 @@ const RepoRuleFileImport: FC<{
     const readFiles = useAction(api.projects.rule_file_repo.readRepoRuleFiles);
     const [open, setOpen] = useState(false);
     const [repoId, setRepoId] = useState<string | undefined>(undefined);
-    const [found, setFound] = useState<FoundFile[] | undefined>(undefined);
+    const [listed, setListed] = useState<Listing | undefined>(undefined);
     const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
     const [looking, setLooking] = useState(false);
     const [failure, setFailure] = useState<Failure | "unknown" | undefined>(undefined);
@@ -80,7 +88,7 @@ const RepoRuleFileImport: FC<{
     const toggle = (next: boolean) => {
         request.current += 1;
         setOpen(next);
-        setFound(undefined);
+        setListed(undefined);
         setFailure(undefined);
         setLooking(false);
         setFocusRequest((count) => count + 1);
@@ -102,7 +110,9 @@ const RepoRuleFileImport: FC<{
     }
 
     const chosen = repositories.find((repo) => repo.id === repoId) ?? repositories.find((repo) => repo.isDefault) ?? first;
-    const repoArgs = { projectId: projectId as Id<"projects">, repoId: chosen.id as Id<"projectRepositories"> };
+    // A listing of another repository than the one shown (a refresh removed it, or made another the default) is none.
+    const listing = listed?.repoId === chosen.id ? listed : undefined;
+    const found = listing?.files;
 
     const failureText: Record<Failure | "unknown", string> = {
         forbidden: t`Your GitHub account cannot read this repository.`,
@@ -118,11 +128,12 @@ const RepoRuleFileImport: FC<{
     const look = () => {
         request.current += 1;
         const asked = request.current;
+        const listedRepo = chosen.id;
 
         setLooking(true);
         setFailure(undefined);
-        setFound(undefined);
-        listFiles(repoArgs)
+        setListed(undefined);
+        listFiles({ projectId: projectId as Id<"projects">, repoId: listedRepo as Id<"projectRepositories"> })
             .then((outcome) => {
                 if (asked !== request.current) {
                     return undefined;
@@ -134,7 +145,7 @@ const RepoRuleFileImport: FC<{
                     return undefined;
                 }
 
-                setFound(outcome.files);
+                setListed({ commit: outcome.commit, files: outcome.files, repoId: listedRepo, truncated: outcome.truncated });
                 setPicked(new Set(outcome.files.filter((file) => !file.tooLarge && !mayBeTooLong(file)).map((file) => file.path)));
 
                 return undefined;
@@ -145,6 +156,14 @@ const RepoRuleFileImport: FC<{
     };
 
     const importPicked = () => {
+        const commit = listing?.commit;
+
+        if (!listing || !commit) {
+            return;
+        }
+
+        // The repository and commit listed: a branch moved since, or another repository chosen, never changes what is read.
+        const readArgs = { commit, projectId: projectId as Id<"projects">, repoId: listing.repoId as Id<"projectRepositories"> };
         // In the order the import takes them: the first a project can hold are read, the rest counted as left out.
         const all = [...picked].toSorted((left, right) => left.localeCompare(right));
         const paths = all.slice(0, MAX_RULE_FILES);
@@ -154,7 +173,7 @@ const RepoRuleFileImport: FC<{
 
         runImport(async () => {
             // A read that failed is said in the panel, as a refusal is.
-            const outcome = await readFiles({ ...repoArgs, paths }).catch(() => undefined);
+            const outcome = await readFiles({ ...readArgs, paths }).catch(() => undefined);
 
             // Cancelled or closed meanwhile: nothing is added, nothing said.
             if (asked !== request.current) {
@@ -189,7 +208,7 @@ const RepoRuleFileImport: FC<{
                     onValueChange={(value) => {
                         request.current += 1;
                         setRepoId(String(value));
-                        setFound(undefined);
+                        setListed(undefined);
                         setFailure(undefined);
                     }}
                     value={chosen.id}
@@ -212,6 +231,9 @@ const RepoRuleFileImport: FC<{
                 {found?.length === 0 && t`No instruction files were found in this repository.`}
                 {found && found.length > 0 && t`Found ${plural(found.length, { one: "# file", other: "# files" })}.`}
             </p>
+            {listing?.truncated && (
+                <p className="text-muted-foreground text-sm">{t`This repository is too large for GitHub to list in full, so some instruction files may be missing here.`}</p>
+            )}
             {found && found.length > 0 && (
                 <ul aria-label={t`Files found`} className="space-y-2">
                     {found.map((file) => (

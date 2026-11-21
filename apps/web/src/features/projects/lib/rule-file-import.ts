@@ -5,6 +5,7 @@
  * read when needed with no description, which the editor will not save until the person says when, or picks another mode.
  * The text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
  */
+import { RULE_FILE_FRONT_MATTER } from "@neore/backend/rule-file-limits";
 
 export interface ImportedRuleFile {
     content: string;
@@ -30,9 +31,6 @@ const QUOTE_START = /^["']/u;
 
 /** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
 const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
-
-/** The front matter, an empty block included: after blank lines, its fences may end in spaces, its lines in CRLF. */
-const FRONT_MATTER = /^(?:[\t ]*\r?\n)*---[\t ]*\r?\n(?:([\s\S]*?)\r?\n)?---[\t ]*(?:\r?\n|$)/u;
 
 /** Where a quoted scalar may open in a value: at its start, or after `[` or `,` in an inline list. */
 const QUOTE_OPENS_AFTER = new Set(["", ",", "["]);
@@ -236,7 +234,7 @@ const isIndented = (line: string): boolean => line.startsWith(" ") || line.start
  * list may also be given as `- item` lines after it.
  */
 const splitFrontMatter = (text: string): { body: string; fields: Map<string, string[]> } => {
-    const match = FRONT_MATTER.exec(text);
+    const match = RULE_FILE_FRONT_MATTER.exec(text);
     const fields = new Map<string, string[]>();
 
     if (!match) {
@@ -354,6 +352,41 @@ export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile 
 
     // Read when needed; with no description it waits for the person to say when (`needsMode`).
     return { content: body, description, mode: "auto", patterns: "", title };
+};
+
+/** Whether the UTF-16 unit at `index` of `text` opens a surrogate pair, so a cut there would split a character. */
+const isHighSurrogate = (text: string, index: number): boolean => {
+    const code = text.codePointAt(index) ?? 0;
+
+    return code > 0xff_ff || (code >= 0xd8_00 && code <= 0xdb_ff);
+};
+
+/**
+ * `title` as a save takes it: one longer than `max` characters (a file's name, which a save would refuse) cut to fit,
+ * never inside a character, and told apart from each of `taken` by ` (2)`, ` (3)`… within `max`, so two long names
+ * that start alike stay two. A title that fits is kept as it is, a repeat included, as names may repeat.
+ */
+export const fitTitle = (title: string, taken: ReadonlySet<string>, max: number): string => {
+    if (title.trim().length <= max) {
+        return title;
+    }
+
+    const cut = (suffix: string): string => {
+        const end = max - suffix.length;
+        const head = title.slice(0, isHighSurrogate(title, end - 1) ? end - 1 : end).trimEnd();
+
+        return `${head}${suffix}`;
+    };
+
+    let candidate = cut("");
+    let copy = 1;
+
+    while (taken.has(candidate)) {
+        copy += 1;
+        candidate = cut(` (${String(copy)})`);
+    }
+
+    return candidate;
 };
 
 /** Whether an imported file said nothing of when it applies: a draft the person must finish before it saves. */

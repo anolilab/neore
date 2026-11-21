@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { importRuleFiles, importRuleTexts, needsMode, toImportedRuleFile } from "./rule-file-import";
+import { fitTitle, importRuleFiles, importRuleTexts, needsMode, toImportedRuleFile } from "./rule-file-import";
 
 describe("toImportedRuleFile", () => {
     it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "claude.md"])("imports %s whole as one always file under its own name", (path) => {
@@ -233,5 +233,24 @@ describe("importRuleFiles", () => {
             ],
             skipped: 1,
         });
+    });
+});
+
+describe("fitTitle", () => {
+    it("keeps a name that fits as it is, a repeat included", () => {
+        expect(fitTitle("SQL", new Set(["SQL"]), 10)).toBe("SQL");
+    });
+
+    it("cuts a longer name to the limit, and tells apart one that starts like a name taken", () => {
+        expect(fitTitle("abcdefghijkl", new Set(), 10)).toBe("abcdefghij");
+        expect(fitTitle("abcdefghijkl", new Set(["abcdefghij"]), 10)).toBe("abcdef (2)");
+        expect(fitTitle("abcdefghijkl", new Set(["abcdef (2)", "abcdefghij"]), 10)).toBe("abcdef (3)");
+    });
+
+    it("never cuts inside a character", () => {
+        const cut = fitTitle(`abcdefghi${"😀".repeat(3)}`, new Set(), 10);
+
+        expect(cut).toBe("abcdefghi");
+        expect(cut.length).toBeLessThanOrEqual(10);
     });
 });

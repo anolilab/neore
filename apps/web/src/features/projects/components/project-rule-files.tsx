@@ -33,7 +33,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { importRuleFiles, needsMode } from "../lib/rule-file-import";
+import { fitTitle, importRuleFiles, needsMode } from "../lib/rule-file-import";
 import type { RepoImportResult } from "./repo-rule-file-import";
 import RepoRuleFileImport from "./repo-rule-file-import";
 
@@ -473,6 +473,8 @@ const ProjectRuleFiles: FC<{
     const latest = useRef({ draft, keptLegacyId, revision: data?.revision ?? "", savedFiles });
     // Bumped by Discard: an import still reading then adds nothing.
     const importGeneration = useRef(0);
+    // Bumped by each import that adds drafts: a save it lands during keeps them, and does not say the list is saved.
+    const importsApplied = useRef(0);
 
     // Before any later event's handler can run, so an import never applies onto a list older than the one shown.
     useLayoutEffect(() => {
@@ -505,8 +507,13 @@ const ProjectRuleFiles: FC<{
             ),
         );
 
+        // A name longer than a save takes (a repository's file name) is cut to fit, and told apart from the others.
+        const titles = new Set(base.map((file) => file.title));
+        let shortened = 0;
+
         for (const file of read.imported) {
-            const draftFile = { ...file, id: crypto.randomUUID() };
+            const title = fitTitle(file.title, titles, MAX_RULE_TITLE_LENGTH);
+            const draftFile = { ...file, id: crypto.randomUUID(), title };
             // What it adds to the stored list: its JSON, and a comma after the one before it.
             const cost = ruleFilesStoredBytes(toSaved([draftFile], legacyTitle)) - (bytes > 2 ? 1 : 2);
 
@@ -516,6 +523,8 @@ const ProjectRuleFiles: FC<{
                 tooLarge += 1;
             } else {
                 added.push(draftFile);
+                titles.add(title);
+                shortened += title === file.title ? 0 : 1;
                 bytes += cost;
             }
         }
@@ -525,6 +534,7 @@ const ProjectRuleFiles: FC<{
                 setBaseRevision(now.revision);
             }
 
+            importsApplied.current += 1;
             setDraft([...base, ...added]);
             setStatus("");
         }
@@ -541,9 +551,13 @@ const ProjectRuleFiles: FC<{
         const size = formatNumber(MAX_RULE_FILES_BYTES / 1_000_000, i18n.locale);
         const tooLargeNote = t`${plural(tooLarge, { one: "# file was left out as too large", other: "# files were left out as too large" })}: a rule file holds at most ${length} characters, and all of a project's together at most ${size} MB.`;
 
+        const titleLimit = formatNumber(MAX_RULE_TITLE_LENGTH, i18n.locale);
+        const shortenedNote = t`${plural(shortened, { one: "# name was", other: "# names were" })} shortened to ${titleLimit} characters.`;
+
         setImportNote(
             [
                 ...addedNote,
+                ...(shortened > 0 ? [shortenedNote] : []),
                 ...(toSet > 0 ? [setNote] : []),
                 ...(skipped > 0 ? [left] : []),
                 ...(tooLarge > 0 ? [tooLargeNote] : []),
@@ -752,6 +766,7 @@ const ProjectRuleFiles: FC<{
         const submitted = draft;
         const ruleFiles = sentFiles();
         const keep = keptLegacyId === undefined ? {} : { keepContext: true };
+        const importsBefore = importsApplied.current;
 
         try {
             const written = await saved.mutateAsync({ ...args, ...keep, revision: baseRevision, ruleFiles });
@@ -762,8 +777,13 @@ const ProjectRuleFiles: FC<{
             setDraft((current) => (current === submitted ? null : current));
             setBaseRevision(written.revision);
             setError(undefined);
-            setStatus(t`Rule files saved.`);
-            setImportNote("");
+
+            // An import that landed while the save ran left unsaved drafts on top of the list just saved: its note stays.
+            if (importsApplied.current === importsBefore) {
+                setStatus(t`Rule files saved.`);
+                setImportNote("");
+            }
+
             refetch().catch(() => undefined);
         } catch (saveError) {
             // A limit the backend holds that this editor did not (an older client): worded and placed as the editor's own.

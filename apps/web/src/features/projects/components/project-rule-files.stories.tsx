@@ -117,12 +117,14 @@ export const ImportFromRepo: Story = {
         msw: {
             handlers: {
                 lunora: withRepo({
+                    commit: "c".repeat(40),
                     files: [
                         { path: "AGENTS.md", size: 32, tooLarge: false },
                         { path: "rules/huge.md", size: 900_000, tooLarge: true },
                         { path: "rules/wide.md", size: 300_000, tooLarge: false },
                     ],
                     status: "ok",
+                    truncated: false,
                 }),
             },
         },
@@ -150,7 +152,7 @@ export const ImportFromRepo: Story = {
 
 /** The repository holds no instruction files: said in the panel, nothing added. */
 export const RepoWithoutInstructionFiles: Story = {
-    parameters: { msw: { handlers: { lunora: withRepo({ files: [], status: "ok" }) } } },
+    parameters: { msw: { handlers: { lunora: withRepo({ files: [], status: "ok", truncated: false }) } } },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement);
 
@@ -158,6 +160,28 @@ export const RepoWithoutInstructionFiles: Story = {
         await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
 
         await expect(await canvas.findByText("No instruction files were found in this repository.")).toBeVisible();
+    },
+};
+
+/** A repository too large for GitHub to list in full: what was listed is offered, and the panel says some may be missing. */
+export const RepoListedInPart: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: withRepo({ commit: "c".repeat(40), files: [{ path: "AGENTS.md", size: 32, tooLarge: false }], status: "ok", truncated: true }),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(await canvas.findByRole("button", { name: "Import from repository" }));
+        await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
+
+        await expect(
+            await canvas.findByText("This repository is too large for GitHub to list in full, so some instruction files may be missing here."),
+        ).toBeVisible();
+        await expect(canvas.getByRole("checkbox", { name: "AGENTS.md" })).toBeChecked();
     },
 };
 
