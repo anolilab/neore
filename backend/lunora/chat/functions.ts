@@ -4926,14 +4926,20 @@ export const generateFollowupSuggestionsForThread = internalAction
 
                 // The model reads the reply's whole turn, its user prompt included, however many pages it spans; the first page's older rows follow.
                 // The rows come newest first, and the model reads a conversation in order: they are reversed here.
-                const modelMessages = docsToModelMessages(
-                    followupModelRows(
-                        rowsAfterContextReset(turnRows, contextReset).filter(
-                            (messageDocument) => messageDocument.message?.role === "user" || messageDocument.message?.role === "assistant",
-                        ),
-                        filteredMessageDocuments,
-                    ).toReversed(),
+                const modelRows = followupModelRows(
+                    rowsAfterContextReset(turnRows, contextReset).filter(
+                        (messageDocument) => messageDocument.message?.role === "user" || messageDocument.message?.role === "assistant",
+                    ),
+                    filteredMessageDocuments,
+                ).toReversed();
+                // A reply a local browser model wrote stays on the device: it is left out of the history a cloud model is sent.
+                const localRowIds = new Set(
+                    await context.runQuery(internal.agent.followup_suggestions.localBrowserRowIds, {
+                        messageIds: modelRows.map((row) => row._id),
+                        userId: ownerUserId,
+                    }),
                 );
+                const modelMessages = docsToModelMessages(modelRows.filter((row) => !localRowIds.has(row._id)));
 
                 // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
                 // Narrows the window to this read; the delete actions refuse while a suggestion is in flight (`followupInFlight`).

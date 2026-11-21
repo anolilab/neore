@@ -9,7 +9,28 @@ import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "
 import { getUser } from "../auth/lib/better-auth-queries";
 import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
+import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
 import { loadActivePathTail } from "./branch-rows";
+
+/**
+ * Which of the given messages a local-browser model wrote, judged by the owner's own custom endpoints. Those rows stay on the device,
+ * so the suggestion job leaves them out of the history it sends to a cloud model.
+ */
+export const localBrowserRowIds = internalQuery
+    .input({ messageIds: v.array(v.string()), userId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx: context }) => {
+        const providers = await loadCustomProviders(context, args.userId);
+        const flags = await Promise.all(
+            args.messageIds.map(async (messageId) => {
+                const row = await context.db.get("messages", messageId as Id<"messages">);
+
+                return row !== null && isLocalBrowserModel(row.model, providers) ? messageId : null;
+            }),
+        );
+
+        return flags.filter((messageId): messageId is string => messageId !== null);
+    });
 
 /** How many rows of a branched thread's active path the job reads: a turn longer than this is not keyed (see the job). */
 export const FOLLOWUP_PATH_LIMIT = 60;
