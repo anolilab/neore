@@ -122,17 +122,9 @@ export const roleConfigRefusal = async (ctx: QueryCtx | MutationCtx, userId: str
 /**
  * The roles in effect for `userId` in a project (or none): the user's, overridden field by field by the project's.
  * The project is read under the rule a run in it is (owner or organization member), so a member's runs follow the
- * owner's overrides; each model still has to pass the running user's checks at admission.
- */
-export const effectiveRoles = async (ctx: QueryCtx | MutationCtx, userId: string, projectId: Id<"projects"> | undefined): Promise<SubAgentRoles> => {
-    const { roles } = await effectiveRoleSettings(ctx, userId, projectId);
-
-    return roles;
-};
-
-/**
- * The roles of {@link effectiveRoles}, with the roles whose instructions come from a project another user owns: a run labels those
- * as the owner's (`instructionsBy`), never as the running user's.
+ * owner's overrides; each model still has to pass the running user's checks at admission. `ownersInstructions` names
+ * the roles whose instructions come from a project another user owns: a run labels those as the owner's
+ * (`instructionsBy`), never as the running user's.
  */
 export const effectiveRoleSettings = async (
     ctx: QueryCtx | MutationCtx,
@@ -212,7 +204,7 @@ export const getRoleCatalogForRun = internalQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { threadId, userId }, ctx }) => {
-        const roles = await effectiveRoles(ctx, userId, await delegationProjectId(ctx, threadId));
+        const { roles } = await effectiveRoleSettings(ctx, userId, await delegationProjectId(ctx, threadId));
         const reads = roleCheckReads(ctx, userId);
         const refused = new Set<string | undefined>(
             await Promise.all(
