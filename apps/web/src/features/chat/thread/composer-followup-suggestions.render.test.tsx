@@ -110,6 +110,17 @@ describe("ComposerFollowupSuggestions", () => {
         expect(readOptions).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true }));
     });
 
+    it("hides suggestions shown before the chat locked, when there is no unlock proof", async () => {
+        const view = render(<ComposerFollowupSuggestions />);
+
+        expect(await screen.findByText(SUGGESTION)).toBeTruthy();
+
+        chat.thread = { lockedAt: 1000 };
+        view.rerender(<ComposerFollowupSuggestions />);
+
+        expect(screen.queryByText(SUGGESTION)).toBeNull();
+    });
+
     it("does not read the cache for a locked chat without its unlock proof", () => {
         chat.thread = { lockedAt: 1000 };
 
