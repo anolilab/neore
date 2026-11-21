@@ -6,6 +6,7 @@ import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
 import { callOnShard } from "../lib/cross-shard";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -4555,8 +4556,14 @@ const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPAT
 const MIN_MODEL_BUDGET_MS = 10 * 1000;
 
 /**
- * The write of a reply's suggestions, and its Text unit, when the job's first write failed. A write that throws is retried by the
- * scheduler's own policy (with backoff). The unit is taken only when the write landed: a refused write (a newer reply) takes none.
+ * The cache write's retry policy: unbounded, with backoff capped at five minutes, so a reply never loses its suggestion to a run of
+ * failed writes. Each write is idempotent (a refused write returns quietly, and the unit is taken only when the write landed).
+ */
+const FOLLOWUP_CACHE_RETRY = { backoff: "exponential", baseMs: 5000, forever: true, maxMs: 300_000 } as const;
+
+/**
+ * The write of a reply's suggestions, and its Text unit, when the job's first write failed. A write that throws is retried with
+ * {@link FOLLOWUP_CACHE_RETRY}. The unit is taken only when the write landed: a refused write (a newer reply) takes none.
  * No model call is made here.
  */
 export const retryFollowupCache = internalAction
@@ -4957,13 +4964,19 @@ export const generateFollowupSuggestionsForThread = internalAction
                     // The suggestions are in hand: the scheduler writes them and takes the unit, with no model call and no second charge.
                     // The claim stays held for that, so a run does not call the model again for this reply meanwhile.
                     chatLogger.error(`[generateFollowupSuggestionsForThread] Cache write failed, retrying it: ${threadId}`, cacheError);
-                    await context.scheduler.runAfter(0, internal.chat.functions.retryFollowupCache, {
-                        ...cacheWrite,
-                        // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
-                        chargedUserId,
-                        organizationId: threadData.organizationId ?? undefined,
-                        requestId: replyChargeKey,
-                    });
+                    await runAfterWithRetry(
+                        context.scheduler,
+                        0,
+                        internal.chat.functions.retryFollowupCache,
+                        {
+                            ...cacheWrite,
+                            // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                            chargedUserId,
+                            organizationId: threadData.organizationId ?? undefined,
+                            requestId: replyChargeKey,
+                        },
+                        FOLLOWUP_CACHE_RETRY,
+                    );
                     paid.cached = true;
 
                     return;
