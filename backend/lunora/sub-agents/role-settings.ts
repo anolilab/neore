@@ -6,7 +6,7 @@
 import { MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { readUserRunPlan } from "../auth/lib/plan";
@@ -31,20 +31,51 @@ const userRoles = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Sub
     return settings?.subAgentRoles ?? undefined;
 };
 
+/** The rows {@link roleModelRefusal} reads for a user, each read once however many models it checks. */
+interface RoleCheckReads {
+    plan: () => ReturnType<typeof readUserRunPlan>;
+    preferences: () => Promise<Doc<"aiUserPreferences"> | null>;
+}
+
+const once = <T>(read: () => Promise<T>): (() => Promise<T>) => {
+    let result: Promise<T> | undefined;
+
+    return async () => {
+        result ??= read();
+
+        return await result;
+    };
+};
+
+const roleCheckReads = (ctx: QueryCtx | MutationCtx, userId: string): RoleCheckReads => {
+    return {
+        plan: once(async () => await readUserRunPlan(ctx, userId)),
+        preferences: once(
+            async () =>
+                await ctx.db
+                    .query("aiUserPreferences")
+                    .withIndex("by_userId", (q) => q.eq("userId", userId))
+                    .unique(),
+        ),
+    };
+};
+
 /**
  * Why `userId`'s runs cannot use `modelId` for a role, or `undefined` when they can: the sub-agent rule, then the
  * checks a run makes before it calls the model (the user's model filters, and a paid model needing a plan or the
  * user's own key), so a role is refused when it is saved or named, never after the run was charged.
  */
-export const roleModelRefusal = async (ctx: QueryCtx | MutationCtx, userId: string, modelId: string): Promise<string | undefined> => {
+export const roleModelRefusal = async (
+    ctx: QueryCtx | MutationCtx,
+    userId: string,
+    modelId: string,
+    reads: RoleCheckReads = roleCheckReads(ctx, userId),
+): Promise<string | undefined> => {
     if (!isRoleModelAllowed(modelId)) {
         return `${modelId} cannot run sub-agents.`;
     }
 
-    const preferences = await ctx.db
-        .query("aiUserPreferences")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .unique();
+    const preferences = await reads.preferences();
     const custom = parseCustomModelId(modelId);
 
     // The user's own endpoint, under the checks `resolveRunModel` makes: theirs, on, and one the server can call.
@@ -70,15 +101,11 @@ export const roleModelRefusal = async (ctx: QueryCtx | MutationCtx, userId: stri
         return `Your model filters exclude ${definition.name ?? modelId}: ${excluded}`;
     }
 
-    const allowed = await allowsPaidModel(
-        definition,
-        async () => await readUserRunPlan(ctx, userId),
-        async () => {
-            const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[definition.provider];
+    const allowed = await allowsPaidModel(definition, reads.plan, async () => {
+        const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[definition.provider];
 
-            return Boolean(entry?.enabled && entry.encryptedKey);
-        },
-    );
+        return Boolean(entry?.enabled && entry.encryptedKey);
+    });
 
     return allowed ? undefined : paidModelRefusal(definition.name ?? modelId, byokPaysFor(definition));
 };
@@ -103,6 +130,39 @@ export const effectiveRoles = async (ctx: QueryCtx | MutationCtx, userId: string
     return mergeSubAgentRoles(user, project?.subAgentRoles ?? undefined);
 };
 
+/** How far up a delegation chain {@link delegationProjectId} looks: the lead, a child, a grandchild (depth ≤ 2). */
+const CHAIN_HOPS = 3;
+
+/**
+ * The project a delegation from `threadId` works in: the thread's own, else the one of the thread that delegated to
+ * it, up to the lead. A sub-agent's or worker's thread has no project, so without this a role named below the lead
+ * would drop the project's overrides.
+ */
+export const delegationProjectId = async (ctx: QueryCtx | MutationCtx, threadId: string): Promise<Id<"projects"> | undefined> => {
+    let current = threadId;
+
+    for (let hop = 0; hop < CHAIN_HOPS; hop += 1) {
+        const thread = await ctx.db.get("threads", current as Id<"threads">);
+
+        if (thread?.projectId) {
+            return thread.projectId as Id<"projects">;
+        }
+
+        const run = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_childThreadId", (q) => q.eq("childThreadId", current))
+            .first();
+
+        if (!run) {
+            return undefined;
+        }
+
+        current = run.parentThreadId;
+    }
+
+    return undefined;
+};
+
 /** The settings screen: the user's roles and, for a project, its overrides and whether this user may change them. */
 export const getSubAgentRoles = authQuery
     .input({ projectId: v.optional(v.id("projects")) })
@@ -123,21 +183,23 @@ export const getSubAgentRoles = authQuery
     });
 
 /**
- * The lead's role catalog for a run in `projectId` (or none), or `null` when no role is on. A role whose model
+ * The lead's role catalog for a run on `threadId` (in its delegation's project, {@link delegationProjectId}), or `null`
+ * when no role is on. A role whose model
  * `roleModelRefusal` refuses for this user (another member's endpoint, a lapsed plan) is left out: `createRun` would
  * refuse every call naming it.
  */
 export const getRoleCatalogForRun = internalQuery
-    .input({ projectId: v.optional(v.id("projects")), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
-    .query(async ({ args: { projectId, userId }, ctx }) => {
-        const roles = await effectiveRoles(ctx, userId, projectId);
+    .query(async ({ args: { threadId, userId }, ctx }) => {
+        const roles = await effectiveRoles(ctx, userId, await delegationProjectId(ctx, threadId));
+        const reads = roleCheckReads(ctx, userId);
         const refused = new Set<string | undefined>(
             await Promise.all(
                 activeRoles(roles).map(async (name) => {
                     const model = roles[name]?.model;
 
-                    return model && (await roleModelRefusal(ctx, userId, model)) ? name : undefined;
+                    return model && (await roleModelRefusal(ctx, userId, model, reads)) ? name : undefined;
                 }),
             ),
         );

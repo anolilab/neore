@@ -563,15 +563,7 @@ export const loadRunContext = async (
         ),
         botPromise,
         // Alongside the project read, so it adds no wait of its own.
-        args.roleCatalog
-            ? threadSettingsPromise.then(
-                  async (settings) =>
-                      await ctx.runQuery(internal.sub_agents.role_settings.getRoleCatalogForRun, {
-                          ...(settings?.projectId && { projectId: settings.projectId as Id<"projects"> }),
-                          userId,
-                      }),
-              )
-            : null,
+        args.roleCatalog ? ctx.runQuery(internal.sub_agents.role_settings.getRoleCatalogForRun, { threadId, userId }) : null,
     ]);
 
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;

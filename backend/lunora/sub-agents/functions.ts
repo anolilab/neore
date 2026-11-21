@@ -124,7 +124,7 @@ import type { vWorkerPolicy } from "./validators";
 import { vDispatchSource, vHostRunnerRequest, vSubAgentRoleName, vSubAgentRunMode, vSubAgentRunRole, vSubAgentRunStatus } from "./validators";
 import type { SubAgentRoleName, SubAgentRunRole } from "./roles";
 import { isRoleModelAllowed, resolveHostRoleLaunch, resolveRoleLaunch } from "./roles";
-import { effectiveRoles, roleModelRefusal } from "./role-settings";
+import { delegationProjectId, effectiveRoles, roleModelRefusal } from "./role-settings";
 
 type RunDoc = Doc<"subAgentRuns">;
 
@@ -979,8 +979,7 @@ export const resolveRunRole = async (
     roleName: SubAgentRoleName,
     onHost = false,
 ): Promise<{ error: string } | { role: SubAgentRunRole }> => {
-    const parent = await ctx.db.get("threads", args.parentThreadId as Id<"threads">);
-    const roles = await effectiveRoles(ctx, args.userId, parent?.projectId ?? undefined);
+    const roles = await effectiveRoles(ctx, args.userId, await delegationProjectId(ctx, args.parentThreadId));
 
     if (onHost) {
         return resolveHostRoleLaunch(roles, roleName);

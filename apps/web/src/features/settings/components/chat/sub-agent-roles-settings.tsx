@@ -103,14 +103,18 @@ interface RoleCardProps {
     inherited?: RoleConfig;
     isProject: boolean;
     models: GatewayModel[];
+    /** Whether the plan, keys and endpoints the model list depends on have loaded, so a missing model means something. */
+    modelsKnown: boolean;
     name: RoleName;
     /** Saves the whole role; answers whether the save went through. */
     onSave: (name: RoleName, config: RoleConfig | null) => Promise<boolean>;
+    /** Runs `save` after every save queued before it, from any card: the screen's one line, kept across scope switches. */
+    queueSave: (save: () => Promise<void>) => void;
     readOnly: boolean;
     value: RoleConfig | undefined;
 }
 
-const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSave, readOnly, value }) => {
+const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, modelsKnown, name, onSave, queueSave, readOnly, value }) => {
     const { i18n, t } = useLingui();
     const modeLabelId = useId();
     const instructionsId = useId();
@@ -120,12 +124,11 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
     const ownRef = useRef(own);
     const serverValue = useRef(value);
     const inFlight = useRef(0);
-    const saveChain = useRef<Promise<void>>(Promise.resolve());
     const effortTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const effectiveModelId = own.model ?? inherited?.model;
     const effectiveModel = models.find((model) => model.id === effectiveModelId);
     // A plan that lapsed, or a project owner's model this member cannot run: the role stays set, but no run will start.
-    const isUnoffered = effectiveModelId !== undefined && effectiveModel === undefined;
+    const isUnoffered = modelsKnown && effectiveModelId !== undefined && effectiveModel === undefined;
     const pickerModels = own.model && models.every((model) => model.id !== own.model) ? [...models, unofferedModel(own.model)] : models;
     const effectiveMode = own.mode ?? inherited?.mode ?? "prefer";
     const [draft, setDraftState] = useState(own.instructions ?? "");
@@ -175,7 +178,7 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
         };
 
         inFlight.current += 1;
-        saveChain.current = saveChain.current.then(runSave);
+        queueSave(runSave);
     });
 
     const save = (patch: Partial<RoleConfig>) => {
@@ -391,6 +394,12 @@ const SubAgentRolesSettings: FC = () => {
     const projects = projectList.readableProjects.filter((project) => project.projectType !== "workflow");
     const user: Roles = rolesQuery.data?.user ?? {};
     const project = rolesQuery.data?.project;
+    // One line for every card's saves: a card remounted by a scope switch must not race a save its earlier self queued.
+    const saveQueue = useRef<Promise<void>>(Promise.resolve());
+    const queueSave = (save: () => Promise<void>) => {
+        saveQueue.current = saveQueue.current.then(save);
+    };
+    const modelsKnown = access !== undefined && aiPreferences !== undefined && (isAnonymous || customProviders !== undefined);
     const handleSave = async (name: RoleName, config: RoleConfig | null): Promise<boolean> => {
         const saving = projectId ? setProjectRole.mutateAsync({ config, projectId, role: name }) : setUserRole.mutateAsync({ config, role: name });
 
@@ -484,8 +493,10 @@ const SubAgentRolesSettings: FC = () => {
                             // A new scope starts its instruction draft from what that scope stores.
                             key={`${scope}:${name}`}
                             models={models}
+                            modelsKnown={modelsKnown}
                             name={name}
                             onSave={handleSave}
+                            queueSave={queueSave}
                             readOnly={project ? !project.editable : false}
                             value={projectId ? project?.roles[name] : user[name]}
                         />

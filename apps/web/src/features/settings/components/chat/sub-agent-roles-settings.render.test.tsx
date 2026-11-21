@@ -9,6 +9,7 @@ const state = vi.hoisted(() => {
     return {
         project: null as null | { editable: boolean; roles: Record<string, unknown> },
         projects: [] as { _id: string; title: string }[],
+        accessPending: false,
         customProviders: [] as Record<string, unknown>[],
         roles: {} as Record<string, unknown>,
         rolesFail: false,
@@ -104,6 +105,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: () => {
                                 return {
                                     queryFn: async () => {
+                                        if (state.accessPending) {
+                                            await new Promise(() => {});
+                                        }
+
                                         return { canRunPaidModels: true };
                                     },
                                     queryKey: ["paid-access"],
@@ -182,6 +187,7 @@ beforeEach(() => {
     );
     state.project = null;
     state.projects = [];
+    state.accessPending = false;
     state.customProviders = [];
     state.roles = {};
     state.rolesFail = false;
@@ -371,5 +377,46 @@ describe("SubAgentRolesSettings", () => {
 
         expect(await screen.findByText("This model cannot run for you, so the role is not offered to the assistant. Pick another one.")).toBeDefined();
         expect(screen.getAllByText("model-gone").length).toBeGreaterThan(0);
+    });
+
+    it("does not call a saved model unusable before the plan it depends on has loaded", async () => {
+        state.accessPending = true;
+        state.roles = { review: { model: "model-gone" } };
+        renderSettings();
+
+        await screen.findAllByText("model-gone");
+        expect(screen.queryByText("This model cannot run for you, so the role is not offered to the assistant. Pick another one.")).toBeNull();
+    });
+
+    it("sends one card's save only after another card's earlier save has finished", async () => {
+        let finishFirst: (value: null) => void = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this project's TypeScript lib (es2023)
+        const first = new Promise<null>((resolve) => {
+            finishFirst = resolve;
+        });
+
+        state.setSubAgentRole.mockImplementationOnce(async () => await first);
+        renderSettings();
+
+        const [architecture, implementation] = await screen.findAllByLabelText("Extra instructions");
+
+        fireEvent.change(architecture!, { target: { value: "First." } });
+        fireEvent.blur(architecture!);
+        fireEvent.change(implementation!, { target: { value: "Second." } });
+        fireEvent.blur(implementation!);
+
+        await waitFor(() => {
+            expect(state.setSubAgentRole).toHaveBeenCalledTimes(1);
+        });
+        // The second waits behind the first; on a line of its own it would have gone by now.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 30);
+        });
+        expect(state.setSubAgentRole).toHaveBeenCalledTimes(1);
+        finishFirst(null);
+        await waitFor(() => {
+            expect(state.setSubAgentRole).toHaveBeenCalledTimes(2);
+        });
+        expect(state.setSubAgentRole.mock.calls[1]?.[0]).toMatchObject({ role: "implementation" });
     });
 });

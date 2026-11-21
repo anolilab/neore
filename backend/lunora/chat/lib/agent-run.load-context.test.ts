@@ -180,7 +180,7 @@ describe(loadRunContext, () => {
         await loadRunContext(asked.ctx, { ...args, roleCatalog: true });
 
         expect(without.runQuery).not.toHaveBeenCalledWith(internal.sub_agents.role_settings.getRoleCatalogForRun, expect.anything());
-        expect(asked.runQuery).toHaveBeenCalledWith(internal.sub_agents.role_settings.getRoleCatalogForRun, { projectId: "p1", userId: "u1" });
+        expect(asked.runQuery).toHaveBeenCalledWith(internal.sub_agents.role_settings.getRoleCatalogForRun, { threadId: args.threadId, userId: "u1" });
     });
 
     it("reports none when nothing was retrieved", async () => {

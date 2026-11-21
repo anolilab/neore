@@ -102,6 +102,39 @@ describe("resolveRunRole", () => {
     });
 });
 
+describe("a delegation below the lead", () => {
+    const insertChild = async (parentThreadId: string) => {
+        const childThreadId = await insertThread();
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId,
+                    createdAt: 0,
+                    depth: 1,
+                    parentThreadId,
+                    status: "running",
+                    task: "t",
+                    updatedAt: 0,
+                    userId,
+                }),
+        );
+
+        return childThreadId;
+    };
+
+    it("takes the lead's project overrides, for the role it names and the catalog it reads", async () => {
+        await setUserRoles({ review: { model: "no-such-model" } });
+        const projectId = await insertProject({ review: { model: DEFAULT_CHAT_MODEL, reasoningEffort: 90 } });
+        const grandchild = await insertChild(await insertChild(await insertThread({ projectId })));
+
+        expect(await harness.run(async (ctx: any) => await resolveRunRole(ctx, { parentThreadId: grandchild, userId }, "review"))).toStrictEqual({
+            role: { model: DEFAULT_CHAT_MODEL, name: "review", reasoningEffort: 90 },
+        });
+        expect(await harness.query(async (ctx: any) => await ctx.runQuery(getRoleCatalogForRun, { threadId: grandchild, userId }))).toContain("- review");
+    });
+});
+
 describe("resolveRunRole with a custom endpoint", () => {
     const setEndpoints = async (customAIProviders: Record<string, unknown>) =>
         await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { customAIProviders, userId }));
@@ -143,7 +176,8 @@ describe("admitSubAgentRun with a role", () => {
 
 describe("getRoleCatalogForRun", () => {
     it("is null until a role has a model, then lists it", async () => {
-        const run = async () => await harness.query(async (ctx: any) => await ctx.runQuery(getRoleCatalogForRun, { userId }));
+        const threadId = await insertThread();
+        const run = async () => await harness.query(async (ctx: any) => await ctx.runQuery(getRoleCatalogForRun, { threadId, userId }));
 
         expect(await run()).toBeNull();
 
@@ -154,7 +188,8 @@ describe("getRoleCatalogForRun", () => {
 
     it("leaves out a role whose model this user cannot run", async () => {
         await setUserRoles({ review: { model: "custom:gone/m" }, test: { model: DEFAULT_CHAT_MODEL } });
-        const catalog = await harness.query(async (ctx: any) => await ctx.runQuery(getRoleCatalogForRun, { userId }));
+        const threadId = await insertThread();
+        const catalog = await harness.query(async (ctx: any) => await ctx.runQuery(getRoleCatalogForRun, { threadId, userId }));
 
         expect(catalog).toContain("- test (prefer):");
         expect(catalog).not.toContain("- review");
