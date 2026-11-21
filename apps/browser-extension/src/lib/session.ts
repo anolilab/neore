@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { holdAccessTokens } from "./access-token";
+import { holdAccessTokens, resumeAccessTokens } from "./access-token";
+import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
 import { grantKey, readGrant, signOutGrant, STORAGE_KEY } from "./extension-grant";
 
@@ -35,16 +36,29 @@ export const loadGrantSession = async (): Promise<GrantSession | null> => {
 };
 
 /**
- * Drop this panel's bearer (`authTokenSync.signOut`, which also stops its
- * refresh) and hold every new token first, then end the grant. So the panel is
- * signed out even when storage cannot read or remove the grant; `signOutGrant`
- * then rejects, and the caller shows the sign-out as failed. The hold lasts
- * until the next session starts (`resumeAccessTokens`).
+ * End the grant, and this panel's session with it. While the grant is being
+ * revoked and removed, no new token goes out (`holdAccessTokens`) and the
+ * refresh loop stops; the bearer and the writes queued offline under it stay.
+ * Once the grant is gone the bearer is cleared. When storage fails to read or
+ * remove the grant, the session comes back for the grant still stored (its
+ * tokens flow and the loop restarts, the queue intact) and this rejects, so
+ * the caller shows the sign-out as failed and it can be tried again.
  */
-export const endSession = async (authTokenSync: { signOut: () => void }): Promise<void> => {
+export const endSession = async (authTokenSync: { suspend: () => SuspendedSession }): Promise<void> => {
     holdAccessTokens();
-    authTokenSync.signOut();
-    await signOutGrant();
+
+    const suspended = authTokenSync.suspend();
+
+    try {
+        await signOutGrant();
+    } catch (error) {
+        resumeAccessTokens();
+        suspended.restore();
+
+        throw error;
+    }
+
+    suspended.finish();
 };
 
 /** The stored grant's session, kept in step with `storage.local`. `undefined` while loading. */

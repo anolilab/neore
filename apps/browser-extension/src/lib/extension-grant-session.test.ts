@@ -7,6 +7,7 @@ const { migrateFromCookieSession, readReconnectNeeded, RECONNECT_KEY, requestGra
     await import("./extension-grant");
 const { clearAccessToken, getAccessToken, resumeAccessTokens } = await import("./access-token");
 const { endSession, loadGrantSession } = await import("./session");
+const { createAuthTokenSync } = await import("./auth-token-sync");
 
 const GRANT_KEY = "neore.extensionGrant";
 const REDIRECT_URI = `https://${"a".repeat(32)}.chromiumapp.org/`;
@@ -211,25 +212,98 @@ describe("signOutGrant", () => {
 });
 
 describe("endSession", () => {
+    const grant = { token: "grant", user: USER };
+
+    /** A panel signed in with `grant`: a real bearer sync over a fake Lunora client. */
+    const signedIn = async () => {
+        const setAuthToken = vi.fn();
+        const sync = createAuthTokenSync({ setAuthToken }, getAccessToken);
+
+        store.set(GRANT_KEY, grant);
+        // The token endpoint answers with the stored grant's own user, whichever grant asks.
+        fetchMock.mockImplementation(async (input) => {
+            if (String(input).endsWith("/revoke")) {
+                return new Response(null, { status: 204 });
+            }
+
+            return Response.json({ token: "jwt", user: (store.get(GRANT_KEY) as typeof grant).user });
+        });
+        sync.start(USER.id);
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith("jwt"));
+        setAuthToken.mockClear();
+
+        return { setAuthToken, sync };
+    };
+
+    let stopSync: (() => void) | undefined;
+
+    afterEach(() => {
+        stopSync?.();
+        stopSync = undefined;
+    });
+
+    it("holds tokens and keeps the bearer while the grant is removed, then clears it", async () => {
+        const { setAuthToken, sync } = await signedIn();
+        const revoke = deferred();
+
+        stopSync = sync.signOut;
+        fetchMock.mockReturnValueOnce(revoke.promise);
+
+        const signingOut = endSession(sync);
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
+        // Pending: no new token, and the bearer (with its offline queue) stays.
+        await expect(getAccessToken({ force: true })).resolves.toBeNull();
+        expect(setAuthToken).not.toHaveBeenCalled();
+
+        revoke.resolve(new Response(null, { status: 204 }));
+        await signingOut;
+
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(setAuthToken.mock.calls).toEqual([[null]]);
+        await expect(getAccessToken({ force: true })).resolves.toBeNull();
+    });
+
     it.each([
         ["read", "get"],
         ["removed", "remove"],
-    ] as const)("signs this panel out even when the grant cannot be %s, and rejects so the failure shows", async (_label, failing) => {
-        const grant = { token: "grant", user: USER };
+    ] as const)("brings the session back when the grant cannot be %s, keeping the bearer, and rejects so the failure shows", async (_label, failing) => {
+        const { setAuthToken, sync } = await signedIn();
 
-        store.set(GRANT_KEY, grant);
-        fetchMock.mockImplementation(async () => Response.json({ token: "jwt", user: USER }));
-        await expect(getAccessToken()).resolves.toBe("jwt");
+        stopSync = sync.signOut;
         vi.spyOn(chrome.storage.local, failing).mockRejectedValueOnce(new Error("storage unavailable"));
-
-        const sync = { signOut: vi.fn() };
 
         await expect(endSession(sync)).rejects.toThrow("storage unavailable");
 
         expect(store.get(GRANT_KEY)).toEqual(grant);
-        expect(sync.signOut).toHaveBeenCalledOnce();
-        // The grant is still stored, but nothing trades it for a bearer any more.
-        await expect(getAccessToken({ force: true })).resolves.toBeNull();
+        // The loop restarted for the grant still stored, and the bearer was never cleared.
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith("jwt"));
+        expect(setAuthToken).not.toHaveBeenCalledWith(null);
+        await expect(getAccessToken({ force: true })).resolves.toBe("jwt");
+    });
+
+    it("leaves a sign-in from another panel alone when its sign-out finishes after it", async () => {
+        const { setAuthToken, sync } = await signedIn();
+        const revoke = deferred();
+        const newer = { token: "newer", user: { ...USER, id: "u2" } };
+
+        fetchMock.mockReturnValueOnce(revoke.promise);
+
+        const signingOut = endSession(sync);
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
+        // Another panel signs in; this panel's provider starts the new session.
+        store.set(GRANT_KEY, newer);
+        resumeAccessTokens();
+        stopSync = sync.start(newer.user.id);
+        revoke.resolve(new Response(null, { status: 204 }));
+        await signingOut;
+
+        expect(store.get(GRANT_KEY)).toEqual(newer);
+        // Only the account switch cleared the bearer; the finished sign-out did not.
+        expect(setAuthToken.mock.calls.filter(([token]) => token === null)).toHaveLength(1);
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenLastCalledWith("jwt"));
+        await expect(getAccessToken()).resolves.toBe("jwt");
     });
 });
 

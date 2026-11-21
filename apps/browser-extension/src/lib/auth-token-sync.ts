@@ -78,6 +78,14 @@ export const keepAuthToken = (
     };
 };
 
+/** A sign-out in progress (`createAuthTokenSync().suspend`). */
+export interface SuspendedSession {
+    /** The grant is gone: clear the bearer, unless another session has started since. */
+    finish: () => void;
+    /** The grant is still stored: refresh its bearer again, unless another session has started since. */
+    restore: () => void;
+}
+
 /**
  * Moves `client`'s bearer from one grant to the next. Every sign-in stores a new
  * grant, even for the account already signed in, so the loop restarts on each;
@@ -87,41 +95,74 @@ export const keepAuthToken = (
  * must not leave with this one's, so a switch clears it before the new loop
  * starts.
  *
- * `signOut` also stops the running loop: a sign-out clears the bearer before
- * the grant is gone from storage, and may fail to remove it, so the session
- * that started the loop can outlive the click.
+ * A sign-out first `suspend`s: the loop stops, but the bearer and its offline
+ * queue stay until the grant is really gone (`finish`). If storage keeps the
+ * grant, `restore` restarts the loop for it. Either is a no-op once another
+ * session has started, so a sign-in from another panel is never undone.
  */
 export const createAuthTokenSync = (
     client: Pick<LunoraClient, "setAuthToken">,
     getToken: (options: { force: boolean }) => Promise<string | null>,
-): { signOut: () => void; start: (userId: string) => () => void } => {
+): { signOut: () => void; start: (userId: string) => () => void; suspend: () => SuspendedSession } => {
     let lastUserId: string | undefined;
-    let stopRunning: (() => void) | undefined;
+    let stopLoop: (() => void) | undefined;
+    /** Bumped by every start and sign-out: what a suspended sign-out checks before it acts. */
+    let generation = 0;
+
+    const run = (userId: string) => {
+        stopLoop?.();
+        stopLoop = keepAuthToken(client, userId, getToken);
+    };
+
+    const stop = () => {
+        stopLoop?.();
+        stopLoop = undefined;
+    };
+
+    const signOut = () => {
+        generation += 1;
+        stop();
+        lastUserId = undefined;
+        client.setAuthToken(null);
+    };
 
     return {
-        signOut: () => {
-            stopRunning?.();
-            stopRunning = undefined;
-            lastUserId = undefined;
-            client.setAuthToken(null);
-        },
+        signOut,
         start: (userId) => {
             if (lastUserId !== undefined && lastUserId !== userId) {
                 client.setAuthToken(null);
             }
 
             lastUserId = userId;
+            generation += 1;
 
-            const stop = keepAuthToken(client, userId, getToken);
+            const started = generation;
 
-            stopRunning = stop;
+            run(userId);
 
             return () => {
-                stop();
-
-                if (stopRunning === stop) {
-                    stopRunning = undefined;
+                if (generation === started) {
+                    stop();
                 }
+            };
+        },
+        suspend: () => {
+            const suspended = generation;
+            const userId = lastUserId;
+
+            stop();
+
+            return {
+                finish: () => {
+                    if (generation === suspended) {
+                        signOut();
+                    }
+                },
+                restore: () => {
+                    if (generation === suspended && userId !== undefined) {
+                        run(userId);
+                    }
+                },
             };
         },
     };

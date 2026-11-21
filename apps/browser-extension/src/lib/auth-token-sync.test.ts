@@ -121,4 +121,66 @@ describe(createAuthTokenSync, () => {
         expect(getToken).toHaveBeenCalledTimes(1);
         expect(setAuthToken).toHaveBeenLastCalledWith(null);
     });
+
+    it("suspends without clearing the bearer, then clears it on finish", async () => {
+        const setAuthToken = vi.fn();
+        const getToken = vi.fn(async () => jwt(600));
+        const sync = createAuthTokenSync({ setAuthToken }, getToken);
+
+        sync.start("user-1");
+        await vi.advanceTimersByTimeAsync(0);
+
+        const suspended = sync.suspend();
+
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(getToken).toHaveBeenCalledTimes(1);
+        expect(setAuthToken).not.toHaveBeenCalledWith(null);
+
+        suspended.finish();
+        expect(setAuthToken).toHaveBeenLastCalledWith(null);
+    });
+
+    it("restarts the loop for the same user on restore, keeping the bearer", async () => {
+        const setAuthToken = vi.fn();
+        const getToken = vi.fn(async () => jwt(600));
+        const sync = createAuthTokenSync({ setAuthToken }, getToken);
+
+        const stop = sync.start("user-1");
+
+        await vi.advanceTimersByTimeAsync(0);
+        sync.suspend().restore();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(getToken).toHaveBeenCalledTimes(2);
+        expect(setAuthToken).not.toHaveBeenCalledWith(null);
+        expect(setAuthToken).toHaveBeenLastCalledWith(jwt(600), "user-1");
+
+        // The session's own stop still ends the restored loop.
+        stop();
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(getToken).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing on finish or restore once another session has started", async () => {
+        const setAuthToken = vi.fn();
+        const getToken = vi.fn(async () => jwt(600, "user-2"));
+        const sync = createAuthTokenSync({ setAuthToken }, getToken);
+
+        sync.start("user-1");
+        await vi.advanceTimersByTimeAsync(0);
+
+        const suspended = sync.suspend();
+
+        sync.start("user-2");
+        await vi.advanceTimersByTimeAsync(0);
+        setAuthToken.mockClear();
+        getToken.mockClear();
+
+        suspended.finish();
+        suspended.restore();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(setAuthToken).not.toHaveBeenCalled();
+        expect(getToken).not.toHaveBeenCalled();
+    });
 });

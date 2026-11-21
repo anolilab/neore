@@ -50,7 +50,7 @@ const readGrantOrNone = async (): Promise<StoredGrant | undefined> => {
 /** A JWT and the grant it was minted for: a token never outlives its grant. */
 let cached: { grant: string; token: string } | null = null;
 let inflight: { grant: string; promise: Promise<string | null> } | null = null;
-/** Set by a sign-out until the next session starts: no token, even for a grant storage failed to remove. */
+/** Set while a sign-out is out and after it: no token for the grant being ended. */
 let held = false;
 
 /**
@@ -120,15 +120,15 @@ export const clearAccessToken = (): void => {
 };
 
 /**
- * A sign-out began: hand out no token until `resumeAccessTokens`, even while
- * the grant is still stored because storage failed to read or remove it.
+ * A sign-out began: hand out no token until `resumeAccessTokens`, though the
+ * grant stays stored until the revoke answers and storage removes it.
  */
 export const holdAccessTokens = (): void => {
     held = true;
     cached = null;
 };
 
-/** A session started (a new grant, or this panel's first): tokens flow again. */
+/** A session started (a new grant, or this panel's first), or a sign-out failed and kept the grant: tokens flow again. */
 export const resumeAccessTokens = (): void => {
     held = false;
 };
