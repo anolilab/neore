@@ -101,7 +101,7 @@ msgstr "\"{truncatedName}\" e altri {moreCount} rifiutati"
 msgid "\"{truncatedName}\" has been rejected"
 msgstr "\"{truncatedName}\" è stato rifiutato"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
 msgstr ""
 
@@ -349,6 +349,12 @@ msgstr "{0, plural, one {# controllo obbligatorio o sconosciuto non è riuscito}
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, one {# controllo obbligatorio o sconosciuto è ancora in corso} other {# controlli obbligatori o sconosciuti sono ancora in corso}}"
 
+#. placeholder {0}: readings.compactable.largeToolRows
+#. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:181
+msgid "{0, plural, one {# result} other {# results}}, {1}"
+msgstr "{0, plural, one {# risultato} other {# risultati}}, {1}"
+
 #. placeholder {0}: added.length
 #: src/features/projects/components/project-rule-files.tsx:534
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
@@ -378,6 +384,15 @@ msgstr "{0, plural, one {# slide} other {# slide}}"
 #: src/features/develop/components/files-tab.tsx:240
 msgid "{0, plural, one {# thread} other {# threads}}"
 msgstr "{0, plural, one {# thread} other {# thread}}"
+
+#. placeholder {0}: readings.other.threads
+#. placeholder {0}: readings.pinned.threads
+#. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
+#. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:187
+#: src/features/admin/components/admin-shard-footprint-row.tsx:193
+msgid "{0, plural, one {# thread} other {# threads}}, {1}"
+msgstr "{0, plural, one {# conversazione} other {# conversazioni}}, {1}"
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -530,6 +545,12 @@ msgstr "{0} conversazioni importate da {1}"
 #: src/features/settings/components/chat/mcp/server-list.tsx:105
 msgid "{0} custom headers"
 msgstr "{0} header personalizzati"
+
+#. placeholder {0}: formatNumber(row.sinceDays, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
+msgid "{0} days"
+msgstr "{0} giorni"
 
 #. placeholder {0}: deleting.name
 #: src/features/local-models/components/ollama-model-manager.tsx:150
@@ -2342,6 +2363,10 @@ msgstr "Sessioni attive ({0})"
 msgid "Active Threads"
 msgstr "Conversazioni attive"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:155
+msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
+msgstr "Conversazioni attive, per giorni dall’ultima attività. Sono incluse quelle in attesa di una persona."
+
 #: src/features/settings/components/personalization/memory-types.ts:25
 msgid "Activities"
 msgstr "Attività"
@@ -2721,7 +2746,7 @@ msgstr "Aggiunti {added} documento/i; saltati {skippedCount} file non supportati
 msgid "Added {added} document(s)."
 msgstr "Aggiunti {added} documento/i."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
 msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
 msgstr ""
 
@@ -3342,8 +3367,8 @@ msgid "All changes saved"
 msgstr "Tutte le modifiche salvate"
 
 #: src/features/home/components/home-page.tsx:243
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:454
 msgid "All chats"
 msgstr "Tutte le chat"
 
@@ -3437,7 +3462,7 @@ msgid "All providers + BYOK"
 msgstr "Tutti i provider + BYOK"
 
 #. placeholder {0}: roleLabel.toLowerCase()
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:289
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:292
 msgid "All real {0} work goes to this model, even quick work."
 msgstr ""
 
@@ -3462,7 +3487,7 @@ msgstr "Tutti i ruoli"
 msgid "All Servers"
 msgstr "Tutti i server"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:134
+#: src/features/admin/components/admin-shard-footprint-row.tsx:230
 msgid "All shards measured."
 msgstr "Tutti gli shard sono stati misurati."
 
@@ -3567,7 +3592,7 @@ msgstr "Stanno visualizzando anche"
 
 #: src/features/projects/components/project-rule-files.tsx:286
 #: src/features/projects/components/project-rule-files.tsx:455
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:308
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:311
 msgid "Always"
 msgstr "Sempre"
 
@@ -3881,6 +3906,10 @@ msgstr ""
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Una stringa a tua scelta; inserisci lo stesso valore del Verify token del webhook nell'app Meta"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
+msgid "Any time"
+msgstr "Qualsiasi durata"
+
 #: src/features/chat/guest-links/guest-link-panel.tsx:348
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
 msgstr "Chiunque abbia un link ospite può lasciarti un messaggio qui. Nulla di ciò che scrive viene eseguito finché non lo invii."
@@ -3986,7 +4015,7 @@ msgstr "Errore dell'applicazione"
 msgid "Applies"
 msgstr "Si applica"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:425
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:443
 msgid "Applies to"
 msgstr ""
 
@@ -4103,7 +4132,9 @@ msgstr "Approvato automaticamente: rischio basso"
 msgid "Approving…"
 msgstr "Approvazione in corso…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:107
+#: src/features/admin/components/admin-shard-footprint-row.tsx:129
+#: src/features/admin/components/admin-shard-footprint-row.tsx:140
+#: src/features/admin/components/admin-shard-footprint-row.tsx:160
 msgid "Approximate size"
 msgstr "Dimensione approssimativa"
 
@@ -4184,9 +4215,17 @@ msgstr "Archivia conversazione"
 msgid "Archived"
 msgstr "Archiviate"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:137
+msgid "Archived for at least"
+msgstr "Archiviate da almeno"
+
 #: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "Conversazioni archiviate"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:134
+msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
+msgstr "Conversazioni archiviate, in base a quanto tempo fa sono state archiviate. Quelle fissate sono contate a parte: non vengono mai eliminate."
 
 #: src/components/delete-confirmation-dialog.tsx:47
 msgid "Are you sure you want to delete \"{itemName}\"? This action cannot be undone."
@@ -5125,7 +5164,7 @@ msgstr "Il modello FLUX Kontext di qualità massima di BFL"
 msgid "BFL's professional FLUX model via direct API"
 msgstr "Il modello FLUX professionale di BFL tramite API diretta"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:290
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:293
 msgid "Bigger pieces go to this model; quick questions stay in the chat."
 msgstr ""
 
@@ -6422,7 +6461,7 @@ msgstr "Cinese (tradizionale)"
 msgid "Choose .md or .zip"
 msgstr "Scegli .md o .zip"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:411
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:429
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr ""
 
@@ -8819,7 +8858,7 @@ msgstr "Impossibile caricare la tua attività."
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "Impossibile caricare i dettagli di fatturazione della tua organizzazione. Riprova più tardi."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:470
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:488
 msgid "Could not load your roles."
 msgstr ""
 
@@ -8965,7 +9004,7 @@ msgstr "Impossibile salvare il nuovo ordine per {label}"
 msgid "Could not save the page"
 msgstr "Impossibile salvare la pagina"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:400
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
 msgid "Could not save the role"
 msgstr ""
 
@@ -10139,7 +10178,7 @@ msgid "Delegate tasks to Devin, the AI software engineer"
 msgstr "Delega attività a Devin, l'ingegnere del software IA"
 
 #. placeholder {0}: roleLabel.toLowerCase()
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:234
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
 msgid "Delegated {0} work runs on this model."
 msgstr ""
 
@@ -11147,7 +11186,7 @@ msgstr "Repubblica Dominicana"
 msgid "Don't have an account?"
 msgstr "Non hai un account?"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:340
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:352
 msgid "Don't use your default instructions in this project"
 msgstr ""
 
@@ -12778,7 +12817,7 @@ msgstr "Ogni 6 ore"
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "Ogni chat ed esecuzione pianificata di questo bot riceve solo questi strumenti. I tuoi permessi sugli strumenti restano validi."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
 msgstr ""
 
@@ -13293,7 +13332,7 @@ msgstr "Modalità di ragionamento esteso sul modello Qwen più grande"
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Ragionamento esteso sull'Opus più capace di Anthropic"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:319
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:322
 msgid "Extra instructions"
 msgstr ""
 
@@ -17084,6 +17123,10 @@ msgstr "Identità"
 msgid "Idle"
 msgstr "Inattivo"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:158
+msgid "Idle for at least"
+msgstr "Inattive da almeno"
+
 #: src/features/develop/components/review-panel.tsx:148
 msgid "If it kept the review as pending, submit or delete it there first."
 msgstr "Se ha lasciato la revisione in sospeso, inviala o eliminala prima lì."
@@ -19513,7 +19556,7 @@ msgstr "Caricamento dell'anteprima..."
 msgid "Loading preview…"
 msgstr "Caricamento anteprima…"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 msgid "Loading projects…"
 msgstr ""
 
@@ -19522,7 +19565,7 @@ msgstr ""
 msgid "Loading repositories…"
 msgstr "Caricamento dei repository…"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:462
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:480
 msgid "Loading roles…"
 msgstr ""
 
@@ -20351,11 +20394,11 @@ msgstr "I server MCP forniscono strumenti aggiuntivi che l'IA può usare durante
 msgid "MCP tools"
 msgstr "Strumenti MCP"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:126
+#: src/features/admin/components/admin-shard-footprint-row.tsx:224
 msgid "Measure more shards"
 msgstr "Misura altri shard"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:122
+#: src/features/admin/components/admin-shard-footprint-row.tsx:220
 msgid "Measuring…"
 msgstr "Misurazione…"
 
@@ -20615,9 +20658,14 @@ msgstr "Ramificazione dei messaggi"
 msgid "Message input"
 msgstr "Campo messaggio"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:103
+#: src/features/admin/components/admin-shard-footprint-row.tsx:125
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Message rows"
 msgstr "Righe di messaggi"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:197
+msgid "Message rows of the largest threads"
+msgstr "Righe di messaggi delle conversazioni più grandi"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:65
 msgid "Message selection"
@@ -20971,7 +21019,7 @@ msgstr "Modalità:"
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:405
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:275
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:278
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -22477,7 +22525,7 @@ msgstr "Ancora nessuna esecuzione"
 msgid "No expiration"
 msgstr "Nessuna scadenza"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:243
 msgid "No extra instructions in this project. Reset to use your default again."
 msgstr ""
 
@@ -23341,7 +23389,7 @@ msgstr "disattivato"
 #: src/features/settings/components/account/account-settings.tsx:420
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:273
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:276
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Off"
 msgstr "Off"
@@ -23354,7 +23402,7 @@ msgstr "Disattivato per impostazione predefinita. Quando il contesto di una chat
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "Disattivato per impostazione predefinita. Quando una chat lunga resta inattiva, condensa i messaggi più vecchi in note, così l’assistente li tiene a mente. Usa una piccola quantità di crediti. Disattivandolo, i riepiloghi già creati vengono eliminati."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:229
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
 msgid "Off until you pick a model."
 msgstr ""
 
@@ -23707,7 +23755,7 @@ msgstr "Solo il proprietario della chat può rispondere. Gli altri nella chat co
 msgid "Only the project's owner can change its repositories."
 msgstr "Solo il proprietario del progetto può modificarne i repository."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:456
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:474
 msgid "Only the project's owner can change its roles."
 msgstr ""
 
@@ -25501,6 +25549,10 @@ msgstr "Fissate"
 msgid "Pinned project"
 msgstr "Progetto fissato"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:185
+msgid "Pinned threads"
+msgstr "Conversazioni fissate"
+
 #: src/features/chat/sidebar/thread-sidebar.tsx:363
 msgid "Pins"
 msgstr "Elementi fissati"
@@ -25782,7 +25834,7 @@ msgstr "controllo preciso"
 msgid "Precise, quantified, and targeted description."
 msgstr "Descrizione precisa, quantificata e mirata."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:307
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:310
 msgid "Prefer"
 msgstr ""
 
@@ -26384,7 +26436,7 @@ msgid "Progress of {toolName}"
 msgstr "Avanzamento di {toolName}"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
@@ -28247,7 +28299,7 @@ msgstr "Invia di nuovo l'email di verifica"
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:265
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:268
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:108
 msgid "Reset"
 msgstr "Ripristina"
@@ -28257,7 +28309,7 @@ msgstr "Ripristina"
 msgid "Reset {0} to default"
 msgstr "Ripristina {0} al valore predefinito"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:254
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 msgid "Reset {roleLabel} to your default"
 msgstr ""
 
@@ -28470,7 +28522,7 @@ msgstr "riprova"
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:472
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:490
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -30362,21 +30414,21 @@ msgstr "Shanghai"
 msgid "Shapes"
 msgstr "Forme"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:82
+#: src/features/admin/components/admin-shard-footprint-row.tsx:104
 msgid "Shard footprint"
 msgstr "Impronta dello shard"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:95
+#: src/features/admin/components/admin-shard-footprint-row.tsx:117
 msgid "Shards"
 msgstr "Shard"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:113
+#: src/features/admin/components/admin-shard-footprint-row.tsx:211
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "Shard ancora in misurazione: {0}. Misura altri shard per completarli."
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:117
+#: src/features/admin/components/admin-shard-footprint-row.tsx:215
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "Gli shard che non è stato possibile misurare sono esclusi dai totali: {0}."
 
@@ -30584,7 +30636,7 @@ msgid "Show more folders"
 msgstr "Mostra altre cartelle"
 
 #: src/features/projects/components/project-repo-picker.tsx:175
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "Mostra altri progetti"
@@ -30940,6 +30992,10 @@ msgstr "limite di dimensione raggiunto"
 #: src/features/appearance/components/appearance-controls.tsx:315
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "Dimensione del testo nei messaggi della chat. La barra laterale e il resto dell’app mantengono la loro dimensione."
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:203
+msgid "Sizes of the largest shards"
+msgstr "Dimensioni degli shard più grandi"
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
@@ -31843,6 +31899,10 @@ msgstr "Avvia le nuove chat come temporanee"
 msgid "Start Ollama for this site"
 msgstr "Avvia Ollama per questo sito"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:55
+msgid "Start over"
+msgstr "Ricomincia"
+
 #: src/features/evals/components/run-dialog.tsx:285
 msgid "Start run"
 msgstr "Avvia esecuzione"
@@ -32161,9 +32221,9 @@ msgstr "Interrotto."
 msgid "Stopping…"
 msgstr "Interruzione in corso…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:84
-msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size. Counts only; no thread is listed."
-msgstr "Dati di conversazione archiviati tra gli shard utente: thread, righe di messaggi e una stima della loro dimensione. Solo conteggi; nessun thread viene elencato."
+#: src/features/admin/components/admin-shard-footprint-row.tsx:106
+msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
+msgstr "Dati di conversazione memorizzati negli shard utente: conversazioni, righe di messaggi e una stima della loro dimensione, per gruppo e anzianità. Solo conteggi; nessuna conversazione o shard viene elencato."
 
 #: src/features/canvas/components/design-preset-selector.tsx:134
 msgid "Story Promo"
@@ -32553,7 +32613,7 @@ msgstr "Sub-agente non riuscito"
 msgid "Sub-agent finished"
 msgstr "Sub-agente completato"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:409
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:427
 #: src/features/settings/lib/settings-navigation.ts:97
 msgid "Sub-agent roles"
 msgstr ""
@@ -34457,7 +34517,7 @@ msgstr "Non è stato possibile salvare lo screenshot."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "Il server non elenca ancora modelli: scaricane o caricane uno prima"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:90
+#: src/features/admin/components/admin-shard-footprint-row.tsx:112
 msgid "The shard footprint could not be measured."
 msgstr "Non è stato possibile misurare l’impronta dello shard."
 
@@ -35122,7 +35182,7 @@ msgstr "Questo messaggio è troppo lungo per essere copiato come link del prompt
 msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
 msgstr "Questo messaggio si chiuderà tra {value, plural, one {# secondo} other {# secondi}}"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:235
 msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
 msgstr ""
 
@@ -35190,7 +35250,7 @@ msgstr "Questo preset verrà rimosso definitivamente."
 msgid "This preview could not be loaded."
 msgstr "Impossibile caricare questa anteprima."
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "This project's chats. Anything it does not set uses your default."
 msgstr ""
 
@@ -35519,7 +35579,9 @@ msgstr "Variabili della conversazione"
 msgid "Thread will auto-delete in {0}"
 msgstr "La conversazione verrà eliminata automaticamente tra {0}"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:99
+#: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:159
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/search-bar.tsx:47
 msgid "Threads"
@@ -35838,6 +35900,10 @@ msgstr "chiamata di strumenti"
 msgid "Tool Calling"
 msgstr "Chiamata di strumenti"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:175
+msgid "Tool output's share of the stored size"
+msgstr "Quota dell’output degli strumenti sulla dimensione memorizzata"
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:354
 #: src/features/settings/lib/settings-navigation.ts:96
 msgid "Tool Permissions"
@@ -35847,6 +35913,11 @@ msgstr "Permessi degli strumenti"
 #: src/features/settings/lib/settings-keywords.ts:64
 msgid "Tool Provider Keys"
 msgstr "Chiavi dei provider di strumenti"
+
+#. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
+msgstr "Risultati degli strumenti di 64 KB o più, nelle conversazioni inattive da almeno {0} giorni"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
 #: src/features/settings/components/chat/bots-settings.tsx:496
@@ -36085,6 +36156,10 @@ msgstr "Ragionamento trasparente su input visivi"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "Pensiero trasparente per compiti legali, finanziari e tecnici"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:191
+msgid "Trashed, temporary, being deleted or orphaned"
+msgstr "Nel cestino, temporanee, in eliminazione o orfane"
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:101
 msgid "Triangle"
 msgstr "Triangolo"
@@ -36189,7 +36264,7 @@ msgstr "Prova a modificare i termini di ricerca."
 
 #: ../../packages/ui/src/components/icon-picker.tsx:454
 #: src/components/error-component.tsx:40
-#: src/features/admin/components/admin-shard-footprint-row.tsx:131
+#: src/features/admin/components/admin-shard-footprint-row.tsx:51
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1039
@@ -38657,7 +38732,7 @@ msgstr "Se impostato, verranno usati solo questi provider. Lascia vuoto per cons
 msgid "When should the assistant use this skill?"
 msgstr "Quando dovrebbe usare questa skill l'assistente?"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:285
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:288
 msgid "When to delegate"
 msgstr ""
 
@@ -39437,11 +39512,11 @@ msgstr "Hai esaurito il limite giornaliero di richieste IA."
 msgid "Your data export is ready"
 msgstr "La tua esportazione dei dati è pronta"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default ({inheritedModelName})"
 msgstr ""
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default (off)"
 msgstr ""
 

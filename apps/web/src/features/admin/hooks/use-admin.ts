@@ -297,6 +297,9 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
     });
 };
 
+/** The query key every page of the shard footprint census shares, followed by that page's cursor. */
+export const SHARD_FOOTPRINT_QUERY_KEY = ["admin", "shardFootprint"] as const;
+
 /**
  * One page of the shard footprint census (`getShardFootprint`): totals for the shards on that page.
  * Pass the previous page's `continueCursor` to measure the next shards.
@@ -306,7 +309,7 @@ export const useShardFootprint = (cursor?: string) => {
 
     return useQuery({
         queryFn: () => measure(cursor === undefined ? {} : { cursor }),
-        queryKey: ["admin", "shardFootprint", cursor ?? null],
+        queryKey: [...SHARD_FOOTPRINT_QUERY_KEY, cursor ?? null],
         refetchOnReconnect: false,
         refetchOnWindowFocus: false,
         retry: 1,
