@@ -14,6 +14,7 @@ import {
     cacheFollowupSuggestions,
     endFollowupDispatch,
     followupDispatchInFlight,
+    followupInFlight,
     followupModelRows,
     getCachedFollowupSuggestionsHandler,
     releaseFollowupSuggestions,
@@ -214,6 +215,16 @@ describe("a model request in flight holds the chat's lock", () => {
         await end("reply-1", claimedAt as number);
 
         await expect(inFlight()).resolves.toBe(false);
+    });
+
+    it("the delete actions read it through the internal query, which answers the same", async () => {
+        const claimedAt = await begin("reply-2");
+
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(followupInFlight, { threadId }))).resolves.toBe(true);
+
+        await end("reply-2", claimedAt as number);
+
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(followupInFlight, { threadId }))).resolves.toBe(false);
     });
 
     it("is not taken for a locked thread, so nothing is sent", async () => {

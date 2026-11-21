@@ -161,6 +161,12 @@ export const endFollowupDispatch = internalMutation
 export const followupDispatchInFlight = async (context: Pick<QueryContext, "db">, threadId: string): Promise<boolean> =>
     await hasClaimWithPrefix(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:`);
 
+/** Whether a suggestion for this chat is being sent to a model now: the chat's delete actions wait for it (`chat/functions.ts`). */
+export const followupInFlight = internalQuery
+    .input({ threadId: v.string() })
+    .output(v.boolean())
+    .query(async ({ args: { threadId }, ctx }) => await followupDispatchInFlight(ctx, threadId));
+
 export const getCachedFollowupSuggestions = internalQuery
     .input({
         threadId: v.string(),
