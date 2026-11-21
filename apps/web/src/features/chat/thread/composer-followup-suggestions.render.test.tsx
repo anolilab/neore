@@ -49,9 +49,7 @@ const cached = vi.hoisted(() => {
 
 vi.mock("@tanstack/react-query", () => {
     return {
-        useQuery: () => {
-            return cached;
-        },
+        useQuery: () => cached,
     };
 });
 
