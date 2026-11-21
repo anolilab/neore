@@ -456,6 +456,11 @@ const ProjectRuleFiles: FC<{
 
     const conflictMessage = t`These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again.`;
 
+    const fileInput = useRef<HTMLInputElement>(null);
+    const folderInput = useRef<HTMLInputElement>(null);
+    // What the last import added, said beside its buttons.
+    const [importNote, setImportNote] = useState("");
+
     const change = (next: RuleFileDraft[]) => {
         if (draft === null) {
             setBaseRevision(data?.revision ?? "");
@@ -463,12 +468,8 @@ const ProjectRuleFiles: FC<{
 
         setDraft(next);
         setStatus("");
+        setImportNote("");
     };
-
-    const fileInput = useRef<HTMLInputElement>(null);
-    const folderInput = useRef<HTMLInputElement>(null);
-    // What the last import added, said beside its buttons.
-    const [importNote, setImportNote] = useState("");
 
     /** Adds the picked Markdown files as unsaved drafts, up to the project's limit; the person saves them like any edit. */
     const importPicked = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -485,12 +486,20 @@ const ProjectRuleFiles: FC<{
         const { imported, skipped } = await importRuleFiles(picked, Math.max(0, MAX_RULE_FILES - files.length));
 
         if (imported.length > 0) {
-            change([
-                ...files,
-                ...imported.map((file) => {
+            if (draft === null) {
+                setBaseRevision(data?.revision ?? "");
+            }
+
+            // Onto the list as it is now: edits typed, or a list read, while the files were read stay.
+            setDraft((current) => {
+                const base = current ?? savedFiles;
+                const added = imported.slice(0, Math.max(0, MAX_RULE_FILES - base.length)).map((file) => {
                     return { ...file, id: crypto.randomUUID() };
-                }),
-            ]);
+                });
+
+                return [...base, ...added];
+            });
+            setStatus("");
         }
 
         const added =
@@ -672,6 +681,7 @@ const ProjectRuleFiles: FC<{
             setBaseRevision(written.revision);
             setError(undefined);
             setStatus(t`Rule files saved.`);
+            setImportNote("");
             refetch().catch(() => undefined);
         } catch (saveError) {
             // A limit the backend holds that this editor did not (an older client): worded and placed as the editor's own.
@@ -823,6 +833,7 @@ const ProjectRuleFiles: FC<{
                                         // Read again: after a refused save the cached list is the one another save replaced.
                                         refetch().catch(() => undefined);
                                         setDraft(null);
+                                        setImportNote("");
                                         setBlocked(false);
                                         setError(undefined);
                                         setInvalid(undefined);
@@ -838,11 +849,10 @@ const ProjectRuleFiles: FC<{
                     </div>
                 </>
             )}
-            {importNote && (
-                <p className="text-muted-foreground text-xs" role="status">
-                    {importNote}
-                </p>
-            )}
+            {/* Kept mounted, so a screen reader announces each note as it changes. */}
+            <p className={importNote ? "text-muted-foreground text-xs" : "sr-only"} role="status">
+                {importNote}
+            </p>
             {showBlocked && (
                 // Read as Save's description once focus lands there; announced itself only when there is no Save to focus.
                 <p className="text-destructive text-sm" id={blockedId} role={canEdit ? undefined : "alert"}>

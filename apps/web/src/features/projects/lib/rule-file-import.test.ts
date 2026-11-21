@@ -35,6 +35,23 @@ describe("toImportedRuleFile", () => {
         expect(toImportedRuleFile("rules/plain.md", "No front matter.")).toMatchObject({ content: "No front matter.", mode: "always", title: "plain" });
     });
 
+    it("reads front matter after a byte-order mark, an empty block, and leaves a block value's description to the editor", () => {
+        expect(toImportedRuleFile("rules/bom.md", "\u{FEFF}---\nglobs: *.ts\n---\nTyped.")).toMatchObject({
+            content: "Typed.",
+            mode: "glob",
+            patterns: "*.ts",
+        });
+        expect(toImportedRuleFile("rules/empty.md", "---\n---\nBody.")).toMatchObject({ content: "Body.", mode: "always" });
+        expect(toImportedRuleFile("rules/folded.md", "---\ndescription: >-\n  Long text\nalwaysApply: false\n---\nBody.")).toMatchObject({
+            description: "",
+            mode: "auto",
+        });
+    });
+
+    it("reads a file that never applies by itself as one read when needed", () => {
+        expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false\n---\nOnly on request.")).toMatchObject({ description: "", mode: "auto" });
+    });
+
     it("leaves out a file that is not Markdown", () => {
         expect(toImportedRuleFile("rules/logo.png", "png")).toBeNull();
     });

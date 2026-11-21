@@ -11,7 +11,7 @@ import z from "zod/v4";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
-import { INSTRUCTION_READ_TOOL, type RunInstruction } from "../../projects/rule-files";
+import { INSTRUCTION_READ_TOOL, oneLine, type RunInstruction } from "../../projects/rule-files";
 import toonEncodeOutput from "./toon-encode";
 
 type InstructionReadOutput = { found: false; names: string[] } | { found: true; id: string; name: string; text: string };
@@ -19,9 +19,10 @@ type InstructionReadOutput = { found: false; names: string[] } | { found: true; 
 /** The file `file` names: its id, else its name, ignoring case and surrounding space. */
 export const findInstruction = (instructions: ReadonlyArray<RunInstruction>, file: string): RunInstruction | undefined => {
     const wanted = file.trim();
-    const lower = wanted.toLowerCase();
+    // As the list shows it (`oneLine`), so a name with a line break in it is still found.
+    const lower = oneLine(wanted).toLowerCase();
 
-    return instructions.find((entry) => entry.id === wanted) ?? instructions.find((entry) => entry.title.trim().toLowerCase() === lower);
+    return instructions.find((entry) => entry.id === wanted) ?? instructions.find((entry) => oneLine(entry.title).toLowerCase() === lower);
 };
 
 /** The tool over `instructions`, the `auto` files the run lists. */
@@ -36,7 +37,7 @@ export const instructionReadTool = (instructions: ReadonlyArray<RunInstruction>)
             toolsLogger.info("[instruction_read]", { fileId: found?.id ?? null, found: found !== undefined });
 
             if (!found) {
-                return { found: false, names: instructions.map((entry) => entry.title) };
+                return { found: false, names: instructions.map((entry) => oneLine(entry.title)) };
             }
 
             return { found: true, id: found.id, name: found.title, text: found.content };

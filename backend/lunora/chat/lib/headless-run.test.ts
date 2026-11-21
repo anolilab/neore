@@ -269,10 +269,10 @@ describe("runHeadlessAgent hidden characters", () => {
 
 describe("runHeadlessAgent project instructions", () => {
     const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
-    const run = (tools: "headless" | "none") =>
+    const run = (tools: "headless" | "none", model = "test-model") =>
         runHeadlessAgent(fakeCtx(), {
             memory: false,
-            model: "test-model",
+            model,
             organizationId: null,
             origin: "trigger",
             personalization: "none",
@@ -295,6 +295,13 @@ describe("runHeadlessAgent project instructions", () => {
 
     it("neither lists nor offers them to a run without tools", async () => {
         await run("none");
+
+        expect(seen.tools.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).not.toContain("instruction_read");
+    });
+
+    it("neither lists nor offers them to a model that cannot call tools", async () => {
+        await run("headless", "cf-gemma-3-12b");
 
         expect(seen.tools.at(-1)).not.toContain("instruction_read");
         expect(seen.system.at(-1)).not.toContain("instruction_read");

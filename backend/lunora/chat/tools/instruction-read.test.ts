@@ -11,6 +11,7 @@ describe("instruction_read", () => {
         expect(findInstruction([deploy, style], "deploy-1")).toBe(deploy);
         expect(findInstruction([deploy, style], "  style GUIDE ")).toBe(style);
         expect(findInstruction([deploy, style], "secrets")).toBeUndefined();
+        expect(findInstruction([{ ...style, title: "Style\n guide" }], "style guide")?.id).toBe("style");
     });
 
     it("returns the file's text, and the listed names for one it does not have", async () => {

@@ -62,7 +62,7 @@ import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import { closeMCPClients } from "./mcp-tools";
-import type { SearchMode } from "./tool-builder";
+import { modelSupportsTools, type SearchMode } from "./tool-builder";
 import { servesUser } from "../../lib/shard-context";
 import { resolveTimeZone } from "../../memory/reflection-logic";
 import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
@@ -334,7 +334,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
         const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
-        const instructions = buildsTools ? (options.projectInstructions ?? []) : [];
+        // Only for a model that calls tools: the list without the tool would name files nothing can read.
+        const instructions = buildsTools && modelSupportsTools(model) ? (options.projectInstructions ?? []) : [];
         const runTools = withInstructionRead(applyToolAllowlist(toolResult.tools, toolAllowlist), instructions);
         const agent = await getAgent(model, {
             backupModelId,

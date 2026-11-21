@@ -78,7 +78,7 @@ import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
 import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
-import { withInstructionRead } from "../tools/instruction-read";
+import { instructionReadTool } from "../tools/instruction-read";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -1399,9 +1399,11 @@ export const resumeApprovedRun = async (
     ]);
 
     // A paused run that offered `instruction_read` offers it again, over its project's `auto` files read anew (its saved
-    // prompt still lists them); a file removed meanwhile is no longer read.
+    // prompt still lists them): a file removed meanwhile, or all of them, is answered as not found, never an unknown tool.
     if (config.toolNames.includes(INSTRUCTION_READ_TOOL)) {
-        toolResult.tools = withInstructionRead(toolResult.tools, await readProjectInstructions(ctx, threadId, userId));
+        toolResult.tools[INSTRUCTION_READ_TOOL] = instructionReadTool(
+            await readProjectInstructions(ctx, threadId, userId),
+        ) as (typeof toolResult.tools)[string];
     }
 
     // Set once the continuation has a result: a run that fails after it still leaves the record of its auto-approved calls.

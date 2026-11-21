@@ -77,7 +77,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
-import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
+import { getToolsForModelAndMode, modelSupportsTools, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { vAskUserAnswers } from "./tools/ask-user-validators";
@@ -541,8 +541,8 @@ export const runStreamingAgent = internalAction
 
                 mcpClients = toolResult.mcpClients;
 
-                // The project's `auto` rule files: listed, and read with `instruction_read`, only by a run that calls tools.
-                const instructions = allowTools ? runContext.projectInstructions : [];
+                // The project's `auto` rule files: listed, and read with `instruction_read`, only by a run whose model calls tools.
+                const instructions = allowTools && modelSupportsTools(model) ? runContext.projectInstructions : [];
                 // Read-only, so a resume may call it again (`repeatable-tools.ts`).
                 const repeatable = new Set(toolResult.repeatable);
 

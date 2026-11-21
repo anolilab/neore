@@ -207,6 +207,16 @@ describe("the continuation of a run that offered its project's rule files", () =
         expect(Object.keys(rebuilt.results[0]!.tools)).toContain("instruction_read");
     });
 
+    it("keeps the tool when the files are gone since the pause, so a call is answered as not found", async () => {
+        const projectId = (await harness.run(async (ctx: any) =>
+            String(await ctx.db.insert("projects", { createdAt: 0, title: "p", userId: OWNER })),
+        )) as string;
+
+        await approve(await pause(undefined, { projectId, toolNames: [...baseConfig.toolNames, "instruction_read"] }));
+
+        expect(Object.keys(rebuilt.results[0]!.tools)).toContain("instruction_read");
+    });
+
     it("control: a paused run that did not offer it does not get it", async () => {
         const projectId = await projectWithAutoFile();
 

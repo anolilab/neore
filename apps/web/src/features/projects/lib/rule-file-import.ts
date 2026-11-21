@@ -1,8 +1,8 @@
 /**
  * Rule files from uploaded Markdown: an `AGENTS.md`, `CLAUDE.md` or `GEMINI.md` becomes one `always` file under its own
  * name; the files of a rule folder take their mode from their front matter (`globs` → applied when files match,
- * `description` → read when needed, `alwaysApply: true` or neither → always). The text is the file's, front matter
- * removed. Nothing is saved here: the editor adds them as unsaved drafts.
+ * `description` or `alwaysApply: false` alone → read when needed, `alwaysApply: true` or none of them → always). The
+ * text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
  */
 
 export interface ImportedRuleFile {
@@ -24,7 +24,8 @@ const LINE_BREAK = /\r?\n/u;
 /** A front-matter key: letters only. */
 const KEY = /^[A-Za-z]+$/u;
 
-const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
+/** The front matter, an empty block included. */
+const FRONT_MATTER = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(?:\r?\n|$)/u;
 
 /** `[a, b]`, `"a", "b"` or `a, b` as its items, quotes dropped. */
 const listOf = (value: string): string[] =>
@@ -64,7 +65,10 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
         if (key) {
             const value = line.slice(colon + 1).trim();
 
-            fields.set(key, key === "globs" ? listOf(value) : [value.replaceAll(/^["']|["']$/gu, "")]);
+            // A block value (`>-`, `|`) spans the lines after it, which this does not read: taken as none.
+            const single = value.startsWith(">") || value.startsWith("|") ? "" : value.replaceAll(/^["']|["']$/gu, "");
+
+            fields.set(key, key === "globs" ? listOf(value) : [single]);
         }
     }
 
@@ -75,8 +79,10 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
 export const isRootInstructionFile = (name: string): boolean => ROOT_INSTRUCTION_FILES.has(name.toLowerCase());
 
 /** One uploaded file as a rule file, or `null` for one that is not Markdown. `path` is its name or its path in a folder. */
-export const toImportedRuleFile = (path: string, text: string): ImportedRuleFile | null => {
+export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile | null => {
     const name = path.slice(path.replaceAll("\\", "/").lastIndexOf("/") + 1);
+    // A byte-order mark would hide the front matter.
+    const text = raw.startsWith("\u{FEFF}") ? raw.slice(1) : raw;
 
     if (isRootInstructionFile(name)) {
         return { content: text, description: "", mode: "always", patterns: "", title: name };
@@ -90,13 +96,14 @@ export const toImportedRuleFile = (path: string, text: string): ImportedRuleFile
     const title = name.replace(MARKDOWN_FILE, "");
     const globs = fields.get("globs") ?? [];
     const description = fields.get("description")?.[0] ?? "";
-    const alwaysApply = fields.get("alwaysapply")?.[0]?.toLowerCase() === "true";
+    const alwaysApply = fields.get("alwaysapply")?.[0]?.toLowerCase();
 
-    if (!alwaysApply && globs.length > 0) {
+    if (alwaysApply !== "true" && globs.length > 0) {
         return { content: body, description: "", mode: "glob", patterns: globs.join("\n"), title };
     }
 
-    if (!alwaysApply && description) {
+    // One that never applies by itself (`alwaysApply: false`, nothing else) is read when needed; the editor asks when.
+    if ((alwaysApply !== "true" && description) || alwaysApply === "false") {
         return { content: body, description, mode: "auto", patterns: "", title };
     }
 

@@ -237,8 +237,14 @@ export const INSTRUCTION_READ_TOOL = "instruction_read";
 /** Heads the list of `auto` files in a run's prompt ({@link renderInstructionList}). */
 const INSTRUCTION_LIST_HEADER = `Instruction files you can read with the ${INSTRUCTION_READ_TOOL} tool (by name or id) when one applies to the task:`;
 
+const WHITESPACE_RUN = /\s+/gu;
+
+/** `text` on one line, each run of white space one space: a name in the one-line list ({@link renderInstructionList}). */
+export const oneLine = (text: string): string => text.replaceAll(WHITESPACE_RUN, " ").trim();
+
 /** One `auto` file's line in that list. */
-const instructionLine = (file: Pick<RuleFile, "description" | "id" | "title">): string => `- ${file.title} (id: ${file.id}): ${file.description ?? ""}`;
+const instructionLine = (file: Pick<RuleFile, "description" | "id" | "title">): string =>
+    `- ${oneLine(file.title)} (id: ${file.id}): ${oneLine(file.description ?? "")}`;
 
 /**
  * The list of a run's `auto` files for its prompt, `null` for none: each by name, id and description, after the
