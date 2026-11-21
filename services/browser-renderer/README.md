@@ -87,7 +87,13 @@ when longer, within the field's `maxlength`), and request interception puts the 
 main frame's POST to the form's action address, only as the password field's value, and only when the stand-in is
 nowhere else in the body. That action and field are the ones of the page as the site sent it, loaded first with
 scripts off: a form a script points elsewhere or builds itself is not typed into, since it could send the password to an
-address of the site that keeps and shows it. A POST elsewhere, or one where the page moved or copied the stand-in, is
+address of the site that keeps and shows it. Of the action's query, only a value both loads spell as a token of the same
+length (8 or more letters, digits, `-` and `_`, not one plain word: a `session_code` or `state` the site renders afresh)
+may differ, and the POST is matched against the scripted load's address; another key, path or a value that spells an
+address, a path or a word is refused. Not covered: a script on the page can swap such a token for one of its own, as it
+can a hidden field of the body. A site where that value alone picks what the password signs into (a login transaction
+with no cookie binding it, a tenant with its own password check) would then take the password for the script's choice.
+The form's target is this window: empty, `_self`, or `_parent` and `_top`, which name it, as the top window. A POST elsewhere, or one where the page moved or copied the stand-in, is
 not sent. Neither is a redirect of the answer whose address carries the password in its query or fragment, in any
 spelling (encoded twice included): that counts as an attempt. A password short enough to be part of an ordinary
 query (`1234` in `?tab=12345`) can fail a sign-in that way after the site took it; the result says it was sent. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before

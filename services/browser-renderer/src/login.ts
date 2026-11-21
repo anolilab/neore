@@ -637,8 +637,9 @@ class OutOfTimeError extends Error {}
  * Where the form `input` belongs to would send it (the `formaction`/`formmethod`/`formtarget`/`formenctype` of its first
  * enabled submit button, else the form's own), and, with `submit`, sends it with `requestSubmit` from that button, which runs the page's own submit
  * handlers. Those handlers can still change where it goes; the request guard is what keeps it on `origin`. No method is
- * GET, which would put the password in the address: such a form is sent by POST. A form for another window is refused:
- * it would post from a page the guard does not watch. So is a `text/plain` form, and one in another charset than UTF-8
+ * GET, which would put the password in the address: such a form is sent by POST. A form for another window (any target
+ * but this one, `_parent` and `_top` only when it is the top window) is refused: it would post from a page the guard does
+ * not watch. So is a `text/plain` form, and one in another charset than UTF-8
  * when the password is not ASCII (`isAscii`): the guard puts the password into URL-encoded or multipart UTF-8 only.
  */
 const checkForm = (
@@ -666,7 +667,10 @@ const checkForm = (
         ""
     ).toLowerCase();
 
-    if ((named ?? "post").toLowerCase() !== "post" || action.origin !== origin || !["", "_self"].includes(target)) {
+    // `_parent` and `_top` name this window when it is the top one, as the main frame's always is.
+    const sameWindow = document.defaultView?.top === document.defaultView ? ["", "_parent", "_self", "_top"] : ["", "_self"];
+
+    if ((named ?? "post").toLowerCase() !== "post" || action.origin !== origin || !sameWindow.includes(target)) {
         return "off-site";
     }
 
@@ -687,6 +691,52 @@ const checkForm = (
     }
 
     return { action: action.href, name };
+};
+
+/** A query value a site renders afresh on each load: letters, digits, `-` and `_`, not one plain word. */
+const TOKEN_RE = /^[\w-]{8,}$/;
+const TOKEN_CLASSES = [/[a-z]/, /[A-Z]/, /\d/];
+
+const isToken = (value: string): boolean => TOKEN_RE.test(value) && TOKEN_CLASSES.filter((letters) => letters.test(value)).length >= 2;
+
+/**
+ * Whether the form address of the scripted load, `scripted`, is the one the site sent in the scripts-off load, `served`:
+ * the same address but for the query, whose keys are the same in the same order. A value may differ only where both
+ * look like a token the site renders afresh on each load (a `session_code`, `state` or nonce) of the same length; a
+ * value spelling an address or a path (`/`, `:`, `%`), or a word (`?page=login` made `?page=comments`, which a site that
+ * routes by query would send to another handler), is not one.
+ */
+export const isSameEndpoint = (served: string, scripted: string): boolean => {
+    if (!URL.canParse(served) || !URL.canParse(scripted)) {
+        return false;
+    }
+
+    const [before, after] = [new URL(served), new URL(scripted)];
+    const [sent, used] = [before, after].map(({ search }) => (search === "" ? [] : search.slice(1).split("&")));
+
+    before.search = "";
+    after.search = "";
+
+    return (
+        withoutFragment(before.href) === withoutFragment(after.href) &&
+        sent?.length === used?.length &&
+        (sent ?? []).every((pair, index) => {
+            const other = used?.[index] ?? "";
+            const [key, value, ...rest] = pair.split("=");
+            const [otherKey, otherValue, ...otherRest] = other.split("=");
+
+            return (
+                pair === other ||
+                (key === otherKey &&
+                    rest.length === 0 &&
+                    otherRest.length === 0 &&
+                    value !== undefined &&
+                    otherValue?.length === value.length &&
+                    isToken(value) &&
+                    isToken(otherValue))
+            );
+        })
+    );
 };
 
 /** Whether any frame of the page has a password field. Throws when it cannot look. */
@@ -937,7 +987,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return "The password field has no name, so its form would not send it; nothing was typed";
         }
 
-        if (served?.action !== form.action || served.name !== form.name) {
+        if (!served || !isSameEndpoint(served.action, form.action) || served.name !== form.name) {
             return served
                 ? "A script changed where the login form sends the password, so nothing was typed"
                 : "The login form is built by a script, so the agent's browser cannot check where it sends the password; nothing was typed";

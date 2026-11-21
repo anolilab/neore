@@ -102,6 +102,7 @@ describe(signIn, () => {
         datagrams.push(message.toString("latin1"));
     });
     let turn = "";
+    let pageLoads = 0;
 
     beforeAll(async () => {
         // Cross-site frames in their own process, as with site isolation: each is a target of its own.
@@ -144,7 +145,12 @@ describe(signIn, () => {
                         response.setHeader(name, value);
                     }
 
-                    html(response, fixture.page);
+                    // A value the site renders afresh on each load, as an identity provider's `session_code` is.
+                    pageLoads += 1;
+                    html(
+                        response,
+                        fixture.page.replaceAll("PER_LOAD", () => `Kq7${String(pageLoads).padStart(13, "0")}`),
+                    );
                 }
             }
         });
@@ -396,6 +402,28 @@ describe(signIn, () => {
         expect(sessionPosts()).toHaveLength(1);
     });
 
+    it.each(["_parent", "_top"])("signs in with a form whose target %s is the top window it is in", async (target) => {
+        fixture.page = loginForm("", `method="post" action="/session" target="${target}"`);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
+        expect(sessionPosts()).toHaveLength(1);
+    });
+
+    it("signs in when the form's address carries a value the site renders afresh on each load", async () => {
+        fixture.page = loginForm("", 'method="post" action="/session?session_code=PER_LOAD&client_id=app"');
+
+        const result = await run();
+        const posts = login.hits.filter((hit) => hit.method === "POST");
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
+        // The address of the page that was typed into: the second load's.
+        expect(posts).toStrictEqual([
+            { body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: `/session?session_code=Kq7${String(pageLoads).padStart(13, "0")}&client_id=app` },
+        ]);
+    });
+
     it("types nothing into a form that would post from another window", async () => {
         fixture.page = loginForm("", 'method="post" action="/session" target="_blank"');
 
@@ -617,8 +645,15 @@ describe(signIn, () => {
     it.each([
         ["points the form at another address of the site", `document.forms[0].action = "/profile";`],
         ["renames the password field", `document.forms[0].pw.name = "bio";`],
+        ["adds a key to the form's query", `document.forms[0].action += "&next=home";`],
+        ["removes a key from the form's query", `document.forms[0].action = "/session?session_code=PER_LOAD";`],
+        ["keeps the query but changes the path", `document.forms[0].action = "/profile?session_code=PER_LOAD&client_id=app";`],
+        [
+            "changes a value of the query to an address",
+            `document.forms[0].action = "/session?session_code=" + encodeURIComponent("https://x.example/") + "&client_id=app";`,
+        ],
     ])("types nothing when a script of the page %s before it is filled", async (_what, script) => {
-        fixture.page = loginForm(script);
+        fixture.page = loginForm(script, 'method="post" action="/session?session_code=PER_LOAD&client_id=app"');
 
         const result = await run();
 

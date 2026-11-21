@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { standIn, withoutSecret, withPassword } from "./login";
+import { isSameEndpoint, standIn, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -71,6 +71,36 @@ describe(withPassword, () => {
         ["the body is plain text", "text/plain", `pw=${STAND}`],
     ])("sends nothing when %s", (_why, type, body) => {
         expect(withPassword(Buffer.from(body), type, FIELD, SECRET)).toBeNull();
+    });
+});
+
+describe(isSameEndpoint, () => {
+    const SERVED = "https://id.example/login?session_code=Kq7aB9xZ2mQ4&client_id=app";
+
+    it.each([
+        ["the same address", SERVED],
+        ["a token rendered afresh", "https://id.example/login?session_code=Zp3cD8yW1nR5&client_id=app"],
+        ["only the fragment changed", `${SERVED}#top`],
+    ])("accepts %s", (_what, scripted) => {
+        expect(isSameEndpoint(SERVED, scripted)).toBe(true);
+    });
+
+    it.each([
+        ["a key added", `${SERVED}&next=home`],
+        ["a key removed", "https://id.example/login?session_code=Kq7aB9xZ2mQ4"],
+        ["the keys reordered", "https://id.example/login?client_id=app&session_code=Kq7aB9xZ2mQ4"],
+        ["another path", "https://id.example/profile?session_code=Kq7aB9xZ2mQ4&client_id=app"],
+        ["another origin", "https://ie.example/login?session_code=Kq7aB9xZ2mQ4&client_id=app"],
+        ["a value made an address", `https://id.example/login?session_code=${encodeURIComponent("https://x.example/a")}&client_id=app`],
+        ["a value made a path", "https://id.example/login?session_code=/comments/12&client_id=app"],
+        ["a word value changed", "https://id.example/login?session_code=Kq7aB9xZ2mQ4&client_id=www"],
+        ["a token of another length", "https://id.example/login?session_code=Zp3cD8yW1nR&client_id=app"],
+    ])("refuses %s", (_what, scripted) => {
+        expect(isSameEndpoint(SERVED, scripted)).toBe(false);
+    });
+
+    it("refuses a word swapped for a word on a site that routes by its query", () => {
+        expect(isSameEndpoint("https://shop.example/index.php?page=signin", "https://shop.example/index.php?page=review")).toBe(false);
     });
 });
 
