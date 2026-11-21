@@ -532,7 +532,50 @@ modelProxyRouter.openapi(
             });
         } catch (error) {
             // A caller that cancelled ended the call itself: the provider did not fail, so the health tracker is not told it did.
-            if (!c.req.raw.signal.aborted) {
+            if (c.req.raw.signal.aborted) {
+                // The provider may already have billed the prompt before the cancel, and no usage came back: record the lower-bound estimate
+                // the stream path records for a cancelled stream, so a cancelled call is not free.
+                const estimate = estimateCancelledUsage({ emittedChars: 0, promptChars: countPromptTextChars(body.callOptions.prompt), reasoningChars: 0 });
+                const pricing = await policy.pricing().catch(() => null);
+                const costMicrodollars = pricing ? calculateCost(pricing, estimate) : 0;
+
+                c.executionCtx.waitUntil(
+                    Promise.allSettled([
+                        usageTracker.record(
+                            {
+                                cachedTokens: 0,
+                                completionTokens: 0,
+                                costMicrodollars,
+                                isStreaming: false,
+                                latencyMs: Date.now() - startTime,
+                                modelApiId: body.modelApiId,
+                                modelId: body.modelId,
+                                operation: "chat",
+                                orgId: body.orgId,
+                                promptTokens: estimate.promptTokens,
+                                provider: body.provider,
+                                reasoningTokens: 0,
+                                requestId: body.requestId,
+                                source: "internal",
+                                threadId: body.threadId,
+                                userId: body.userId,
+                            },
+                            c.var.telemetry,
+                        ),
+                        usageReporter.report({
+                            billingMode,
+                            byokFeeRate,
+                            completionTokens: 0,
+                            costMicrodollars,
+                            modelId: body.modelId,
+                            orgId: body.orgId,
+                            promptTokens: estimate.promptTokens,
+                            requestId: body.requestId,
+                            userId: body.userId,
+                        }),
+                    ]),
+                );
+            } else {
                 c.executionCtx.waitUntil(policy.recordHealth.failure());
             }
 
