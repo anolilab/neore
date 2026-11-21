@@ -50,8 +50,8 @@ describe(onNativeFiles, () => {
     it("attaches a batch that arrived across an account switch to neither account", async () => {
         let account: string | undefined = "u1";
         const handler = vi.fn();
-        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        const stop = onNativeFiles(handler, () => account);
+        const discarded = vi.fn();
+        const stop = onNativeFiles(handler, () => account, discarded);
 
         shell.answer?.([]);
         shell.notify?.();
@@ -62,9 +62,8 @@ describe(onNativeFiles, () => {
         });
 
         expect(handler).not.toHaveBeenCalled();
-        expect(warn).toHaveBeenCalledTimes(1);
+        expect(discarded).toHaveBeenCalledExactlyOnceWith(2);
 
-        warn.mockRestore();
         stop();
     });
 

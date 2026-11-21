@@ -100,6 +100,8 @@ const onNativePending = <T>(
 export const onNativeFiles = (
     handler: (files: File[], accountId: string | undefined) => void,
     accountAtStart: () => string | undefined = () => undefined,
+    // Called with the number of files a batch held when it was let go (it arrived across an account switch).
+    onDiscarded: (count: number) => void = () => {},
 ): UnlistenFunction =>
     onNativePending(
         (listener) => getNative()?.onFiles?.(listener),
@@ -115,7 +117,7 @@ export const onNativeFiles = (
             // The shell joins the drops it holds: across an account switch while it answered, the batch can hold drops of
             // both accounts, so it goes to neither. A drop made before the session was known (no account) is not a switch.
             if (accountId !== undefined && accountAtStart() !== accountId) {
-                console.warn("[native] Dropped files arrived across an account switch and were not attached.");
+                onDiscarded(files.length);
 
                 return undefined;
             }

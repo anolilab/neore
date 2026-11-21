@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 const inbox = vi.hoisted(() => {
     return {
         accountsAtStart: [] as (() => string | undefined)[],
+        discards: [] as ((count: number) => void)[],
         fileListeners: [] as ((files: File[], accountId: string | undefined) => void)[],
         unsubscribed: 0,
     };
@@ -38,8 +39,10 @@ vi.mock("@tanstack/react-router", () => {
     };
 });
 
+const toastError = vi.hoisted(() => vi.fn());
+
 vi.mock("sonner", () => {
-    return { toast: { error: () => {}, success: () => {} } };
+    return { toast: { error: toastError, success: () => {} } };
 });
 
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
@@ -85,9 +88,14 @@ vi.mock("./shell-inbox", () => {
         completeNativeSignIn: async () => {},
         onNativeCompose: none,
         onNativeDraft: none,
-        onNativeFiles: (listener: (files: File[], accountId: string | undefined) => void, accountAtStart: () => string | undefined) => {
+        onNativeFiles: (
+            listener: (files: File[], accountId: string | undefined) => void,
+            accountAtStart: () => string | undefined,
+            onDiscarded: (count: number) => void,
+        ) => {
             inbox.fileListeners.push(listener);
             inbox.accountsAtStart.push(accountAtStart);
+            inbox.discards.push(onDiscarded);
 
             return () => {
                 inbox.unsubscribed += 1;
@@ -129,6 +137,13 @@ describe("NativeBridge dock drops", () => {
             expect(requestComposerAttach).toHaveBeenCalledWith({ accountId: "u1", files: [file] });
         });
         expect(inbox.accountsAtStart[0]?.()).toBe("u2");
+    });
+
+    it("tells the person when a dock drop was let go across an account switch", () => {
+        render(<NativeBridge />);
+        inbox.discards.at(-1)?.(2);
+
+        expect(toastError).toHaveBeenCalledTimes(1);
     });
 
     it("marks a drop made with no one signed in as signed out, not as any account", () => {

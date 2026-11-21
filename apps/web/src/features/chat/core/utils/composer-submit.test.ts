@@ -97,6 +97,21 @@ describe(requestComposerAttach, () => {
         stop();
     });
 
+    it("lets go of files left for another account when a composer opens, so they never come back later", () => {
+        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
+
+        // Account u2's new chat opens: u1's drop from before the switch is let go.
+        onComposerAttachRequest("u2", () => {})();
+
+        const back = vi.fn();
+        const stop = onComposerAttachRequest("u1", back);
+
+        expect(back).not.toHaveBeenCalled();
+        expect(hasPendingComposerAttach("u1")).toBe(false);
+
+        stop();
+    });
+
     it("leaves a new account's files for its composer while the old account's composer still listens", () => {
         const oldComposer = vi.fn();
         const stopOld = onComposerAttachRequest("u1", oldComposer);

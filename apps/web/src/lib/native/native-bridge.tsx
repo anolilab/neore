@@ -62,6 +62,14 @@ const NativeBridge = (): JSX.Element | null => {
     useEffect(() => {
         sessionUserIdRef.current = sessionUserId;
     }, [sessionUserId]);
+
+    // Read by the dock listener from a ref, so a locale change never re-subscribes it mid-drain either.
+    const discardedMessage = t`The files arrived while the account changed, so they were not attached. Drop them again.`;
+    const discardedMessageRef = useRef(discardedMessage);
+
+    useEffect(() => {
+        discardedMessageRef.current = discardedMessage;
+    }, [discardedMessage]);
     const afterFirstPaint = useAfterFirstPaint();
     const [hasDeviceTools, setHasDeviceTools] = useState(false);
 
@@ -112,6 +120,9 @@ const NativeBridge = (): JSX.Element | null => {
                     })();
                 },
                 () => sessionUserIdRef.current,
+                () => {
+                    toast.error(discardedMessageRef.current);
+                },
             ),
         [openNewChat],
     );

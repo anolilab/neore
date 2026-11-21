@@ -90,5 +90,15 @@ export const withdrawComposerAttach = (files: ReadonlyArray<File>): void => {
  * stays for that account's composer (during a switch, the old one may still be listening), is never uploaded under
  * this one, and the next drop for another account replaces it.
  */
-export const onComposerAttachRequest = (accountId: string, handler: (request: ComposerAttachRequest) => void): (() => void) =>
-    composerAttachChannel.consume(handler, (request: ComposerAttachRequest) => request.accountId === undefined || request.accountId === accountId);
+export const onComposerAttachRequest = (accountId: string, handler: (request: ComposerAttachRequest) => void): (() => void) => {
+    // A request that already waits for another account when this composer opens was dropped before a switch: it is let go,
+    // so it never turns up hours later in that account's next new chat. One that arrives while this composer listens (the
+    // old account's, mid-switch) still waits for its own account's composer.
+    const { pending, take } = composerAttachChannel.store.getState();
+
+    if (pending && pending.payload.accountId !== undefined && pending.payload.accountId !== accountId) {
+        take();
+    }
+
+    return composerAttachChannel.consume(handler, (request: ComposerAttachRequest) => request.accountId === undefined || request.accountId === accountId);
+};
