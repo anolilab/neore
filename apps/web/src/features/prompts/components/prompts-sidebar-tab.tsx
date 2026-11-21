@@ -26,7 +26,14 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import validatePromptSettings from "../lib/prompt-validation";
-import { extractVariables, fillsAnyOf, getAutoPopulatedVariables, organizationValueNames, replaceVariables } from "../lib/prompt-variables";
+import {
+    extractVariables,
+    fillsAnyOf,
+    getAutoPopulatedVariables,
+    impersonatedValueNames,
+    organizationValueNames,
+    replaceVariables,
+} from "../lib/prompt-variables";
 import PromptFormDialog from "./prompt-form-dialog";
 import VariableFillDialog from "./variable-fill-dialog";
 
@@ -123,13 +130,18 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
         };
     }, [resolvedVariables, sessionData, activeOrganization]);
 
-    /** Marks the draft when `prompt` was filled with a value the organization set (`organizationValueNames`), after its own mark. */
+    /** Marks the draft when `prompt` was filled with a value the organization set (`organizationValueNames`) or an admin wrote as the person (`impersonatedValueNames`), after its own mark. */
     const noteFilledPrompt = useCallback(
         (prompt: Doc<"prompts">, values: Record<string, string>, typed?: Record<string, string>) => {
             noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
 
             if (fillsAnyOf(prompt.content, values, organizationValueNames(resolvedVariables?.sources, activeOrganization?.name), typed)) {
                 markComposerDraft("organizationValue");
+            }
+
+            // A value an admin wrote while acting as the person marks it last: it names the stronger reason.
+            if (fillsAnyOf(prompt.content, values, impersonatedValueNames(resolvedVariables?.sources), typed)) {
+                markComposerDraft("impersonated");
             }
         },
         [resolvedVariables?.sources, activeOrganization?.name, sessionData?.user?.id],

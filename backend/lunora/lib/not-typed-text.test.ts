@@ -17,7 +17,7 @@ describe("the mark on text the owner did not type", () => {
         expect(parseNotTypedDraft("promptLink")).toBe("promptLink");
         expect(parseNotTypedDraft("sharedPrompt")).toBe("sharedPrompt");
 
-        for (const draft of ["forwarded", "assistantText", "suggestion", "improvedPrompt", "galleryPrompt", "organizationValue"] as const) {
+        for (const draft of ["forwarded", "assistantText", "suggestion", "improvedPrompt", "galleryPrompt", "organizationValue", "collaborator"] as const) {
             expect(NOT_TYPED_DRAFTS).toContain(draft);
             expect(parseNotTypedDraft(draft)).toBe(draft);
         }

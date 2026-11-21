@@ -249,7 +249,15 @@ export const getAutoPopulatedVariables = (userContext?: UserContext): Record<str
 };
 
 /** Where a resolved variable's value came from (`prompts.functions.getResolvedVariables`). */
-export type VariableSource = "organization" | "thread" | "user";
+export type VariableSource = "impersonated" | "organization" | "thread" | "user";
+
+/** The variables whose value an admin wrote while acting as a user (the person's, or their organization's): not the person's words. */
+export const impersonatedValueNames = (sources: Readonly<Record<string, VariableSource>> | undefined): Set<string> =>
+    new Set(
+        Object.entries(sources ?? {})
+            .filter(([, source]) => source === "impersonated")
+            .map(([name]) => name),
+    );
 
 /**
  * The variables whose value the organization set and the person did not override: its variable defaults, and its name

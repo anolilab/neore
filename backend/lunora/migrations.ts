@@ -272,3 +272,15 @@ export const addApprovalProjectId = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A queued steer's not-typed mark gained `collaborator`: another person's message in a shared chat put back into the
+ * composer (Restore to input). Only the union widened, so every stored mark still fits. A no-op, so `lunora prepare`
+ * records the wider shape in the baseline.
+ */
+export const widenNotTypedSteerCollaborator = defineMigration({
+    id: "widen-not-typed-steer-collaborator",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

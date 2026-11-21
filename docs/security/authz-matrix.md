@@ -784,9 +784,13 @@ for a schema table that is neither policed nor listed:
   prompt improver's Apply (`improvedPrompt`), a media gallery item's stored prompt, edited or not (`galleryPrompt`), an
   organization's variable default or active name filled into a prompt, not a value the viewer typed into the fill dialog (`organizationValue`), and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
   prompt, edit, steer or local turn an admin sent while impersonating (or, on `/chat/edit`, under a sign-in that cannot
-  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. A quoted reply is not marked: its `>` lines refuse the turn on the server. Still unmarked, and to be marked
-  before the fill tool ships: bot instructions, personalization and variable defaults an impersonating admin wrote, an
-  accepted ghost-text completion, and Restore to input of a collaborator's message in a shared chat.
+  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. A quoted reply is not marked: its `>` lines refuse the turn on the server. A bot's name and instructions, the owner's
+  personalization and language and their variable values (user, organization and thread rows) an admin wrote while impersonating are
+  marked on the row from the session, never from args, and the mark stays (`instructionsByImpersonator`,
+  `personalizationByImpersonator`, `variablesByImpersonator`, which names only the values the admin changed or added); the run names that system-prompt text with a refused kind
+  (`chat/lib/system-context-kinds.ts`) and `getResolvedVariables` reports the values as `impersonated`, which marks the
+  draft. An accepted ghost-text completion is `suggestion`; Restore to input and prompt history of another person's message
+  in a shared chat are `collaborator`.
 
 ## Removed from the client surface in this audit
 
@@ -804,7 +808,7 @@ else the better-auth cookie). No route takes identity from a header.
 | route | auth | ownership check | status |
 | --- | --- | --- | --- |
 | `POST /chat/start` | gateway HMAC + forwarded JWT | thread write access; regenerate owner; `fileIds` via `getFile(userId)`; `guestMessageId`: the caller's own HELD note on a live link, left in this thread, text model only, never with a `goal` (all refused with 400 before the `guest-send` claim and the charge, each with its own code: `GUEST_NOTE_NOT_SENDABLE`, `GUEST_NOTE_NEEDS_TEXT_MODEL`, `GUEST_NOTE_AS_GOAL`, `GUEST_LINK_ENDED` for a lapsed link, also when it lapses between the note's read and its claim), saved from its stored text as `guestTextPart` and never used to pick a skill; one send per note (a second answers 409 `GUEST_NOTE_ALREADY_SENT`, or `GUEST_NOTE_BEING_SENT` while another send holds the claim; `guest-send` claim taken before the daily charge, released if the charge is refused or the save fails, settled after a 5-min lease, or at once on a failed save, from the message tagged with the note id; a walk past 3 pages takes the note as sent, `past-scan`); the note is marked sent in the write that records the saved message; `draftFrom` (a known source only, else 400 before anything is saved or charged) and an impersonating session mark the prompt as not typed (`lib/not-typed-text.ts`) | **fixed** (high) — `getCurrentUserInternal` never read `isAnonymous`/`role` from the user row, so guests ran any (paid) model on the free-tier quota and admins never got their exemption |
-| `POST /chat/media` | JWT / cookie | `message.userId === caller` | **fixed** (high) — no quota at all: guests refused, `numImages` clamped to 4, each call charged to `chat/daily{Image,Video,Audio}` (`/chat/start` no longer pre-charges media prompts) |
+| `POST /chat/media` | JWT / cookie | thread write gate, then `message.userId === caller` or thread owner (the owner regenerates a collaborator's prompt) | **fixed** (high) — no quota at all: guests refused, `numImages` clamped to 4, each call charged to `chat/daily{Image,Video,Audio}` (`/chat/start` no longer pre-charges media prompts) |
 | `POST /chat/edit` | JWT / cookie | thread owner; `getFile(userId, threadId)`; the edit keeps the original's not-typed mark, and `draftFrom`, an impersonating session or one that cannot be confirmed adds one | **fixed** (medium) — every edit regenerates; now charged to `chat/dailyText` |
 | `POST /chat/improve-prompt`, `/chat/optimize-system-prompt`, `/chat/iterate-prompt` | JWT / cookie | `runOptimizer` checks thread read access | **fixed** (high) — a body `threadId` loaded a stranger's recent messages into the prompt whose rewrite came back to the caller |
 | `POST /prompts/optimize` | JWT / cookie, resolved on the route | no ids | **fixed** (functional) — the internal action read `identity.subject`, which `resolveIdentity` never sets, so every caller got "unauthorized"; the route now resolves the caller and passes `userId` |
