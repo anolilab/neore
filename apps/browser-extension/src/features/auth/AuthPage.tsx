@@ -2,7 +2,7 @@ import { LogInIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { LLM_GATEWAY_URL, LUNORA_URL } from "@/lib/env";
-import { readReconnectNeeded, signInWithWebAuthFlow } from "@/lib/extension-grant";
+import { signInWithWebAuthFlow, watchReconnectNeeded } from "@/lib/extension-grant";
 
 /** The backend and gateway host patterns, as `manifest.config.ts` declares them. */
 const hostOrigins = (): string[] =>
@@ -28,23 +28,7 @@ export function AuthPage() {
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [reconnect, setReconnect] = useState(false);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        const load = async () => {
-            const needed = await readReconnectNeeded();
-
-            if (!cancelled) {
-                setReconnect(needed);
-            }
-        };
-
-        void load();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    useEffect(() => watchReconnectNeeded(setReconnect), []);
 
     const signIn = () => {
         setError(undefined);

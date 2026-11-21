@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 // `env.ts` reads the build's env once, at import: set it first, then load the module.
 vi.stubEnv("VITE_LUNORA_URL", "https://api.example.test");
 
-const { migrateFromCookieSession, readReconnectNeeded, RECONNECT_KEY, requestGrantAccessToken, signInWithWebAuthFlow, signOutGrant } =
+const { migrateFromCookieSession, readReconnectNeeded, RECONNECT_KEY, requestGrantAccessToken, signInWithWebAuthFlow, signOutGrant, watchReconnectNeeded } =
     await import("./extension-grant");
 const { clearAccessToken, getAccessToken } = await import("./access-token");
 const { loadGrantSession } = await import("./session");
@@ -24,6 +24,12 @@ const installChrome = () => {
     launchWebAuthFlow = vi.fn();
 
     const keysOf = (keys: string | string[]) => (Array.isArray(keys) ? keys : [keys]);
+    const listeners = new Set<(changes: Record<string, chrome.storage.StorageChange>, area: string) => void>();
+    const notify = (changes: Record<string, chrome.storage.StorageChange>) => {
+        for (const listener of listeners) {
+            listener(changes, "local");
+        }
+    };
 
     vi.stubGlobal("chrome", {
         identity: { getRedirectURL: () => REDIRECT_URI, launchWebAuthFlow },
@@ -33,13 +39,19 @@ const installChrome = () => {
                 remove: async (keys: string | string[]) => {
                     for (const key of keysOf(keys)) {
                         store.delete(key);
+                        notify({ [key]: {} });
                     }
                 },
                 set: async (items: Record<string, Stored>) => {
                     for (const [key, value] of Object.entries(items)) {
                         store.set(key, value);
+                        notify({ [key]: { newValue: value } });
                     }
                 },
+            },
+            onChanged: {
+                addListener: (listener: Parameters<typeof listeners.add>[0]) => listeners.add(listener),
+                removeListener: (listener: Parameters<typeof listeners.add>[0]) => listeners.delete(listener),
             },
         },
     });
@@ -316,6 +328,19 @@ describe("migrateFromCookieSession", () => {
         await migrateFromCookieSession({ isFirefox: false, reason: "update" });
 
         await expect(readReconnectNeeded()).resolves.toBe(false);
+    });
+
+    it("reaches a sign-in page that opened before the mark was written", async () => {
+        const seen: boolean[] = [];
+        const stop = watchReconnectNeeded((needed) => {
+            seen.push(needed);
+        });
+
+        await vi.waitFor(() => expect(seen).toEqual([false]));
+        await migrateFromCookieSession({ isFirefox: false, reason: "update" });
+        stop();
+
+        expect(seen).toEqual([false, true]);
     });
 
     it.each([

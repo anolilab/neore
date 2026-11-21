@@ -225,6 +225,41 @@ export const readReconnectNeeded = async (): Promise<boolean> => {
     return stored[RECONNECT_KEY] === true;
 };
 
+/**
+ * Calls `onChange` with whether the reconnect notice is due, now and whenever
+ * that changes. The panel can open before `runtime.onInstalled` has written the
+ * mark, so one read at mount would miss it. Returns the unsubscribe.
+ */
+export const watchReconnectNeeded = (onChange: (needed: boolean) => void): (() => void) => {
+    let changed = false;
+
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+        if (area !== "local" || !Object.hasOwn(changes, RECONNECT_KEY)) {
+            return;
+        }
+
+        changed = true;
+        onChange(changes[RECONNECT_KEY]?.newValue === true);
+    };
+
+    chrome.storage.onChanged.addListener(listener);
+
+    const load = async () => {
+        const needed = await readReconnectNeeded().catch(() => false);
+
+        // A change that arrived first is newer than this read.
+        if (!changed) {
+            onChange(needed);
+        }
+    };
+
+    void load();
+
+    return () => {
+        chrome.storage.onChanged.removeListener(listener);
+    };
+};
+
 /** Forget the grant `token` names, and only that one. */
 const clearGrant = async (token: string): Promise<void> => {
     await updateGrantIf(token, () => undefined);
