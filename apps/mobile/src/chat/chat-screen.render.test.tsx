@@ -11,6 +11,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { returnedPrompts } from "@/chat/returned-prompts";
+
 import ChatScreen from "../../app/chat/[threadId]";
 
 const harness = vi.hoisted(() => {
@@ -33,8 +35,12 @@ const harness = vi.hoisted(() => {
         onDelta: undefined as ((delta: { reasoning: string; text: string }) => void) | undefined,
         /** Settles a held start, as the gateway would. */
         settleStart: undefined as ((outcome: Error) => void) | undefined,
+        /** The `clientMessageId` of each start the screen sent, in order. */
+        startedIds: [] as string[],
         /** What each `Text` rendered: a row skipped by its memo adds nothing. */
         textRenders: [] as string[],
+        /** How many ids the screen has asked for: each is new. */
+        uuids: 0,
     };
 });
 
@@ -147,7 +153,13 @@ vi.mock(import("expo-router"), async () => {
 });
 
 // eslint-disable-next-line no-restricted-syntax -- native module
-vi.mock(import("expo-crypto"), () => ({ randomUUID: () => "client-message-id" } as never));
+vi.mock(import("expo-crypto"), () => ({
+    randomUUID: () => {
+        harness.uuids += 1;
+
+        return `client-message-id-${harness.uuids}`;
+    },
+} as never));
 
 // eslint-disable-next-line no-restricted-syntax -- native module
 vi.mock(import("react-native-safe-area-context"), () => ({ useSafeAreaInsets: () => stable.insets } as never));
@@ -172,7 +184,9 @@ vi.mock(import("@/chat/chat-api"), async (importOriginal) => {
 
     return {
         ...original,
-        startChat: async () => {
+        startChat: async ({ body }: { body: { clientMessageId: string } }) => {
+            harness.startedIds.push(body.clientMessageId);
+
             if (!harness.holdStart) {
                 return started;
             }
@@ -353,6 +367,9 @@ describe("the chat screen's composer", () => {
         harness.textRenders = [];
         harness.settleStart = undefined;
         harness.holdStart = true;
+        harness.startedIds = [];
+        harness.uuids = 0;
+        returnedPrompts.clear();
         // React reads this to allow `act` outside a testing library.
         Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
         mounted.container = document.createElement("div");
@@ -378,33 +395,101 @@ describe("the chat screen's composer", () => {
         expect(harness.listRenders).toHaveLength(listBefore);
     });
 
-    it("sends the typed prompt, empties the box, and gives the prompt back when the start is refused", async () => {
+    const buttonNamed = (name: string): HTMLButtonElement | undefined => [...mounted.container?.querySelectorAll("button") ?? []].find((button) => button.textContent === name);
+
+    /** Sends `text` from the box, and refuses its start: the prompt is kept in the chat's list, not put back in the box. */
+    const sendAndRefuse = async (text: string) => {
         const { ChatError } = await import("@/chat/chat-api");
 
-        await openChat();
-        typeInto("Go on");
-
-        const send = [...mounted.container?.querySelectorAll("button") ?? []].find((button) => button.textContent === "Send");
+        typeInto(text);
 
         await act(async () => {
-            send?.click();
+            harness.settleStart = undefined;
+            buttonNamed("Send")?.click();
             await vi.waitFor(() => {
                 expect(harness.settleStart).toBeDefined();
             });
         });
 
-        // The prompt left the box with the send, and shows as the user's row.
-        expect(messageBox().value).toBe("");
-        expect(mounted.container?.textContent).toContain("Go on");
-
         await act(async () => {
             harness.settleStart?.(new ChatError("The message was refused.", { isRefusal: true }));
             await vi.waitFor(() => {
-                expect(messageBox().value).toBe("Go on");
+                expect(buttonNamed("Resend")).toBeDefined();
+            });
+        });
+    };
+
+    it("sends the typed prompt, empties the box, and keeps the prompt as an item when the start is refused", async () => {
+        await openChat();
+        await sendAndRefuse("Go on");
+
+        expect(messageBox().value).toBe("");
+        expect(mounted.container?.textContent).toContain("The message was refused.");
+        expect(returnedPrompts.list("t1").map((item) => item.prompt)).toStrictEqual(["Go on"]);
+    });
+
+    it("resends a returned prompt under its own id, leaves the box as it is, and takes the item off once the start answers", async () => {
+        await openChat();
+        await sendAndRefuse("Go on");
+        typeInto("Something else");
+        harness.holdStart = false;
+
+        await act(async () => {
+            buttonNamed("Resend")?.click();
+            await vi.waitFor(() => {
+                expect(buttonNamed("Resend")).toBeUndefined();
             });
         });
 
-        expect(mounted.container?.textContent).toContain("The message was refused.");
+        expect(harness.startedIds).toHaveLength(2);
+        expect(harness.startedIds[1]).toBe(harness.startedIds[0]);
+        expect(messageBox().value).toBe("Something else");
+        expect(returnedPrompts.list("t1")).toStrictEqual([]);
+    });
+
+    it("sends the text of a returned prompt from the box under its id, so the message is saved once", async () => {
+        await openChat();
+        await sendAndRefuse("Go on");
+        typeInto("Go on");
+        harness.holdStart = false;
+
+        await act(async () => {
+            buttonNamed("Send")?.click();
+            await vi.waitFor(() => {
+                expect(buttonNamed("Resend")).toBeUndefined();
+            });
+        });
+
+        expect(harness.startedIds).toHaveLength(2);
+        expect(harness.startedIds[1]).toBe(harness.startedIds[0]);
+    });
+
+    it("discards a returned prompt without sending it", async () => {
+        await openChat();
+        await sendAndRefuse("Go on");
+
+        act(() => {
+            buttonNamed("Discard")?.click();
+        });
+
+        expect(buttonNamed("Resend")).toBeUndefined();
+        expect(returnedPrompts.list("t1")).toStrictEqual([]);
+        expect(harness.startedIds).toHaveLength(1);
+    });
+
+    it("keeps a returned prompt when its chat is left, and shows it again when the chat is opened", async () => {
+        await openChat();
+        await sendAndRefuse("Go on");
+
+        act(() => {
+            mounted.root?.unmount();
+        });
+        mounted.root = createRoot(mounted.container as HTMLElement);
+
+        await openChat();
+
+        expect(mounted.container?.textContent).toContain("Go on");
+        expect(buttonNamed("Resend")).toBeDefined();
     });
 });
 
