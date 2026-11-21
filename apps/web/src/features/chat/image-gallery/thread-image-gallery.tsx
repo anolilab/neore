@@ -20,7 +20,7 @@ import { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
 
 import { useImageGalleryStore } from "./image-gallery-store";
 
-/** The index the gallery shows for `key`: that image, or the first when the key is absent or no longer loaded. */
+/** The index of `key`'s image, 0 for no key, or -1 when the gallery does not hold that key (it then stays closed). */
 export const galleryIndexOf = (images: ReadonlyArray<ThreadImage>, key: string | null): number =>
     key === null ? 0 : images.findIndex((image) => image.key === key);
 
@@ -173,6 +173,8 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
                                 aria-label={t`Previous image`}
                                 className="absolute top-1/2 left-2 -translate-y-1/2"
                                 disabled={index === 0}
+                                // Keeps the focus at the first image, so the arrow keys still reach the dialog.
+                                focusableWhenDisabled
                                 onClick={() => show(index - 1)}
                                 size="icon"
                                 variant="secondary"
@@ -183,6 +185,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
                                 aria-label={t`Next image`}
                                 className="absolute top-1/2 right-2 -translate-y-1/2"
                                 disabled={index === images.length - 1}
+                                focusableWhenDisabled
                                 onClick={() => show(index + 1)}
                                 size="icon"
                                 variant="secondary"

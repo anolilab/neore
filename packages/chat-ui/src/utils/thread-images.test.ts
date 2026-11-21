@@ -39,6 +39,19 @@ describe(collectThreadImages, () => {
         ]);
     });
 
+    it("names a generated image by its prompt, as the reply does, before its file name", () => {
+        const images = collectThreadImages([
+            {
+                id: "m7",
+                metadata: { prompt: "A fox logo, flat colours" },
+                parts: [{ filename: "fox.png", mediaType: "image/png", type: "file", url: "https://api.test/files/fox?sig=1" }],
+            },
+            { id: "m8", parts: [{ image: "https://api.test/files/owl?sig=1", prompt: "An owl at dusk", type: "image" }] },
+        ]);
+
+        expect(images.map((image) => image.alt)).toEqual(["A fox logo, flat colours", "An owl at dusk"]);
+    });
+
     it("leaves out images not shown: still checked, blocked, or a tool output the page has not loaded", () => {
         expect(
             collectThreadImages([

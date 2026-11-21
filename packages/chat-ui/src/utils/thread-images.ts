@@ -31,6 +31,7 @@ interface PartLike {
     mediaType?: string;
     nsfwStatus?: string;
     output?: unknown;
+    prompt?: string;
     toolCallId?: string;
     type: string;
     url?: string;
@@ -50,7 +51,8 @@ interface CodeOutput {
 
 const isHidden = (part: PartLike): boolean => part.nsfwStatus === "blocked" || part.nsfwStatus === "checking";
 
-const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): ThreadImage[] => {
+// `generationPrompt` is the message's `metadata.prompt` (a generated image's): named first, as `DefaultImage` does.
+const imagesOfPart = (messageId: string, part: PartLike, partIndex: number, generationPrompt: string | undefined): ThreadImage[] => {
     if (part.type === "tool-browser" && part.toolCallId) {
         const output = part.output as BrowserOutput | undefined;
         const src = output?.screenshotFormat
@@ -79,13 +81,13 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): Thr
     const key = `${messageId}:${String(partIndex)}`;
 
     if (part.type === "image" && typeof part.image === "string" && part.image.length > 0) {
-        return [{ alt: part.filename || undefined, key, kind: "file", messageId, src: part.image }];
+        return [{ alt: generationPrompt || part.prompt || part.filename || undefined, key, kind: "file", messageId, src: part.image }];
     }
 
     const fileUrl = part.url || part.data;
 
     if (part.type === "file" && part.mediaType?.startsWith("image/") === true && fileUrl) {
-        return [{ alt: part.filename || undefined, key, kind: "file", messageId, src: fileUrl }];
+        return [{ alt: generationPrompt || part.filename || undefined, key, kind: "file", messageId, src: fileUrl }];
     }
 
     return [];
@@ -93,6 +95,7 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): Thr
 
 interface MessageLike {
     id: string;
+    metadata?: unknown;
     parts: ReadonlyArray<unknown>;
 }
 
@@ -103,7 +106,11 @@ const imagesOfMessage = (message: MessageLike): ThreadImage[] => {
     let images = imagesByMessage.get(message);
 
     if (!images) {
-        images = message.parts.flatMap((part, partIndex) => imagesOfPart(message.id, part as PartLike, partIndex));
+        const { prompt } = (message.metadata ?? {}) as { prompt?: unknown };
+
+        images = message.parts.flatMap((part, partIndex) =>
+            imagesOfPart(message.id, part as PartLike, partIndex, typeof prompt === "string" ? prompt : undefined),
+        );
         imagesByMessage.set(message, images);
     }
 

@@ -168,13 +168,23 @@ describe("ThreadImageGallery", () => {
         expect(preview().getAttribute("alt")).toBe("Pricing page");
     });
 
+    it("keeps the end buttons focusable when disabled, so the keyboard still steps after the last image", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt("m3:1");
+
+        const next = screen.getByRole("button", { name: "Next image" });
+
+        expect(next.getAttribute("aria-disabled")).toBe("true");
+        expect((next as HTMLButtonElement).disabled).toBe(false);
+    });
+
     it("shows the image whose thumbnail is chosen, and the buttons step too", () => {
         render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
         openAt(null);
 
         fireEvent.click(screen.getByRole("button", { name: "Image 3: Logo" }));
         expect(preview().getAttribute("alt")).toBe("Logo");
-        expect((screen.getByRole("button", { name: "Next image" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByRole("button", { name: "Next image" }).getAttribute("aria-disabled")).toBe("true");
 
         fireEvent.click(screen.getByRole("button", { name: "Previous image" }));
         expect(preview().getAttribute("alt")).toBe("Chart");
