@@ -19,6 +19,7 @@ import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { systemDb } from "../lib/rls/scope";
 import { ownedStorageKeys } from "../lib/storage-ownership";
+import { storedRow, storedRows } from "../lib/stored-row";
 
 /**
  * `.input()` takes the field RECORD, and `InferArgs` reads that same record, so
@@ -331,7 +332,7 @@ export const getFileForUser = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const row = await ctx.db.chatFiles.findFirst({ where: { _id: args.fileId } });
+        const row = storedRow(await ctx.db.chatFiles.findFirst({ where: { _id: args.fileId } }));
         const file = row
             ? {
                   _id: row._id,
@@ -466,7 +467,7 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
             continue;
         }
 
-        const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
+        const file = storedRow(await context.db.chatFiles.findFirst({ where: { _id: fileId } }));
 
         if (file && file.refcount > 0) {
             await patchRow(context.db, "chatFiles", file, refcountChange(file, file.refcount - 1));
@@ -484,7 +485,7 @@ export const changeRefcount = async (context: MutationContext, previous: Id<"cha
             continue;
         }
 
-        const file = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
+        const file = storedRow(await context.db.chatFiles.findFirst({ where: { _id: fileId } }));
 
         if (file) {
             await patchRow(context.db, "chatFiles", file, refcountChange(file, file.refcount + 1));
@@ -599,7 +600,7 @@ export const getFilesToDelete = internalQuery
             where: { refcount: 0 },
         });
 
-        return { continueCursor: page.continueCursor, isDone: page.isDone, page: page.page };
+        return { continueCursor: page.continueCursor, isDone: page.isDone, page: storedRows(page.page) };
     });
 
 export const deleteFiles = internalMutation

@@ -28,6 +28,7 @@ import { eraseProjectRepositories, eraseProjectRuleFiles, markProjectRuleFilesEr
 import { mayEditProject } from "../projects/edit-access";
 import { forViewer } from "../projects/machine-location";
 import type { SubAgentRoles } from "../sub-agents/roles";
+import { storedRow } from "../lib/stored-row";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -260,7 +261,7 @@ export const updateProject = internalMutation
     })
     .output(v.from(vProjectDocument))
     .mutation(async ({ args, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: args.projectId } });
+        const project = storedRow(await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: args.projectId } }));
 
         assert(project, `Project ${args.projectId} not found`);
 
@@ -298,7 +299,7 @@ export const deleteProject = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = storedRow(await ctx.db.projects.findFirst({ where: { _id: args.projectId } }));
 
         assert(project, `Project ${args.projectId} not found`);
 
