@@ -25,6 +25,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
+import { callerSessionNotOwn } from "../auth/lib/caller-session";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { noteShardActivity } from "../lib/shard-housekeeping";
@@ -86,7 +87,7 @@ export const answerSecretRequest = authMutation
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
     .mutation(async ({ args: { approvalId, expectedUrl, more, threadId, unlockProof, value }, ctx }) => {
         const claim = await claimSecretAnswer(ctx, {
-            answeredByImpersonator: Boolean(ctx.user.impersonatedBy),
+            answeredByImpersonator: await callerSessionNotOwn(ctx),
             approvalId,
             callerId: ctx.user.userId,
             expectedUrl,

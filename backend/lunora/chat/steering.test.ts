@@ -76,8 +76,21 @@ let threadId: string;
 let streamId: string;
 let pendingId: string;
 let promptId: string;
+/** Each user's live sign-in, so a steer reads as theirs (`callerSessionNotOwn`). */
+const sessions = new Map<string, string>();
 
-const as = (userId: string) => harness.withIdentity({ userId } as never);
+const signIn = async (userId: string): Promise<string> => {
+    const sessionId = (await harness.run(
+        async (ctx: any) =>
+            await ctx.db.insert("session", { createdAt: 1, expiresAt: Number.MAX_SAFE_INTEGER, token: `token-${userId}`, updatedAt: 1, userId }),
+    )) as string;
+
+    sessions.set(userId, sessionId);
+
+    return sessionId;
+};
+
+const as = (userId: string) => harness.withIdentity({ sessionId: sessions.get(userId), userId } as never);
 
 const steer = async (text: string, userId = OWNER, stream = streamId, steerId?: string): Promise<{ steerId: string }> =>
     (await as(userId).mutation(steerRun as never, { steerId, streamId: stream, text, threadId } as never)) as { steerId: string };
@@ -143,6 +156,8 @@ beforeEach(async () => {
 
     pendingId = step.messages[1]!._id;
     streamId = await insertStream();
+    sessions.clear();
+    await signIn(OWNER);
 });
 
 afterEach(() => {
@@ -248,6 +263,13 @@ describe("deliverSteers and withdrawSteer", () => {
         await steer("use the other file");
 
         expect(await deliver()).not.toHaveProperty("notTyped");
+    });
+
+    it("delivers marked a steer whose sign-in's session is gone, as an ended impersonation's token", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.delete("session", sessions.get(OWNER)));
+        await steer("use the other file");
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ impersonated: true });
     });
 
     it("delivers every queued message as one user row, and reports them delivered", async () => {

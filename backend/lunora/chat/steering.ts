@@ -29,6 +29,7 @@ import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
+import { callerSessionNotOwn } from "../auth/lib/caller-session";
 import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { hasNotTypedMarks, mergeNotTypedMarks, notTypedMarksOfDraftFrom } from "../lib/not-typed-text";
@@ -58,7 +59,7 @@ export const steerRun = authMutation
     })
     .output(v.object({ steerId: v.string() }))
     .mutation(async ({ args: { draftFrom, steerId: requestedId, streamId, text: rawText, threadId, unlockProof }, ctx }) => {
-        const { impersonatedBy, userId } = ctx.user;
+        const { userId } = ctx.user;
         // The composer strips these too; a client that skips it still sends text straight into a running reply.
         const text = stripHiddenText(rawText).text.trim();
 
@@ -99,8 +100,8 @@ export const steerRun = authMutation
         }
 
         const steerId = requestedId ?? ctx.newId();
-        // An admin acting as the owner steers marked, as `/chat/start` saves their prompt.
-        const notTyped = mergeNotTypedMarks(notTypedMarksOfDraftFrom(draftFrom), impersonatedBy ? { impersonated: true } : {});
+        // An admin acting as the owner, or a sign-in not readable as theirs, steers marked, as `/chat/start` saves their prompt.
+        const notTyped = mergeNotTypedMarks(notTypedMarksOfDraftFrom(draftFrom), (await callerSessionNotOwn(ctx)) ? { impersonated: true } : {});
         const steers = queueSteer(stream.steers ?? [], { id: steerId, sentAt: ctx.now, text });
 
         if (!steers) {

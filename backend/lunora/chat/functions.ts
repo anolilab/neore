@@ -29,7 +29,6 @@ import {
     type SystemOptimizerStyle,
     type UserOptimizerStyle,
 } from "@neore/ai/prompts/optimizer";
-import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
@@ -1123,64 +1122,6 @@ export const getToolOutput = liteAuthQuery
             raw !== null && typeof raw === "object" && typeof (raw as { type?: unknown }).type === "string" ? (raw as { value?: unknown }).value : raw;
 
         return { output };
-    });
-
-/**
- * Output cap for `continueThread`, which streams a reply into an existing thread.
- * Generation bills per output token, so this bounds one reply the way
- * `pages/agent.ts` caps its own generation.
- */
-const CONTINUE_THREAD_MAX_OUTPUT_TOKENS = 16_000;
-
-export const continueThread = authAction
-    .use(rateLimit("chat/stream"))
-    .input({
-        model: v.string().max(MAX_LENGTH.short),
-        prompt: v.string().max(MAX_LENGTH.text),
-        threadId: v.id("threads"),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-    })
-    // The handler returns a `Response`, whose inferred type drags DOM WebSocket
-    // types into `_generated/` (which then fails to compile). Codegen renders a
-    // `v.any()` output from the handler's return type, hence `Promise<unknown>`.
-    .output(v.any())
-    .action(async ({ args: { model, prompt, threadId, unlockProof }, ctx: context }): Promise<unknown> => {
-        const { userId } = context.user;
-
-        const cleanPrompt = stripHiddenText(prompt).text;
-
-        if (cleanPrompt.trim() === "") {
-            throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
-        }
-
-        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
-
-        throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
-
-        if (gateResult.isWorker) {
-            throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");
-        }
-
-        // A cloud model must never answer in a thread the desktop owns: `runChatStart` refuses it the same way.
-        if (gateResult.hostRun) {
-            throw new LunoraError("CONFLICT", "This thread runs on a paired computer. Send the message from the desktop app.");
-        }
-
-        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-        const threadLanguage = threadData?.language;
-
-        const agent = await getAgentForUser(context, userId, model, threadLanguage);
-
-        const { thread } = await agent.continueThread(context, {
-            threadId,
-            userId,
-        });
-
-        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt: cleanPrompt });
-
-        context.log.event("chat.continue_thread", { model });
-
-        return result.toUIMessageStreamResponse();
     });
 
 export const getThreads = authQuery

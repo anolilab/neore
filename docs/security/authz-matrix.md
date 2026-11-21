@@ -300,7 +300,6 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.abortStreamByMessageId` | mutation | authMutation | threads | thread access (owner/grant) | ok |
 | `chat_functions.abortThreadStream` | mutation | authMutation + RL | threads | thread access (owner/grant, write) | ok |
 | `chat_functions.branchThread` | action | authAction + RL | threads | row.userId == caller | ok |
-| `chat_functions.continueThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — rate-limited; advisor: no maxOutputTokens bound |
 | `chat_functions.convertTemporaryToPermanent` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.createExtensionPairing` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns; the new chat takes the bot's permission mode, except `full` while impersonating | **fixed** (low) — organizationId must be the active org |
@@ -769,7 +768,8 @@ for a schema table that is neither policed nor listed:
   (`isOwnInteractiveTurn`: `startedBy` the owner, origin `lead`, not headless, not impersonated; a public API run records
   the key's owner as `startedBy`, so that alone is not enough). Impersonation is recorded on the run's job at `/chat/start`
   from the session, never the body, and carried by a pause and an approval's snapshot; an approval, question or secret
-  answered while impersonating marks the continuation impersonated (`claimToolApproval`); a run that recorded none, or a
+  answered while impersonating, or from a sign-in whose session cannot be read as the owner's own, marks the
+  continuation impersonated (`claimToolApproval`, `auth/lib/caller-session.ts`); a run that recorded none, or a
   turn missing its prompt or system-prompt kinds, gets no login (`ToolCtx.runTurn`, `siteLoginTurnOf`). Offered built-in
   tools only, its system prompt only the app's instructions, the owner's personalization, the teammate's instructions,
   our own agent and search mode text and the task plan (enabled skills, an invoked skill and the attached-documents note
@@ -891,5 +891,3 @@ else the better-auth cookie). No route takes identity from a header.
 - `privileged_fanout_from_public_procedure` — 2: `changelog_functions.getChangelogs`
   (accepted: cached, module cooldown) and `knowledge_functions.removeFile` (fixed:
   rate-limited).
-- `ai_unbounded_generation_public` — 1: `chat_functions.continueThread`
-  (accepted: rate-limited; no `maxOutputTokens`).

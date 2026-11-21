@@ -51,7 +51,9 @@
   per offered tool. `runTurn` is set whole or not at all (`setRunTurn`): `/chat/start` records `impersonated` from the
   session on the job (none without a sign-in session), `runStreamingAgent` adds the prompt and the kinds, and the
   approval snapshot and a pause's stored arguments carry them. An approval, question or secret answered by an admin
-  acting as the owner marks its continuation impersonated (`claimToolApproval`'s `answeredByImpersonator`). Only that path sets it; every other run path (edit, group,
+  acting as the owner, or from a sign-in whose session row cannot be read as theirs (gone, expired), marks its continuation
+  impersonated (`claimToolApproval`'s `answeredByImpersonator`); steers and local turns are marked by the same
+  check (`auth/lib/caller-session.ts#callerSessionNotOwn`). Only that path sets it; every other run path (edit, group,
   headless, aside, goal rounds) sets none, which refuses. `systemContext` is `loadRunContext`'s kinds plus
   `agentPromptKinds` for what `getAgent` and the run add: `agent-mode`, `search-mode` and `task-plan` are safe (our own
   text; the plan quotes only the prompt), `skills`, `skill-instructions` and `attached-documents` refuse. A new piece

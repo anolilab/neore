@@ -38,6 +38,7 @@ import { readRunToolSelection } from "../bots/run-tool-selection";
 import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
+import { callerSessionNotOwn } from "../auth/lib/caller-session";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
 import { patchThread } from "../agent/table-writes";
 import { isDeviceEligibleThread } from "../devices/internal";
@@ -921,7 +922,7 @@ export const respondToToolApproval = authMutation
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
     .mutation(async ({ args: { approvalId, decision, threadId, unlockProof }, ctx }) => {
         const claim = await claimToolApproval(ctx, {
-            answeredByImpersonator: Boolean(ctx.user.impersonatedBy),
+            answeredByImpersonator: await callerSessionNotOwn(ctx),
             approvalId,
             callerId: ctx.user.userId,
             decision,

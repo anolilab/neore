@@ -20,6 +20,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
+import { callerSessionNotOwn } from "../auth/lib/caller-session";
 import { syncActiveAgent } from "../agent/agent-switch";
 import { getThreadRow } from "../agent/branch-rows";
 import { saveEditedSiblingHandler } from "../agent/branches";
@@ -257,7 +258,7 @@ export const saveLocalTurn = authMutation
     })
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {
-        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { impersonated: Boolean(ctx.user.impersonatedBy) });
+        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { impersonated: await callerSessionNotOwn(ctx) });
 
         ctx.log.event("chat.save_local_turn", { branched: args.branch !== undefined, newThread: args.threadId === undefined, outcome: args.outcome });
 

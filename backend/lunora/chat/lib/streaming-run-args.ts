@@ -15,12 +15,12 @@ import { v } from "lunorash/server";
 import { MAX_LENGTH } from "../../lib/validators";
 
 export const runStreamingAgentFields = {
-    /** Anonymous callers are pinned to the free model; a skill must not lift that. */
     /**
      * Whether an admin acting as the owner sent the turn, from the session at `/chat/start`. Kept with a pause's and an
      * interrupted run's stored arguments. Absent (a goal round, a run queued elsewhere) is not `false`: no saved login.
      */
     impersonated: v.optional(v.boolean()),
+    /** Anonymous callers are pinned to the free model; a skill must not lift that. */
     isAnonymous: v.optional(v.boolean()),
     messageId: v.string(),
     /** The caller's active organization, verified by `/chat/start` — scopes organization-shared skills. */

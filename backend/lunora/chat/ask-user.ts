@@ -13,6 +13,7 @@
 import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
+import { callerSessionNotOwn } from "../auth/lib/caller-session";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { isThreadLocked } from "../lib/thread-lock";
 import { claimAskUserAnswer } from "./lib/ask-user-claim";
@@ -78,7 +79,7 @@ export const answerAskUser = authMutation
         }
 
         const claim = await claimAskUserAnswer(ctx, {
-            answeredByImpersonator: Boolean(ctx.user.impersonatedBy),
+            answeredByImpersonator: await callerSessionNotOwn(ctx),
             approvalId,
             callerId: ctx.user.userId,
             reply: askUserReply(answer, answers),
