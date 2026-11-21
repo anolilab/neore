@@ -1260,8 +1260,9 @@ export const continueAfterToolApproval = internalAction
                 await discardRunSecrets(ctx, { streamId, threadId });
             }
 
-            // A reply that finishes after an approval gets its suggestions, as any finished reply does. A sub-agent's child thread does not.
-            if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped) {
+            // A reply that finishes after an approval gets its suggestions, as any finished reply does. A continuation that saved only tool
+            // results has no new reply to suggest for, and a sub-agent's child thread does not get any.
+            if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped && resumed.savedReply === true) {
                 void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId });
             }
         } catch (error) {
