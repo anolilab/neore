@@ -23,7 +23,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
-import type { ResearchDepth } from "../../agent/client/create-tool";
+import type { ResearchDepth, RunTurn } from "../../agent/client/create-tool";
 import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
 import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
 import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
@@ -309,6 +309,19 @@ export const setHeadlessRun = (ctx: object): void => {
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runTurn`. Set only when every field is
+ * known: a run started before `/chat/start` recorded impersonation, or a snapshot written before these fields, sets none.
+ */
+export const setRunTurn = (ctx: object, turn: Partial<RunTurn> | undefined): void => {
+    const { impersonated, promptMessageId, systemContext } = turn ?? {};
+
+    (ctx as { runTurn?: RunTurn }).runTurn =
+        impersonated === undefined || promptMessageId === undefined || systemContext === undefined
+            ? undefined
+            : { impersonated, promptMessageId, systemContext };
 };
 
 /**
@@ -1558,6 +1571,8 @@ export const resumeApprovedRun = async (
 
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
+        // And what the saved-login verdict needs of that turn: a snapshot without any of it sets none.
+        setRunTurn(ctx, { impersonated: config.impersonated, promptMessageId: config.promptMessageId, systemContext: config.systemContext });
         setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
 
         const stopping = new AbortController();

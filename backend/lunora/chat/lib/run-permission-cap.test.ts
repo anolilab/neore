@@ -91,7 +91,7 @@ describe("readRequestPermissionCap", () => {
         const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: "org_a" }).mockResolvedValueOnce("ask");
 
         expect(await readRequestPermissionCap(requestCtx("session_1", runQuery), "user_1")).toStrictEqual({ cap: "ask" });
-        expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "session_1", userId: "user_1" });
+        expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "session_1", userId: "user_1", viaGrant: false });
         expect(runQuery).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_a" });
     });
 
@@ -114,7 +114,7 @@ describe("readRequestPermissionCap", () => {
         } as never;
 
         expect(await readRequestPermissionCap(context, "user_1")).toStrictEqual({ cap: "ask" });
-        expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "grant_session_1", userId: "user_1" });
+        expect(runQuery).toHaveBeenNthCalledWith(1, expect.anything(), { sessionId: "grant_session_1", userId: "user_1", viaGrant: true });
     });
 
     it("gives auto for a valid session in the personal space", async () => {

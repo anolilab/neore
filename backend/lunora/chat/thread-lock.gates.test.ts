@@ -428,7 +428,13 @@ describe("writes into a locked chat", () => {
         await expect(
             harness.run(
                 async (context: any) =>
-                    await claimToolApproval(context, { approvalId: "a-1", callerId: OWNER, decision: "approve", threadId: threadId as never }),
+                    await claimToolApproval(context, {
+                        answeredByImpersonator: false,
+                        approvalId: "a-1",
+                        callerId: OWNER,
+                        decision: "approve",
+                        threadId: threadId as never,
+                    }),
             ),
         ).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
     });

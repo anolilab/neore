@@ -504,6 +504,8 @@ describe("/chat/start with text the owner did not type", () => {
     it("saves the owner's own typed prompt unmarked", async () => {
         expect((await start({})).status).toBe(200);
         expect(saved.prompts[0]?.message.content).toStrictEqual([{ text: "sign in to my bank", type: "text" }]);
+        // The run records the turn as the owner's own, from the session: the saved-login verdict reads it.
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: false });
     });
 
     it.each(NOT_TYPED_DRAFTS)("saves a prompt filled from a %s marked", async (draftFrom) => {
@@ -519,6 +521,22 @@ describe("/chat/start with text the owner did not type", () => {
             marked({ impersonated: true }),
             marked({ draft: "promptLink", impersonated: true }),
         ]);
+        // And the run records the turn as an admin's, whatever the body says.
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
+    });
+
+    it("saves a prompt a browser extension's grant sends marked, and records the turn as not the owner's own", async () => {
+        const extension = {
+            "auth_session_organization:getSessionOrganizationForCap": async () => {
+                return { extension: true, organizationId: null };
+            },
+        };
+
+        await start({}, extension);
+        await start({ draftFrom: "promptLink" }, extension);
+
+        expect(saved.prompts.map((prompt) => prompt.message.content)).toStrictEqual([marked({ draft: "extension" }), marked({ draft: "extension" })]);
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
     });
 
     it("refuses a draft source nobody named, before anything is saved or charged", async () => {

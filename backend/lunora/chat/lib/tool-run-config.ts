@@ -49,6 +49,12 @@ export const vToolRunConfig = v.object({
      * again for a nested dispatch. Absent on a snapshot that predates it, which reads as no inherited approval.
      */
     headlessApproved: v.optional(v.array(v.string())),
+    /**
+     * Whether the turn that paused is not the owner's own: sent by an admin acting as the owner or from a browser-extension
+     * sign-in (as `/chat/start` recorded it), or answered from a session `callerSessionNotOwn` rejects. Absent (a run path
+     * that records none, or an older snapshot) is not `false`: the continuation then gets no saved login.
+     */
+    impersonated: v.optional(v.boolean()),
     instructions: v.optional(v.string()),
     mcpServerNames: v.array(v.string()),
     /**
@@ -106,6 +112,11 @@ export const vToolRunConfig = v.object({
      * (`sub_agents.functions.resumeRunForAnswer`, then the run's end), so the result still reaches the parent once.
      */
     subAgentRunId: v.optional(v.id("subAgentRuns")),
+    /**
+     * One kind per piece of the paused run's system prompt (`chat/lib/system-context-kinds.ts`): the continuation runs on
+     * `instructions`, the same text, so the saved-login verdict reads it from here. Absent = no answer, no login.
+     */
+    systemContext: v.optional(v.array(v.string().max(40)).max(32)),
     toolNames: v.array(v.string()),
     /**
      * Runtime tool name -> stable permission key, taken from the tools as they

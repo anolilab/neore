@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExtensionGrantStore, ExtensionGrantUser } from "./extension-grant";
+import { MOBILE_REDIRECT_URI, NATIVE_REDIRECT_URI } from "../lib/extension-origins";
 import { authorizeExtension, CODE_TTL_MS, exchangeExtensionCode, mintExtensionAccessToken, pkceChallenge, revokeExtensionSession } from "./extension-grant";
 
 const REDIRECT_URI = `https://${"a1".repeat(20)}.extensions.allizom.org/`;
@@ -20,7 +21,7 @@ const USER: ExtensionGrantUser = { email: "ada@example.test", id: "user-1", imag
  */
 const createStore = (users: ExtensionGrantUser[] = [USER]) => {
     const codes = new Map<string, { expiresAt: Date; value: string }>();
-    const sessions = new Map<string, { expiresAt: Date; id: string; userId: string }>();
+    const sessions = new Map<string, { clientGrant?: string; expiresAt: Date; id: string; userId: string }>();
     const signed: Record<string, unknown>[] = [];
     let sessionCount = 0;
 
@@ -32,12 +33,12 @@ const createStore = (users: ExtensionGrantUser[] = [USER]) => {
 
             return row;
         },
-        createSession: async (userId) => {
+        createSession: async (userId, meta) => {
             sessionCount += 1;
 
             const session = { expiresAt: new Date(Date.now() + 7 * 86_400_000), token: `session-${sessionCount}` };
 
-            sessions.set(session.token, { expiresAt: session.expiresAt, id: `sid-${String(sessionCount)}`, userId });
+            sessions.set(session.token, { clientGrant: meta.clientGrant, expiresAt: session.expiresAt, id: `sid-${String(sessionCount)}`, userId });
 
             return session;
         },
@@ -149,6 +150,18 @@ describe("exchangeExtensionCode", () => {
 
         expect(result.user).toEqual({ email: USER.email, id: USER.id, image: null, name: USER.name });
         expect(sessions.get(result.token)?.userId).toBe(USER.id);
+    });
+
+    it.each([
+        [REDIRECT_URI, "extension"],
+        [MOBILE_REDIRECT_URI, "mobile"],
+        [NATIVE_REDIRECT_URI, "desktop"],
+    ])("records on the session which app the code for %s was issued for", async (redirectUri, clientGrant) => {
+        const { sessions, store } = createStore();
+        const { code } = await authorize(store, { redirectUri, trustedRedirectUris: [redirectUri] });
+        const result = await exchangeExtensionCode(store, { code, codeVerifier: VERIFIER, redirectUri });
+
+        expect(sessions.get(result.token)?.clientGrant).toBe(clientGrant);
     });
 
     it("is single use: a replayed code fails even with the right verifier", async () => {

@@ -275,7 +275,9 @@ describe("regenerate and edit on the local path", () => {
         const fromLink = await save(OWNER, { draftFrom: "promptLink", prompt: "hi", reply: "first answer" });
         const byAdmin = await harness.run(
             async (ctx: any) =>
-                await saveLocalTurnHandler(ctx, OWNER, { model: MODEL, outcome: "complete", prompt: "hi", reply: "ok" } as never, { impersonated: true }),
+                await saveLocalTurnHandler(ctx, OWNER, { model: MODEL, outcome: "complete", prompt: "hi", reply: "ok" } as never, {
+                    sessionMarks: { impersonated: true },
+                }),
         );
         const edited = await save(OWNER, {
             branch: { kind: "edit", messageId: fromLink.userMessageId },

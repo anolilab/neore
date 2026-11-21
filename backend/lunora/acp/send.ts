@@ -20,7 +20,7 @@ import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isUnlockProofValid } from "../agent/thread-passcode";
 import { getCurrentUserInternal } from "../auth/lib/helper";
-import { requestSignIn } from "../auth/lib/request-sign-in";
+import { requestSignIn, requestSignInIsGrant } from "../auth/lib/request-sign-in";
 import { createStreamToken } from "../chat/streaming/persistent/stream-token";
 import type { DeviceTaintSource } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
@@ -259,9 +259,16 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
     }
 
     // The caller's space, as `/chat/start` reads it: a sign-in whose session cannot be validated is refused, not read as personal.
-    const signIn = requestSignIn(await context.auth.getIdentity());
+    const identity = await context.auth.getIdentity();
+    const signIn = requestSignIn(identity);
     const placed =
-        signIn === undefined ? null : await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId });
+        signIn === undefined
+            ? null
+            : await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, {
+                  sessionId: signIn,
+                  userId,
+                  viaGrant: requestSignInIsGrant(identity),
+              });
 
     if (!placed) {
         return json({ error: "not_authenticated" }, 401);

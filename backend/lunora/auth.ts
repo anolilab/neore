@@ -549,6 +549,13 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
         // Only the overrides: `@lunora/auth` fills `enabled: true`, `storage: "database"`
         // and its own catch-all rule, which it merges AFTER these so ours match first.
         rateLimit: { customRules: AUTH_RATE_LIMIT_CUSTOM_RULES },
+        session: {
+            additionalFields: {
+                // The app a grant's session was made for (`auth/lib/sign-in-standing.ts`): written by the code exchange
+                // through `createSession`'s override, never by a client (`input: false`).
+                clientGrant: { input: false, required: false, type: "string" },
+            },
+        },
         // Every social provider is optional — email+password always works.
         socialProviders: buildSocialProviders(),
         telemetry: { enabled: false },

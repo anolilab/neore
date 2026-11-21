@@ -281,7 +281,10 @@ export const deleteSiteLogin = authMutation
 const siteLoginTurnFields = {
     /** `ToolCtx.headless`: a sub-agent, trigger, task, eval or messenger reply. Nobody is at the app to see the run. */
     headless: v.boolean(),
-    /** Whether an admin acting as the owner sent the turn. Recorded on the turn when it starts; a turn that cannot say is not usable. */
+    /**
+     * Whether the turn is not the owner's own (an admin acting as the owner, an extension sign-in, or an approval answered
+     * from a session that isn't the owner's live one). Recorded on the turn; a turn that cannot say is not usable.
+     */
     impersonated: v.boolean(),
     /** `ToolCtx.dispatchOrigin`: `"lead"` for the owner's own chat, else what started the run (an outside agent, a trigger, a messenger reply). */
     origin: v.string().max(40),

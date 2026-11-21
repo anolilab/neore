@@ -6,10 +6,13 @@
     "add-approval-bot-lookup",
     "add-approval-chain-source",
     "add-approval-project-id",
+    "add-approval-run-turn",
     "add-approval-tool-origins",
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-run-args-impersonated",
+    "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
@@ -20652,6 +20655,13 @@
                         "nullable": false,
                         "optional": false,
                         "unique": false,
+                        "literal": "\"extension\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
                         "literal": "\"forwarded\""
                       },
                       {
@@ -20760,6 +20770,12 @@
               "optional": false,
               "unique": false,
               "fields": {
+                "impersonated": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
                 "isAnonymous": {
                   "kind": "boolean",
                   "nullable": false,
@@ -20921,6 +20937,20 @@
                     }
                   }
                 },
+                "systemContext": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "refined": true
+                },
                 "threadId": {
                   "kind": "string",
                   "nullable": false,
@@ -21073,6 +21103,12 @@
           "optional": true,
           "unique": false,
           "fields": {
+            "impersonated": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "isAnonymous": {
               "kind": "boolean",
               "nullable": false,
@@ -21233,6 +21269,20 @@
                   "unique": false
                 }
               }
+            },
+            "systemContext": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "threadId": {
               "kind": "string",
@@ -24256,6 +24306,12 @@
           "unique": false
         },
         "activeTeamId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "clientGrant": {
           "kind": "string",
           "nullable": false,
           "optional": true,
@@ -29609,6 +29665,12 @@
                 "unique": false
               }
             },
+            "impersonated": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "instructions": {
               "kind": "string",
               "nullable": false,
@@ -29776,6 +29838,20 @@
               "optional": true,
               "unique": false,
               "ref": "subAgentRuns"
+            },
+            "systemContext": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "toolNames": {
               "kind": "array",

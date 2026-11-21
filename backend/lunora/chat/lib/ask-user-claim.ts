@@ -81,9 +81,16 @@ export const resolveQuestionAnswers = (
 
 export const claimAskUserAnswer = async (
     ctx: Pick<MutationCtx, "db">,
-    args: { approvalId: string; callerId: string; reply: AskUserReply; threadId: Id<"threads">; unlockProof?: string | null },
+    args: {
+        answeredByImpersonator: boolean;
+        approvalId: string;
+        callerId: string;
+        reply: AskUserReply;
+        threadId: Id<"threads">;
+        unlockProof?: string | null;
+    },
 ): Promise<ClaimResult & { answer?: string; answers?: AskUserQuestionAnswer[] }> => {
-    const { approvalId, callerId, reply, threadId, unlockProof } = args;
+    const { answeredByImpersonator, approvalId, callerId, reply, threadId, unlockProof } = args;
     const answer = reply.kind === "answer" ? normalizeAskUserAnswer(reply.answer) : undefined;
 
     if (reply.kind === "answer" && answer === undefined) {
@@ -91,6 +98,7 @@ export const claimAskUserAnswer = async (
     }
 
     const claim = await claimToolApproval(ctx, {
+        answeredByImpersonator,
         approvalId,
         callerId,
         decision: reply.kind === "dismiss" ? "deny" : "approve",
