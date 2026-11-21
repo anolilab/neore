@@ -94,16 +94,37 @@ const onNativePending = <T>(
 /**
  * Calls `handler` with each batch of files the shell is handed (the dock icon),
  * including a batch that arrived before the page loaded. Returns the unsubscribe function.
+ * `accountAtStart` is read when a batch starts to be taken from the shell and handed over with it, so an account
+ * switch while the shell answers never tags the files with the account that arrived after them.
  */
-export const onNativeFiles = (handler: (files: File[]) => void): UnlistenFunction =>
+export const onNativeFiles = (
+    handler: (files: File[], accountId: string | undefined) => void,
+    accountAtStart: () => string | undefined = () => undefined,
+    // Called with the number of files a batch held when it was let go (it arrived across an account switch).
+    onDiscarded: (count: number) => void = () => {},
+): UnlistenFunction =>
     onNativePending(
         (listener) => getNative()?.onFiles?.(listener),
         async () => {
+            // Before the shell is asked: the account the drop was made under, whatever happens while it answers.
+            const accountId = accountAtStart();
             const files = await takePendingFiles();
 
-            return files.length > 0 ? files : undefined;
+            if (files.length === 0) {
+                return undefined;
+            }
+
+            // The shell joins the drops it holds: across an account switch while it answered, the batch can hold drops of
+            // both accounts, so it goes to neither. A drop made before the session was known (no account) is not a switch.
+            if (accountId !== undefined && accountAtStart() !== accountId) {
+                onDiscarded(files.length);
+
+                return undefined;
+            }
+
+            return { accountId, files };
         },
-        handler,
+        ({ accountId, files }) => handler(files, accountId),
     );
 
 /**

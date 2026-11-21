@@ -101,7 +101,7 @@ msgstr "“{truncatedName}”及另外 {moreCount} 个被拒绝"
 msgid "\"{truncatedName}\" has been rejected"
 msgstr "“{truncatedName}”已被拒绝"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
 msgstr ""
 
@@ -349,6 +349,12 @@ msgstr "{0, plural, other {# 项必需或未知检查失败}}"
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 项必需或未知检查仍在运行}}"
 
+#. placeholder {0}: readings.compactable.largeToolRows
+#. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:181
+msgid "{0, plural, one {# result} other {# results}}, {1}"
+msgstr "{0, plural, other {# 个结果}}，{1}"
+
 #. placeholder {0}: added.length
 #: src/features/projects/components/project-rule-files.tsx:534
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
@@ -378,6 +384,15 @@ msgstr "{0, plural, other {# 张幻灯片}}"
 #: src/features/develop/components/files-tab.tsx:240
 msgid "{0, plural, one {# thread} other {# threads}}"
 msgstr "{0, plural, other {# 个讨论串}}"
+
+#. placeholder {0}: readings.other.threads
+#. placeholder {0}: readings.pinned.threads
+#. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
+#. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:187
+#: src/features/admin/components/admin-shard-footprint-row.tsx:193
+msgid "{0, plural, one {# thread} other {# threads}}, {1}"
+msgstr "{0, plural, other {# 个对话}}，{1}"
 
 #. placeholder {0}: stats.estimatedTokens
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:765
@@ -530,6 +545,12 @@ msgstr "已从 {1} 导入 {0} 个对话"
 #: src/features/settings/components/chat/mcp/server-list.tsx:105
 msgid "{0} custom headers"
 msgstr "{0} 个自定义请求头"
+
+#. placeholder {0}: formatNumber(row.sinceDays, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
+msgid "{0} days"
+msgstr "{0} 天"
 
 #. placeholder {0}: deleting.name
 #: src/features/local-models/components/ollama-model-manager.tsx:150
@@ -2342,6 +2363,10 @@ msgstr "活跃会话（{0}）"
 msgid "Active Threads"
 msgstr "活跃对话"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:155
+msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
+msgstr "活跃对话，按距上次活动的天数分组。包括正在等待某人处理的对话。"
+
 #: src/features/settings/components/personalization/memory-types.ts:25
 msgid "Activities"
 msgstr "活动"
@@ -2721,7 +2746,7 @@ msgstr "已添加 {added} 个文档；跳过了 {skippedCount} 个不支持或�
 msgid "Added {added} document(s)."
 msgstr "已添加 {added} 个文档。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
 msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
 msgstr ""
 
@@ -3342,8 +3367,8 @@ msgid "All changes saved"
 msgstr "所有更改已保存"
 
 #: src/features/home/components/home-page.tsx:243
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:454
 msgid "All chats"
 msgstr "全部对话"
 
@@ -3437,7 +3462,7 @@ msgid "All providers + BYOK"
 msgstr "所有提供商 + BYOK"
 
 #. placeholder {0}: roleLabel.toLowerCase()
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:289
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:292
 msgid "All real {0} work goes to this model, even quick work."
 msgstr ""
 
@@ -3462,7 +3487,7 @@ msgstr "所有角色"
 msgid "All Servers"
 msgstr "所有服务器"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:134
+#: src/features/admin/components/admin-shard-footprint-row.tsx:230
 msgid "All shards measured."
 msgstr "所有分片均已测量。"
 
@@ -3567,7 +3592,7 @@ msgstr "同时在看"
 
 #: src/features/projects/components/project-rule-files.tsx:286
 #: src/features/projects/components/project-rule-files.tsx:455
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:308
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:311
 msgid "Always"
 msgstr "始终"
 
@@ -3881,6 +3906,10 @@ msgstr ""
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意你选择的字符串；在 Meta 应用中填入相同的值作为 webhook 验证令牌"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:146
+msgid "Any time"
+msgstr "不限时长"
+
 #: src/features/chat/guest-links/guest-link-panel.tsx:348
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
 msgstr "任何拥有访客链接的人都可以在这里给你留言。在你发送之前，他们写的内容都不会运行。"
@@ -3986,7 +4015,7 @@ msgstr "应用错误"
 msgid "Applies"
 msgstr "应用方式"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:425
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:443
 msgid "Applies to"
 msgstr ""
 
@@ -4103,7 +4132,9 @@ msgstr "已自动批准——低风险"
 msgid "Approving…"
 msgstr "正在批准…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:107
+#: src/features/admin/components/admin-shard-footprint-row.tsx:129
+#: src/features/admin/components/admin-shard-footprint-row.tsx:140
+#: src/features/admin/components/admin-shard-footprint-row.tsx:160
 msgid "Approximate size"
 msgstr "大致大小"
 
@@ -4184,9 +4215,17 @@ msgstr "归档对话"
 msgid "Archived"
 msgstr "已归档"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:137
+msgid "Archived for at least"
+msgstr "已归档至少"
+
 #: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "已归档的对话"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:134
+msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
+msgstr "已归档对话，按归档至今的时长分组。已置顶的对话单独统计：它们永远不会被删除。"
 
 #: src/components/delete-confirmation-dialog.tsx:47
 msgid "Are you sure you want to delete \"{itemName}\"? This action cannot be undone."
@@ -5125,7 +5164,7 @@ msgstr "BFL 最高质量的 FLUX Kontext 模型"
 msgid "BFL's professional FLUX model via direct API"
 msgstr "通过直接 API 提供的 BFL 专业版 FLUX 模型"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:290
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:293
 msgid "Bigger pieces go to this model; quick questions stay in the chat."
 msgstr ""
 
@@ -6422,7 +6461,7 @@ msgstr "中文（繁体）"
 msgid "Choose .md or .zip"
 msgstr "选择 .md 或 .zip"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:411
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:429
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr ""
 
@@ -8819,7 +8858,7 @@ msgstr "无法加载你的活动。"
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "无法加载你所在组织的账单详情。请稍后重试。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:470
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:488
 msgid "Could not load your roles."
 msgstr ""
 
@@ -8965,7 +9004,7 @@ msgstr "无法保存{label}的新顺序"
 msgid "Could not save the page"
 msgstr "无法保存页面"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:400
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
 msgid "Could not save the role"
 msgstr ""
 
@@ -10139,7 +10178,7 @@ msgid "Delegate tasks to Devin, the AI software engineer"
 msgstr "将任务委派给 AI 软件工程师 Devin"
 
 #. placeholder {0}: roleLabel.toLowerCase()
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:234
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
 msgid "Delegated {0} work runs on this model."
 msgstr ""
 
@@ -11147,7 +11186,7 @@ msgstr "多米尼加共和国"
 msgid "Don't have an account?"
 msgstr "还没有账号？"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:340
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:352
 msgid "Don't use your default instructions in this project"
 msgstr ""
 
@@ -12778,7 +12817,7 @@ msgstr "每 6 小时"
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "此机器人的每次聊天和计划运行只获得这些工具。你的工具权限仍然适用。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
 msgstr ""
 
@@ -13293,7 +13332,7 @@ msgstr "最大 Qwen 模型上的扩展思考模式"
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Anthropic 能力最强的 Opus 上的扩展思考"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:319
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:322
 msgid "Extra instructions"
 msgstr ""
 
@@ -17084,6 +17123,10 @@ msgstr "身份"
 msgid "Idle"
 msgstr "空闲"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:158
+msgid "Idle for at least"
+msgstr "闲置至少"
+
 #: src/features/develop/components/review-panel.tsx:148
 msgid "If it kept the review as pending, submit or delete it there first."
 msgstr "如果它将审查保留为待处理状态，请先在那里提交或删除。"
@@ -19513,7 +19556,7 @@ msgstr "正在加载预览..."
 msgid "Loading preview…"
 msgstr "正在加载预览…"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 msgid "Loading projects…"
 msgstr ""
 
@@ -19522,7 +19565,7 @@ msgstr ""
 msgid "Loading repositories…"
 msgstr "正在加载仓库…"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:462
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:480
 msgid "Loading roles…"
 msgstr ""
 
@@ -20351,11 +20394,11 @@ msgstr "MCP 服务器提供额外的工具，供 AI 在对话中使用。已连�
 msgid "MCP tools"
 msgstr "MCP 工具"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:126
+#: src/features/admin/components/admin-shard-footprint-row.tsx:224
 msgid "Measure more shards"
 msgstr "测量更多分片"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:122
+#: src/features/admin/components/admin-shard-footprint-row.tsx:220
 msgid "Measuring…"
 msgstr "正在测量…"
 
@@ -20615,9 +20658,14 @@ msgstr "消息分支"
 msgid "Message input"
 msgstr "消息输入"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:103
+#: src/features/admin/components/admin-shard-footprint-row.tsx:125
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Message rows"
 msgstr "消息行"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:197
+msgid "Message rows of the largest threads"
+msgstr "最大对话的消息行数"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:65
 msgid "Message selection"
@@ -20971,7 +21019,7 @@ msgstr "模式："
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:405
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:275
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:278
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -22477,7 +22525,7 @@ msgstr "尚无执行记录"
 msgid "No expiration"
 msgstr "不过期"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:243
 msgid "No extra instructions in this project. Reset to use your default again."
 msgstr ""
 
@@ -23341,7 +23389,7 @@ msgstr "关"
 #: src/features/settings/components/account/account-settings.tsx:420
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:273
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:276
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Off"
 msgstr "关闭"
@@ -23354,7 +23402,7 @@ msgstr "默认关闭。当聊天上下文达到模型窗口的这一比例时，
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "默认关闭。长聊天闲置时，会将较早的消息浓缩为笔记，让助手始终记得。会消耗少量积分。关闭后会删除已生成的摘要。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:229
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
 msgid "Off until you pick a model."
 msgstr ""
 
@@ -23707,7 +23755,7 @@ msgstr "只有聊天的所有者可以作答。共享聊天中的其他人会看
 msgid "Only the project's owner can change its repositories."
 msgstr "只有项目所有者可以更改其仓库。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:456
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:474
 msgid "Only the project's owner can change its roles."
 msgstr ""
 
@@ -25501,6 +25549,10 @@ msgstr "已置顶"
 msgid "Pinned project"
 msgstr "已置顶的项目"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:185
+msgid "Pinned threads"
+msgstr "已置顶的对话"
+
 #: src/features/chat/sidebar/thread-sidebar.tsx:363
 msgid "Pins"
 msgstr "置顶"
@@ -25782,7 +25834,7 @@ msgstr "精准控制"
 msgid "Precise, quantified, and targeted description."
 msgstr "精确、量化且有针对性的描述。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:307
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:310
 msgid "Prefer"
 msgstr ""
 
@@ -26384,7 +26436,7 @@ msgid "Progress of {toolName}"
 msgstr "{toolName} 的进度"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
@@ -28247,7 +28299,7 @@ msgstr "重新发送验证邮件"
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:265
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:268
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:108
 msgid "Reset"
 msgstr "重置"
@@ -28257,7 +28309,7 @@ msgstr "重置"
 msgid "Reset {0} to default"
 msgstr "将 {0} 重置为默认"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:254
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 msgid "Reset {roleLabel} to your default"
 msgstr ""
 
@@ -28470,7 +28522,7 @@ msgstr "重试"
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:472
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:490
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -30362,21 +30414,21 @@ msgstr "上海"
 msgid "Shapes"
 msgstr "形状"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:82
+#: src/features/admin/components/admin-shard-footprint-row.tsx:104
 msgid "Shard footprint"
 msgstr "分片占用"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:95
+#: src/features/admin/components/admin-shard-footprint-row.tsx:117
 msgid "Shards"
 msgstr "分片"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:113
+#: src/features/admin/components/admin-shard-footprint-row.tsx:211
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "仍在测量的分片：{0}。测量更多分片以完成。"
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:117
+#: src/features/admin/components/admin-shard-footprint-row.tsx:215
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "无法测量的分片未计入合计：{0}。"
 
@@ -30584,7 +30636,7 @@ msgid "Show more folders"
 msgstr "显示更多文件夹"
 
 #: src/features/projects/components/project-repo-picker.tsx:175
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "显示更多项目"
@@ -30940,6 +30992,10 @@ msgstr "已达到大小上限"
 #: src/features/appearance/components/appearance-controls.tsx:315
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "聊天消息中文字的大小。侧边栏和应用的其余部分保持原有大小。"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:203
+msgid "Sizes of the largest shards"
+msgstr "最大分片的大小"
 
 #: src/features/chat/forward/forward-dialog.tsx:114
 #: src/features/evals/components/run-dialog.tsx:185
@@ -31843,6 +31899,10 @@ msgstr "新聊天默认为临时"
 msgid "Start Ollama for this site"
 msgstr "为此网站启动 Ollama"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:55
+msgid "Start over"
+msgstr "重新开始"
+
 #: src/features/evals/components/run-dialog.tsx:285
 msgid "Start run"
 msgstr "开始运行"
@@ -32161,9 +32221,9 @@ msgstr "已停止。"
 msgid "Stopping…"
 msgstr "正在停止…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:84
-msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size. Counts only; no thread is listed."
-msgstr "跨用户分片存储的对话数据：对话、消息行及其大小估算。仅显示计数，不列出任何对话。"
+#: src/features/admin/components/admin-shard-footprint-row.tsx:106
+msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
+msgstr "跨用户分片存储的对话数据：对话、消息行及其大小估算，按对话分组和时长统计。仅显示计数，不列出任何对话或分片。"
 
 #: src/features/canvas/components/design-preset-selector.tsx:134
 msgid "Story Promo"
@@ -32553,7 +32613,7 @@ msgstr "子代理运行失败"
 msgid "Sub-agent finished"
 msgstr "子代理运行完成"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:409
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:427
 #: src/features/settings/lib/settings-navigation.ts:97
 msgid "Sub-agent roles"
 msgstr ""
@@ -34457,7 +34517,7 @@ msgstr "无法保存屏幕截图。"
 msgid "The server lists no models yet — pull or load one first"
 msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:90
+#: src/features/admin/components/admin-shard-footprint-row.tsx:112
 msgid "The shard footprint could not be measured."
 msgstr "无法测量分片占用。"
 
@@ -35122,7 +35182,7 @@ msgstr "此消息过长，无法复制为提示词链接。"
 msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
 msgstr "此消息将在 {value, plural, other {# 秒}} 后关闭"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:235
 msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
 msgstr ""
 
@@ -35190,7 +35250,7 @@ msgstr "此预设将被永久删除。"
 msgid "This preview could not be loaded."
 msgstr "无法加载此预览。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "This project's chats. Anything it does not set uses your default."
 msgstr ""
 
@@ -35519,7 +35579,9 @@ msgstr "对话变量"
 msgid "Thread will auto-delete in {0}"
 msgstr "对话将在 {0} 后自动删除"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:99
+#: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:159
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/search-bar.tsx:47
 msgid "Threads"
@@ -35838,6 +35900,10 @@ msgstr "工具调用"
 msgid "Tool Calling"
 msgstr "工具调用"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:175
+msgid "Tool output's share of the stored size"
+msgstr "工具输出占存储大小的比例"
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:354
 #: src/features/settings/lib/settings-navigation.ts:96
 msgid "Tool Permissions"
@@ -35847,6 +35913,11 @@ msgstr "工具权限"
 #: src/features/settings/lib/settings-keywords.ts:64
 msgid "Tool Provider Keys"
 msgstr "工具提供商密钥"
+
+#. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
+msgstr "闲置至少 {0} 天的对话中 64 KB 及以上的工具结果"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
 #: src/features/settings/components/chat/bots-settings.tsx:496
@@ -36085,6 +36156,10 @@ msgstr "对视觉输入进行透明推理"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "面向法律、金融和技术任务的透明思考"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:191
+msgid "Trashed, temporary, being deleted or orphaned"
+msgstr "已移至回收站、临时、正在删除或孤立"
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:101
 msgid "Triangle"
 msgstr "三角形"
@@ -36189,7 +36264,7 @@ msgstr "尝试调整搜索词。"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:454
 #: src/components/error-component.tsx:40
-#: src/features/admin/components/admin-shard-footprint-row.tsx:131
+#: src/features/admin/components/admin-shard-footprint-row.tsx:51
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1039
@@ -38657,7 +38732,7 @@ msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 msgid "When should the assistant use this skill?"
 msgstr "助手应在什么时候使用此技能？"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:285
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:288
 msgid "When to delegate"
 msgstr ""
 
@@ -39437,11 +39512,11 @@ msgstr "你的 AI 请求每日额度已用完。"
 msgid "Your data export is ready"
 msgstr "你的数据导出已就绪"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default ({inheritedModelName})"
 msgstr ""
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default (off)"
 msgstr ""
 

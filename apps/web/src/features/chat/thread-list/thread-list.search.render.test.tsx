@@ -27,6 +27,21 @@ vi.mock("@tanstack/react-router", () => {
         useLocation: () => {
             return { pathname: "/chat" };
         },
+        // The list's file drop zone (`thread-list-drop-zone.tsx`) opens the new chat; no test here drops a file.
+        useNavigate: () => () => Promise.resolve(),
+        useRouter: () => {
+            return { state: { location: { pathname: "/chat" } } };
+        },
+    };
+});
+
+// The list's file drop zone tags a drop with the account; no test here drops a file.
+vi.mock("@/features/auth/hooks/use-auth-session", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("@/features/auth/hooks/use-auth-session")>()),
+        useAuthSession: () => {
+            return { data: null };
+        },
     };
 });
 

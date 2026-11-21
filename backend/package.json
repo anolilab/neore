@@ -56,6 +56,7 @@
         "./source-control/capabilities": "./lunora/source-control/capabilities.ts",
         "./source-control/guide-logic": "./lunora/source-control/guide-logic.ts",
         "./source-control/types": "./lunora/source-control/types.ts",
+        "./stored-row": "./lunora/lib/stored-row.ts",
         "./triggers/event-limits": "./lunora/triggers/event-sources/types.ts",
         "./triggers/presets": "./lunora/triggers/presets.ts",
         "./triggers/webhook-template": "./lunora/triggers/webhook-template.ts",
