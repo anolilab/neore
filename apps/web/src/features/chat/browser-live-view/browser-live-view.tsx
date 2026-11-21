@@ -35,9 +35,15 @@ const RENEW_EVERY_MS = 30_000;
 /**
  * How long past the lease's end, as the card last heard it (or past a page load's answer, if later), a renewal still out
  * may take to answer before a status read decides, and how long a status read may take before control ends unconfirmed.
- * A page load still out has no such limit: the server holds the lease while it loads.
  */
 const DECIDE_GRACE_MS = 15_000;
+
+/**
+ * How long the server may hold the lease for a page load: the renderer cuts a load at 60 s (`NAV_TIMEOUT`), plus the
+ * backend's `RENDERER_CALL_START_MS` and `RENDERER_CALL_SETTLE_MS`. A
+ * load with no answer {@link DECIDE_GRACE_MS} past it is taken as lost, and the lease's end is decided without it.
+ */
+const LOAD_HOLD_MS = 75_000;
 
 /** How long the card says a page is still loading: the load that timed out may hold the browser a little longer. */
 const STILL_LOADING_MS = 15_000;
@@ -277,7 +283,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const [notice, setNotice] = useState<string | undefined>(undefined);
     const [address, setAddress] = useState("");
     const [addressError, setAddressError] = useState<string | undefined>(undefined);
-    const [navigating, setNavigating] = useState(false);
+    /** When (on this device's clock) the page load still out was sent. */
+    const [navigatingSince, setNavigatingSince] = useState<number | undefined>(undefined);
+    const navigating = navigatingSince !== undefined;
     const [stillLoading, setStillLoading] = useState(0);
     const attempts = useRef(0);
     /** Names the page being opened: an answer for an older one (control ended or moved on since) changes nothing. */
@@ -308,13 +316,15 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     // the caller's ends it. The live status names the person, not the tab, so its end never moves this tab's: the lease
     // lasts until the latest end told for this tab's claim, by `takeControl`, a `keepControl` answer, or a status read
     // that named the claim. That end passing does not end control by itself: a renewal or a page load still out may have
-    // moved the lease on, so the card waits for it, and then reads the status once before it ends it.
+    // moved the lease on, so the card waits for it (a page load no longer than the server holds the lease for one), and then
+    // reads the status once before it ends it.
     const seen = lease !== undefined && statusClock.now >= lease.writtenBy;
     const refused = seen && (!canControl || control?.byYou !== true);
     const leaseUntil = lease === undefined ? undefined : Math.max(lease.until - statusClock.skew, lease.confirmedUntil ?? 0);
     const leaseEnded = usePassed(leaseUntil);
     const graceOver = usePassed(leaseUntil === undefined ? undefined : Math.max(leaseUntil, loadedAt) + DECIDE_GRACE_MS);
     const checkTimedOut = usePassed(checkBy);
+    const loadOverdue = usePassed(navigatingSince === undefined ? undefined : navigatingSince + LOAD_HOLD_MS + DECIDE_GRACE_MS);
     const youControl = lease !== undefined && !refused;
     // Another person's lease ends on the server's clock too; while this tab's claim is unseen, the status may be older.
     const otherEnded = usePassed(control?.byYou === false ? control.until - statusClock.skew : undefined);
@@ -342,7 +352,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         // A page still loading under a lease that ended answers into nothing.
         if (next === undefined) {
             navigations.current += 1;
-            setNavigating(false);
+            setNavigatingSince(undefined);
         }
 
         // A status read still out speaks for the claim it was asked for only.
@@ -486,12 +496,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         const result = outcome.value;
 
-        // Another of the person's tabs took control since, or control ended; while a hand back is out, that is its answer.
+        // Another of the person's tabs took control since, or control ended. Also while a hand back is out: its answer
+        // then finds the claim gone and changes nothing, so a hand back that fails cannot leave the view open.
         if (result === null) {
-            if (returningRef.current === held) {
-                return;
-            }
-
             endControl(t`You no longer have control of the browser.`);
 
             return;
@@ -574,7 +581,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const leaseExpired = useEffectEvent((): void => {
         const holding = claimRef.current;
 
-        // A page still loading holds the lease on the server: its answer (and the renewal it sends) decides.
+        // A page still loading holds the lease on the server: its answer (and the renewal it sends) decides, unless it
+        // is overdue (then the load is dropped, and this runs again).
         if (holding === undefined || navigating) {
             return;
         }
@@ -596,6 +604,19 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             confirmLease(holding);
         }
     });
+
+    // The server holds the lease no longer than a load may take: an answer that never came is not waited for.
+    const loadLost = useEffectEvent((): void => {
+        navigations.current += 1;
+        setNavigatingSince(undefined);
+        setAddressError(t`That page could not be opened.`);
+    });
+
+    useEffect(() => {
+        if (loadOverdue) {
+            loadLost();
+        }
+    }, [loadOverdue]);
 
     const leave = useEffectEvent((): void => {
         giveBack();
@@ -781,7 +802,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
     /**
      * The person hands back: the claim stays this tab's, and the view interactive, until the hand back lands, as the
-     * server's lease does. One that did not land leaves the person in control, and says so.
+     * server's lease does. One that did not land leaves the person in control, and says so, unless a renewal answered
+     * meanwhile that the claim is gone: the view has closed then, and the hand back's answer changes nothing.
      */
     const handBackNow = (): void => {
         const handing = claimRef.current;
@@ -832,7 +854,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             return;
         }
 
-        setNavigating(false);
+        setNavigatingSince(undefined);
         setLoadedAt(Date.now());
         // The load held the lease on the server: its answer, and the renewal it sends, decide afresh.
         dropCheck();
@@ -862,7 +884,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             return;
         }
 
-        setNavigating(false);
+        setNavigatingSince(undefined);
         setLoadedAt(Date.now());
         // The load held the lease on the server: its answer, and the renewal it sends, decide afresh.
         dropCheck();
@@ -888,11 +910,11 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         setAddressError(undefined);
         // A page an earlier load left loading says so again only if this load answers the same.
         setStillLoading(0);
-        setNavigating(true);
+        setNavigatingSince(Date.now());
         navigations.current += 1;
         const navigation = navigations.current;
 
-        // A page may take the renderer's whole hold (about 75 s) to load: nothing here gives up before the answer.
+        // A page may take the renderer's whole hold (about 75 s) to load: the card gives up only past it and its grace.
         const submitted = address.trim();
 
         void navigateInControl({ claim: held, threadId, url: submitted })

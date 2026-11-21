@@ -1564,6 +1564,57 @@ describe("BrowserLiveView", () => {
             });
         });
 
+        it.each([
+            ["fails", { code: "BAD_REQUEST", status: 400 }],
+            ["lands", true],
+        ] as const)(
+            "closes the interactive view when a renewal answers null while a hand back is out, and the hand back %s after",
+            async (_landing, answer) => {
+                vi.useFakeTimers({ shouldAdvanceTime: true });
+                controllable();
+                const queryClient = mountCard();
+
+                await takeControl(queryClient, Date.now() + 40_000);
+                const answers = heldRenewal();
+                const handedBack: { reject: (error: unknown) => void; resolve: (value: boolean) => void }[] = [];
+
+                backend.handBack.mockImplementationOnce(
+                    async () =>
+                        await new Promise((resolve, reject) => {
+                            handedBack.push({ reject, resolve });
+                        }),
+                );
+                await act(async () => {
+                    await vi.advanceTimersByTimeAsync(11_000);
+                });
+                await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+                await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+                await act(async () => {
+                    answers[0]?.(null);
+                });
+
+                expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+                expect(screen.getByText("You no longer have control of the browser.")).toBeTruthy();
+
+                await act(async () => {
+                    if (answer === true) {
+                        handedBack[0]?.resolve(true);
+                    } else {
+                        handedBack[0]?.reject(answer);
+                    }
+                });
+
+                expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+                expect(screen.queryByTitle(READ_ONLY_VIEW)).toBeNull();
+                expect(screen.queryByText("You handed the browser back to the agent.")).toBeNull();
+                expect(
+                    screen.queryByText("The browser could not be handed back. The agent gets it back on its own after two minutes without input."),
+                ).toBeNull();
+                expect(screen.getByText("You no longer have control of the browser.")).toBeTruthy();
+                expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+            },
+        );
+
         it("takes the end an earlier renewal answered, though a later one failed first", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
@@ -1685,6 +1736,74 @@ describe("BrowserLiveView", () => {
             expect(backend.statusReads).toBe(reads);
             expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
             expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("stops waiting for a page load that never answers once the server's hold and its grace are past, and ends a lease the status read does not confirm", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const start = Date.now();
+
+            await takeControl(queryClient, start + 40_000);
+            // The renewal sent with the address moves nothing, and the load never answers.
+            backend.keep.mockResolvedValueOnce({ until: start + 40_000 });
+            const loads: ((value: unknown) => void)[] = [];
+
+            backend.navigate.mockImplementation(
+                async () =>
+                    await new Promise((resolve) => {
+                        loads.push(resolve);
+                    }),
+            );
+            await typeAddress();
+            const reads = backend.oneOffReads;
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(85_000);
+            });
+            // Past the lease's end, but within the load's hold: the load decides.
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(backend.oneOffReads).toBe(reads);
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(8000);
+            });
+
+            expect(backend.oneOffReads).toBe(reads + 1);
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByText("Control of the browser is back with the agent.")).toBeTruthy();
+            expect(backend.handBack).toHaveBeenCalledWith(expect.objectContaining({ claim: "claim-1", reason: "left" }));
+
+            // The dropped load answers after all: it changes nothing.
+            await act(async () => {
+                loads[0]?.({ status: "ok", url: "https://example.com/next" });
+            });
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.queryByText("https://example.com/next")).toBeNull();
+        });
+
+        it("keeps control after dropping a page load that never answers, while the status read confirms the lease, and lets the person try again", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const start = Date.now();
+
+            await takeControl(queryClient, start + 40_000);
+            backend.keep.mockResolvedValueOnce({ until: start + 40_000 });
+            backend.navigate.mockImplementation(async () => await new Promise(() => {}));
+            await typeAddress();
+            // The server moved the lease on (its push never came): the status read names the later end.
+            backend.browser = { ...backend.browser!, control: { byYou: true, until: start + 600_000 } };
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(93_000);
+            });
+
+            expect(backend.oneOffReads).toBeGreaterThan(0);
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.getByRole("alert").textContent).toBe("That page could not be opened.");
+            expect(screen.queryByText("Opening the page. This can take up to a minute.")).toBeNull();
+            expect(screen.getByRole("button", { name: "Go" })).toHaveProperty("disabled", false);
         });
 
         it("drops a page's still-loading notice once a new page is asked for", async () => {
