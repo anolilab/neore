@@ -28,10 +28,11 @@ const requestSend = async (text: string): Promise<void> => {
 };
 
 /** Lazy, like `requestSend`: the new-thread composer takes the files and attaches them (`composer-submit.ts`). */
-const requestAttach = async (files: File[], accountId: string | undefined): Promise<void> => {
+/** Returns the number of files of an earlier drop this one replaced (another account's), which were not attached. */
+const requestAttach = async (files: File[], accountId: string | undefined): Promise<number> => {
     const { requestComposerAttach } = await import("@/features/chat/core/utils/composer-submit");
 
-    requestComposerAttach({ accountId, files });
+    return requestComposerAttach({ accountId, files });
 };
 
 /**
@@ -70,6 +71,13 @@ const NativeBridge = (): JSX.Element | null => {
     useEffect(() => {
         discardedMessageRef.current = discardedMessage;
     }, [discardedMessage]);
+
+    const replacedMessage = t`Files dropped earlier for another account were not attached. Drop them again.`;
+    const replacedMessageRef = useRef(replacedMessage);
+
+    useEffect(() => {
+        replacedMessageRef.current = replacedMessage;
+    }, [replacedMessage]);
     const afterFirstPaint = useAfterFirstPaint();
     const [hasDeviceTools, setHasDeviceTools] = useState(false);
 
@@ -115,7 +123,10 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeFiles(
                 (files, accountId) => {
                     void (async () => {
-                        await requestAttach(files, accountId);
+                        if ((await requestAttach(files, accountId)) > 0) {
+                            toast.error(replacedMessageRef.current);
+                        }
+
                         await openNewChat();
                     })();
                 },

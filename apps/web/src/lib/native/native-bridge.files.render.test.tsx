@@ -139,6 +139,17 @@ describe("NativeBridge dock drops", () => {
         expect(inbox.accountsAtStart[0]?.()).toBe("u2");
     });
 
+    it("tells the person when a dock drop replaced an earlier drop for another account", async () => {
+        requestComposerAttach.mockReturnValueOnce(1);
+        toastError.mockClear();
+        render(<NativeBridge />);
+        inbox.fileListeners.at(-1)?.([new File(["a"], "a.txt")], "u2");
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it("tells the person when a dock drop was let go across an account switch", () => {
         render(<NativeBridge />);
         inbox.discards.at(-1)?.(2);

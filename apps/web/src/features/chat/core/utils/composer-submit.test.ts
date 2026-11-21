@@ -60,7 +60,9 @@ describe(requestComposerAttach, () => {
         const second = new File(["b"], "b.txt");
 
         requestComposerAttach({ accountId: "u1", files: [first] });
-        requestComposerAttach({ accountId: "u1", files: [second] });
+
+        // Joined, so nothing is let go.
+        expect(requestComposerAttach({ accountId: "u1", files: [second] })).toBe(0);
 
         const handler = vi.fn();
         const stop = onComposerAttachRequest("u1", handler);
@@ -74,8 +76,9 @@ describe(requestComposerAttach, () => {
         const mine = new File(["a"], "a.txt");
         const theirs = new File(["b"], "b.txt");
 
-        requestComposerAttach({ accountId: "u1", files: [mine] });
-        requestComposerAttach({ accountId: "u2", files: [theirs] });
+        expect(requestComposerAttach({ accountId: "u1", files: [mine] })).toBe(0);
+        // The held drop's one file is let go, and the caller is told so.
+        expect(requestComposerAttach({ accountId: "u2", files: [theirs] })).toBe(1);
 
         const handler = vi.fn();
         const stop = onComposerAttachRequest("u2", handler);

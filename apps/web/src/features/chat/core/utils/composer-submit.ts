@@ -44,7 +44,7 @@ const isForAccount = (requestAccountId: string | undefined, accountId: string | 
  * replace the first, and a drop made while the session loaded joins the next one, taking its account. Only a drop for
  * another known account replaces the held one, so files never mix across accounts.
  */
-export const requestComposerAttach = (request: ComposerAttachRequest): void => {
+export const requestComposerAttach = (request: ComposerAttachRequest): number => {
     const held = composerAttachChannel.store.getState().pending?.payload;
 
     // Joined for one account, or when the held drop was made before the session was known (it takes the new account). A
@@ -52,10 +52,13 @@ export const requestComposerAttach = (request: ComposerAttachRequest): void => {
     if (held && (held.accountId === request.accountId || held.accountId === undefined)) {
         composerAttachChannel.request({ accountId: request.accountId, files: [...held.files, ...request.files] });
 
-        return;
+        return 0;
     }
 
     composerAttachChannel.request({ accountId: request.accountId, files: request.files });
+
+    // The files of a held drop this one replaced (another account's), so the caller can ask for them to be dropped again.
+    return held?.files.length ?? 0;
 };
 
 /**

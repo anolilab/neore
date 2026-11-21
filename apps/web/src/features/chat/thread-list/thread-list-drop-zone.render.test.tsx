@@ -142,6 +142,17 @@ describe("ThreadListDropZone", () => {
         expect(requestComposerAttach.mock.calls[0]?.[0]).toMatchObject({ accountId: "signed-out" });
     });
 
+    it("says so when the drop replaced an earlier one for another account", async () => {
+        requestComposerAttach.mockReturnValue(2);
+        location.pathname = "/chat";
+        renderZone();
+        fireEvent.drop(screen.getByTestId("thread-list-drop-zone"), filesTransfer([new File(["a"], "a.txt", { type: "text/plain" })]));
+
+        await waitFor(() => {
+            expect(showError).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it("takes the files back and says so when the new chat does not open", async () => {
         const report = new File(["%PDF"], "report.pdf", { type: "application/pdf" });
 

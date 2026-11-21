@@ -88,7 +88,9 @@ const ThreadListDropZone: FC<{ children: ReactNode }> = ({ children }) => {
             }
 
             // Held until the new-chat composer takes them, so the drop survives the navigation below.
-            requestComposerAttach({ accountId, files });
+            if (requestComposerAttach({ accountId, files }) > 0) {
+                showError(t`Files dropped earlier for another account were not attached. Drop them again.`);
+            }
 
             if (isNewChatPath(router.state.location.pathname)) {
                 return;
