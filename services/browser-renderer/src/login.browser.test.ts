@@ -1404,6 +1404,32 @@ describe(signIn, () => {
         expect(page.isClosed()).toBe(true);
     });
 
+    it("closes the session rather than navigate with no time limit when the cleanup's lock-down answers right at its end", async () => {
+        const deadline = Date.now() + 30_000;
+        let frozen: number | undefined;
+
+        // The cleanup's lock-down answers exactly when the cleanup's own end comes, and the clock stops there: what is
+        // left for the blank page is 0, which Playwright would read as no limit.
+        scriptsOff(async (call, send, isOff) => {
+            if (call === 1 || !isOff) {
+                return send();
+            }
+
+            const answer = await send();
+
+            frozen = deadline - 1000;
+
+            return answer;
+        });
+        fixture.page = loginForm();
+
+        const result = await run(() => frozen ?? Date.now(), undefined, deadline);
+
+        expect(frozen).toBeDefined();
+        expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
+        expect(page.isClosed()).toBe(true);
+    });
+
     it("types the username into a field outside the form that belongs to it by its form attribute", async () => {
         fixture.page = `<input name="user" form="login"><form id="login" method="post" action="/session"><input name="pw" type="password"><button>Go</button></form>`;
 

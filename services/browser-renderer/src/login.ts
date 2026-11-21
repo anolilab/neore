@@ -1081,7 +1081,14 @@ const clearPassword = async (
             return false;
         }
 
-        await page.goto("about:blank", { timeout: lookUntil - now() });
+        // Taken once and refused at zero: Playwright reads a timeout of 0 as no time limit at all.
+        const blankWithin = lookUntil - now();
+
+        if (blankWithin <= 0) {
+            return false;
+        }
+
+        await page.goto("about:blank", { timeout: blankWithin });
     } catch {
         return false;
     }
@@ -1123,8 +1130,10 @@ const clearPassword = async (
     }
 
     // The page as the session goes on with it, scripts and all: it was clean without them.
-    if (isReloaded && deadline - now() >= 1000) {
-        await page.reload({ timeout: deadline - now(), waitUntil: "domcontentloaded" }).catch(() => undefined);
+    const reloadWithin = deadline - now();
+
+    if (isReloaded && reloadWithin >= 1000) {
+        await page.reload({ timeout: reloadWithin, waitUntil: "domcontentloaded" }).catch(() => undefined);
     }
 
     return true;
