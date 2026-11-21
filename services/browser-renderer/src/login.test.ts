@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { withoutSecret } from "./login";
+import { withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -39,5 +39,33 @@ describe(withoutSecret, () => {
 
     it("keeps text without the password", () => {
         expect(withoutSecret("https://example.com/home?p=other", SECRET)).toBe("https://example.com/home?p=other");
+    });
+});
+
+describe(withPassword, () => {
+    const STAND = "Xq7Rk2Lm9Pz4Wv8T";
+    const FIELD = { name: "pw", stand: STAND };
+    const part = (name: string, value: string) => `--b\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`;
+
+    it("puts the password into the URL-encoded password field", () => {
+        const filled = withPassword(Buffer.from(`user=ann&pw=${STAND}`), "application/x-www-form-urlencoded", FIELD, SECRET);
+
+        expect(Object.fromEntries(new URLSearchParams(filled?.toString() ?? ""))).toStrictEqual({ pw: SECRET, user: "ann" });
+    });
+
+    it("puts the password into the multipart password field", () => {
+        const filled = withPassword(Buffer.from(`${part("user", "ann")}${part("pw", STAND)}--b--\r\n`), 'multipart/form-data; boundary="b"', FIELD, SECRET);
+
+        expect(filled?.toString()).toBe(`${part("user", "ann")}${part("pw", SECRET)}--b--\r\n`);
+    });
+
+    it.each([
+        ["the password field lost the stand-in", "application/x-www-form-urlencoded", `pw=${STAND.slice(1)}`],
+        ["another field holds the stand-in", "application/x-www-form-urlencoded", `bio=${STAND}`],
+        ["the stand-in is copied into another field too", "application/x-www-form-urlencoded", `user=${STAND}&pw=${STAND}`],
+        ["a multipart stand-in is in another field", 'multipart/form-data; boundary="b"', `${part("bio", STAND)}--b--\r\n`],
+        ["the body is plain text", "text/plain", `pw=${STAND}`],
+    ])("sends nothing when %s", (_why, type, body) => {
+        expect(withPassword(Buffer.from(body), type, FIELD, SECRET)).toBeNull();
     });
 });

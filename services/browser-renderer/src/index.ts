@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { originOf, signIn, withoutSecret } from "./login";
+import { originOf, signIn, TYPE_RESERVE_MS, withoutSecret } from "./login";
 
 // @cloudflare/playwright types — the binding provides launch() and connect()
 interface BrowserBinding {
@@ -309,30 +309,23 @@ const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promis
     return page;
 };
 
-app.post("/action", async (c) => {
-    // Parse request — catch malformed JSON
-    let body: unknown;
+/**
+ * The sessions this isolate's calls are using: a `/login` holds its session alone from before it connects until its
+ * cleanup ends, so no `/action` (an `extract` of the filled page) runs beside it, and it waits for none.
+ */
+const signingIn = new Set<string>();
+const acting = new Map<string, number>();
 
-    try {
-        body = await c.req.json();
-    } catch {
-        return c.json({ error: "Invalid JSON body", success: false }, 400);
-    }
+const BUSY_SIGNING_IN = "The browser session is signing in with a saved login; try again once that is done";
 
-    const parsed = actionSchema.safeParse(body);
-
-    if (!parsed.success) {
-        return c.json({ error: `Invalid request: ${parsed.error.message}`, success: false }, 400);
-    }
-
-    const { action, direction, fullPage, selector, sessionId, text, url } = parsed.data;
-
+/** One browser action, on the session `sessionId` or a new one. */
+const act = async (env: Env, { action, direction, fullPage, selector, sessionId, text, url }: z.infer<typeof actionSchema>): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
     if (action === "navigate" && url) {
         const urlError = validateUrl(url);
 
         if (urlError) {
-            return c.json({ error: urlError, success: false }, 400);
+            return Response.json({ error: urlError, success: false }, { status: 400 });
         }
     }
 
@@ -340,14 +333,14 @@ app.post("/action", async (c) => {
     let activeSessionId: string | undefined;
 
     try {
-        ({ browser, sessionId: activeSessionId } = await openBrowser(c.env, sessionId));
+        ({ browser, sessionId: activeSessionId } = await openBrowser(env, sessionId));
     } catch (error) {
-        return c.json(
+        return Response.json(
             {
                 error: `Failed to launch browser: ${error instanceof Error ? error.message : String(error)}`,
                 success: false,
             },
-            500,
+            { status: 500 },
         );
     }
 
@@ -426,7 +419,7 @@ app.post("/action", async (c) => {
                         await browser.close().catch(() => {});
                         activeSessionId = undefined;
 
-                        return c.json({ error: `Redirected to blocked URL: ${redirectError}`, success: false });
+                        return Response.json({ error: `Redirected to blocked URL: ${redirectError}`, success: false });
                     }
                 }
 
@@ -494,14 +487,14 @@ app.post("/action", async (c) => {
         }
 
         // Include sessionId so the caller can reconnect for follow-up actions
-        return c.json({ ...result, sessionId: activeSessionId });
+        return Response.json({ ...result, sessionId: activeSessionId });
     } catch (error) {
-        return c.json(
+        return Response.json(
             {
                 error: error instanceof Error ? error.message : String(error),
                 success: false,
             },
-            500,
+            { status: 500 },
         );
     } finally {
         // Don't close the browser — keepAlive will handle cleanup after idle timeout.
@@ -510,19 +503,123 @@ app.post("/action", async (c) => {
             await browser.close().catch(() => {});
         }
     }
+};
+
+app.post("/action", async (c) => {
+    // Parse request — catch malformed JSON
+    let body: unknown;
+
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: "Invalid JSON body", success: false }, 400);
+    }
+
+    const parsed = actionSchema.safeParse(body);
+
+    if (!parsed.success) {
+        return c.json({ error: `Invalid request: ${parsed.error.message}`, success: false }, 400);
+    }
+
+    const { action, direction, fullPage, selector, sessionId, text, url } = parsed.data;
+
+    if (sessionId && signingIn.has(sessionId)) {
+        return c.json({ error: BUSY_SIGNING_IN, success: false }, 409);
+    }
+
+    if (sessionId) {
+        acting.set(sessionId, (acting.get(sessionId) ?? 0) + 1);
+    }
+
+    try {
+        return await act(c.env, { action, direction, fullPage, selector, sessionId, text, url });
+    } finally {
+        if (sessionId) {
+            const left = (acting.get(sessionId) ?? 1) - 1;
+
+            if (left > 0) {
+                acting.set(sessionId, left);
+            } else {
+                acting.delete(sessionId);
+            }
+        }
+    }
 });
 
 // ─── Saved-login fill ────────────────────────────────────────────────────────────
 
+/** The hold `/login` keeps after its deadline, for the response to get back. */
+const LOGIN_MARGIN_MS = 2000;
+
+/** The least budget a sign-in can succeed in: the margin, a page load, and the time typing and the cleanup need. */
+const MIN_LOGIN_BUDGET_MS = LOGIN_MARGIN_MS + 6000 + TYPE_RESERVE_MS;
+
+const MAX_LOGIN_BUDGET_MS = 120_000;
+
 const loginSchema = z.object({
-    /** The time the caller gives the whole call; nothing is typed once too little of it is left. */
-    budgetMs: z.int().min(1000).max(120_000).optional(),
+    /** The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left. */
+    budgetMs: z.int().min(MIN_LOGIN_BUDGET_MS).max(MAX_LOGIN_BUDGET_MS).optional(),
     origin: z.string().max(2048),
     password: z.string().min(1).max(1024),
     sessionId: z.string().optional(),
     url: z.string().max(8192),
     username: z.string().min(1).max(320),
 });
+
+type Browser = import("@cloudflare/playwright").Browser;
+
+/** `promise`, or `null` once `ms` passed. */
+const settledWithin = async <T>(promise: Promise<T>, ms: number): Promise<T | null> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<null>((resolve) => {
+                timer = setTimeout(resolve, Math.max(0, ms), null);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+/**
+ * The session's browser and page for a sign-in, or `null` when they are not ready by `deadline`: a browser that is ready
+ * later is closed, since nothing will use it.
+ */
+const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: number) => {
+    let isLate = false;
+    let opened: { browser: Browser; sessionId: string } | undefined;
+    const close = (browser: Browser): void => {
+        browser.close().catch(() => undefined);
+    };
+    const opening = openBrowser(env, sessionId).then((result) => {
+        opened = result;
+
+        if (isLate) {
+            close(result.browser);
+        }
+
+        return result;
+    });
+    const ready = await settledWithin(
+        opening.then(async (result) => {
+            return { ...result, page: await pageOf(result.browser) };
+        }),
+        deadline - Date.now(),
+    );
+
+    if (!ready) {
+        isLate = true;
+
+        if (opened) {
+            close(opened.browser);
+        }
+    }
+
+    return { opened, ready };
+};
 
 app.post("/login", async (c) => {
     let body: unknown;
@@ -537,7 +634,17 @@ app.post("/login", async (c) => {
 
     // Never the validation message: it may quote what was sent.
     if (!parsed.success) {
-        return c.json({ error: "Invalid login request", success: false }, 400);
+        const isBudget = parsed.error.issues.some((issue) => issue.path[0] === "budgetMs");
+
+        return c.json(
+            {
+                error: isBudget
+                    ? `budgetMs must be from ${MIN_LOGIN_BUDGET_MS} to ${MAX_LOGIN_BUDGET_MS}: a sign-in needs at least ${MIN_LOGIN_BUDGET_MS / 1000} s`
+                    : "Invalid login request",
+                success: false,
+            },
+            400,
+        );
     }
 
     const { budgetMs, origin, password, sessionId, url, username } = parsed.data;
@@ -546,44 +653,76 @@ app.post("/login", async (c) => {
         return c.json({ error: "The login page is not on the site the login was saved for", success: false }, 400);
     }
 
-    const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - 2000;
-
-    let browser: import("@cloudflare/playwright").Browser | undefined;
-    let activeSessionId: string | undefined;
-
-    try {
-        ({ browser, sessionId: activeSessionId } = await openBrowser(c.env, sessionId));
-    } catch (error) {
-        return c.json(
-            { error: `Failed to launch browser: ${withoutSecret(error instanceof Error ? error.message : String(error), password)}`, success: false },
-            500,
-        );
+    if (sessionId && (signingIn.has(sessionId) || acting.has(sessionId))) {
+        return c.json({ error: "The browser session is busy with another call; try the sign-in again once it is done", success: false }, 409);
     }
 
-    let shouldCloseSession = !activeSessionId;
+    if (sessionId) {
+        signingIn.add(sessionId);
+    }
+
+    const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - LOGIN_MARGIN_MS;
 
     try {
-        const result = await signIn(await pageOf(browser), { deadline, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
+        const { body: answer, status } = await logIn(c.env, { deadline, origin, password, sessionId, url, username });
+
+        return c.json(answer, status);
+    } finally {
+        if (sessionId) {
+            signingIn.delete(sessionId);
+        }
+    }
+});
+
+/** The sign-in of `/login`, the browser setup included, ended by `deadline`; the browser is closed when it must be. */
+const logIn = async (
+    env: Env,
+    {
+        deadline,
+        origin,
+        password,
+        sessionId,
+        url,
+        username,
+    }: { deadline: number; origin: string; password: string; sessionId: string | undefined; url: string; username: string },
+) => {
+    const scrub = (error: unknown): string => withoutSecret(error instanceof Error ? error.message : String(error), password);
+    let setup: Awaited<ReturnType<typeof setUpWithin>>;
+
+    try {
+        setup = await setUpWithin(env, sessionId, deadline);
+    } catch (error) {
+        return { body: { error: `Failed to launch browser: ${scrub(error)}`, success: false }, status: 500 } as const;
+    }
+
+    const { opened, ready } = setup;
+
+    if (!ready) {
+        return { body: { error: "The browser did not start in time, so nothing was typed. Try it again.", success: false }, status: 504 } as const;
+    }
+
+    const { browser, page } = ready;
+    let shouldCloseSession = !ready.sessionId;
+
+    try {
+        const result = await signIn(page, { deadline, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
 
         if (!result.success && result.sessionClosed) {
             shouldCloseSession = true;
 
-            return c.json(result);
+            return { body: result, status: 200 } as const;
         }
 
-        return c.json({ ...result, sessionId: activeSessionId });
+        return { body: { ...result, sessionId: ready.sessionId }, status: 200 } as const;
     } catch (error) {
         // Before anything was typed (`signIn` handles every error after): the session holds no password.
-        return c.json(
-            { error: withoutSecret(error instanceof Error ? error.message : String(error), password), sessionId: activeSessionId, success: false },
-            500,
-        );
+        return { body: { error: scrub(error), sessionId: opened?.sessionId, success: false }, status: 500 } as const;
     } finally {
         if (shouldCloseSession) {
             await browser.close().catch(() => {});
         }
     }
-});
+};
 
 // Health check
 app.get("/health", (c) => c.json({ service: "browser-renderer", status: "ok" }));

@@ -81,13 +81,20 @@ So that the page cannot parse rules where no script reaches (a declarative shado
 declarative shadow root of the page as served) means nothing is typed, and a speculative load the browser starts once
 the password is typed counts as an attempt; that is reported, not stopped, since the browser has already sent it.
 
-Not closed: a `<link rel="preconnect">` (or `dns-prefetch`, where the browser does it) to a host the password is spelled
-into. The browser looks the host up and connects as the element is added, in a context of its own profile (the one
-Browser Rendering gives); request interception never sees it, and neither a `Content-Security-Policy` nor
-`X-DNS-Prefetch-Control` stops it. Chromium's `Connection-Allowlist` header does, but it also fails every redirect a
-navigation of the page meets (a sign-in's `303` included), so it is not used. Nor is a page a script replaces with its
-own markup through a `javascript:` address: that document cannot be told from a reload, so rules in a declarative shadow
-root of it are sent.
+The page never holds the password. Its field gets a random stand-in (64 letters and digits, or the password's length
+when longer, within the field's `maxlength`), and request interception puts the password in its place only in the
+main frame's POST to the form's action address, only as the password field's value, and only when the stand-in is
+nowhere else in the body. A POST elsewhere, or one where the page moved or copied the stand-in, is not sent. Scripts are
+off for the document that answers the POST, so nothing the site shows of it can be read before the cleanup. So no page
+script can read the password, by the field's value or any other way (other realms, events, `FormData`, selection), and a
+`<link rel="preconnect">` or a `javascript:` page can only carry the stand-in. A site that signs in from a script (a
+fetch, XHR or socket message with what it read from the field) cannot be filled: that is reported as `scriptSignIn`,
+and nothing is sent. So is a form sent as `text/plain`, or in a charset other than UTF-8 when the password is not ASCII.
+
+Not covered: the stand-in's length tells the page the length of a password longer than 64 characters. A site whose
+server shows the password in a page loaded after the sign-in (the cleanup's reload) is checked for known spellings
+only (`isClean`). `/login` holds its session alone against other calls of the same isolate (a `409` for an `/action`
+on it); a call from another isolate is not excluded.
 
 `test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with
 cross-site frames in their own process, and needs

