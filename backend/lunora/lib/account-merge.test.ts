@@ -784,6 +784,50 @@ describe("a shard that holds both accounts' rows", () => {
             harness.close();
         }
     });
+
+    it("moves a collaborator's comment on the guest's page with the page, still owned by the collaborator", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const pageId = await context.db.insert("pages", {
+                    contentRevision: 0,
+                    createdAt: 0,
+                    order: 0,
+                    revision: 0,
+                    title: "Plan",
+                    updatedAt: 0,
+                    userId: "guest",
+                });
+                // Inserted then removed, so the new shard does not already hold the row when the guest's shard sends it over.
+                const commentId = await context.db.insert("pageComments", {
+                    authorName: "Collaborator",
+                    body: "from a collaborator",
+                    commentId: "c-collab",
+                    createdAt: 0,
+                    pageId,
+                    status: "open",
+                    userId: "collab",
+                });
+                const sent = await context.db.get("pageComments", commentId);
+
+                await context.db.delete("pageComments", commentId);
+
+                await context.runMutation(importShardRows, {
+                    from: "guest",
+                    rows: [sent],
+                    table: "pageComments",
+                    to: "user",
+                });
+
+                return { stored: await context.db.get("pageComments", commentId) };
+            });
+
+            expect(result.stored).toMatchObject({ body: "from a collaborator", userId: "collab" });
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("clearing the guest's settings", () => {

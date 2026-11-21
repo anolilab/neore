@@ -220,19 +220,19 @@ export const importShardRows = internalMutation
 
         let imported = 0;
 
-        // On a user-sharded table only the guest's own rows are theirs to move: a shared shard lists every user's rows too.
+        // A user-sharded table's rows are copied for the guest, and also for another user whose row sits on the guest's shard.
         const ownerField = shardOwnerField(args.table);
 
         for (const row of args.rows as Record<string, unknown>[]) {
-            if (ownerField !== undefined && row[ownerField] !== args.from) {
-                continue;
-            }
-
             const id = row._id as string;
             const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
 
             if (existing === null) {
-                await db.insert(args.table, rewriteOwner(row, args.from, args.to), { allowExplicitId: true });
+                // The guest's own row is re-owned. Another user's row (a collaborator's comment on the guest's page) moves as it
+                // is: its owner stays and nothing in it is rewritten, so it still belongs to the page once the page moves.
+                const guestOwned = ownerField === undefined || row[ownerField] === args.from;
+
+                await db.insert(args.table, guestOwned ? rewriteOwner(row, args.from, args.to) : row, { allowExplicitId: true });
                 imported += 1;
 
                 continue;
