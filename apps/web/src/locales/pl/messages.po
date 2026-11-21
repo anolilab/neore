@@ -77,10 +77,6 @@ msgstr "Nie udało się przesłać \"{fileName}\", więc wiadomość nie został
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Nie udało się przesłać „{fileName}”. Sprawdź połączenie i spróbuj ponownie."
 
-#: src/features/chat/thread/composer-input.tsx:1146
-#~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
-#~ msgstr "Nie udało się przesłać \"{fileName}\". Usuń go, aby wysłać."
-
 #: src/features/chat/thread/composer-input.tsx:642
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}” jest za duży. Dokumenty mogą mieć maksymalnie {maxMegabytes} MB."
@@ -104,6 +100,10 @@ msgstr "Odrzucono „{truncatedName}” i {moreCount} innych"
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:226
 msgid "\"{truncatedName}\" has been rejected"
 msgstr "Odrzucono „{truncatedName}”"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
+msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
+msgstr ""
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:567
 msgid "\"v1\" for the current Azure OpenAI API. A dated version such as 2024-10-21 uses the older per-deployment URLs."
@@ -2255,8 +2255,8 @@ msgid "Accessing Veo 3.1 quality with audio at faster speeds and a more accessib
 msgstr "Jakość Veo 3.1 z dźwiękiem, szybciej i w bardziej przystępnej cenie"
 
 #: src/features/layout/lib/dashboard-page-names.ts:11
-#: src/features/settings/lib/settings-navigation.ts:102
-#: src/features/settings/lib/settings-navigation.ts:111
+#: src/features/settings/lib/settings-navigation.ts:104
+#: src/features/settings/lib/settings-navigation.ts:113
 msgid "Account"
 msgstr "Konto"
 
@@ -2721,6 +2721,10 @@ msgstr "Dodano dokumenty: {added}; pominięto nieobsługiwane lub zbyt duże pli
 msgid "Added {added} document(s)."
 msgstr "Dodano dokumenty: {added}."
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
+msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-item.tsx:72
 msgid "Added by you · {learnedOn}"
 msgstr "Dodane przez Ciebie · {learnedOn}"
@@ -3019,7 +3023,7 @@ msgstr "Po treści z zewnątrz"
 #: src/features/chat/host/host-composer.tsx:735
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
-#: src/features/settings/lib/settings-navigation.ts:93
+#: src/features/settings/lib/settings-navigation.ts:94
 #: src/features/tasks/components/task-form-dialog.tsx:354
 msgid "Agent"
 msgstr "Agent"
@@ -3338,6 +3342,8 @@ msgid "All changes saved"
 msgstr "Zapisano wszystkie zmiany"
 
 #: src/features/home/components/home-page.tsx:243
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "All chats"
 msgstr "Wszystkie czaty"
 
@@ -3429,6 +3435,11 @@ msgstr "Wszyscy dostawcy"
 #: src/features/marketing/components/gateway-landing-page.tsx:122
 msgid "All providers + BYOK"
 msgstr "Wszyscy dostawcy + BYOK"
+
+#. placeholder {0}: roleLabel.toLowerCase()
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:289
+msgid "All real {0} work goes to this model, even quick work."
+msgstr ""
 
 #: src/features/develop/components/checks-tab.tsx:96
 msgid "All required checks passed."
@@ -3556,6 +3567,7 @@ msgstr "Oglądają też"
 
 #: src/features/projects/components/project-rule-files.tsx:286
 #: src/features/projects/components/project-rule-files.tsx:455
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:308
 msgid "Always"
 msgstr "Zawsze"
 
@@ -3698,7 +3710,7 @@ msgstr "analityczny"
 msgid "Analytical (deep structure)"
 msgstr "Analityczny (głęboka struktura)"
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "analytics"
 msgstr "analityka"
 
@@ -3861,6 +3873,10 @@ msgstr "Dowolna nazwa z ollama.com/library, np. llama3.2, qwen3:8b lub gemma3:4b
 msgid "Any of my chats"
 msgstr "Dowolny z moich czatów"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:63
+msgid "Any other self-contained task."
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:162
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Dowolny wybrany ciąg znaków; wpisz tę samą wartość co Verify token webhooka w aplikacji Meta"
@@ -3911,8 +3927,8 @@ msgstr "Utworzono klucz API"
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:80
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
-#: src/features/settings/lib/settings-navigation.ts:96
-#: src/features/settings/lib/settings-navigation.ts:104
+#: src/features/settings/lib/settings-navigation.ts:98
+#: src/features/settings/lib/settings-navigation.ts:106
 #: src/routes/admin/route.tsx:61
 msgid "API Keys"
 msgstr "Klucze API"
@@ -3931,7 +3947,7 @@ msgid "API version"
 msgstr "Wersja API"
 
 #: src/features/layout/lib/dashboard-page-names.ts:16
-#: src/features/settings/lib/settings-navigation.ts:84
+#: src/features/settings/lib/settings-navigation.ts:85
 msgid "App"
 msgstr "Aplikacja"
 
@@ -3969,6 +3985,10 @@ msgstr "Błąd aplikacji"
 #: src/features/projects/components/project-rule-files.tsx:282
 msgid "Applies"
 msgstr "Obowiązuje"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:425
+msgid "Applies to"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
@@ -4013,8 +4033,8 @@ msgstr "Zastosuj styl"
 msgid "Applying..."
 msgstr "Stosowanie..."
 
-#: src/features/settings/lib/settings-keywords.ts:101
 #: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "approval"
 msgstr "zatwierdzenie"
 
@@ -4123,6 +4143,10 @@ msgstr "Duży model LLM Arcee z rozumowaniem przez OpenRouter"
 #: src/lib/model-descriptions.ts:36
 msgid "Arcee's small reasoning LLM"
 msgstr "Mały model LLM Arcee z rozumowaniem"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:50
+msgid "Architecture"
+msgstr ""
 
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
@@ -4294,7 +4318,7 @@ msgstr "Dla artystów, którzy chcą estetyki Krea w otwartoźródłowym, przyst
 msgid "Asc"
 msgstr "Rosn."
 
-#: src/features/settings/lib/settings-keywords.ts:101
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "ask"
 msgstr "zapytaj"
 
@@ -4524,7 +4548,7 @@ msgstr "Uwierzytelnianie"
 msgid "Authentication Required"
 msgstr "Wymagane uwierzytelnienie"
 
-#: src/features/settings/lib/settings-keywords.ts:101
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "auto"
 msgstr "auto"
 
@@ -4773,7 +4797,7 @@ msgstr "Wróć do edytora"
 msgid "Back to Gallery"
 msgstr "Wróć do galerii"
 
-#: src/components/settings/settings-modal.tsx:590
+#: src/components/settings/settings-modal.tsx:595
 msgid "Back to settings sections"
 msgstr "Wróć do sekcji ustawień"
 
@@ -4793,7 +4817,7 @@ msgstr "Kolor tła (opcjonalnie)"
 msgid "Background Removal"
 msgstr "Usuwanie tła"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "backup"
 msgstr "kopia zapasowa"
 
@@ -5101,11 +5125,15 @@ msgstr "Model FLUX Kontext od BFL o maksymalnej jakości"
 msgid "BFL's professional FLUX model via direct API"
 msgstr "Profesjonalny model FLUX od BFL przez bezpośrednie API"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:290
+msgid "Bigger pieces go to this model; quick questions stay in the chat."
+msgstr ""
+
 #: src/features/chat/thread/message-cost-badge.tsx:79
 msgid "Billed to your own API key, not your credits."
 msgstr "Rozliczane z twojego własnego klucza API, nie z twoich kredytów."
 
-#: src/features/settings/lib/settings-navigation.ts:107
+#: src/features/settings/lib/settings-navigation.ts:109
 msgid "Billing"
 msgstr "Rozliczenia"
 
@@ -5406,8 +5434,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Przeglądaj, rozwidlaj i remiksuj przepływy pracy udostępnione przez społeczność"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:944
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
+#: src/features/chat/browser-live-view/browser-live-view.tsx:951
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1151
 msgid "Browser"
 msgstr "Przeglądarka"
 
@@ -5525,7 +5553,7 @@ msgstr "Wbudowane wnioskowanie przed generowaniem"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:370
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:371
-#: src/features/settings/lib/settings-keywords.ts:101
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "Built-in tools"
 msgstr "Wbudowane narzędzia"
 
@@ -6157,7 +6185,7 @@ msgstr "czat"
 #: src/features/settings/components/account/account-settings.tsx:341
 #: src/features/settings/components/chat/bots-settings.tsx:499
 #: src/features/settings/lib/settings-keywords.ts:33
-#: src/features/settings/lib/settings-navigation.ts:98
+#: src/features/settings/lib/settings-navigation.ts:100
 msgid "Chat"
 msgstr "Czat"
 
@@ -6235,7 +6263,7 @@ msgstr "Rozmawiaj z AI przez bota własnej aplikacji Feishu lub Lark, w wiadomo�
 msgid "Chat, create, <0>and build.</0>"
 msgstr "Rozmawiaj, twórz <0>i buduj.</0>"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "chatgpt"
 msgstr "chatgpt"
 
@@ -6325,6 +6353,10 @@ msgstr "Sprawdzono: {0}"
 msgid "Checking"
 msgstr "Sprawdzanie"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:66
+msgid "Checking code, a draft or a plan for mistakes."
+msgstr ""
+
 #: ../../packages/chat-ui/src/chat/message-content.tsx:401
 msgid "Checking image safety..."
 msgstr "Sprawdzanie bezpieczeństwa obrazu..."
@@ -6389,6 +6421,10 @@ msgstr "Chiński (tradycyjny)"
 #: src/features/skills/components/skill-import-dialog.tsx:165
 msgid "Choose .md or .zip"
 msgstr "Wybierz .md lub .zip"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:411
+msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
+msgstr ""
 
 #: src/features/workflow/components/template-picker.tsx:111
 msgid "Choose a template to get started quickly. Templates provide pre-configured workflows for common tasks."
@@ -6568,7 +6604,7 @@ msgstr "Podaż w obiegu"
 msgid "city"
 msgstr "miasto"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "claude"
 msgstr "claude"
 
@@ -6940,6 +6976,10 @@ msgstr "Nawigacja po kodzie"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:602
 msgid "Code output"
 msgstr "Wynik kodu"
+
+#: src/features/settings/lib/settings-keywords.ts:99
+msgid "code review"
+msgstr ""
 
 #: src/features/chat/group/group-mode.ts:50
 #: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:16
@@ -7607,7 +7647,7 @@ msgstr "Skonfiguruj wartości zmiennych dla tego wątku. Te wartości zastąpią
 msgid "Configure Variables"
 msgstr "Skonfiguruj zmienne"
 
-#: src/components/settings/settings-modal.tsx:505
+#: src/components/settings/settings-modal.tsx:510
 msgid "Configure your application settings"
 msgstr "Skonfiguruj ustawienia aplikacji"
 
@@ -7921,7 +7961,7 @@ msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your to
 msgstr "Konektory komunikują się z własnym serwerem MCP każdego dostawcy przez OAuth 2.0. Twoje tokeny są przechowywane w postaci zaszyfrowanej, AI pyta przed użyciem narzędzia, które może zmienić dane, a rozłączenie odbiera dostęp."
 
 #: src/features/settings/components/privacy/consent-preferences.tsx:17
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "Consent Preferences"
 msgstr "Preferencje zgód"
 
@@ -8130,11 +8170,11 @@ msgstr "Kontroluj głębię ostrości ustawieniem przysłony"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Kontroluj, jak twoje dane osobowe są wyświetlane w interfejsie."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:471
+#: src/features/chat/browser-live-view/browser-live-view.tsx:475
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "Sterowanie przeglądarką wróciło do agenta: serwer nie potwierdził na czas, że nadal nią sterujesz."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:472
+#: src/features/chat/browser-live-view/browser-live-view.tsx:476
 msgid "Control of the browser is back with the agent."
 msgstr "Sterowanie przeglądarką wróciło do agenta."
 
@@ -8247,7 +8287,7 @@ msgstr "Przekształć na TypeScript"
 msgid "Converting..."
 msgstr "Konwertowanie..."
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "cookies"
 msgstr "pliki cookie"
 
@@ -8779,6 +8819,10 @@ msgstr "Nie udało się wczytać Twojej aktywności."
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "Nie udało się wczytać danych rozliczeniowych Twojej organizacji. Spróbuj ponownie później."
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:470
+msgid "Could not load your roles."
+msgstr ""
+
 #: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr "Nie udało się wczytać zapisanych wyborów, więc Pomiń i Wznów są wyłączone, dopóki nie zostaną ponownie odczytane."
@@ -8920,6 +8964,10 @@ msgstr "Nie udało się zapisać nowej kolejności dla {label}"
 #: src/features/pages/components/page-view.tsx:248
 msgid "Could not save the page"
 msgstr "Nie udało się zapisać strony"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:400
+msgid "Could not save the role"
+msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:185
 msgid "Could not save the summary, so nothing was submitted. Try again."
@@ -9133,7 +9181,7 @@ msgstr "Utwórz tag…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Utwórz zadanie, określ kryteria sukcesu i uruchom je. Możesz łączyć zadania zależnościami i powtarzać je według harmonogramu."
 
-#: src/components/settings/settings-modal.tsx:160
+#: src/components/settings/settings-modal.tsx:162
 msgid "Create an account"
 msgstr "Utwórz konto"
 
@@ -9603,7 +9651,7 @@ msgid "Customer messaging and support platform"
 msgstr "Platforma do komunikacji z klientami i wsparcia"
 
 #: src/features/layout/lib/dashboard-page-names.ts:22
-#: src/features/settings/lib/settings-navigation.ts:81
+#: src/features/settings/lib/settings-navigation.ts:82
 msgid "Customization"
 msgstr "Personalizacja"
 
@@ -9748,12 +9796,12 @@ msgid "Data & Analysis"
 msgstr "Dane i analiza"
 
 #: src/features/settings/components/privacy/data-access.tsx:21
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "Data Access Summary"
 msgstr "Podsumowanie dostępu do danych"
 
 #: src/features/settings/components/privacy/data-export.tsx:95
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "Data Export"
 msgstr "Eksport danych"
 
@@ -10046,7 +10094,7 @@ msgstr "Domyślny model do rozumienia i transkrypcji wideo"
 msgid "Default model updated"
 msgstr "Zaktualizowano domyślny model"
 
-#: src/features/settings/lib/settings-navigation.ts:91
+#: src/features/settings/lib/settings-navigation.ts:92
 msgid "Default Models"
 msgstr "Domyślne modele"
 
@@ -10082,9 +10130,18 @@ msgstr "Stopnie"
 msgid "Delayed"
 msgstr "Opóźniony"
 
+#: src/features/settings/lib/settings-keywords.ts:99
+msgid "delegate"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:226
 msgid "Delegate tasks to Devin, the AI software engineer"
 msgstr "Deleguj zadania do Devina, inżyniera oprogramowania AI"
+
+#. placeholder {0}: roleLabel.toLowerCase()
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:234
+msgid "Delegated {0} work runs on this model."
+msgstr ""
 
 #: src/components/delete-confirmation-dialog.tsx:45
 #: src/components/delete-confirmation-dialog.tsx:71
@@ -10669,6 +10726,7 @@ msgid "Deselect image"
 msgstr "Odznacz obraz"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:41
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:51
 msgid "Design"
 msgstr "Projekt"
 
@@ -10679,6 +10737,10 @@ msgstr "Podgląd projektu niedostępny"
 #: src/features/marketing/data/models-data.ts:37
 msgid "Designers creating logos, icons, and brand assets where text and layout precision matter most"
 msgstr "Dla projektantów tworzących logo, ikony i materiały marki, gdzie najważniejsza jest precyzja tekstu i układu"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:61
+msgid "Designing a system or a change that spans several parts."
+msgstr ""
 
 #: src/features/download/components/download-page.tsx:65
 msgid "Desktop"
@@ -11085,6 +11147,10 @@ msgstr "Dominikana"
 msgid "Don't have an account?"
 msgstr "Nie masz konta?"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:340
+msgid "Don't use your default instructions in this project"
+msgstr ""
+
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
@@ -11129,7 +11195,7 @@ msgstr "Kliknij dwukrotnie, aby zmienić nazwę"
 msgid "down"
 msgstr "w dół"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "download"
 msgstr "pobierz"
 
@@ -12712,6 +12778,10 @@ msgstr "Co 6 godzin"
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "Każdy czat i zaplanowane uruchomienie tego bota dostaje tylko te narzędzia. Twoje uprawnienia narzędzi nadal obowiązują."
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+msgid "Every chat, unless its project sets the role."
+msgstr ""
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
 msgstr "Codziennie o 09:00 UTC"
@@ -13222,6 +13292,10 @@ msgstr "Tryb rozszerzonego myślenia w największym modelu Qwen"
 #: src/features/marketing/data/models-data.ts:946
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Rozszerzone myślenie w najbardziej wydajnym modelu Opus od Anthropic"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:319
+msgid "Extra instructions"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:29
 msgid "Extra Tall"
@@ -14756,6 +14830,10 @@ msgstr "Znajdź najlepsze włoskie restauracje w mojej okolicy"
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Znajdź poradniki do nauki programowania w Pythonie"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:65
+msgid "Finding, reading and comparing sources."
+msgstr ""
+
 #: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "Dostrój skalę CFG, sampler, harmonogram i seed"
@@ -15427,8 +15505,8 @@ msgstr "Sekcje bramy"
 msgid "Gaussian Blur"
 msgstr "Rozmycie gaussowskie"
 
-#: src/features/settings/lib/settings-keywords.ts:105
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "gdpr"
 msgstr "rodo"
 
@@ -15436,7 +15514,7 @@ msgstr "rodo"
 msgid "GDPR Requests:"
 msgstr "Żądania RODO:"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "gemini"
 msgstr "gemini"
 
@@ -15451,6 +15529,7 @@ msgstr "Modele Gemini z Twoim kluczem API Google AI Studio."
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:286
 #: src/features/chat/tags/thread-categories.ts:14
 #: src/features/chat/tags/thread-category-filter.tsx:26
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:52
 msgid "General"
 msgstr "Ogólne"
 
@@ -15794,7 +15873,7 @@ msgstr "Daj innym dostęp do tej strony lub opublikuj link tylko do odczytu."
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "Globalne analizy analityków, analizy rynku i dane inwestycyjne"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1064
 msgid "Go"
 msgstr "Przejdź"
 
@@ -16373,7 +16452,7 @@ msgstr "W"
 msgid "Hand (pan)"
 msgstr "Rączka (przesuwanie)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:974
 msgid "Hand back"
 msgstr "Oddaj"
 
@@ -16532,7 +16611,7 @@ msgstr "Ukryj kolumnę"
 msgid "Hide follow-up suggestions"
 msgstr "Ukryj sugestie kolejnych pytań"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:969
 msgid "Hide live view"
 msgstr "Ukryj podgląd na żywo"
 
@@ -17247,6 +17326,10 @@ msgstr "Zakończenie podszywania"
 msgid "Impersonation Stopped"
 msgstr "Zakończono podszywanie się"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:53
+msgid "Implementation"
+msgstr ""
+
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
 #: src/features/skills/components/skill-import-dialog.tsx:247
@@ -17284,7 +17367,7 @@ msgid "Import complete!"
 msgstr "Import zakończony!"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:333
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "Import Conversations"
 msgstr "Importuj rozmowy"
 
@@ -17742,7 +17825,7 @@ msgstr "Zainstalowane modele"
 msgid "instruct"
 msgstr "instrukcyjny"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "instructions"
 msgstr "instrukcje"
 
@@ -17805,6 +17888,10 @@ msgstr "Inteligentny model wideo, który myśli przed generowaniem"
 #: src/features/canvas/canvas-panel.tsx:225
 msgid "Intensity"
 msgstr "Intensywność"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:62
+msgid "Interface, user experience and visual design."
+msgstr ""
 
 #: src/features/chat/thread/composer-input-area.tsx:348
 msgid "Interrupt and restart"
@@ -18239,7 +18326,7 @@ msgstr "Kazachstan"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "Akceptuj stary sekret jeszcze przez 24 godziny"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1000
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1007
 msgid "Keep control"
 msgstr "Zachowaj sterowanie"
 
@@ -18307,7 +18394,7 @@ msgstr "Skróty klawiszowe"
 #: src/features/settings/lib/settings-keywords.ts:43
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
-#: src/features/settings/lib/settings-navigation.ts:82
+#: src/features/settings/lib/settings-navigation.ts:83
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
 msgstr "Skróty klawiszowe"
@@ -18351,7 +18438,7 @@ msgstr "Baza wiedzy"
 #: src/features/chat/header/kb-attachment-button.tsx:186
 #: src/features/layout/lib/dashboard-page-names.ts:26
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:279
-#: src/features/settings/lib/settings-navigation.ts:90
+#: src/features/settings/lib/settings-navigation.ts:91
 msgid "Knowledge Base"
 msgstr "Baza wiedzy"
 
@@ -18904,7 +18991,7 @@ msgstr "Od lewej do prawej (LTR)"
 msgid "Left: this version. Right: the page now."
 msgstr "Po lewej: ta wersja. Po prawej: strona obecnie."
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:110
 msgid "legal"
 msgstr "prawne"
 
@@ -19206,11 +19293,11 @@ msgstr "Podgląd na żywo — wyrenderuje się, gdy komponent skończy się prze
 msgid "Live preview — updating as the artifact streams"
 msgstr "Podgląd na żywo — aktualizuje się w trakcie przesyłania artefaktu"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Live view of the agent's browser (read-only)"
 msgstr "Podgląd na żywo przeglądarki agenta (tylko do odczytu)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Live view of the agent's browser (you have control)"
 msgstr "Podgląd na żywo przeglądarki agenta (sterujesz)"
 
@@ -19426,10 +19513,18 @@ msgstr "Wczytywanie podglądu..."
 msgid "Loading preview…"
 msgstr "Wczytywanie podglądu…"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+msgid "Loading projects…"
+msgstr ""
+
 #: src/features/projects/components/project-repo-picker.tsx:241
 #: src/features/projects/components/project-repositories.tsx:304
 msgid "Loading repositories…"
 msgstr "Wczytywanie repozytoriów…"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:462
+msgid "Loading roles…"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -20242,7 +20337,7 @@ msgstr "Serwer MCP: {0}"
 #: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
-#: src/features/settings/lib/settings-navigation.ts:94
+#: src/features/settings/lib/settings-navigation.ts:95
 msgid "MCP Servers"
 msgstr "Serwery MCP"
 
@@ -20252,7 +20347,7 @@ msgstr "Serwery MCP udostępniają dodatkowe narzędzia, których AI może używ
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:387
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:388
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "MCP tools"
 msgstr "Narzędzia MCP"
 
@@ -20364,7 +20459,7 @@ msgstr "Zaktualizowano rolę członka"
 #: src/features/auth/components/organization/organization-members-card.tsx:58
 #: src/features/auth/components/organization/organization-members-card.tsx:109
 #: src/features/layout/lib/dashboard-page-names.ts:28
-#: src/features/settings/lib/settings-navigation.ts:109
+#: src/features/settings/lib/settings-navigation.ts:111
 msgid "Members"
 msgstr "Członkowie"
 
@@ -20657,7 +20752,7 @@ msgstr "Odmówiono dostępu do mikrofonu. Zezwól na dostęp do mikrofonu w usta
 msgid "Microsoft App ID of your Azure Bot"
 msgstr "Microsoft App ID twojego Azure Bot"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "migrate"
 msgstr "migruj"
 
@@ -20876,6 +20971,7 @@ msgstr "Tryb:"
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:405
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:275
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -20933,6 +21029,10 @@ msgstr "Filtr modeli"
 msgid "Model info"
 msgstr "Informacje o modelu"
 
+#: src/features/settings/lib/settings-keywords.ts:99
+msgid "Model per kind of work"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:74
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
 msgstr "Ceny modeli z models.dev, buforowane w KV przez 24 godziny. Automatyczne obliczanie kosztów w mikrodolarach."
@@ -20979,7 +21079,7 @@ msgstr "Model: OpenAI Whisper"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:564
 #: src/features/settings/components/chat/models-settings.tsx:367
 #: src/features/settings/components/chat/native-providers-settings.tsx:637
-#: src/features/settings/lib/settings-navigation.ts:92
+#: src/features/settings/lib/settings-navigation.ts:93
 msgid "Models"
 msgstr "Modele"
 
@@ -21430,7 +21530,7 @@ msgstr "Wycisz"
 msgid "Mute thread"
 msgstr ""
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "my data"
 msgstr "moje dane"
 
@@ -22377,6 +22477,10 @@ msgstr "Brak wykonań"
 msgid "No expiration"
 msgstr "Bez wygaśnięcia"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
+msgid "No extra instructions in this project. Reset to use your default again."
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:276
 msgid "No facts found in the pasted text."
 msgstr "We wklejonym tekście nie znaleziono faktów."
@@ -22444,7 +22548,7 @@ msgstr "Nie ma jeszcze obrazów"
 msgid "No indexed files available. Files are still being processed."
 msgstr "Brak zindeksowanych plików. Pliki są jeszcze przetwarzane."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:997
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "Od dłuższej chwili brak działań: sterowanie wróci do agenta za mniej niż minutę."
 
@@ -23229,7 +23333,7 @@ msgstr "Prompt obiektu"
 msgid "occupation"
 msgstr "zawód"
 
-#: src/features/settings/lib/settings-keywords.ts:101
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "off"
 msgstr "wyłączone"
 
@@ -23237,6 +23341,7 @@ msgstr "wyłączone"
 #: src/features/settings/components/account/account-settings.tsx:420
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:273
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Off"
 msgstr "Wył."
@@ -23248,6 +23353,10 @@ msgstr "Domyślnie wyłączone. Gdy kontekst czatu zapełni tyle okna modelu, st
 #: src/features/settings/components/account/account-settings.tsx:368
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "Domyślnie wyłączone. Gdy długi czat jest bezczynny, starsze wiadomości są streszczane w notatki, aby asystent o nich pamiętał. Zużywa niewielką ilość kredytów. Wyłączenie usuwa już utworzone podsumowania."
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:229
+msgid "Off until you pick a model."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:561
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
@@ -23597,6 +23706,10 @@ msgstr "Odpowiedzieć może tylko właściciel czatu. Wszyscy inni w udostępnio
 #: src/features/projects/components/project-repositories.tsx:377
 msgid "Only the project's owner can change its repositories."
 msgstr "Tylko właściciel projektu może zmieniać jego repozytoria."
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:456
+msgid "Only the project's owner can change its roles."
+msgstr ""
 
 #: src/features/devices/components/device-scope.tsx:73
 msgid "Only these projects"
@@ -24197,11 +24310,11 @@ msgstr "Najmniejszy model LLM OpenAI"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "Najmniejszy model OpenAI dla maksymalnej szybkości"
 
-#: src/components/settings/settings-modal.tsx:340
+#: src/components/settings/settings-modal.tsx:342
 msgid "Opened {tabLabel}"
 msgstr "Otwarto {tabLabel}"
 
-#: src/components/settings/settings-modal.tsx:340
+#: src/components/settings/settings-modal.tsx:342
 msgid "Opened {tabLabel}: {label}"
 msgstr "Otwarto {tabLabel}: {label}"
 
@@ -24233,11 +24346,11 @@ msgstr "Otwieranie pull requesta…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Otwarcie asystenta bez rozmowy przenosi do najnowszej zamiast do pustego czatu."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1015
 msgid "Opening the live view…"
 msgstr "Otwieranie podglądu na żywo…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1070
 msgid "Opening the page. This can take up to a minute."
 msgstr "Otwieranie strony. Może to potrwać do minuty."
 
@@ -24410,7 +24523,7 @@ msgstr "Ustaw kolejność modeli oznaczonych gwiazdką w selektorze modeli i nad
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
-#: src/features/settings/lib/settings-navigation.ts:108
+#: src/features/settings/lib/settings-navigation.ts:110
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:129
 msgid "Organization"
@@ -24470,7 +24583,7 @@ msgstr "Zaktualizowano slug organizacji"
 
 #: src/features/auth/components/organization/organizations-card.tsx:42
 #: src/features/layout/lib/dashboard-page-names.ts:33
-#: src/features/settings/lib/settings-navigation.ts:105
+#: src/features/settings/lib/settings-navigation.ts:107
 msgid "Organizations"
 msgstr "Organizacje"
 
@@ -24675,7 +24788,7 @@ msgstr "Strona {currentPage} z {totalPages}"
 msgid "Page added. It is being fetched and indexed."
 msgstr "Dodano stronę. Trwa jej pobieranie i indeksowanie."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1049
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "Adres strony"
@@ -25178,8 +25291,8 @@ msgstr "Tryb uprawnień: {0}"
 msgid "Permission requests from the agent"
 msgstr "Prośby agenta o uprawnienia"
 
-#: src/features/settings/lib/settings-keywords.ts:101
 #: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "permissions"
 msgstr "uprawnienia"
 
@@ -25195,7 +25308,7 @@ msgstr "Perski"
 msgid "Persian (Iran)"
 msgstr "Perski (Iran)"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "persona"
 msgstr "persona"
 
@@ -25217,7 +25330,7 @@ msgid "Personal information is now visible"
 msgstr "Dane osobowe są teraz widoczne"
 
 #: src/features/layout/lib/dashboard-page-names.ts:34
-#: src/features/settings/lib/settings-navigation.ts:88
+#: src/features/settings/lib/settings-navigation.ts:89
 msgid "Personalization"
 msgstr "Personalizacja"
 
@@ -25669,6 +25782,10 @@ msgstr "precyzyjna kontrola"
 msgid "Precise, quantified, and targeted description."
 msgstr "Precyzyjny, skwantyfikowany i ukierunkowany opis."
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:307
+msgid "Prefer"
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-types.ts:29
 msgid "Preferences"
 msgstr "Preferencje"
@@ -26044,18 +26161,18 @@ msgstr "prywatność"
 #: src/features/settings/components/account/account-settings.tsx:159
 #: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-navigation.ts:115
+#: src/features/settings/lib/settings-navigation.ts:117
 msgid "Privacy"
 msgstr "Prywatność"
 
 #: src/features/layout/lib/dashboard-page-names.ts:36
-#: src/features/settings/lib/settings-navigation.ts:114
+#: src/features/settings/lib/settings-navigation.ts:116
 #: src/routes/dashboard/settings/privacy.tsx:16
 msgid "Privacy & Data"
 msgstr "Prywatność i dane"
 
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:110
 msgid "Privacy Policy"
 msgstr "Polityka prywatności"
 
@@ -26250,7 +26367,7 @@ msgstr "Precyzja edycji klasy profesjonalnej"
 msgid "Professionals who need versatile, high-quality image creation from descriptive text prompts"
 msgstr "Profesjonaliści, którzy potrzebują wszechstronnego tworzenia wysokiej jakości obrazów na podstawie opisowych promptów"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "profile"
 msgstr "profil"
 
@@ -26267,6 +26384,7 @@ msgid "Progress of {toolName}"
 msgstr "Postęp: {toolName}"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
@@ -26321,7 +26439,7 @@ msgstr "Projekty, w których to urządzenie jest oferowane"
 msgid "Promote to Admin"
 msgstr "Awansuj na administratora"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "prompt"
 msgstr "prompt"
 
@@ -28077,7 +28195,7 @@ msgstr "Brak wymaganych zmiennych"
 msgid "Required."
 msgstr "Wymagane."
 
-#: src/components/settings/settings-modal.tsx:151
+#: src/components/settings/settings-modal.tsx:153
 msgid "requires an account"
 msgstr "wymaga konta"
 
@@ -28092,6 +28210,7 @@ msgstr "badania"
 #: src/features/chat/tags/thread-categories.ts:17
 #: src/features/chat/tags/thread-category-filter.tsx:19
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:83
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:54
 #: src/features/skills/components/skill-form-dialog.tsx:123
 msgid "Research"
 msgstr "Badanie"
@@ -28128,6 +28247,7 @@ msgstr "Wyślij ponownie e-mail weryfikacyjny"
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:265
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:108
 msgid "Reset"
 msgstr "Resetuj"
@@ -28136,6 +28256,10 @@ msgstr "Resetuj"
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:102
 msgid "Reset {0} to default"
 msgstr "Przywróć domyślne ustawienie {0}"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:254
+msgid "Reset {roleLabel} to your default"
+msgstr ""
 
 #: src/features/workflow/components/canvas/workflow-controls.tsx:664
 #: src/features/workflow/components/canvas/workflow-controls.tsx:671
@@ -28346,6 +28470,7 @@ msgstr "ponów"
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:472
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -28419,6 +28544,7 @@ msgstr "Cofnij"
 msgid "Reverting…"
 msgstr "Cofanie…"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:55
 #: src/features/tasks/components/task-card.tsx:94
 msgid "Review"
 msgstr "Przejrzyj"
@@ -28585,6 +28711,10 @@ msgstr "Zaktualizowano rolę"
 #: src/features/admin/components/audit-log-card.tsx:140
 msgid "Role Updates"
 msgstr "Zmiany ról"
+
+#: src/features/settings/lib/settings-keywords.ts:99
+msgid "roles"
+msgstr ""
 
 #: src/features/chat/core/utils/language-utilities.ts:393
 msgid "Romania"
@@ -29564,7 +29694,8 @@ msgid "Sections"
 msgstr "Sekcje"
 
 #: src/features/layout/lib/dashboard-page-names.ts:37
-#: src/features/settings/lib/settings-navigation.ts:103
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:56
+#: src/features/settings/lib/settings-navigation.ts:105
 msgid "Security"
 msgstr "Bezpieczeństwo"
 
@@ -30109,7 +30240,7 @@ msgstr "Server-Sent Events (SSE)"
 msgid "Serverless Postgres database with branching"
 msgstr "Bezserwerowa baza danych Postgres z rozgałęzianiem"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "servers"
 msgstr "serwery"
 
@@ -30183,8 +30314,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Skonfiguruj wyzwalacze, aby automatyzować zadania według harmonogramu, przez webhooki lub w odpowiedzi na zdarzenia."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:405
-#: src/components/settings/settings-modal.tsx:503
+#: src/components/settings/settings-modal.tsx:407
+#: src/components/settings/settings-modal.tsx:508
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -30453,6 +30584,7 @@ msgid "Show more folders"
 msgstr "Pokaż więcej folderów"
 
 #: src/features/projects/components/project-repo-picker.tsx:175
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "Pokaż więcej projektów"
@@ -30563,7 +30695,7 @@ msgstr "Prawy pasek boczny"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/components/settings/settings-modal.tsx:164
+#: src/components/settings/settings-modal.tsx:166
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
@@ -30637,7 +30769,7 @@ msgstr "Zaloguj się, aby odblokować wszystkie modele."
 msgid "Sign in to your account"
 msgstr "Zaloguj się na swoje konto"
 
-#: src/components/settings/settings-modal.tsx:154
+#: src/components/settings/settings-modal.tsx:156
 msgid "Sign in to your account to use it."
 msgstr "Zaloguj się na swoje konto, aby z tego korzystać."
 
@@ -30687,7 +30819,7 @@ msgstr "Zarejestruj się"
 msgid "Sign Up"
 msgstr "Zarejestruj się"
 
-#: src/components/settings/settings-modal.tsx:154
+#: src/components/settings/settings-modal.tsx:156
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "Zarejestruj się i wykup subskrypcję za 8 $/mies., aby odblokować wszystkie funkcje."
 
@@ -31145,13 +31277,13 @@ msgstr "Nie udało się zapisać niektórych obrazów z tego uruchomienia."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Niektóre kroki nie miały danych o cenach; suma jest wartością minimalną."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:948
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
+#: src/features/chat/browser-live-view/browser-live-view.tsx:955
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
 msgid "Someone else has control of this browser."
 msgstr "Ktoś inny steruje tą przeglądarką."
 
 #: src/components/error-boundary.tsx:200
-#: src/components/settings/settings-modal.tsx:128
+#: src/components/settings/settings-modal.tsx:130
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "Coś poszło nie tak"
@@ -32405,6 +32537,10 @@ msgstr "Wynik stylizacji"
 msgid "stylized animation"
 msgstr "stylizowana animacja"
 
+#: src/features/settings/lib/settings-keywords.ts:99
+msgid "sub-agent"
+msgstr ""
+
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 msgid "Sub-agent"
 msgstr "Podagent"
@@ -32416,6 +32552,11 @@ msgstr "Podagent zakończył się błędem"
 #: src/features/notifications/lib/notification-labels.ts:64
 msgid "Sub-agent finished"
 msgstr "Podagent zakończył pracę"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:409
+#: src/features/settings/lib/settings-navigation.ts:97
+msgid "Sub-agent roles"
+msgstr ""
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:71
 msgid "Sub-agent was not approved."
@@ -32760,11 +32901,11 @@ msgid "System prompt applied"
 msgstr "Zastosowano prompt systemowy"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:258
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "System Prompt Presets"
 msgstr "Ustawienia wstępne promptów systemowych"
 
-#: src/features/settings/lib/settings-navigation.ts:89
+#: src/features/settings/lib/settings-navigation.ts:90
 msgid "System Prompts"
 msgstr "Prompty systemowe"
 
@@ -32826,7 +32967,7 @@ msgstr "Tajwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Weź obraz wejściowy, usuń tło, a następnie zastosuj transfer stylu"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:985
+#: src/features/chat/browser-live-view/browser-live-view.tsx:992
 msgid "Take control"
 msgstr "Przejmij sterowanie"
 
@@ -33158,7 +33299,7 @@ msgstr "Włączono tryb tymczasowy"
 msgid "Temporary mode enabled ({0})"
 msgstr "Włączono tryb tymczasowy ({0})"
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:110
 msgid "terms"
 msgstr "warunki"
 
@@ -33201,6 +33342,10 @@ msgstr "Testuj swoich agentów, modele i bazę wiedzy na stałym zestawie przypa
 #: src/features/workflow/templates/index.ts:259
 msgid "testing"
 msgstr "testowanie"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:57
+msgid "Testing"
+msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:105
 msgid "text"
@@ -33463,12 +33608,12 @@ msgid "That message was already sent."
 msgstr "Ta wiadomość została już wysłana."
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:886
+#: src/features/chat/browser-live-view/browser-live-view.tsx:890
 msgid "That page could not be opened: {0}"
 msgstr "Nie udało się otworzyć tej strony: {0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:620
-#: src/features/chat/browser-live-view/browser-live-view.tsx:906
+#: src/features/chat/browser-live-view/browser-live-view.tsx:624
+#: src/features/chat/browser-live-view/browser-live-view.tsx:910
 msgid "That page could not be opened."
 msgstr "Nie udało się otworzyć tej strony."
 
@@ -33573,7 +33718,7 @@ msgstr "agent nie oferuje tego wyboru"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "Agent zakończył pracę bez dostarczenia przewodnika. Napisz go ponownie."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1019
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1026
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "Agent kończy działanie w przeglądarce, co może potrwać ponad minutę. Spróbuj ponownie za chwilę."
 
@@ -33585,7 +33730,7 @@ msgstr "Agent nadal otwiera swoją sesję. Spróbuj ponownie za chwilę."
 msgid "The agent is still working on the last message."
 msgstr "Agent nadal pracuje nad ostatnią wiadomością."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:945
+#: src/features/chat/browser-live-view/browser-live-view.tsx:952
 msgid "The agent is using a browser"
 msgstr "Agent używa przeglądarki"
 
@@ -33609,11 +33754,11 @@ msgstr "Agent nie wprowadził zmian w plikach."
 msgid "The agent on your computer is reading the change…"
 msgstr "Agent na Twoim komputerze czyta zmianę…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:880
+#: src/features/chat/browser-live-view/browser-live-view.tsx:884
 msgid "The agent's browser closed while the page loaded."
 msgstr "Przeglądarka agenta została zamknięta podczas ładowania strony."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:762
+#: src/features/chat/browser-live-view/browser-live-view.tsx:766
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "Przeglądarka agenta została zastąpiona, a sterowanie wróciło do agenta. Możesz ponownie przejąć sterowanie."
 
@@ -33687,7 +33832,7 @@ msgstr "Zapisano narzędzia bota"
 msgid "The browser cannot read this video to capture a frame"
 msgstr "Przeglądarka nie może odczytać tego wideo, aby przechwycić klatkę"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:855
+#: src/features/chat/browser-live-view/browser-live-view.tsx:859
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "Nie udało się oddać przeglądarki. Agent odzyska ją sam po dwóch minutach bez aktywności."
 
@@ -34060,15 +34205,11 @@ msgstr "Link może być błędny albo właściciel ustawił rozmowę jako prywat
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Link może być błędny albo właściciel wycofał publikację strony lub ją usunął."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
 msgid "The live view could not be opened."
 msgstr "Nie udało się otworzyć podglądu na żywo."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:223
-#~ msgid "The live view could not be opened. Try again."
-#~ msgstr ""
-
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1013
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "The live view is not available right now."
 msgstr "Podgląd na żywo jest teraz niedostępny."
 
@@ -34199,7 +34340,7 @@ msgstr "Agent strony nie mógł edytować tej strony"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "Strona pokazuje teraz drugą wersję. Skopiuj ze swojej wszystko, co chcesz zachować."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1075
 msgid "The page you opened is still loading."
 msgstr "Otwarta przez Ciebie strona nadal się ładuje."
 
@@ -34981,6 +35122,10 @@ msgstr "Ta wiadomość jest zbyt długa, aby skopiować ją jako link do promptu
 msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
 msgstr "Ta wiadomość zostanie zamknięta za {value, plural, one {# sekundę} few {# sekundy} many {# sekund} other {# sekundy}}"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
+msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
+msgstr ""
+
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
 msgstr "Ten model nie ma wysiłku rozumowania"
@@ -35044,6 +35189,10 @@ msgstr "To ustawienie wstępne zostanie trwale usunięte."
 #: src/features/chat/thread/sandbox-files.tsx:199
 msgid "This preview could not be loaded."
 msgstr "Nie udało się wczytać tego podglądu."
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+msgid "This project's chats. Anything it does not set uses your default."
+msgstr ""
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
@@ -35640,7 +35789,7 @@ msgstr "Zbyt wiele prób. Poczekaj kilka sekund i spróbuj ponownie."
 msgid "too many files"
 msgstr "zbyt wiele plików"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1034
 msgid "Too many live views were opened. Try again later."
 msgstr "Otwarto zbyt wiele podglądów na żywo. Spróbuj ponownie później."
 
@@ -35690,7 +35839,7 @@ msgid "Tool Calling"
 msgstr "Wywoływanie narzędzi"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:354
-#: src/features/settings/lib/settings-navigation.ts:95
+#: src/features/settings/lib/settings-navigation.ts:96
 msgid "Tool Permissions"
 msgstr "Uprawnienia narzędzi"
 
@@ -35816,7 +35965,7 @@ msgstr "Śledź każdy token i każdego dolara."
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "Śledź zużycie tokenów LLM i koszty oraz ustawiaj alerty budżetowe"
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "tracking"
 msgstr "śledzenie"
 
@@ -36043,8 +36192,8 @@ msgstr "Spróbuj zmienić wyszukiwane hasła."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1159
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1166
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36061,7 +36210,7 @@ msgstr "Spróbuj ponownie"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:133
+#: src/components/settings/settings-modal.tsx:135
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "Spróbuj ponownie"
@@ -36805,7 +36954,7 @@ msgstr "Przejdź na Pro"
 msgid "Upgrade to Pro, monthly"
 msgstr "Ulepsz do Pro, miesięcznie"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "upload"
 msgstr "prześlij"
 
@@ -38008,6 +38157,10 @@ msgstr "Wolumen"
 msgid "Volume (24h)"
 msgstr "Wolumen (24 h)"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:67
+msgid "Vulnerabilities, secrets, access control, threat models."
+msgstr ""
+
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:258
 msgctxt "width abbreviation"
 msgid "W"
@@ -38119,7 +38272,7 @@ msgstr "Chcesz kontynuować od tego miejsca?"
 msgid "Watch"
 msgstr "Obserwuj"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:969
 msgid "Watch live"
 msgstr "Oglądaj na żywo"
 
@@ -38426,7 +38579,7 @@ msgstr "Co obserwować"
 msgid "What users sent from the app, newest first"
 msgstr "Co użytkownicy wysłali z aplikacji, od najnowszych"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "what we store"
 msgstr "co przechowujemy"
 
@@ -38504,6 +38657,10 @@ msgstr "Po ustawieniu używani będą tylko ci dostawcy. Pozostaw puste, aby zez
 msgid "When should the assistant use this skill?"
 msgstr "Kiedy asystent ma używać tej umiejętności?"
 
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:285
+msgid "When to delegate"
+msgstr ""
+
 #: src/features/projects/components/project-rule-files.tsx:301
 msgid "When to read it"
 msgstr "Kiedy go czytać"
@@ -38532,7 +38689,7 @@ msgstr "Gdzie myśli<0/><1>stają się działaniami.</1>"
 msgid "Where you stay in control"
 msgstr "Gdzie zachowujesz kontrolę"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1153
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Nie udało się sprawdzić, czy agent używa przeglądarki."
 
@@ -38760,6 +38917,14 @@ msgstr "Pisz lub wpisz „/”, aby użyć poleceń…"
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:116
 msgid "Writing"
 msgstr "Pisanie"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:64
+msgid "Writing or changing code, configuration or scripts."
+msgstr ""
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:68
+msgid "Writing tests and checking that a change works."
+msgstr ""
 
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "Writing the guide…"
@@ -38999,8 +39164,8 @@ msgstr "Te integracje zostały wybrane w kreatorze agenta. Każda z nich otworzy
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "Otrzymasz powiadomienie, gdy uruchomienie się zakończy, wymaga przeglądu lub się nie uda. Zakończone uruchomienie łączy się z czatem, a uruchomienie wymagające przeglądu z tablicą zadań."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:505
-#: src/features/chat/browser-live-view/browser-live-view.tsx:834
+#: src/features/chat/browser-live-view/browser-live-view.tsx:509
+#: src/features/chat/browser-live-view/browser-live-view.tsx:838
 msgid "You handed the browser back to the agent."
 msgstr "Oddano przeglądarkę agentowi."
 
@@ -39066,9 +39231,9 @@ msgstr "Nie możesz przejąć sterowania tą przeglądarką."
 msgid "You need to sign in to access this page."
 msgstr "Musisz się zalogować, aby uzyskać dostęp do tej strony."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:510
-#: src/features/chat/browser-live-view/browser-live-view.tsx:834
-#: src/features/chat/browser-live-view/browser-live-view.tsx:882
+#: src/features/chat/browser-live-view/browser-live-view.tsx:514
+#: src/features/chat/browser-live-view/browser-live-view.tsx:838
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
 msgid "You no longer have control of the browser."
 msgstr "Nie sterujesz już przeglądarką."
 
@@ -39223,7 +39388,7 @@ msgstr "Twoje czaty i {0}"
 msgid "Your chats and the bots you chose"
 msgstr "Twoje czaty i wybrane boty"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1084
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "Twoje kliknięcia, wpisywanie i przewijanie w podglądzie trafiają do przeglądarki. Agent czeka, aż ją oddasz."
 
@@ -39271,6 +39436,14 @@ msgstr "Wykorzystano dzienny limit żądań AI."
 #: src/features/notifications/lib/notification-labels.ts:52
 msgid "Your data export is ready"
 msgstr "Twój eksport danych jest gotowy"
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+msgid "Your default ({inheritedModelName})"
+msgstr ""
+
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+msgid "Your default (off)"
+msgstr ""
 
 #: src/features/auth/components/settings/account/update-name-card.tsx:21
 msgid "Your display name for your account"

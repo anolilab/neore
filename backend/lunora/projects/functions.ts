@@ -616,8 +616,8 @@ export const createProject = authMutation
 
 /**
  * Sets or clears one sub-agent role override on a project (`sub-agents/roles.ts`); `null` makes the role inherit the
- * user's again. The rule is `writableProject`'s, as for `updateProject` and the project's context: its owner, or any
- * member for an organization project nobody owns. The overrides apply to every member's runs in it.
+ * user's again. Who may: the rule of `updateProject` and the rule files ({@link projectWithEditableSettings}), its owner
+ * only, never a member, not even on a project nobody owns. The overrides apply to every member's runs in it.
  */
 export const setProjectSubAgentRole = authMutation
     .use(rateLimit("projects/update"))
@@ -625,9 +625,9 @@ export const setProjectSubAgentRole = authMutation
     .output(v.null())
     .mutation(async ({ args: { config, projectId, role }, ctx: context }) => {
         const { userId } = context.user;
-        // On the primary: the save writes the whole map back, so it must hold a save a moment ago; and a member removed a
-        // moment ago must not pass on a lagging replica.
-        const project = await writableProject(context, projectId, userId, { primary: true });
+        // On the primary: the save writes the whole map back, so it must hold a save from a moment ago, and the owner check
+        // rests on the authoritative row.
+        const project = await projectWithEditableSettings(context, projectId, userId, { primary: true });
 
         if (!project) {
             throw new LunoraError("NOT_FOUND", "Project not found");

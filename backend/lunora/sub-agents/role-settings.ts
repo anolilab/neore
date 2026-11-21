@@ -16,6 +16,7 @@ import { isLocalBrowserProvider } from "../chat/lib/custom-providers";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { authQuery } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
+import { mayEditProject } from "../projects/edit-access";
 import { readableProject } from "../projects/functions";
 import type { SubAgentRoleConfig, SubAgentRoles } from "./roles";
 import { activeRoles, buildRoleCatalog, isRoleModelAllowed, mergeSubAgentRoles } from "./roles";
@@ -116,7 +117,7 @@ export const getSubAgentRoles = authQuery
         const [user, project] = await Promise.all([userRoles(ctx, userId), projectId ? readableProject(ctx, projectId, userId) : null]);
 
         return {
-            project: project ? { editable: !project.userId || project.userId === userId, roles: project.subAgentRoles ?? {} } : null,
+            project: project ? { editable: mayEditProject(project, userId), roles: project.subAgentRoles ?? {} } : null,
             user: user ?? {},
         };
     });
