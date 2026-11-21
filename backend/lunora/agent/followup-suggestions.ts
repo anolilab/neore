@@ -53,6 +53,16 @@ export const replyAnchorRow = <Row extends ReplyAnchorRow>(turnRows: ReadonlyArr
 };
 
 /**
+ * The rows the suggestion model reads: the reply's whole turn, its user prompt included, then the older rows of the first page.
+ * Both lists come newest first and the result keeps that order, so a tool turn longer than one page is not cut short.
+ */
+export const followupModelRows = <Row extends { _id: string }>(turnRows: ReadonlyArray<Row>, pageRows: ReadonlyArray<Row>): Row[] => {
+    const inTurn = new Set(turnRows.map((row) => row._id));
+
+    return [...turnRows, ...pageRows.filter((row) => !inTurn.has(row._id))];
+};
+
+/**
  * Whether a reply gets a suggestion for this user: the setting is on (absent = on) and the user is not a guest.
  * Read before any model is picked, so a user who switched the setting off costs no call.
  */

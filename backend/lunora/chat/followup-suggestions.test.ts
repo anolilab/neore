@@ -14,6 +14,7 @@ import {
     cacheFollowupSuggestions,
     endFollowupDispatch,
     followupDispatchInFlight,
+    followupModelRows,
     getCachedFollowupSuggestionsHandler,
     releaseFollowupSuggestions,
     replyAnchorRow,
@@ -246,5 +247,24 @@ describe("the row a reply is keyed by", () => {
         const older = row("older", "assistant", 5, 0);
 
         expect(replyAnchorRow([...turn, older], turn[2]!)._id).toBe("text");
+    });
+});
+
+describe("the rows the suggestion model reads", () => {
+    type Row = { _id: string };
+    const ids = (rows: Row[]) => rows.map((row) => row._id);
+
+    it("a tool turn longer than one page is read whole, its user prompt included, then the older rows of the page", () => {
+        // Newest first: the reply's rows, the user prompt that began it (on the second page), then an older turn on the first page.
+        const turnRows = [{ _id: "final" }, { _id: "tool" }, { _id: "text" }, { _id: "prompt" }];
+        const pageRows = [{ _id: "final" }, { _id: "tool" }, { _id: "text" }, { _id: "older" }];
+
+        expect(ids(followupModelRows(turnRows, pageRows))).toEqual(["final", "tool", "text", "prompt", "older"]);
+    });
+
+    it("a turn that fits in one page is read as that page", () => {
+        const page = [{ _id: "final" }, { _id: "text" }, { _id: "prompt" }];
+
+        expect(ids(followupModelRows(page, page))).toEqual(["final", "text", "prompt"]);
     });
 });

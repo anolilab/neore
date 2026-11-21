@@ -4,7 +4,7 @@ import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
-import { FOLLOWUP_DISPATCH_TTL_MS, replyAnchorRow } from "../agent/followup-suggestions";
+import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow } from "../agent/followup-suggestions";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -4606,7 +4606,15 @@ export const generateFollowupSuggestionsForThread = internalAction
             const language = threadLanguage || userLanguage;
 
             // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
-            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
+            // The paid fallback, if any, is metered to the paying user: the collaborator who keeps suggestions on, else the owner. Passing
+            // the collaborator when they opted out would bill their plan for a call the owner's quota is charged for.
+            const background = await resolveBackgroundModel(
+                context,
+                threadData.userId,
+                DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string,
+                actorGate.enabled ? userId : ownerUserId,
+                true,
+            );
 
             if (!background) {
                 return;
@@ -4809,7 +4817,15 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
-                const modelMessages = docsToModelMessages(filteredMessageDocuments);
+                // The model reads the reply's whole turn, its user prompt included, however many pages it spans; the first page's older rows follow.
+                const modelMessages = docsToModelMessages(
+                    followupModelRows(
+                        rowsAfterContextReset(turnRows, contextReset).filter(
+                            (messageDocument) => messageDocument.message?.role === "user" || messageDocument.message?.role === "assistant",
+                        ),
+                        filteredMessageDocuments,
+                    ),
+                );
 
                 const output = await generateFollowupSuggestionsInternal(
                     modelMessages,

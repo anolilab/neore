@@ -1366,6 +1366,8 @@ export const resumeApprovedRun = async (
     looped?: LoopFinding;
     messageIds?: string[];
     paused: boolean;
+    /** Whether the continuation saved an assistant row, not only tool results: what a finished reply after an approval is judged by. */
+    savedReply?: boolean;
     stopped: boolean;
     /** A sub-agent child that paused again: whether its run now waits (false: it was refused or ended, its requests closed). */
     subAgentWaits?: boolean;
@@ -1792,6 +1794,7 @@ export const resumeApprovedRun = async (
             looped,
             messageIds,
             paused,
+            savedReply: (result.savedMessages ?? []).some((message) => !message.tool),
             stopped: false,
             ...(subAgentWaits !== undefined && { subAgentWaits }),
         };
