@@ -510,11 +510,13 @@ describe(fetchBudget, () => {
     /** Subrequests a Worker request may make on the Free plan. */
     const SUBREQUEST_CAP = 50;
     /**
-     * What an import action asks of the backend besides the host, at most: the session and rate-limit checks (2 each),
-     * the repository and grant lookups, a token refresh's call and store (and its re-read on a refused grant), and a
-     * 401's forced refresh (the grant again, the call, the store, the re-read).
+     * What an import action asks of the backend besides the host, at most 13 counted, one spare: the session check (5),
+     * the rate limit, the repository, the grant with a token refresh and its store (or its re-read on a refused grant),
+     * and the same three again for a 401's forced refresh.
      */
     const ACTION_CALLS = 14;
+    /** The commit and the trees of the root, `.rules`, `rules`, `.agents` and `.agents/rules`. */
+    const WALK = 6;
 
     /** `request`, counting what reaches it, and answering the `at`-th with a 401 (the token refused), once. */
     const refusedOnceAt = (request: HostRequest, at: number) => {
@@ -557,6 +559,8 @@ describe(fetchBudget, () => {
 
     it("keeps an import action under the Worker's subrequest cap with room to spare", () => {
         expect(HOST_FETCHES_PER_IMPORT + ACTION_CALLS).toBeLessThanOrEqual(SUBREQUEST_CAP - 8);
+        // A 401 at a listing's last request leaves its repeat the walk, which is never cut short.
+        expect(WALK + MAX_LINKS_FOLLOWED + WALK).toBeLessThanOrEqual(HOST_FETCHES_PER_IMPORT);
     });
 
     it("reads 20 picked links without a 401 in full, and after one partway reads what is left, the rest not read", async () => {
@@ -580,8 +584,8 @@ describe(fetchBudget, () => {
         const reads = await readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked);
 
         expect(host.count()).toBe(HOST_FETCHES_PER_IMPORT);
-        expect(reads.filter((read) => read.status === "ok")).toHaveLength(HOST_FETCHES_PER_IMPORT - 15 - 6);
-        expect(reads.filter((read) => read.status === "not_read").map((read) => read.path)).toStrictEqual(links.slice(HOST_FETCHES_PER_IMPORT - 15 - 6));
+        expect(reads.filter((read) => read.status === "ok")).toHaveLength(HOST_FETCHES_PER_IMPORT - 15 - WALK);
+        expect(reads.filter((read) => read.status === "not_read").map((read) => read.path)).toStrictEqual(links.slice(HOST_FETCHES_PER_IMPORT - 15 - WALK));
         // Nothing more is sent once it is spent.
         const after = await readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked);
 

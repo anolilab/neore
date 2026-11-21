@@ -216,12 +216,22 @@ const RepoRuleFileImport: FC<{
             }
 
             const texts = outcome.files.flatMap((file) => (file.status === "ok" ? [{ path: file.path, text: () => file.text }] : []));
-            const notRead = outcome.files.filter((file) => file.status === "not_read").length;
+            const notRead = outcome.files.flatMap((file) => (file.status === "not_read" ? [file.path] : []));
             const read = await importRuleTexts(texts, MAX_RULE_FILES);
 
-            toggle(false);
+            if (notRead.length > 0) {
+                // Open with only those ticked, so importing again adds the rest and nothing twice.
+                setPicked(new Set(notRead));
+            } else {
+                toggle(false);
+            }
 
-            return { ...read, notRead, skipped: read.skipped + all.length - paths.length, unreadable: outcome.files.length - texts.length - notRead };
+            return {
+                ...read,
+                notRead: notRead.length,
+                skipped: read.skipped + all.length - paths.length,
+                unreadable: outcome.files.length - texts.length - notRead.length,
+            };
         });
     };
 

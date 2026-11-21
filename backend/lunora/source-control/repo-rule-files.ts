@@ -20,7 +20,8 @@
  * A listing holds every root instruction file and at most `MAX_LISTED_FOLDER_FILES` of the rules folder's, the first by
  * path; it counts the rest (`omitted`), and gives each file it would read the blob SHA it reads (a link's final
  * target's). A read lists the same way without following links: it takes a file's own blob when that is the SHA given,
- * and a link's only when the SHA given is that of a file the link may lead to, so it reads nothing a link could not.
+ * and a link's only when the SHA given is that of a file a link may lead to, so it reads only files the listing could
+ * offer (a link is not tied to its own target: one the listing refused may be read as another of those files).
  *
  * Both run under {@link HOST_FETCHES_PER_IMPORT} host requests, a 401's repeat included ({@link fetchBudget}): past it
  * a link is refused (`budget`) and a file is `not_read`, never a failed request.
@@ -57,9 +58,9 @@ export const MAX_LINKS_FOLLOWED = 16;
 
 /**
  * Host requests one import action makes, at most, both tries of a 401 together. A Worker request may make 50
- * subrequests on the Free plan, and the action's own make up to 14 more (the session and rate-limit checks, the
- * repository and grant lookups, a token refresh and its store, and a 401's forced refresh), so this keeps it under the
- * cap with room to spare. A listing spends at most 6 on the commit and its trees and {@link MAX_LINKS_FOLLOWED} on
+ * subrequests on the Free plan, and the action's own make up to 14 more (the session check's five lookups, the rate
+ * limit, the repository, and the grant with a token refresh and its store, then again for a 401's forced refresh), so
+ * this keeps it under the cap with room to spare. A listing spends at most 6 on the commit and its trees and {@link MAX_LINKS_FOLLOWED} on
  * links, so a repeat always has its trees; a read 6 and one per file picked (at most 20), so one without a 401 reads
  * them all.
  */

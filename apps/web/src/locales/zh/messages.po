@@ -167,7 +167,7 @@ msgstr "（指向此处所列文件之外的文件）"
 msgid "(maximum reached)"
 msgstr "（已达上限）"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:294
+#: src/features/projects/components/repo-rule-file-import.tsx:304
 msgid "(may be too long)"
 msgstr "(可能过长)"
 
@@ -207,7 +207,7 @@ msgstr "（必填）"
 msgid "(shared)"
 msgstr "（共享）"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:292
+#: src/features/projects/components/repo-rule-file-import.tsx:302
 msgid "(too large)"
 msgstr "（太大）"
 
@@ -263,8 +263,6 @@ msgstr "{0, plural, other {# 个文件已更改}}"
 msgid "{0, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large."
 msgstr "{0, plural, other {# 个文件无法读取}}：已不在仓库中或太大。"
 
-#. placeholder {0}: read.notRead
-#: src/features/projects/components/project-rule-files.tsx:550
 #. placeholder {0}: read.notRead
 #: src/features/projects/components/project-rule-files.tsx:550
 msgid "{0, plural, one {# file was not read this time} other {# files were not read this time}}: import again to add the rest."
@@ -5840,7 +5838,7 @@ msgstr "加拿大"
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
-#: src/features/projects/components/repo-rule-file-import.tsx:316
+#: src/features/projects/components/repo-rule-file-import.tsx:326
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -14652,7 +14650,7 @@ msgstr "锁定的聊天中无法附加文件。"
 msgid "Files changed by this turn"
 msgstr "本轮更改的文件"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:272
+#: src/features/projects/components/repo-rule-file-import.tsx:282
 msgid "Files found"
 msgstr "找到的文件"
 
@@ -14786,7 +14784,7 @@ msgstr "正在收尾..."
 msgid "Financial data and bank connection APIs"
 msgstr "金融数据与银行连接 API"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:312
+#: src/features/projects/components/repo-rule-file-import.tsx:322
 msgid "Find files"
 msgstr "查找文件"
 
@@ -15125,7 +15123,7 @@ msgid "Forward to a new chat"
 msgstr "转发到新聊天"
 
 #. placeholder {0}: found.length
-#: src/features/projects/components/repo-rule-file-import.tsx:261
+#: src/features/projects/components/repo-rule-file-import.tsx:271
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "找到 {0, plural, other {# 个文件}}。"
 
@@ -17372,7 +17370,7 @@ msgid "Import files"
 msgstr "导入文件"
 
 #: src/features/projects/components/repo-rule-file-import.tsx:120
-#: src/features/projects/components/repo-rule-file-import.tsx:231
+#: src/features/projects/components/repo-rule-file-import.tsx:241
 msgid "Import from repository"
 msgstr "从仓库导入"
 
@@ -17392,7 +17390,7 @@ msgstr "每次只能导入一种导出。"
 msgid "Import rule folder"
 msgstr "导入规则文件夹"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:308
+#: src/features/projects/components/repo-rule-file-import.tsx:318
 msgid "Import selected"
 msgstr "导入所选文件"
 
@@ -19856,16 +19854,16 @@ msgstr "正在查找设备…"
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "正在 {baseUrl} 查找 Ollama…"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:312
+#: src/features/projects/components/repo-rule-file-import.tsx:322
 msgid "Looking..."
 msgstr "正在查找..."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:255
+#: src/features/projects/components/repo-rule-file-import.tsx:265
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, and for a rules folder."
 msgstr "在仓库根目录中查找 AGENTS.md、CLAUDE.md 和 GEMINI.md，以及规则文件夹。"
 
 #. placeholder {0}: repoName(chosen.url)
-#: src/features/projects/components/repo-rule-file-import.tsx:256
+#: src/features/projects/components/repo-rule-file-import.tsx:266
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "在 {0} 的根目录中查找 AGENTS.md、CLAUDE.md 和 GEMINI.md，以及规则文件夹。"
 
@@ -22540,7 +22538,7 @@ msgstr "没有已索引的文件。文件仍在处理中。"
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:260
+#: src/features/projects/components/repo-rule-file-import.tsx:270
 msgid "No instruction files were found in this repository."
 msgstr "此仓库中没有找到指令文件。"
 
@@ -28098,7 +28096,7 @@ msgid "Repositories"
 msgstr "仓库"
 
 #: src/features/projects/components/project-repositories.tsx:383
-#: src/features/projects/components/repo-rule-file-import.tsx:235
+#: src/features/projects/components/repo-rule-file-import.tsx:245
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "代码仓库"
@@ -34410,7 +34408,7 @@ msgid "The rule files could not be loaded."
 msgstr "无法加载规则文件。"
 
 #. placeholder {0}: listing.omitted
-#: src/features/projects/components/repo-rule-file-import.tsx:268
+#: src/features/projects/components/repo-rule-file-import.tsx:278
 msgid "The rules folder holds {0, plural, one {# more file} other {# more files}} than this list shows."
 msgstr "规则文件夹中还有 {0, plural, other {# 个}}文件未在此列表中显示。"
 
@@ -35179,7 +35177,7 @@ msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取
 msgid "This repository is already listed."
 msgstr "此仓库已在列表中。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:264
+#: src/features/projects/components/repo-rule-file-import.tsx:274
 msgid "This repository is too large for GitHub to list in full, so some instruction files may be missing here."
 msgstr "此仓库太大，GitHub 无法完整列出，因此这里可能缺少部分指令文件。"
 

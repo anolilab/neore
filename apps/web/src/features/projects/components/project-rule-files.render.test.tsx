@@ -1234,6 +1234,32 @@ describe("project rule files imported from the project's repository", () => {
         await user.click(await screen.findByRole("button", { name: "Import selected" }));
 
         expect(await screen.findByText("1 rule file imported. Review, then save. 2 files were not read this time: import again to add the rest.")).toBeTruthy();
+
+        // The panel stays open with only those ticked: importing again adds nothing twice.
+        const found = screen.getByRole("list", { name: "Files found" });
+
+        expect(within(found).getByRole("checkbox", { name: "rules/a.md" }).getAttribute("aria-checked")).toBe("false");
+        expect(within(found).getByRole("checkbox", { name: "rules/b.md" }).getAttribute("aria-checked")).toBe("true");
+
+        backend.repoRead.mockResolvedValue({
+            files: ["rules/b.md", "rules/c.md"].map((path) => {
+                return { path, status: "ok", text: "---\nalwaysApply: true\n---\nText" };
+            }),
+            status: "ok",
+        });
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(backend.repoRead).toHaveBeenLastCalledWith({
+            commit: COMMIT,
+            files: [
+                { path: "rules/b.md", sha: "sha-b" },
+                { path: "rules/c.md", sha: "sha-c" },
+            ],
+            projectId: "p1",
+            repoId: "repo1",
+        });
+        await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
+        expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(5);
     });
 
     it("shortens a file name past what a save takes, keeping two that start alike apart, and the drafts save", async () => {

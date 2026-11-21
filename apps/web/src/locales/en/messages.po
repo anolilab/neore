@@ -166,7 +166,7 @@ msgstr "(links to a file outside the ones listed here)"
 msgid "(maximum reached)"
 msgstr "(maximum reached)"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:294
+#: src/features/projects/components/repo-rule-file-import.tsx:304
 msgid "(may be too long)"
 msgstr "(may be too long)"
 
@@ -206,7 +206,7 @@ msgstr "(required)"
 msgid "(shared)"
 msgstr "(shared)"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:292
+#: src/features/projects/components/repo-rule-file-import.tsx:302
 msgid "(too large)"
 msgstr "(too large)"
 
@@ -262,8 +262,6 @@ msgstr "{0, plural, one {# file changed} other {# files changed}}"
 msgid "{0, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large."
 msgstr "{0, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large."
 
-#. placeholder {0}: read.notRead
-#: src/features/projects/components/project-rule-files.tsx:550
 #. placeholder {0}: read.notRead
 #: src/features/projects/components/project-rule-files.tsx:550
 msgid "{0, plural, one {# file was not read this time} other {# files were not read this time}}: import again to add the rest."
@@ -5839,7 +5837,7 @@ msgstr "Canada"
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
-#: src/features/projects/components/repo-rule-file-import.tsx:316
+#: src/features/projects/components/repo-rule-file-import.tsx:326
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -14651,7 +14649,7 @@ msgstr "Files cannot be attached in a locked chat."
 msgid "Files changed by this turn"
 msgstr "Files changed by this turn"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:272
+#: src/features/projects/components/repo-rule-file-import.tsx:282
 msgid "Files found"
 msgstr "Files found"
 
@@ -14785,7 +14783,7 @@ msgstr "Finalizing..."
 msgid "Financial data and bank connection APIs"
 msgstr "Financial data and bank connection APIs"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:312
+#: src/features/projects/components/repo-rule-file-import.tsx:322
 msgid "Find files"
 msgstr "Find files"
 
@@ -15124,7 +15122,7 @@ msgid "Forward to a new chat"
 msgstr "Forward to a new chat"
 
 #. placeholder {0}: found.length
-#: src/features/projects/components/repo-rule-file-import.tsx:261
+#: src/features/projects/components/repo-rule-file-import.tsx:271
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "Found {0, plural, one {# file} other {# files}}."
 
@@ -17371,7 +17369,7 @@ msgid "Import files"
 msgstr "Import files"
 
 #: src/features/projects/components/repo-rule-file-import.tsx:120
-#: src/features/projects/components/repo-rule-file-import.tsx:231
+#: src/features/projects/components/repo-rule-file-import.tsx:241
 msgid "Import from repository"
 msgstr "Import from repository"
 
@@ -17391,7 +17389,7 @@ msgstr "Import one kind of export at a time."
 msgid "Import rule folder"
 msgstr "Import rule folder"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:308
+#: src/features/projects/components/repo-rule-file-import.tsx:318
 msgid "Import selected"
 msgstr "Import selected"
 
@@ -19855,16 +19853,16 @@ msgstr "Looking for machines…"
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "Looking for Ollama at {baseUrl}…"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:312
+#: src/features/projects/components/repo-rule-file-import.tsx:322
 msgid "Looking..."
 msgstr "Looking..."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:255
+#: src/features/projects/components/repo-rule-file-import.tsx:265
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, and for a rules folder."
 msgstr "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, and for a rules folder."
 
 #. placeholder {0}: repoName(chosen.url)
-#: src/features/projects/components/repo-rule-file-import.tsx:256
+#: src/features/projects/components/repo-rule-file-import.tsx:266
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 
@@ -22539,7 +22537,7 @@ msgstr "No indexed files available. Files are still being processed."
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "No input for a while: control goes back to the agent in under a minute."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:260
+#: src/features/projects/components/repo-rule-file-import.tsx:270
 msgid "No instruction files were found in this repository."
 msgstr "No instruction files were found in this repository."
 
@@ -28097,7 +28095,7 @@ msgid "Repositories"
 msgstr "Repositories"
 
 #: src/features/projects/components/project-repositories.tsx:383
-#: src/features/projects/components/repo-rule-file-import.tsx:235
+#: src/features/projects/components/repo-rule-file-import.tsx:245
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "Repository"
@@ -34409,7 +34407,7 @@ msgid "The rule files could not be loaded."
 msgstr "The rule files could not be loaded."
 
 #. placeholder {0}: listing.omitted
-#: src/features/projects/components/repo-rule-file-import.tsx:268
+#: src/features/projects/components/repo-rule-file-import.tsx:278
 msgid "The rules folder holds {0, plural, one {# more file} other {# more files}} than this list shows."
 msgstr "The rules folder holds {0, plural, one {# more file} other {# more files}} than this list shows."
 
@@ -35178,7 +35176,7 @@ msgstr "This removes the model files from your computer. You can pull it again l
 msgid "This repository is already listed."
 msgstr "This repository is already listed."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:264
+#: src/features/projects/components/repo-rule-file-import.tsx:274
 msgid "This repository is too large for GitHub to list in full, so some instruction files may be missing here."
 msgstr "This repository is too large for GitHub to list in full, so some instruction files may be missing here."
 
