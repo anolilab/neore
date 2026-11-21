@@ -84,6 +84,7 @@ const NEEDS_A_PATTERN = /needs at least one pattern/u;
 const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
 const COPY_OF_A = /^rules\/z\.md\s*\(same file as rules\/a\.md\)$/u;
 const LINKED_COPY = /^CLAUDE\.md\s*\(same file as AGENTS\.md\)$/u;
+const LINK_TO_Z = /^rules\/a\.md\s*\(same file as rules\/z\.md\)$/u;
 const REFUSED_LINK = /^GEMINI\.md\s*\(links to a file outside the ones listed here\)$/u;
 const WIDE_FILE = /^rules\/wide\.md\s*\(may be too long\)$/u;
 
@@ -1304,8 +1305,8 @@ describe("project rule files imported from the project's repository", () => {
                 ...["a", "b", "c"].map((name) => {
                     return { path: `rules/${name}.md`, sha: `sha-${name}`, size: 10, tooLarge: false };
                 }),
-                // A link to rules/a.md: the same blob.
-                { path: "rules/z.md", sha: "sha-a", size: 10, tooLarge: false },
+                // A link to rules/a.md: its blob.
+                { linkOf: "rules/a.md", path: "rules/z.md", sha: "sha-a", size: 10, tooLarge: false },
             ],
             status: "ok",
             truncated: false,
@@ -1395,6 +1396,99 @@ describe("project rule files imported from the project's repository", () => {
         ).toBe("src/**/*.ts");
     });
 
+    it("reads two files with the same bytes under different names as two rule files", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.listed = { canEdit: true, files: [], revision: "r1" };
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [
+                // Copies, not links: the same blob, two files.
+                { path: "rules/a.md", sha: "sha-same", size: 10, tooLarge: false },
+                { path: "rules/b.md", sha: "sha-same", size: 10, tooLarge: false },
+            ],
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockImplementation(async ({ files: asked }: { files: { path: string }[] }) => {
+            return {
+                files: asked.map(({ path }) => {
+                    return { path, status: "ok", text: "---\nalwaysApply: true\n---\nUse pnpm." };
+                }),
+                status: "ok",
+            };
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const found = await screen.findByRole("list", { name: "Files found" });
+
+        expect(within(found).getByRole("checkbox", { name: "rules/a.md" }).getAttribute("aria-checked")).toBe("true");
+        expect(within(found).getByRole("checkbox", { name: "rules/b.md" }).getAttribute("aria-checked")).toBe("true");
+
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(backend.repoRead).toHaveBeenCalledWith({
+            commit: COMMIT,
+            files: [
+                { path: "rules/a.md", sha: "sha-same" },
+                { path: "rules/b.md", sha: "sha-same" },
+            ],
+            projectId: "p1",
+            repoId: "repo1",
+        });
+        expect(await screen.findByText("2 rule files imported. Review, then save.")).toBeTruthy();
+        expect(screen.getByRole("listitem", { name: "a" })).toBeTruthy();
+        expect(screen.getByRole("listitem", { name: "b" })).toBeTruthy();
+    });
+
+    it("reads a link sorted before the file it leads to as that file, once when both are picked", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.listed = { canEdit: true, files: [], revision: "r1" };
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [
+                // A link to rules/z.md, listed first.
+                { linkOf: "rules/z.md", path: "rules/a.md", sha: "sha-z", size: 10, tooLarge: false },
+                { path: "rules/z.md", sha: "sha-z", size: 10, tooLarge: false },
+            ],
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockImplementation(async ({ files: asked }: { files: { path: string }[] }) => {
+            return {
+                files: asked.map(({ path }) => {
+                    return { path, status: "ok", text: "---\nalwaysApply: true\n---\nUse pnpm." };
+                }),
+                status: "ok",
+            };
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const found = await screen.findByRole("list", { name: "Files found" });
+
+        const link = within(found).getByRole("checkbox", { name: LINK_TO_Z });
+
+        expect(link.getAttribute("aria-checked")).toBe("false");
+
+        await user.click(link);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        // Both picked: the link is left out for the file it leads to.
+        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, files: [{ path: "rules/z.md", sha: "sha-z" }], projectId: "p1", repoId: "repo1" });
+        expect(
+            await screen.findByText(
+                "1 rule file imported. Review, then save. 1 file was left out as the same file as another picked: the same text would apply twice.",
+            ),
+        ).toBeTruthy();
+    });
+
     it("names the files the read refused", async () => {
         const user = userEvent.setup();
 
@@ -1437,7 +1531,7 @@ describe("project rule files imported from the project's repository", () => {
             commit: COMMIT,
             files: [
                 { path: "AGENTS.md", sha: "sha-agents", size: 20, tooLarge: false },
-                { path: "CLAUDE.md", sha: "sha-agents", size: 20, tooLarge: false },
+                { linkOf: "AGENTS.md", path: "CLAUDE.md", sha: "sha-agents", size: 20, tooLarge: false },
             ],
             status: "ok",
             truncated: false,

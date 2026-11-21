@@ -22,7 +22,7 @@ import { importRuleTexts, isWholeInstructionFile } from "../lib/rule-file-import
 /**
  * What a repository import read: the files as the upload import turns them into drafts (`skipped`: the paths past the
  * room), the paths it could not read, how many it had no requests left for (`notRead`), which another import reads, and
- * picks left out as the same file as one before them (`duplicates`: a link such as `CLAUDE.md → AGENTS.md`, whose text
+ * picks left out as the same file as another picked (`duplicates`: a link such as `CLAUDE.md → AGENTS.md`, whose text
  * would apply twice).
  */
 export interface RepoImportResult extends ImportedRuleTexts {
@@ -34,8 +34,11 @@ export interface RepoImportResult extends ImportedRuleTexts {
 /** Why a symlink is not followed (`LinkRefusal` in `source-control/repo-rule-files.ts`): listed, never read. */
 type LinkRefusal = "broken" | "budget" | "outside" | "too_deep" | "too_long";
 
-/** `refused`: a symlink not followed, with why; `sha`: the blob the read takes for it, which it sends back. */
-type FoundFile = { path: string; refused?: LinkRefusal; sha?: string; size: number; tooLarge: boolean };
+/**
+ * `linkOf`: for a symlink followed, the path it leads to; `refused`: one not followed, with why; `sha`: the blob the read
+ * takes for it, which it sends back.
+ */
+type FoundFile = { linkOf?: string; path: string; refused?: LinkRefusal; sha?: string; size: number; tooLarge: boolean };
 
 /** Whether a found file can be picked at all. */
 const isPickable = (file: FoundFile): boolean => !file.tooLarge && file.refused === undefined;
@@ -65,30 +68,52 @@ const repoName = (url: string): string => url.replace(HOST_PREFIX, "").replace(G
 const mayBeTooLong = (file: FoundFile): boolean => isPickable(file) && file.size > MAX_RULE_FILE_LENGTH;
 
 /**
- * What makes two picks one draft: the same blob read the same way. A root instruction file is imported whole, a rules
- * folder's file by its front matter, so the same bytes at both make two different drafts.
+ * What makes two picks one draft: the same file read the same way. Only a link is another path's file (`linkOf`): two
+ * files with equal bytes are two rule files, with their own names. A root instruction file is imported whole, a rules
+ * folder's file by its front matter, so a link from one to the other makes two different drafts.
  */
-const draftKey = (path: string, sha: string): string => `${isWholeInstructionFile(path) ? "whole" : "rule"}:${sha}`;
+const draftKey = (file: FoundFile): string => `${isWholeInstructionFile(file.path) ? "whole" : "rule"}:${file.linkOf ?? file.path}`;
 
-/** For each pickable file whose draft an earlier one by path makes (a link to it), that earlier file's path. */
-const sameFileAs = (files: ReadonlyArray<FoundFile>): Map<string, string> => {
-    const first = new Map<string, string>();
-    const same = new Map<string, string>();
+/**
+ * One of `paths` (sorted by path) per draft, in their order: the file a link leads to when it is among them, else the
+ * first. A path not in `byPath` is kept.
+ */
+const onePerDraft = (paths: ReadonlyArray<string>, byPath: ReadonlyMap<string, FoundFile>): string[] => {
+    const kept = new Map<string, string>();
 
-    const byPath = files.toSorted((left, right) => left.path.localeCompare(right.path));
+    for (const path of paths) {
+        const file = byPath.get(path);
 
-    for (const file of byPath) {
-        if (!isPickable(file) || file.sha === undefined) {
+        if (file === undefined) {
             continue;
         }
 
-        const key = draftKey(file.path, file.sha);
-        const earlier = first.get(key);
+        const key = draftKey(file);
+        const earlier = kept.get(key);
 
-        if (earlier === undefined) {
-            first.set(key, file.path);
-        } else {
-            same.set(file.path, earlier);
+        if (earlier === undefined || (file.linkOf === undefined && byPath.get(earlier)?.linkOf !== undefined)) {
+            kept.set(key, path);
+        }
+    }
+
+    const keep = new Set(kept.values());
+
+    return paths.filter((path) => !byPath.has(path) || keep.has(path));
+};
+
+/** For each pickable file whose draft another makes (a link to it, or another link to its target), that file's path. */
+const sameFileAs = (files: ReadonlyArray<FoundFile>): Map<string, string> => {
+    const pickable = files.filter((file) => isPickable(file)).toSorted((left, right) => left.path.localeCompare(right.path));
+    const byPath = new Map(pickable.map((file) => [file.path, file]));
+    const keep = new Set(onePerDraft([...byPath.keys()], byPath));
+    const kept = new Map(pickable.filter((file) => keep.has(file.path)).map((file) => [draftKey(file), file.path]));
+    const same = new Map<string, string>();
+
+    for (const file of pickable) {
+        const keeper = kept.get(draftKey(file));
+
+        if (keeper !== undefined && keeper !== file.path) {
+            same.set(file.path, keeper);
         }
     }
 
@@ -237,30 +262,17 @@ const RepoRuleFileImport: FC<{
         // The repository and commit listed: a branch moved since, or another repository chosen, never changes what is read.
         const readArgs = { commit, projectId: projectId as Id<"projects">, repoId: listing.repoId as Id<"projectRepositories"> };
         // Each with the blob its listing found, so the read need not follow links again.
-        const shas = new Map(listing.files.map((file) => [file.path, file.sha]));
-        // In the order the import takes them, one pick of each draft (the first by path; a link to it is the same text,
-        // read the same way): the first a project can hold are read, the rest left out.
-        const taken = new Set<string>();
-        const all = [...picked]
-            .toSorted((left, right) => left.localeCompare(right))
-            .filter((path) => {
-                const sha = shas.get(path);
-
-                if (sha === undefined) {
-                    return true;
-                }
-
-                const key = draftKey(path, sha);
-                const repeat = taken.has(key);
-
-                taken.add(key);
-
-                return !repeat;
-            });
+        const byPath = new Map(listing.files.map((file) => [file.path, file]));
+        // In the order the import takes them, one pick of each draft (a link is its target's text, read the same way):
+        // the first a project can hold are read, the rest left out.
+        const all = onePerDraft(
+            [...picked].toSorted((left, right) => left.localeCompare(right)),
+            byPath,
+        );
         const duplicates = picked.size - all.length;
         const paths = all.slice(0, MAX_RULE_FILES);
         const files = paths.map((path) => {
-            const sha = shas.get(path);
+            const sha = byPath.get(path)?.sha;
 
             return sha === undefined ? { path } : { path, sha };
         });
@@ -291,9 +303,9 @@ const RepoRuleFileImport: FC<{
 
             // What this read answered, and any pick of a draft it answered: importing again adds nothing twice.
             const keyOf = (path: string): string | undefined => {
-                const sha = shas.get(path);
+                const file = byPath.get(path);
 
-                return sha === undefined ? undefined : draftKey(path, sha);
+                return file === undefined ? undefined : draftKey(file);
             };
             const answered = new Set(outcome.files.flatMap((file) => (file.status === "not_read" ? [] : [file.path])));
             const answeredKeys = new Set([...answered].flatMap((path) => keyOf(path) ?? []));

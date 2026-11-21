@@ -203,13 +203,14 @@ describe(listRepoRuleFiles, () => {
             commit: COMMIT,
             files: [
                 { path: "AGENTS.md", sha: "blob-AGENTS.md", size: 7, tooLarge: false },
-                // Listed with its target's size and blob: the read takes the target's.
-                { path: "CLAUDE.md", sha: "blob-AGENTS.md", size: 7, tooLarge: false },
+                // Listed with its target's path, size and blob: the read takes the target's.
+                { linkOf: "AGENTS.md", path: "CLAUDE.md", sha: "blob-AGENTS.md", size: 7, tooLarge: false },
                 { path: "GEMINI.md", refused: "outside", size: 4, tooLarge: false },
                 { path: "rules/escape.md", refused: "outside", size: 16, tooLarge: false },
                 // A loop is a chain past the depth.
                 { path: "rules/loop.md", refused: "too_deep", size: 7, tooLarge: false },
-                { path: "rules/style.md", sha: "blob-AGENTS.md", size: 7, tooLarge: false },
+                // Its last hop's path, through CLAUDE.md.
+                { linkOf: "AGENTS.md", path: "rules/style.md", sha: "blob-AGENTS.md", size: 7, tooLarge: false },
             ],
             truncated: false,
         });
@@ -279,7 +280,13 @@ describe(listRepoRuleFiles, () => {
         const listing = await listRepoRuleFiles(host.request, ADDRESS);
 
         expect(listing.files.filter((file) => file.refused === "budget").map((file) => file.path)).toStrictEqual(links.slice(MAX_LINKS_FOLLOWED - 1));
-        expect(listing.files.find((file) => file.path === "CLAUDE.md")).toStrictEqual({ path: "CLAUDE.md", sha: "blob-AGENTS.md", size: 7, tooLarge: false });
+        expect(listing.files.find((file) => file.path === "CLAUDE.md")).toStrictEqual({
+            linkOf: "AGENTS.md",
+            path: "CLAUDE.md",
+            sha: "blob-AGENTS.md",
+            size: 7,
+            tooLarge: false,
+        });
         expect(listing.files.filter((file) => file.refused === undefined)).toHaveLength(MAX_LINKS_FOLLOWED + 2);
         await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, picksOf(listing, [links[0]!, links.at(-1)!]))).resolves.toStrictEqual([
             { path: links[0], status: "ok", text: "# Rules" },

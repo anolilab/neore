@@ -120,6 +120,11 @@ export const MAX_LISTED_FOLDER_FILES = 100;
 export type LinkRefusal = "broken" | "budget" | "outside" | "too_deep" | "too_long";
 
 export interface RepoRuleFileEntry {
+    /**
+     * Set for a symlink followed: the path of the file it leads to (its last hop's), which another entry of the
+     * listing may be. Two entries are one file only through it, never by equal bytes.
+     */
+    linkOf?: string;
     path: string;
     /** Set for a symlink not followed, with why: listed, never read. */
     refused?: LinkRefusal;
@@ -166,8 +171,8 @@ interface Blob {
     size: number;
 }
 
-/** Where a link led: the file a read takes, or why it is not followed. */
-type Followed = { blob: Blob } | { refused: LinkRefusal };
+/** Where a link led: the file a read takes and its path, or why it is not followed. */
+type Followed = { at: string; blob: Blob } | { refused: LinkRefusal };
 
 const repoPath = ({ name, owner }: RepoAddress): string => `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
@@ -335,7 +340,7 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
 
         for (let hop = 0; ; hop += 1) {
             if (!current.link) {
-                return { blob: current };
+                return { at, blob: current };
             }
 
             if (hop === MAX_LINK_HOPS) {
@@ -448,7 +453,13 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
 
             files.push(
                 "blob" in followed
-                    ? { path, sha: followed.blob.sha, size: followed.blob.size, tooLarge: followed.blob.size > REPO_RULE_FILE_MAX_BYTES }
+                    ? {
+                          ...(blob.link && { linkOf: followed.at }),
+                          path,
+                          sha: followed.blob.sha,
+                          size: followed.blob.size,
+                          tooLarge: followed.blob.size > REPO_RULE_FILE_MAX_BYTES,
+                      }
                     : { path, refused: followed.refused, size: blob.size, tooLarge: false },
             );
         }

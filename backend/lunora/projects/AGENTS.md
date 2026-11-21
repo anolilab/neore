@@ -96,5 +96,5 @@
   store nothing: the editor turns the text into drafts with the upload's rules (`importRuleTexts`; an instruction-file
   name is `always` only at the top), leaving out and counting what a save would refuse (count, length, list size) and
   cutting a name past `MAX_RULE_TITLE_LENGTH` (`fitTitle`), renaming one a save reserves (`unreservedTitle`), and reading one
-  pick per `draftKey`: blob SHA plus root-file-or-rules-folder, so a link at the top imports once, but a top-level
-  instruction file and a rules-folder file with the same bytes stay two drafts.
+  pick per `draftKey`: a link's target path (`linkOf`, else its own; never the blob SHA) plus root-or-rules-folder, so
+  a link imports once, but equal bytes under two names, or a root and a folder file linked together, stay two drafts.

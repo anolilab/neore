@@ -51,9 +51,9 @@ const addressFor = async (
 };
 
 /**
- * The instruction files the repository holds at one commit, by path, size and the blob a read takes (a link not
- * followed with why), whether a tree was cut, and how many of the rules folder's files are past the listing's cap; none
- * read yet. At most `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included.
+ * The instruction files the repository holds at one commit, by path, size and the blob a read takes (a link followed
+ * with the path it leads to, one not followed with why), whether a tree was cut, and how many of the rules folder's
+ * files are past the listing's cap; none read yet. At most `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included.
  */
 export const listRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
@@ -64,6 +64,7 @@ export const listRepoRuleFiles = authAction
                 commit: v.optional(v.string()),
                 files: v.array(
                     v.object({
+                        linkOf: v.optional(v.string().max(MAX_LENGTH.long)),
                         path: v.string().max(MAX_LENGTH.long),
                         refused: v.optional(
                             v.union(v.literal("broken"), v.literal("budget"), v.literal("outside"), v.literal("too_deep"), v.literal("too_long")),
