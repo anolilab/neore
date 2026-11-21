@@ -153,7 +153,13 @@ export const roleSystemText = (role: SubAgentRunRole): string => {
     const parts = [`ROLE: ${role.name}\n${ROLE_INSTRUCTIONS[role.name]}`];
 
     if (role.instructions) {
-        parts.push(`THE USER'S INSTRUCTIONS FOR THIS ROLE:\n${role.instructions}`);
+        // A project's owner wrote these, not the user: the agent must not take them for the user's own word.
+        const header =
+            role.instructionsBy === "projectOwner"
+                ? "THE PROJECT OWNER'S INSTRUCTIONS FOR THIS ROLE (set for the project by its owner, not by the user):"
+                : "THE USER'S INSTRUCTIONS FOR THIS ROLE:";
+
+        parts.push(`${header}\n${role.instructions}`);
     }
 
     return parts.join("\n\n");

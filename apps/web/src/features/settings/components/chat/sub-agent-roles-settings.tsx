@@ -339,7 +339,16 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, modelsKnown
                         value={draft}
                     />
                     {isProject && inherited?.instructions && own.instructions === undefined && !readOnly && (
-                        <Button className="h-auto px-0" onClick={() => save({ instructions: "" })} size="sm" variant="link">
+                        <Button
+                            className="h-auto px-0"
+                            onClick={() => {
+                                // Clicking blurs the field first, which saves what was typed; the switch-off replaces it.
+                                setDraft("");
+                                save({ instructions: "" });
+                            }}
+                            size="sm"
+                            variant="link"
+                        >
                             {t`Don't use your default instructions in this project`}
                         </Button>
                     )}

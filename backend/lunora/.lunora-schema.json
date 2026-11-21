@@ -26223,6 +26223,13 @@
               "optional": true,
               "unique": false
             },
+            "instructionsBy": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"projectOwner\""
+            },
             "model": {
               "kind": "string",
               "nullable": false,

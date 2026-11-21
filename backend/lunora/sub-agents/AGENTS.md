@@ -73,7 +73,9 @@
   same): never pick another model instead. A worker on a computer skips the model checks: it runs on its coding agent. Only the user's backup model still applies on a gateway failure, as for
   every run. The run keeps the resolved role on its row (a worker copies its first run's), and `execute.ts` re-checks
   the model (a worker's thread model too), so a settings change never reaches a running role. A host worker gets the
-  role's instructions ahead of the task (`host-runs.ts`). The lead's catalog (`buildRoleCatalog`: names, scopes,
+  role's instructions ahead of the task (`host-runs.ts`). Instructions from another user's project are labelled as
+  its owner's (`instructionsBy`), never the user's. A role below the lead takes the lead's project
+  (`delegationProjectId`). The lead's catalog (`buildRoleCatalog`: names, scopes,
   modes, never the instructions) is added only when the run has the delegate tool (`chat/execute.ts`);
   `loadRunContext` reads it only when asked (`roleCatalog: true`). It leaves out a role `roleModelRefusal` refuses for
   the running user, since `createRun` would refuse it.

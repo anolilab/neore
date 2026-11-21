@@ -102,6 +102,36 @@ describe("resolveRunRole", () => {
     });
 });
 
+describe("a role in another user's project", () => {
+    it("marks the owner's instructions as the owner's, and the member's own as the member's", async () => {
+        const ownerId = await insertUser();
+        const organizationId = "org-1";
+
+        await harness.run(async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId, role: "member", userId }));
+        await setUserRoles({
+            review: { instructions: "Mine.", model: DEFAULT_CHAT_MODEL },
+            security: { instructions: "Also mine.", model: DEFAULT_CHAT_MODEL },
+        });
+        const projectId = (await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("projects", {
+                    createdAt: 0,
+                    organizationId,
+                    subAgentRoles: { review: { instructions: "The owner's." } },
+                    title: "P",
+                    userId: ownerId,
+                }),
+        )) as string;
+        const parentThreadId = await insertThread({ projectId });
+        const resolve = async (role: "review" | "security", onHost = false) =>
+            await harness.run(async (ctx: any) => await resolveRunRole(ctx, { parentThreadId, userId }, role, onHost));
+
+        expect(await resolve("review")).toMatchObject({ role: { instructions: "The owner's.", instructionsBy: "projectOwner" } });
+        expect(await resolve("review", true)).toMatchObject({ role: { instructions: "The owner's.", instructionsBy: "projectOwner" } });
+        expect(((await resolve("security")) as { role: Record<string, unknown> }).role).not.toHaveProperty("instructionsBy");
+    });
+});
+
 describe("a delegation below the lead", () => {
     const insertChild = async (parentThreadId: string) => {
         const childThreadId = await insertThread();

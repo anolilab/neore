@@ -124,7 +124,7 @@ import type { vWorkerPolicy } from "./validators";
 import { vDispatchSource, vHostRunnerRequest, vSubAgentRoleName, vSubAgentRunMode, vSubAgentRunRole, vSubAgentRunStatus } from "./validators";
 import type { SubAgentRoleName, SubAgentRunRole } from "./roles";
 import { isRoleModelAllowed, resolveHostRoleLaunch, resolveRoleLaunch } from "./roles";
-import { delegationProjectId, effectiveRoles, roleModelRefusal } from "./role-settings";
+import { delegationProjectId, effectiveRoleSettings, roleModelRefusal } from "./role-settings";
 
 type RunDoc = Doc<"subAgentRuns">;
 
@@ -979,10 +979,12 @@ export const resolveRunRole = async (
     roleName: SubAgentRoleName,
     onHost = false,
 ): Promise<{ error: string } | { role: SubAgentRunRole }> => {
-    const roles = await effectiveRoles(ctx, args.userId, await delegationProjectId(ctx, args.parentThreadId));
+    const { ownersInstructions, roles } = await effectiveRoleSettings(ctx, args.userId, await delegationProjectId(ctx, args.parentThreadId));
+    const attributed = (role: SubAgentRunRole): SubAgentRunRole =>
+        role.instructions && ownersInstructions.has(roleName) ? { ...role, instructionsBy: "projectOwner" } : role;
 
     if (onHost) {
-        return resolveHostRoleLaunch(roles, roleName);
+        return { role: attributed(resolveHostRoleLaunch(roles, roleName).role) };
     }
 
     const launch = resolveRoleLaunch(roles, roleName, isRoleModelAllowed);
@@ -998,7 +1000,7 @@ export const resolveRunRole = async (
         ? {
               error: `The ${roleName} role's model cannot run for you: ${refusal} Delegate without a role, or ask the user to pick another model for it in Settings → Sub-agent roles.`,
           }
-        : launch;
+        : { role: attributed(launch.role) };
 };
 
 export const createRun = internalMutation

@@ -78,6 +78,14 @@ describe(roleSystemText, () => {
 
         expect(text.startsWith("ROLE: security\n")).toBe(true);
         expect(text.indexOf("Check auth.")).toBeGreaterThan(text.indexOf("ROLE: security"));
+        expect(text).toContain("THE USER'S INSTRUCTIONS FOR THIS ROLE:");
+    });
+
+    it("labels a project owner's instructions as theirs, never as the user's", () => {
+        const text = roleSystemText({ instructions: "Check auth.", instructionsBy: "projectOwner", model: "m", name: "security" });
+
+        expect(text).toContain("THE PROJECT OWNER'S INSTRUCTIONS FOR THIS ROLE");
+        expect(text).not.toContain("THE USER'S INSTRUCTIONS");
     });
 });
 

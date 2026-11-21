@@ -419,4 +419,33 @@ describe("SubAgentRolesSettings", () => {
         });
         expect(state.setSubAgentRole.mock.calls[1]?.[0]).toMatchObject({ role: "implementation" });
     });
+
+    it("keeps the switch-off over a typed draft when the card goes away", async () => {
+        state.roles = { review: { instructions: "Check auth.", model: "model-a" } };
+        state.project = { editable: true, roles: {} };
+        state.projects = [{ _id: "p1", title: "Project one" }];
+        const view = renderSettings();
+        const user = userEvent.setup();
+
+        await screen.findAllByText("Off until you pick a model.");
+        await user.click(screen.getByRole("combobox", { name: "Applies to" }));
+        await user.click(await screen.findByRole("option", { name: "Project one" }));
+
+        // Activated with focus still in the field (a screen reader's virtual cursor), so no blur saves the draft first.
+        const fields = await screen.findAllByLabelText("Extra instructions");
+
+        fireEvent.change(fields[3]!, { target: { value: "Typed." } });
+        fireEvent.click(screen.getByRole("button", { name: "Don't use your default instructions in this project" }));
+        view.unmount();
+
+        await waitFor(() => {
+            expect(state.setProjectSubAgentRole).toHaveBeenCalled();
+        });
+        await new Promise((resolve) => {
+            setTimeout(resolve, 30);
+        });
+        expect(state.setProjectSubAgentRole.mock.calls.map((call) => call[0])).toStrictEqual([
+            { config: { instructions: "" }, projectId: "p1", role: "review" },
+        ]);
+    });
 });

@@ -18,7 +18,7 @@ import { authQuery } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { mayEditProject } from "../projects/edit-access";
 import { readableProject } from "../projects/functions";
-import type { SubAgentRoleConfig, SubAgentRoles } from "./roles";
+import type { SubAgentRoleConfig, SubAgentRoleName, SubAgentRoles } from "./roles";
 import { activeRoles, buildRoleCatalog, isRoleModelAllowed, mergeSubAgentRoles } from "./roles";
 import { vSubAgentRoles } from "./validators";
 
@@ -125,9 +125,29 @@ export const roleConfigRefusal = async (ctx: QueryCtx | MutationCtx, userId: str
  * owner's overrides; each model still has to pass the running user's checks at admission.
  */
 export const effectiveRoles = async (ctx: QueryCtx | MutationCtx, userId: string, projectId: Id<"projects"> | undefined): Promise<SubAgentRoles> => {
-    const [user, project] = await Promise.all([userRoles(ctx, userId), projectId ? readableProject(ctx, projectId, userId) : null]);
+    const { roles } = await effectiveRoleSettings(ctx, userId, projectId);
 
-    return mergeSubAgentRoles(user, project?.subAgentRoles ?? undefined);
+    return roles;
+};
+
+/**
+ * The roles of {@link effectiveRoles}, with the roles whose instructions come from a project another user owns: a run labels those
+ * as the owner's (`instructionsBy`), never as the running user's.
+ */
+export const effectiveRoleSettings = async (
+    ctx: QueryCtx | MutationCtx,
+    userId: string,
+    projectId: Id<"projects"> | undefined,
+): Promise<{ ownersInstructions: ReadonlySet<SubAgentRoleName>; roles: SubAgentRoles }> => {
+    const [user, project] = await Promise.all([userRoles(ctx, userId), projectId ? readableProject(ctx, projectId, userId) : null]);
+    const overrides = project?.subAgentRoles ?? undefined;
+    const ownersInstructions = new Set<SubAgentRoleName>(
+        project && project.userId !== userId && overrides
+            ? (Object.keys(overrides) as SubAgentRoleName[]).filter((name) => overrides[name]?.instructions !== undefined)
+            : [],
+    );
+
+    return { ownersInstructions, roles: mergeSubAgentRoles(user, overrides) };
 };
 
 /** How far up a delegation chain {@link delegationProjectId} looks: the lead, a child, a grandchild (depth ≤ 2). */
