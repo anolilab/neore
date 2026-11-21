@@ -1173,6 +1173,11 @@ fn run_action(
     remaining: Duration,
     decision: &'static str,
 ) -> Outcome {
+    // The instruction files are checked against the folders shared now and read before an update can share another:
+    // under the save lock, which nothing in that read waits on (its opens never block, the files are small; a home
+    // folder on a hung network mount would stall settings updates until it answers).
+    let _saving =
+        matches!(action, Action::GlobalInstructions(_)).then(|| state.save_lock.lock().unwrap());
     let roots = shareable_roots(&state.settings().roots);
 
     Outcome::of(

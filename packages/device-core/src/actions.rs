@@ -355,7 +355,7 @@ pub fn run(
     mcp: Option<&McpManager>,
 ) -> Outcome {
     match action {
-        Action::GlobalInstructions(request) => Outcome::completed(request.run()),
+        Action::GlobalInstructions(request) => Outcome::completed(request.run(roots)),
         Action::List(path) => match fs::list(roots, &path) {
             Ok(listing) => {
                 Outcome::completed(serde_json::to_string_pretty(&listing).unwrap_or_default())

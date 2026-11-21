@@ -4,13 +4,18 @@
 //! ones the person ticked. The request only ever PICKS from [`FILES`] by id; no path comes from it.
 //!
 //! Each file is resolved when the call is planned, so the prompt shows where a link really leads, and again when it
-//! runs: a file that resolves elsewhere by then is refused. It is read only when it resolves, links followed, to a
+//! runs: a file that resolves elsewhere by then, or is another file there, is refused. The run checks against the
+//! shared folders it was planned with AND those saved when it runs, and opens what it resolved without following a
+//! link swapped in since or waiting on a FIFO, then reads only a regular file that is still the one approved (its
+//! device and inode on Unix; Windows has no stable id in `std`, so there the open handle's real path must be the
+//! approved one, and a named pipe cannot sit in the home folder). A file with another name (a hard link, which a
+//! shared folder could hold) is refused on Unix; Windows does not check that. It is read only when it resolves, links followed, to a
 //! regular Markdown file inside the home folder and outside every shared folder (the agent can write there), and is
 //! at most [`MAX_FILE_BYTES`]. One read returns what fits in one result ([`MAX_OUTPUT_BYTES`]); a file that does not
 //! fit is named as left out, never cut.
 
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs::{self, File, Metadata};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
@@ -58,12 +63,50 @@ pub fn is_global_instructions_tool(tool: &str) -> bool {
     tool == LIST_TOOL || tool == READ_TOOL
 }
 
-/// Where one file resolved.
+/// Which file a path names: its device and inode on Unix, nothing elsewhere.
+type Identity = Option<(u64, u64)>;
+
+fn identity(metadata: &Metadata) -> Identity {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        Some((metadata.dev(), metadata.ino()))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+
+        None
+    }
+}
+
+/// Whether the file has another name: a hard link from a shared folder would let the agent write it, and no path
+/// check sees that name. Unix only; Windows hard links stay a documented gap.
+fn hard_linked(metadata: &Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        metadata.nlink() > 1
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+
+        false
+    }
+}
+
+const CHANGED: &str = "it changed after it was approved";
+const HARD_LINKED: &str = "it has another name (a hard link)";
+
+/// Where one file resolved, and which file it was there.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Resolved {
     Missing,
     Refused(&'static str),
-    At(PathBuf),
+    At(PathBuf, Identity),
 }
 
 /// A planned request: `read` is `None` for the list, else the ids picked, in [`FILES`] order. `resolved` is where
@@ -155,10 +198,10 @@ impl Request {
                 let path = self.home.join(file.relative);
 
                 match resolved {
-                    Resolved::At(real) if *real != path => {
+                    Resolved::At(real, _) if *real != path => {
                         format!("  {} (links to {})", path.display(), real.display())
                     }
-                    Resolved::At(_) => format!("  {}", path.display()),
+                    Resolved::At(..) => format!("  {}", path.display()),
                     Resolved::Missing => format!("  {} (not there)", path.display()),
                     Resolved::Refused(reason) => {
                         format!("  {} (refused: {reason})", path.display())
@@ -176,18 +219,23 @@ impl Request {
         }
     }
 
-    /// Runs the request: a JSON list in [`FILES`] order.
-    pub fn run(&self) -> String {
+    /// Runs the request against the shared folders saved now (`current`, canonical) as well as those it was planned
+    /// with: a JSON list in [`FILES`] order.
+    pub fn run(&self, current: &[PathBuf]) -> String {
+        let roots: Vec<PathBuf> = self.roots.iter().chain(current).cloned().collect();
         let mut used = 2;
         let entries: Vec<Value> = self
             .resolved
             .iter()
             .map(|(file, planned)| {
                 let mut entry = json!({ "id": file.id, "name": file.name, "path": format!("~/{}", file.relative) });
-                let now = resolve(&self.home, file, &self.roots);
+                let now = resolve(&self.home, file, &roots);
                 let opened = match now {
-                    _ if now != *planned => Err(Resolved::Refused("it changed after it was approved")),
-                    Resolved::At(real) => open(&real),
+                    Resolved::At(real, approved) if now_matches(planned, &real, approved) => {
+                        open(&self.home, &real, approved)
+                    }
+                    Resolved::Refused(reason) => Err(Resolved::Refused(reason)),
+                    _ if now != *planned => Err(Resolved::Refused(CHANGED)),
                     other => Err(other),
                 };
 
@@ -277,17 +325,32 @@ fn resolve(home: &Path, file: &GlobalFile, roots: &[PathBuf]) -> Resolved {
         return Resolved::Refused("it links to a file that is not Markdown");
     }
 
-    // Before any open: opening a FIFO would wait for a writer.
-    if !fs::metadata(&real).is_ok_and(|metadata| metadata.is_file()) {
-        return Resolved::Refused("it is not a regular file");
+    match fs::metadata(&real) {
+        Ok(metadata) if metadata.is_file() && hard_linked(&metadata) => {
+            Resolved::Refused(HARD_LINKED)
+        }
+        Ok(metadata) if metadata.is_file() => Resolved::At(real, identity(&metadata)),
+        _ => Resolved::Refused("it is not a regular file"),
     }
-
-    Resolved::At(real)
 }
 
-/// Opens a resolved file; the size is the open handle's, so a file swapped in after the check is the one measured.
-fn open(real: &Path) -> Result<(File, u64), Resolved> {
-    let handle = File::open(real).map_err(|_| Resolved::Refused("it could not be opened"))?;
+fn now_matches(planned: &Resolved, real: &Path, approved: Identity) -> bool {
+    matches!(planned, Resolved::At(path, id) if path == real && *id == approved)
+}
+
+/// Opens a resolved file (`real`, canonical, inside `home`) without following a link swapped in since it resolved
+/// and without waiting on a FIFO, then takes it only if the open handle is a regular file and the very one approved.
+/// The size is the handle's. On Unix the walk down from `/` follows no link and the dev/inode must match; Windows has
+/// no such id in `std`, so there the handle's real path must be `real` itself.
+fn open(home: &Path, real: &Path, approved: Identity) -> Result<(File, u64), Resolved> {
+    let within = if cfg!(unix) { home } else { real };
+    let handle = crate::fs::open_confined(&[within.to_owned()], real).map_err(|error| {
+        Resolved::Refused(if is_swapped_link(&error) {
+            CHANGED
+        } else {
+            "it could not be opened"
+        })
+    })?;
     let metadata = handle
         .metadata()
         .map_err(|_| Resolved::Refused("it could not be opened"))?;
@@ -296,7 +359,28 @@ fn open(real: &Path) -> Result<(File, u64), Resolved> {
         return Err(Resolved::Refused("it is not a regular file"));
     }
 
+    if identity(&metadata) != approved {
+        return Err(Resolved::Refused(CHANGED));
+    }
+
+    if hard_linked(&metadata) {
+        return Err(Resolved::Refused(HARD_LINKED));
+    }
+
     Ok((handle, metadata.len()))
+}
+
+/// A link, or anything but a folder, where a folder or the file was (`O_NOFOLLOW` and `O_DIRECTORY` refuse it), or, on
+/// Windows, a handle whose real path is not the approved one.
+fn is_swapped_link(error: &io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        matches!(error.raw_os_error(), Some(libc::ELOOP | libc::ENOTDIR))
+    }
+    #[cfg(not(unix))]
+    {
+        error.kind() == io::ErrorKind::PermissionDenied
+    }
 }
 
 fn read_text(handle: File) -> Result<String, &'static str> {
@@ -339,7 +423,7 @@ mod tests {
     }
 
     fn entries(request: &Request) -> Vec<Value> {
-        serde_json::from_str::<Vec<Value>>(&request.run()).unwrap()
+        serde_json::from_str::<Vec<Value>>(&request.run(&[])).unwrap()
     }
 
     fn read(home: &Path, ids: &[&str]) -> Vec<Value> {
@@ -510,7 +594,7 @@ mod tests {
             &[],
         )
         .unwrap()
-        .run();
+        .run(&[]);
         let got: Vec<Value> = serde_json::from_str(&output).unwrap();
 
         assert!(output.len() <= MAX_OUTPUT_BYTES);
@@ -542,7 +626,7 @@ mod tests {
         )
         .unwrap();
         let detail = request.detail();
-        let got: Vec<Value> = serde_json::from_str(&request.run()).unwrap();
+        let got: Vec<Value> = serde_json::from_str(&request.run(&[])).unwrap();
 
         assert_eq!(
             got[0]["reason"],
@@ -580,7 +664,7 @@ mod tests {
                 &[shared],
             )
             .unwrap()
-            .run(),
+            .run(&[]),
         )
         .unwrap();
 
@@ -616,7 +700,7 @@ mod tests {
         std::os::unix::fs::symlink(home.join("b/claude.md"), home.join(".claude/CLAUDE.md"))
             .unwrap();
 
-        let got: Vec<Value> = serde_json::from_str(&request.run()).unwrap();
+        let got: Vec<Value> = serde_json::from_str(&request.run(&[])).unwrap();
 
         assert_eq!(got[0]["reason"], json!("it changed after it was approved"));
         assert!(got[0].get("text").is_none());
@@ -638,5 +722,161 @@ mod tests {
         let listed = entries(&plan(LIST_TOOL, &json!({}), Some(home), &[]).unwrap());
 
         assert_eq!(listed[0]["reason"], json!("it is not a regular file"));
+    }
+
+    /// The approved file at `relative`, as `resolve` saw it.
+    #[cfg(unix)]
+    fn approved(home: &Path, relative: &str) -> (PathBuf, Identity) {
+        let real = home.join(relative);
+
+        (real.clone(), identity(&fs::metadata(&real).unwrap()))
+    }
+
+    #[cfg(unix)]
+    fn refusal(opened: Result<(File, u64), Resolved>) -> Resolved {
+        opened.map(|_| ()).unwrap_err()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_another_file_put_at_the_approved_path() {
+        let (_dir, home) = home("replaced");
+
+        put(&home, ".claude/CLAUDE.md", "approved");
+
+        let request = plan(
+            READ_TOOL,
+            &json!({ "files": ["claude"] }),
+            Some(home.clone()),
+            &[],
+        )
+        .unwrap();
+
+        // Moved aside, not deleted: a freed inode number can be handed straight to the new file.
+        fs::rename(home.join(".claude/CLAUDE.md"), home.join("old.md")).unwrap();
+        put(&home, ".claude/CLAUDE.md", "swapped in");
+
+        let got: Vec<Value> = serde_json::from_str(&request.run(&[])).unwrap();
+
+        assert_eq!(got[0]["reason"], json!(CHANGED));
+        assert!(got[0].get("text").is_none());
+    }
+
+    /// A swap between the run's own check and its open: the open handle decides, never the path.
+    #[cfg(unix)]
+    #[test]
+    fn opens_only_the_approved_file_when_it_is_swapped_after_the_check() {
+        let (dir, home) = home("swap-open");
+        let relative = ".claude/CLAUDE.md";
+
+        put(&home, relative, "approved");
+        put(&home, "other.md", "another file");
+
+        // Another regular file at the same path.
+        let (real, id) = approved(&home, relative);
+
+        fs::rename(home.join("other.md"), &real).unwrap();
+        assert_eq!(refusal(open(&home, &real, id)), Resolved::Refused(CHANGED));
+
+        // A link at the path, even to a file inside home.
+        let (real, id) = approved(&home, relative);
+
+        fs::remove_file(&real).unwrap();
+        put(&home, "notes/x.md", "linked");
+        std::os::unix::fs::symlink(home.join("notes/x.md"), &real).unwrap();
+        assert_eq!(refusal(open(&home, &real, id)), Resolved::Refused(CHANGED));
+
+        // A folder on the way swapped for a link out of home.
+        fs::remove_file(&real).unwrap();
+        put(&home, relative, "approved");
+
+        let (real, id) = approved(&home, relative);
+
+        put(&dir, "outside/CLAUDE.md", "secret");
+        fs::rename(home.join(".claude"), home.join("claude-old")).unwrap();
+        std::os::unix::fs::symlink(dir.join("outside"), home.join(".claude")).unwrap();
+        assert_eq!(refusal(open(&home, &real, id)), Resolved::Refused(CHANGED));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_fifo_swapped_in_after_the_check_does_not_block_the_open() {
+        let (_dir, home) = home("swap-fifo");
+        let relative = ".claude/CLAUDE.md";
+
+        put(&home, relative, "approved");
+
+        let (real, id) = approved(&home, relative);
+
+        fs::remove_file(&real).unwrap();
+
+        let name = std::ffi::CString::new(real.as_os_str().as_encoded_bytes()).unwrap();
+
+        // SAFETY: a valid NUL-terminated path; mkfifo only creates the node.
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        // No writer ever opens it: a blocking open would hang this test.
+        assert_eq!(
+            refusal(open(&home, &real, id)),
+            Resolved::Refused("it is not a regular file")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_file_in_a_folder_shared_after_the_plan() {
+        let (_dir, home) = home("shared-later");
+
+        put(&home, "work/claude.md", "agent-written");
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        std::os::unix::fs::symlink(home.join("work/claude.md"), home.join(".claude/CLAUDE.md"))
+            .unwrap();
+
+        let request = plan(
+            READ_TOOL,
+            &json!({ "files": ["claude"] }),
+            Some(home.clone()),
+            &[],
+        )
+        .unwrap();
+        let got: Vec<Value> = serde_json::from_str(&request.run(&[home.join("work")])).unwrap();
+
+        assert_eq!(
+            got[0]["reason"],
+            json!("it is in a folder shared with the assistant")
+        );
+        assert!(got[0].get("text").is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_hard_link_into_a_shared_folder() {
+        let (_dir, home) = home("hard-link");
+
+        put(&home, "work/claude.md", "agent-written");
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        fs::hard_link(home.join("work/claude.md"), home.join(".claude/CLAUDE.md")).unwrap();
+
+        let request = plan(
+            READ_TOOL,
+            &json!({ "files": ["claude"] }),
+            Some(home.clone()),
+            &[home.join("work")],
+        )
+        .unwrap();
+        let got: Vec<Value> = serde_json::from_str(&request.run(&[])).unwrap();
+
+        assert_eq!(got[0]["reason"], json!(HARD_LINKED));
+        assert!(got[0].get("text").is_none());
+
+        // Linked after the check: the open handle is refused too.
+        put(&home, ".codex/AGENTS.md", "mine");
+
+        let (real, id) = approved(&home, ".codex/AGENTS.md");
+
+        fs::hard_link(&real, home.join("work/agents.md")).unwrap();
+        assert_eq!(
+            refusal(open(&home, &real, id)),
+            Resolved::Refused(HARD_LINKED)
+        );
     }
 }
