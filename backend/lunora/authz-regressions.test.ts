@@ -416,6 +416,21 @@ describe("thread-scoped rows keyed by an argument thread id", () => {
         expect(owner.values).toMatchObject({ secret: "owner-value" });
     });
 
+    it("names an organization's variable defaults the organization's, also for the admin whose id their row carries", async () => {
+        await run(async (context) => {
+            await context.db.insert("userVariableDefaults", {
+                organizationId: "org-1",
+                updatedAt: 0,
+                userId: OWNER,
+                variables: [{ name: "brand", value: "Acme" }],
+            });
+        });
+
+        const resolved = (await as(OWNER).query(procedureAt("prompts_functions", "getResolvedVariables"), {} as never)) as { sources: Record<string, string> };
+
+        expect({ ...resolved.sources }).toStrictEqual({ brand: "organization" });
+    });
+
     it("thread knowledge links are the thread owner's alone", async () => {
         const victim = await newThread(OWNER);
         const [ownerFile, strangerFile] = await run(async (context) => [

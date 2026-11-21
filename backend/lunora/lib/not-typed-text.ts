@@ -5,8 +5,23 @@
  * restricts (`vault/site-login-turn.ts` refuses a turn that holds one). An edit keeps the mark of the row it replaces.
  * No imports: the web app reads the mark too (`@neore/backend/not-typed-text`); the validator is `not-typed-text-validator.ts`.
  */
-/** Where a composer draft the owner did not type came from. The web client names it when it sends (`draft-origin.ts`). */
-export const NOT_TYPED_DRAFTS = ["promptLink", "shellLink", "sharedPrompt"] as const;
+/**
+ * Where a composer draft the owner did not type came from. The web client names it when it sends (`draft-origin.ts`): a link,
+ * the desktop shell, someone else's saved prompt, forwarded messages, a reply sent on as a prompt (Generate image or video),
+ * a suggestion (the model's follow-ups, the welcome screen's), the prompt improver's rewrite, a gallery item's stored
+ * prompt, and an organization's value filled into a prompt (a variable default, its name).
+ */
+export const NOT_TYPED_DRAFTS = [
+    "promptLink",
+    "shellLink",
+    "sharedPrompt",
+    "forwarded",
+    "assistantText",
+    "suggestion",
+    "improvedPrompt",
+    "galleryPrompt",
+    "organizationValue",
+] as const;
 
 export type NotTypedDraft = (typeof NOT_TYPED_DRAFTS)[number];
 
