@@ -1,24 +1,25 @@
-import { useEffect, useState } from "react";
-
 import { APP_URL, LUNORA_URL } from "./env";
 
 /*
- * Sign-in for the Firefox build, which cannot use the web app's session cookie.
+ * Sign-in for both builds. Neither uses the web app's session cookie: the
+ * server must be able to tell the extension's sends from the web app's, and
+ * Firefox gives every install its own random `moz-extension://<uuid>` origin,
+ * which no backend could trust for credentialed CORS anyway.
  *
- * Every Firefox install has its own random `moz-extension://<uuid>` origin, so
- * the backend has no origin to trust for credentialed CORS. It does not need
- * one: with `host_permissions` for the backend, requests from extension pages
- * are exempt from CORS, and the backend only checks `Origin` on requests that
- * carry a cookie. So this build never sends cookies (`credentials: 'omit'`) —
- * only bearer tokens — and gets its token through an authorization-code flow
- * with PKCE, driven by `identity.launchWebAuthFlow` (server side:
- * `backend/lunora/auth/extension-grant.ts`):
+ * With `host_permissions` for the backend, requests from extension pages are
+ * exempt from CORS, and the backend only checks `Origin` on requests that carry
+ * a cookie — and refuses an extension origin's cookie outright
+ * (`backend/src/extension-cookie.ts`). So the extension never sends cookies
+ * (`credentials: 'omit'`, here and in `lunora-client.ts`), only bearer tokens,
+ * and gets its token through an authorization-code flow with PKCE driven by
+ * `identity.launchWebAuthFlow` (server side: `backend/lunora/auth/extension-grant.ts`):
  *
  * 1. Generate a verifier; open `APP_URL/auth/extension` with its S256 challenge,
- *    `identity.getRedirectURL()` and a random `state`.
+ *    `identity.getRedirectURL()` (`https://<id>.chromiumapp.org/` in Chrome,
+ *    `https://<hash>.extensions.allizom.org/` in Firefox) and a random `state`.
  * 2. The user signs in on the web app — any method — and approves. The page
- *    redirects to the redirect URI with a one-time `code`; Firefox intercepts it
- *    and resolves `launchWebAuthFlow` with that URL, never loading it.
+ *    redirects to the redirect URI with a one-time `code`; the browser intercepts
+ *    it and resolves `launchWebAuthFlow` with that URL, never loading it.
  * 3. POST code + verifier to `/extension/auth/exchange` for a session token (the
  *    "grant"), kept in `storage.local`.
  * 4. Trade the grant for a short-lived JWT at `/extension/auth/token` whenever a
@@ -35,12 +36,18 @@ export interface GrantUser {
     name: string;
 }
 
-interface StoredGrant {
+export interface StoredGrant {
     token: string;
     user: GrantUser;
 }
 
-const STORAGE_KEY = "neore.extensionGrant";
+export const STORAGE_KEY = "neore.extensionGrant";
+
+/** Set once a Chrome install that rode the web cookie has been told to connect; cleared by a sign-in. */
+export const RECONNECT_KEY = "neore.reconnectNeeded";
+
+/** Written on the first run of a build that signs in through the grant, so the check below runs once per install. */
+const MIGRATION_KEY = "neore.authMigration";
 
 const toBase64Url = (bytes: Uint8Array): string => {
     let binary = "";
@@ -147,6 +154,31 @@ const writeGrant = async (grant: StoredGrant): Promise<void> => {
     await chrome.storage.local.set({ [STORAGE_KEY]: grant });
 };
 
+/**
+ * Run from `runtime.onInstalled`. The Chrome build used to ride the web app's
+ * cookie and stored no grant, so an UPDATE that finds no grant and no migration
+ * mark is an install that was signed in that way: the sign-in page then says
+ * why it is back, once. A fresh install, a Firefox one (it always held a grant)
+ * and every later update only write the mark.
+ */
+export const migrateFromCookieSession = async (input: { isFirefox: boolean; reason: string }): Promise<void> => {
+    const stored = await chrome.storage.local.get([MIGRATION_KEY, STORAGE_KEY]);
+
+    if (Object.hasOwn(stored, MIGRATION_KEY)) {
+        return;
+    }
+
+    const needsReconnect = input.reason === "update" && !input.isFirefox && !Object.hasOwn(stored, STORAGE_KEY);
+
+    await chrome.storage.local.set({ [MIGRATION_KEY]: 1, ...(needsReconnect && { [RECONNECT_KEY]: true }) });
+};
+
+export const readReconnectNeeded = async (): Promise<boolean> => {
+    const stored = await chrome.storage.local.get(RECONNECT_KEY);
+
+    return stored[RECONNECT_KEY] === true;
+};
+
 const clearGrant = async (): Promise<void> => {
     await chrome.storage.local.remove(STORAGE_KEY);
 };
@@ -187,6 +219,7 @@ export const signInWithWebAuthFlow = async (): Promise<GrantUser> => {
     const { token, user } = (await response.json()) as StoredGrant;
 
     await writeGrant({ token, user });
+    await chrome.storage.local.remove(RECONNECT_KEY);
 
     return user;
 };
@@ -250,38 +283,4 @@ export const signOutGrant = async (): Promise<void> => {
     } finally {
         await clearGrant();
     }
-};
-
-/** The stored grant's user, kept in step with `storage.local`. `undefined` while loading. */
-export const useGrantUser = (): { isPending: boolean; user: GrantUser | null } => {
-    const [user, setUser] = useState<GrantUser | null | undefined>(undefined);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-            if (area === "local" && Object.hasOwn(changes, STORAGE_KEY)) {
-                setUser((changes[STORAGE_KEY]?.newValue as StoredGrant | undefined)?.user ?? null);
-            }
-        };
-
-        chrome.storage.onChanged.addListener(listener);
-
-        const load = async () => {
-            const grant = await readGrant();
-
-            if (!cancelled) {
-                setUser(grant?.user ?? null);
-            }
-        };
-
-        void load();
-
-        return () => {
-            cancelled = true;
-            chrome.storage.onChanged.removeListener(listener);
-        };
-    }, []);
-
-    return { isPending: user === undefined, user: user ?? null };
 };

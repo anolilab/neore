@@ -8,14 +8,10 @@ import { OPTIONAL_ENV_KEYS } from "./env-validation";
 import {
     MOBILE_REDIRECT_URI,
     NATIVE_REDIRECT_URI,
-    parseTrustedExtensionOrigins,
     parseTrustedExtensionRedirectUris,
     SHIPPED_FIREFOX_EXTENSION_ID,
     SHIPPED_FIREFOX_REDIRECT_URI,
 } from "./extension-origins";
-
-const CHROME = `chrome-extension://${"a".repeat(32)}`;
-const FIREFOX = "moz-extension://0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b";
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -24,23 +20,9 @@ afterEach(() => {
 /** Quote style is the formatter's call, so match either quote. */
 const GECKO_ID_DECLARATION = /export const GECKO_ID = (["'])(?<id>[^"']+)\1/u;
 
-describe("parseTrustedExtensionOrigins", () => {
-    it("allows nothing when unset or empty", () => {
-        expect(parseTrustedExtensionOrigins(undefined)).toEqual([]);
-        expect(parseTrustedExtensionOrigins("")).toEqual([]);
-        expect(parseTrustedExtensionOrigins(" , ,")).toEqual([]);
-    });
-
-    it("parses a comma-separated list of exact extension origins", () => {
-        expect(parseTrustedExtensionOrigins(` ${CHROME}/ , ${FIREFOX},${CHROME}`)).toEqual([CHROME, FIREFOX]);
-    });
-
-    it("never widens to a wildcard, a bare scheme or a web origin", () => {
-        vi.spyOn(console, "warn").mockImplementation(() => {});
-
-        expect(parseTrustedExtensionOrigins("*,chrome-extension://,chrome-extension://*,https://evil.example,chrome-extension://short")).toEqual([]);
-        expect(console.warn).toHaveBeenCalledTimes(5);
-    });
+describe("parseTrustedExtensionRedirectUris", () => {
+    const FIREFOX_REDIRECT = `https://${"0a".repeat(20)}.extensions.allizom.org/`;
+    const CHROME_REDIRECT = `https://${"b".repeat(32)}.chromiumapp.org/`;
 
     it("accepts the native shell's callback only when listed, and only exactly", () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -54,11 +36,6 @@ describe("parseTrustedExtensionOrigins", () => {
         expect(parseTrustedExtensionRedirectUris("neore://auth/callback/,neore://auth/other,neore://evil")).toEqual([]);
         expect(console.warn).toHaveBeenCalledTimes(3);
     });
-});
-
-describe("parseTrustedExtensionRedirectUris", () => {
-    const FIREFOX_REDIRECT = `https://${"0a".repeat(20)}.extensions.allizom.org/`;
-    const CHROME_REDIRECT = `https://${"b".repeat(32)}.chromiumapp.org/`;
 
     it("admits the mobile callback only when listed, and only exactly", () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -101,12 +78,18 @@ describe("parseTrustedExtensionRedirectUris", () => {
         expect(declared).toBe(SHIPPED_FIREFOX_EXTENSION_ID);
     });
 
+    it("is the Firefox URI `pnpm dev:setup` lists beside a Chrome id, which replaces the default", () => {
+        const setup = readFileSync(join(import.meta.dirname, "../../../scripts/dev-setup.js"), "utf8");
+
+        expect(setup).toContain(`.chromiumapp.org/,${SHIPPED_FIREFOX_REDIRECT_URI}`);
+    });
+
     it("an explicit value replaces the default rather than adding to it", () => {
         expect(parseTrustedExtensionRedirectUris(CHROME_REDIRECT)).toEqual([CHROME_REDIRECT]);
     });
 
-    it("reaches the deployed Worker: both extension vars are in the optional passthrough", () => {
-        expect(OPTIONAL_ENV_KEYS).toEqual(expect.arrayContaining(["TRUSTED_EXTENSION_ORIGINS", "TRUSTED_EXTENSION_REDIRECT_URIS"]));
+    it("reaches the deployed Worker: the var is in the optional passthrough", () => {
+        expect(OPTIONAL_ENV_KEYS).toContain("TRUSTED_EXTENSION_REDIRECT_URIS");
     });
 
     it("accepts browser-intercepted redirect URIs, with or without the trailing slash", () => {

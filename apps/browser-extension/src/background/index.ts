@@ -1,4 +1,5 @@
-import { firefoxBrowser } from "@/lib/target";
+import { migrateFromCookieSession } from "@/lib/extension-grant";
+import { firefoxBrowser, IS_FIREFOX } from "@/lib/target";
 import { PageContextError } from "@/page-context/build";
 import { capturePage, selectionContext } from "@/page-context/capture";
 import type { PanelRequest } from "@/page-context/panel-request";
@@ -75,8 +76,12 @@ const createMenus = (): void => {
     });
 };
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(({ reason }) => {
     createMenus();
+
+    migrateFromCookieSession({ isFirefox: IS_FIREFOX, reason }).catch((error: unknown) => {
+        console.warn("[anole] could not check the sign-in migration", error);
+    });
 
     // Toolbar click opens the panel (no popup).
     chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch((error: unknown) => {

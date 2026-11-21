@@ -469,18 +469,29 @@ const main = async () => {
 
     // Browser extension. Optional, and only asked on a terminal: a piped or CI
     // run keeps whatever is there (possibly nothing, which just means the
-    // extension cannot sign in). The id appears on the extension's card once
-    // apps/browser-extension/dist is loaded unpacked at chrome://extensions.
-    if (process.stdin.isTTY && !backendEnv["TRUSTED_EXTENSION_ORIGINS"]) {
+    // Chrome build cannot sign in). The id appears on the extension's card once
+    // apps/browser-extension/dist is loaded unpacked at chrome://extensions. A
+    // value replaces the backend's default (the shipped Firefox add-on), so
+    // that URI is listed too — keep it in step with SHIPPED_FIREFOX_REDIRECT_URI
+    // in backend/lunora/lib/extension-origins.ts.
+    if (process.stdin.isTTY && !backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"]) {
         const extensionId = await ask("\n  Unpacked browser extension ID (chrome://extensions, leave blank to skip)");
 
         if (/^[a-p]{32}$/.test(extensionId)) {
-            backendEnv["TRUSTED_EXTENSION_ORIGINS"] = `chrome-extension://${extensionId}`;
+            backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] =
+                `https://${extensionId}.chromiumapp.org/,https://c64d88ed4645bb5915bc267506fbc3dcd4a1da90.extensions.allizom.org/`;
             backendChanged = true;
-            console.log("  [set]   TRUSTED_EXTENSION_ORIGINS");
+            console.log("  [set]   TRUSTED_EXTENSION_REDIRECT_URIS");
         } else if (extensionId) {
-            console.log("  [skip]  TRUSTED_EXTENSION_ORIGINS — an extension id is 32 letters a–p");
+            console.log("  [skip]  TRUSTED_EXTENSION_REDIRECT_URIS — an extension id is 32 letters a–p");
         }
+    }
+
+    // Retired: the extension signs in through an app grant, never the cookie.
+    if ("TRUSTED_EXTENSION_ORIGINS" in backendEnv) {
+        delete backendEnv["TRUSTED_EXTENSION_ORIGINS"];
+        backendChanged = true;
+        console.log("  [drop]  TRUSTED_EXTENSION_ORIGINS");
     }
 
     // AI provider key

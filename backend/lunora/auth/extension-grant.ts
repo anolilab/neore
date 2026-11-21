@@ -1,16 +1,16 @@
 /**
- * Sign-in for browser extensions that cannot share the web app's cookies.
+ * Sign-in for browser extensions (both builds), which never use the web app's cookies.
  *
- * Firefox gives every install its own random `moz-extension://<uuid>` origin, so
- * the Chrome build's model — trust the extension's exact origin for credentialed
- * CORS (`TRUSTED_EXTENSION_ORIGINS`) — has no single origin to list. It does not
- * need one: an extension page holding `host_permissions` for the backend is not
- * subject to CORS at all (MDN, `host_permissions`: "XMLHttpRequest and fetch
- * access to those origins without cross-origin restrictions"), and every check
- * that looks at the `Origin` header here — better-auth's origin check, Lunora's
- * CSRF and WebSocket checks — only runs for requests that carry a cookie. So the
- * Firefox build sends NO cookies, only bearer tokens, and nothing needs to
- * recognise its origin.
+ * The server must tell an extension's sends from the web app's, so no extension
+ * rides the web cookie: `src/extension-cookie.ts` strips it off any
+ * extension-origin request. (Firefox could not anyway: every install has its own
+ * random `moz-extension://<uuid>` origin.) No origin needs trusting: an extension
+ * page holding `host_permissions` for the backend is not subject to CORS at all
+ * (MDN, `host_permissions`: "XMLHttpRequest and fetch access to those origins
+ * without cross-origin restrictions"), and every check that looks at the
+ * `Origin` header here — better-auth's origin check, Lunora's CSRF and WebSocket
+ * checks — only runs for requests that carry a cookie. So the extension sends
+ * NO cookies, only bearer tokens.
  *
  * What it needs instead is a way to obtain a token. This is an authorization-code
  * flow with PKCE (RFC 7636), run through `identity.launchWebAuthFlow`:

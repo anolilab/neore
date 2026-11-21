@@ -24,7 +24,6 @@
         "@neore/backend": "workspace:*",
         "@neore/chat-ui": "workspace:*",
         "@neore/ui": "workspace:*",
-        "better-auth": "catalog:auth",
         "lucide-react": "catalog:icons",
         "react": "catalog:react",
         "react-dom": "catalog:react"

@@ -1,0 +1,12 @@
+# BROWSER EXTENSION — AGENT NOTES
+
+The rules for working in `apps/browser-extension/`. The protocol and the reasoning are in this folder's `README.md`.
+
+## SIGN-IN
+
+- Both builds (Chrome, Firefox) sign in through the app grant only: `identity.launchWebAuthFlow` → `/extension/auth/exchange` → grant token in `storage.local` → `/extension/auth/token` for the bearer (`src/lib/extension-grant.ts`). Never add a cookie path back: the server must tell the extension's sends from the web app's.
+- Every request to our origins sends no cookie: `credentials: "omit"` on our fetches, and the Lunora client gets a `fetch` that forces it (`src/lib/lunora-client.ts`), since it asks for `"include"` on its own. The backend strips the cookie off extension-origin requests anyway (`backend/src/extension-cookie.ts`).
+- No host permission for the app origin: the extension only opens it in the sign-in window.
+- A 401 from `/extension/auth/token` drops the grant (revoked or expired); sign-out revokes it server side, then forgets it even if offline.
+- A Chrome install updated from the cookie build is told once to connect (`migrateFromCookieSession` on `runtime.onInstalled`, `neore.reconnectNeeded`). Keep the migration mark (`neore.authMigration`) so it runs once per install.
+- A Chrome build signs in only when the backend lists `https://<id>.chromiumapp.org/` in `TRUSTED_EXTENSION_REDIRECT_URIS`; a value replaces the Firefox default, so list both.

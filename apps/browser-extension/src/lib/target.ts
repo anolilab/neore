@@ -2,11 +2,8 @@
  * The browser this build targets, fixed at build time by `vite.config.ts`
  * (`TARGET_BROWSER=firefox` → the `build:firefox` script).
  *
- * The two builds differ in how they authenticate: Chrome shares the web app's
- * session cookie (`lib/auth.ts`, with the extension's exact origin trusted by
- * the backend); Firefox cannot — every install has its own random
- * `moz-extension://` origin — so it signs in through `identity.launchWebAuthFlow`
- * and holds a bearer grant instead (`lib/extension-grant.ts`).
+ * Both builds sign in the same way, through `identity.launchWebAuthFlow` and a
+ * bearer grant (`lib/extension-grant.ts`); they differ in the side panel API.
  */
 export const IS_FIREFOX = import.meta.env.VITE_TARGET_BROWSER === "firefox";
 

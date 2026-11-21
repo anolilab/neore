@@ -1,6 +1,4 @@
-import { APP_URL } from "./env";
 import { requestGrantAccessToken } from "./extension-grant";
-import { IS_FIREFOX } from "./target";
 
 /** Refresh this long before `exp`, so a request never leaves with a token about to lapse. */
 const REFRESH_MARGIN_MS = 60_000;
@@ -43,43 +41,15 @@ let cached: string | null = null;
 let inflight: Promise<string | null> | null = null;
 
 /**
- * The backend bearer token: better-auth's jwt plugin mints it at `/api/auth/token`
- * for the session cookie on the app origin (see
- * `apps/web/src/lib/auth/lunora-auth-start.ts`). An extension has no server to
- * do this for it, so it asks directly.
- *
- * Returns `null` rather than throwing: a signed-out user is the normal case.
+ * A current bearer token for the stored grant, fetched once and reused until
+ * near expiry. `null` when signed out — the normal case, never a throw.
  */
-const requestToken = async (): Promise<string | null> => {
-    // Firefox cannot send the app's cookie; it trades its own grant instead.
-    if (IS_FIREFOX) {
-        return requestGrantAccessToken();
-    }
-
-    try {
-        const response = await fetch(new URL("/api/auth/token", APP_URL), { credentials: "include" });
-
-        if (!response.ok) {
-            await response.body?.cancel();
-
-            return null;
-        }
-
-        const data = (await response.json()) as { token?: string };
-
-        return data.token ?? null;
-    } catch {
-        return null;
-    }
-};
-
-/** A current bearer token for the signed-in session, fetched once and reused until near expiry. */
 export const getAccessToken = async (options: { force?: boolean } = {}): Promise<string | null> => {
     if (!options.force && cached && !isTokenStale(cached)) {
         return cached;
     }
 
-    inflight ??= requestToken().then((token) => {
+    inflight ??= requestGrantAccessToken().then((token) => {
         cached = token;
         inflight = null;
 

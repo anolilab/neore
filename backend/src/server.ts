@@ -11,6 +11,7 @@ import type { ExecutionContextLike, ScheduledControllerLike, ShardNamespaceLike 
 
 import type { BearerIdentity } from "./bearer-identity";
 import { identityFromBearerClaims } from "./bearer-identity";
+import { withoutExtensionCookie } from "./extension-cookie.js";
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
 import { env as workerEnv } from "cloudflare:workers";
@@ -645,8 +646,10 @@ const withCors = (response: Response, request: Request): Response => {
 };
 
 export default {
-    async fetch(request: Request, env: Env, context: ExecutionContextLike): Promise<Response> {
+    async fetch(incoming: Request, env: Env, context: ExecutionContextLike): Promise<Response> {
         const entered = Date.now();
+        // An extension authenticates with its grant's bearer, never a cookie: `extension-cookie.ts`.
+        const request = withoutExtensionCookie(incoming);
 
         // better-auth owns `/api/auth/*`. It must be handled BEFORE the Lunora
         // worker, which would otherwise 404 those paths — Lunora only routes its

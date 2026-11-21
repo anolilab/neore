@@ -1,14 +1,13 @@
-import { authClient } from "./auth";
-import { signOutGrant, useGrantUser } from "./extension-grant";
-import { IS_FIREFOX } from "./target";
+import { useEffect, useState } from "react";
+
+import type { GrantUser, StoredGrant } from "./extension-grant";
+import { readGrant, STORAGE_KEY } from "./extension-grant";
+
+export { signOutGrant as signOut } from "./extension-grant";
 
 /**
- * The signed-in user, the same shape for both builds.
- *
- * Chrome reads better-auth's cookie session on the app origin; Firefox reads the
- * bearer grant it holds itself (`extension-grant.ts`). `IS_FIREFOX` is a
- * build-time constant, so each build calls one hook, always — the rules of hooks
- * hold.
+ * The signed-in user: the app grant this extension holds itself
+ * (`extension-grant.ts`). Neither build reads the web app's cookie session.
  */
 export interface ExtensionSession {
     /** Changes when the signed-in session does; for effect dependencies, not display. */
@@ -16,29 +15,42 @@ export interface ExtensionSession {
     user: { email: string; id: string; image?: string | null; name?: string | null };
 }
 
-const useCookieSession = (): { data: ExtensionSession | null; isPending: boolean } => {
-    const { data, isPending } = authClient.useSession();
+/** The stored grant's user, kept in step with `storage.local`. `undefined` while loading. */
+const useGrantUser = (): { isPending: boolean; user: GrantUser | null } => {
+    const [user, setUser] = useState<GrantUser | null | undefined>(undefined);
 
-    return {
-        data: data?.session ? { sessionId: data.session.id, user: data.user } : null,
-        isPending,
-    };
+    useEffect(() => {
+        let cancelled = false;
+
+        const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+            if (area === "local" && Object.hasOwn(changes, STORAGE_KEY)) {
+                setUser((changes[STORAGE_KEY]?.newValue as StoredGrant | undefined)?.user ?? null);
+            }
+        };
+
+        chrome.storage.onChanged.addListener(listener);
+
+        const load = async () => {
+            const grant = await readGrant();
+
+            if (!cancelled) {
+                setUser(grant?.user ?? null);
+            }
+        };
+
+        void load();
+
+        return () => {
+            cancelled = true;
+            chrome.storage.onChanged.removeListener(listener);
+        };
+    }, []);
+
+    return { isPending: user === undefined, user: user ?? null };
 };
 
-const useGrantSession = (): { data: ExtensionSession | null; isPending: boolean } => {
+export const useSession = (): { data: ExtensionSession | null; isPending: boolean } => {
     const { isPending, user } = useGrantUser();
 
     return { data: user ? { sessionId: user.id, user } : null, isPending };
-};
-
-export const useSession = IS_FIREFOX ? useGrantSession : useCookieSession;
-
-export const signOut = async (): Promise<void> => {
-    if (IS_FIREFOX) {
-        await signOutGrant();
-
-        return;
-    }
-
-    await authClient.signOut();
 };

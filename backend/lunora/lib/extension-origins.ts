@@ -1,46 +1,9 @@
 /**
- * `TRUSTED_EXTENSION_ORIGINS` → the browser-extension origins the backend trusts
- * for credentialed CORS (`http.ts`) and better-auth's origin check (`auth.ts`).
- *
- * Optional: unset means the browser extension simply cannot sign in. It must
- * NEVER widen to "any extension" — trusting every installed extension would let
- * any of them drive authenticated requests — so this parses to an exact list,
- * and anything that is not one concrete extension origin (`*`, a bare scheme, a
- * web origin, a typo) is dropped with a warning rather than honoured.
+ * The redirect URIs the app-grant sign-in may deliver a code to
+ * (`auth/extension-grant.ts`). There is no extension ORIGIN list: no extension
+ * origin is trusted for a cookie session or credentialed CORS, and the Worker
+ * strips the cookie off any extension-origin request (`src/extension-cookie.ts`).
  */
-const EXTENSION_ORIGIN = /^(?:chrome-extension:\/\/[a-p]{32}|moz-extension:\/\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/;
-
-/** Strips trailing slashes without a backtracking-prone regex. */
-const withoutTrailingSlashes = (value: string): string => {
-    let end = value.length;
-
-    while (end > 0 && value[end - 1] === "/") {
-        end -= 1;
-    }
-
-    return value.slice(0, end);
-};
-
-export const parseTrustedExtensionOrigins = (raw: string | undefined): string[] => {
-    const origins: string[] = [];
-    const entries = (raw ?? "").split(",");
-
-    for (const entry of entries) {
-        const origin = withoutTrailingSlashes(entry.trim());
-
-        if (!origin) {
-            continue;
-        }
-
-        if (EXTENSION_ORIGIN.test(origin)) {
-            origins.push(origin);
-        } else {
-            console.warn(`[env] TRUSTED_EXTENSION_ORIGINS: ignoring "${origin}" — expected chrome-extension://<32-letter id> or moz-extension://<uuid>`);
-        }
-    }
-
-    return [...new Set(origins)];
-};
 
 /**
  * A `launchWebAuthFlow` redirect URI. The browser intercepts navigation to it and
@@ -91,8 +54,8 @@ export const MOBILE_REDIRECT_URI = "neore-mobile://auth/callback";
  * `TRUSTED_EXTENSION_REDIRECT_URIS` → the exact redirect URIs the extension
  * sign-in flow may deliver a code to.
  *
- * UNSET means the shipped Firefox add-on's URI, unlike `TRUSTED_EXTENSION_ORIGINS`
- * where unset means none. That default is safe because of who can receive it:
+ * UNSET means the shipped Firefox add-on's URI; the Chrome build's
+ * `https://<id>.chromiumapp.org/` must be listed. That default is safe because of who can receive it:
  * Firefox intercepts the URI only for the add-on whose id it derives from, AMO
  * signs one add-on per id, and a release Firefox runs only signed add-ons. The
  * one other way to hold that id is a temporary or unsigned install the user put

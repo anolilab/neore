@@ -10,7 +10,7 @@ import { useSession } from "./session";
 const MIN_REFRESH_DELAY_MS = 30_000;
 
 /**
- * Keeps the Lunora client's bearer token in step with the better-auth session.
+ * Keeps the Lunora client's bearer token in step with the stored grant.
  *
  * `setAuthToken` takes a token, not a fetcher, so this also schedules the
  * refresh: the JWT is short-lived, and without one every query would go
