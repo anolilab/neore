@@ -155,4 +155,22 @@ describe("confirmOnTick", () => {
         expect(reportRead).not.toHaveBeenCalled();
         expect(show).not.toHaveBeenCalled();
     });
+
+    it("aborts the read itself when the screen moves on, rather than leaving it to run to its deadline", async () => {
+        let signal: AbortSignal | undefined;
+        const client = clientWith(((_function: unknown, _args: unknown, options: { signal: AbortSignal }) => {
+            signal = options.signal;
+
+            return new Promise(() => {});
+        }) as never);
+
+        const cancel = confirmOnTick({ client, projectId: "p1", reportRead: vi.fn(), show: vi.fn() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(signal?.aborted).toBe(false);
+
+        cancel();
+
+        expect(signal?.aborted).toBe(true);
+    });
 });

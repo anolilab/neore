@@ -34,10 +34,26 @@ const classify = (error: unknown): ConfirmOutcome => {
 
 /**
  * One direct read of one project, bounded by `timeoutMs`. It asks the server instead of waiting for a live subscription,
- * which after a reconnect may only resume without answering.
+ * which after a reconnect may only resume without answering. `cancel` is the caller giving up (its screen moved on): the
+ * read is aborted then, not left to run until its deadline.
  */
-export const confirmProject = async (client: ConfirmClient, projectId: string, timeoutMs = CONFIRM_READ_TIMEOUT_MS): Promise<ConfirmOutcome> => {
+export const confirmProject = async (
+    client: ConfirmClient,
+    projectId: string,
+    timeoutMs = CONFIRM_READ_TIMEOUT_MS,
+    cancel?: AbortSignal,
+): Promise<ConfirmOutcome> => {
     const controller = new AbortController();
+    const abortRead = (): void => {
+        controller.abort();
+    };
+
+    if (cancel?.aborted === true) {
+        abortRead();
+    } else {
+        cancel?.addEventListener("abort", abortRead, { once: true });
+    }
+
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<ConfirmOutcome>((resolve) => {
         timer = setTimeout(() => {
@@ -57,7 +73,8 @@ export const confirmProject = async (client: ConfirmClient, projectId: string, t
 
             return { found: Boolean(project), kind: "answered" };
         } catch (error: unknown) {
-            return classify(error);
+            // An aborted read was given up by its caller or its deadline: nothing about the connection is learned.
+            return controller.signal.aborted ? { kind: "unreachable" } : classify(error);
         }
     };
 
@@ -65,6 +82,7 @@ export const confirmProject = async (client: ConfirmClient, projectId: string, t
         return await Promise.race([read(), deadline]);
     } finally {
         clearTimeout(timer);
+        cancel?.removeEventListener("abort", abortRead);
     }
 };
 
@@ -85,9 +103,10 @@ export const confirmOnTick = ({
     show: (view: ConfirmView | undefined) => void;
 }): () => void => {
     let isCancelled = false;
+    const leaving = new AbortController();
 
     settleQuietly(async () => {
-        const outcome = await confirmProject(client, projectId);
+        const outcome = await confirmProject(client, projectId, CONFIRM_READ_TIMEOUT_MS, leaving.signal);
 
         if (isCancelled) {
             return;
@@ -103,5 +122,7 @@ export const confirmOnTick = ({
 
     return () => {
         isCancelled = true;
+        // The screen moved on: the read itself stops now, not at its deadline.
+        leaving.abort();
     };
 };
