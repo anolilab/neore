@@ -101,7 +101,7 @@ msgstr "「{truncatedName}」ほか {moreCount} 件が拒否されました"
 msgid "\"{truncatedName}\" has been rejected"
 msgstr "「{truncatedName}」は拒否されました"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
 msgstr ""
 
@@ -2721,7 +2721,7 @@ msgstr "{added} 件のドキュメントを追加しました。未対応また�
 msgid "Added {added} document(s)."
 msgstr "{added} 件のドキュメントを追加しました。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
 msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
 msgstr ""
 
@@ -3167,7 +3167,7 @@ msgstr "AI 動画生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "完全な記録コンテキストによる AI 支援のバグトリアージ"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:384
+#: ../../packages/chat-ui/src/chat/message-content.tsx:387
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3342,8 +3342,8 @@ msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
 #: src/features/home/components/home-page.tsx:243
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:454
 msgid "All chats"
 msgstr "すべてのチャット"
 
@@ -3437,7 +3437,7 @@ msgid "All providers + BYOK"
 msgstr "すべてのプロバイダー + BYOK"
 
 #. placeholder {0}: roleLabel.toLowerCase()
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:289
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:292
 msgid "All real {0} work goes to this model, even quick work."
 msgstr ""
 
@@ -3567,7 +3567,7 @@ msgstr "他の閲覧者"
 
 #: src/features/projects/components/project-rule-files.tsx:286
 #: src/features/projects/components/project-rule-files.tsx:455
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:308
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:311
 msgid "Always"
 msgstr "常に"
 
@@ -3656,7 +3656,7 @@ msgstr "エラーが発生しました"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap サインイン中にエラーが発生しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1162
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1170
 msgid "An error occurred while generating the response."
 msgstr "応答の生成中にエラーが発生しました。"
 
@@ -3986,7 +3986,7 @@ msgstr "アプリケーションエラー"
 msgid "Applies"
 msgstr "適用"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:425
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:443
 msgid "Applies to"
 msgstr ""
 
@@ -5125,7 +5125,7 @@ msgstr "BFL 最高品質の FLUX Kontext モデル"
 msgid "BFL's professional FLUX model via direct API"
 msgstr "直接 API 経由の BFL プロフェッショナル FLUX モデル"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:290
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:293
 msgid "Bigger pieces go to this model; quick questions stay in the chat."
 msgstr ""
 
@@ -5433,13 +5433,13 @@ msgstr "ワークフローの以前のバージョンを閲覧して復元しま
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:951
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1151
+#: ../../packages/chat-ui/src/chat/message-content.tsx:748
+#: src/features/chat/browser-live-view/browser-live-view.tsx:966
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1143
 msgid "Browser"
 msgstr "ブラウザー"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:768
+#: ../../packages/chat-ui/src/chat/message-content.tsx:771
 msgid "Browser action failed"
 msgstr "ブラウザー操作に失敗しました"
 
@@ -5447,7 +5447,7 @@ msgstr "ブラウザー操作に失敗しました"
 msgid "Browser Automation"
 msgstr "ブラウザー自動化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:766
+#: ../../packages/chat-ui/src/chat/message-content.tsx:769
 msgid "Browser error"
 msgstr "ブラウザーエラー"
 
@@ -5456,7 +5456,7 @@ msgid "Browser notes"
 msgstr "ブラウザーに関する注意"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:728
+#: ../../packages/chat-ui/src/chat/message-content.tsx:731
 msgid "Browser screenshot"
 msgstr "ブラウザーのスクリーンショット"
 
@@ -5464,7 +5464,7 @@ msgstr "ブラウザーのスクリーンショット"
 msgid "Browser Session"
 msgstr "ブラウザーセッション"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:678
+#: ../../packages/chat-ui/src/chat/message-content.tsx:681
 msgid "Browser working..."
 msgstr "ブラウザーで作業中..."
 
@@ -6357,7 +6357,7 @@ msgstr "確認中"
 msgid "Checking code, a draft or a plan for mistakes."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:401
+#: ../../packages/chat-ui/src/chat/message-content.tsx:404
 msgid "Checking image safety..."
 msgstr "画像の安全性を確認しています..."
 
@@ -6422,7 +6422,7 @@ msgstr "中国語（繁体字）"
 msgid "Choose .md or .zip"
 msgstr ".md または .zip を選択"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:411
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:429
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr ""
 
@@ -6776,7 +6776,7 @@ msgstr "クリックして編集"
 msgid "Click to edit..."
 msgstr "クリックして編集..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:670
+#: ../../packages/chat-ui/src/chat/message-content.tsx:673
 msgid "Clicking element..."
 msgstr "要素をクリックしています..."
 
@@ -6936,7 +6936,7 @@ msgstr "Cloudflare Workers AI のモデルは Cloudflare に空きのある場�
 msgid "Code"
 msgstr "コード"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:131
+#: ../../packages/chat-ui/src/chat/message-content.tsx:134
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "コードブロック"
@@ -6949,7 +6949,7 @@ msgstr "コード実行"
 msgid "Code execution and sandbox files"
 msgstr "コード実行とサンドボックスのファイル"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:646
+#: ../../packages/chat-ui/src/chat/message-content.tsx:649
 msgid "Code execution failed"
 msgstr "コードの実行に失敗しました"
 
@@ -6973,7 +6973,7 @@ msgstr "コードモードはまだお客様のアカウントでは利用でき
 msgid "Code navigation"
 msgstr "コードナビゲーション"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:602
+#: ../../packages/chat-ui/src/chat/message-content.tsx:605
 msgid "Code output"
 msgstr "コードの出力"
 
@@ -8170,11 +8170,11 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:475
+#: src/features/chat/browser-live-view/browser-live-view.tsx:455
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "ブラウザーの操作はエージェントに戻りました。まだ操作権があることをサーバーが時間内に確認できませんでした。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:476
+#: src/features/chat/browser-live-view/browser-live-view.tsx:456
 msgid "Control of the browser is back with the agent."
 msgstr "ブラウザーの操作はエージェントに戻りました。"
 
@@ -8819,7 +8819,7 @@ msgstr "アクティビティを読み込めませんでした。"
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "組織の請求の詳細を読み込めませんでした。後でもう一度お試しください。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:470
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:488
 msgid "Could not load your roles."
 msgstr ""
 
@@ -8965,7 +8965,7 @@ msgstr "{label} の新しい順序を保存できませんでした"
 msgid "Could not save the page"
 msgstr "ページを保存できませんでした"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:400
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
 msgid "Could not save the role"
 msgstr ""
 
@@ -9382,7 +9382,7 @@ msgstr "ボットを作成中…"
 msgid "Creating branch..."
 msgstr "ブランチを作成しています..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:325
+#: ../../packages/chat-ui/src/chat/message-content.tsx:328
 msgid "Creating slides..."
 msgstr "スライドを作成しています..."
 
@@ -10139,7 +10139,7 @@ msgid "Delegate tasks to Devin, the AI software engineer"
 msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 
 #. placeholder {0}: roleLabel.toLowerCase()
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:234
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
 msgid "Delegated {0} work runs on this model."
 msgstr ""
 
@@ -11102,7 +11102,7 @@ msgid "Do you want to add more rows?"
 msgstr "行を追加しますか？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:300
+#: ../../packages/chat-ui/src/chat/message-content.tsx:303
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11147,7 +11147,7 @@ msgstr "ドミニカ共和国"
 msgid "Don't have an account?"
 msgstr "アカウントをお持ちでないですか？"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:340
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:352
 msgid "Don't use your default instructions in this project"
 msgstr ""
 
@@ -11264,7 +11264,7 @@ msgstr "ドキュメントをダウンロード"
 msgid "Download Export"
 msgstr "エクスポートをダウンロード"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:466
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "ファイルをダウンロード"
@@ -12689,7 +12689,7 @@ msgstr "エラー率"
 msgid "Error trace:"
 msgstr "エラートレース:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:261
+#: ../../packages/chat-ui/src/chat/message-content.tsx:264
 msgid "Error:"
 msgstr "エラー:"
 
@@ -12778,7 +12778,7 @@ msgstr "6 時間ごと"
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "このボットのすべてのチャットとスケジュール実行はこれらのツールのみを使います。ツールの権限設定は引き続き適用されます。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
 msgstr ""
 
@@ -12969,7 +12969,7 @@ msgstr "ツールを実行しています..."
 msgid "Execution"
 msgstr "実行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:636
+#: ../../packages/chat-ui/src/chat/message-content.tsx:639
 msgid "Execution failed"
 msgstr "実行に失敗しました"
 
@@ -13293,7 +13293,7 @@ msgstr "最大の Qwen モデルでの拡張思考モード"
 msgid "Extended thinking on Anthropic's most capable Opus"
 msgstr "Anthropic で最も高性能な Opus での拡張思考"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:319
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:322
 msgid "Extra instructions"
 msgstr ""
 
@@ -13317,11 +13317,11 @@ msgstr "ページを抽出"
 msgid "Extract subject"
 msgstr "被写体を抽出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:736
+#: ../../packages/chat-ui/src/chat/message-content.tsx:739
 msgid "Extracted"
 msgstr "抽出済み"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:671
+#: ../../packages/chat-ui/src/chat/message-content.tsx:674
 msgid "Extracting content..."
 msgstr "コンテンツを抽出しています..."
 
@@ -15694,7 +15694,7 @@ msgstr "生成された動画"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した動画はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:478
+#: ../../packages/chat-ui/src/chat/message-content.tsx:481
 msgid "Generating audio..."
 msgstr "音声を生成しています..."
 
@@ -15702,12 +15702,12 @@ msgstr "音声を生成しています..."
 msgid "Generating draft…"
 msgstr "下書きを生成しています…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:479
+#: ../../packages/chat-ui/src/chat/message-content.tsx:482
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "画像を生成しています..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:322
+#: ../../packages/chat-ui/src/chat/message-content.tsx:325
 msgid "Generating presentation..."
 msgstr "プレゼンテーションを生成しています..."
 
@@ -15715,7 +15715,7 @@ msgstr "プレゼンテーションを生成しています..."
 msgid "Generating response"
 msgstr "応答を生成中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:480
+#: ../../packages/chat-ui/src/chat/message-content.tsx:483
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "動画を生成しています..."
@@ -15873,7 +15873,7 @@ msgstr "このページへのアクセス権を付与するか、読み取り専
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "グローバルなアナリストリサーチ、市場分析、投資データ"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1064
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1066
 msgid "Go"
 msgstr "移動"
 
@@ -16452,7 +16452,7 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "ハンド（パン）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:974
+#: src/features/chat/browser-live-view/browser-live-view.tsx:989
 msgid "Hand back"
 msgstr "操作を返す"
 
@@ -16611,7 +16611,7 @@ msgstr "列を非表示"
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:969
+#: src/features/chat/browser-live-view/browser-live-view.tsx:984
 msgid "Hide live view"
 msgstr "ライブビューを隠す"
 
@@ -17111,7 +17111,7 @@ msgid "illustration"
 msgstr "イラスト"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:430
+#: ../../packages/chat-ui/src/chat/message-content.tsx:433
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -17749,7 +17749,7 @@ msgstr "入力テンプレート"
 msgid "Input tokens"
 msgstr "入力トークン"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:238
+#: ../../packages/chat-ui/src/chat/message-content.tsx:241
 msgid "Input:"
 msgstr "入力:"
 
@@ -18168,7 +18168,7 @@ msgstr "自身のセッションとは別のセッションを開いたため、
 msgid "It was not saved. Paste it again and save."
 msgstr "保存されませんでした。もう一度貼り付けて保存してください。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:407
+#: ../../packages/chat-ui/src/chat/message-content.tsx:410
 msgid "It will be visible once approved by a moderator"
 msgstr "モデレーターの承認後に表示されます"
 
@@ -18326,7 +18326,7 @@ msgstr "カザフスタン"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "古いシークレットを 24 時間引き続き受け付ける"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1007
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1009
 msgid "Keep control"
 msgstr "操作を続ける"
 
@@ -19293,11 +19293,11 @@ msgstr "ライブプレビュー — コンポーネントのストリーミン�
 msgid "Live preview — updating as the artifact streams"
 msgstr "ライブプレビュー — アーティファクトのストリーミングに合わせて更新中"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
 msgid "Live view of the agent's browser (read-only)"
 msgstr "エージェントのブラウザーのライブビュー（閲覧のみ）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
 msgid "Live view of the agent's browser (you have control)"
 msgstr "エージェントのブラウザーのライブビュー（操作中）"
 
@@ -19428,7 +19428,7 @@ msgstr "エディターを読み込んでいます…"
 msgid "Loading feedback"
 msgstr "フィードバックを読み込み中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:344
+#: ../../packages/chat-ui/src/chat/message-content.tsx:347
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "ファイルを読み込んでいます…"
@@ -19513,7 +19513,7 @@ msgstr "プレビューを読み込んでいます..."
 msgid "Loading preview…"
 msgstr "プレビューを読み込んでいます…"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 msgid "Loading projects…"
 msgstr ""
 
@@ -19522,7 +19522,7 @@ msgstr ""
 msgid "Loading repositories…"
 msgstr "リポジトリを読み込んでいます…"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:462
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:480
 msgid "Loading roles…"
 msgstr ""
 
@@ -19644,7 +19644,7 @@ msgstr "サーバー、コネクタ、コンピュータを読み込んでいま
 msgid "Loading..."
 msgstr "読み込んでいます..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:347
+#: ../../packages/chat-ui/src/chat/message-content.tsx:350
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20971,7 +20971,7 @@ msgstr "モード:"
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:405
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:275
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:278
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21739,11 +21739,11 @@ msgstr "スレッド間を移動"
 msgid "navigate within each column"
 msgstr "各列内を移動"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:737
+#: ../../packages/chat-ui/src/chat/message-content.tsx:740
 msgid "Navigated"
 msgstr "移動しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:678
+#: ../../packages/chat-ui/src/chat/message-content.tsx:681
 msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
@@ -21766,6 +21766,7 @@ msgstr "自分のレビューが必要"
 msgid "Needs review"
 msgstr "要レビュー"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:114
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22477,7 +22478,7 @@ msgstr "まだ実行されていません"
 msgid "No expiration"
 msgstr "有効期限なし"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:243
 msgid "No extra instructions in this project. Reset to use your default again."
 msgstr ""
 
@@ -22548,7 +22549,7 @@ msgstr "画像はまだありません"
 msgid "No indexed files available. Files are still being processed."
 msgstr "インデックス済みのファイルはありません。ファイルはまだ処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1006
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "しばらく入力がありません。1 分以内に操作がエージェントに戻ります。"
 
@@ -22689,6 +22690,10 @@ msgstr "ペアリング済みのコンピュータはまだありません。"
 msgid "No pending invitations"
 msgstr "保留中の招待はありません"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:153
+msgid "No picture of the page could be taken. Take control to see it in the live view."
+msgstr "ページの画像を取得できませんでした。操作を引き継ぐと、ライブビューで確認できます。"
+
 #: src/features/chat/pins/pins-sidebar-tab.tsx:77
 msgid "No pins yet"
 msgstr "ピンはまだありません"
@@ -22785,7 +22790,7 @@ msgstr "この期間に記録された返信はありません。"
 msgid "No resolved comments."
 msgstr "解決済みのコメントはありません。"
 
-#: src/features/chat/thread/comparison-view.tsx:67
+#: src/features/chat/thread/comparison-view.tsx:68
 msgid "No response yet"
 msgstr "まだ応答がありません"
 
@@ -23341,7 +23346,7 @@ msgstr "オフ"
 #: src/features/settings/components/account/account-settings.tsx:420
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:90
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:97
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:273
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:276
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Off"
 msgstr "オフ"
@@ -23354,7 +23359,7 @@ msgstr "既定では無効です。チャットのコンテキストがモデル
 msgid "Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made."
 msgstr "デフォルトではオフです。長いチャットがしばらく使われていない間、古いメッセージをノートに要約して、アシスタントが覚えておけるようにします。少量のクレジットを使用します。オフにすると、作成済みの要約は削除されます。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:229
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
 msgid "Off until you pick a model."
 msgstr ""
 
@@ -23666,6 +23671,10 @@ msgstr "すべてのフィルターが JSON ボディに一致した場合のみ
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "比較できるのは同じ種類のモデルだけです。種類を切り替えるには選択をクリアしてください。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:98
+msgid "Only someone who can write in this chat can take control of the browser."
+msgstr "このチャットに書き込める人だけがブラウザーを操作できます。"
+
 #. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:631
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
@@ -23707,7 +23716,7 @@ msgstr "回答できるのはチャットの所有者だけです。共有チャ
 msgid "Only the project's owner can change its repositories."
 msgstr "このプロジェクトのリポジトリを変更できるのはプロジェクトの所有者だけです。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:456
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:474
 msgid "Only the project's owner can change its roles."
 msgstr ""
 
@@ -23756,7 +23765,7 @@ msgstr "問題が発生しました"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:723
+#: ../../packages/chat-ui/src/chat/message-content.tsx:726
 #: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -23779,7 +23788,7 @@ msgstr "始値"
 msgid "Open {filename}"
 msgstr "{filename} を開く"
 
-#: src/features/chat/thread/comparison-view.tsx:151
+#: src/features/chat/thread/comparison-view.tsx:152
 msgid "Open {modelName} in full thread"
 msgstr "{modelName} をスレッド全体で開く"
 
@@ -24046,6 +24055,10 @@ msgstr "サブエージェントのスレッドを開く"
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:177
 msgid "Open the thread list search and focus it ({0})"
 msgstr "スレッドリストの検索を開いてフォーカスする（{0}）"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:101
+msgid "Open this model's chat on its own to take control of its browser."
+msgstr "このモデルのブラウザーを操作するには、このモデルのチャットを単独で開いてください。"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
 msgid "Open thread"
@@ -24346,11 +24359,11 @@ msgstr "プルリクエストを作成しています…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "会話なしでアシスタントを開くと、空のチャットではなく最新の会話に移動します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1015
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1017
 msgid "Opening the live view…"
 msgstr "ライブビューを開いています…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1070
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1072
 msgid "Opening the page. This can take up to a minute."
 msgstr "ページを開いています。最大 1 分ほどかかることがあります。"
 
@@ -24670,7 +24683,7 @@ msgstr "古い"
 msgid "Outpaint"
 msgstr "アウトペイント"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:578
+#: ../../packages/chat-ui/src/chat/message-content.tsx:581
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -24730,8 +24743,8 @@ msgstr "出力タイプ"
 msgid "Output-format focused"
 msgstr "出力形式重視"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:246
-#: ../../packages/chat-ui/src/chat/message-content.tsx:254
+#: ../../packages/chat-ui/src/chat/message-content.tsx:249
+#: ../../packages/chat-ui/src/chat/message-content.tsx:257
 msgid "Output:"
 msgstr "出力:"
 
@@ -24775,7 +24788,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋標準時（米国およびカナダ）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:677
+#: ../../packages/chat-ui/src/chat/message-content.tsx:680
 msgid "page"
 msgstr "ページ"
 
@@ -24788,7 +24801,7 @@ msgstr "{currentPage} / {totalPages} ページ"
 msgid "Page added. It is being fetched and indexed."
 msgstr "ページを追加しました。取得とインデックス作成を行っています。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1049
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1051
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "ページのアドレス"
@@ -25782,7 +25795,7 @@ msgstr "精密な制御"
 msgid "Precise, quantified, and targeted description."
 msgstr "正確で、定量的で、的を絞った説明。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:307
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:310
 msgid "Prefer"
 msgstr ""
 
@@ -26384,7 +26397,7 @@ msgid "Progress of {toolName}"
 msgstr "{toolName} の進捗"
 
 #: src/features/projects/components/project-repo-picker.tsx:145
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:433
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
 #: src/features/tasks/components/task-form-dialog.tsx:427
 msgid "Project"
@@ -28247,7 +28260,7 @@ msgstr "確認メールを再送信"
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:265
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:268
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:108
 msgid "Reset"
 msgstr "リセット"
@@ -28257,7 +28270,7 @@ msgstr "リセット"
 msgid "Reset {0} to default"
 msgstr "{0} を既定に戻す"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:254
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 msgid "Reset {roleLabel} to your default"
 msgstr ""
 
@@ -28470,7 +28483,7 @@ msgstr "再試行"
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:472
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:490
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -28946,7 +28959,7 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 msgid "Running"
 msgstr "実行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:539
+#: ../../packages/chat-ui/src/chat/message-content.tsx:542
 msgid "Running code..."
 msgstr "コードを実行しています..."
 
@@ -28954,7 +28967,7 @@ msgstr "コードを実行しています..."
 msgid "Running on {device}…"
 msgstr "{device} で実行中…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:215
+#: ../../packages/chat-ui/src/chat/message-content.tsx:218
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -29356,7 +29369,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:719
+#: ../../packages/chat-ui/src/chat/message-content.tsx:722
 msgid "Screenshot"
 msgstr "スクリーンショット"
 
@@ -29992,7 +30005,7 @@ msgstr "送信"
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so each one is accepted only once, for as long as the trigger exists; a delivery that did not run can be redelivered. Requests with the neore headers are rejected."
 msgstr "<0>X-Hub-Signature-256: sha256=<hex></0> を送信してください。これは、シークレットをキーとした生のリクエストボディの HMAC-SHA256 です（GitHub の Webhook と同じ形式）。この署名にはタイムスタンプがないため、トリガーが存在する間、それぞれ一度だけ受け付けられます。実行されなかった配信は再配信できます。neore ヘッダー付きのリクエストは拒否されます。"
 
-#: src/features/chat/thread/comparison-view.tsx:68
+#: src/features/chat/thread/comparison-view.tsx:69
 msgid "Send a message below to start"
 msgstr "下にメッセージを送信して始めましょう"
 
@@ -30584,7 +30597,7 @@ msgid "Show more folders"
 msgstr "さらにフォルダーを表示"
 
 #: src/features/projects/components/project-repo-picker.tsx:175
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:449
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
 msgstr "さらにプロジェクトを表示"
@@ -31111,7 +31124,7 @@ msgstr "スライド {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "スライドのタイトル"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1095
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1103
 msgid "Slide updated"
 msgstr "スライドを更新しました"
 
@@ -31269,7 +31282,7 @@ msgstr "堅実な汎用能力"
 msgid "Solid performance across most task types"
 msgstr "ほとんどのタスクで堅実な性能"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:628
+#: ../../packages/chat-ui/src/chat/message-content.tsx:631
 msgid "Some images from this run could not be saved."
 msgstr "この実行の一部の画像を保存できませんでした。"
 
@@ -31277,8 +31290,9 @@ msgstr "この実行の一部の画像を保存できませんでした。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "一部のステップに料金データがありませんでした。合計は最小値です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:955
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-human-check.tsx:96
+#: src/features/chat/browser-live-view/browser-live-view.tsx:970
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1029
 msgid "Someone else has control of this browser."
 msgstr "このブラウザーは別の人が操作しています。"
 
@@ -31367,8 +31381,8 @@ msgstr "効果音を有効にしました"
 msgid "Source"
 msgstr "ソース"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1232
-#: src/features/chat/thread/message-content.tsx:146
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1240
+#: src/features/chat/thread/message-content.tsx:154
 msgid "Source {index}"
 msgstr "出典 {index}"
 
@@ -32553,7 +32567,7 @@ msgstr "サブエージェントが失敗しました"
 msgid "Sub-agent finished"
 msgstr "サブエージェントが完了しました"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:409
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:427
 #: src/features/settings/lib/settings-navigation.ts:97
 msgid "Sub-agent roles"
 msgstr ""
@@ -32967,19 +32981,24 @@ msgstr "台湾"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "入力画像の背景を削除し、スタイル転送を適用"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:992
+#: src/features/chat/browser-live-view/browser-human-check.tsx:147
+#: src/features/chat/browser-live-view/browser-live-view.tsx:994
 msgid "Take control"
 msgstr "操作を代わる"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:120
+msgid "Take control, clear it, then hand the browser back."
+msgstr "操作を引き継いで確認を済ませたら、ブラウザーを返してください。"
 
 #: src/features/chat/group/group-mode.ts:75
 msgid "Take turns"
 msgstr "順番に回答"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:318
 msgid "Taking control is not available while impersonating."
 msgstr "なりすまし中はブラウザーを操作できません。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:672
+#: ../../packages/chat-ui/src/chat/message-content.tsx:675
 msgid "Taking screenshot..."
 msgstr "スクリーンショットを撮影しています..."
 
@@ -33608,12 +33627,12 @@ msgid "That message was already sent."
 msgstr "そのメッセージはすでに送信されています。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:890
+#: src/features/chat/browser-live-view/browser-live-view.tsx:870
 msgid "That page could not be opened: {0}"
 msgstr "そのページを開けませんでした: {0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:624
-#: src/features/chat/browser-live-view/browser-live-view.tsx:910
+#: src/features/chat/browser-live-view/browser-live-view.tsx:604
+#: src/features/chat/browser-live-view/browser-live-view.tsx:890
 msgid "That page could not be opened."
 msgstr "そのページを開けませんでした。"
 
@@ -33718,7 +33737,7 @@ msgstr "エージェントはその選択肢を提示していません"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "エージェントがガイドを作成せずに終了しました。もう一度作成してください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1026
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "エージェントがブラウザー操作を終えるところです。1 分以上かかることがあります。少ししてからもう一度お試しください。"
 
@@ -33730,7 +33749,7 @@ msgstr "エージェントはまだセッションを開いています。しば
 msgid "The agent is still working on the last message."
 msgstr "エージェントはまだ最後のメッセージを処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:952
+#: src/features/chat/browser-live-view/browser-live-view.tsx:967
 msgid "The agent is using a browser"
 msgstr "エージェントがブラウザーを使用しています"
 
@@ -33754,11 +33773,19 @@ msgstr "エージェントはファイルを変更しませんでした。"
 msgid "The agent on your computer is reading the change…"
 msgstr "お使いのコンピュータ上のエージェントが変更を読み取っています…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:884
+#: src/features/chat/browser-live-view/browser-live-view.tsx:864
 msgid "The agent's browser closed while the page loaded."
 msgstr "ページの読み込み中にエージェントのブラウザーが閉じられました。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:766
+#: src/features/chat/browser-live-view/browser-human-check.tsx:118
+msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
+msgstr "エージェントのブラウザーが、人にしか通過できない {site} のページに到達しました。エージェントは待機し、回避を試みません。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:117
+msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
+msgstr "エージェントのブラウザーが、人にしか通過できないページに到達しました。エージェントは待機し、回避を試みません。"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:746
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "エージェントのブラウザーが置き換えられ、操作はエージェントに戻りました。もう一度操作を代わることができます。"
 
@@ -33828,13 +33855,25 @@ msgstr "このチャットのモデルはボットが設定します。"
 msgid "The bot's tools were saved"
 msgstr "ボットのツールを保存しました"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:92
+msgid "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
+msgstr "現在、このブラウザーを操作できません。ページがまだ必要な場合は、もう一度ページを確認するようエージェントに依頼してください。"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
 msgstr "ブラウザーがこの動画を読み取れないため、フレームをキャプチャできません"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:859
+#: src/features/chat/browser-live-view/browser-live-view.tsx:839
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "ブラウザーを返せませんでした。2 分間入力がないと、エージェントに自動的に戻ります。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:85
+msgid "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows."
+msgstr "ブラウザーが閉じられたため、ここではこの確認を完了できません。エージェントの返信が終わったら、もう一度試すよう依頼してください。新しいブラウザーを開き、確認がまだ表示される場合は再度あなたに依頼します。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:89
+msgid "The browser has since moved on from {site}, so this check is no longer open."
+msgstr "ブラウザーはすでに {site} から移動したため、この確認はもう開いていません。"
 
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
@@ -34205,11 +34244,11 @@ msgstr "リンクが間違っているか、所有者が会話を非公開にし
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "リンクが間違っているか、所有者がページの公開を停止したか削除した可能性があります。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1037
 msgid "The live view could not be opened."
 msgstr "ライブビューを開けませんでした。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1022
 msgid "The live view is not available right now."
 msgstr "現在ライブビューは利用できません。"
 
@@ -34340,7 +34379,7 @@ msgstr "ページエージェントがこのページを編集できませんで
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "ページには相手のバージョンが表示されています。残したい内容があれば、自分のバージョンからコピーしてください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1075
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
 msgid "The page you opened is still loading."
 msgstr "開いたページはまだ読み込み中です。"
 
@@ -34449,7 +34488,7 @@ msgstr "ルールファイルを読み込めませんでした。"
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "実行は選択した先に送られます: 毎回新しいチャット、以前と同じチャット、または新しいコンテキストを持つ同じチャット。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:748
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "The screenshot could not be saved."
 msgstr "スクリーンショットを保存できませんでした。"
 
@@ -34677,7 +34716,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "思考機能を備えた視覚言語モデル"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1158
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1166
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:803
 msgid "Thinking..."
@@ -34799,6 +34838,10 @@ msgstr "このチャットはロックされています。送信するにはロ
 #: src/features/chat/compaction/use-compact-thread.ts:51
 msgid "This chat is too long to compact."
 msgstr "このチャットは長すぎて圧縮できません。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:87
+msgid "This check was for an earlier browser, which the agent no longer uses."
+msgstr "この確認は、エージェントがもう使っていない以前のブラウザーに対するものでした。"
 
 #: src/features/auth/components/device-approval.tsx:83
 msgid "This code can't be approved here."
@@ -34997,7 +35040,7 @@ msgstr "このホストは ~/.ssh/config の Match ルールで使用されて�
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "このホストは ~/.ssh/config で {key} を使用していますが、Neore はこれをサポートしていません。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:406
+#: ../../packages/chat-ui/src/chat/message-content.tsx:409
 msgid "This image has been flagged for review"
 msgstr "この画像はレビュー対象としてフラグが付けられています"
 
@@ -35122,7 +35165,7 @@ msgstr "このメッセージは長すぎて、プロンプトのリンクとし
 msgid "This message will close in {value, plural, one {# second} other {# seconds}}"
 msgstr "このメッセージは{value, plural, other {# 秒}}後に閉じます"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:235
 msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
 msgstr ""
 
@@ -35190,7 +35233,7 @@ msgstr "このプリセットは完全に削除されます。"
 msgid "This preview could not be loaded."
 msgstr "このプレビューを読み込めませんでした。"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "This project's chats. Anything it does not set uses your default."
 msgstr ""
 
@@ -35789,7 +35832,7 @@ msgstr "試行回数が多すぎます。数秒待ってから、もう一度お
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1034
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1036
 msgid "Too many live views were opened. Try again later."
 msgstr "ライブビューを開いた回数が多すぎます。後でもう一度お試しください。"
 
@@ -36192,8 +36235,9 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1166
+#: src/features/chat/browser-live-view/browser-human-check.tsx:137
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1041
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1158
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36399,7 +36443,7 @@ msgstr "メッセージを入力..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "インターフェース全体の書体です。コードブロックは常に等幅のままです。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:673
+#: ../../packages/chat-ui/src/chat/message-content.tsx:676
 msgid "Typing text..."
 msgstr "テキストを入力しています..."
 
@@ -36905,11 +36949,11 @@ msgstr "OpenAI のフロンティア性能を更新"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "初代 R1 から推論能力を更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1093
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1101
 msgid "Updated slide"
 msgstr "スライドを更新しました"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1093
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1101
 msgid "Updated slide {slideNumber}"
 msgstr "スライド {slideNumber} を更新しました"
 
@@ -38272,7 +38316,7 @@ msgstr "ここから続けますか？"
 msgid "Watch"
 msgstr "監視"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:969
+#: src/features/chat/browser-live-view/browser-live-view.tsx:984
 msgid "Watch live"
 msgstr "ライブで見る"
 
@@ -38553,6 +38597,14 @@ msgstr "ガイドで何に注目すべきですか？"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "過去 30 日間にエージェントがあなたのデバイスに依頼した内容です。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:157
+msgid "What the agent's browser sees"
+msgstr "エージェントのブラウザーに表示されている内容"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:157
+msgid "What the agent's browser sees on {site}"
+msgstr "{site} でエージェントのブラウザーに表示されている内容"
+
 #: src/features/prompts/components/variable-definitions.tsx:127
 msgid "What this variable represents..."
 msgstr "この変数が表すもの..."
@@ -38657,7 +38709,7 @@ msgstr "設定すると、これらのプロバイダーのみ使用されます
 msgid "When should the assistant use this skill?"
 msgstr "アシスタントはどんなときにこのスキルを使うべきですか？"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:285
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:288
 msgid "When to delegate"
 msgstr ""
 
@@ -38689,9 +38741,13 @@ msgstr "思考が<0/><1>行動に変わる場所。</1>"
 msgid "Where you stay in control"
 msgstr "コントロールを保てる場面"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1153
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1145
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "エージェントがブラウザーを使用しているか確認できませんでした。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:80
+msgid "Whether the browser is still open could not be checked."
+msgstr "ブラウザーがまだ開いているか確認できませんでした。"
 
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
@@ -39164,10 +39220,14 @@ msgstr "これらはエージェントビルダーで選択した連携です。
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "実行が完了したとき、レビューが必要なとき、または失敗したときに通知を受け取ります。完了した実行はそのチャットにリンクされ、レビューが必要な実行はタスクボードにリンクされます。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:509
-#: src/features/chat/browser-live-view/browser-live-view.tsx:838
+#: src/features/chat/browser-live-view/browser-live-view.tsx:489
+#: src/features/chat/browser-live-view/browser-live-view.tsx:818
 msgid "You handed the browser back to the agent."
 msgstr "ブラウザーの操作をエージェントに返しました。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:94
+msgid "You have control. Clear the check in the live view, then hand the browser back."
+msgstr "操作中です。ライブビューで確認を済ませたら、ブラウザーを返してください。"
 
 #: src/features/auth/components/team/leave-team-dialog.tsx:47
 msgid "You have left the team"
@@ -39223,7 +39283,7 @@ msgstr "今日のメッセージ数の上限に達しました。後でもう一
 msgid "You have used today's translations. Try again later."
 msgstr "本日の翻訳の上限に達しました。後でもう一度お試しください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:318
 msgid "You may not take control of this browser."
 msgstr "このブラウザーを操作する権限がありません。"
 
@@ -39231,9 +39291,9 @@ msgstr "このブラウザーを操作する権限がありません。"
 msgid "You need to sign in to access this page."
 msgstr "このページにアクセスするにはサインインが必要です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:514
-#: src/features/chat/browser-live-view/browser-live-view.tsx:838
-#: src/features/chat/browser-live-view/browser-live-view.tsx:886
+#: src/features/chat/browser-live-view/browser-live-view.tsx:494
+#: src/features/chat/browser-live-view/browser-live-view.tsx:818
+#: src/features/chat/browser-live-view/browser-live-view.tsx:866
 msgid "You no longer have control of the browser."
 msgstr "このブラウザーの操作権はもうありません。"
 
@@ -39388,7 +39448,7 @@ msgstr "自分のチャットと {0}"
 msgid "Your chats and the bots you chose"
 msgstr "自分のチャットと選択したボット"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1084
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1086
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "ビュー内でのクリック、入力、スクロールはブラウザーに送られます。操作を返すまでエージェントは待機します。"
 
@@ -39437,11 +39497,11 @@ msgstr "AI リクエストの 1 日の上限を使い切りました。"
 msgid "Your data export is ready"
 msgstr "データのエクスポートの準備ができました"
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default ({inheritedModelName})"
 msgstr ""
 
-#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:228
+#: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default (off)"
 msgstr ""
 

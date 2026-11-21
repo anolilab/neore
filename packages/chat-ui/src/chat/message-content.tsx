@@ -79,6 +79,9 @@ interface MessageContentProps {
     citationLabel?: (index: number) => string;
     className?: string;
     components?: {
+        /** Rendered in place of a browser call's result whose page needs a person, and the person was asked (`humanCheck.status: "asked"`). */
+        BrowserHumanCheck?: FC<{ part: ToolPart }>;
+
         /**
          * Rendered for every call of a tool that runs on the user's own computer
          * (`utils/device-tool-name.ts`), in every state after approval — its
@@ -786,6 +789,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     const isStreaming = isStreamingProp ?? false;
     const { t } = useLingui();
     const {
+        BrowserHumanCheck,
         DeviceToolCall,
         DocumentArtifact,
         Image = DefaultImage,
@@ -1017,7 +1021,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
                     // Special rendering for browser tool — show live status or screenshot result
                     if (part.type === "tool-browser") {
-                        renderedParts.push(<BrowserToolResultView key={key} part={toolPart} />);
+                        const asked = (toolPart.output as { humanCheck?: { status?: string } } | undefined)?.humanCheck?.status === "asked";
+
+                        renderedParts.push(
+                            BrowserHumanCheck && asked ? <BrowserHumanCheck key={key} part={toolPart} /> : <BrowserToolResultView key={key} part={toolPart} />,
+                        );
                         break;
                     }
 

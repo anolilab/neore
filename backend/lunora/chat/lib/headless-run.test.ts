@@ -923,6 +923,9 @@ describe("runHeadlessAgent failure on a thread it continues", () => {
 
 const GOAL_REFUSED = /cannot have a goal/u;
 
+/** A headless run's own reply key (`ToolCtx.replyKey`). */
+const HEADLESS_REPLY_KEY = /^headless:/u;
+
 describe("runHeadlessAgent pauseForApproval", () => {
     beforeEach(() => {
         seen.buildOptions = [];
@@ -1005,6 +1008,23 @@ describe("runHeadlessAgent pauseForApproval", () => {
 
         expect(patches.at(-1)).toMatchObject({ status: "active" });
         expect(patches.at(-1)).not.toHaveProperty("lastReplyAt");
+    });
+
+    it("gives each run on a thread its own reply key, and saves it so the continuation keeps it", async () => {
+        seen.saved = [approvalRequest];
+
+        const first = fakeCtx();
+        const second = fakeCtx();
+
+        await run(first, { pauseForApproval: { subAgentRunId: RUN_ID } });
+        await run(second, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const firstKey = (first as { replyKey?: string }).replyKey;
+        const [recorded] = calls(first, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(firstKey).toMatch(HEADLESS_REPLY_KEY);
+        expect((second as { replyKey?: string }).replyKey).not.toBe(firstKey);
+        expect(recorded!.config.replyKey).toBe(firstKey);
     });
 
     it("saves what started the run and its chain, so a task's child resumes dispatching as before, within the task's limit", async () => {
