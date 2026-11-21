@@ -4542,7 +4542,7 @@ export const generateFollowupSuggestionsForThread = internalAction
         chatLogger.debug(`[generateFollowupSuggestionsForThread] Starting`, { threadId, userId });
 
         // The reply's paid claim, once taken. A failure before its cache lands gives the claim back (see the catch).
-        let paid: { cached: boolean; lastMessageId: string } | null = null;
+        let paid: { cached: boolean; claimedAt: number; lastMessageId: string } | null = null;
 
         // Gives the reply's paid claim back, at most once per run: a run that cached, or that already gave it back, does not again.
         const giveBackPaidClaim = async (): Promise<void> => {
@@ -4550,10 +4550,10 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            const { lastMessageId } = paid;
+            const { claimedAt, lastMessageId } = paid;
 
             paid = null;
-            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { claimedAt, lastMessageId, threadId, userId });
         };
 
         try {
@@ -4747,11 +4747,17 @@ export const generateFollowupSuggestionsForThread = internalAction
             }
 
             // One paid call per reply: a second run of this reply, or one on a thread locked since the check above, stops here.
-            if (!(await context.runMutation(internal.agent.followup_suggestions.admitFollowupSuggestions, { lastMessageId, threadId, userId }))) {
+            const admittedAt = await context.runMutation(internal.agent.followup_suggestions.admitFollowupSuggestions, {
+                lastMessageId,
+                threadId,
+                userId,
+            });
+
+            if (admittedAt === null) {
                 return;
             }
 
-            paid = { cached: false, lastMessageId };
+            paid = { cached: false, claimedAt: admittedAt, lastMessageId };
 
             // The chat's dispatch claim is taken after the lock check and held until this request settles, so a lock waits for it.
             const dispatchedAt = await context.runMutation(internal.agent.followup_suggestions.beginFollowupDispatch, { requestId: lastMessageId, threadId });

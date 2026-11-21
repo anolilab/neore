@@ -15,6 +15,7 @@ import {
     endFollowupDispatch,
     followupDispatchInFlight,
     getCachedFollowupSuggestionsHandler,
+    releaseFollowupSuggestions,
     replyAnchorRow,
 } from "../agent/followup-suggestions";
 import schema from "../schema";
@@ -112,14 +113,14 @@ describe("one paid call per reply", () => {
         await harness.action(async (context: any) => await context.runMutation(admitFollowupSuggestions, { lastMessageId, threadId: id, userId: OWNER }));
 
     it("the first run of a reply is admitted, a second run of the same reply is not", async () => {
-        await expect(admit("reply-1")).resolves.toBe(true);
-        await expect(admit("reply-1")).resolves.toBe(false);
+        await expect(admit("reply-1")).resolves.toEqual(expect.any(Number));
+        await expect(admit("reply-1")).resolves.toBeNull();
     });
 
     it("the next reply is admitted on its own claim", async () => {
         await admit("reply-1");
 
-        await expect(admit("reply-2")).resolves.toBe(true);
+        await expect(admit("reply-2")).resolves.toEqual(expect.any(Number));
     });
 
     it("a locked thread is not admitted", async () => {
@@ -127,7 +128,31 @@ describe("one paid call per reply", () => {
             async (ctx: any) => await ctx.db.insert("threads", { createdAt: 1, lockedAt: 1000, status: "active", title: "L", updatedAt: 1, userId: OWNER }),
         );
 
-        await expect(admit("reply-1", locked)).resolves.toBe(false);
+        await expect(admit("reply-1", locked)).resolves.toBeNull();
+    });
+});
+
+describe("a late run cannot free a later run's claim", () => {
+    const admitRun = async (lastMessageId: string) =>
+        await harness.action(async (context: any) => await context.runMutation(admitFollowupSuggestions, { lastMessageId, threadId, userId: OWNER }));
+
+    const releaseRun = async (claimedAt: number, lastMessageId: string) =>
+        await harness.action(
+            async (context: any) => await context.runMutation(releaseFollowupSuggestions, { claimedAt, lastMessageId, threadId, userId: OWNER }),
+        );
+
+    it("a release with another run's claimedAt leaves the claim held; the right one frees it", async () => {
+        const claimedAt = await admitRun("reply-1");
+
+        expect(claimedAt).toEqual(expect.any(Number));
+
+        await releaseRun((claimedAt as number) + 1, "reply-1");
+
+        await expect(admitRun("reply-1")).resolves.toBeNull();
+
+        await releaseRun(claimedAt as number, "reply-1");
+
+        await expect(admitRun("reply-1")).resolves.toEqual(expect.any(Number));
     });
 });
 
