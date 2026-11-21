@@ -27,6 +27,7 @@ popups) passes the same check, and a redirect to a blocked URL closes the browse
 | Route          | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
 | `POST /action` | One browser action: `navigate`, `screenshot`, `click`, `type`, `extract` or `scroll` |
+| `POST /login`  | Sign in with a saved login in one call (`src/login.ts`); never returns the password  |
 | `GET /health`  | `{ "service": "browser-renderer", "status": "ok" }`                                  |
 
 The body is validated by `actionSchema` in `src/index.ts` (`action`, plus
@@ -64,7 +65,11 @@ pnpm --filter browser-renderer lint:types
 pnpm --filter browser-renderer lint:eslint
 pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 pnpm --filter browser-renderer build      # wrangler deploy --dry-run
+pnpm --filter browser-renderer test       # unit tests (scrubbing)
+pnpm --filter browser-renderer test:browser   # the saved-login fill against a local Chromium
 ```
 
-The package has no unit tests. Deploys belong to CI (Alchemy); do not run the
+`test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins) and needs
+Chromium (`pnpm --filter browser-renderer exec playwright install chromium`). CI's unit-test job installs no browser,
+so it runs only `test`. Deploys belong to CI (Alchemy); do not run the
 package's `deploy` script or `pnpm deploy`.

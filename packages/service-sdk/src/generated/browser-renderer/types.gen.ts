@@ -34,9 +34,13 @@ export type BrowserLoginResponse = {
     url?: string;
     title?: string;
     /**
-     * The form was filled and sent
+     * The form was sent to the login's origin; false when nothing was sent (no form, the page held it back, or a step was refused)
      */
     submitted?: boolean;
+    /**
+     * The password could not be cleared from the page, so the browser session was closed and no sessionId is returned
+     */
+    sessionClosed?: boolean;
     /**
      * A password field is still on the page after sending: the sign-in may have failed
      */

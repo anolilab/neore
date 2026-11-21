@@ -145,7 +145,14 @@
                     "sessionId": { "type": "string" },
                     "url": { "type": "string" },
                     "title": { "type": "string" },
-                    "submitted": { "type": "boolean", "description": "The form was filled and sent" },
+                    "submitted": {
+                        "type": "boolean",
+                        "description": "The form was sent to the login's origin; false when nothing was sent (no form, the page held it back, or a step was refused)"
+                    },
+                    "sessionClosed": {
+                        "type": "boolean",
+                        "description": "The password could not be cleared from the page, so the browser session was closed and no sessionId is returned"
+                    },
                     "passwordFieldRemains": {
                         "type": "boolean",
                         "description": "A password field is still on the page after sending: the sign-in may have failed"
