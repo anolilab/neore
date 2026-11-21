@@ -16,6 +16,7 @@ import { gdprLogger } from "../lib/logger";
 import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
+import { storedPage, storedRows } from "../lib/stored-row";
 
 const TRAILING_SLASH = /\/$/;
 
@@ -503,10 +504,12 @@ export const collectPrompts = internalQuery.input({ userId: v.string() }).query(
     // `prompts` / `promptHistory` are `.global()` (D1): ORM facade, no legacy
     // reader. Unlimited `findMany` returns every matching row. Order mirrors the
     // old `by_user_and_favorite` walk and the old full-table scan.
-    const { page: prompts } = await context.db.prompts.findMany({
-        orderBy: [{ isFavorite: "asc" }, { _creationTime: "asc" }],
-        where: { userId },
-    });
+    const { page: prompts } = storedPage(
+        await context.db.prompts.findMany({
+            orderBy: [{ isFavorite: "asc" }, { _creationTime: "asc" }],
+            where: { userId },
+        }),
+    );
 
     // History of the user's prompts only — filtered in the query rather than by
     // scanning every user's history rows.
@@ -515,7 +518,7 @@ export const collectPrompts = internalQuery.input({ userId: v.string() }).query(
             ? []
             : await context.db.promptHistory
                   .findMany({ orderBy: [{ _creationTime: "asc" }], where: { promptId: { in: prompts.map((p) => p._id) } } })
-                  .then((result) => result.page);
+                  .then((result) => storedRows(result.page));
 
     return {
         promptHistory: relevantHistory.map((h) => {

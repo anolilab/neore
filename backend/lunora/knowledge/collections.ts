@@ -31,6 +31,7 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { DELETING_STATUS } from "./file-removal";
 import { canReadCollection, planRetrievalScope } from "./scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { type StoredRow, storedRow, storedRows } from "../lib/stored-row";
 
 export const MAX_COLLECTIONS = 100;
 export const MAX_COLLECTION_NAME = 80;
@@ -44,7 +45,7 @@ const MAX_FILES_PER_MOVE = 100;
  */
 const MAX_FILES_UNFILED_WITH_COLLECTION = 1000;
 
-type Collection = Doc<"knowledgeCollections">;
+type Collection = StoredRow<Doc<"knowledgeCollections">>;
 type Db = MutationCtx["db"] | QueryCtx["db"];
 
 const cleanName = (name: string): string => {
@@ -69,7 +70,7 @@ const cleanDescription = (description: string | undefined): string | undefined =
 
 /** The caller's OWN collection, or NOT_FOUND — never FORBIDDEN, so a probe learns nothing. */
 const requireOwnCollection = async (db: Db, collectionId: Id<"knowledgeCollections">, userId: string): Promise<Collection> => {
-    const collection = await db.knowledgeCollections.findFirst({ where: { _id: collectionId } });
+    const collection = storedRow(await db.knowledgeCollections.findFirst({ where: { _id: collectionId } }));
 
     if (!collection || collection.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Collection not found");
@@ -87,7 +88,7 @@ const requireReadableCollection = async (
     ctx: { db: Db; user: { activeOrganization?: { id: string } | null; userId: string } },
     collectionId: Id<"knowledgeCollections">,
 ): Promise<Collection> => {
-    const collection = await ctx.db.knowledgeCollections.findFirst({ where: { _id: collectionId } });
+    const collection = storedRow(await ctx.db.knowledgeCollections.findFirst({ where: { _id: collectionId } }));
     const activeOrganizationId = ctx.user.activeOrganization?.id;
 
     if (!collection || !canReadCollection(collection, ctx.user.userId, new Set(activeOrganizationId ? [activeOrganizationId] : []))) {
@@ -131,9 +132,9 @@ export const listCollections = authQuery
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
         const [own, shared] = await Promise.all([
-            ctx.db.knowledgeCollections.findMany({ limit: MAX_COLLECTIONS, where: { userId } }).then((result) => result.page),
+            ctx.db.knowledgeCollections.findMany({ limit: MAX_COLLECTIONS, where: { userId } }).then((result) => storedRows(result.page)),
             organizationId
-                ? ctx.db.knowledgeCollections.findMany({ limit: MAX_COLLECTIONS, where: { organizationId } }).then((result) => result.page)
+                ? ctx.db.knowledgeCollections.findMany({ limit: MAX_COLLECTIONS, where: { organizationId } }).then((result) => storedRows(result.page))
                 : Promise.resolve([] as Collection[]),
         ]);
         const others = shared.filter((collection) => collection.userId !== userId);

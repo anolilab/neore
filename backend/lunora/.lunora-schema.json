@@ -13866,6 +13866,12 @@
           "optional": false,
           "unique": false
         },
+        "reportRetryAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "reportedToProvider": {
           "kind": "boolean",
           "nullable": false,
@@ -13880,6 +13886,16 @@
             "idempotencyKey"
           ],
           "unique": true
+        },
+        "by_provider_unreported_due": {
+          "fields": [
+            "provider",
+            "reportedToProvider",
+            "reportRetryAt",
+            "createdAt",
+            "idempotencyKey"
+          ],
+          "unique": false
         },
         "by_reference_created": {
           "fields": [

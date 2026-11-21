@@ -17,6 +17,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { ImageOpenContext } from "@neore/chat-ui/chat/image-open-context";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -172,9 +173,11 @@ const ModelColumn: FC<{
                             <div className="prose prose-sm dark:prose-invert max-w-none px-6 py-4">
                                 <ChatThreadContext value={columnThreadContext}>
                                     <ChatThreadIdentityContext value={columnThreadContext}>
-                                        {/* No live view card in a column: a "Needs you" card points to the model's own chat. */}
+                                        {/* No live view card in a column: a "Needs you" card points to the model's own chat. The page's gallery holds its own chat's images, not the column's: here they stay plain. */}
                                         <BrowserLiveViewHereContext value={false}>
-                                            <MessageContent message={assistant} />
+                                            <ImageOpenContext value={null}>
+                                                <MessageContent message={assistant} />
+                                            </ImageOpenContext>
                                         </BrowserLiveViewHereContext>
                                     </ChatThreadIdentityContext>
                                 </ChatThreadContext>

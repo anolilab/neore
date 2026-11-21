@@ -13,6 +13,7 @@ import { authMutation, publicAction, publicQuery, rateLimit } from "../lib/crpc"
 import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
+import { storedPage, storedRow } from "../lib/stored-row";
 
 // Generate a unique share token
 const generateToken = (): string => crypto.randomUUID();
@@ -146,7 +147,7 @@ export const getPublicWorkflowOwner = internalQuery
     .input({ publicAccessToken: v.string() })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { publicAccessToken }, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } });
+        const project = storedRow(await ctx.db.projects.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } }));
 
         return project?.isPublic && project.projectType === "workflow" ? (project.userId ?? null) : null;
     });
@@ -157,7 +158,7 @@ export const readPublicWorkflow = internalQuery
         publicAccessToken: v.string(),
     })
     .query(async ({ args: { publicAccessToken }, ctx: context }) => {
-        const project = await context.db.projects.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } });
+        const project = storedRow(await context.db.projects.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } }));
 
         if (!project || !project.isPublic || project.projectType !== "workflow") {
             return null;
@@ -210,11 +211,13 @@ export const getFeaturedWorkflows = publicQuery
         ),
     )
     .query(async ({ ctx: context }) => {
-        const { page: results } = await context.db.projects.findMany({
-            limit: 10,
-            orderBy: [{ _creationTime: "asc" }],
-            where: { galleryFeatured: true, isPublic: true, projectType: "workflow" },
-        });
+        const { page: results } = storedPage(
+            await context.db.projects.findMany({
+                limit: 10,
+                orderBy: [{ _creationTime: "asc" }],
+                where: { galleryFeatured: true, isPublic: true, projectType: "workflow" },
+            }),
+        );
 
         return results.map((p) => {
             return {

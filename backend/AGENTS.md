@@ -65,6 +65,7 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 - `findMany` without `limit` returns every row and always a `QueryPage` (`.page`); test past 25 rows before claiming read completeness. `findUnique` throws `NOT_UNIQUE`, takes no `limit`/`cursor`.
 - Index `.eq()` takes `null`, never `undefined` (`args.x ?? null`).
 - Never pass `undefined` (or `null` for a `v.optional` column) to `ctx.db.patch`: use `lib/patch.ts` (`patchRow`/`patchById`, `withoutUndefined`).
+- `Doc_*` types an optional `.global()` column `T | null`, but reads return it absent (lunora#1668): narrow a row with `lib/stored-row.ts` (`storedRow`/`storedRows`/`storedPage`) where it is read, before an `.output()` or a `?: T` helper takes it; never widen an output to `null`. Clients name such a row `StoredRow<Doc<…>>` (`@neore/backend/stored-row`).
 - `.global()` D1 tables are created lazily: exercise the route before checking `sqlite_master`; drop the `globalSchemaMarker` row if you drop a table by hand.
 - `lunora build` gates schema drift against `backend/lunora/.lunora-schema.json`: commit it with schema changes; with data at rest, widen → migrate → narrow.
 - Delete rows of `AUDIT_TABLES` one at a time, never `Promise.all` (`deleteParentsWithChildren` in `gdpr/batch.ts`).

@@ -11,6 +11,7 @@ import { paginatedDocsOf } from "../lib/output-validators";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
+import { storedRow } from "../lib/stored-row";
 
 // Get a workflow project
 export const getWorkflow = authQuery
@@ -20,7 +21,7 @@ export const getWorkflow = authQuery
     .query(async ({ args: { projectId }, ctx: context }) => {
         const { userId } = context.user;
 
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = storedRow(await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } }));
 
         if (!project) {
             return null;

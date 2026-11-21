@@ -19,6 +19,7 @@
 import { v } from "lunorash/server";
 
 import { internalQuery } from "../_generated/server";
+import { storedRow } from "../lib/stored-row";
 
 /**
  * Tool descriptor — lightweight metadata used for system prompt injection.
@@ -143,7 +144,7 @@ export const getSkillToolConfig = internalQuery
         ),
     )
     .query(async ({ args: { skillId }, ctx }) => {
-        const skill = await ctx.db.skills.findFirst({ where: { _id: skillId } });
+        const skill = storedRow(await ctx.db.skills.findFirst({ where: { _id: skillId } }));
 
         if (!skill) {
             return null;
