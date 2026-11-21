@@ -355,7 +355,9 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  * worker's or service worker's own request). The page holds only `stand`, never the password: after `expectSubmit()`,
  * the main frame's POST to `form.action` is sent with the password in place of the stand-in in the field `form.name`
  * (`withPassword`), with scripts turned off for the document it loads, so nothing the site shows of it can be read
- * (`sent()`). A POST elsewhere, or one whose stand-in is missing or also in another field, is not sent (`changed()`). Any other request or socket message that carries
+ * (`sent()`). Only the first such POST can be sent: it is claimed before anything is awaited, and any later one is
+ * not. A POST elsewhere, or one whose stand-in is missing or also in another field, is not sent (`changed()`); nor is one
+ * whose answer the scripts could not be turned off for (`unshielded()`). Any other request or socket message that carries
  * the stand-in (a script read the field) is dropped, a script's fetch, XHR or socket message to `origin` as
  * `scripted()`: that sign-in cannot be filled. A 307 or 308 redirect of a request with a body, which would carry it on,
  * is failed when it points elsewhere or its `Location` does not parse; a new page (a popup) is closed; a WebSocket to
@@ -373,8 +375,11 @@ const armGuard = async (
 ) => {
     let isExpecting = false;
     let isCounting = true;
+    let isClaimed = false;
     let sent: Request | null = null;
     let isChanged = false;
+    let isUnshielded = false;
+    let isUnsent = false;
     let isScripted = false;
     let attempt: string | null = null;
     let admitted: string | null = null;
@@ -412,22 +417,42 @@ const armGuard = async (
 
         if (isSecretAddress(request.url())) {
             attempt ??= "the password in an address";
-        } else if (isExpecting && !sent && isOwn && request.isNavigationRequest() && request.method() === "POST" && frameOf(request) === page.mainFrame()) {
+        } else if (
+            isExpecting &&
+            !isClaimed &&
+            isOwn &&
+            request.isNavigationRequest() &&
+            request.method() === "POST" &&
+            frameOf(request) === page.mainFrame()
+        ) {
+            // Claimed before anything is awaited: a second submission that arrives meanwhile is never the one sent.
+            isClaimed = true;
+
             const filled =
                 body && withoutFragment(request.url()) === withoutFragment(form.action)
                     ? withPassword(body, request.headers()["content-type"] ?? "", { name: form.name, stand }, password)
                     : null;
-            // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later.
-            const isShielded = filled !== null && (await shield());
 
-            if (filled && isShielded) {
-                sent = request;
-                await route.fallback({ postData: filled });
+            if (filled === null) {
+                isChanged = true;
+            } else if (await shield()) {
+                // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later.
+                try {
+                    // It rejects only before it hands the request on (one already handled). Once it resolves, whether the
+                    // bytes reach the site is unknown: that counts as sent, so the sign-in is never sent again.
+                    await route.fallback({ postData: filled });
+                    sent = request;
 
-                return;
+                    return;
+                } catch {
+                    isUnsent = true;
+                    await route.abort("blockedbyclient").catch(() => undefined);
+
+                    return;
+                }
+            } else {
+                isUnshielded = true;
             }
-
-            isChanged = true;
         } else if (isOwn && body?.includes(stand)) {
             isScripted ||= ["fetch", "xhr"].includes(request.resourceType());
         } else if (isOwn || isAdmitted) {
@@ -576,8 +601,12 @@ const armGuard = async (
         scripted: () => isScripted,
         /** Turns the tab's scripts off until the guard is taken down; false when that cannot be confirmed. */
         shield,
-        /** Whether the form's own POST went out, with the password. */
+        /** Whether the form's own POST was handed on with the password: it may have reached the site, so it is never resent. */
         submitted: () => sent !== null,
+        /** Whether the form's own POST could not be handed on: it was not sent. */
+        unsent: () => isUnsent,
+        /** Whether the form's own POST was held because the tab's scripts could not be turned off for its answer. */
+        unshielded: () => isUnshielded,
     };
 };
 
@@ -882,7 +911,8 @@ const clearPassword = async (
     const lookUntil = deadline - CLOSE_MS;
 
     try {
-        if (now() >= lookUntil || !(await guard.shield())) {
+        // The command can stall: the hold ends regardless, and the page is closed.
+        if (now() >= lookUntil || !(await within(guard.shield(), lookUntil - now(), false))) {
             return false;
         }
 
@@ -1029,10 +1059,11 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                     : "The login form is built by a script, so the agent's browser cannot check where it sends the password; nothing was typed";
             }
 
+            // The form's controls in document order, those outside it by a `form` attribute included.
             const userHandle = await field.evaluateHandle((input) => {
-                const scope = (input as HTMLInputElement).form ?? document;
-                const before = [...scope.querySelectorAll("input")].filter(
-                    (candidate) =>
+                const before = [...((input as HTMLInputElement).form?.elements ?? [])].filter(
+                    (candidate): candidate is HTMLInputElement =>
+                        candidate instanceof HTMLInputElement &&
                         ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
                         candidate.getClientRects().length > 0 &&
                         Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -1137,7 +1168,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         const waitUntil = now() + left(SEND_WAIT_MS);
 
-        while (!guard.submitted() && !guard.attempt() && !guard.changed() && !guard.scripted() && now() < waitUntil) {
+        while (!guard.submitted() && !guard.attempt() && !guard.changed() && !guard.scripted() && !guard.unshielded() && !guard.unsent() && now() < waitUntil) {
             await page.waitForTimeout(100);
         }
 
@@ -1164,6 +1195,14 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         if (guard.scripted()) {
             return { ...failed("This site signs in with a script the agent's browser cannot fill safely, so the password was not sent"), scriptSignIn: true };
+        }
+
+        if (guard.unshielded()) {
+            return failed("The browser could not be locked down for the send, so nothing was sent");
+        }
+
+        if (guard.unsent()) {
+            return failed("The browser did not send the login form, so the password was not sent");
         }
 
         return failed(

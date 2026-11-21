@@ -113,7 +113,7 @@ a page that asks for the password to change an email or delete the account would
 The form's target is this window: empty, `_self`, or `_parent` and `_top`, which name it, as the top window. A POST elsewhere, or one where the page moved or copied the stand-in, is
 not sent. Neither is a redirect of the answer whose address carries the password in its query or fragment, in any
 spelling (encoded twice included): that counts as an attempt. A password short enough to be part of an ordinary
-query (`1234` in `?tab=12345`) can fail a sign-in that way after the site took it; the result says it was sent. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before
+query (`1234` in `?tab=12345`) can fail a sign-in that way after the site took it; the result says it was sent. Only the first such POST is sent; another the page starts meanwhile is not. When the browser cannot turn scripts off for the answer, nothing is sent; a POST handed on counts as sent, since it may have reached the site, so it is never sent again. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before
 the lock lifts and only then loaded with its scripts. So no page
 script can read the password, by the field's value or any other way (other realms, events, `FormData`, selection), and a
 `<link rel="preconnect">` or a `javascript:` page can only carry the stand-in. A site that signs in from a script (a

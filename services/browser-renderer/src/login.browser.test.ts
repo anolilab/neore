@@ -7,13 +7,20 @@ import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 
 import type { Page as WorkerPage } from "@cloudflare/playwright";
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser, BrowserContext, Page, Route } from "playwright";
 import { chromium } from "playwright";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { signIn } from "./login";
 
 const SAVED_SECRET = "s3cret-pw";
+
+type FallbackOptions = Parameters<Route["fallback"]>[0];
+
+/** A command answer that never comes. */
+const NEVER = new Promise<never>(() => {
+    // Never settles.
+});
 
 interface Hit {
     body: string;
@@ -190,12 +197,12 @@ describe(signIn, () => {
         await context.close();
     });
 
-    const run = async (now: () => number = Date.now, url = `${login.origin}/`) =>
+    const run = async (now: () => number = Date.now, url = `${login.origin}/`, deadline = Date.now() + 30_000) =>
         signIn(
             // The Worker's fork of the same API; its types differ only in a few narrower overloads.
             page as unknown as WorkerPage,
             {
-                deadline: Date.now() + 30_000,
+                deadline,
                 navTimeout: 10_000,
                 now,
                 origin: login.origin,
@@ -214,6 +221,59 @@ describe(signIn, () => {
         page.url() === "about:blank" && (await page.evaluate(() => typeof RTCPeerConnection === "function" && typeof Worker === "function"));
 
     const sessionPosts = (): Hit[] => login.hits.filter((hit) => hit.url === "/session");
+
+    /** Has the `call`th `Emulation.setScriptExecutionDisabled` of the tab's DevTools sessions (from 1) answered by `answer`. */
+    const scriptsOff = (answer: (call: number, send: () => Promise<unknown>) => Promise<unknown>): void => {
+        const { newCDPSession } = context;
+        let calls = 0;
+
+        context.newCDPSession = async (...args) => {
+            const session = await newCDPSession.apply(context, args);
+            const { send } = session;
+
+            session.send = (async (method: string, params?: Parameters<typeof send>[1]) => {
+                if (method !== "Emulation.setScriptExecutionDisabled") {
+                    return send.call(session, method as never, params as never);
+                }
+
+                calls += 1;
+
+                return answer(calls, async () => send.call(session, method as never, params as never));
+            }) as typeof send;
+
+            return session;
+        };
+    };
+
+    /** Calls `around` in place of each `route.fallback` of the browser, until `afterEach` puts the method back. */
+    const aroundFallback = async (around: (fallback: (options?: FallbackOptions) => Promise<void>, options?: FallbackOptions) => Promise<void>) => {
+        let prototype: Pick<Route, "fallback"> | undefined;
+
+        await page.route("**/probe", async (route) => {
+            prototype = Object.getPrototypeOf(route) as Pick<Route, "fallback">;
+            await route.fulfill({ body: "" });
+        });
+        await page.goto(`${login.origin}/probe`);
+        await page.unroute("**/probe");
+
+        const owner = prototype as Pick<Route, "fallback">;
+        const { fallback } = owner;
+
+        owner.fallback = new Proxy(fallback, {
+            apply: async (target, route, [options]: [FallbackOptions?]) =>
+                around(async (next) => Reflect.apply(target, route, [next]) as Promise<void>, options),
+        });
+        restoreFallback = () => {
+            owner.fallback = fallback;
+        };
+    };
+
+    let restoreFallback = (): void => undefined;
+
+    afterEach(() => {
+        restoreFallback();
+        restoreFallback = () => undefined;
+    });
 
     it("sends the form by POST to the login's origin and reports where it landed", async () => {
         fixture.page = loginForm();
@@ -998,6 +1058,15 @@ describe(signIn, () => {
     it.each([
         ["the page", () => rtc("window")],
         ["a blank frame's realm", () => `const frame = document.createElement("iframe"); document.body.append(frame); ${rtc("frame.contentWindow")}`],
+        // Each way to call `open`: the window's own (Chromium keeps it on the window, not `Window.prototype`), called on
+        // the window, a blank frame's, and `document.open` with three arguments. A window it makes would be a fresh realm.
+        ["a window the prototype's open makes", () => rtc(`(Window.prototype.open?.call(window, "") ?? window)`)],
+        ["a window open makes, called on the window", () => rtc(`(Function.prototype.call.call(open, window, "") ?? window)`)],
+        [
+            "a window a blank frame's open makes",
+            () => `const frame = document.createElement("iframe"); document.body.append(frame); ${rtc(`(frame.contentWindow.open("") ?? window)`)}`,
+        ],
+        ["a window document.open makes", () => rtc(`(document.open("", "", "") ?? window)`)],
     ])("refuses WebRTC from %s while the password is in it", async (_where, send) => {
         fixture.page = onSubmit(send());
 
@@ -1025,6 +1094,105 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ error: expect.stringContaining("changed the password field"), submitted: false, success: false });
         expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("hands on the form's POST with the password only once when the page submits it again while the first waits", async () => {
+        const forwarded: string[] = [];
+
+        await aroundFallback(async (fallback, options) => {
+            const { postData } = options ?? {};
+
+            if (typeof postData === "string" || Buffer.isBuffer(postData)) {
+                forwarded.push(String(postData));
+            }
+
+            return fallback(options);
+        });
+        let first: Promise<unknown> = Promise.resolve();
+
+        // The first send waits on the scripts going off; the page submits the form again meanwhile.
+        scriptsOff(async (call, send) => {
+            if (call !== 1) {
+                return send();
+            }
+
+            first = new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            })
+                .then(send)
+                .catch(() => undefined);
+
+            return first;
+        });
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", () => setTimeout(() => HTMLFormElement.prototype.submit.call(document.forms[0]), 100));`,
+        );
+
+        await run();
+        // The first send's handler, which goes on once its command answers.
+        await first;
+        await new Promise(setImmediate);
+
+        expect(forwarded.filter((body) => body.includes(SAVED_SECRET))).toHaveLength(1);
+        expect(sessionPosts().filter((hit) => hit.body.includes(SAVED_SECRET)).length).toBeLessThanOrEqual(1);
+    });
+
+    it("reports a form POST that could not be handed on as not sent", async () => {
+        await aroundFallback(async (fallback, options) => {
+            if (options?.postData !== undefined) {
+                throw new Error("Route is already handled!");
+            }
+
+            return fallback(options);
+        });
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("did not send the login form"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("says the browser could not be locked down, not that the page changed the field, when the scripts cannot be turned off for the send", async () => {
+        scriptsOff(async (call, send) => (call === 1 ? Promise.reject(new Error("Target closed")) : send()));
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("could not be locked down for the send"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("closes the session when turning the scripts off for the cleanup stalls past the hold", async () => {
+        const deadline = Date.now() + 30_000;
+        let offset = 0;
+
+        // The send's command answers; the cleanup's never does.
+        scriptsOff(async (call, send) => (call === 1 ? send() : NEVER));
+        fixture.page = loginForm();
+        // The site's answer leaves the cleanup a second and a half.
+        Object.defineProperty(fixture, "home", {
+            configurable: true,
+            get: () => {
+                offset = deadline - 2500 - Date.now();
+
+                return "<h1>Home</h1>";
+            },
+        });
+
+        const result = await run(() => Date.now() + offset, undefined, deadline).finally(() => Reflect.deleteProperty(fixture, "home"));
+
+        expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
+        expect(page.isClosed()).toBe(true);
+    });
+
+    it("types the username into a field outside the form that belongs to it by its form attribute", async () => {
+        fixture.page = `<input name="user" form="login"><form id="login" method="post" action="/session"><input name="pw" type="password"><button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts().map((hit) => new URLSearchParams(hit.body).get("user"))).toStrictEqual(["ann"]);
     });
 
     it("stops waiting on a submit handler that does not return", async () => {
