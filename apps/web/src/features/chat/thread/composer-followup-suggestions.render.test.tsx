@@ -47,10 +47,22 @@ const cached = vi.hoisted(() => {
     return { data: { lastMessageId: "m2", suggestions: ["Sign in to my bank and pay the bill"] }, isFetching: false };
 });
 
+// The options each read is sent with, so a test can see whether the cache query is enabled.
+const readOptions = vi.hoisted(() => vi.fn());
+
 vi.mock("@tanstack/react-query", () => {
     return {
-        useQuery: () => cached,
+        useQuery: (options: unknown) => {
+            readOptions(options);
+
+            return cached;
+        },
     };
+});
+
+// The thread the chat shows; a test sets it to a locked chat to check the read is held back.
+const chat = vi.hoisted(() => {
+    return { thread: undefined as { lockedAt?: number } | undefined };
 });
 
 vi.mock("@/features/chat/core/context/chat-context", () => {
@@ -65,7 +77,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
             return { messages };
         },
         useChatThread: () => {
-            return { threadId: "thread-1" };
+            return { thread: chat.thread, threadId: "thread-1" };
         },
     };
 });
@@ -78,6 +90,8 @@ const { default: ComposerFollowupSuggestions } = await import("./composer-follow
 
 beforeEach(() => {
     useChatUIStore.getState().reset();
+    chat.thread = undefined;
+    readOptions.mockClear();
 });
 
 describe("ComposerFollowupSuggestions", () => {
@@ -88,5 +102,19 @@ describe("ComposerFollowupSuggestions", () => {
 
         expect(useChatUIStore.getState().composerText).toBe(SUGGESTION);
         expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
+    it("reads the cache for an open chat", () => {
+        render(<ComposerFollowupSuggestions />);
+
+        expect(readOptions).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true }));
+    });
+
+    it("does not read the cache for a locked chat without its unlock proof", () => {
+        chat.thread = { lockedAt: 1000 };
+
+        render(<ComposerFollowupSuggestions />);
+
+        expect(readOptions).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }));
     });
 });
