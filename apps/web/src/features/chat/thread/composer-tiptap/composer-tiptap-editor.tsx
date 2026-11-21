@@ -675,8 +675,17 @@ const ComposerTiptapEditor = ({
             editor.commands.setSuggestedPrompt(null);
             // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
             setGhostAnnouncement("");
-            lastPlacedPromptRef.current = null;
 
+            // A reply without a suggestion starts over. A pause or a draft does not: a prompt dismissed in this reply stays dismissed.
+            if (!nextPromptSuggestion) {
+                lastPlacedPromptRef.current = null;
+            }
+
+            return undefined;
+        }
+
+        // Placed once per reply: a dismissal (typing or Escape) is not undone by a pause or a cleared draft.
+        if (lastPlacedPromptRef.current?.scope === nextPromptScope && lastPlacedPromptRef.current.text === promptAnnouncementText) {
             return undefined;
         }
 

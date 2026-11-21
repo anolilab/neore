@@ -8,6 +8,7 @@ import { createRef } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ComposerTiptapEditorRef } from "./composer-tiptap-editor";
+import { getGhostCompletion } from "./extensions/ghost-completion";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -175,6 +176,30 @@ describe("the suggested next prompt announcement", () => {
         tick(0);
 
         expect(announcedText()).toBe("Suggested next prompt: Same. Press Tab to insert.");
+    });
+
+    it("a dismissed prompt stays dismissed through a pause in which the composer is disabled", () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const element = (disabled: boolean) => (
+            <ComposerTiptapEditor
+                disabled={disabled}
+                nextPromptScope="thread-1"
+                nextPromptSuggestion="Summarize it"
+                onChange={() => {}}
+                onSubmit={() => {}}
+                ref={ref}
+                value=""
+            />
+        );
+        const view = render(element(false));
+
+        act(() => {
+            ref.current!.getEditor()!.commands.clearGhost();
+        });
+        view.rerender(element(true));
+        view.rerender(element(false));
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)).toBeNull();
     });
 
     // A prompt the person dismisses is gone, so its line goes with it: it is not left to run out on the timer.
