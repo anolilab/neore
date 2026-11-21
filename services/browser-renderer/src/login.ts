@@ -317,6 +317,7 @@ const armGuard = async (
     let isChanged = false;
     let isScripted = false;
     let attempt: string | null = null;
+    let admitted: string | null = null;
 
     /** A service worker's request has no frame: it is not the page's. */
     const frameOf = (request: Request) => {
@@ -327,10 +328,21 @@ const armGuard = async (
         }
     };
 
+    let cdp: CDPSession | undefined;
+
+    const shield = async (): Promise<boolean> =>
+        cdp
+            ? cdp
+                  .send("Emulation.setScriptExecutionDisabled", { value: true })
+                  .then(() => true)
+                  .catch(() => false)
+            : false;
+
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();
         const body = request.postDataBuffer();
         const isOwn = frameOf(request)?.page() === page && originOf(request.url()) === origin;
+        const isAdmitted = body === null && request.url() === admitted && request.isNavigationRequest() && frameOf(request) === page.mainFrame();
 
         if (hasSecretInAddress(request.url(), stand)) {
             attempt ??= "the password in an address";
@@ -340,12 +352,7 @@ const armGuard = async (
                     ? withPassword(body, request.headers()["content-type"] ?? "", { name: form.name, stand }, password)
                     : null;
             // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later.
-            const isShielded =
-                filled !== null &&
-                (await cdp
-                    ?.send("Emulation.setScriptExecutionDisabled", { value: true })
-                    .then(() => true)
-                    .catch(() => false));
+            const isShielded = filled !== null && (await shield());
 
             if (filled && isShielded) {
                 sent = request;
@@ -357,7 +364,7 @@ const armGuard = async (
             isChanged = true;
         } else if (isOwn && body?.includes(stand)) {
             isScripted ||= ["fetch", "xhr"].includes(request.resourceType());
-        } else if (isOwn) {
+        } else if (isOwn || isAdmitted) {
             await route.fallback();
 
             return;
@@ -394,7 +401,6 @@ const armGuard = async (
         opened.close().catch(() => undefined);
     };
 
-    let cdp: CDPSession | undefined;
     let gate: SocketGate | undefined;
 
     const disarm = async (): Promise<void> => {
@@ -484,6 +490,10 @@ const armGuard = async (
     }
 
     return {
+        /** Lets the main frame load `url` by GET, wherever it is: the cleanup's reload of the page the sign-in landed on. */
+        admit: (url: string): void => {
+            admitted = url;
+        },
         /** Whether the final answer to the form's own navigation arrived. */
         answered: () => !isCounting,
         attempt: () => attempt,
@@ -495,6 +505,8 @@ const armGuard = async (
         },
         /** Whether a script sent what it read from the field: such a sign-in is not one the stand-in can fill. */
         scripted: () => isScripted,
+        /** Turns the tab's scripts off until the guard is taken down; false when that cannot be confirmed. */
+        shield,
         /** Whether the form's own POST went out, with the password. */
         submitted: () => sent !== null,
     };
@@ -660,62 +672,79 @@ const isClean = async (page: Page, password: string): Promise<boolean> => {
 };
 
 /**
- * Takes the password out of the page before `deadline`: leaves the document that had it for `about:blank` while the
- * guard and the channel lock still hold (its `pagehide` and `unload` handlers run under them, and the workers it started
- * go with it), lifts both (`release`, which must end within a second), then, when the hold leaves time for it, loads the address again by GET, never resending the form, and looks
- * (`isClean`). An address that carries the password is not loaded again: the page stays blank, which is clean. Whether
- * the page is verifiably clean in time: when it is not, it must not be used again.
+ * Takes the password out of the page before `deadline`, with the guard and the channel lock still holding and the tab's
+ * scripts off: leaves the document that had it for `about:blank` (its `pagehide` and `unload` handlers run under them,
+ * and the workers it started go with it), loads the address again by GET when the hold leaves time for it, never
+ * resending the form, and looks (`isClean`) before any script of it runs. Only a clean page has the lock lifted
+ * (`release`, which must end within a second), and is then loaded once more with its scripts, time allowing. An address
+ * that carries the password is not loaded again: the page stays blank, which is clean. Whether the page is verifiably
+ * clean in time: when it is not, it must not be used again.
  */
 const clearPassword = async (
     page: Page,
     {
         deadline,
+        guard,
         navTimeout,
         now,
         password,
         release,
-    }: { deadline: number; navTimeout: number; now: () => number; password: string; release: () => Promise<void> },
+    }: { deadline: number; guard: Guard; navTimeout: number; now: () => number; password: string; release: () => Promise<void> },
 ): Promise<boolean> => {
     const address = page.url();
+    // The end of the time the reload and the look may take: the release has the last second.
+    const lookUntil = deadline - CLOSE_MS;
 
     try {
-        if (now() >= deadline - CLOSE_MS) {
+        if (now() >= lookUntil || !(await guard.shield())) {
             return false;
         }
 
-        await page.goto("about:blank", { timeout: deadline - CLOSE_MS - now() });
+        await page.goto("about:blank", { timeout: lookUntil - now() });
     } catch {
         return false;
+    }
+
+    const reloadMs = lookUntil - CHECK_MS - now();
+    const isReloaded = reloadMs >= 1000 && originOf(address) !== null && !hasSecret(address, password);
+
+    if (isReloaded) {
+        guard.admit(address);
+
+        try {
+            await page.goto(address, { timeout: Math.min(navTimeout, reloadMs), waitUntil: "domcontentloaded" });
+        } catch {
+            return false;
+        }
+
+        if (
+            !(await within(
+                isClean(page, password).catch(() => false),
+                lookUntil - now(),
+                false,
+            ))
+        ) {
+            return false;
+        }
     }
 
     // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
     if (
         !(await within(
             release().then(() => true),
-            1000,
+            CLOSE_MS,
             false,
         ))
     ) {
         return false;
     }
 
-    const reloadMs = deadline - CHECK_MS - now();
-
-    if (reloadMs < 1000 || originOf(address) === null || hasSecret(address, password)) {
-        return true;
+    // The page as the session goes on with it, scripts and all: it was clean without them.
+    if (isReloaded && deadline - now() >= 1000) {
+        await page.reload({ timeout: deadline - now(), waitUntil: "domcontentloaded" }).catch(() => undefined);
     }
 
-    try {
-        await page.goto(address, { timeout: Math.min(navTimeout, reloadMs), waitUntil: "domcontentloaded" });
-    } catch {
-        return false;
-    }
-
-    return within(
-        isClean(page, password).catch(() => false),
-        deadline - now(),
-        false,
-    );
+    return true;
 };
 
 /**
@@ -760,8 +789,39 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         return { error: scrub(why), submitted: Boolean(guard?.submitted()), success: false, url: scrub(page.url()) };
     };
 
+    /**
+     * Where the login form sends the password in the page as the site sent it, before any script of it ran: a script
+     * could otherwise point the form, and the password, at an address of the site that keeps and shows what it is sent.
+     * `null` when that page has no such form (a script builds it).
+     */
+    const servedForm = async (): Promise<FormTarget | null> => {
+        const session = await page.context().newCDPSession(page);
+
+        try {
+            await session.send("Emulation.setScriptExecutionDisabled", { value: true });
+            await page.goto(url, { timeout: left(navTimeout), waitUntil: "domcontentloaded" });
+
+            if (offSite()) {
+                return null;
+            }
+
+            const field = await page
+                .locator('input[type="password"]:visible')
+                .first()
+                .elementHandle({ timeout: left(1000) })
+                .catch(() => null);
+            const form = await field?.evaluate(checkForm, { isAscii, origin, submit: false });
+
+            return typeof form === "object" ? form : null;
+        } finally {
+            await session.detach().catch(() => undefined);
+        }
+    };
+
     /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
     const findFields = async () => {
+        const served = await servedForm();
+
         await page.goto(url, { timeout: left(navTimeout), waitUntil: "domcontentloaded" });
 
         const landed = offSite();
@@ -797,6 +857,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         if (form.name === "") {
             return "The password field has no name, so its form would not send it; nothing was typed";
+        }
+
+        if (served?.action !== form.action || served.name !== form.name) {
+            return served
+                ? "A script changed where the login form sends the password, so nothing was typed"
+                : "The login form is built by a script, so the agent's browser cannot check where it sends the password; nothing was typed";
         }
 
         const userHandle = await field.evaluateHandle((input) => {
@@ -966,7 +1032,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     const landedAt = scrub(page.url());
 
     // Whatever happened once the password was typed, it leaves the page before anything else can read the page.
-    if (!(await clearPassword(page, { deadline, navTimeout, now, password, release }))) {
+    if (!(await clearPassword(page, { deadline, guard: armed, navTimeout, now, password, release }))) {
         // Closed before the lock lifts: a worker it holds would run once let go.
         await within(
             page
