@@ -202,6 +202,24 @@ describe("the suggested next prompt announcement", () => {
         expect(getGhostCompletion(ref.current!.getEditor()!.state)).toBeNull();
     });
 
+    // The same text for a later reply is placed again once the earlier reply's suggestion has gone: the placement record resets
+    // between replies, because the picker answers nothing for a reply while the previous one's cache is shown.
+    it("the same prompt for a later reply is placed again once the earlier reply's suggestion has gone", () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const element = (suggestion: string | null) => (
+            <ComposerTiptapEditor nextPromptScope="thread-1" nextPromptSuggestion={suggestion} onChange={() => {}} onSubmit={() => {}} ref={ref} value="" />
+        );
+        const view = render(element("Same"));
+
+        act(() => {
+            ref.current!.getEditor()!.commands.clearGhost();
+        });
+        view.rerender(element(null));
+        view.rerender(element("Same"));
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)?.text).toBe("Same");
+    });
+
     it("no suggested prompt is placed while the composer holds attachments", () => {
         const ref = createRef<ComposerTiptapEditorRef>();
 
