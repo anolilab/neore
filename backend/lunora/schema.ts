@@ -443,7 +443,7 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .shardBy("userId")
-        .index("by_threadId_run_site", ["threadId", "run", "site"])
+        .index("by_threadId_site_run", ["threadId", "site", "run"])
         .index("by_userId", ["userId"]),
 
     browserSessions: defineTable({

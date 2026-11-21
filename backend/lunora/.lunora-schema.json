@@ -4514,11 +4514,11 @@
         }
       },
       "indexes": {
-        "by_threadId_run_site": {
+        "by_threadId_site_run": {
           "fields": [
             "threadId",
-            "run",
-            "site"
+            "site",
+            "run"
           ],
           "unique": false
         },

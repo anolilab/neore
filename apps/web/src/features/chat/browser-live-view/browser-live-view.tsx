@@ -952,13 +952,14 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
     // A "Needs you" card in the chat (`browser-human-check.tsx`) asks for control: the same as this card's own button.
     const controlRequested = useEffectEvent((requested: string): boolean => {
-        if (requested !== threadId || !mayTakeControl) {
+        if (requested !== threadId) {
             return false;
         }
 
+        // The card is there, so the request is answered, whether or not control can be taken now: the card says why not.
         section.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
-        if (!takingControl) {
+        if (mayTakeControl && !takingControl) {
             startControl();
         }
 

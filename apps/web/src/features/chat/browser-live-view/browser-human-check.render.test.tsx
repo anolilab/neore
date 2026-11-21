@@ -1,6 +1,6 @@
 import type { ToolPart } from "@neore/chat-ui/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -89,7 +89,7 @@ describe("the Needs you card", () => {
 
         await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
         expect(asked).toEqual(["thread-1"]);
-        expect(screen.queryByRole("status")).toBeNull();
+        expect(screen.getByRole("status").textContent).toBe("");
         stop();
     });
 
@@ -111,9 +111,9 @@ describe("the Needs you card", () => {
         backend.browser = browser;
         show();
 
-        const shown = await screen.findByRole("status");
-
-        expect(shown.textContent).toContain(text);
+        await waitFor(() => {
+            expect(screen.getByRole("status").textContent).toContain(text);
+        });
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
     });
 });

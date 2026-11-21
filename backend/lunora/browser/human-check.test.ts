@@ -18,8 +18,11 @@ const CLEAR_AFTER_HAND_BACK_NOTE = /handed it back;.*no longer shows: the page l
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
 const CLEAR_PAGE: LadderResult = { success: true, title: "Item 42 – Shop", url: "https://shop.example.com/item" };
 
-/** Deps over an in-memory set of asked sites; `looks` are the pages the fresh looks return, in order. */
-const dependenciesFor = (looks: LadderResult[], asked = new Set<string>()) => {
+/**
+ * Dependencies over in-memory sets of sites asked about in this run (`asked`) and in the thread's earlier runs
+ * (`earlier`); `looks` are the pages the fresh looks return, in order.
+ */
+const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earlier = new Set<string>()) => {
     const dependencies = {
         claimAsk: vi.fn(async (site: string) => {
             if (asked.has(site)) {
@@ -30,9 +33,9 @@ const dependenciesFor = (looks: LadderResult[], asked = new Set<string>()) => {
 
             return true;
         }),
-        look: vi.fn(async () => looks.shift() ?? CLEAR_PAGE),
+        look: vi.fn(async (_kind: "extract" | "screenshot") => looks.shift() ?? CLEAR_PAGE),
         sleep: vi.fn(async () => undefined),
-        wasAsked: vi.fn(async (site: string) => asked.has(site)),
+        wasAsked: vi.fn(async (site: string, scope: "run" | "thread") => asked.has(site) || (scope === "thread" && earlier.has(site))),
     } satisfies LadderDependencies<LadderResult>;
 
     return { asked, dependencies };
@@ -45,22 +48,32 @@ describe("detectHumanCheck", () => {
         [{ title: "Verify you are human" }, "title"],
         [{ title: "Are you a robot?" }, "title"],
         [{ url: "https://example.com/cdn-cgi/challenge-platform/h/b/orchestrate" }, "url"],
-        [{ url: "https://example.com/captcha?return=/" }, "url"],
+        [{ url: "https://example.com/item?__cf_chl_rt_tk=abc" }, "url"],
+        [{ title: "Checking your browser before accessing example.com" }, "title"],
         [{ content: "Verifying you are human. This may take a few seconds.", title: "example.com" }, "content"],
         [{ content: "Press & Hold to confirm you are a human (and not a bot)." }, "content"],
     ])("reads %j as a check (%s)", (page, marker) => {
-        expect(detectHumanCheck(page)).toBe(marker);
+        expect(detectHumanCheck(page, true)).toBe(marker);
+    });
+
+    it("reads a page's text only when it is the whole page's", () => {
+        expect(detectHumanCheck({ content: "Verifying you are human." })).toBeUndefined();
     });
 
     it.each([
         { title: "How captchas work – a guide" },
+        { title: "CAPTCHA - Wikipedia" },
+        { title: "Security Checkpoint Wait Times – Airport" },
+        { title: "Human verification methods compared" },
+        { title: "Attention required: update your profile" },
         { title: "Just a moment of your time: our survey" },
+        { url: "https://developers.example.com/recaptcha/docs" },
         { url: "https://example.com/blog/captcha-alternatives" },
         // A long article that mentions the phrase is a real page.
         { content: `${"An article about bots. ".repeat(200)}Verify you are human, it says.` },
         {},
     ])("leaves %j alone", (page) => {
-        expect(detectHumanCheck(page)).toBeUndefined();
+        expect(detectHumanCheck(page, true)).toBeUndefined();
     });
 });
 
@@ -86,11 +99,20 @@ describe("humanCheckLadder", () => {
         const result = await humanCheckLadder(CHECK_PAGE, dependencies);
 
         expect(dependencies.sleep).toHaveBeenCalledExactlyOnceWith(HUMAN_CHECK_WAIT_MS);
-        expect(dependencies.look).toHaveBeenCalledOnce();
+        expect(dependencies.look).toHaveBeenCalledExactlyOnceWith("screenshot");
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
         expect(result).toMatchObject({ success: true, title: CLEAR_PAGE.title });
         expect(result.humanCheck).toBeUndefined();
         expect(result.error).toMatch(CLEARED_NOTE);
+    });
+
+    it("step 1: a check found in the page's text is looked for in the text again", async () => {
+        const blocked: LadderResult = { content: "Verifying you are human.", success: true, title: "shop.example.com", url: "https://shop.example.com/" };
+        const { dependencies } = dependenciesFor([blocked]);
+        const result = await humanCheckLadder(blocked, dependencies, { readContent: true });
+
+        expect(dependencies.look).toHaveBeenCalledExactlyOnceWith("extract");
+        expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
     });
 
     it("step 2: still blocked after the wait, the person is asked, and told not to solve it", async () => {
@@ -139,14 +161,14 @@ describe("humanCheckLadder", () => {
     it("the agent's own report asks at once, with no wait", async () => {
         const signIn: LadderResult = { success: true, title: "Sign in", url: "https://portal.example.com/login" };
         const { dependencies } = dependenciesFor([]);
-        const result = await humanCheckLadder(signIn, dependencies, true);
+        const result = await humanCheckLadder(signIn, dependencies, { reported: true });
 
         expect(dependencies.sleep).not.toHaveBeenCalled();
         expect(result.humanCheck).toEqual({ site: "portal.example.com", status: "asked" });
     });
 
-    it("step 3: after the hand back, a clear page tells the agent it is clear and to look first", async () => {
-        const { dependencies } = dependenciesFor([], new Set(["shop.example.com"]));
+    it("step 3: after the hand back, a clear page tells the agent it is clear and to look first, also in the next run", async () => {
+        const { dependencies } = dependenciesFor([], new Set(), new Set(["shop.example.com"]));
         const result = await humanCheckLadder(
             { ...CLEAR_PAGE, error: "The person had control of the browser and handed it back;", handedBack: true },
             dependencies,

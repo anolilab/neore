@@ -96,8 +96,9 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 userId,
                 userTier: context.userTier,
             })) as BrowserResult;
-        // One ask per site per run: the run is its prompt (a continuation of the same prompt is the same run).
-        const runKey = (context as { promptMessageId?: string }).promptMessageId ?? context.messageId ?? threadId;
+        // One ask per site per run: the run is its reply, the same through a pause, a resume and an approval's continuation
+        // (a headless run sets none: its prompt, else the thread).
+        const runKey = context.replyKey ?? (context as { promptMessageId?: string }).promptMessageId ?? threadId;
 
         try {
             const reported = action === "needs_person";
@@ -110,15 +111,21 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                           {
                               claimAsk: async (site) =>
                                   await context.runMutation(internal.browser.functions.claimHumanCheckAsk, { run: runKey, site, threadId, userId }),
-                              look: async () => await run({ action: "screenshot" }),
+                              look: async (kind) => await run({ action: kind }),
                               sleep: async (ms) => {
                                   await new Promise((resolve) => {
                                       setTimeout(resolve, ms);
                                   });
                               },
-                              wasAsked: async (site) => await context.runQuery(internal.browser.functions.wasHumanCheckAsked, { run: runKey, site, threadId }),
+                              wasAsked: async (site, scope) =>
+                                  await context.runQuery(internal.browser.functions.wasHumanCheckAsked, {
+                                      ...(scope === "run" && { run: runKey }),
+                                      site,
+                                      threadId,
+                                  }),
                           },
-                          reported && first.success === true,
+                          // Only a whole page's text is read for a check: a selected element's is always short.
+                          { readContent: action === "extract" && input.selector === undefined, reported: reported && first.success === true },
                       )
                     : first;
 

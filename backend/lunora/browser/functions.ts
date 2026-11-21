@@ -346,17 +346,21 @@ export const closeSession = internalMutation
 
 // ── Human checks (`human-check.ts`) ──────────────────────────────────────
 
-/** The row recording that the person was asked about `site` during the run `run` of the thread, if they were. */
-const humanCheckAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string): Promise<Doc<"browserHumanChecks"> | null> =>
+/** The row recording that the person was asked about `site` in the thread: during the run `run`, or any run when absent. */
+const humanCheckAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, site: string, run?: string): Promise<Doc<"browserHumanChecks"> | null> =>
     await db
         .query("browserHumanChecks")
-        .withIndex("by_threadId_run_site", (q) => q.eq("threadId", threadId).eq("run", run).eq("site", site))
+        .withIndex("by_threadId_site_run", (q) => {
+            const bySite = q.eq("threadId", threadId).eq("site", site);
+
+            return run === undefined ? bySite : bySite.eq("run", run);
+        })
         .first();
 
 export const wasHumanCheckAsked = internalQuery
-    .input({ run: v.string(), site: v.string(), threadId: v.id("threads") })
+    .input({ run: v.optional(v.string()), site: v.string(), threadId: v.id("threads") })
     .output(v.boolean())
-    .query(async ({ args: { run, site, threadId }, ctx }) => (await humanCheckAsk(ctx.db, threadId, run, site)) !== null);
+    .query(async ({ args: { run, site, threadId }, ctx }) => (await humanCheckAsk(ctx.db, threadId, site, run)) !== null);
 
 /**
  * The person is asked about `site` once per run: `true` for the first ask, which records it in the same transaction,
@@ -366,7 +370,7 @@ export const claimHumanCheckAsk = internalMutation
     .input({ run: v.string(), site: v.string(), threadId: v.id("threads"), userId: v.string() })
     .output(v.boolean())
     .mutation(async ({ args: { run, site, threadId, userId }, ctx }) => {
-        if ((await humanCheckAsk(ctx.db, threadId, run, site)) !== null) {
+        if ((await humanCheckAsk(ctx.db, threadId, site, run)) !== null) {
             return false;
         }
 

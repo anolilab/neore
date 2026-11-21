@@ -27,6 +27,8 @@ type Harness = ReturnType<typeof lunoraTest>;
 let harness: Harness;
 let userId: string;
 let delegated: unknown;
+/** The reply key the approved call's tool context carried. */
+let toolReplyKey: string | undefined;
 
 const insertThread = async () => (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId }))) as string;
 
@@ -70,7 +72,8 @@ beforeEach(async () => {
 
     // The approved delegation: admitted with the chain its tool context carries.
     vi.mocked(getAgent).mockResolvedValue({
-        approveToolCall: vi.fn(async (toolCtx: { chainSource?: string }) => {
+        approveToolCall: vi.fn(async (toolCtx: { chainSource?: string; replyKey?: string }) => {
+            toolReplyKey = toolCtx.replyKey;
             delegated = await harness.run(
                 async (ctx: any) =>
                     await admitSubAgentRun(ctx, {
@@ -206,5 +209,14 @@ describe("a resumed run's turn", () => {
 
     it("is none for a snapshot that does not say whether an admin sent it", async () => {
         expect(await resumeWith({ promptMessageId: "prompt-1", systemContext: ["instructions"] })).toBeUndefined();
+    });
+});
+
+describe("a resumed run's tool context", () => {
+    it("names the reply the run belongs to: its first stream, else this one", async () => {
+        await resume(undefined);
+
+        // The snapshot in `resume` has no `replyKey`: the continuation's own stream names the reply.
+        expect(toolReplyKey).toBe("stream-1");
     });
 });

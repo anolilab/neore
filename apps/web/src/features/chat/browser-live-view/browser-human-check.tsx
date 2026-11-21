@@ -38,7 +38,9 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
     // The same live status the live view card reads: one subscription for both.
     const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
     const browser = status.data;
-    const [missed, setMissed] = useState(false);
+    // The browser no live view card answered for: once it changes, the button comes back.
+    const [missedBrowser, setMissedBrowser] = useState<string | undefined>(undefined);
+    const missed = browser !== undefined && browser !== null && missedBrowser === browser.browserId;
     const screenshot = output.screenshotFormat
         ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
         : undefined;
@@ -72,14 +74,18 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
                             : t`The agent's browser reached a page on ${site} only a person can clear. The agent waits and will not try to get around it.`}
                     </p>
                     <p className="text-xs text-amber-800 dark:text-amber-300">{t`Take control, clear it, then hand the browser back.`}</p>
-                    {state !== undefined && (
-                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-300" role="status">
-                            {state}
-                        </p>
-                    )}
+                    {/* Mounted throughout, so a screen reader announces the text when it changes. */}
+                    <p className="mt-1 text-xs text-amber-800 empty:hidden dark:text-amber-300" role="status">
+                        {state}
+                    </p>
                 </div>
                 {canAsk && (
-                    <Button className="any-pointer-coarse:min-h-11" onClick={() => setMissed(!requestBrowserControl(threadId))} size="sm" type="button">
+                    <Button
+                        className="any-pointer-coarse:min-h-11"
+                        onClick={() => setMissedBrowser(requestBrowserControl(threadId) ? undefined : browser?.browserId)}
+                        size="sm"
+                        type="button"
+                    >
                         {t`Take control`}
                     </Button>
                 )}
