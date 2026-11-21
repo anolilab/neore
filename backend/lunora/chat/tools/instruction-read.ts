@@ -19,29 +19,34 @@ type InstructionReadOutput =
     | { found: false; names: string[] }
     | { found: true; id: string; name: string; text: string };
 
+/** Opens the explicit form of an id (`id:<id>`), which no name is read as; in any case. */
+const ID_FORM = "id:";
+
 /**
- * The files `file` names: the one with that id, else every one with that name, ignoring case and surrounding space. Ids
- * are unique and names need not be, so more than one means the name alone does not say which.
+ * The files `file` names: with the `id:` form ({@link ID_FORM}) the one with that id; otherwise every one whose id is
+ * `file` or whose name is, ignoring case and surrounding space. Ids are unique, but names need not be and a name may be
+ * another file's id, so more than one means `file` alone does not say which.
  */
 export const findInstruction = (instructions: ReadonlyArray<RunInstruction>, file: string): RunInstruction[] => {
     const wanted = file.trim();
-    const byId = instructions.find((entry) => entry.id === wanted);
+    const explicitId = wanted.toLowerCase().startsWith(ID_FORM) ? wanted.slice(ID_FORM.length).trim() : undefined;
+    const byExplicitId = explicitId ? instructions.find((entry) => entry.id === explicitId) : undefined;
 
-    if (byId) {
-        return [byId];
+    if (byExplicitId) {
+        return [byExplicitId];
     }
 
     // As the list shows it (`oneLine`), so a name with a line break in it is still found.
     const lower = oneLine(wanted).toLowerCase();
 
-    return instructions.filter((entry) => oneLine(entry.title).toLowerCase() === lower);
+    return instructions.filter((entry) => entry.id === wanted || oneLine(entry.title).toLowerCase() === lower);
 };
 
 /** The tool over `instructions`, the `auto` files the run lists. */
 export const instructionReadTool = (instructions: ReadonlyArray<RunInstruction>) =>
     createTool<{ file: string }, InstructionReadOutput, ToolContext>({
         description:
-            "Read one of the project's instruction files listed in the system prompt, by its id (or its name, when no other file has it), when it applies to the task. Returns its full text.",
+            "Read one of the project's instruction files listed in the system prompt, by its id (written id:<id> when the bare id or name could mean another file) or its name, when it applies to the task. Returns its full text.",
         execute: async (_context, { file }) => {
             const matches = findInstruction(instructions, file);
             const [found] = matches;
@@ -53,16 +58,16 @@ export const instructionReadTool = (instructions: ReadonlyArray<RunInstruction>)
                 return { found: false, names: instructions.map((entry) => oneLine(entry.title)) };
             }
 
-            // Never a guess between files of the same name: the model asks again by id, which the list shows.
+            // Never a guess between files `file` could mean: the model asks again in the id form, which no name is read as.
             if (matches.length > 1) {
-                return { found: false, ids: matches.map((entry) => entry.id), reason: "Several files have this name: read one by its id." };
+                return { found: false, ids: matches.map((entry) => entry.id), reason: "Several files match this: read one as id:<its id>." };
             }
 
             return { found: true, id: found.id, name: found.title, text: found.content };
         },
         inputSchema: z
             .object({
-                file: z.string().min(1).max(200).meta({ description: "The instruction file's name or id, as listed" }),
+                file: z.string().min(1).max(200).meta({ description: "The instruction file's name or id as listed, or id:<id>" }),
             })
             .strict(),
         title: "Project instructions",

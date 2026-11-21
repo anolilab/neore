@@ -474,6 +474,13 @@ const retrieveKnowledgeContext = async (
 };
 
 /**
+ * Characters of the longest context a run of `context` may append: which of its two kinds it sends is known only once its
+ * tools are built (`instruction_read` may be removed), so an Auto route, chosen before, is sized for the longer.
+ */
+export const longestContextCharacters = (context: { contextParts: string[]; contextPartsWithoutInstructions: string[] }): number =>
+    Math.max(context.contextParts.join("\n\n").length, context.contextPartsWithoutInstructions.join("\n\n").length);
+
+/**
  * The per-user context an interactive run reads before it starts: preferences
  * and personalization, the thread's settings, the user's provider keys, and the
  * extra system-prompt context — relevant memories, knowledge-base excerpts,

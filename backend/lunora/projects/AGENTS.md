@@ -53,8 +53,8 @@
   thread's project by then), and a task run (`projectInstructions` on `runHeadlessAgent`). Edit (`streamAsync`) and group
   runs take the text only. A run that lists none takes `textWithoutInstructions` when present, the text chosen
   without the list's cost (`selectRuleFiles(…, false)`); a line that does not fit is skipped, never ends the selection,
-  so one that lists none is that text already. Triggers have no project. Names may repeat, ids do not: a name that more than one file has
-  is answered with their ids, never a guess.
+  so one that lists none is that text already. Triggers have no project. Names may repeat, and may be another file's id: a name or bare id
+  that fits more than one file is answered with their ids, never a guess; `id:<id>` names one file only.
 - Never a `defineMigration` on `projectRuleFiles`: a shard's data migration has no `.global()` store (`adminWriter` in
   `_generated/shard.ts`), so it fails there. Keep a new field optional, so every stored row still fits.
 - Glob matching is `matchesGlob`, never a `RegExp` built from a pattern: one constant-cost step per (pattern, path)

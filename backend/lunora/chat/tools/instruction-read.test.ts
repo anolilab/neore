@@ -39,4 +39,17 @@ describe("instruction_read", () => {
         await expect(tool.execute({ file: "deploy" }, options)).resolves.toMatchObject({ found: false, ids: ["deploy-1", "deploy-2"] });
         await expect(tool.execute({ file: "deploy-2" }, options)).resolves.toMatchObject({ found: true, text: "Staging only." });
     });
+
+    it("never reads another file under a name that is some file's id: it names both, and reads either in the id form", async () => {
+        // A file named like another file's id.
+        const named = { ...style, content: "Not the deploy file.", id: "style-2", title: "deploy-1" };
+        const tool = { ...instructionReadTool([deploy, named]), ctx: { userId: "u1" } } as unknown as {
+            execute: (input: { file: string }, options: unknown) => Promise<unknown>;
+        };
+        const options = { messages: [], toolCallId: "call-1" };
+
+        await expect(tool.execute({ file: "deploy-1" }, options)).resolves.toMatchObject({ found: false, ids: ["deploy-1", "style-2"] });
+        await expect(tool.execute({ file: "id:deploy-1" }, options)).resolves.toMatchObject({ found: true, text: "Run the deploy script." });
+        await expect(tool.execute({ file: "ID: style-2" }, options)).resolves.toMatchObject({ found: true, text: "Not the deploy file." });
+    });
 });

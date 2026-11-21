@@ -116,6 +116,20 @@ describe("toImportedRuleFile", () => {
         });
     });
 
+    it.each([
+        ["after blank lines", "\n  \n---\nglobs: *.ts\n---\nTyped."],
+        ["with spaces after its fences", "--- \nglobs: *.ts\n---\t \nTyped."],
+        ["with CRLF line endings", "---\r\nglobs: *.ts\r\n---\r\nTyped."],
+    ])("reads front matter %s", (_case, text) => {
+        expect(toImportedRuleFile("rules/spaced.md", text)).toStrictEqual({
+            content: "Typed.",
+            description: "",
+            mode: "glob",
+            patterns: "*.ts",
+            title: "spaced",
+        });
+    });
+
     it("reads a file that never applies by itself as one read when needed", () => {
         expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false\n---\nOnly on request.")).toMatchObject({ description: "", mode: "auto" });
     });

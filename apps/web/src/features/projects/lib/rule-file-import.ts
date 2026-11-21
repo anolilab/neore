@@ -32,8 +32,8 @@ const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
 const QUOTE_START = /^["']/u;
 const QUOTE_END = /["']$/u;
 
-/** The front matter, an empty block included. */
-const FRONT_MATTER = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(?:\r?\n|$)/u;
+/** The front matter, an empty block included: after blank lines, its fences may end in spaces, its lines in CRLF. */
+const FRONT_MATTER = /^(?:[\t ]*\r?\n)*---[\t ]*\r?\n(?:([\s\S]*?)\r?\n)?---[\t ]*(?:\r?\n|$)/u;
 
 /** Where a quoted scalar may open in a value: at its start, or after `[` or `,` in an inline list. */
 const QUOTE_OPENS_AFTER = new Set(["", ",", "["]);

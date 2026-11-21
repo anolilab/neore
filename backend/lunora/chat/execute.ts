@@ -43,6 +43,7 @@ import {
     finishRun,
     isAgentRunError,
     loadRunContext,
+    longestContextCharacters,
     mayExtractMemory,
     memoryToCarry,
     readResumeInterruptedRuns,
@@ -387,9 +388,7 @@ export const runStreamingAgent = internalAction
                                 getAgentForUser(ctx, userId, preRouteModel, thread?.language),
                             ]);
                             const systemCharacters =
-                                (fallbackAgent.options.instructions ?? "").length +
-                                run.contextParts.join("\n\n").length +
-                                (invokedSkill?.instructions.length ?? 0);
+                                (fallbackAgent.options.instructions ?? "").length + longestContextCharacters(run) + (invokedSkill?.instructions.length ?? 0);
 
                             return {
                                 contextTokens: history.contextTokens + Math.ceil(estimateTokensFromCharacters(systemCharacters)),

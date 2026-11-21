@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { internal } from "../../_generated/internal";
-import { loadRunContext } from "./agent-run";
+import { loadRunContext, longestContextCharacters } from "./agent-run";
 
 // The agent and tool builders pull in the whole agent client, which this pure
 // data-loading path never touches.
@@ -175,5 +175,17 @@ describe(loadRunContext, () => {
         const result = await loadRunContext(ctx, { ...args, promptText: undefined });
 
         expect(result.untrustedContext).toBe(false);
+    });
+});
+
+describe(longestContextCharacters, () => {
+    it("counts the longer of the two kinds, so an Auto route fits whichever the run sends", () => {
+        const longer = "PROJECT CONTEXT:\nBe brief.\n\nAlso this.";
+
+        // The text without the list can be the longer: a file the list left no room for.
+        expect(longestContextCharacters({ contextParts: ["PROJECT CONTEXT:\nBe brief."], contextPartsWithoutInstructions: [longer, "B"] })).toBe(
+            longer.length + 3,
+        );
+        expect(longestContextCharacters({ contextParts: [longer], contextPartsWithoutInstructions: ["A"] })).toBe(longer.length);
     });
 });
