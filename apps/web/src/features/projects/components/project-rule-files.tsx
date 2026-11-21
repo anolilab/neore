@@ -34,6 +34,7 @@ import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { fitTitle, importRuleFiles, needsMode, unreservedTitle } from "../lib/rule-file-import";
+import ComputerRuleFileImport from "./computer-rule-file-import";
 import type { RepoImportResult } from "./repo-rule-file-import";
 import RepoRuleFileImport from "./repo-rule-file-import";
 
@@ -956,6 +957,7 @@ const ProjectRuleFiles: FC<{
                             type="file"
                             {...{ directory: "", webkitdirectory: "" }}
                         />
+                        <ComputerRuleFileImport disabled={importing || files.length >= MAX_RULE_FILES} runImport={runImport} />
                         {draft && (
                             <>
                                 <Button

@@ -217,7 +217,7 @@ describe("getGlobalInstructionsCall", () => {
             { callId, deviceId, payload, signature: await signDevicePayload(secret, "result", payload) } as never,
         );
 
-        await expect(read(ownerId, callId)).resolves.toEqual({ error: "The computer's answer could not be read", status: "failed" });
+        await expect(read(ownerId, callId)).resolves.toEqual({ code: "ANSWER_UNREADABLE", error: "The computer's answer could not be read", status: "failed" });
     });
 });
 
