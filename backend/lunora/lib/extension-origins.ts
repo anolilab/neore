@@ -174,7 +174,13 @@ export const carryRetiredExtensionOrigins = (
     const entries = origins?.split(",") ?? [];
 
     for (const entry of entries) {
-        const origin = entry.trim();
+        // The retired parser stripped every trailing slash, so `chrome-extension://<id>//` was a valid entry.
+        let origin = entry.trim();
+
+        while (origin.endsWith("/")) {
+            origin = origin.slice(0, -1);
+        }
+
         const uri = origin.startsWith("chrome-extension://") && CHROME_EXTENSION_ID.test(origin) ? normalizeRedirectUri(origin) : undefined;
 
         if (uri && !listed.has(uri)) {

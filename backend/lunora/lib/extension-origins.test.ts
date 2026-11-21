@@ -139,6 +139,14 @@ describe("carryRetiredExtensionOrigins", () => {
         expect(parseTrustedExtensionRedirectUris(carried.value)).toEqual(expected.split(","));
     });
 
+    it("moves an old origin written with several trailing slashes, as the retired parser accepted it", () => {
+        expect(carryRetiredExtensionOrigins(`chrome-extension://${ID}//`, undefined)).toEqual({
+            added: [CHROME],
+            value: `${SHIPPED_FIREFOX_REDIRECT_URI},${CHROME}`,
+            withheld: [],
+        });
+    });
+
     it.each([
         ["no Chrome origin", "chrome-extension://not-an-id,moz-extension://x", undefined],
         ["an already listed URI, copied without its slash", `chrome-extension://${ID}/`, `https://${ID}.chromiumapp.org`],
