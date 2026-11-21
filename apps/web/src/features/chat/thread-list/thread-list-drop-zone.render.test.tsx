@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const navigate = vi.hoisted(() => vi.fn());
 const requestComposerAttach = vi.hoisted(() => vi.fn());
 const withdrawComposerAttach = vi.hoisted(() => vi.fn());
+const discardComposerAttachNotFor = vi.hoisted(() => vi.fn(() => 0));
 const showError = vi.hoisted(() => vi.fn());
 const location = vi.hoisted(() => {
     return { pathname: "/chat/k17abc" };
@@ -34,7 +35,7 @@ vi.mock("@tanstack/react-router", () => {
 });
 
 vi.mock("@/features/chat/core/utils/composer-submit", () => {
-    return { requestComposerAttach, withdrawComposerAttach };
+    return { discardComposerAttachNotFor, requestComposerAttach, withdrawComposerAttach };
 });
 
 const session = vi.hoisted(() => {
@@ -140,6 +141,26 @@ describe("ThreadListDropZone", () => {
             expect(requestComposerAttach).toHaveBeenCalledTimes(1);
         });
         expect(requestComposerAttach.mock.calls[0]?.[0]).toMatchObject({ accountId: "signed-out" });
+    });
+
+    it("lets go of a drop left for the account before, and says so, when the account changes", () => {
+        discardComposerAttachNotFor.mockReturnValueOnce(1);
+
+        const { rerender } = renderZone();
+
+        expect(discardComposerAttachNotFor).not.toHaveBeenCalled();
+
+        session.data = { user: { id: "u2" } };
+        rerender(
+            <ThreadListDropZone>
+                <ul aria-label="Threads">
+                    <li>Quarterly plan</li>
+                </ul>
+            </ThreadListDropZone>,
+        );
+
+        expect(discardComposerAttachNotFor).toHaveBeenCalledWith("u2");
+        expect(showError).toHaveBeenCalledTimes(1);
     });
 
     it("says so when the drop replaced an earlier one for another account", async () => {

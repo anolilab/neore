@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    discardComposerAttachNotFor,
     hasPendingComposerAttach,
     onComposerAttachRequest,
     onComposerSubmitRequest,
@@ -100,21 +101,48 @@ describe(requestComposerAttach, () => {
         stop();
     });
 
-    it("lets go of files left for another account when a composer opens, so they never come back later", () => {
-        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
+    it("lets go of files left for another account once the account has changed, so they never come back later", () => {
+        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt"), new File(["b"], "b.txt")] });
 
-        // Account u2's new chat opens: u1's drop from before the switch is let go, and the person is told.
-        const discarded = vi.fn();
-
-        onComposerAttachRequest("u2", () => {}, discarded)();
-
-        expect(discarded).toHaveBeenCalledExactlyOnceWith(1);
+        expect(discardComposerAttachNotFor("u2")).toBe(2);
 
         const back = vi.fn();
         const stop = onComposerAttachRequest("u1", back);
 
         expect(back).not.toHaveBeenCalled();
-        expect(hasPendingComposerAttach("u1")).toBe(false);
+
+        stop();
+    });
+
+    it("keeps the new account's drop, and a drop made before the session was known, when the account changes", () => {
+        requestComposerAttach({ accountId: "u2", files: [new File(["a"], "a.txt")] });
+
+        expect(discardComposerAttachNotFor("u2")).toBe(0);
+        expect(hasPendingComposerAttach("u2")).toBe(true);
+
+        drainAttach();
+        requestComposerAttach({ files: [new File(["b"], "b.txt")] });
+
+        expect(discardComposerAttachNotFor("u2")).toBe(0);
+        expect(hasPendingComposerAttach("u2")).toBe(true);
+    });
+
+    it("never lets an old account's composer that subscribes again take or drop the new account's files", () => {
+        const file = new File(["a"], "a.txt");
+
+        requestComposerAttach({ accountId: "u2", files: [file] });
+
+        // The old account's composer is still mounted and subscribes again (its effect re-ran) before u2's opens.
+        const old = vi.fn();
+
+        onComposerAttachRequest("u1", old)();
+
+        expect(old).not.toHaveBeenCalled();
+
+        const next = vi.fn();
+        const stop = onComposerAttachRequest("u2", next);
+
+        expect(next).toHaveBeenCalledExactlyOnceWith({ accountId: "u2", files: [file] });
 
         stop();
     });

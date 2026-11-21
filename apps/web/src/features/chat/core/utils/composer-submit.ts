@@ -93,21 +93,22 @@ export const withdrawComposerAttach = (files: ReadonlyArray<File>): void => {
  * stays for that account's composer (during a switch, the old one may still be listening), is never uploaded under
  * this one, and the next drop for another account replaces it.
  */
-export const onComposerAttachRequest = (
-    accountId: string,
-    handler: (request: ComposerAttachRequest) => void,
-    // Told the number of files let go below, so the person can be asked to drop them again.
-    onDiscarded: (count: number) => void = () => {},
-): (() => void) => {
-    // A request that already waits for another account when this composer opens was dropped before a switch: it is let go,
-    // so it never turns up hours later in that account's next new chat. One that arrives while this composer listens (the
-    // old account's, mid-switch) still waits for its own account's composer.
+export const onComposerAttachRequest = (accountId: string, handler: (request: ComposerAttachRequest) => void): (() => void) =>
+    composerAttachChannel.consume(handler, (request: ComposerAttachRequest) => request.accountId === undefined || request.accountId === accountId);
+
+/**
+ * Lets go of a drop waiting for another known account, once the signed-in account has changed to `accountId`: dropped
+ * before the switch, it must not turn up hours later in that account's next new chat. Returns how many files it let go,
+ * so the person can be asked to drop them again. A drop made before the session was known (no account) stays.
+ */
+export const discardComposerAttachNotFor = (accountId: string): number => {
     const { pending, take } = composerAttachChannel.store.getState();
 
-    if (pending && pending.payload.accountId !== undefined && pending.payload.accountId !== accountId) {
-        take();
-        onDiscarded(pending.payload.files.length);
+    if (!pending || pending.payload.accountId === undefined || pending.payload.accountId === accountId) {
+        return 0;
     }
 
-    return composerAttachChannel.consume(handler, (request: ComposerAttachRequest) => request.accountId === undefined || request.accountId === accountId);
+    take();
+
+    return pending.payload.files.length;
 };
