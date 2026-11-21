@@ -28,6 +28,12 @@ export const executeBrowserAction = internalAction
         browserSettings: v.optional(v.any()),
         direction: v.optional(v.string()),
         fullPage: v.optional(v.boolean()),
+        /**
+         * One of the human-check ladder's own reads (`browser/human-check.ts`), which the agent never asked for: not
+         * charged to the user's browser rate limit. Only `chat/tools/browser.ts` sets it, capped per tool call
+         * (`HUMAN_CHECK_LOOK_BUDGET`); an internal action, so no client or model input reaches it.
+         */
+        ladderLook: v.optional(v.boolean()),
         selector: v.optional(v.string()),
         text: v.optional(v.string()),
         threadId: v.id("threads"),
@@ -103,11 +109,15 @@ export const executeBrowserAction = internalAction
                 // The ended lease this action looks at the page for: once a look came back, the next actions act again.
                 const { inspecting } = use;
 
-                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser.
-                const rlResult = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
-                    identifier: userId,
-                    key: `browser/action:${args.userTier ?? "free"}`,
-                });
+                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser,
+                // nor one of the human-check ladder's own reads.
+                const rlResult =
+                    args.ladderLook === true
+                        ? { ok: true }
+                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
+                              identifier: userId,
+                              key: `browser/action:${args.userTier ?? "free"}`,
+                          });
 
                 if (!rlResult.ok) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
@@ -238,7 +248,11 @@ export const executeBrowserAction = internalAction
         };
     });
 
-/** A `#fragment` change is the same page: it is no navigation to read again. */
+/**
+ * A `#fragment` change is the same page: it is no navigation to read again. A query change is one: a search form sent
+ * from a click lands on a new query, and an interstitial there need not add its token to the URL. The read is not
+ * charged to the user's rate limit, and is capped per tool call (`HUMAN_CHECK_LOOK_BUDGET`).
+ */
 const withoutHash = (url: string): string => url.split("#", 1)[0] ?? url;
 
 /** The actions whose result carries the page's URL but neither its title nor its text. */

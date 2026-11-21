@@ -11,6 +11,7 @@ import { claimHumanCheckAsk, wasHumanCheckAsked } from "./functions";
 import { BATCH } from "../gdpr/batch";
 import { eraseBrowserDataForUser } from "./gdpr";
 import {
+    budgetedLook,
     detectHumanCheck,
     HUMAN_CHECK_HAND_BACK_WINDOW_MS,
     HUMAN_CHECK_WAIT_MS,
@@ -30,6 +31,7 @@ const CLEAR_AFTER_HAND_BACK_NOTE = /handed it back;.*no longer shows: the page l
 /** The hand-back note, then the ask about the other site the read landed on. */
 const HAND_BACK_THEN_OTHER_ASK_NOTE = /^The person had control.*other\.example\.org shows a check/su;
 const REPORTED_HAND_BACK_NOTE = /handed the browser back after you asked them about portal\.example\.com.*before you act/su;
+const STILL_SHOWS_AFTER_HAND_BACK_NOTE = /still shows a check after the person handed the browser back.*not asked again/su;
 const UNKNOWN_AFTER_HAND_BACK_NOTE = /cleared is unknown.*Look at the page before you act/su;
 
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
@@ -304,8 +306,8 @@ describe("humanCheckLadder", () => {
         const result = await humanCheckLadder({ ...CLEAR_PAGE, handedBack: true }, dependencies);
 
         expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "already_asked" }, success: false });
+        expect(result.error).toMatch(STILL_SHOWS_AFTER_HAND_BACK_NOTE);
         expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
-        expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
     it("step 3: a failed action or a failed read after the hand back leaves it unknown, never clear", async () => {
@@ -318,12 +320,39 @@ describe("humanCheckLadder", () => {
         expect(result.success).toBe(false);
     });
 
-    it("step 3: a page still blocked after the hand back is not asked about again", async () => {
-        const { dependencies } = dependenciesFor([], new Set(["shop.example.com"]));
+    it.each([
+        ["this reply", new Set(["shop.example.com"]), new Set<string>()],
+        ["a recent one", new Set<string>(), new Set(["shop.example.com"])],
+    ])("step 3: a page still blocked after the hand back, asked about in %s, is neither waited out nor asked about again", async (_when, asked, earlier) => {
+        const { dependencies } = dependenciesFor([], asked, earlier);
         const result = await humanCheckLadder({ ...CHECK_PAGE, handedBack: true }, dependencies);
 
-        expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "already_asked" });
+        expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "already_asked" }, success: false });
+        expect(result.error).toMatch(STILL_SHOWS_AFTER_HAND_BACK_NOTE);
+        expect(dependencies.sleep).not.toHaveBeenCalled();
+        expect(dependencies.look).not.toHaveBeenCalled();
+        // No new row: it would restart the recent-ask window although no card was shown.
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
+    });
+
+    it("step 1: a person who handed back the check still showing during the wait, after a recent reply's ask, is not asked again", async () => {
+        const { dependencies } = dependenciesFor([{ ...CHECK_PAGE, handedBack: true }], new Set(), new Set(["shop.example.com"]));
+        const result = await humanCheckLadder(CHECK_PAGE, dependencies);
+
+        expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "already_asked" }, success: false });
+        expect(result.error).toMatch(STILL_SHOWS_AFTER_HAND_BACK_NOTE);
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["nobody was asked about", new Set(["other.example.org"]), new Set<string>()],
+        ["the person was only asked to sign in on", new Set(["shop.example.com"]), new Set(["shop.example.com"])],
+    ])("step 3: a hand back that shows a check on a site %s goes up the ladder", async (_what, earlier, reported) => {
+        const { dependencies } = dependenciesFor([CHECK_PAGE], new Set(), earlier, reported);
+        const result = await humanCheckLadder({ ...CHECK_PAGE, handedBack: true }, dependencies);
+
+        expect(dependencies.sleep).toHaveBeenCalledExactlyOnceWith(HUMAN_CHECK_WAIT_MS);
+        expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "asked" }, success: false });
     });
 
     it("step 1: a blank or clean page on another host after the wait is not clear, and the ask names the site the check was on", async () => {
@@ -452,6 +481,38 @@ describe("humanCheckLadder", () => {
         const handed = { ...CLEAR_PAGE, handedBack: true };
 
         await expect(humanCheckLadder(handed, dependencies)).resolves.toBe(handed);
+    });
+});
+
+describe("budgetedLook", () => {
+    it("looks up to its budget, then answers the spent result without looking", async () => {
+        const spent: LadderResult = { error: "spent", success: false };
+        const look = vi.fn(async (_kind: "extract" | "screenshot") => CLEAR_EXTRACT);
+        const limited = budgetedLook<LadderResult>(look, spent, 2);
+
+        await expect(limited("extract")).resolves.toBe(CLEAR_EXTRACT);
+        await expect(limited("screenshot")).resolves.toBe(CLEAR_EXTRACT);
+        await expect(limited("extract")).resolves.toBe(spent);
+        expect(look).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves room for the most looks one tool call makes: a failed read after a click handed back, its own read onto another site's check, the wait's look, the card", async () => {
+        const clicked = { success: true, url: "https://shop.example.com/checkout" };
+        const other = { content: "Verifying you are human.", success: true, title: "other.example.org", url: "https://other.example.org/" };
+        const { dependencies } = dependenciesFor(
+            [{ error: "Renderer down", handedBack: true, success: false, url: clicked.url }, other, other, { ...other, screenshot: "jpeg" }],
+            new Set(),
+            new Set(["shop.example.com"]),
+        );
+        const { look } = dependencies;
+        const result = await humanCheckLadder<LadderResult>(
+            clicked,
+            { ...dependencies, look: budgetedLook(look, { error: "spent", success: false }) },
+            { navigated: true },
+        );
+
+        expect(look).toHaveBeenCalledTimes(4);
+        expect(result).toMatchObject({ humanCheck: { site: "other.example.org", status: "asked" }, screenshot: "jpeg" });
     });
 });
 

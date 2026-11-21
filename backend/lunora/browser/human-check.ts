@@ -14,6 +14,15 @@ export const HUMAN_CHECK_WAIT_MS = 8000;
  */
 export const HUMAN_CHECK_HAND_BACK_WINDOW_MS = 60 * 60_000;
 
+/**
+ * The most renderer calls the ladder makes of its own in one tool call: at worst a read after a navigation that came
+ * back handed back but failed, the hand back's own read, which lands on another site's check, the look after that
+ * check's wait and the card's screenshot. They are not charged to the user's browser rate limit
+ * (`browser/action:<tier>`), as the agent never asked for them, so this fixed cap bounds them instead: every tool call
+ * that reaches the ladder ran one charged action first.
+ */
+export const HUMAN_CHECK_LOOK_BUDGET = 4;
+
 /** Extracted text longer than this is a real page that merely mentions a check, never the check itself. */
 const SHORT_PAGE_CHARS = 3000;
 
@@ -109,6 +118,9 @@ export const humanCheckMessages = {
     clearedAfterHandBack: (site: string): string => `The check on ${siteName(site)} no longer shows: the page looks clear. Look at it before you act.`,
     clearedOnItsOwn: (site: string): string =>
         `${siteName(site)} showed a check page, which cleared on its own after a short wait. This is the page now: look at it before you act.`,
+    lookBudgetSpent: "The page could not be looked at again during this browser action. Look at it yourself before you act.",
+    stillShowsAfterHandBack: (site: string): string =>
+        `${siteName(site)} still shows a check after the person handed the browser back. They were already asked to clear it, so they are not asked again. Do not try to solve or get around it: tell them it still shows, or reach what you need another way.`,
     unknownAfterHandBack: (site: string): string =>
         `Whether the check on ${siteName(site)} cleared is unknown: the page's text could not be read after the hand back. Look at the page before you act, and do not try to solve or get around a check that still shows.`,
 };
@@ -202,6 +214,41 @@ const showsClear = (page: LadderResult, marker: HumanCheckMarker, site: string):
     page[marker]?.trim() !== "" &&
     detectHumanCheck(page, marker === "content") === undefined;
 
+/**
+ * `look`, answering `spent` (a failed look) once it ran `budget` times: the ladder's own reads stay bounded although
+ * no rate limit counts them ({@link HUMAN_CHECK_LOOK_BUDGET}). Make one per tool call.
+ */
+export const budgetedLook = <R extends LadderResult>(
+    look: LadderDependencies<R>["look"],
+    spent: R,
+    budget = HUMAN_CHECK_LOOK_BUDGET,
+): LadderDependencies<R>["look"] => {
+    let left = budget;
+
+    return async (kind) => {
+        if (left <= 0) {
+            return spent;
+        }
+
+        left -= 1;
+
+        return await look(kind);
+    };
+};
+
+/**
+ * The page the person handed back still shows a check on a site they were asked to clear one on (in this reply or a
+ * recent one): the agent hears so, and nobody is waited for or asked again. Nothing is recorded: a new row would
+ * restart {@link HUMAN_CHECK_HAND_BACK_WINDOW_MS} although no card was shown.
+ */
+const stillShowsAfterHandBack = <R extends LadderResult>(result: R, site: string): R => {
+    return { ...withNote(result, humanCheckMessages.stillShowsAfterHandBack(site)), humanCheck: { site, status: "already_asked" }, success: false };
+};
+
+/** Whether the person was asked to clear a check (not to sign in, say) on `site` in this reply or a recent one. */
+const askedToClearRecently = async <R extends LadderResult>(dependencies: LadderDependencies<R>, site: string): Promise<boolean> =>
+    (await dependencies.wasAsked(site, "recent")) === "detected";
+
 /** A look that threw (the action call failed) is a failed look, never an error out of the ladder after an ask is recorded. */
 const safeLook = async <R extends LadderResult>(dependencies: LadderDependencies<R>, kind: "extract" | "screenshot"): Promise<R | LadderResult> => {
     try {
@@ -236,6 +283,13 @@ export const humanCheckLadder = async <R extends LadderResult>(
 
     // The site the check was found on: what is asked about, whatever page a later look lands on.
     const site = humanCheckSite(result.url);
+
+    // A hand back that still shows a check on a site the person was asked to clear one on, also in an earlier reply:
+    // they are not waited for nor asked again. A site nobody was asked about recently, or only to sign in, goes up the
+    // ladder as usual.
+    if (marker !== undefined && result.handedBack === true && (await askedToClearRecently(dependencies, site))) {
+        return stillShowsAfterHandBack(result, site);
+    }
 
     // One ask per site per reply: a second block is not waited out nor asked about again. A report on a site asked
     // about for a check is still recorded as one, so its hand back is not read as cleared.
@@ -274,6 +328,11 @@ export const humanCheckLadder = async <R extends LadderResult>(
 
         if (showsClear(page, marker, site)) {
             return withNote(page, humanCheckMessages.clearedOnItsOwn(site));
+        }
+
+        // A person took control during the wait and handed back the check still showing, after an earlier reply's ask.
+        if (page.handedBack === true && (await askedToClearRecently(dependencies, site))) {
+            return stillShowsAfterHandBack(page, site);
         }
     }
 
@@ -337,7 +396,7 @@ const afterHandBack = async <R extends LadderResult>(result: R, dependencies: La
             return result.error === undefined ? own : { ...own, error: own.error === undefined ? result.error : `${result.error} ${own.error}` };
         }
 
-        return { ...withNote(result, humanCheckMessages.alreadyAsked(site)), humanCheck: { site, status: "already_asked" }, success: false };
+        return stillShowsAfterHandBack(result, site);
     }
 
     return withNote(result, humanCheckMessages.unknownAfterHandBack(site));

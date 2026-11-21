@@ -433,6 +433,28 @@ describe("two first browser actions at once", () => {
 
         expect(actions).toHaveLength(2);
     });
+    it("runs the human-check ladder's own reads without charging the user's browser limit", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValue(answered({ content: "Page", sessionId: "s-1", success: true, url: "https://example.com/before" }));
+
+        await expect(
+            harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(executeBrowserAction, { action: "extract", ladderLook: true, threadId, userId: OWNER, userTier: "free" }),
+            ),
+        ).resolves.toMatchObject({ success: true });
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("rateLimits").collect())).resolves.toEqual([]);
+
+        // Also once the user's own limit is spent.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 20, identifier: OWNER, key: "browser/action:free" }));
+        await expect(
+            harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(executeBrowserAction, { action: "screenshot", ladderLook: true, threadId, userId: OWNER, userTier: "free" }),
+            ),
+        ).resolves.toMatchObject({ success: true });
+        expect(renderer).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe("a browser action after the provider reaped the browser", () => {

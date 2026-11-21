@@ -15,7 +15,7 @@ import { internal } from "../../_generated/internal";
  */
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
-import { HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckLadder, waitUnlessStopped } from "../../browser/human-check";
+import { budgetedLook, HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckLadder, humanCheckMessages, waitUnlessStopped } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
 
@@ -85,12 +85,16 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
 
         const threadId = context.threadId as Id<"threads">;
         const { userId } = context;
-        const run = async (step: Omit<typeof input, "action"> & { action: Exclude<typeof input.action, "needs_person"> }): Promise<BrowserResult> =>
+        // `ladderLook`: one of the human-check ladder's own reads, set here only, never from the model's input.
+        const run = async (
+            step: Omit<typeof input, "action"> & { action: Exclude<typeof input.action, "needs_person">; ladderLook?: true },
+        ): Promise<BrowserResult> =>
             (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
                 action: step.action,
                 browserSettings: (context as { browserSettings?: unknown }).browserSettings,
                 direction: step.direction,
                 fullPage: step.fullPage,
+                ...(step.ladderLook === true && { ladderLook: true }),
                 selector: step.selector,
                 text: step.text,
                 threadId,
@@ -118,7 +122,11 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                                       site,
                                       threadId,
                                   }),
-                              look: async (kind) => await run({ action: kind }),
+                              // Not charged to the user's browser rate limit, so capped per tool call instead.
+                              look: budgetedLook(async (kind) => await run({ action: kind, ladderLook: true }), {
+                                  error: humanCheckMessages.lookBudgetSpent,
+                                  success: false,
+                              }),
                               // Between two actions, so no browser hold is kept and a person can take control; Stop ends it.
                               sleep: async (ms) => await waitUnlessStopped(ms, options.abortSignal),
                               wasAsked: async (site, scope) =>
