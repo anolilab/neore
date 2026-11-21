@@ -31,6 +31,7 @@ import type { ChangeEvent, FC, KeyboardEvent } from "react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
+import ComputerRuleFileImport from "@/features/projects/components/computer-rule-file-import";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { importRuleFiles, needsMode } from "../lib/rule-file-import";
@@ -487,18 +488,8 @@ const ProjectRuleFiles: FC<{
         setImportNote("");
     };
 
-    /** Adds the picked Markdown files as unsaved drafts, up to the project's limit; the person saves them like any edit. */
-    const importPicked = async (event: ChangeEvent<HTMLInputElement>) => {
-        const input = event.currentTarget;
-        const picked = [...(input.files ?? [])];
-
-        // Cleared, so picking the same file again imports it again.
-        input.value = "";
-
-        if (picked.length === 0) {
-            return;
-        }
-
+    /** Adds the Markdown files as unsaved drafts, up to the project's limit; the person saves them like any edit. */
+    const importPicked = async (picked: ReadonlyArray<File>) => {
         const generation = importGeneration.current;
         // Up to the project's limit, not the room left now: a draft removed while the files are read frees room the import takes.
         const read = await importRuleFiles(picked, MAX_RULE_FILES);
@@ -539,21 +530,26 @@ const ProjectRuleFiles: FC<{
         setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : [])].join(" "));
     };
 
-    /** Reads the picked files, one import at a time. */
-    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
-        if (importing) {
-            const input = event.currentTarget;
-
-            input.value = "";
-
+    /** Reads `picked` (uploaded, or read from the person's computer), one import at a time: one asked for meanwhile is dropped. */
+    const importFiles = (picked: ReadonlyArray<File>) => {
+        if (importing || picked.length === 0) {
             return;
         }
 
         setImporting(true);
-        importPicked(event)
+        importPicked(picked)
             .catch(() => setImportNote(t`The files could not be read.`))
             .then(() => setImporting(false))
             .catch(() => undefined);
+    };
+
+    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+        const input = event.currentTarget;
+        const picked = [...(input.files ?? [])];
+
+        // Cleared, so picking the same file again imports it again.
+        input.value = "";
+        importFiles(picked);
     };
 
     /** How a refusal reads, for `file` when it names one; the editor's own check and the backend's word it alike. */
@@ -857,6 +853,7 @@ const ProjectRuleFiles: FC<{
                             type="file"
                             {...{ directory: "", webkitdirectory: "" }}
                         />
+                        <ComputerRuleFileImport disabled={importing || files.length >= MAX_RULE_FILES} onImport={importFiles} />
                         {draft && (
                             <>
                                 <Button
