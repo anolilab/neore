@@ -478,6 +478,8 @@ const ProjectRuleFiles: FC<{
     const importGeneration = useRef(0);
     // Bumped by each import that adds drafts: a save it lands during keeps them, and does not say the list is saved.
     const importsApplied = useRef(0);
+    // Bumped by each import that leaves a note, drafts or not: a save it lands during keeps the note.
+    const importNotes = useRef(0);
 
     // Before any later event's handler can run, so an import never applies onto a list older than the one shown.
     useLayoutEffect(() => {
@@ -580,6 +582,7 @@ const ProjectRuleFiles: FC<{
         const shortenedNote = t`${plural(shortened, { one: "# name was", other: "# names were" })} shortened to ${titleLimit} characters.`;
         const renamedNote = t`${plural(renamed, { one: "# name opened with id:, which names a file by its id, so it now opens with id-", other: "# names opened with id:, which names a file by its id, so they now open with id-" })} instead.`;
 
+        importNotes.current += 1;
         setImportNote(
             [
                 ...addedNote,
@@ -612,8 +615,15 @@ const ProjectRuleFiles: FC<{
         read(isCurrent)
             // An import a Discard overtook adds nothing.
             .then((result) => (result && isCurrent() ? applyImport(result) : undefined))
-            // One a Discard overtook says nothing either.
-            .catch(() => (isCurrent() ? setImportNote(t`The files could not be read.`) : undefined))
+            .catch(() => {
+                // One a Discard overtook says nothing either.
+                if (!isCurrent()) {
+                    return;
+                }
+
+                importNotes.current += 1;
+                setImportNote(t`The files could not be read.`);
+            })
             .then(() => setImporting(false))
             .catch(() => undefined);
     };
@@ -798,6 +808,7 @@ const ProjectRuleFiles: FC<{
         const ruleFiles = sentFiles();
         const keep = keptLegacyId === undefined ? {} : { keepContext: true };
         const importsBefore = importsApplied.current;
+        const notesBefore = importNotes.current;
 
         try {
             const written = await saved.mutateAsync({ ...args, ...keep, revision: baseRevision, ruleFiles });
@@ -809,9 +820,13 @@ const ProjectRuleFiles: FC<{
             setBaseRevision(written.revision);
             setError(undefined);
 
-            // An import that landed while the save ran left unsaved drafts on top of the list just saved: its note stays.
+            // An import that landed while the save ran left unsaved drafts on top of the list just saved, or a note saying
+            // why it added none: that note stays.
             if (importsApplied.current === importsBefore) {
                 setStatus(t`Rule files saved.`);
+            }
+
+            if (importNotes.current === notesBefore) {
                 setImportNote("");
             }
 

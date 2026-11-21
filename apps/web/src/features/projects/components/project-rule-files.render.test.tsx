@@ -1,3 +1,4 @@
+import { MAX_RULE_FILE_LENGTH } from "@neore/backend/rule-file-limits";
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -87,6 +88,7 @@ vi.mock("@/features/auth/lib/utilities", () => {
 
 const NEEDS_A_PATTERN = /needs at least one pattern/u;
 const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
+const LEFT_OUT_AS_TOO_LARGE = /1 file was left out as too large/u;
 const COPY_OF_A = /^rules\/z\.md\s*\(same file as rules\/a\.md\)$/u;
 const LINKED_COPY = /^CLAUDE\.md\s*\(same file as AGENTS\.md\)$/u;
 const LINK_TO_Z = /^rules\/a\.md\s*\(same file as rules\/z\.md\)$/u;
@@ -191,6 +193,31 @@ const slowFile = (name: string, text: string): { file: File; finish: () => void 
 };
 
 describe("importing rule files", () => {
+    it("keeps the note of an import that added nothing when it lands during a save", async () => {
+        const user = userEvent.setup();
+        const saving: { finish: () => void } = { finish: () => {} };
+
+        backend.save.mockImplementation(
+            async ({ ruleFiles }: { ruleFiles: unknown[] }) =>
+                await new Promise((resolve) => {
+                    saving.finish = () => resolve({ files: ruleFiles, revision: "r2" });
+                }),
+        );
+        renderEditor();
+        await user.type(within(await screen.findByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Instructions" }), " Always.");
+
+        const slow = slowFile("huge.md", "x".repeat(MAX_RULE_FILE_LENGTH + 1));
+
+        await user.upload(screen.getByTestId("rule-file-import"), slow.file);
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+        slow.finish();
+        await screen.findByText(LEFT_OUT_AS_TOO_LARGE);
+        saving.finish();
+        await screen.findByText("Rule files saved.");
+
+        expect(screen.getByText(LEFT_OUT_AS_TOO_LARGE)).toBeTruthy();
+    });
+
     it("applies an import that finishes after a save onto the list just saved, at its revision", async () => {
         const user = userEvent.setup();
 
