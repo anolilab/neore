@@ -54,39 +54,49 @@ export const executeBrowserAction = internalAction
 
             const startTime = Date.now();
             // The session this action holds while it runs, and its hold's deadline; released if the action fails.
-            let held: { sessionId: Id<"browserSessions">; until: number } | undefined;
+            let held: { reaped?: boolean; sessionId: Id<"browserSessions">; until: number } | undefined;
             // A person's hand back this action is the first to hear of; the note reaches the agent even if the action fails.
             let returned: BrowserReturn | undefined;
-            // The ended lease this action looks at the page for: once a look came back, the next actions act again.
-            let inspecting: string | undefined;
             // The renderer call's deadline, and when it falls: a call that ran until then may still be acting in the renderer.
             let callSignal: AbortSignal | undefined;
             let callEndsBy: number | undefined;
 
             try {
-                // Check for existing CF session to enable multi-step workflows
+                // Check for existing CF session to enable multi-step workflows. The thread's first action opens the row
+                // before its renderer call, not after: it holds that row like any other, so a second action that finishes
+                // first cannot leave it free for a person to take while this one still opens its browser.
                 let sessionDocument = await ctx.runQuery(internal.browser.functions.getActiveSession, { threadId });
-                // What the row named when this action started: its result is written only if no other action moved it on.
-                let startedWithProviderSessionId = sessionDocument?.providerSessionId ?? null;
-                const cfSessionId = sessionDocument?.providerSessionId === NO_PROVIDER_SESSION ? undefined : sessionDocument?.providerSessionId;
 
-                // A browser still alive is in use from here on, not only once the action returns: a slow action must not
-                // read as idle. A reaped one is not held: its old page must not come back while the renderer replaces it.
-                // The same write refuses the action while a person drives the browser, and tells of a hand back once.
-
-                if (sessionDocument) {
-                    // Past the end of the renderer call, however late it starts: a person cannot take control mid-action.
-                    const until = rendererCallHold(Date.now());
-                    const use = await ctx.runMutation(internal.browser.functions.beginSessionUse, { sessionId: sessionDocument._id, until });
-
-                    if (use.controlled) {
-                        return { error: PERSON_HAS_CONTROL, success: false };
-                    }
-
-                    held = use.held ? { sessionId: sessionDocument._id, until } : undefined;
-                    returned = use.returned;
-                    inspecting = use.inspecting;
+                if (!sessionDocument) {
+                    await ctx.runMutation(internal.browser.functions.createSession, { connectUrl: BROWSER_RENDERER_CONNECT, threadId, userId });
+                    sessionDocument = await ctx.runQuery(internal.browser.functions.getActiveSession, { threadId });
                 }
+
+                if (!sessionDocument) {
+                    throw new Error("The browser session could not be opened. Try it again.");
+                }
+
+                // What the row named when this action started: its result is written only if no other action moved it on.
+                const startedWithProviderSessionId = sessionDocument.providerSessionId ?? null;
+                const cfSessionId = sessionDocument.providerSessionId === NO_PROVIDER_SESSION ? undefined : sessionDocument.providerSessionId;
+                const sessionId = sessionDocument._id;
+
+                // The row is in use from here on, not only once the action returns: no person takes control mid-action, and
+                // a slow action on a browser still alive does not read as idle (one read as reaped is held without being
+                // offered: its old page must not come back while the renderer replaces it). The same write refuses the
+                // action while a person drives the browser, and tells of a hand back once.
+                // Past the end of the renderer call, however late it starts.
+                const until = rendererCallHold(Date.now());
+                const use = await ctx.runMutation(internal.browser.functions.beginSessionUse, { sessionId, until });
+
+                if (use.controlled) {
+                    return { error: PERSON_HAS_CONTROL, success: false };
+                }
+
+                held = use.held ? { sessionId, until, ...(use.reaped === true && { reaped: true }) } : undefined;
+                returned = use.returned;
+                // The ended lease this action looks at the page for: once a look came back, the next actions act again.
+                const { inspecting } = use;
 
                 // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser.
                 const rlResult = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
@@ -153,28 +163,17 @@ export const executeBrowserAction = internalAction
                 // browser (it closed it after a blocked redirect), so there is nothing to reuse or watch.
                 const returnedSessionId = result.sessionId ?? NO_PROVIDER_SESSION;
 
-                if (!sessionDocument) {
-                    const newSessionId = await ctx.runMutation(internal.browser.functions.createSession, {
-                        connectUrl: BROWSER_RENDERER_CONNECT,
-                        providerSessionId: returnedSessionId,
-                        threadId,
-                        userId,
-                    });
-
-                    sessionDocument = { _id: newSessionId } as any;
-                    startedWithProviderSessionId = returnedSessionId;
-                }
-
                 // One write: a replaced browser's id, the page this action left it on, the activity stamp, this action's hold's end.
                 const logged = await ctx.runMutation(internal.browser.functions.logAction, {
                     action: looksFirst ? "screenshot" : action,
                     currentUrl: result.url,
                     durationMs,
                     errorMessage: result.error,
+                    heldReaped: held?.reaped,
                     heldUntil: held?.until,
                     ...(inspecting !== undefined && result.success === true && { inspected: inspecting }),
                     providerSessionId: returnedSessionId,
-                    sessionId: sessionDocument!._id,
+                    sessionId,
                     startedAt: startTime,
                     startedWithProviderSessionId,
                     success: result.success ?? false,

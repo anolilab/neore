@@ -64,6 +64,7 @@ interface SessionRow {
     inUseHolds?: number[];
     lastActivityAt: number;
     providerSessionId?: string;
+    reapedHolds?: number[];
     source?: string;
     status: string;
 }
@@ -230,15 +231,25 @@ describe("a browser action on a running browser", () => {
         await expect(row()).resolves.toMatchObject({ inUseHolds: [rendererCallHold(NOW)], lastActivityAt: NOW - 1000 });
     });
 
-    it("gives a first action, with no browser to hold yet, the whole renderer call", async () => {
-        const timeout = vi.spyOn(AbortSignal, "timeout");
+    it("opens and holds the row of a thread's first action before its renderer call, without offering a browser yet", async () => {
+        let during: SessionRow | undefined;
 
-        rendererStart.hook = () => vi.setSystemTime(NOW + 30_000);
-        renderer.mockResolvedValueOnce(answered({ sessionId: "s-new", success: true, url: "https://example.com/" }));
+        renderer.mockImplementationOnce(async () => {
+            during = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first())) as SessionRow;
+
+            return answered({ sessionId: "s-new", success: true, url: "https://example.com/" });
+        });
 
         await act();
 
-        expect(timeout).toHaveBeenLastCalledWith(FETCH_TIMEOUT_LONG_MS);
+        // A second action finishing first cannot leave the row free for a person while this one still opens its browser.
+        expect(during).toMatchObject({ reapedHolds: [rendererCallHold(NOW)], status: "active" });
+        expect(watchableSessionId(during, NOW)).toBeUndefined();
+        const after = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").collect())) as SessionRow[];
+
+        expect(after).toHaveLength(1);
+        expect(after[0]).toMatchObject({ currentUrl: "https://example.com/", providerSessionId: "s-new" });
+        expect(after[0]?.reapedHolds).toBeUndefined();
     });
 
     it("ends the hold when the renderer fails, without stamping the browser as used", async () => {
@@ -430,6 +441,67 @@ describe("a browser action after the provider reaped the browser", () => {
         await act();
 
         expect(seen.value).toBe("none");
+    });
+
+    it("still holds a browser it reads as reaped while it acts: another action that refreshes the row leaves no person a gap", async () => {
+        await addSession(NOW - BROWSER_IDLE_REAP_MS - 1000);
+        let during: SessionRow | undefined;
+
+        renderer.mockImplementationOnce(async () => {
+            // A second action on the same browser finished first and stamped the row alive again.
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(logAction, {
+                        action: "click",
+                        currentUrl: "https://example.com/other",
+                        providerSessionId: "s-1",
+                        sessionId,
+                        startedAt: NOW,
+                        startedWithProviderSessionId: "s-1",
+                        success: true,
+                    }),
+            );
+            during = await row();
+
+            return answered({ sessionId: "s-1", success: true, url: "https://example.com/after" });
+        });
+
+        await act("click");
+
+        // Alive again, and still held: a person is refused until this action ends.
+        expect(during).toMatchObject({ reapedHolds: [rendererCallHold(NOW)] });
+        expect(watchableSessionId(during, NOW)).toBe("s-1");
+        expect(during?.inUseHolds).toBeUndefined();
+        await expect(row()).resolves.not.toHaveProperty("reapedHolds");
+    });
+
+    it("ends the hold of a rate-limited first action, and leaves its row for the next action to open a browser in", async () => {
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 200, identifier: OWNER, key: "browser/action:premium" }));
+
+        await expect(act("click")).resolves.toMatchObject({ success: false });
+        expect(renderer).not.toHaveBeenCalled();
+        const [opened] = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").collect())) as SessionRow[];
+
+        expect(opened).toMatchObject({ status: "active" });
+        expect(opened?.reapedHolds).toBeUndefined();
+        expect(watchableSessionId(opened, NOW)).toBeUndefined();
+
+        vi.setSystemTime(NOW + 3_600_000);
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-new", success: true, url: "https://example.com/" }));
+        await expect(act()).resolves.toMatchObject({ sessionId: "s-new", success: true });
+        const after = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").collect())) as SessionRow[];
+
+        expect(after).toHaveLength(1);
+        expect(after[0]).toMatchObject({ providerSessionId: "s-new" });
+    });
+
+    it("ends the hold on a browser it read as reaped when the renderer fails", async () => {
+        await addSession(NOW - BROWSER_IDLE_REAP_MS - 1000);
+        renderer.mockRejectedValueOnce(new Error("renderer down"));
+
+        await act("click");
+
+        await expect(row()).resolves.not.toHaveProperty("reapedHolds");
     });
 
     it("does not hold a browser at the very edge of its reap: the provider may have reaped it already", async () => {

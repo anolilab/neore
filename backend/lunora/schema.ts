@@ -432,7 +432,9 @@ export const schema = defineSchema({
         connectUrl: v.optional(v.string()),
         /**
          * A person drives the browser (`browser/live-view.ts#takeControl`): the agent's actions are refused while
-         * `until` is ahead. Kept after it ends, until an agent action has looked at the page the person left (told that they drove).
+         * `until` is ahead. `by` is an opaque holder (`browser/live-view.ts#controlHolder`, a keyed hash of the session
+         * and the person), never a user id: a collaborator's id here would outlive their account. Kept after it ends,
+         * until an agent action has looked at the page the person left (told that they drove).
          * `ended`: how the person gave it back (`browser_closed`: the renderer closed or replaced the browser they drove);
          * absent once `until` passed is the idle timeout.
          */
@@ -461,6 +463,12 @@ export const schema = defineSchema({
         inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
+        /**
+         * The deadlines of the browser actions in flight that began while the row read the browser as reaped (or before it
+         * named one): they keep a person from taking control until they end, but keep no browser alive, so a reaped one
+         * is not offered while the renderer replaces it.
+         */
+        reapedHolds: v.optional(v.array(v.number())),
         source: v.optional(v.string()),
         startedAt: v.number(),
         status: v.string(),

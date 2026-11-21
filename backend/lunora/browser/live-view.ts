@@ -17,6 +17,7 @@ import { meetsThreadPermission, resolveThreadReadAccess } from "../agent/thread-
 import { BROWSER_LIVE_VIEW_API_TOKEN, CLOUDFLARE_ACCOUNT_ID } from "../env";
 import { authAction, authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
+import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
@@ -42,7 +43,8 @@ type ReaderBrowser =
           browserId: string;
           /** The caller may drive the browser: the owner, or a grantee with write access. */
           canControl: boolean;
-          control?: { by: string; until: number };
+          /** A person drives the browser until `until`; `byCaller`: the caller holds the lease. */
+          control?: { byCaller: boolean; until: number };
           currentUrl?: string;
           idleUntil: number;
           kind: "watchable";
@@ -60,6 +62,29 @@ const browserIdOf = async (sessionId: Id<"browserSessions">, providerSessionId: 
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${sessionId}:${providerSessionId}`));
 
     return [...new Uint8Array(digest).slice(0, 12)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+/**
+ * Who holds a lease, as `browserSessions.control.by` stores it: a keyed hash of the session and the person, never their
+ * id. The row is on the thread owner's shard, which a collaborator's account deletion never reaches, so it must not
+ * name them; the key is the backend's own signing secret (the one the unlock proofs use), so no one without it can
+ * tell whose lease it was. `undefined` on a deploy without that secret: no lease is taken there.
+ */
+export const controlHolder = async (sessionId: Id<"browserSessions">, userId: string): Promise<string | undefined> => {
+    const secret = process.env.STORAGE_SIGNING_SECRET ?? "";
+
+    return secret === "" ? undefined : await hmacSha256Hex(secret, `browser-control\n${sessionId}\n${userId}`);
+};
+
+/** The caller holds the lease on `session` (handed back or not, lapsed or not): its `by` is theirs. */
+const holdsLease = async (session: Pick<Doc<"browserSessions">, "_id" | "control">, userId: string): Promise<boolean> => {
+    if (session.control === undefined) {
+        return false;
+    }
+
+    const holder = await controlHolder(session._id, userId);
+
+    return holder !== undefined && timingSafeEqual(holder, session.control.by);
 };
 
 /**
@@ -102,7 +127,7 @@ const readerBrowser = async (
         browserId: await browserIdOf(session._id, providerSessionId),
         canControl: meetsThreadPermission(access.permission, "write"),
         ...(controlStateOf(session, now) === "person" &&
-            session.control !== undefined && { control: { by: session.control.by, until: session.control.until } }),
+            session.control !== undefined && { control: { byCaller: await holdsLease(session, userId), until: session.control.until } }),
         currentUrl: session.currentUrl,
         idleUntil: browserAliveUntil(session),
         kind: "watchable",
@@ -148,7 +173,7 @@ export const getThreadBrowser = authQuery
             ...(browser.accessUntil !== undefined && { accessUntil: browser.accessUntil }),
             browserId: browser.browserId,
             canControl: browser.canControl,
-            ...(browser.control !== undefined && { control: { byYou: browser.control.by === ctx.user.userId, until: browser.control.until } }),
+            ...(browser.control !== undefined && { control: { byYou: browser.control.byCaller, until: browser.control.until } }),
             currentUrl: browser.currentUrl,
             idleUntil: browser.idleUntil,
             now: ctx.now,
@@ -186,9 +211,9 @@ export const getReaderBrowser = internalQuery
 
         return {
             canControl: browser.canControl,
-            controlledByOther: browser.control !== undefined && browser.control.by !== userId,
+            controlledByOther: browser.control !== undefined && !browser.control.byCaller,
             inControl:
-                browser.control?.by === userId &&
+                browser.control?.byCaller === true &&
                 browser.session.control?.ended === undefined &&
                 (claim === undefined || browser.session.control?.claim === claim),
             kind: browser.kind,
@@ -315,7 +340,9 @@ export const claimControl = internalMutation
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(
         v.union(
-            v.object({ kind: v.union(v.literal("busy"), v.literal("denied"), v.literal("none"), v.literal("read_only"), v.literal("taken")) }),
+            v.object({
+                kind: v.union(v.literal("busy"), v.literal("denied"), v.literal("none"), v.literal("read_only"), v.literal("taken"), v.literal("unavailable")),
+            }),
             v.object({
                 claim: v.string(),
                 /** `fresh`: this claim started the lease (a renewal by its holder did not), so only it may drop it again. */
@@ -342,12 +369,19 @@ export const claimControl = internalMutation
             return { kind: "read_only" as const };
         }
 
-        if (browser.control !== undefined && browser.control.by !== userId) {
+        if (browser.control !== undefined && !browser.control.byCaller) {
             return { kind: "taken" as const };
         }
 
-        if ((browser.session.inUseHolds ?? []).some((until) => until > ctx.now)) {
+        // An agent action still runs, on the browser the row names or on one it reads as reaped (the renderer may reconnect to it).
+        if ([...(browser.session.inUseHolds ?? []), ...(browser.session.reapedHolds ?? [])].some((until) => until > ctx.now)) {
             return { kind: "busy" as const };
+        }
+
+        const by = await controlHolder(browser.session._id, userId);
+
+        if (by === undefined) {
+            return { kind: "unavailable" as const };
         }
 
         const claim = crypto.randomUUID();
@@ -359,7 +393,7 @@ export const claimControl = internalMutation
             await patchRow(ctx.db, "browserSessions", browser.session, {
                 ...activeNow(browser.session, ctx.now),
                 control: {
-                    by: userId,
+                    by,
                     claim,
                     ...(current.navigatingUntil !== undefined && { navigatingUntil: current.navigatingUntil }),
                     since: current.since,
@@ -381,7 +415,7 @@ export const claimControl = internalMutation
 
         await patchRow(ctx.db, "browserSessions", browser.session, {
             ...activeNow(browser.session, ctx.now),
-            control: { by: userId, claim, since: ctx.now, until },
+            control: { by, claim, since: ctx.now, until },
         });
 
         return { claim, fresh: true, kind: "ok" as const, providerSessionId: browser.providerSessionId, ...(returned !== undefined && { returned }) };
@@ -406,7 +440,7 @@ export const dropControlClaim = internalMutation
         const session = await activeThreadSession(ctx.db, threadId);
         const control = session?.control;
 
-        if (session === null || control?.by !== userId || control.claim !== claim || control.ended !== undefined) {
+        if (session === null || control?.claim !== claim || control.ended !== undefined || !(await holdsLease(session, userId))) {
             return;
         }
 
@@ -567,7 +601,7 @@ export const keepControl = authMutation
         if (
             browser.kind !== "watchable" ||
             !browser.canControl ||
-            browser.control?.by !== ctx.user.userId ||
+            browser.control?.byCaller !== true ||
             control?.claim !== claim ||
             control.ended !== undefined
         ) {
@@ -595,7 +629,7 @@ export const handBack = authMutation
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
         const session = await activeThreadSession(systemDb(ctx), threadId);
 
-        if (session?.control?.by === ctx.user.userId && session.control.claim === claim && controlStateOf(session, ctx.now) === "person") {
+        if (session?.control?.claim === claim && controlStateOf(session, ctx.now) === "person" && (await holdsLease(session, ctx.user.userId))) {
             // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
             const until = Math.max(ctx.now, session.control.navigatingUntil ?? 0);
 
@@ -735,7 +769,13 @@ export const beginControlNavigation = internalMutation
 
         const control = browser.kind === "watchable" ? browser.session.control : undefined;
 
-        if (browser.kind !== "watchable" || !browser.canControl || browser.control?.by !== userId || control?.claim !== claim || control.ended !== undefined) {
+        if (
+            browser.kind !== "watchable" ||
+            !browser.canControl ||
+            browser.control?.byCaller !== true ||
+            control?.claim !== claim ||
+            control.ended !== undefined
+        ) {
             return { kind: "refused" as const };
         }
 
@@ -781,7 +821,7 @@ export const endControlNavigation = internalMutation
         const session = await ctx.db.get("browserSessions", sessionId);
         const control = session?.control;
 
-        if (!session || control?.by !== userId || control.navigatingUntil !== navigatingUntil) {
+        if (!session || control?.navigatingUntil !== navigatingUntil || !(await holdsLease(session, userId))) {
             return;
         }
 

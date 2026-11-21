@@ -6,12 +6,13 @@ import { lunoraTest } from "@lunora/testing";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
-import { getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
+import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
 import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
@@ -22,6 +23,10 @@ const WRITER = "user-writer";
 const NOW = Date.UTC(2026, 10, 20, 12);
 /** The provider session ids the tests use: a browser name a client sees must hold neither. */
 const PROVIDER_SESSION_ID = /s-[12]/u;
+/** What a lease's holder looks like on the row: a SHA-256 HMAC in hex. */
+const HOLDER = /^[\da-f]{64}$/u;
+/** The backend's signing secret: the key of a lease's opaque holder. */
+const SIGNING_SECRET = "browser-control-test-secret";
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
 
 const { config, registry, sessionFrom } = vi.hoisted(() => {
@@ -156,6 +161,27 @@ const addSession = async (fields: Record<string, unknown> = {}): Promise<string>
 
 const answer = (status: number, body: unknown): Response => Response.json(body, { status });
 
+/**
+ * A lease as the tests read it: `by` holds an opaque holder, never a user id, so it is named back here by the person whose
+ * holder it is (`unknown` for any other value: a raw id on the row would read as that).
+ */
+const named = async (control: any): Promise<any> => {
+    if (control === undefined) {
+        return undefined;
+    }
+
+    const session = await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
+    const sessionId = (session as { _id: Id<"browserSessions"> })._id;
+
+    for (const userId of [OWNER, READER, STRANGER, WRITER]) {
+        if (control.by === (await controlHolder(sessionId, userId))) {
+            return { ...control, by: userId };
+        }
+    }
+
+    return { ...control, by: "unknown" };
+};
+
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "browser_functions", await import("./functions"));
@@ -165,6 +191,7 @@ beforeAll(async () => {
 beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
+    vi.stubEnv("STORAGE_SIGNING_SECRET", SIGNING_SECRET);
     harness = lunoraTest(schema as never);
     config.accountId = "account-1";
     config.token = "token-1";
@@ -189,6 +216,7 @@ afterEach(() => {
     fetchMock.mockReset();
     renderer.mockReset();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.useRealTimers();
 });
 
@@ -362,6 +390,17 @@ describe("an agent action", () => {
             async (ctx: any) => await ctx.runMutation(logAction, { startedAt: NOW, startedWithProviderSessionId: "s-1", success: true, ...args }),
         );
 
+    it("ends a hold in the list it was taken in, also beside another action's hold with the same deadline", async () => {
+        const sessionId = await addSession({ inUseHolds: [NOW + 20_000], reapedHolds: [NOW + 20_000] });
+
+        await log({ action: "click", heldReaped: true, heldUntil: NOW + 20_000, sessionId });
+        await expect(sessionRow(sessionId)).resolves.toMatchObject({ inUseHolds: [NOW + 20_000] });
+        await expect(sessionRow(sessionId)).resolves.not.toHaveProperty("reapedHolds");
+
+        await log({ action: "click", heldUntil: NOW + 20_000, sessionId });
+        await expect(sessionRow(sessionId)).resolves.not.toHaveProperty("inUseHolds");
+    });
+
     it("keeps the browser watchable past the idle window it started in, and records the page it left it on", async () => {
         const sessionId = await addSession({ lastActivityAt: NOW - BROWSER_IDLE_REAP_MS + 1000 });
 
@@ -486,7 +525,8 @@ describe("a browser that ended", () => {
 
 describe("taking control of the browser", () => {
     const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
-    const control = async (): Promise<any> => ((await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first())) as any).control;
+    const control = async (): Promise<any> =>
+        await named(((await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first())) as any).control);
 
     it("gives the owner an interactive view and refuses the agent's turn to anyone else meanwhile", async () => {
         await addSession();
@@ -735,8 +775,43 @@ describe("taking control of the browser", () => {
         await expect(control()).resolves.toBeUndefined();
     });
 
+    it("refuses a claim while an agent action runs on a browser the row reads as reaped: the renderer may reconnect to it", async () => {
+        await addSession({ reapedHolds: [NOW + 10_000] });
+
+        await expect(take(WRITER)).resolves.toEqual({ status: "busy" });
+        await expect(control()).resolves.toBeUndefined();
+    });
+
+    it("never stores the id of the person in control on the owner's row: only an opaque holder, also once the lease ended", async () => {
+        await addSession();
+
+        await expect(take(WRITER)).resolves.toMatchObject({ status: "ok" });
+        await giveBack(WRITER, "handed_back");
+
+        const stored = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first())) as any;
+
+        expect(JSON.stringify(stored)).not.toContain(WRITER);
+        expect(stored.control.by).toMatch(HOLDER);
+        await expect(control()).resolves.toMatchObject({ by: WRITER, ended: "handed_back" });
+    });
+
+    it("takes no lease on a deploy without the backend's signing secret", async () => {
+        vi.stubEnv("STORAGE_SIGNING_SECRET", "");
+        await addSession();
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toBeUndefined();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("keeps the agent's note of an earlier hand back when a new claim's mint fails", async () => {
-        await addSession({ control: { by: WRITER, claim: "c-0", ended: "handed_back", since: NOW - 5000, until: NOW - 1 } });
+        const sessionId = await addSession();
+        const by = await controlHolder(sessionId as never, WRITER);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.patch("browserSessions", sessionId, { control: { by, claim: "c-0", ended: "handed_back", since: NOW - 5000, until: NOW - 1 } }),
+        );
         fetchMock.mockResolvedValue(answer(500, {}));
 
         await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
@@ -803,7 +878,7 @@ describe("opening a page while in control", () => {
         // Loaded: the lease ends now, and the agent's next action hears of the hand back.
         const loaded = await session();
 
-        expect(loaded.control).toMatchObject({ by: OWNER, ended: "handed_back", since: NOW, until: NOW });
+        await expect(named(loaded.control)).resolves.toMatchObject({ by: OWNER, ended: "handed_back", since: NOW, until: NOW });
         expect(loaded.control).not.toHaveProperty("navigatingUntil");
     });
 
