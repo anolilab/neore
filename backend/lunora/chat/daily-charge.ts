@@ -26,15 +26,6 @@ export const DAILY_CHARGE_SCOPE = "daily-charge";
 const DAILY_CHARGE_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Charge `count` units (default one) of `kind` to `userId`'s daily quota, all or nothing. `false` when they
- * do not all fit, the tier may not generate `kind` at all, or the user is gone — the caller stops there.
- * Platform admins are exempt, as on the HTTP routes.
- *
- * With a `requestId` the units are taken once per request: a retry of the same request returns `true`
- * without a second charge. The claim and the units are one transaction, and a refused charge releases its
- * claim, so a retry after a refusal is charged normally.
- */
-/**
  * How a user's `kind` of work is metered: exempt (an admin, as on the HTTP routes), limited by a daily `key`, or refused outright
  * (no such user, or the tier may not generate `kind`). Shared by the charge and by the read-only check of what is left.
  */
@@ -97,6 +88,15 @@ export const dailyUnitAvailable = internalMutation
         return remaining >= 1;
     });
 
+/**
+ * Charge `count` units (default one) of `kind` to `userId`'s daily quota, all or nothing. `false` when they
+ * do not all fit, the tier may not generate `kind` at all, or the user is gone — the caller stops there.
+ * Platform admins are exempt, as on the HTTP routes.
+ *
+ * With a `requestId` the units are taken once per request: a retry of the same request returns `true`
+ * without a second charge. The claim and the units are one transaction, and a refused charge releases its
+ * claim, so a retry after a refusal is charged normally.
+ */
 export const chargeDailyUnit = internalMutation
     .input({
         count: v.optional(v.number()),

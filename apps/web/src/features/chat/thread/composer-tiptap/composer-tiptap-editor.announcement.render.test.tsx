@@ -178,6 +178,30 @@ describe("the suggested next prompt announcement", () => {
         expect(announcedText()).toBe("Suggested next prompt: Same. Press Tab to insert.");
     });
 
+    it("a dismissed prompt stays dismissed while the composer holds attachments, and after they go", () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const element = (held: boolean) => (
+            <ComposerTiptapEditor
+                nextPromptHeld={held}
+                nextPromptScope="thread-1"
+                nextPromptSuggestion="Continue the thread"
+                onChange={() => {}}
+                onSubmit={() => {}}
+                ref={ref}
+                value=""
+            />
+        );
+        const view = render(element(false));
+
+        act(() => {
+            ref.current!.getEditor()!.commands.clearGhost();
+        });
+        view.rerender(element(true));
+        view.rerender(element(false));
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)).toBeNull();
+    });
+
     it("a prompt only hidden by a pause, never dismissed, comes back when the composer is enabled again", () => {
         const ref = createRef<ComposerTiptapEditorRef>();
         const element = (disabled: boolean) => (

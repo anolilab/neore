@@ -93,6 +93,12 @@ export interface ComposerTiptapEditorProps {
     /** Max height in rows (approximate) */
     maxRows?: number;
 
+    /**
+     * The suggestion is held back while the composer holds attachments: it is hidden now, and its record is kept, so a prompt the
+     * person dismissed stays dismissed when the attachments go.
+     */
+    nextPromptHeld?: boolean;
+
     /** The chat the suggestion belongs to: the same text in another chat is placed again. */
     nextPromptScope?: string | null;
 
@@ -205,6 +211,7 @@ const ComposerTiptapEditor = ({
     onSubmit,
     placeholder: placeholderProp,
     nextPromptScope = null,
+    nextPromptHeld = false,
     nextPromptSuggestion = null,
     ref,
     requestCompletion,
@@ -672,7 +679,7 @@ const ComposerTiptapEditor = ({
         }
 
         // A disabled composer holds no prompt, because Tab would otherwise insert it into a draft that cannot be edited.
-        if (!nextPromptSuggestion || disabled || readComposerText(editor) !== "") {
+        if (!nextPromptSuggestion || disabled || nextPromptHeld || readComposerText(editor) !== "") {
             editor.commands.setSuggestedPrompt(null);
             // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
             setGhostAnnouncement("");
@@ -738,7 +745,7 @@ const ComposerTiptapEditor = ({
             clearTimeout(clearAnnouncement);
             clearTimeout(restoreAnnouncement);
         };
-    }, [disabled, editor, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
+    }, [disabled, editor, nextPromptHeld, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
         if (!editor || !hasCompletionSource) {
