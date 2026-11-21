@@ -19,7 +19,7 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-vi.mock("@/features/chat/core/context/chat-context", () => {
+vi.mock("@/features/chat/core/context/chat-context-hooks", () => {
     return {
         useChatMessages: () => {
             return { messages: loaded.messages };
@@ -37,6 +37,7 @@ const reply = {
         { image: "https://files.example/owl.png", type: "image" },
         { filename: "notes.pdf", mediaType: "application/pdf", type: "file", url: "https://files.example/notes.pdf" },
         { mediaType: "image/png", nsfwStatus: "blocked", type: "file", url: "https://files.example/x.png" },
+        { data: "https://files.example/stored.png", filename: "stored.png", mediaType: "image/png", type: "file" },
     ],
 };
 
@@ -44,6 +45,10 @@ describe(findPinnedImage, () => {
     it("finds a file image and an image part by message and part index", () => {
         expect(findPinnedImage([reply], "m1", 1)).toEqual({ filename: "fox.png", url: "https://files.example/fox.png" });
         expect(findPinnedImage([reply], "m1", 2)).toEqual({ filename: undefined, url: "https://files.example/owl.png" });
+    });
+
+    it("finds a stored file image whose link is in `data`", () => {
+        expect(findPinnedImage([reply], "m1", 5)).toEqual({ filename: "stored.png", url: "https://files.example/stored.png" });
     });
 
     it("finds nothing for text, a non-image file, a blocked image, a missing part or an unloaded message", () => {

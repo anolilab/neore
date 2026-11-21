@@ -16,7 +16,7 @@ import { PinIcon } from "lucide-react";
 import type { FC } from "react";
 import { memo } from "react";
 
-import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context";
+import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
 import { isValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { trackEvent } from "@/lib/analytics";

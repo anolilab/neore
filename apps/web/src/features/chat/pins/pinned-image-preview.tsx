@@ -9,9 +9,10 @@ import { useLingui } from "@lingui/react/macro";
 import { ImageIcon } from "lucide-react";
 import type { FC } from "react";
 
-import { useChatMessages } from "@/features/chat/core/context/chat-context";
+import { useChatMessages } from "@/features/chat/core/context/chat-context-hooks";
 
 interface PartLike {
+    data?: string;
     filename?: string;
     image?: unknown;
     mediaType?: string;
@@ -36,8 +37,11 @@ export const findPinnedImage = (
         return { filename: part.filename, url: part.image };
     }
 
-    if (part.type === "file" && part.mediaType?.startsWith("image/") === true && part.url) {
-        return { filename: part.filename, url: part.url };
+    // As chat-ui's `FilePartView` reads it: a stored file's signed link can be in `data` rather than `url`.
+    const fileUrl = part.url || part.data;
+
+    if (part.type === "file" && part.mediaType?.startsWith("image/") === true && fileUrl) {
+        return { filename: part.filename, url: fileUrl };
     }
 
     return null;

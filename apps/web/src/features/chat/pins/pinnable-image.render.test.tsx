@@ -52,7 +52,7 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-vi.mock("@/features/chat/core/context/chat-context", () => {
+vi.mock("@/features/chat/core/context/chat-context-hooks", () => {
     return {
         useChatThreadIdentity: () => {
             return { threadId: "k17abc" };
