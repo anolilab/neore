@@ -919,6 +919,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         // A page an earlier load left loading says so again only if this load answers the same.
         setStillLoading(0);
         setNavigatingSince(Date.now());
+        // The load holds the lease on the server: a status read still out cannot speak for it, and the lease's end is
+        // decided again once the load answers (or is dropped).
+        dropCheck();
         navigations.current += 1;
         const navigation = navigations.current;
 
@@ -976,7 +979,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                             noticeTurn.current += 1;
                             setNotice(undefined);
                             setAddressError(undefined);
-                            setAddress(currentUrl ?? "");
+                            setAddress(openedUrl ?? currentUrl ?? "");
                             ask(false, "control");
                         }}
                         size="sm"

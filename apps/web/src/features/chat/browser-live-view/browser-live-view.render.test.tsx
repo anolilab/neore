@@ -1466,7 +1466,10 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack).not.toHaveBeenCalled();
         });
 
-        it("lets a page load that answers after a status read ran out of time decide", async () => {
+        it.each([
+            ["runs out of time", undefined],
+            ["fails", new Error("offline")],
+        ])("lets a page load decide when a status read still out as it starts %s while it loads", async (_, failure) => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
             const queryClient = mountCard();
@@ -1495,10 +1498,15 @@ describe("BrowserLiveView", () => {
             );
             await typeAddress();
             expect(backend.keep).toHaveBeenCalledTimes(1);
-            // The read runs out of time while the page loads; the load then answers.
+            // The read runs out of time (or fails) while the page loads; the load then answers.
             await act(async () => {
+                if (failure !== undefined) {
+                    backend.heldReads?.[0]?.(failure);
+                }
+
                 await vi.advanceTimersByTimeAsync(20_000);
             });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
             await act(async () => {
                 loads[0]?.({ status: "ok" });
             });
@@ -1615,6 +1623,7 @@ describe("BrowserLiveView", () => {
                 ).toBeNull();
                 expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
                 expect(backend.open).toHaveBeenCalledTimes(1);
+                expect(backend.handBack).toHaveBeenCalledTimes(1);
             },
         );
 
@@ -1864,7 +1873,7 @@ describe("BrowserLiveView", () => {
             expect(screen.queryByText("The page you opened is still loading.")).toBeNull();
         });
 
-        it("shows the controlled browser's page: the status's at first, then the one a page load answered", async () => {
+        it("shows the controlled browser's page: the status's at first, then the one a page load answered, also on taking control again", async () => {
             controllable();
             backend.browser = { ...backend.browser!, currentUrl: "https://example.com/login" };
             backend.navigate.mockResolvedValue({ status: "ok", url: "https://example.com/welcome" });
@@ -1884,6 +1893,12 @@ describe("BrowserLiveView", () => {
             expect(backend.keep.mock.calls.at(-1)?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
             expect(screen.getByRole("region", { name: "Browser" }).textContent).toContain("https://example.com/welcome");
             expect(screen.getByRole("region", { name: "Browser" }).textContent).not.toContain("https://example.com/login");
+
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+            expect(await screen.findByTitle(READ_ONLY_VIEW)).toBeTruthy();
+            await takeControl(queryClient);
+
+            expect(screen.getByRole("textbox", { name: "Page address" })).toHaveProperty("value", "https://example.com/welcome");
         });
     });
 });
