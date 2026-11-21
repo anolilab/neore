@@ -27,7 +27,13 @@ import httpApp, { getAllowedOrigins } from "../lunora/http.js";
 import type { ApiKeyAuthApi } from "../lunora/public-api/identity.js";
 import { isPublicApiPath, resolveApiKeyIdentity } from "../lunora/public-api/identity.js";
 import { requestBearer } from "../lunora/lib/request-bearer.js";
-import { handleWsTicketRequest, purgeExpiredWsTickets, resolveWsTicketIdentity } from "../lunora/lib/ws-ticket.js";
+import {
+    handleWsTicketRequest,
+    purgeExpiredWsTickets,
+    resolveWsTicketIdentity,
+    WsTicketUnavailableError,
+    wsTicketUnavailableResponse,
+} from "../lunora/lib/ws-ticket.js";
 import { runInShard } from "../lunora/lib/shard-context.js";
 import { shardScopedSchedulerNamespace } from "../lunora/lib/shard-scheduler.js";
 import { withoutStage } from "./queue-stage.js";
@@ -287,7 +293,9 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
     // The live-query socket's upgrade (and its re-authentication) carries a
     // single-use ticket instead of a bearer (`lib/ws-ticket.ts`): a browser cannot set
     // headers on a `WebSocket`, and the URL is logged. A refused ticket falls
-    // through to the session on the upgrade only (`resolveWsTicketIdentity`).
+    // through to the session on the upgrade only (`resolveWsTicketIdentity`). One
+    // whose session cannot be read throws `WsTicketUnavailableError`: a 503, never an
+    // anonymous upgrade or a signed-out re-authentication.
     const identity = await resolveWsTicketIdentity(request, env.DB, async (sessionRequest) => await resolveSessionIdentity(env, sessionRequest));
 
     return identity ? { ...identity } : null;
@@ -559,14 +567,27 @@ export { SchedulerDO } from "@lunora/scheduler";
  * (`./shard-routing.ts`). The identity resolved for that is handed to
  * `resolveIdentity` through {@link routedIdentities}, so it is not resolved
  * twice — which a single-use socket ticket could not survive anyway. A caller
- * with no identity stays on `__root__`.
+ * with no identity stays on `__root__`. A live-query ticket whose session cannot
+ * be read answers a 503 here instead of a request, and the client reconnects.
  */
-const routeToCallerShard = async (env: Env, request: Request): Promise<Request> => {
+const routeToCallerShard = async (env: Env, request: Request): Promise<Request | Response> => {
     if (!isShardRoutedRequest(request)) {
         return request;
     }
 
-    const identity = await resolveCallerIdentity(env, request);
+    let identity: CallerIdentity;
+
+    try {
+        identity = await resolveCallerIdentity(env, request);
+    } catch (error) {
+        // Outside `app.fetch`, so the runtime's error mapping never sees it: answered here, and the client reconnects.
+        if (error instanceof WsTicketUnavailableError) {
+            return wsTicketUnavailableResponse();
+        }
+
+        throw error;
+    }
+
     const routed = await withCallerShard(request, identity?.userId);
 
     routedIdentities.set(routed, identity);
@@ -733,7 +754,9 @@ export default {
         }
 
         if (!isTimingEnabled(env)) {
-            return withCors(await app.fetch(await routeToCallerShard(env, request), env, context), request);
+            const routed = await routeToCallerShard(env, request);
+
+            return withCors(routed instanceof Response ? routed : await app.fetch(routed, env, context), request);
         }
 
         installFetchTiming();
@@ -745,7 +768,7 @@ export default {
             const routeMs = Date.now() - entered;
 
             try {
-                return withCors(await app.fetch(routed, env, context), request);
+                return withCors(routed instanceof Response ? routed : await app.fetch(routed, env, context), request);
             } finally {
                 logTiming("worker", { method: request.method, ms: Date.now() - entered, path, routeMs });
             }

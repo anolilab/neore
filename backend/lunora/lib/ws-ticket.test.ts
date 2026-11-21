@@ -12,6 +12,7 @@ import {
     resolveWsTicketIdentity,
     WS_TICKET_PATH,
     WS_TICKET_TTL_MS,
+    WsTicketUnavailableError,
 } from "./ws-ticket";
 
 /**
@@ -144,12 +145,49 @@ describe("ws tickets", () => {
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
     });
 
-    it("refuses, rather than throws, when the session table cannot be read", async () => {
-        const ticket = await issueWsTicket(database, { sessionId: "s1", userId: "u1" });
+    it("throws a retryable error, rather than refusing, when the session table cannot be read", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        const named = await issueWsTicket(database, { sessionId: "s1", userId: "u1" });
+        const unnamed = await issueWsTicket(database, { userId: "u1" });
 
         database.sqlite.exec(`DROP TABLE "session"`);
 
-        await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
+        await expect(redeemWsTicket(database, named)).rejects.toBeInstanceOf(WsTicketUnavailableError);
+        await expect(redeemWsTicket(database, unnamed)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", status: 503 });
+        expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses a ticket whose web session is gone even when its grant's read fails", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "grant", sessionId: "gone", userId: "u1" });
+        const failingGrant = {
+            prepare: (sql: string) => {
+                const prepared = database.prepare(sql);
+
+                return {
+                    ...prepared,
+                    bind: (...values: unknown[]) => {
+                        if (values[0] === "grant") {
+                            throw new Error("D1 unavailable");
+                        }
+
+                        return prepared.bind(...values);
+                    },
+                };
+            },
+        };
+
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        await expect(redeemWsTicket(failingGrant, ticket)).resolves.toBeNull();
     });
 
     it("refuses a ticket it never minted", async () => {
@@ -350,6 +388,25 @@ describe(resolveWsTicketIdentity, () => {
         for (const ticket of ["forged", spent, expired, revoked]) {
             await expect(resolveWsTicketIdentity(reauth(ticket), database, cookie)).resolves.toBeNull();
         }
+    });
+
+    it("neither falls through nor ends the authentication when the ticket's session cannot be read", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        const database = createDatabase();
+        const onUpgrade = await issueWsTicket(database, { grantSessionId: "s1", userId: "u1" });
+        const onReauth = await issueWsTicket(database, { grantSessionId: "s1", userId: "u1" });
+        const fallback = vi.fn(cookie);
+
+        database.sqlite.exec(`DROP TABLE "session"`);
+
+        await expect(resolveWsTicketIdentity(upgrade(onUpgrade), database, fallback)).rejects.toBeInstanceOf(WsTicketUnavailableError);
+        await expect(resolveWsTicketIdentity(reauth(onReauth), database, fallback)).rejects.toBeInstanceOf(WsTicketUnavailableError);
+        expect(fallback).not.toHaveBeenCalled();
     });
 
     it("leaves a request with no ticket to the session", async () => {

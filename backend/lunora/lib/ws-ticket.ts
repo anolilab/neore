@@ -1,4 +1,5 @@
 import type { D1DatabaseLike } from "@lunora/d1";
+import { LunoraError } from "lunorash/server";
 
 import { isWsReauth, requestWsTicket } from "./request-bearer";
 
@@ -129,19 +130,45 @@ export const issueWsTicket = async (database: TicketDatabase, identity: WsTicket
     return ticket;
 };
 
-/** Whether the session `id` of `userId` still exists; `"unknown"` when the read failed. */
-const lookUpSession = async (database: TicketDatabase, id: string, userId: string): Promise<boolean | "unknown"> => {
+/** A session read that could not answer: neither live nor gone. */
+type SessionLiveness = boolean | "unknown";
+
+/**
+ * A redeem whose session check could not be read. Thrown, never answered as
+ * "signed out": the runtime turns it into a 503 on `/_lunora/ws/reauth`, and
+ * `src/server.ts` does the same on the upgrade, so the socket keeps no
+ * identity it was not confirmed to have and the client reconnects with a
+ * fresh ticket. The ticket itself is already spent, which costs nothing: the
+ * client mints a new one for every connect and every re-authentication.
+ */
+export class WsTicketUnavailableError extends LunoraError {
+    public constructor(cause?: unknown) {
+        super("SERVICE_UNAVAILABLE", "The live-query session could not be checked; try again", { cause });
+    }
+}
+
+/** The 503 for a session read that failed; the client retries it. */
+export const wsTicketUnavailableResponse = (): Response =>
+    Response.json({ error: { code: "SERVICE_UNAVAILABLE", message: "Try again shortly" } }, { headers: { "cache-control": "no-store" }, status: 503 });
+
+const readSession = async (database: TicketDatabase, sql: string, values: string[]): Promise<SessionLiveness> => {
     try {
-        const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`).bind(id, userId).first();
+        const row = await database
+            .prepare(sql)
+            .bind(...values)
+            .first();
 
         return row !== null;
-    } catch {
+    } catch (error) {
+        console.warn("ws-ticket: the session table could not be read", error);
+
         return "unknown";
     }
 };
 
-/** Whether the session `id` of `userId` still exists. A failed read counts as gone. */
-const sessionExists = async (database: TicketDatabase, id: string, userId: string): Promise<boolean> => (await lookUpSession(database, id, userId)) === true;
+/** Whether the session `id` of `userId` still exists; `"unknown"` when the read failed. */
+const lookUpSession = async (database: TicketDatabase, id: string, userId: string): Promise<SessionLiveness> =>
+    await readSession(database, `SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`, [id, userId]);
 
 /**
  * Whether every sign-in a ticket was minted under still exists: its web session
@@ -152,32 +179,31 @@ const sessionExists = async (database: TicketDatabase, id: string, userId: strin
  * the same D1 database. Expiry is not re-checked — the caller was verified at
  * mint, 30s ago at most; what this catches is a session DELETED since, by
  * sign-out, a grant revoke or account deletion
- * (`gdpr_steps_deletion_steps.revokeUserSessions`). A failed read refuses the
- * ticket: the upgrade then falls through to the cookie, like a spent one.
+ * (`gdpr_steps_deletion_steps.revokeUserSessions`). A gone session wins over a
+ * failed read; with none gone, a failed read is `"unknown"`.
  */
-const hasLiveSession = async (database: TicketDatabase, identity: WsTicketIdentity): Promise<boolean> => {
+const hasLiveSession = async (database: TicketDatabase, identity: WsTicketIdentity): Promise<SessionLiveness> => {
     const named = [identity.sessionId, identity.grantSessionId].filter((id): id is string => id !== undefined);
 
-    if (named.length > 0) {
-        const live = await Promise.all(named.map(async (id) => await sessionExists(database, id, identity.userId)));
-
-        return live.every(Boolean);
+    if (named.length === 0) {
+        return await readSession(database, `SELECT 1 AS "live" FROM "session" WHERE "userId" = ? LIMIT 1`, [identity.userId]);
     }
 
-    try {
-        const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "userId" = ? LIMIT 1`).bind(identity.userId).first();
+    const live = await Promise.all(named.map(async (id) => await lookUpSession(database, id, identity.userId)));
 
-        return row !== null;
-    } catch {
+    if (live.includes(false)) {
         return false;
     }
+
+    return live.includes("unknown") ? "unknown" : true;
 };
 
 /**
  * Exchanges a ticket for the identity it was minted for — once. The row is
  * deleted by the same statement that reads it, so two upgrades racing on one
  * ticket cannot both win. An expired ticket is consumed and refused, and so is
- * one whose session has been deleted since it was minted.
+ * one whose session has been deleted since it was minted. When that session
+ * cannot be read, it throws {@link WsTicketUnavailableError}.
  */
 export const redeemWsTicket = async (database: TicketDatabase, ticket: string, now = Date.now()): Promise<WsTicketIdentity | null> => {
     await ensureTable(database);
@@ -197,7 +223,13 @@ export const redeemWsTicket = async (database: TicketDatabase, ticket: string, n
         ...(row.grantSessionId !== null && { grantSessionId: row.grantSessionId }),
     };
 
-    return (await hasLiveSession(database, identity)) ? identity : null;
+    const live = await hasLiveSession(database, identity);
+
+    if (live === "unknown") {
+        throw new WsTicketUnavailableError();
+    }
+
+    return live ? identity : null;
 };
 
 /**
@@ -210,6 +242,9 @@ export const redeemWsTicket = async (database: TicketDatabase, ticket: string, n
  * that request presents, so a refused one ends the socket's authentication: the
  * runtime answers 401, and the socket lapses at its revalidation deadline
  * instead of being kept signed in by whatever else rode the request.
+ *
+ * A ticket whose session could not be read throws {@link WsTicketUnavailableError}
+ * on both, instead of falling through or ending the authentication.
  */
 export const resolveWsTicketIdentity = async <Identity>(
     request: Request,
@@ -268,9 +303,7 @@ export const handleWsTicketRequest = async (
 
         // A failed read is not a sign-out: a 401 would open the socket anonymously, a 503 makes the client retry.
         if (grant === "unknown") {
-            console.warn("ws-ticket: the grant's session could not be read; answering 503");
-
-            return Response.json({ error: { code: "UNAVAILABLE", message: "Try again shortly" } }, { headers, status: 503 });
+            return wsTicketUnavailableResponse();
         }
 
         if (!grant) {
