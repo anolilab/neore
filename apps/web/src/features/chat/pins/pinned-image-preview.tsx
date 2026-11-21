@@ -22,41 +22,65 @@ interface PartLike {
     url?: string;
 }
 
+/** The source an image part is shown from: `image` on an image part, `url` or `data` on a file part (as `FilePartView`). */
+const sourceOf = (part: PartLike): string | undefined => {
+    if (part.type === "image") {
+        return typeof part.image === "string" && part.image.length > 0 ? part.image : undefined;
+    }
+
+    return part.url || part.data || undefined;
+};
+
 /**
- * The `imageIndex`-th image of message `messageId` (counted as chat-ui renders them, `imageOrdinals`), or `null` when it
- * is not loaded, there is no such image, or it is not shown.
+ * An image's storage path: the path of its signed link, without host or signature, which stays the same when the link is
+ * signed again. `undefined` for an image with no link to our storage (a `data:` URL).
+ */
+export const imageKeyOf = (source: string): string | undefined => {
+    try {
+        const url = new URL(source);
+
+        return url.protocol === "http:" || url.protocol === "https:" ? url.pathname : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+/**
+ * The pinned image of message `messageId`, or `null` when it is not loaded, gone, or not shown. A pin with a storage
+ * path (`imageKey`) finds its image by that path wherever it now sits, so an earlier image that became unavailable (and
+ * a text part) cannot make it show the next one; a pin without one counts images as chat-ui renders them (`imageIndex`).
  */
 export const findPinnedImage = (
     messages: ReadonlyArray<{ id: string; parts: ReadonlyArray<unknown> }>,
     messageId: string,
     imageIndex: number,
+    imageKey?: string,
 ): { filename?: string; url: string } | null => {
     const parts = messages.find((message) => message.id === messageId)?.parts ?? [];
-    const partIndex = [...imageOrdinals(parts)].find(([, ordinal]) => ordinal === imageIndex)?.[0];
-    const part = partIndex === undefined ? undefined : (parts[partIndex] as PartLike | undefined);
+    const images = [...imageOrdinals(parts)].map(([partIndex, ordinal]) => {
+        return { ordinal, part: parts[partIndex] as PartLike };
+    });
+    const found =
+        imageKey === undefined
+            ? images.find((image) => image.ordinal === imageIndex)
+            : images.find((image) => {
+                  const source = sourceOf(image.part);
 
-    if (!part || part.nsfwStatus === "blocked" || part.nsfwStatus === "checking") {
+                  return source !== undefined && imageKeyOf(source) === imageKey;
+              });
+    const source = found ? sourceOf(found.part) : undefined;
+
+    if (!found || !source || found.part.nsfwStatus === "blocked" || found.part.nsfwStatus === "checking") {
         return null;
     }
 
-    if (part.type === "image" && typeof part.image === "string" && part.image.length > 0) {
-        return { filename: part.filename, url: part.image };
-    }
-
-    // As chat-ui's `FilePartView` reads it: a stored file's signed link can be in `data` rather than `url`.
-    const fileUrl = part.url || part.data;
-
-    if (part.type === "file" && fileUrl) {
-        return { filename: part.filename, url: fileUrl };
-    }
-
-    return null;
+    return { filename: found.part.filename, url: source };
 };
 
-const PinnedImagePreview: FC<{ alt?: string; imageIndex: number; messageId: string }> = ({ alt, messageId, imageIndex }) => {
+const PinnedImagePreview: FC<{ alt?: string; imageIndex: number; imageKey?: string; messageId: string }> = ({ alt, imageIndex, imageKey, messageId }) => {
     const { t } = useLingui();
     const { messages } = useChatMessages();
-    const image = findPinnedImage(messages, messageId, imageIndex);
+    const image = findPinnedImage(messages, messageId, imageIndex, imageKey);
 
     if (!image) {
         return (

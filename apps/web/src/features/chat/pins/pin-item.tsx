@@ -58,6 +58,8 @@ interface PinItemProps {
         _id: string;
         createdAt: number;
         imageIndex?: number;
+        /** The pinned image's storage path, when it has one (`pinned-image-preview.tsx`). */
+        imageKey?: string;
         /** `"image"` pins one image of the message, at `imageIndex`; absent pins the whole message. */
         kind?: "image" | "message";
         messageId: string;
@@ -168,7 +170,7 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
             <div className="group/pin relative flex overflow-hidden rounded-md border">
                 <div className="flex w-full flex-col px-3 pt-2.5 pb-2">
                     {pin.kind === "image" && pin.imageIndex !== undefined && (
-                        <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} messageId={pin.messageId} />
+                        <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} imageKey={pin.imageKey} messageId={pin.messageId} />
                     )}
 
                     {pin.kind !== "image" && !pin.selectedText && (

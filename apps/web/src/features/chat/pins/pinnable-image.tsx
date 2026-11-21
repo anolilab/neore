@@ -23,6 +23,8 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
+import { imageKeyOf } from "./pinned-image-preview";
+
 /** The text kept with an image pin: its generation prompt, else its file name. Shown in the pins tab. */
 export const imagePinText = (part: ImageRendererProps["part"]): string | undefined => part.prompt?.trim() || part.filename?.trim() || undefined;
 
@@ -52,6 +54,8 @@ const PinImageButton: FC<{ imageIndex: number; messageId: string; part: ImageRen
                 messageId,
                 messageRole: "assistant",
                 imageIndex,
+                // The storage path, so the pin finds this image wherever it sits later (not stored for a `data:` image).
+                imageKey: imageKeyOf(part.image),
                 selectedText: imagePinText(part),
                 threadId: threadId as Id<"threads">,
             },

@@ -27,7 +27,7 @@ vi.mock("@/features/chat/core/context/chat-context-hooks", () => {
     };
 });
 
-const { default: PinnedImagePreview, findPinnedImage } = await import("./pinned-image-preview");
+const { default: PinnedImagePreview, findPinnedImage, imageKeyOf } = await import("./pinned-image-preview");
 
 const reply = {
     id: "m1",
@@ -57,6 +57,29 @@ describe(findPinnedImage, () => {
         expect(findPinnedImage([reply], "m2", 0)).toBeNull();
     });
 
+    it("finds an image by its storage path wherever it sits, so an earlier image that went missing shifts nothing", () => {
+        const pinned = "https://api.test/agent-files/b?sig=1";
+        const before = {
+            id: "m6",
+            parts: [
+                { image: "https://api.test/agent-files/a?sig=1", type: "image" },
+                { image: pinned, type: "image" },
+            ],
+        };
+        // The first image could not be signed again: it is a text part now, and the pinned one is image 0.
+        const after = {
+            id: "m6",
+            parts: [
+                { text: "[attachment unavailable]", type: "text" },
+                { image: "https://api.test/agent-files/b?sig=2", type: "image" },
+            ],
+        };
+
+        expect(findPinnedImage([before], "m6", 1, "/agent-files/b")?.url).toBe(pinned);
+        expect(findPinnedImage([after], "m6", 1, "/agent-files/b")?.url).toBe("https://api.test/agent-files/b?sig=2");
+        expect(findPinnedImage([after], "m6", 0, "/agent-files/a")).toBeNull();
+    });
+
     it("keeps finding the pinned image after an edit removes the text before it", () => {
         const before = {
             id: "m5",
@@ -76,6 +99,14 @@ describe(findPinnedImage, () => {
 
         expect(findPinnedImage([before], "m5", 0)?.url).toBe("https://files.example/a.png");
         expect(findPinnedImage([edited], "m5", 0)?.url).toBe("https://files.example/a.png");
+    });
+});
+
+describe(imageKeyOf, () => {
+    it("keeps a stored image's path, without host or signature, and nothing for an inline image", () => {
+        expect(imageKeyOf("https://api.test/agent-files/abc?sig=1&exp=2")).toBe("/agent-files/abc");
+        expect(imageKeyOf("data:image/png;base64,iVBORw0KGgo=")).toBeUndefined();
+        expect(imageKeyOf("not a url")).toBeUndefined();
     });
 });
 

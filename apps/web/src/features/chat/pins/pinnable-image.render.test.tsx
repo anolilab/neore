@@ -127,6 +127,7 @@ describe("PinnableImage", () => {
             messageId: "m1",
             messageRole: "assistant",
             imageIndex: 3,
+            imageKey: "/fox.png",
             selectedText: "A fox logo",
             threadId: "k17abc",
         });

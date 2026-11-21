@@ -3362,6 +3362,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         // An image pin's place among the message's images (`kind: "image"`, `imageOrdinals` in chat-ui); a message pin has none.
         imageIndex: v.optional(v.number()),
+        // An image pin's storage path (`/agent-files/<sha256>`, no host or signature): found wherever the image now sits,
+        // which an image index alone cannot do when an earlier image is gone. Never signed or served from here.
+        imageKey: v.optional(v.string()),
         // What is pinned: the whole message (absent, as every pin before images), or one image of it.
         kind: v.optional(v.union(v.literal("message"), v.literal("image"))),
         messageId: v.string(),

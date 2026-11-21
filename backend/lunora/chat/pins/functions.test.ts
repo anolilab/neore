@@ -73,17 +73,20 @@ describe(isPinShapeValid, () => {
         [{ kind: "image" as const }, false],
         [{ imageIndex: 2 }, false],
         [{ imageIndex: 2, kind: "message" as const }, false],
+        [{ imageIndex: 0, imageKey: "/agent-files/a", kind: "image" as const }, true],
+        [{ imageKey: "/agent-files/a" }, false],
     ])("%o is %s", (shape, expected) => {
         expect(isPinShapeValid(shape)).toBe(expected);
     });
 });
 
 describe("image pins", () => {
-    it("stores an image pin with its part index and returns it", async () => {
+    it("stores an image pin with its image index and storage path and returns it", async () => {
         await as(OWNER).mutation(
             createPin as never,
             {
                 imageIndex: 2,
+                imageKey: "/agent-files/abc",
                 kind: "image",
                 messageId: "m-1",
                 messageRole: "assistant",
@@ -94,7 +97,7 @@ describe("image pins", () => {
 
         const [pin] = await pinsOf();
 
-        expect(pin).toMatchObject({ imageIndex: 2, kind: "image", messageId: "m-1", selectedText: "A fox logo, flat colours" });
+        expect(pin).toMatchObject({ imageIndex: 2, imageKey: "/agent-files/abc", kind: "image", messageId: "m-1", selectedText: "A fox logo, flat colours" });
     });
 
     it("stores a message pin as before, with no kind and no part index", async () => {

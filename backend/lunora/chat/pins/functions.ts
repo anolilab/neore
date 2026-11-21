@@ -12,11 +12,11 @@ export const MAX_PINNED_IMAGE_INDEX = 999;
 const vPinKind = v.union(v.literal("message"), v.literal("image"));
 
 /**
- * Whether a pin's kind and part index fit together: an image pin names the part it pins, a message pin names none.
- * Pure; pinned by `pins/functions.test.ts`.
+ * Whether a pin's kind and image fit together: an image pin names the image it pins (its index, and its storage path
+ * when it has one), a message pin names neither. Pure; pinned by `pins/functions.test.ts`.
  */
-export const isPinShapeValid = ({ imageIndex, kind }: { imageIndex?: number; kind?: "image" | "message" }): boolean =>
-    kind === "image" ? imageIndex !== undefined : imageIndex === undefined;
+export const isPinShapeValid = ({ imageIndex, imageKey, kind }: { imageIndex?: number; imageKey?: string; kind?: "image" | "message" }): boolean =>
+    kind === "image" ? imageIndex !== undefined : imageIndex === undefined && imageKey === undefined;
 
 export const getThreadPins = authQuery
     .input({
@@ -30,6 +30,7 @@ export const getThreadPins = authQuery
                 _id: v.string(),
                 createdAt: v.number(),
                 imageIndex: v.optional(v.number()),
+                imageKey: v.optional(v.string()),
                 kind: v.optional(vPinKind),
                 messageId: v.string(),
                 messageRole: v.string(),
@@ -64,6 +65,8 @@ export const createPin = authMutation
     .use(rateLimit("pins/create"))
     .input({
         imageIndex: v.optional(v.number().int().min(0).max(MAX_PINNED_IMAGE_INDEX)),
+        // The image's storage path, matched against the message's images when the pin is shown; never signed or served.
+        imageKey: v.optional(v.string().max(MAX_LENGTH.short)),
         // Absent or "message" pins the whole message; "image" pins the image at `imageIndex`.
         kind: v.optional(vPinKind),
         messageId: v.string().max(MAX_LENGTH.id),
@@ -73,11 +76,11 @@ export const createPin = authMutation
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.string())
-    .mutation(async ({ args: { imageIndex, kind, messageId, messageRole, selectedText, threadId, unlockProof }, ctx: context }) => {
+    .mutation(async ({ args: { imageIndex, imageKey, kind, messageId, messageRole, selectedText, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
         const { now } = context;
 
-        if (!isPinShapeValid({ imageIndex, kind })) {
+        if (!isPinShapeValid({ imageIndex, imageKey, kind })) {
             throw new LunoraError("BAD_REQUEST", "An image pin names the part it pins; a message pin names none");
         }
 
@@ -91,6 +94,7 @@ export const createPin = authMutation
             createdAt: now,
             // A message pin is stored as before (no kind), so old and new rows read the same.
             ...(kind === "image" && { imageIndex, kind }),
+            ...(kind === "image" && imageKey !== undefined && { imageKey }),
             messageId,
             messageRole,
             selectedText,
