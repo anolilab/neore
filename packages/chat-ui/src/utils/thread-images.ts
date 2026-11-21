@@ -18,11 +18,11 @@ export interface ThreadImage {
     src: string;
 }
 
-/** The gallery key of a browser screenshot. */
-export const browserImageKey = (toolCallId: string): string => `tool:${toolCallId}`;
+/** The gallery key of a browser screenshot: by message too, since a provider can reuse a tool-call id in a later turn. */
+export const browserImageKey = (messageId: string, toolCallId: string): string => `tool:${messageId}:${toolCallId}`;
 
-/** The gallery key of the `index`-th result of a code run. */
-export const codeImageKey = (toolCallId: string, index: number): string => `tool:${toolCallId}:${String(index)}`;
+/** The gallery key of the `index`-th result of a code run (by message too, as {@link browserImageKey}). */
+export const codeImageKey = (messageId: string, toolCallId: string, index: number): string => `tool:${messageId}:${toolCallId}:${String(index)}`;
 
 interface PartLike {
     data?: string;
@@ -59,7 +59,9 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number, gene
             ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
             : undefined;
 
-        return src ? [{ alt: output?.title || output?.url || undefined, key: browserImageKey(part.toolCallId), kind: "browser", messageId, src }] : [];
+        return src
+            ? [{ alt: output?.title || output?.url || undefined, key: browserImageKey(messageId, part.toolCallId), kind: "browser", messageId, src }]
+            : [];
     }
 
     if (part.type === "tool-codeExecution" && part.toolCallId) {
@@ -70,7 +72,7 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number, gene
             const src =
                 result.type === "image" ? toolImageSource({ inline: result.value, mediaType: `image/${result.format || "png"}`, url: result.url }) : undefined;
 
-            return src ? [{ key: codeImageKey(toolCallId, index), kind: "code", messageId, src }] : [];
+            return src ? [{ key: codeImageKey(messageId, toolCallId, index), kind: "code", messageId, src }] : [];
         });
     }
 

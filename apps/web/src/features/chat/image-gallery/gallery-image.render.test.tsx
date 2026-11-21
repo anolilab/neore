@@ -66,7 +66,7 @@ describe("a browser screenshot in a reply", () => {
         );
         fireEvent.click(screen.getByRole("button", OPEN_SCREENSHOT));
 
-        expect(useImageGalleryStore.getState().shown).toEqual({ key: "tool:call-1", threadId: "t1" });
+        expect(useImageGalleryStore.getState().shown).toEqual({ key: "tool:m1:call-1", threadId: "t1" });
         expect(screen.getByText("Image 1 of 1")).toBeTruthy();
     });
 

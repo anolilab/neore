@@ -33,8 +33,8 @@ describe(collectThreadImages, () => {
 
         expect(images).toEqual([
             { alt: "sketch.png", key: "m1:0", kind: "file", messageId: "m1", src: "https://api.test/files/sketch?sig=1" },
-            { alt: "Pricing", key: browserImageKey("call-1"), kind: "browser", messageId: "m2", src: `data:image/png;base64,${PNG}` },
-            { key: codeImageKey("call-2", 1), kind: "code", messageId: "m2", src: "https://api.test/files/chart?sig=1" },
+            { alt: "Pricing", key: browserImageKey("m2", "call-1"), kind: "browser", messageId: "m2", src: `data:image/png;base64,${PNG}` },
+            { key: codeImageKey("m2", "call-2", 1), kind: "code", messageId: "m2", src: "https://api.test/files/chart?sig=1" },
             { alt: undefined, key: "m2:3", kind: "file", messageId: "m2", src: "https://api.test/files/owl?sig=1" },
         ]);
     });
@@ -50,6 +50,15 @@ describe(collectThreadImages, () => {
         ]);
 
         expect(images.map((image) => image.alt)).toEqual(["A fox logo, flat colours", "An owl at dusk"]);
+    });
+
+    it("keys tool images by message too, so a tool-call id reused in a later turn does not collide", () => {
+        const screenshot = (id: string) => {
+            return { id, parts: [{ output: { screenshot: PNG, screenshotFormat: "png" }, toolCallId: "call-0", type: "tool-browser" }] };
+        };
+        const keys = collectThreadImages([screenshot("m1"), screenshot("m2")]).map((image) => image.key);
+
+        expect(new Set(keys).size).toBe(2);
     });
 
     it("leaves out images not shown: still checked, blocked, or a tool output the page has not loaded", () => {

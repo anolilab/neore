@@ -529,7 +529,7 @@ interface CodeExecutionOutput {
     unsavedMedia?: number;
 }
 
-const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const CodeExecutionResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const [isCodeExpanded, setIsCodeExpanded] = useState(false);
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
@@ -604,7 +604,7 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                                     <GalleryImage
                                         alt={t`Code output`}
                                         className="max-w-full rounded"
-                                        imageKey={codeImageKey(part.toolCallId, index)}
+                                        imageKey={codeImageKey(messageId, part.toolCallId, index)}
                                         src={source}
                                     />
                                 </div>
@@ -668,7 +668,7 @@ const DOCUMENT_ARTIFACT_TOOLS = new Set(["tool-createDocument", "tool-deepResear
 /** Tools that render their own card or ask the person something; never folded into a summary. */
 const UNFOLDABLE_TOOLS = new Set(["tool-askUser", "tool-browser", "tool-codeExecution", "tool-createPresentation", "tool-updateSlide"]);
 
-const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const BrowserToolResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
     const isError = part.state === "output-error";
@@ -736,7 +736,7 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     alt={output.title || t`Browser screenshot`}
                     buttonClassName="block w-full"
                     className="w-full"
-                    imageKey={browserImageKey(part.toolCallId)}
+                    imageKey={browserImageKey(messageId, part.toolCallId)}
                     src={screenshotSource}
                 />
             </div>
@@ -1019,7 +1019,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                             : null;
 
                     if (part.type === "tool-codeExecution") {
-                        renderedParts.push(<CodeExecutionResultView key={key} part={toolPart} />);
+                        renderedParts.push(<CodeExecutionResultView key={key} messageId={message.id} part={toolPart} />);
 
                         if (sandboxOutputs && SandboxFiles) {
                             renderedParts.push(<SandboxFiles key={`${key}-files`} {...sandboxOutputs} />);
@@ -1030,7 +1030,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
                     // Special rendering for browser tool — show live status or screenshot result
                     if (part.type === "tool-browser") {
-                        renderedParts.push(<BrowserToolResultView key={key} part={toolPart} />);
+                        renderedParts.push(<BrowserToolResultView key={key} messageId={message.id} part={toolPart} />);
                         break;
                     }
 
