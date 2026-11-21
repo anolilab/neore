@@ -492,6 +492,8 @@ const runSendMessageBody = async (
             // support multi-ref (FAL Nano-Banana et al.).
             if (attachedReferences.length > 0) {
                 requestBody.referenceImages = attachedReferences.map((ref) => ref.url);
+                // The picker's id for each one, which the backend checks against the caller's own rows (`chat/reference-gate.ts`).
+                requestBody.referenceIds = attachedReferences.map((ref) => ref.id);
             }
         }
 
