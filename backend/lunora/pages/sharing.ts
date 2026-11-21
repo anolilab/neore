@@ -179,6 +179,7 @@ export const createPageInvite = authMutation
         const token = crypto.randomUUID();
         const expiresAt = now + Math.floor(args.expiresInDays) * DAY_MS;
 
+        // lunora-advisor-exempt owner_field_from_args_not_auth -- `ownerId` is the stored owner of a page `requirePageAccess` proved the caller administers: the invite's shard, not a caller-chosen id
         await ctx.db.insert("pageInvites", {
             createdAt: now,
             expiresAt,
