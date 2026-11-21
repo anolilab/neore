@@ -104,8 +104,7 @@ parser ties to its fields without holding them). A page with password forms to m
 beside the login form), a form whose submit buttons go to different places, a login form only in a declarative shadow root,
 and a `url` that differs from the tab's address only by its fragment are refused too. The capture has been run
 against Playwright's Chromium only, not yet on Browser Rendering; there, a body it does not hand back refuses every
-sign-in rather than allow one. Not covered: a script can still change a hidden field of the body, as the site's own
-scripts do; a site where such a field alone picks what the password signs into would take the password for the
+sign-in rather than allow one. Not covered: a script can still change the other fields of the body (a hidden field, or the username), as the site's own scripts do, or send a form of its own with the stand-in in the password field's name to the same action; a site where such a field alone picks what the password signs into would take the password for the
 script's choice. The same goes for a 307 or 308 redirect of the POST to another address of the same site, which carries
 the body there, and for cookies a script of the site set earlier, which shape the page the site sends. The check proves
 the site sent the form, not that it is a sign-in: `url` (any page of `origin`) decides that, so a caller pointing it at
@@ -113,7 +112,7 @@ a page that asks for the password to change an email or delete the account would
 The form's target is this window: empty, `_self`, or `_parent` and `_top`, which name it, as the top window. A POST elsewhere, or one where the page moved or copied the stand-in, is
 not sent. Neither is a redirect of the answer whose address carries the password in its query or fragment, in any
 spelling (encoded twice included): that counts as an attempt. A password short enough to be part of an ordinary
-query (`1234` in `?tab=12345`) can fail a sign-in that way after the site took it; the result says it was sent. Only the first such POST is sent; another the page starts meanwhile is not. When the browser cannot turn scripts off for the answer, nothing is sent; a POST handed on counts as sent, since it may have reached the site, so it is never sent again. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before
+query (`1234` in `?tab=12345`) can fail a sign-in that way after the site took it; the result says it was sent. Only the first such POST is sent; another the page starts meanwhile is not, and neither is one still waiting when the sign-in gives up. When the browser cannot turn scripts off for the answer, nothing is sent; a POST handed on counts as sent, since it may have reached the site, so it is never sent again. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before
 the lock lifts and only then loaded with its scripts. So no page
 script can read the password, by the field's value or any other way (other realms, events, `FormData`, selection), and a
 `<link rel="preconnect">` or a `javascript:` page can only carry the stand-in. A site that signs in from a script (a
