@@ -34,6 +34,8 @@ import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { importRuleFiles, needsMode } from "../lib/rule-file-import";
+import type { RepoImportResult } from "./repo-rule-file-import";
+import RepoRuleFileImport from "./repo-rule-file-import";
 
 /** The id and name the backend gives a project's older single context (`LEGACY_CONTEXT_RULE_ID`). */
 const LEGACY_CONTEXT_ID = "context";
@@ -487,26 +489,7 @@ const ProjectRuleFiles: FC<{
         setImportNote("");
     };
 
-    /** Adds the picked Markdown files as unsaved drafts, up to the project's limit; the person saves them like any edit. */
-    const importPicked = async (event: ChangeEvent<HTMLInputElement>) => {
-        const input = event.currentTarget;
-        const picked = [...(input.files ?? [])];
-
-        // Cleared, so picking the same file again imports it again.
-        input.value = "";
-
-        if (picked.length === 0) {
-            return;
-        }
-
-        const generation = importGeneration.current;
-        // Up to the project's limit, not the room left now: a draft removed while the files are read frees room the import takes.
-        const read = await importRuleFiles(picked, MAX_RULE_FILES);
-
-        if (generation !== importGeneration.current) {
-            return;
-        }
-
+    const applyImport = (read: RepoImportResult) => {
         // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
         // room left now is taken.
         const now = latest.current;
@@ -529,31 +512,50 @@ const ProjectRuleFiles: FC<{
         }
 
         const toSet = added.filter((file) => needsMode(file)).length;
-        const noneFound = read.imported.length === 0 ? [t`No Markdown files were found to import.`] : [];
+        const noneFound = read.imported.length === 0 && read.unreadable === 0 ? [t`No Markdown files were found to import.`] : [];
         const addedNote =
             added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
         const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
         const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
+        const unreadable = t`${plural(read.unreadable, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large.`;
 
-        setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : [])].join(" "));
+        setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : []), ...(read.unreadable > 0 ? [unreadable] : [])].join(" "));
     };
 
-    /** Reads the picked files, one import at a time. */
-    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+    /**
+     * Adds what `read` imports as unsaved drafts, up to the project's limit; the person saves them like any edit. One
+     * import at a time: one asked for while another reads is dropped.
+     */
+    const runImport = (read: () => Promise<RepoImportResult | null>) => {
         if (importing) {
-            const input = event.currentTarget;
-
-            input.value = "";
-
             return;
         }
 
+        const generation = importGeneration.current;
+
         setImporting(true);
-        importPicked(event)
+        read()
+            // An import a Discard overtook adds nothing.
+            .then((result) => (result && generation === importGeneration.current ? applyImport(result) : undefined))
             .catch(() => setImportNote(t`The files could not be read.`))
             .then(() => setImporting(false))
             .catch(() => undefined);
+    };
+
+    /** Reads the picked files: up to the project's limit, not the room left now, as a draft removed meanwhile frees room. */
+    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+        const input = event.currentTarget;
+        const picked = [...(input.files ?? [])];
+
+        // Cleared, so picking the same file again imports it again.
+        input.value = "";
+
+        if (picked.length > 0) {
+            runImport(async () => {
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), unreadable: 0 };
+            });
+        }
     };
 
     /** How a refusal reads, for `file` when it names one; the editor's own check and the backend's word it alike. */
@@ -834,6 +836,7 @@ const ProjectRuleFiles: FC<{
                             <FolderUp aria-hidden="true" className="size-4" />
                             {t`Import rule folder`}
                         </Button>
+                        <RepoRuleFileImport disabled={importing || files.length >= MAX_RULE_FILES} projectId={projectId} runImport={runImport} />
                         <input
                             accept=".md,.mdc,.markdown,text/markdown"
                             aria-hidden="true"

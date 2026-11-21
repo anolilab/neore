@@ -80,3 +80,8 @@
   `PROJECT_CONTEXT_EXPORT_BYTES` of the output (`gdpr/steps.ts`; a carried one is neither exported nor counted); one
   past it is left out, its project marked `ruleFilesOmitted` too. The rule files' read budget counts the bytes
   the triggers actually read (`collectAllTriggers` reports `readBytes`), not the triggers' allowance.
+- **Import from a repository** (`rule-file-repo.ts`, `source-control/repo-rule-files.ts`): two actions, list then read,
+  with the person's own GitHub token, for whoever may save the rule files (`repoForRuleFileImport`) and a repository the
+  project lists. They read only `isImportablePath` paths (root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, Markdown right in
+  one `RULE_FOLDERS` folder), within `REPO_RULE_FILE_MAX_BYTES` each and `REPO_RULE_FILES_READ_BYTES` together, and
+  store nothing: the editor turns the text into drafts with the upload's rules (`importRuleTexts`).

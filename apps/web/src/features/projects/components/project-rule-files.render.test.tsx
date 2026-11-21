@@ -36,12 +36,17 @@ const backend = vi.hoisted(() => {
         listed: { canEdit: true, files: [] as unknown[], revision: "r1" } as { canEdit: boolean; files: unknown[]; legacyContextId?: string; revision: string },
         // When set, how a read answers instead of with `listed`.
         read: undefined as (() => Promise<unknown>) | undefined,
+        // The project's repositories, and what the repository import's two actions answer.
+        repoList: vi.fn(),
+        repoRead: vi.fn(),
+        repos: [] as { id: string; isDefault: boolean; revision: number; url: string }[],
         save: vi.fn(),
     };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
     return {
+        useAction: (reference: { __lunoraRef?: string }) => (String(reference.__lunoraRef).endsWith("listRepoRuleFiles") ? backend.repoList : backend.repoRead),
         useCRPC: () => {
             return {
                 projects: {
@@ -52,6 +57,11 @@ vi.mock("@/lib/lunora/crpc", () => {
                                     queryFn: async () => await (backend.read?.() ?? structuredClone(backend.listed)),
                                     queryKey: ["listProjectRuleFiles", args],
                                 };
+                            },
+                        },
+                        listProjectRepos: {
+                            queryOptions: (args: unknown) => {
+                                return { queryFn: async () => structuredClone(backend.repos), queryKey: ["listProjectRepos", args] };
                             },
                         },
                         setProjectRuleFiles: {
@@ -71,6 +81,7 @@ vi.mock("@/features/auth/lib/utilities", () => {
 });
 
 const NEEDS_A_PATTERN = /needs at least one pattern/u;
+const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
 
 const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
     render(
@@ -83,6 +94,9 @@ beforeEach(() => {
     translations.clear();
     backend.save.mockReset();
     backend.read = undefined;
+    backend.repos = [];
+    backend.repoList.mockReset();
+    backend.repoRead.mockReset();
     backend.save.mockImplementation(async ({ ruleFiles }: { ruleFiles: unknown[] }) => {
         return { files: ruleFiles, revision: "r2" };
     });
@@ -903,5 +917,96 @@ describe("project rule files", () => {
         expect(screen.getByText("**/*.sql")).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Add rule file" })).toBeNull();
         expect(screen.queryByRole("textbox")).toBeNull();
+    });
+});
+
+describe("project rule files imported from the project's repository", () => {
+    const REPO = { id: "repo1", isDefault: true, revision: 0, url: "https://github.com/acme/web.git" };
+
+    it("offers nothing while the project lists no repository", async () => {
+        renderEditor();
+        await screen.findByRole("button", { name: "Add rule file" });
+
+        expect(screen.queryByRole("button", { name: "Import from repository" })).toBeNull();
+    });
+
+    it("reads nothing before the person asks, shows what was found, and imports an AGENTS.md as one always draft", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            files: [
+                { path: "AGENTS.md", size: 20, tooLarge: false },
+                { path: "rules/huge.md", size: 900_000, tooLarge: true },
+            ],
+            status: "ok",
+        });
+        backend.repoRead.mockResolvedValue({ files: [{ path: "AGENTS.md", status: "ok", text: "Use pnpm, never npm." }], status: "ok" });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+
+        expect(backend.repoList).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        expect(backend.repoList).toHaveBeenCalledWith({ projectId: "p1", repoId: "repo1" });
+
+        const found = await screen.findByRole("list", { name: "Files found" });
+
+        expect(within(found).getByRole("checkbox", { name: "AGENTS.md" }).getAttribute("aria-checked")).toBe("true");
+        expect(within(found).getByRole("checkbox", { name: HUGE_FILE }).getAttribute("aria-disabled")).toBe("true");
+
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(backend.repoRead).toHaveBeenCalledWith({ paths: ["AGENTS.md"], projectId: "p1", repoId: "repo1" });
+
+        const imported = await screen.findByRole("listitem", { name: "AGENTS.md" });
+
+        expect(within(imported).getByRole("radio", { name: "Always" }).getAttribute("aria-checked")).toBe("true");
+        expect(within(imported).getByRole("textbox", { name: "Instructions" })).toHaveProperty("value", "Use pnpm, never npm.");
+        expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(3);
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByText("1 rule file imported. Review, then save.")).toBeTruthy();
+    });
+
+    it("says why the repository could not be read and adds nothing", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({ status: "not_connected" });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Connect GitHub in Settings → Connectors to import from a repository.");
+        expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(2);
+    });
+
+    it("adds nothing from a read the person cancelled, and gives focus back to the button that opens the panel", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({ files: [{ path: "AGENTS.md", size: 20, tooLarge: false }], status: "ok" });
+        // Answers only once the panel is closed: the read lands after the Cancel.
+        backend.repoRead.mockImplementation(async () => {
+            await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
+
+            return { files: [{ path: "AGENTS.md", status: "ok", text: "Use pnpm." }], status: "ok" };
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+        const opener = await screen.findByRole("button", { name: "Import from repository" });
+
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        await waitFor(() => expect(document.activeElement).toBe(opener));
+        await waitFor(() => expect(opener).toHaveProperty("disabled", false));
+        expect(screen.queryByRole("listitem", { name: "AGENTS.md" })).toBeNull();
+        expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(2);
     });
 });

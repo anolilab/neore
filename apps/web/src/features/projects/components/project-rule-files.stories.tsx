@@ -1,3 +1,4 @@
+import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
@@ -15,6 +16,23 @@ const FILES = [
 
 const ruleFiles = (canEdit: boolean) => lunora(api.projects.functions.listProjectRuleFiles, { canEdit, files: FILES, revision: "r1" });
 
+const REPOSITORY = { id: "repo-1", isDefault: true, revision: 0, url: "https://github.com/acme/web.git" };
+
+const noRepositories = lunora(api.projects.functions.listProjectRepos, []);
+
+/** The project lists one repository, whose instruction files the import finds (`listRepoRuleFiles`) and reads. */
+const withRepo = (found: ReturnOf<typeof api.projects.rule_file_repo.listRepoRuleFiles>) =>
+    lunoraHandlers(
+        ...userFixtures(),
+        ruleFiles(true),
+        lunora(api.projects.functions.listProjectRepos, [REPOSITORY]),
+        lunora(api.projects.rule_file_repo.listRepoRuleFiles, found),
+        lunora(api.projects.rule_file_repo.readRepoRuleFiles, {
+            files: [{ path: "AGENTS.md", status: "ok" as const, text: "# Agents\n\nRun the tests first." }],
+            status: "ok" as const,
+        }),
+    );
+
 const meta = {
     args: { projectId: "project-1" },
     component: ProjectRuleFiles,
@@ -25,7 +43,7 @@ const meta = {
             </div>
         ),
     ],
-    parameters: { layout: "padded", msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ruleFiles(true)) } } },
+    parameters: { layout: "padded", msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ruleFiles(true), noRepositories) } } },
     title: "Projects/Rule files",
 } satisfies Meta<typeof ProjectRuleFiles>;
 
@@ -80,12 +98,73 @@ export const ImportedAgentsFile: Story = {
 
 /** A member who may not edit: each file's mode, and a file read when needed with its line. */
 export const ReadOnly: Story = {
-    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ruleFiles(false)) } } },
+    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ruleFiles(false), noRepositories) } } },
     play: async ({ canvasElement }) => {
         const canvas = within(canvasElement);
 
         await expect(await canvas.findByText("How we deploy a release")).toBeVisible();
         await expect(canvas.getByText("When needed")).toBeVisible();
         await expect(canvas.queryByRole("button", { name: "Import files" })).toBeNull();
+    },
+};
+
+/** The project's repository: its instruction files are listed for the owner to pick, and an AGENTS.md lands as one always draft. */
+export const ImportFromRepo: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: withRepo({
+                    files: [
+                        { path: "AGENTS.md", size: 32, tooLarge: false },
+                        { path: "rules/huge.md", size: 900_000, tooLarge: true },
+                    ],
+                    status: "ok",
+                }),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await lunoraAnswered(api.projects.functions.listProjectRuleFiles);
+        await userEvent.click(await canvas.findByRole("button", { name: "Import from repository" }));
+        await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
+
+        const found = within(await canvas.findByRole("list", { name: "Files found" }));
+
+        await expect(found.getByRole("checkbox", { name: "AGENTS.md" })).toBeChecked();
+        await expect(found.getByRole("checkbox", { name: /huge/u })).toHaveAttribute("aria-disabled", "true");
+        await userEvent.click(canvas.getByRole("button", { name: "Import selected" }));
+
+        const imported = within(await canvas.findByRole("listitem", { name: "AGENTS.md" }));
+
+        await expect(imported.getByRole("radio", { name: "Always" })).toBeChecked();
+        await expect(canvas.getByText("1 rule file imported. Review, then save.")).toBeVisible();
+    },
+};
+
+/** The repository holds no instruction files: said in the panel, nothing added. */
+export const RepoWithoutInstructionFiles: Story = {
+    parameters: { msw: { handlers: { lunora: withRepo({ files: [], status: "ok" }) } } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(await canvas.findByRole("button", { name: "Import from repository" }));
+        await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
+
+        await expect(await canvas.findByText("No instruction files were found in this repository.")).toBeVisible();
+    },
+};
+
+/** GitHub is not connected: the panel says where to connect it. */
+export const RepoNotConnected: Story = {
+    parameters: { msw: { handlers: { lunora: withRepo({ status: "not_connected" }) } } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(await canvas.findByRole("button", { name: "Import from repository" }));
+        await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("Connect GitHub in Settings → Connectors to import from a repository.");
     },
 };

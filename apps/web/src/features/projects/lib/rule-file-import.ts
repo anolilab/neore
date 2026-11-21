@@ -356,18 +356,21 @@ export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile 
 export const needsMode = (file: Pick<ImportedRuleFile, "description" | "mode">): boolean => file.mode === "auto" && file.description.trim() === "";
 
 /**
- * The rule files of the uploaded `files`, in name order, at most `room` of them: those past it are counted in `skipped`,
- * files that are not Markdown are left out.
+ * The rule files of `entries` (a path, and its text read on demand), in path order, at most `room` of them (those past it
+ * counted in `skipped`), files that are not Markdown left out: the upload ({@link importRuleFiles}) and the repository
+ * import share it.
  */
-export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<{ imported: ImportedRuleFile[]; skipped: number }> => {
-    const pathOf = (file: File): string => file.webkitRelativePath || file.name;
-    const sorted = files.toSorted((left, right) => pathOf(left).localeCompare(pathOf(right)));
+export const importRuleTexts = async (
+    entries: ReadonlyArray<{ path: string; text: () => Promise<string> | string }>,
+    room: number,
+): Promise<{ imported: ImportedRuleFile[]; skipped: number }> => {
+    const sorted = entries.toSorted((left, right) => left.path.localeCompare(right.path));
     const imported: ImportedRuleFile[] = [];
     let skipped = 0;
 
-    for (const file of sorted) {
+    for (const entry of sorted) {
         // A name alone decides whether it is taken, before its text is read.
-        if (toImportedRuleFile(pathOf(file), "") === null) {
+        if (toImportedRuleFile(entry.path, "") === null) {
             continue;
         }
 
@@ -376,7 +379,7 @@ export const importRuleFiles = async (files: ReadonlyArray<File>, room: number):
             continue;
         }
 
-        const ruleFile = toImportedRuleFile(pathOf(file), await file.text());
+        const ruleFile = toImportedRuleFile(entry.path, await entry.text());
 
         if (ruleFile) {
             imported.push(ruleFile);
@@ -385,3 +388,15 @@ export const importRuleFiles = async (files: ReadonlyArray<File>, room: number):
 
     return { imported, skipped };
 };
+
+/**
+ * The rule files of the uploaded `files`, in name order, at most `room` of them: those past it are counted in `skipped`,
+ * files that are not Markdown are left out.
+ */
+export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<{ imported: ImportedRuleFile[]; skipped: number }> =>
+    importRuleTexts(
+        files.map((file) => {
+            return { path: file.webkitRelativePath || file.name, text: () => file.text() };
+        }),
+        room,
+    );
