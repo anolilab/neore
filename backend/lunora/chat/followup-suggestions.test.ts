@@ -18,6 +18,7 @@ import {
     getCachedFollowupSuggestionsHandler,
     releaseFollowupSuggestions,
     replyAnchorRow,
+    withDeadline,
 } from "../agent/followup-suggestions";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
@@ -273,5 +274,50 @@ describe("the rows the suggestion model reads", () => {
         const page = [{ _id: "final" }, { _id: "text" }, { _id: "prompt" }];
 
         expect(ids(followupModelRows(page, page))).toEqual(["final", "text", "prompt"]);
+    });
+});
+
+describe("withDeadline", () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("aborts the call once its deadline passes, and nothing before it", async () => {
+        let seen: AbortSignal | undefined;
+
+        const outcome = withDeadline(1000, (signal) => {
+            seen = signal;
+
+            return new Promise<never>((_resolve, reject) => {
+                signal.addEventListener("abort", () => reject(new Error("aborted")));
+            });
+        })
+            .then(() => "resolved")
+            .catch((error: Error) => error.message);
+
+        vi.advanceTimersByTime(999);
+        expect(seen?.aborted).toBe(false);
+
+        vi.advanceTimersByTime(1);
+        expect(seen?.aborted).toBe(true);
+        await expect(outcome).resolves.toBe("aborted");
+    });
+
+    it("clears its deadline once a call succeeds, so no timer is left behind", async () => {
+        await expect(withDeadline(1000, async () => "done")).resolves.toBe("done");
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("clears its deadline once a call fails, and the failure is the call's own", async () => {
+        await expect(
+            withDeadline(1000, async () => {
+                throw new Error("provider failed");
+            }),
+        ).rejects.toThrow("provider failed");
+        expect(vi.getTimerCount()).toBe(0);
     });
 });
