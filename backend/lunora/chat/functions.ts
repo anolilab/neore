@@ -4928,8 +4928,10 @@ export const generateFollowupSuggestionsForThread = internalAction
                     threadId,
                 };
 
+                let written: boolean;
+
                 try {
-                    await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, cacheWrite);
+                    written = await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, cacheWrite);
                 } catch (cacheError) {
                     // The suggestions are in hand: the scheduler writes them and takes the unit, with no model call and no second charge.
                     // The claim stays held for that, so a run does not call the model again for this reply meanwhile.
@@ -4942,6 +4944,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                         requestId: replyChargeKey,
                     });
                     paid.cached = true;
+
+                    return;
+                }
+
+                // Refused: a newer reply's suggestions are stored, or the thread is gone. Nothing is written and no unit is taken.
+                if (!written) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The cache refused this reply, not charging: ${threadId}`);
+                    await giveBackPaidClaim();
 
                     return;
                 }
