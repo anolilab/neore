@@ -347,18 +347,22 @@ export const closeSession = internalMutation
 
 // ── Human checks (`human-check.ts`) ──────────────────────────────────────
 
-const askKind = (row: { reported?: boolean } | null): "detected" | "reported" | null => {
+const askKind = (row: { inText?: boolean; reported?: boolean } | null): "detected" | "detected_in_text" | "reported" | null => {
     if (row === null) {
         return null;
     }
 
-    return row.reported === true ? "reported" : "detected";
+    if (row.reported === true) {
+        return "reported";
+    }
+
+    return row.inText === true ? "detected_in_text" : "detected";
 };
 
 /** How the person was asked about `site` in this run, else (with `askedSince`) the thread's latest ask since then; `null` for none. */
 export const wasHumanCheckAsked = internalQuery
     .input({ askedSince: v.optional(v.number()), run: v.string(), site: v.string(), threadId: v.id("threads") })
-    .output(v.union(v.literal("detected"), v.literal("reported"), v.null()))
+    .output(v.union(v.literal("detected"), v.literal("detected_in_text"), v.literal("reported"), v.null()))
     .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
         const inRun = await ctx.db
             .query("browserHumanChecks")
@@ -387,9 +391,9 @@ export const wasHumanCheckAsked = internalQuery
  * person handed back then shows no marker either way.
  */
 export const claimHumanCheckAsk = internalMutation
-    .input({ reported: v.optional(v.boolean()), run: v.string(), site: v.string(), threadId: v.id("threads") })
+    .input({ inText: v.optional(v.boolean()), reported: v.optional(v.boolean()), run: v.string(), site: v.string(), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args: { reported, run, site, threadId }, ctx }) => {
+    .mutation(async ({ args: { inText, reported, run, site, threadId }, ctx }) => {
         const thread = await ctx.db.get("threads", threadId);
 
         if (!thread) {
@@ -412,7 +416,15 @@ export const claimHumanCheckAsk = internalMutation
         }
 
         try {
-            await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, ...(reported === true && { reported }), run, site, threadId, userId: thread.userId });
+            await ctx.db.insert("browserHumanChecks", {
+                askedAt: ctx.now,
+                ...(inText === true && reported !== true && { inText }),
+                ...(reported === true && { reported }),
+                run,
+                site,
+                threadId,
+                userId: thread.userId,
+            });
         } catch (error) {
             if (isUniqueViolation(error)) {
                 return false;

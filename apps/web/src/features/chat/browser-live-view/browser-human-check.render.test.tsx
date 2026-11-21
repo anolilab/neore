@@ -1,6 +1,6 @@
 import type { ToolPart } from "@neore/chat-ui/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -140,6 +140,35 @@ describe("the Needs you card", () => {
             expect(screen.getByRole("status").textContent).toContain(text);
         });
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+    });
+
+    it.each([
+        [true, "You have control."],
+        [false, "Someone else has control of this browser."],
+    ])("offers Take control again once a lease (byYou %s) has lapsed on the server's clock", async (byYou, text) => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+
+        try {
+            // The server's clock runs 5 s ahead of this device's: the lease ends 10 s after the answer on the server's.
+            const serverNow = Date.now() + 5000;
+
+            backend.browser = running({ control: { byYou, until: serverNow + 10_000 }, now: serverNow });
+            show();
+
+            await waitFor(() => {
+                expect(screen.getByRole("status").textContent).toContain(text);
+            });
+            expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+
+            expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+            expect(screen.getByRole("status").textContent).toBe("");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("does not call a browser closed when its status could not be read, and asks again on Try again", async () => {

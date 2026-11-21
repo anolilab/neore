@@ -33,26 +33,51 @@ const HAND_BACK_THEN_OTHER_ASK_NOTE = /^The person had control.*other\.example\.
 const REPORTED_HAND_BACK_NOTE = /handed the browser back after you asked them about portal\.example\.com.*before you act/su;
 const STILL_SHOWS_AFTER_HAND_BACK_NOTE = /still shows a check after the person handed the browser back.*not asked again/su;
 const UNKNOWN_AFTER_HAND_BACK_NOTE = /cleared is unknown.*Look at the page before you act/su;
+const UNKNOWN_LONG_PAGE_NOTE = /cleared is unknown: the page now has too much text to tell/u;
+/** Why the read of a new page failed, at the end of the note. */
+const READ_FAILED_REASON = /Navigation timeout$/u;
+const NAVIGATION_UNCHECKED_NOTE = /the new page could not be read to see whether it shows a check.*Look at it before you act/su;
 
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
 const CLEAR_PAGE: LadderResult = { success: true, title: "Item 42 – Shop", url: "https://shop.example.com/item" };
 /** The whole page's text read back, with no check in it: the only look that proves a check is gone after a hand back. */
 const CLEAR_EXTRACT: LadderResult = { ...CLEAR_PAGE, content: "Item 42. Add to cart." };
 const TEXT_CHECK: LadderResult = { content: "Verifying you are human.", success: true, title: "shop.example.com", url: "https://shop.example.com/" };
+/** A whole-page read past what the text detector reads: whether a check is in it cannot be told. */
+const LONG_EXTRACT: LadderResult = { ...CLEAR_PAGE, content: "Item 42. ".repeat(400) };
+/** A read the renderer cut short (its own marker appended), which the detector cannot read either. */
+const TRUNCATED_EXTRACT: LadderResult = { ...CLEAR_PAGE, content: `${"Item 42. ".repeat(1700)}\n\n[Content truncated]`, truncated: true };
 
 /**
  * Dependencies over in-memory sets of sites asked about in this run (`asked`) and in the thread's recent earlier
- * runs (`earlier`), of which `reported` were the agent's own reports; `looks` are the pages the fresh looks return, in order.
+ * runs (`earlier`), of which `reported` were the agent's own reports and `inText` checks found only in the text; `looks`
+ * are the pages the fresh looks return, in order.
  */
-const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earlier = new Set<string>(), reported = new Set<string>()) => {
-    const kindOf = (site: string): HumanCheckAskKind => (reported.has(site) ? "reported" : "detected");
+const dependenciesFor = (
+    looks: LadderResult[],
+    asked = new Set<string>(),
+    earlier = new Set<string>(),
+    reported = new Set<string>(),
+    inText = new Set<string>(),
+) => {
+    const kindOf = (site: string): HumanCheckAskKind => {
+        if (reported.has(site)) {
+            return "reported";
+        }
+
+        return inText.has(site) ? "detected_in_text" : "detected";
+    };
     const dependencies = {
-        claimAsk: vi.fn(async (site: string, _kind: HumanCheckAskKind) => {
+        claimAsk: vi.fn(async (site: string, kind: HumanCheckAskKind) => {
             if (asked.has(site)) {
                 return false;
             }
 
             asked.add(site);
+
+            if (kind === "detected_in_text") {
+                inText.add(site);
+            }
 
             return true;
         }),
@@ -74,6 +99,7 @@ describe("detectHumanCheck", () => {
         [{ title: "Are you a robot?" }, "title"],
         [{ url: "https://example.com/cdn-cgi/challenge-platform/h/b/orchestrate" }, "url"],
         [{ url: "https://example.com/item?__cf_chl_rt_tk=abc" }, "url"],
+        [{ url: "https://example.com/item?a=1&__cf_chl_f_tk=abc#top" }, "url"],
         [{ title: "Checking your browser before accessing example.com" }, "title"],
         [{ content: "Verifying you are human. This may take a few seconds.", title: "example.com" }, "content"],
         [{ content: "Press & Hold to confirm you are a human (and not a bot)." }, "content"],
@@ -94,6 +120,13 @@ describe("detectHumanCheck", () => {
         { title: "Just a moment of your time: our survey" },
         { url: "https://developers.example.com/recaptcha/docs" },
         { url: "https://example.com/blog/captcha-alternatives" },
+        // The challenge's path or key only as text in a query value or the fragment of an ordinary link.
+        { url: "https://example.com/search?q=/cdn-cgi/challenge-platform/h/b" },
+        { url: "https://example.com/docs#/cdn-cgi/challenge-platform/" },
+        { url: "https://example.com/item?next=%3F__cf_chl_rt_tk%3Dabc" },
+        { url: "https://example.com/item#?__cf_chl_rt_tk=abc" },
+        { url: "https://example.com/docs/cdn-cgi/challenge-platform/" },
+        { url: "not a url /cdn-cgi/challenge-platform/" },
         // Short help pages with a phrase a challenge also uses, and no second sign of one.
         { content: "To restart the phone, press and hold the power button for ten seconds.", title: "Restart your phone" },
         { content: "Why does the form ask me to tick “I'm not a robot”? It keeps spam out.", title: "FAQ" },
@@ -276,6 +309,19 @@ describe("humanCheckLadder", () => {
         await expect(humanCheckLadder<LadderResult>(clicked, dependenciesFor([]).dependencies)).resolves.toBe(clicked);
     });
 
+    it("a click that moved on, whose read of the new page failed, still succeeds and says the page was not checked", async () => {
+        const clicked = { clickedSelector: "#next", success: true, url: "https://shop.example.com/page-2" };
+        const { dependencies } = dependenciesFor([{ error: "Navigation timeout", success: false }]);
+        const result = await humanCheckLadder<LadderResult>(clicked, dependencies, { navigated: true });
+
+        expect(result).toMatchObject({ clickedSelector: "#next", success: true });
+        expect(result.error).toMatch(NAVIGATION_UNCHECKED_NOTE);
+        // Why the read failed (a person took control, say) reaches the agent too.
+        expect(result.error).toMatch(READ_FAILED_REASON);
+        expect(result.humanCheck).toBeUndefined();
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
+    });
+
     it("step 3: after the hand back, a page whose text shows no check is clear, also in the next run", async () => {
         const { dependencies } = dependenciesFor([CLEAR_EXTRACT], new Set(), new Set(["shop.example.com"]));
         const result = await humanCheckLadder(
@@ -287,6 +333,49 @@ describe("humanCheckLadder", () => {
         expect(dependencies.look).toHaveBeenCalledExactlyOnceWith("extract");
         expect(result.humanCheck).toBeUndefined();
         expect(result.error).toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+    });
+
+    it.each([
+        ["too long to read", LONG_EXTRACT],
+        ["cut short by the renderer", TRUNCATED_EXTRACT],
+    ])("step 3: a read after the hand back %s is unknown for a check found in the text, and clear for one found by its title", async (_why, page) => {
+        const site = new Set(["shop.example.com"]);
+        const inText = dependenciesFor([page], site, new Set(), new Set(), new Set(site)).dependencies;
+        const result = await humanCheckLadder({ ...CLEAR_PAGE, handedBack: true }, inText);
+
+        expect(result.error).toMatch(UNKNOWN_LONG_PAGE_NOTE);
+        expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+        expect(result.humanCheck).toBeUndefined();
+
+        const byTitle = dependenciesFor([page], new Set(site)).dependencies;
+
+        await expect(
+            humanCheckLadder({ ...CLEAR_PAGE, error: "The person had control of the browser and handed it back;", handedBack: true }, byTitle),
+        ).resolves.toMatchObject({
+            error: expect.stringMatching(CLEAR_AFTER_HAND_BACK_NOTE),
+        });
+    });
+
+    it("a check found in the text is asked about as such, so its hand back needs text short enough to read", async () => {
+        const { dependencies } = dependenciesFor([TEXT_CHECK, { ...TEXT_CHECK, screenshot: "jpeg" }]);
+
+        await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+        expect(dependencies.claimAsk).toHaveBeenCalledExactlyOnceWith("shop.example.com", "detected_in_text");
+    });
+
+    it("step 1: a check found in the text that turned into a page too long to read is unknown: neither cleared nor asked about", async () => {
+        const { dependencies } = dependenciesFor([LONG_EXTRACT]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+        expect(result.error).toMatch(UNKNOWN_LONG_PAGE_NOTE);
+        expect(result.error).not.toMatch(CLEARED_NOTE);
+        expect(result.humanCheck).toBeUndefined();
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
+
+        // A title check is told by its title, whatever the page's length.
+        const titled = dependenciesFor([{ ...LONG_EXTRACT, title: "Item 42 – Shop" }]).dependencies;
+
+        await expect(humanCheckLadder(CHECK_PAGE, titled)).resolves.toMatchObject({ error: expect.stringMatching(CLEARED_NOTE) });
     });
 
     it("step 3: a whole-page extract handed back is its own evidence, with no second look", async () => {
@@ -578,6 +667,10 @@ describe("the ask record", () => {
         await expect(wasAsked("r1", "a.example")).resolves.toBe("detected");
         await expect(claim("r1", "b.example")).resolves.toBe(true);
         await expect(claim("r2", "a.example")).resolves.toBe(true);
+
+        // A check found only in the text is told apart, so a long page after its hand back is not read as cleared.
+        await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { inText: true, run: "r4", site: "d.example", threadId }));
+        await expect(wasAsked("r4", "d.example")).resolves.toBe("detected_in_text");
 
         // An ask the agent reported is told apart, so a hand back on it is not read as cleared.
         await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { reported: true, run: "r3", site: "c.example", threadId }));

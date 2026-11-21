@@ -18,6 +18,7 @@ import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { onBrowserControlRequest } from "@/features/chat/browser-live-view/control-request";
+import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/status-clock";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 /**
@@ -104,29 +105,6 @@ const failureReasonOf = (error: unknown): FailureReason => {
 };
 
 const CLOSED: View = { kind: "closed" };
-
-/** The longest delay a browser timer keeps (2^31 − 1 ms, about 24.8 days); a longer one fires at once. */
-const MAX_TIMER_DELAY_MS = 2_147_483_647;
-
-/** True once `until` has passed; re-renders at that moment, so the card leaves without a new server answer. */
-const usePassed = (until: number | undefined): boolean => {
-    const [now, setNow] = useState(() => Date.now());
-
-    useEffect(() => {
-        if (until === undefined || until <= now) {
-            return undefined;
-        }
-
-        // From the real time, not the last render's: a later `until` would otherwise fire late by the time between. A
-        // far-off `until` waits in steps of the longest delay a timer keeps; each step re-arms for what is left.
-        const delay = Math.min(Math.max(0, until - Date.now()) + 50, MAX_TIMER_DELAY_MS);
-        const timer = setTimeout(() => setNow(Date.now()), delay);
-
-        return () => clearTimeout(timer);
-    }, [until, now]);
-
-    return until !== undefined && until <= now;
-};
 
 type Asked = { attempt: number; browserId: string; connectBy: number; mode: Mode; renewed: boolean };
 
@@ -1133,18 +1111,8 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     const headingId = useId();
     const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
     const browser = status.data;
-    // The answer's deadlines are on the server's clock: each is moved onto this device's clock by how far the server's
-    // was ahead when the answer came (late by the answer's way here, so a deadline is never taken as passed early). When
-    // it came is kept per answer (`now` names it): a live query's refetch hands back the same push with a later
-    // `dataUpdatedAt`, which would move every deadline later and bring back a card whose grant has ended.
-    const [received, setReceived] = useState<{ at: number; now: number } | undefined>(undefined);
-
-    if (browser && received?.now !== browser.now) {
-        setReceived({ at: status.dataUpdatedAt, now: browser.now });
-    }
-
-    const receivedAt = browser && received?.now === browser.now ? received.at : status.dataUpdatedAt;
-    const skew = browser ? browser.now - receivedAt : 0;
+    // The answer's deadlines are on the server's clock: each is moved onto this device's clock (`useStatusSkew`).
+    const skew = useStatusSkew(browser?.now, status.dataUpdatedAt);
     const local = (at: number | undefined): number | undefined => (at === undefined ? undefined : at - skew);
     // The card's own lease keeps the browser alive past an `idleUntil` whose push has not come yet.
     const [hold, setHold] = useState<number | undefined>(undefined);

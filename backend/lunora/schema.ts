@@ -437,6 +437,8 @@ export const schema = defineSchema({
      */
     browserHumanChecks: defineTable({
         askedAt: v.number(),
+        /** The check was found only in the page's text: a later read too long to read cannot show it gone. */
+        inText: v.optional(v.boolean()),
         /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
         reported: v.optional(v.boolean()),
         run: v.string(),

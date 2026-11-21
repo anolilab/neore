@@ -16,6 +16,7 @@ import type { FC } from "react";
 import { use, useId, useState } from "react";
 
 import { BrowserLiveViewHereContext, requestBrowserControl } from "@/features/chat/browser-live-view/control-request";
+import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/status-clock";
 import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -41,6 +42,11 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     // The same live status the live view card reads: one subscription for both.
     const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
     const browser = status.data;
+    // A control lease whose end passed (on the server's clock) is over, though no new status says so yet: the live view
+    // card reads it the same way, so both offer Take control again at once.
+    const skew = useStatusSkew(browser?.now, status.dataUpdatedAt);
+    const controlEnded = usePassed(browser?.control === undefined ? undefined : browser.control.until - skew);
+    const control = controlEnded ? undefined : browser?.control;
     // The browser no live view card answered for: once it changes, the button comes back.
     const [missedBrowser, setMissedBrowser] = useState<string | undefined>(undefined);
     const missed = browser !== undefined && browser !== null && missedBrowser === browser.browserId;
@@ -59,9 +65,9 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     } else if (missed) {
         // No live view card answered: the browser went idle (its card is gone) though the status still lists it.
         state = t`The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed.`;
-    } else if (browser?.control?.byYou === true) {
+    } else if (control?.byYou === true) {
         state = t`You have control. Clear the check in the live view, then hand the browser back.`;
-    } else if (browser?.control !== undefined) {
+    } else if (control !== undefined) {
         state = t`Someone else has control of this browser.`;
     } else if (browser?.canControl === false) {
         state = t`Only someone who can write in this chat can take control of the browser.`;

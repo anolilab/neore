@@ -118,6 +118,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                               claimAsk: async (site, kind) =>
                                   await context.runMutation(internal.browser.functions.claimHumanCheckAsk, {
                                       ...(kind === "reported" && { reported: true }),
+                                      ...(kind === "detected_in_text" && { inText: true }),
                                       run: runKey,
                                       site,
                                       threadId,

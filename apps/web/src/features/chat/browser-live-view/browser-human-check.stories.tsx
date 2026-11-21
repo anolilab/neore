@@ -64,12 +64,12 @@ export const NeedsYou: Story = {
     },
 };
 
-/** No live view card is mounted to take control (the browser went): the card says so. */
+/** No live view card took the request (the browser went idle): the card says it cannot be taken over, never that it closed. */
 export const BrowserGoneOnTakeControl: Story = {
     play: async ({ canvas }) => {
         await lunoraAnswered(api.browser.live_view.getThreadBrowser);
         await userEvent.click(await canvas.findByRole("button", { name: "Take control" }));
-        await expect(await canvas.findByRole("status")).toHaveTextContent("The browser has closed.");
+        await expect(await canvas.findByRole("status")).toHaveTextContent("The browser cannot be taken over right now.");
     },
 };
 
