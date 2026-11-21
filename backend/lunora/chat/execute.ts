@@ -512,10 +512,7 @@ export const runStreamingAgent = internalAction
                               // Offered as a candidate like any built-in, only to a model that calls tools. A failed context read
                               // fails the run through `runContextPromise` below, so this one offers nothing.
                               ...(modelSupportsTools(model) && {
-                                  instructions: runContextPromise.then(
-                                      (context) => context.projectInstructions,
-                                      () => [],
-                                  ),
+                                  instructions: runContextPromise.then((context) => context.projectInstructions).catch(() => []),
                               }),
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,

@@ -142,6 +142,8 @@ describe("project rule files read when needed", () => {
     });
 });
 
+const LEFT_OUT = /left out/u;
+
 /** A picked file whose text arrives only when `finish` is called: an import still reading. */
 const slowFile = (name: string, text: string): { file: File; finish: () => void } => {
     const file = new File([text], name, { type: "text/markdown" });
@@ -241,7 +243,7 @@ describe("importing rule files", () => {
         slow.finish();
 
         await screen.findByRole("listitem", { name: "a" });
-        expect(screen.queryByText(/left out/u)).toBeNull();
+        expect(screen.queryByText(LEFT_OUT)).toBeNull();
     });
 
     it("says which imported files need a description or another mode before they save", async () => {

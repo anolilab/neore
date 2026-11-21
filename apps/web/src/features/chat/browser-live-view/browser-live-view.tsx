@@ -77,7 +77,7 @@ type Asked = { attempt: number; browserId: string; connectBy: number; renewed: b
  * What the view becomes after the person asked for it. `ended` reads as unavailable too: the browser may be gone before the
  * status read drops the card, or the provider may not see it at all, and either way the click must not do nothing.
  */
-const viewFrom = (asked: Asked, result: { status: "ended" | "unavailable" } | { status: "ok"; url: string }, now: number): View =>
+const viewFrom = (asked: Asked, result: { status: "controlled" | "ended" | "unavailable" } | { status: "ok"; url: string }, now: number): View =>
     result.status === "ok" ? { ...asked, connected: false, kind: "open", stale: now >= asked.connectBy, url: result.url } : { kind: "unavailable" };
 
 /** The answer to `attempt`, applied only while the view still waits for that attempt. */
@@ -107,7 +107,12 @@ const loadedFor =
 const isForOtherBrowser = (view: View, browserId: string): boolean => (view.kind === "open" || view.kind === "opening") && view.browserId !== browserId;
 
 /** The card for one thread's browser. It unmounts when the browser stops, so its view and the view's credential go with it. */
-const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threadId: Id<"threads"> }> = ({ browserId, currentUrl, threadId }) => {
+const BrowserCard: FC<{ browserId: string; controlledByOther: boolean; currentUrl: string | undefined; threadId: Id<"threads"> }> = ({
+    browserId,
+    controlledByOther,
+    currentUrl,
+    threadId,
+}) => {
     const { t } = useLingui();
     const headingId = useId();
     const viewId = useId();
@@ -176,6 +181,18 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
         askForReplacement();
     }, [browserId]);
 
+    // Someone else took control and may type a password: an open view goes (the frame unmounts, ending its connection),
+    // and a request still out is dropped. The provider cannot revoke a view, so the card must close it.
+    const [closedForControl, setClosedForControl] = useState(controlledByOther);
+
+    if (closedForControl !== controlledByOther) {
+        setClosedForControl(controlledByOther);
+
+        if (controlledByOther) {
+            setView(CLOSED);
+        }
+    }
+
     const toggle = (): void => {
         if (expanded) {
             setView(CLOSED);
@@ -195,8 +212,22 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
                 <div className="min-w-0 flex-1">
                     <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300" id={headingId}>{t`Browser`}</h3>
                     <p className="text-muted-foreground truncate text-xs">{currentUrl ?? t`The agent is using a browser`}</p>
+                    {controlledByOther && (
+                        <p className="text-muted-foreground text-xs" role="status">
+                            {t`Someone else has control of this browser.`}
+                        </p>
+                    )}
                 </div>
-                <Button aria-controls={viewId} aria-expanded={expanded} className={TOUCH_TARGET} onClick={toggle} size="sm" type="button" variant="outline">
+                <Button
+                    aria-controls={viewId}
+                    aria-expanded={expanded}
+                    className={TOUCH_TARGET}
+                    disabled={controlledByOther}
+                    onClick={toggle}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
                     {expanded ? t`Hide live view` : t`Watch live`}
                 </Button>
             </div>
@@ -247,10 +278,27 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     const headingId = useId();
     const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
     const browser = status.data;
-    const idle = usePassed(browser?.idleUntil);
+    // The answer's deadlines are on the server's clock: each is moved onto this device's clock by how far the server's
+    // was ahead when the answer came (late by the answer's way here, so a deadline is never taken as passed early). When
+    // it came is kept per answer (`now` names it): a live query's refetch hands back the same push with a later
+    // `dataUpdatedAt`, which would move every deadline later and bring back a card whose grant has ended.
+    const [received, setReceived] = useState<{ at: number; now: number } | undefined>(undefined);
+
+    if (browser && received?.now !== browser.now) {
+        setReceived({ at: status.dataUpdatedAt, now: browser.now });
+    }
+
+    const receivedAt = browser && received?.now === browser.now ? received.at : status.dataUpdatedAt;
+    const skew = browser ? browser.now - receivedAt : 0;
+    const local = (at: number | undefined): number | undefined => (at === undefined ? undefined : at - skew);
+    const idle = usePassed(local(browser?.idleUntil));
     // A grantee's grant ended: nothing re-runs the live query when only the clock moves, so the card goes at once and the
     // status is asked again; the server answers nothing after the grant's end.
-    const accessEnded = usePassed(browser?.accessUntil);
+    const accessEnded = usePassed(local(browser?.accessUntil));
+    // A lease that runs out writes nothing, so no new answer comes when it ends, and asking again would not help: a live
+    // query's refetch answers from its subscription's last push. The lease is over once its `until` passes on the server's
+    // clock; a renewal is a write, and its push moves `until`.
+    const controlEnded = usePassed(local(browser?.control?.until));
     const refetchStatus = useEffectEvent((): void => {
         status.refetch().catch(() => undefined);
     });
@@ -297,7 +345,15 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         return null;
     }
 
-    return <BrowserCard browserId={browser.browserId} currentUrl={browser.currentUrl} key={threadId} threadId={threadId} />;
+    return (
+        <BrowserCard
+            browserId={browser.browserId}
+            controlledByOther={browser.control !== undefined && !browser.control.byYou && !controlEnded}
+            currentUrl={browser.currentUrl}
+            key={threadId}
+            threadId={threadId}
+        />
+    );
 };
 
 export default BrowserLiveView;

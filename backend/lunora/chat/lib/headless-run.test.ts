@@ -22,8 +22,6 @@ const seen = vi.hoisted(() => {
         botModeFails: false,
         botModeReads: [] as unknown[],
         buildOptions: [] as unknown[],
-        /** The tools' own gates removed `instruction_read`. */
-        removesInstructionRead: false,
         callOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "round" | "thread" | undefined,
@@ -35,6 +33,8 @@ const seen = vi.hoisted(() => {
         prepareSteps: [] as unknown[],
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
+        /** The tools' own gates removed `instruction_read`. */
+        removesInstructionRead: false,
         replies: [] as string[],
         // Extra fields of the next generation's result (its prompt's order, its steps).
         result: {} as Record<string, unknown>,

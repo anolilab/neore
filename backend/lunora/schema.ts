@@ -397,6 +397,11 @@ export const schema = defineSchema({
 
     browserActions: defineTable({
         action: v.union(v.literal("navigate"), v.literal("screenshot"), v.literal("click"), v.literal("type"), v.literal("extract"), v.literal("scroll")),
+        /**
+         * A person in control of the browser did this: the session's `owner`, or a `collaborator` they shared the chat
+         * with; absent: the agent. A kind, never a user id: a collaborator's id here would outlive their account.
+         */
+        actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
         durationMs: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
         sessionId: v.id("browserSessions"),
@@ -425,6 +430,33 @@ export const schema = defineSchema({
     browserSessions: defineTable({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
+        /**
+         * A person drives the browser (`browser/live-view.ts#takeControl`): the agent's actions are refused while
+         * `until` is ahead. `by` is an opaque holder (`browser/live-view.ts#controlHolder`, a keyed hash of the session
+         * and the person), never a user id: a collaborator's id here would outlive their account. Kept after it ends,
+         * until an agent action has looked at the page the person left (told that they drove).
+         * `ended`: how the person gave it back (`browser_closed`: the renderer closed or replaced the browser they drove);
+         * absent once `until` passed is the idle timeout.
+         */
+        control: v.optional(
+            v.object({
+                by: v.string(),
+                /** New on every claim and renewal: a failed claim drops the lease only while it is still this one. */
+                claim: v.string(),
+                ended: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
+                /** A page the person asked for loads until then: the lease lasts at least as long. */
+                navigatingUntil: v.optional(v.number()),
+                /**
+                 * A renewal's mint is still running: the claim it replaces, which the view holding it keeps using until the
+                 * renewal settles (then it goes) or fails (then it is `claim` again).
+                 */
+                renewing: v.optional(v.string()),
+                /** The view under `renewing` closed (handed back or left) while the renewal mints: a failed renewal ends the lease so. */
+                renewingEnded: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
+                since: v.number(),
+                until: v.number(),
+            }),
+        ),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),
@@ -438,6 +470,12 @@ export const schema = defineSchema({
         inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
+        /**
+         * The deadlines of the browser actions in flight that began while the row read the browser as reaped (or before it
+         * named one): they keep a person from taking control until they end, but keep no browser alive, so a reaped one
+         * is not offered while the renderer replaces it.
+         */
+        reapedHolds: v.optional(v.array(v.number())),
         source: v.optional(v.string()),
         startedAt: v.number(),
         status: v.string(),

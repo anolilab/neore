@@ -4100,7 +4100,7 @@ export const getBrowserSession = authQuery
  * Returns the most recent actions (up to 50).
  */
 // Projection of `browserActions` rows: `success` is stored as a number and
-// surfaced as a boolean, and the session/user columns are deliberately dropped.
+// surfaced as a boolean, and the session column is deliberately dropped.
 export const getBrowserActions = authQuery
     .input({
         sessionId: v.string().max(MAX_LENGTH.id),
@@ -4117,6 +4117,8 @@ export const getBrowserActions = authQuery
                     v.literal("extract"),
                     v.literal("scroll"),
                 ),
+                /** A person in control of the browser did this: the owner, or someone they shared the chat with; absent: the agent. */
+                actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
                 durationMs: v.optional(v.number()),
                 errorMessage: v.optional(v.string()),
                 success: v.boolean(),
@@ -4145,6 +4147,7 @@ export const getBrowserActions = authQuery
             return {
                 _id: a._id,
                 action: a.action,
+                actor: a.actor,
                 durationMs: a.durationMs,
                 errorMessage: a.errorMessage,
                 success: a.success === 1,

@@ -603,10 +603,10 @@ export const runProjectFor = internalQuery
             v.null(),
             v.object({
                 context: v.optional(v.string()),
-                // The project's `auto` rule files, from the same read: listed, and read with `instruction_read`.
-                instructions: v.optional(v.array(v.object({ content: v.string(), description: v.string(), id: v.string(), title: v.string() }))),
                 // The text a run that lists no `auto` file takes instead, when the list's cost cut it (`projectRunContext`).
                 contextWithoutInstructions: v.optional(v.string()),
+                // The project's `auto` rule files, from the same read: listed, and read with `instruction_read`.
+                instructions: v.optional(v.array(v.object({ content: v.string(), description: v.string(), id: v.string(), title: v.string() }))),
                 projectId: v.id("projects"),
             }),
         ),

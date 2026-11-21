@@ -50,11 +50,10 @@ const withoutComment = (value: string): string => {
     for (let index = 0; index < value.length; index += 1) {
         const character = value[index]!;
 
-        if (quote === '"' && character === "\\") {
-            // An escape inside a double-quoted scalar: the next character is text, a quote included.
-            index += 1;
-        } else if (quote === "'" && character === "'" && value[index + 1] === "'") {
-            // `''` is a single quote inside a single-quoted scalar.
+        // An escape inside a double-quoted scalar, or `''` inside a single-quoted one: the next character is text, a quote included.
+        const escapes = (quote === '"' && character === "\\") || (quote === "'" && character === "'" && value[index + 1] === "'");
+
+        if (escapes) {
             index += 1;
         } else if (quote) {
             quote = character === quote ? undefined : quote;
@@ -76,7 +75,9 @@ const withoutComment = (value: string): string => {
 const DOUBLE_QUOTED_ESCAPE = /\\(.)/gu;
 const DOUBLED_SINGLE_QUOTE = /''/gu;
 
-const unescaped = (character: string): string => (character === "n" || character === "t" || character === "r" ? " " : character);
+const WHITESPACE_ESCAPES = new Set(["n", "r", "t"]);
+
+const unescaped = (character: string): string => (WHITESPACE_ESCAPES.has(character) ? " " : character);
 
 /** One scalar with the quotes around it dropped, and its escapes read: `\"` in a double-quoted one, `''` in a single-quoted one. */
 const unquoted = (value: string): string => {

@@ -106,15 +106,15 @@ const ctx = () =>
     ({
         runQuery: vi.fn(async (reference: string, args: unknown) => {
             switch (reference) {
-                case "auth_organization_policy:getPermissionCapQuery": {
-                    return cap;
-                }
                 case "auth_functions:getMCPServersQuery": {
                     return [
                         { enabled: true, name: "Docs (renamed)", protocol: "http", url: DOCS_URL },
                         { enabled: true, name: "mail", protocol: "http", url: MAIL_URL },
                         ...extraServers,
                     ];
+                }
+                case "auth_organization_policy:getPermissionCapQuery": {
+                    return cap;
                 }
                 case "bots_functions:getBotToolSelectionForRun": {
                     lookups.push(args);
