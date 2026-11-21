@@ -19,6 +19,7 @@ import { useDropzone } from "react-dropzone";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { requestComposerAttach, withdrawComposerAttach } from "@/features/chat/core/utils/composer-submit";
+import { SIGNED_OUT } from "@/features/chat/core/utils/signed-out";
 import { showError } from "@/lib/toast";
 
 /** Whether `pathname` is the new-chat page, whose composer takes the files without a navigation. */
@@ -45,8 +46,9 @@ const ThreadListDropZone: FC<{ children: ReactNode }> = ({ children }) => {
     const navigate = useNavigate();
     const router = useRouter();
     // The files are for this account: a composer of another one (after an account switch) never uploads them.
-    const { data: session } = useAuthSession();
-    const accountId = session?.user?.id;
+    // Undefined only while the session loads; a loaded session with no user is signed out, never "any account".
+    const { data: session, isPending: sessionPending } = useAuthSession();
+    const accountId = session?.user?.id ?? (sessionPending ? undefined : SIGNED_OUT);
 
     const onDrop = useCallback(
         (files: File[]) => {

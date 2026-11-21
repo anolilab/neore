@@ -37,10 +37,14 @@ vi.mock("@/features/chat/core/utils/composer-submit", () => {
     return { requestComposerAttach, withdrawComposerAttach };
 });
 
+const session = vi.hoisted(() => {
+    return { data: { user: { id: "u1" } } as { user: { id: string } } | null };
+});
+
 vi.mock("@/features/auth/hooks/use-auth-session", () => {
     return {
         useAuthSession: () => {
-            return { data: { user: { id: "u1" } } };
+            return { data: session.data, isPending: false };
         },
     };
 });
@@ -97,6 +101,7 @@ describe("ThreadListDropZone", () => {
         withdrawComposerAttach.mockReset();
         showError.mockReset();
         location.pathname = "/chat/k17abc";
+        session.data = { user: { id: "u1" } };
     });
 
     it("queues dropped files for a new chat and opens it", async () => {
@@ -112,6 +117,17 @@ describe("ThreadListDropZone", () => {
         expect(requestComposerAttach.mock.calls[0]?.[0]).toEqual({ accountId: "u1", files: [report, photo] });
         expect(navigate).toHaveBeenCalledWith({ search: {}, to: "/chat" });
         expect(withdrawComposerAttach).not.toHaveBeenCalled();
+    });
+
+    it("marks a drop made with no one signed in as signed out, so a later sign-in never takes it", async () => {
+        session.data = null;
+        renderZone();
+        fireEvent.drop(screen.getByTestId("thread-list-drop-zone"), filesTransfer([new File(["a"], "a.txt", { type: "text/plain" })]));
+
+        await waitFor(() => {
+            expect(requestComposerAttach).toHaveBeenCalledTimes(1);
+        });
+        expect(requestComposerAttach.mock.calls[0]?.[0]).toMatchObject({ accountId: "signed-out" });
     });
 
     it("takes the files back and says so when the new chat does not open", async () => {

@@ -24,6 +24,8 @@ export const requestComposerSubmit = (request: ComposerSubmitRequest): void => {
 /** Subscribes the new-thread composer — including to a request made before it mounted. */
 export const onComposerSubmitRequest = (handler: (request: ComposerSubmitRequest) => void): (() => void) => composerSubmitChannel.consume(handler);
 
+export { SIGNED_OUT } from "./signed-out";
+
 export interface ComposerAttachRequest {
     /** The account the files were dropped for; absent when it was not known yet (a dock drop while the app starts). */
     accountId?: string;

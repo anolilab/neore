@@ -8,10 +8,14 @@ import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const inbox = vi.hoisted(() => {
-    return { fileListeners: [] as ((files: File[]) => void)[], unsubscribed: 0 };
+    return {
+        accountsAtStart: [] as (() => string | undefined)[],
+        fileListeners: [] as ((files: File[], accountId: string | undefined) => void)[],
+        unsubscribed: 0,
+    };
 });
 const session = vi.hoisted(() => {
-    return { data: null as { user: { id: string } } | null };
+    return { data: null as { user: { id: string } } | null, isPending: true };
 });
 const requestComposerAttach = vi.hoisted(() => vi.fn());
 // Stable across renders, as the router's own `navigate` and `router` are.
@@ -44,7 +48,7 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
             return {
                 authClient: {
                     useSession: () => {
-                        return { data: session.data };
+                        return { data: session.data, isPending: session.isPending };
                     },
                 },
             };
@@ -81,8 +85,9 @@ vi.mock("./shell-inbox", () => {
         completeNativeSignIn: async () => {},
         onNativeCompose: none,
         onNativeDraft: none,
-        onNativeFiles: (listener: (files: File[]) => void) => {
+        onNativeFiles: (listener: (files: File[], accountId: string | undefined) => void, accountAtStart: () => string | undefined) => {
             inbox.fileListeners.push(listener);
+            inbox.accountsAtStart.push(accountAtStart);
 
             return () => {
                 inbox.unsubscribed += 1;
@@ -104,17 +109,33 @@ describe("NativeBridge dock drops", () => {
         const { rerender } = render(<NativeBridge />);
 
         session.data = { user: { id: "u1" } };
+        session.isPending = false;
         rerender(<NativeBridge />);
 
         expect(inbox.fileListeners).toHaveLength(1);
         expect(inbox.unsubscribed).toBe(0);
 
+        // The shell starts handing a drop over under u1; the account switches before it answers.
+        const startedFor = inbox.accountsAtStart[0]?.();
+
+        session.data = { user: { id: "u2" } };
+        rerender(<NativeBridge />);
+
         const file = new File(["a"], "a.txt");
 
-        inbox.fileListeners[0]?.([file]);
+        inbox.fileListeners[0]?.([file], startedFor);
 
         await waitFor(() => {
             expect(requestComposerAttach).toHaveBeenCalledWith({ accountId: "u1", files: [file] });
         });
+        expect(inbox.accountsAtStart[0]?.()).toBe("u2");
+    });
+
+    it("marks a drop made with no one signed in as signed out, not as any account", () => {
+        session.data = null;
+        session.isPending = false;
+        render(<NativeBridge />);
+
+        expect(inbox.accountsAtStart.at(-1)?.()).toBe("signed-out");
     });
 });
