@@ -333,6 +333,27 @@ describe("endSession", () => {
         expect(setAuthToken.mock.calls).toEqual([[null]]);
     });
 
+    it("keeps tokens held for a newer grant's sign-out when an older one finds its grant replaced", async () => {
+        const { sync } = await signedIn();
+        const revoke = deferred();
+        const newer = { id: "g2", token: "newer", user: { ...USER, id: "u2" } };
+
+        stopSync = sync.signOut;
+        store.set(GRANT_KEY, newer);
+        fetchMock.mockReturnValueOnce(revoke.promise);
+
+        // The newer grant's sign-out is revoking; the older one finds its grant replaced and ends.
+        const newerSignOut = endSession(sync, "g2");
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
+        await expect(endSession(sync, USER.id)).resolves.toBeUndefined();
+
+        await expect(getAccessToken()).resolves.toBeNull();
+
+        revoke.resolve(new Response(null, { status: 204 }));
+        await newerSignOut;
+    });
+
     it("leaves another grant stored since the page was shown signed in, and resolves", async () => {
         const { setAuthToken, sync } = await signedIn();
         const newer = { id: "g2", token: "newer", user: { ...USER, id: "u2" } };

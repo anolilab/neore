@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { holdAccessTokens, resumeAccessTokens } from "./access-token";
+import { holdAccessTokens, releaseAccessTokens } from "./access-token";
 import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
 import { grantKey, readGrant, signOutGrant, STORAGE_KEY } from "./extension-grant";
@@ -52,7 +52,7 @@ const runEndSession = async (authTokenSync: { suspend: () => SuspendedSession },
         if (error instanceof GrantRemovalError && error.revoked) {
             suspended.finish();
         } else {
-            resumeAccessTokens();
+            releaseAccessTokens();
             suspended.restore();
         }
 
@@ -60,7 +60,7 @@ const runEndSession = async (authTokenSync: { suspend: () => SuspendedSession },
     }
 
     if (outcome === "replaced") {
-        resumeAccessTokens();
+        releaseAccessTokens();
         suspended.restore();
 
         return;

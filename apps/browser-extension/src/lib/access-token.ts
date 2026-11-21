@@ -50,8 +50,13 @@ const readGrantOrNone = async (): Promise<StoredGrant | undefined> => {
 /** A JWT and the grant it was minted for: a token never outlives its grant. */
 let cached: { grant: string; token: string } | null = null;
 let inflight: { grant: string; promise: Promise<string | null> } | null = null;
-/** Set while a sign-out is out and after it: no token for the grant being ended. */
-let held = false;
+
+/**
+ * Sign-outs holding tokens: none goes out while any is held. A count, not a
+ * flag, so a sign-out that ends early (its grant was replaced) cannot lift the
+ * hold of another still revoking.
+ */
+let holds = 0;
 
 /**
  * A current bearer token for the stored grant, fetched once and reused until
@@ -62,7 +67,7 @@ let held = false;
  * handing out the previous one's JWT.
  */
 export const getAccessToken = async (options: { force?: boolean } = {}): Promise<string | null> => {
-    if (held) {
+    if (holds > 0) {
         return null;
     }
 
@@ -95,7 +100,7 @@ export const getAccessToken = async (options: { force?: boolean } = {}): Promise
                 return await getAccessToken();
             }
 
-            if (held) {
+            if (holds > 0) {
                 return null;
             }
 
@@ -111,7 +116,7 @@ export const getAccessToken = async (options: { force?: boolean } = {}): Promise
 
     const token = await inflight.promise;
 
-    return held ? null : token;
+    return holds > 0 ? null : token;
 };
 
 /** Forget the cached token (sign-out, or a 401 that says it is no longer good). */
@@ -124,11 +129,16 @@ export const clearAccessToken = (): void => {
  * grant stays stored until the revoke answers and storage removes it.
  */
 export const holdAccessTokens = (): void => {
-    held = true;
+    holds += 1;
     cached = null;
+};
+
+/** A sign-out that held tokens ended without signing out (its grant was replaced, or storage failed): it lifts only its own hold. */
+export const releaseAccessTokens = (): void => {
+    holds = Math.max(0, holds - 1);
 };
 
 /** A session started (a new grant, or this panel's first), or a sign-out failed and kept the grant: tokens flow again. */
 export const resumeAccessTokens = (): void => {
-    held = false;
+    holds = 0;
 };
