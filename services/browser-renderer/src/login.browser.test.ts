@@ -107,7 +107,16 @@ describe(signIn, () => {
     beforeAll(async () => {
         // Cross-site frames in their own process, as with site isolation: each is a target of its own.
         browser = await chromium.launch({ args: ["--site-per-process"] });
-        evil = await site("127.0.0.2", (request, response) => (request.url === "/relay" ? html(response, fixture.evil) : response.end("ok")));
+        evil = await site("127.0.0.2", (request, response) => {
+            if (request.url === "/relay") {
+                html(response, fixture.evil);
+            } else if (request.url === "/bounce") {
+                response.writeHead(302, { location: `${login.origin}/` });
+                response.end();
+            } else {
+                response.end("ok");
+            }
+        });
         await new Promise<void>((resolve) => {
             udp.bind(0, "127.0.0.2", resolve);
         });
@@ -181,7 +190,7 @@ describe(signIn, () => {
         await context.close();
     });
 
-    const run = async (now: () => number = Date.now) =>
+    const run = async (now: () => number = Date.now, url = `${login.origin}/`) =>
         signIn(
             // The Worker's fork of the same API; its types differ only in a few narrower overloads.
             page as unknown as WorkerPage,
@@ -192,7 +201,7 @@ describe(signIn, () => {
                 origin: login.origin,
                 pageTimeout: 5000,
                 password: SAVED_SECRET,
-                url: `${login.origin}/`,
+                url,
                 username: "ann",
             },
         );
@@ -411,14 +420,15 @@ describe(signIn, () => {
         expect(sessionPosts()).toHaveLength(1);
     });
 
-    it("signs in when the form's address carries a value the site renders afresh on each load", async () => {
+    it("signs in when the form's address carries a value the site renders afresh on each load, loading the page once", async () => {
         fixture.page = loginForm("", 'method="post" action="/session?session_code=PER_LOAD&client_id=app"');
 
+        const loadsBefore = pageLoads;
         const result = await run();
         const posts = login.hits.filter((hit) => hit.method === "POST");
 
         expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
-        // The address of the page that was typed into: the second load's.
+        expect(pageLoads - loadsBefore).toBe(1);
         expect(posts).toStrictEqual([
             { body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: `/session?session_code=Kq7${String(pageLoads).padStart(13, "0")}&client_id=app` },
         ]);
@@ -648,6 +658,11 @@ describe(signIn, () => {
         ["adds a key to the form's query", `document.forms[0].action += "&next=home";`],
         ["removes a key from the form's query", `document.forms[0].action = "/session?session_code=PER_LOAD";`],
         ["keeps the query but changes the path", `document.forms[0].action = "/profile?session_code=PER_LOAD&client_id=app";`],
+        ["swaps the per-load code for one of its own", `document.forms[0].action = "/session?session_code=Zp3cD8yW1nR50000&client_id=app";`],
+        ["swaps the code's key for another", `document.forms[0].action = "/session?tenant=PER_LOAD&client_id=app";`],
+        ["points the form's submit button elsewhere", `document.forms[0].querySelector("button").formAction = "/profile?session_code=PER_LOAD&client_id=app";`],
+        ["changes how the form is encoded", `document.forms[0].enctype = "multipart/form-data";`],
+
         [
             "changes a value of the query to an address",
             `document.forms[0].action = "/session?session_code=" + encodeURIComponent("https://x.example/") + "&client_id=app";`,
@@ -658,6 +673,61 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("A script changed where"), submitted: false, success: false });
+        expect(await leftBlank()).toBe(true);
+    });
+
+    it("types nothing when a script hides the login form so that another form the site sent is filled", async () => {
+        fixture.page = `${loginForm()}<form method="post" action="/profile"><input name="user"><input name="pw" type="password"><button>Save</button></form><script>document.forms[0].hidden = true;</script>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("A script changed where"), submitted: false, success: false });
+        expect(login.hits.filter((hit) => hit.method === "POST")).toStrictEqual([]);
+    });
+
+    it("types nothing when a script moves the tab to another page of the site with a form of its own", async () => {
+        fixture.page = loginForm(`location.replace("/popup");`);
+        fixture.popup = `<form method="post" action="/profile"><input name="user"><input name="pw" type="password"><button>Save</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: false, success: false });
+        expect(login.hits.filter((hit) => hit.method === "POST")).toStrictEqual([]);
+    });
+
+    it("signs in with a form whose empty action is the page's own address, whatever its base", async () => {
+        fixture.page = `<base href="/other/">${loginForm("", 'method="post" action=""')}`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true });
+        expect(login.hits.filter((hit) => hit.method === "POST")).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/" }]);
+    });
+
+    it("types nothing into a login page another site redirected the tab to", async () => {
+        fixture.page = loginForm();
+
+        const result = await run(Date.now, `${evil.origin}/bounce`);
+
+        expect(result).toMatchObject({
+            error: expect.stringContaining("cannot check where the login form sends the password"),
+            submitted: false,
+            success: false,
+        });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("types nothing when the page's HTML as the site sent it cannot be read whole", async () => {
+        // Past the 2 MB the served HTML is read up to.
+        fixture.page = `${loginForm()}<!--${"x".repeat(2 * 1024 * 1024)}-->`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({
+            error: expect.stringContaining("cannot check where the login form sends the password"),
+            submitted: false,
+            success: false,
+        });
         expect(await leftBlank()).toBe(true);
     });
 

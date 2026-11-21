@@ -6,6 +6,8 @@ import type { BrowserContext, CDPSession, Page, Request, Response, Route, WebSoc
 
 import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
+import type { FormTarget } from "./served-form";
+import { MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
 
 /** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
 export const originOf = (url: string): string | null => {
@@ -363,12 +365,6 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  * `attempt()` names the first blocked request that could have carried what the page has (a navigation, a body, a socket
  * or such a redirect). A guard that cannot be set up whole is taken down again before the error is thrown.
  */
-/** Where the form sends the password: its action address, and the password field's name. */
-interface FormTarget {
-    action: string;
-    name: string;
-}
-
 const withoutFragment = (url: string): string => url.split("#", 1)[0] ?? url;
 
 const armGuard = async (
@@ -659,7 +655,11 @@ const checkForm = (
             (control) => control.form === form && ["image", "submit"].includes(control.type) && !control.matches(":disabled"),
         ) ?? null;
     const named = button?.getAttribute("formmethod") ?? form.getAttribute("method");
-    const action = new URL(button?.getAttribute("formaction") ?? form.getAttribute("action") ?? "", document.baseURI);
+    const written = button?.getAttribute("formaction") ?? form.getAttribute("action") ?? "";
+    // An empty action is the document's own address, whatever its base.
+    const action = new URL(written === "" ? document.URL : written, document.baseURI);
+
+    action.hash = "";
     const target = (
         button?.getAttribute("formtarget") ??
         form.getAttribute("target") ??
@@ -690,53 +690,111 @@ const checkForm = (
         form.requestSubmit(button ?? undefined);
     }
 
-    return { action: action.href, name };
+    return {
+        action: action.href,
+        charset: form.getAttribute("accept-charset") ?? "",
+        enctype: encoding,
+        method: (named ?? "post").toLowerCase(),
+        name,
+        target,
+    };
 };
 
-/** A query value a site renders afresh on each load: letters, digits, `-` and `_`, not one plain word. */
-const TOKEN_RE = /^[\w-]{8,}$/;
-const TOKEN_CLASSES = [/[a-z]/, /[A-Z]/, /\d/];
-
-const isToken = (value: string): boolean => TOKEN_RE.test(value) && TOKEN_CLASSES.filter((letters) => letters.test(value)).length >= 2;
+/** What the site answered a document load with: enough to read its body and where it came from. */
+interface Answer {
+    requestId: string;
+    response: { fromServiceWorker?: boolean; mimeType: string; url: string };
+}
 
 /**
- * Whether the form address of the scripted load, `scripted`, is the one the site sent in the scripts-off load, `served`:
- * the same address but for the query, whose keys are the same in the same order. A value may differ only where both
- * look like a token the site renders afresh on each load (a `session_code`, `state` or nonce) of the same length; a
- * value spelling an address or a path (`/`, `:`, `%`), or a word (`?page=login` made `?page=comments`, which a site that
- * routes by query would send to another handler), is not one.
+ * Loads `url` in the main frame of `page`, until its `DOMContentLoaded` or `timeout`, past the HTTP cache, and keeps hold
+ * of that load. `served()` is then the HTML the site sent for it, as the network delivered it and the browser decoded it,
+ * read over the DevTools protocol where no script of the page reaches, with its address: `null` when the page no longer
+ * shows the document that load committed (a script navigated it away), a redirect of it passed through another origin
+ * than `origin`, a service worker answered, it is not `text/html`, or its body is not kept (over `MAX_SERVED_BYTES`,
+ * which the browser then drops, or gone) or not text the browser decoded. Throws when the load fails; `detach()` lets
+ * go of it.
  */
-export const isSameEndpoint = (served: string, scripted: string): boolean => {
-    if (!URL.canParse(served) || !URL.canParse(scripted)) {
-        return false;
+const loadServed = async (page: Page, { origin, timeout, url }: { origin: string; timeout: number; url: string }) => {
+    const session = await page.context().newCDPSession(page);
+    const answers = new Map<string, Answer>();
+    // Loads that asked another origin on the way, by a redirect: that hop chose the page.
+    const strayed = new Set<string>();
+
+    session.on("Network.requestWillBeSent", ({ loaderId, request, type }) => {
+        if (type === "Document" && originOf(request.url) !== origin) {
+            strayed.add(loaderId);
+        }
+    });
+    session.on("Network.responseReceived", ({ loaderId, requestId, response, type }) => {
+        if (type === "Document") {
+            answers.set(loaderId, { requestId, response });
+        }
+    });
+
+    const detach = async (): Promise<void> => {
+        await session.detach().catch(() => undefined);
+    };
+
+    let loaderId: string | undefined;
+
+    try {
+        await session.send("Network.enable", { maxResourceBufferSize: MAX_SERVED_BYTES, maxTotalBufferSize: MAX_SERVED_BYTES * 4 });
+        // A response a script of the site had cached (with headers of its own choosing) is not the site's answer to this load.
+        await session.send("Network.setCacheDisabled", { cacheDisabled: true });
+
+        const loaded = page
+            .waitForEvent("domcontentloaded", { timeout })
+            .then(() => true)
+            .catch(() => false);
+        const navigated = await within(session.send("Page.navigate", { url }), timeout, null);
+
+        if (!navigated) {
+            await session.send("Page.stopLoading").catch(() => undefined);
+
+            throw new Error("The login page did not load in time");
+        }
+
+        loaderId = navigated.loaderId;
+
+        // No loader: a navigation within the document the tab already shows, whose HTML was not sent for this load.
+        if (loaderId === undefined || navigated.errorText) {
+            throw new Error(`The login page did not load${navigated.errorText ? ` (${navigated.errorText})` : ""}`);
+        }
+
+        if (!(await loaded)) {
+            throw new Error("The login page did not load in time");
+        }
+    } catch (error) {
+        await detach();
+
+        throw error;
     }
 
-    const [before, after] = [new URL(served), new URL(scripted)];
-    const [sent, used] = [before, after].map(({ search }) => (search === "" ? [] : search.slice(1).split("&")));
+    const served = async (): Promise<{ text: string; url: string } | null> => {
+        try {
+            const { frameTree } = await session.send("Page.getFrameTree");
+            const answer = answers.get(frameTree.frame.loaderId);
 
-    before.search = "";
-    after.search = "";
+            if (
+                !answer ||
+                frameTree.frame.loaderId !== loaderId ||
+                strayed.has(loaderId) ||
+                answer.response.fromServiceWorker ||
+                answer.response.mimeType !== "text/html"
+            ) {
+                return null;
+            }
 
-    return (
-        withoutFragment(before.href) === withoutFragment(after.href) &&
-        sent?.length === used?.length &&
-        (sent ?? []).every((pair, index) => {
-            const other = used?.[index] ?? "";
-            const [key, value, ...rest] = pair.split("=");
-            const [otherKey, otherValue, ...otherRest] = other.split("=");
+            const { base64Encoded, body } = await session.send("Network.getResponseBody", { requestId: answer.requestId });
 
-            return (
-                pair === other ||
-                (key === otherKey &&
-                    rest.length === 0 &&
-                    otherRest.length === 0 &&
-                    value !== undefined &&
-                    otherValue?.length === value.length &&
-                    isToken(value) &&
-                    isToken(otherValue))
-            );
-        })
-    );
+            return base64Encoded || body.length > MAX_SERVED_BYTES ? null : { text: body, url: answer.response.url };
+        } catch {
+            return null;
+        }
+    };
+
+    return { detach, served };
 };
 
 /** Whether any frame of the page has a password field. Throws when it cannot look. */
@@ -917,95 +975,76 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         return { error: scrub(why), submitted: Boolean(guard?.submitted()), success: false, url: scrub(page.url()) };
     };
 
-    /**
-     * Where the login form sends the password in the page as the site sent it, before any script of it ran: a script
-     * could otherwise point the form, and the password, at an address of the site that keeps and shows what it is sent.
-     * `null` when that page has no such form (a script builds it).
-     */
-    const servedForm = async (): Promise<FormTarget | null> => {
-        const session = await page.context().newCDPSession(page);
+    /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
+    const findFields = async () => {
+        const load = await loadServed(page, { origin, timeout: left(navTimeout), url });
 
         try {
-            await session.send("Emulation.setScriptExecutionDisabled", { value: true });
-            await page.goto(url, { timeout: left(navTimeout), waitUntil: "domcontentloaded" });
+            const landed = offSite();
 
-            if (offSite()) {
-                return null;
+            if (landed) {
+                return `${landed}, so nothing was typed`;
             }
 
+            // The main frame only: a frame of another site is never typed into.
             const field = await page
                 .locator('input[type="password"]:visible')
                 .first()
-                .elementHandle({ timeout: left(1000) })
+                .elementHandle({ timeout: left(pageTimeout) })
                 .catch(() => null);
-            const form = await field?.evaluate(checkForm, { isAscii, origin, submit: false });
 
-            return typeof form === "object" ? form : null;
+            if (!field) {
+                return "No password field is on the page";
+            }
+
+            const form = await field.evaluate(checkForm, { isAscii, origin, submit: false });
+
+            if (form === "no-form") {
+                return "The password field is not in a form, so nothing was typed or sent";
+            }
+
+            if (form === "off-site") {
+                return `The login form would not send the password to ${origin} by POST in this window, so nothing was typed`;
+            }
+
+            if (form === "encoding") {
+                return "The login form encodes what it sends in a way the agent's browser cannot put a saved password into, so nothing was typed";
+            }
+
+            if (form.name === "") {
+                return "The password field has no name, so its form would not send it; nothing was typed";
+            }
+
+            const html = await within(load.served(), left(SEND_WAIT_MS), null);
+            const served = html ? servedForms(html.text, html.url) : [];
+            const target = servedTarget(served, form);
+
+            if (html === null || served[0] === null) {
+                return "The agent's browser cannot check where the login form sends the password (the page as the site sent it could not be read, or its first password field is in no form it can read), so nothing was typed";
+            }
+
+            if (!target) {
+                return served.length > 0
+                    ? "A script changed where the login form sends the password, so nothing was typed"
+                    : "The login form is built by a script, so the agent's browser cannot check where it sends the password; nothing was typed";
+            }
+
+            const userHandle = await field.evaluateHandle((input) => {
+                const scope = (input as HTMLInputElement).form ?? document;
+                const before = [...scope.querySelectorAll("input")].filter(
+                    (candidate) =>
+                        ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
+                        candidate.getClientRects().length > 0 &&
+                        Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
+                );
+
+                return before.at(-1) ?? null;
+            });
+
+            return { field, target, user: userHandle.asElement() };
         } finally {
-            await session.detach().catch(() => undefined);
+            await load.detach();
         }
-    };
-
-    /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
-    const findFields = async () => {
-        const served = await servedForm();
-
-        await page.goto(url, { timeout: left(navTimeout), waitUntil: "domcontentloaded" });
-
-        const landed = offSite();
-
-        if (landed) {
-            return `${landed}, so nothing was typed`;
-        }
-
-        // The main frame only: a frame of another site is never typed into.
-        const field = await page
-            .locator('input[type="password"]:visible')
-            .first()
-            .elementHandle({ timeout: left(pageTimeout) })
-            .catch(() => null);
-
-        if (!field) {
-            return "No password field is on the page";
-        }
-
-        const form = await field.evaluate(checkForm, { isAscii, origin, submit: false });
-
-        if (form === "no-form") {
-            return "The password field is not in a form, so nothing was typed or sent";
-        }
-
-        if (form === "off-site") {
-            return `The login form would not send the password to ${origin} by POST in this window, so nothing was typed`;
-        }
-
-        if (form === "encoding") {
-            return "The login form encodes what it sends in a way the agent's browser cannot put a saved password into, so nothing was typed";
-        }
-
-        if (form.name === "") {
-            return "The password field has no name, so its form would not send it; nothing was typed";
-        }
-
-        if (!served || !isSameEndpoint(served.action, form.action) || served.name !== form.name) {
-            return served
-                ? "A script changed where the login form sends the password, so nothing was typed"
-                : "The login form is built by a script, so the agent's browser cannot check where it sends the password; nothing was typed";
-        }
-
-        const userHandle = await field.evaluateHandle((input) => {
-            const scope = (input as HTMLInputElement).form ?? document;
-            const before = [...scope.querySelectorAll("input")].filter(
-                (candidate) =>
-                    ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
-                    candidate.getClientRects().length > 0 &&
-                    Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
-            );
-
-            return before.at(-1) ?? null;
-        });
-
-        return { field, target: form, user: userHandle.asElement() };
     };
 
     const attempt = async (): Promise<SignInResult> => {

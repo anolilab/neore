@@ -85,14 +85,31 @@ the password is typed counts as an attempt; that is reported, not stopped, since
 The page never holds the password. Its field gets a random stand-in (64 letters and digits, or the password's length
 when longer, within the field's `maxlength`), and request interception puts the password in its place only in the
 main frame's POST to the form's action address, only as the password field's value, and only when the stand-in is
-nowhere else in the body. That action and field are the ones of the page as the site sent it, loaded first with
-scripts off: a form a script points elsewhere or builds itself is not typed into, since it could send the password to an
-address of the site that keeps and shows it. Of the action's query, only a value both loads spell as a token of the same
-length (8 or more letters, digits, `-` and `_`, not one plain word: a `session_code` or `state` the site renders afresh)
-may differ, and the POST is matched against the scripted load's address; another key, path or a value that spells an
-address, a path or a word is refused. Not covered: a script on the page can swap such a token for one of its own, as it
-can a hidden field of the body. A site where that value alone picks what the password signs into (a login transaction
-with no cookie binding it, a tenant with its own password check) would then take the password for the script's choice.
+nowhere else in the body. That form must be the one the site sent. The login page is loaded once, past the HTTP cache,
+and the HTML the site sent for that load (the main-frame document's response body, read over the DevTools protocol as
+the browser decoded it, and only while the tab still shows that load's document) is parsed in the Worker
+(`src/served-form.ts`, with parse5), where no page script reaches. The live form's action (the submit button's
+`formaction` included; an empty one is the page's own address), method, enctype, target and `accept-charset` must be
+exactly those the site sent for its password fields, all of which must go to that one place, through submit buttons
+that all agree, and the field typed into must have the name of one of them; the guard then sends only to that action
+and field. A per-load value in the action (a `session_code` or `state`) is matched against its own load, so a script
+that swaps it, a key or the path, points the button elsewhere, changes the encoding, builds the form, moves the tab to
+another page, or hides the site's login form so that another of its forms is filled, has nothing typed. Faking what the
+page reports gains nothing either: what goes out is held to the served action and field name. Nothing is typed, with a
+result saying the browser cannot check where the form sends the password, when that HTML cannot be read whole (no
+body, a service worker's answer, not `text/html`, over 2 MB, or bytes the browser does not hand back as text, as it does
+not for Shift_JIS or an undeclared charset with non-ASCII bytes), when a redirect of the load passed through another
+site, or when the site's first password field is in no form parse5 sees (a form inside a table, which the browser's
+parser ties to its fields without holding them). A page with password forms to more than one place (a sign-up form
+beside the login form), a form whose submit buttons go to different places, a login form only in a declarative shadow root,
+and a `url` that differs from the tab's address only by its fragment are refused too. The capture has been run
+against Playwright's Chromium only, not yet on Browser Rendering; there, a body it does not hand back refuses every
+sign-in rather than allow one. Not covered: a script can still change a hidden field of the body, as the site's own
+scripts do; a site where such a field alone picks what the password signs into would take the password for the
+script's choice. The same goes for a 307 or 308 redirect of the POST to another address of the same site, which carries
+the body there, and for cookies a script of the site set earlier, which shape the page the site sends. The check proves
+the site sent the form, not that it is a sign-in: `url` (any page of `origin`) decides that, so a caller pointing it at
+a page that asks for the password to change an email or delete the account would have it typed there.
 The form's target is this window: empty, `_self`, or `_parent` and `_top`, which name it, as the top window. A POST elsewhere, or one where the page moved or copied the stand-in, is
 not sent. Neither is a redirect of the answer whose address carries the password in its query or fragment, in any
 spelling (encoded twice included): that counts as an attempt. A password short enough to be part of an ordinary

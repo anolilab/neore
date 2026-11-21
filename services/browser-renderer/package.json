@@ -19,6 +19,7 @@
     "dependencies": {
         "@cloudflare/playwright": "^1.4.0",
         "hono": "catalog:server",
+        "parse5": "catalog:utils",
         "zod": "catalog:utils"
     },
     "devDependencies": {
