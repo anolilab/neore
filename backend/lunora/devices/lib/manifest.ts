@@ -7,7 +7,14 @@
 import type { Infer } from "lunorash/server";
 
 import type { vAcpOffer, vDeviceManifestTool } from "../validators";
-import { ACP_TOOLS, MAX_MANIFEST_DESCRIPTION_CHARS, MAX_MANIFEST_OFFERS, MAX_MANIFEST_SCHEMA_BYTES, MAX_MANIFEST_TOOLS } from "./constants";
+import {
+    ACP_TOOLS,
+    isGlobalInstructionsTool,
+    MAX_MANIFEST_DESCRIPTION_CHARS,
+    MAX_MANIFEST_OFFERS,
+    MAX_MANIFEST_SCHEMA_BYTES,
+    MAX_MANIFEST_TOOLS,
+} from "./constants";
 import { utf8Length } from "./signing";
 
 export type DeviceManifestTool = Infer<typeof vDeviceManifestTool>;
@@ -51,6 +58,14 @@ export const parseManifestTools = (value: unknown): DeviceManifestTool[] | null 
         }
 
         seen.add(name);
+
+        // The instruction-file tools are started only from project settings (`../global-instructions.ts`), whose prompt tells
+        // the person the agent did not ask. Offered to a chat, the agent could read those files under that wording.
+        // Dropped, not refused like an `acp_` name: they are real tools of the computer, only never a chat's.
+        if (isGlobalInstructionsTool(name)) {
+            continue;
+        }
+
         tools.push({
             description: description.slice(0, MAX_MANIFEST_DESCRIPTION_CHARS),
             inputSchema,

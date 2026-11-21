@@ -46,6 +46,10 @@ describe("parseManifestTools", () => {
         expect(parseManifestTools([tool({ name: "acp_backup" })])).toBeNull();
     });
 
+    it.each(["instructions_list", "instructions_read"])("drops %s: only project settings starts one, never a chat", (name) => {
+        expect(parseManifestTools([tool(), tool({ name })])?.map((entry) => entry.name)).toEqual(["fs_read"]);
+    });
+
     it("truncates long descriptions", () => {
         expect(parseManifestTools([tool({ description: "x".repeat(5000) })])?.[0]?.description).toHaveLength(2000);
     });

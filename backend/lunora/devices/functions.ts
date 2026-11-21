@@ -27,6 +27,7 @@ import { decryptKey } from "../lib/encryption";
 import {
     ACP_CLAIM_LEASE_MS,
     DEVICE_SIGNATURE_WINDOW_MS,
+    isGlobalInstructionsTool,
     MAX_APP_VERSION_INPUT_LENGTH,
     MAX_DEVICE_OUTPUT_BYTES,
     MAX_DEVICE_SCOPE_PROJECTS,
@@ -34,7 +35,6 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
-import { isGlobalInstructionsTool } from "./global-instructions";
 import { scheduleClearDeviceProjects } from "./internal";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";

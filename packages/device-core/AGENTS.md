@@ -22,7 +22,8 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
   in a shared folder (planned AND current; the read holds no lock, and a `settings_update` saved during it voids its
   result); the real file is a regular `.md` inside `$HOME`; opened via `fs::open_confined`, then the handle must be the
   approved dev/inode (Windows: the approved real path) and not hard-linked (Unix); 48 KiB each, always asked
-  (`can_always_allow`); the desktop words it as the person's request (`apps/desktop/src/device/prompt-origin.ts`).
+  (`can_always_allow`); the desktop words it as the person's request (`apps/desktop/src/device/prompt-origin.ts`), so an
+  envelope that names a `threadId` (a chat's) is refused before it asks.
   Never add a path from the request.
 - **`device-core` has two halves**: `actions.rs` imports no pairing/envelope/approval/keychain; `engine.rs` verifies, asks, then calls it. The paired half is the default `keychain` feature.
 - `neore-host --stdio` is built `--no-default-features`, trusts only its pipe and re-checks folders and sandbox on its own machine. New tools/changed results go in `tests/common/actions.json`. Desktop main-process calls use `HostTransport`.

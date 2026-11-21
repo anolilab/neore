@@ -619,7 +619,18 @@ impl DeviceState {
         // A copy, so the lock is not held while an instruction-file plan touches the home folder: a hung mount there
         // would otherwise stall `replanned_since`, which takes this lock under `save_lock`, and every settings update.
         let mcp_tools = self.mcp_tools.lock().unwrap().clone();
-        let planned = plan(&call.tool, &call.input, &settings, &mcp_tools);
+        // Only a click in a project's settings starts an instruction-file call, and the prompt says the agent did not ask: one
+        // that names a chat is refused before it is shown. The backend never signs one (`createDeviceCall`).
+        let planned = if global_instructions::is_global_instructions_tool(&call.tool)
+            && call.thread_id.is_some()
+        {
+            Err(format!(
+                "{} is started only from a project's settings, never by a chat",
+                call.tool
+            ))
+        } else {
+            plan(&call.tool, &call.input, &settings, &mcp_tools)
+        };
         let mut detail = String::new();
 
         let outcome = match planned {
@@ -2420,6 +2431,87 @@ mod tests {
     fn offers_no_file_or_shell_tools_without_shared_folders() {
         assert!(builtin_tools(&[], "here").is_empty());
         assert_eq!(builtin_tools(&[std::env::temp_dir()], "here").len(), 4);
+    }
+
+    /// An instruction-file call that names a chat is refused unasked: its prompt would say the agent did not ask. The
+    /// same call from settings (no thread) is shown.
+    #[test]
+    fn an_instruction_file_call_from_a_chat_is_refused_before_it_asks() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!(
+            "neore-device-chat-instructions-{}",
+            std::process::id()
+        ));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let call = |nonce: &str, thread: Option<&str>| {
+            let mut payload = json!({
+                "v": 1, "kind": "call", "callId": nonce, "deviceId": "dev1", "tool": "instructions_list",
+                "input": {}, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": nonce,
+            });
+
+            if let Some(thread) = thread {
+                payload["threadId"] = json!(thread);
+            }
+
+            envelope::sign_value(&secret, Domain::Call, &payload)
+        };
+
+        let result = state.execute(&call("n1", Some("t1"))).unwrap();
+        let parsed: Value = serde_json::from_str(&result.payload).unwrap();
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(parsed["error"]
+            .as_str()
+            .is_some_and(|error| error.contains("never by a chat")));
+        assert!(parsed.get("output").is_none());
+        assert!(!received
+            .try_iter()
+            .any(|event| matches!(event, Event::Prompt { .. })));
+
+        let signed = call("n2", None);
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = next_prompt(&received);
+
+        state.prompt_answer(prompt.id, "deny").unwrap();
+
+        let parsed: Value = serde_json::from_str(&worker.join().unwrap().unwrap().payload).unwrap();
+
+        assert_eq!(parsed["status"], "denied");
+
+        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// The approval gate end to end: a call waits for a person, a refusal runs

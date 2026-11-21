@@ -20,3 +20,5 @@
   signs `instructions_list` / `instructions_read` for the caller's own desktop (never a server or a machine paired
   by code), with no thread (`deviceCalls.threadId` is optional for it alone). The request names ids from a fixed
   list; the paths live only in Rust (`device-core/src/global_instructions.rs`), keep the two id lists in step.
+  No chat reaches them: `parseManifestTools` drops the two names, `createDeviceCall` refuses them, and Rust refuses
+  one whose envelope names a `threadId`.

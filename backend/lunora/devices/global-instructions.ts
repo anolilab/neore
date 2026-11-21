@@ -17,19 +17,19 @@ import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery } from "../lib/crpc";
 import { decryptKey } from "../lib/encryption";
 import { checkRateLimit } from "../lib/rate-limiter";
-import { DEVICE_CALL_DEADLINE_MS, MAX_OPEN_CALLS_PER_DEVICE } from "./lib/constants";
+import {
+    DEVICE_CALL_DEADLINE_MS,
+    GLOBAL_INSTRUCTIONS_LIST_TOOL,
+    GLOBAL_INSTRUCTIONS_READ_TOOL,
+    isGlobalInstructionsTool,
+    MAX_OPEN_CALLS_PER_DEVICE,
+} from "./lib/constants";
 import { signDevicePayload } from "./lib/signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated } from "./lib/state";
 import { vDeviceCallStatus } from "./validators";
 
 /** The ids the device knows, in its order. Keep in step with `FILES` in `global_instructions.rs`. */
 export const GLOBAL_INSTRUCTION_FILE_IDS = ["claude", "codex", "gemini", "windsurf"] as const;
-
-export const GLOBAL_INSTRUCTIONS_LIST_TOOL = "instructions_list";
-export const GLOBAL_INSTRUCTIONS_READ_TOOL = "instructions_read";
-
-/** Whether a device call is one of the two that carry the person's local instruction files. */
-export const isGlobalInstructionsTool = (toolName: string): boolean => toolName === GLOBAL_INSTRUCTIONS_LIST_TOOL || toolName === GLOBAL_INSTRUCTIONS_READ_TOOL;
 
 /** The `data.code` of a refusal the editor words itself. */
 export const GLOBAL_INSTRUCTIONS_REFUSALS = { BUSY: "DEVICE_BUSY", OFFLINE: "DEVICE_OFFLINE", OUTDATED: "DEVICE_OUTDATED" } as const;

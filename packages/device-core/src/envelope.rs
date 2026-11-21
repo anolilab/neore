@@ -81,6 +81,10 @@ pub struct CallEnvelope {
     pub nonce: String,
     #[serde(default)]
     pub tainted_by: Vec<String>,
+    /// The chat the call came from. Every chat call names one; the only calls without one are the global instruction
+    /// files, started from a project's settings (`backend/lunora/devices/global-instructions.ts`).
+    #[serde(default)]
+    pub thread_id: Option<String>,
     #[serde(default)]
     pub thread_title: String,
     pub tool: String,
