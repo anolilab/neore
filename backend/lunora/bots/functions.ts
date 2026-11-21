@@ -11,6 +11,7 @@ import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { INSTRUCTION_READ_TOOL } from "../projects/rule-files";
 import { SUB_AGENT_MAX_DEPTH } from "../sub-agents/logic";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { markBotOwnerDeleted } from "./owner";
@@ -96,7 +97,8 @@ const storedToolSelection = (selection: BotToolSelection | null): BotToolSelecti
         return undefined;
     }
 
-    const normalized = normalizeBotToolSelection(selection, new Set(listBuiltInTools().map((tool) => tool.name as string)));
+    // `instruction_read` is not in the tool list (it exists only in a run with a project's `auto` files), but an exclusion may name it.
+    const normalized = normalizeBotToolSelection(selection, new Set([...listBuiltInTools().map((tool) => tool.name as string), INSTRUCTION_READ_TOOL]));
 
     if ("error" in normalized) {
         throw new LunoraError("BAD_REQUEST", normalized.error);

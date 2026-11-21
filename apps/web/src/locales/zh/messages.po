@@ -25,11 +25,11 @@ msgstr " · 模型：{modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}，{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- INSERT --"
 msgstr "-- 插入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- NORMAL --"
 msgstr "-- 普通 --"
 
@@ -61,19 +61,19 @@ msgstr "“{0}” 将在其依赖项完成后开始"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "“{badLogin}”不是有效的登录名。登录名须以字母或数字开头，最多 {0} 个字符，且只能包含字母、数字以及单个连字符或下划线。"
 
-#: src/features/chat/thread/composer-input.tsx:642
+#: src/features/chat/thread/composer-input.tsx:644
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:635
+#: src/features/chat/thread/composer-input.tsx:637
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:1152
+#: src/features/chat/thread/composer-input.tsx:1165
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "\"{fileName}\" 无法上传，因此消息未发送。"
 
-#: src/features/chat/thread/composer-input.tsx:637
+#: src/features/chat/thread/composer-input.tsx:639
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
@@ -81,19 +81,19 @@ msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重�
 #~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
 #~ msgstr "\"{fileName}\" 无法上传。请移除后再发送。"
 
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:642
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:641
+#: src/features/chat/thread/composer-input.tsx:643
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
-#: src/features/projects/components/project-rule-files.tsx:436
+#: src/features/projects/components/project-rule-files.tsx:584
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "“{name}”的文件模式超过 {limit} 个。请删除一些，或移到另一个文件中。"
 
-#: src/features/projects/components/project-rule-files.tsx:425
+#: src/features/projects/components/project-rule-files.tsx:567
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "“{name}”超过 {limit} 个字符。请缩短，或拆分为多个文件。"
 
@@ -349,6 +349,11 @@ msgstr "{0, plural, other {# 项必需或未知检查失败}}"
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 项必需或未知检查仍在运行}}"
 
+#. placeholder {0}: added.length
+#: src/features/projects/components/project-rule-files.tsx:534
+msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
+msgstr "{0, plural, other {已导入 # 个规则文件。}} 请检查后保存。"
+
 #. placeholder {0}: executions.length
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:217
 msgid "{0, plural, one {# run} other {# runs}}"
@@ -429,7 +434,7 @@ msgstr "{0, plural, other {再显示 # 个视频}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:200
+#: src/routes/(chat)/chat/index.tsx:202
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {不支持的查询参数}}：{1}"
 
@@ -664,7 +669,7 @@ msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
 #. placeholder {0}: referenceImageIds.length
-#: src/features/chat/thread/media-gallery-view.tsx:362
+#: src/features/chat/thread/media-gallery-view.tsx:370
 msgid "{0} of {MAX_REFERENCE_IMAGES} references selected"
 msgstr "已选择 {0}/{MAX_REFERENCE_IMAGES} 张参考图"
 
@@ -1185,11 +1190,11 @@ msgstr "{metricLabel} > 每小时 {threshold}"
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 每月 {threshold}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:337
+#: src/features/chat/thread/media-gallery-view.tsx:345
 msgid "{mins}m"
 msgstr "{mins} 分"
 
-#: src/features/chat/thread/media-gallery-view.tsx:337
+#: src/features/chat/thread/media-gallery-view.tsx:345
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
@@ -1206,11 +1211,11 @@ msgstr "{minutes} 分钟前"
 msgid "{minutes}m remaining"
 msgstr "剩余 {minutes} 分钟"
 
-#: src/features/chat/thread/composer.tsx:235
+#: src/features/chat/thread/composer.tsx:237
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}模式——点击更改"
 
-#: src/features/chat/thread/thread.tsx:255
+#: src/features/chat/thread/thread.tsx:256
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {向 # 个模型提问任何问题...}}"
 
@@ -1404,7 +1409,7 @@ msgstr "{rowsNeeded, plural, other {需要再添加 # 行才能粘贴剪贴板�
 msgid "{secondLabel} ×{secondCount}"
 msgstr "{secondLabel} ×{secondCount}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:331
+#: src/features/chat/thread/media-gallery-view.tsx:339
 msgid "{seconds}s"
 msgstr "{seconds} 秒"
 
@@ -1427,6 +1432,10 @@ msgstr "{server} · 截至 {until}"
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, other {有 # 个文件无法导入，已被跳过}}"
+
+#: src/features/projects/components/project-rule-files.tsx:537
+msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
+msgstr "{skipped, plural, other {有 # 个文件未导入。}} 一个项目最多包含 {limit} 个规则文件。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:55
 msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
@@ -1486,6 +1495,10 @@ msgstr "{toolId} API 密钥已移除"
 msgid "{toolId} API key saved"
 msgstr "{toolId} API 密钥已保存"
 
+#: src/features/projects/components/project-rule-files.tsx:535
+msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
+msgstr "{toSet, plural, other {# 个文件未说明何时适用}}：请设置描述或选择其他模式。"
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:30
 msgid "{total, plural, one {Used # tool · {tail}} other {Used # tools · {tail}}}"
 msgstr "{total, plural, other {已使用 # 个工具 · {tail}}}"
@@ -1515,7 +1528,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "OpenRouter token 用量排名第一"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:868
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:906
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
@@ -1865,13 +1878,17 @@ msgstr "与你一起思考的文档编辑器。"
 msgid "A few questions first"
 msgstr "先回答几个问题"
 
-#: src/features/projects/components/project-rule-files.tsx:432
+#: src/features/projects/components/project-rule-files.tsx:580
 msgid "A file applied when files match needs at least one pattern."
 msgstr "“文件匹配时”应用的规则文件至少需要一个模式。"
 
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
 msgstr "仅所有者可读取的文件（无可用的钥匙串）"
+
+#: src/features/projects/components/project-rule-files.tsx:574
+msgid "A file read when needed needs a line saying when to read it."
+msgstr "按需读取的文件需要一行说明何时读取它。"
 
 #: src/features/skills/components/skill-import-dialog.tsx:202
 msgid "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not."
@@ -1986,7 +2003,7 @@ msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在�
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "一个项目最多可列出 {MAX_REPOSITORIES} 个仓库。"
 
-#: src/features/projects/components/project-rule-files.tsx:452
+#: src/features/projects/components/project-rule-files.tsx:601
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "一个项目最多包含 {limit} 个规则文件。请先删除一个。"
 
@@ -2024,9 +2041,13 @@ msgstr "使用了记忆的回复会显示“已使用的记忆”列表，方便
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "经路由或被提及的一轮最多有三位发言者。并行一轮最多有四个回答和一份综合结果，辩论最多进行三轮。"
 
-#: src/features/projects/components/project-rule-files.tsx:442
+#: src/features/projects/components/project-rule-files.tsx:591
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "规则文件的名称最多 {limit} 个字符。"
+
+#: src/features/projects/components/project-rule-files.tsx:587
+msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
+msgstr "规则文件的名称不能以“id:”开头。请重命名“{name}”。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:25
 msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
@@ -2429,7 +2450,7 @@ msgstr "请至少添加一个模型 ID"
 msgid "Add attachment"
 msgstr "添加附件"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:63
+#: src/features/canvas/components/canvas-toolbar.tsx:64
 msgid "Add background"
 msgstr "添加背景"
 
@@ -2454,7 +2475,7 @@ msgstr "添加圆形"
 msgid "Add comment"
 msgstr "添加评论"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:40
+#: src/features/canvas/components/canvas-toolbar.tsx:41
 msgid "Add comments"
 msgstr "添加注释"
 
@@ -2467,7 +2488,7 @@ msgstr "在差异的某一行添加评论，然后提交。"
 msgid "Add Endpoint"
 msgstr "添加端点"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:42
+#: src/features/canvas/components/canvas-toolbar.tsx:43
 msgid "Add error handling"
 msgstr "添加错误处理"
 
@@ -2509,7 +2530,7 @@ msgstr "添加成员"
 msgid "Add Model"
 msgstr "添加模型"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:57
+#: src/features/canvas/components/canvas-toolbar.tsx:58
 msgid "Add more rows"
 msgstr "添加更多行"
 
@@ -2550,7 +2571,7 @@ msgstr "添加项目"
 msgid "Add project on {0}"
 msgstr "在 {0} 上添加项目"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:487
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:525
 msgid "Add prompt"
 msgstr "添加提示词"
 
@@ -2588,7 +2609,7 @@ msgstr "添加参考图以保持一致性"
 msgid "Add row"
 msgstr "添加行"
 
-#: src/features/projects/components/project-rule-files.tsx:652
+#: src/features/projects/components/project-rule-files.tsx:813
 msgid "Add rule file"
 msgstr "添加规则文件"
 
@@ -2613,7 +2634,7 @@ msgstr "添加排序来整理你的行。"
 msgid "Add sub-page"
 msgstr "添加子页面"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:48
+#: src/features/canvas/components/canvas-toolbar.tsx:49
 msgid "Add summary row"
 msgstr "添加汇总行"
 
@@ -2633,7 +2654,7 @@ msgstr "添加文本"
 msgid "Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once."
 msgstr "将其作为 webhook 添加到仓库（内容类型 JSON）。选择单个事件并勾选 Pull requests 和 Pull request reviews：否则新的审查请求要等到下一次轮询，最长 30 分钟。密钥仅显示一次。"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:64
+#: src/features/canvas/components/canvas-toolbar.tsx:65
 msgid "Add title text"
 msgstr "添加标题文字"
 
@@ -2644,7 +2665,7 @@ msgstr "添加到收藏"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:836
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 msgid "Add to Favorites"
 msgstr "添加到收藏"
 
@@ -3397,7 +3418,7 @@ msgid "All Organization"
 msgstr "整个组织"
 
 #: src/features/prompts/components/prompt-list.tsx:463
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:741
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:779
 msgid "All Prompts"
 msgstr "所有提示词"
 
@@ -3533,8 +3554,8 @@ msgstr "已关联到此对话。"
 msgid "Also viewing"
 msgstr "同时在看"
 
-#: src/features/projects/components/project-rule-files.tsx:266
-#: src/features/projects/components/project-rule-files.tsx:608
+#: src/features/projects/components/project-rule-files.tsx:286
+#: src/features/projects/components/project-rule-files.tsx:455
 msgid "Always"
 msgstr "始终"
 
@@ -3594,6 +3615,10 @@ msgstr "智能体（技能）"
 #: src/features/tasks/components/task-form-dialog.tsx:207
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "智能体会自主处理任务，然后由验证器根据你的成功标准检查结果。"
+
+#: src/features/projects/components/project-rule-files.tsx:819
+msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
+msgstr "AGENTS.md、CLAUDE.md 或 GEMINI.md 文件，或其他 Markdown 文件"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:13
 msgid "An approval card asks to allow a tool. A pointer clicks Approve, the status changes to running, and the result appears."
@@ -3704,7 +3729,7 @@ msgid "anime"
 msgstr "动漫"
 
 #: src/features/chat/thread/composer-image-settings.tsx:55
-#: src/features/chat/thread/media-gallery-view.tsx:67
+#: src/features/chat/thread/media-gallery-view.tsx:68
 msgid "Anime"
 msgstr "动漫"
 
@@ -3941,12 +3966,12 @@ msgstr "公众号“基本配置”中的 AppID"
 msgid "Application Error"
 msgstr "应用错误"
 
-#: src/features/projects/components/project-rule-files.tsx:262
+#: src/features/projects/components/project-rule-files.tsx:282
 msgid "Applies"
 msgstr "应用方式"
 
 #: src/features/canvas/canvas-panel.tsx:119
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:330
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
@@ -4295,7 +4320,7 @@ msgstr "提出旁支问题"
 msgid "Ask a side question without interrupting the reply"
 msgstr "在不打断回复的情况下提出旁支问题"
 
-#: src/features/chat/thread/thread.tsx:255
+#: src/features/chat/thread/thread.tsx:256
 msgid "Ask all models anything..."
 msgstr "向所有模型提问任何问题..."
 
@@ -4307,7 +4332,7 @@ msgstr "输入任何问题来开始新对话…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "向 GPT-4、Claude 和 Gemini 提出同一个问题。在 FLUX、Imagen 和 Stable Diffusion 上运行同一个提示词。选出最优的——而不是默认的。"
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:273
 msgid "Ask me anything..."
 msgstr "问我任何问题..."
 
@@ -4325,8 +4350,8 @@ msgstr "请你的其他助手列出它记住的内容，粘贴其回答，并选
 msgid "Aspect ratio"
 msgstr "宽高比"
 
-#: src/features/chat/thread/media-gallery-view.tsx:448
-#: src/features/chat/thread/media-gallery-view.tsx:533
+#: src/features/chat/thread/media-gallery-view.tsx:456
+#: src/features/chat/thread/media-gallery-view.tsx:541
 #: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "宽高比"
@@ -4445,7 +4470,7 @@ msgstr "奥克兰"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:132
+#: src/features/chat/thread/composer.tsx:134
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4509,8 +4534,8 @@ msgstr "自动"
 #: src/features/chat/thread/composer-model-selector.tsx:122
 #: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
-#: src/features/chat/thread/media-gallery-view.tsx:64
-#: src/features/chat/thread/media-gallery-view.tsx:501
+#: src/features/chat/thread/media-gallery-view.tsx:65
+#: src/features/chat/thread/media-gallery-view.tsx:509
 #: src/features/settings/components/chat/bots-settings.tsx:131
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
@@ -5259,11 +5284,11 @@ msgstr "底部"
 msgid "Box Blur"
 msgstr "方框模糊"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:71
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
 msgid "Brainstorm creative marketing strategies for a new product"
 msgstr "为新产品头脑风暴创意营销策略"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:78
 msgid "Brainstorm ways to improve team productivity"
 msgstr "头脑风暴提升团队效率的方法"
 
@@ -5381,8 +5406,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:196
-#: src/features/chat/browser-live-view/browser-live-view.tsx:274
+#: src/features/chat/browser-live-view/browser-live-view.tsx:213
+#: src/features/chat/browser-live-view/browser-live-view.tsx:322
 msgid "Browser"
 msgstr "浏览器"
 
@@ -5752,7 +5777,7 @@ msgstr "加拿大"
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
-#: src/features/chat/thread/generation-model-menu.tsx:162
+#: src/features/chat/thread/generation-model-menu.tsx:163
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
@@ -5867,8 +5892,8 @@ msgstr "候选事实会按类型保存：身份、偏好、情境、活动或经
 msgid "Cannot be exported: {0}"
 msgstr "无法导出：{0}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:172
-#: src/features/prompts/hooks/use-prompt-loader.tsx:62
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:197
+#: src/features/prompts/hooks/use-prompt-loader.tsx:65
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "无法使用提示词：{errorMessages}"
 
@@ -6022,7 +6047,7 @@ msgstr "变化"
 msgid "Change (points)"
 msgstr "变化（分）"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:66
+#: src/features/canvas/components/canvas-toolbar.tsx:67
 msgid "Change colors"
 msgstr "更改颜色"
 
@@ -6039,7 +6064,7 @@ msgstr "更改口令"
 msgid "Change Password"
 msgstr "修改密码"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:36
+#: src/features/canvas/components/canvas-toolbar.tsx:37
 msgid "Change tone"
 msgstr "更改语气"
 
@@ -6229,6 +6254,10 @@ msgstr "聊天"
 #: src/features/knowledge/components/project-knowledge-collections.tsx:49
 msgid "Chats in this project search these collections and cite them."
 msgstr "此项目中的聊天会搜索并引用这些集合。"
+
+#: src/features/projects/components/project-rule-files.tsx:317
+msgid "Chats see the name and this line, and read the file when it applies."
+msgstr "聊天会看到名称和这一行，并在适用时读取该文件。"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:654
 #: src/features/settings/components/chat/native-providers-settings.tsx:725
@@ -6462,14 +6491,14 @@ msgid "cinematic"
 msgstr "电影感"
 
 #: src/features/chat/thread/composer-image-settings.tsx:38
-#: src/features/chat/thread/media-gallery-view.tsx:54
-#: src/features/chat/thread/media-gallery-view.tsx:70
+#: src/features/chat/thread/media-gallery-view.tsx:55
+#: src/features/chat/thread/media-gallery-view.tsx:71
 msgid "Cinematic"
 msgstr "电影感"
 
 #: src/features/chat/thread/composer-image-settings.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:32
-#: src/features/chat/thread/media-gallery-view.tsx:55
+#: src/features/chat/thread/media-gallery-view.tsx:56
 msgid "Cinematic (ultra-wide)"
 msgstr "电影感（超宽）"
 
@@ -6559,7 +6588,7 @@ msgstr "Claude Code 和其他 MCP 客户端可使用此密钥访问你的账号�
 msgid "Claude Opus, Sonnet, Haiku — latest model family"
 msgstr "Claude Opus、Sonnet、Haiku——最新模型系列"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:53
+#: src/features/canvas/components/canvas-toolbar.tsx:54
 msgid "Clean data"
 msgstr "清理数据"
 
@@ -6588,7 +6617,7 @@ msgstr "清理失败"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:96
-#: src/features/chat/thread/media-gallery-view.tsx:372
+#: src/features/chat/thread/media-gallery-view.tsx:380
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
@@ -6630,7 +6659,7 @@ msgstr "清除模型"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:525
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
 #: src/features/vault/components/empty-states.tsx:21
 msgid "Clear search"
 msgstr "清除搜索"
@@ -6703,7 +6732,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:323
+#: src/features/chat/thread/composer-input.tsx:325
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -7149,7 +7178,7 @@ msgstr "命令不能超过 {SKILL_SLUG_MAX} 个字符"
 msgid "Command Palette"
 msgstr "命令面板"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:544
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:547
 msgid "Commands"
 msgstr "命令"
 
@@ -7351,7 +7380,7 @@ msgstr "并排对比多个图像模型的输出"
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "并排对比多个模型的输出"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:84
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:87
 msgid "Compare the pros and cons of renewable energy sources"
 msgstr "比较各种可再生能源的优缺点"
 
@@ -7513,7 +7542,7 @@ msgstr "正在压缩上下文..."
 msgid "Computer"
 msgstr "电脑"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:66
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:67
 msgid "Condense older messages for the model"
 msgstr "为模型精简较早的消息"
 
@@ -8162,8 +8191,8 @@ msgstr "此列表未显示的文件上的对话和待提交评论"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "此差异不再显示的行上的对话"
 
-#: src/features/chat/thread/composer-input.tsx:826
-#: src/features/chat/thread/composer-input.tsx:1714
+#: src/features/chat/thread/composer-input.tsx:828
+#: src/features/chat/thread/composer-input.tsx:1745
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -8201,7 +8230,7 @@ msgstr "转为永久对话"
 msgid "Convert to save your data"
 msgstr "转换以保存你的数据"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:43
+#: src/features/canvas/components/canvas-toolbar.tsx:44
 msgid "Convert to TypeScript"
 msgstr "转换为 TypeScript"
 
@@ -8229,7 +8258,7 @@ msgstr "已复制最后一个代码块"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:137
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:162
 msgid "Copied to clipboard"
 msgstr "已复制到剪贴板"
 
@@ -8254,8 +8283,8 @@ msgid "Copy"
 msgstr "复制"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:649
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:788
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:687
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:826
 msgid "Copy {0} to clipboard"
 msgstr "复制 {0} 到剪贴板"
 
@@ -8368,8 +8397,8 @@ msgstr "请立即复制此密钥并保存到你的 Webhook 发送方。之后将
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:665
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:804
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:703
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:842
 msgid "Copy to clipboard"
 msgstr "复制到剪贴板"
 
@@ -8493,7 +8522,7 @@ msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 msgid "Could not attach {0}. Try those again."
 msgstr "无法附加 {0}。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1738
+#: src/features/chat/thread/composer-input.tsx:1775
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -8709,7 +8738,7 @@ msgid "Could not load this"
 msgstr "无法加载此内容"
 
 #: src/features/chat/split/chat-split-view.tsx:239
-#: src/features/chat/thread/thread.tsx:360
+#: src/features/chat/thread/thread.tsx:361
 msgid "Could not load this chat's details."
 msgstr "无法加载此聊天的详情。"
 
@@ -8797,11 +8826,11 @@ msgstr "无法连接服务器以开始生成。请检查网络连接后重试。
 msgid "Could not reach the server. Try again."
 msgstr "无法连接服务器。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1741
+#: src/features/chat/thread/composer-input.tsx:1778
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1742
+#: src/features/chat/thread/composer-input.tsx:1779
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -8915,7 +8944,7 @@ msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
 
 #. placeholder {0}: errorText(error)
-#: src/features/chat/voice-mode/voice-mode-controller.tsx:100
+#: src/features/chat/voice-mode/voice-mode-controller.tsx:103
 msgid "Could not send your message: {0}"
 msgstr "无法发送你的消息：{0}"
 
@@ -9006,7 +9035,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "覆盖大多数日常视频使用场景"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:571
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:609
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "创建"
@@ -9080,7 +9109,7 @@ msgstr "创建新团队，在组织内管理成员"
 msgid "Create a permanent account to save your data and access it from any device."
 msgstr "创建永久账号，保存你的数据并在任意设备上访问。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:104
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
 msgid "Create a script for a 5-minute educational video about photosynthesis"
 msgstr "为一段关于光合作用的 5 分钟教育视频写脚本"
 
@@ -9108,7 +9137,7 @@ msgstr "创建账号即可翻译消息。"
 msgid "Create an Azure Bot resource in the Azure portal and note its Microsoft App ID, a client secret (App password) and, for single-tenant bots, the Tenant ID."
 msgstr "在 Azure 门户中创建 Azure Bot 资源，并记下其 Microsoft App ID、客户端密钥（应用密码），单租户机器人还需记下租户 ID。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:116
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "为一篇关于可持续生活的博客文章列提纲"
 
@@ -9574,7 +9603,7 @@ msgstr "个性化"
 msgid "Customize"
 msgstr "自定义"
 
-#: src/features/chat/thread/media-gallery-view.tsx:429
+#: src/features/chat/thread/media-gallery-view.tsx:437
 msgid "Customize and regenerate"
 msgstr "自定义并重新生成"
 
@@ -9791,7 +9820,7 @@ msgstr "辩论轮数"
 msgid "Debates for {0} rounds."
 msgstr "辩论 {0} 轮。"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:279
 msgid "Debug an error or review my code..."
 msgstr "调试错误或审查我的代码..."
 
@@ -10064,8 +10093,8 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/pages/components/pages-sidebar.tsx:281
 #: src/features/prompts/components/prompt-item.tsx:228
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:709
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:848
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:747
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:886
 #: src/features/settings/components/chat/bots-settings.tsx:508
 #: src/features/settings/components/chat/bots-settings.tsx:562
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
@@ -10121,7 +10150,7 @@ msgstr "删除 {fileName}"
 msgid "Delete {itemName}"
 msgstr "删除 {itemName}"
 
-#: src/features/projects/components/project-rule-files.tsx:257
+#: src/features/projects/components/project-rule-files.tsx:277
 msgid "Delete {name}"
 msgstr "删除 {name}"
 
@@ -10248,7 +10277,7 @@ msgstr "删除项目"
 
 #: src/features/prompts/components/prompt-item.tsx:308
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:930
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:968
 msgid "Delete Prompt"
 msgstr "删除提示词"
 
@@ -10526,7 +10555,7 @@ msgstr "描述如何转换这张图片..."
 msgid "Describe the image to generate..."
 msgstr "描述要生成的图片..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:438
+#: src/features/chat/thread/media-gallery-view.tsx:446
 msgid "Describe the image you want to create..."
 msgstr "描述你想创建的图像..."
 
@@ -10551,7 +10580,7 @@ msgstr "描述任务、预期结果以及重复时间：每天、每周，或 UT
 msgid "Describe the video to generate..."
 msgstr "描述要生成的视频..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:438
+#: src/features/chat/thread/media-gallery-view.tsx:446
 msgid "Describe the video you want to create..."
 msgstr "描述你想创建的视频..."
 
@@ -10785,7 +10814,7 @@ msgstr "此托管服务不提供差异。"
 msgid "Digital"
 msgstr "数字"
 
-#: src/features/chat/thread/media-gallery-view.tsx:69
+#: src/features/chat/thread/media-gallery-view.tsx:70
 msgid "Digital Art"
 msgstr "数字艺术"
 
@@ -10844,7 +10873,7 @@ msgid "Discard"
 msgstr "放弃"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:684
+#: src/features/projects/components/project-rule-files.tsx:892
 msgid "Discard changes"
 msgstr "放弃更改"
 
@@ -11230,11 +11259,11 @@ msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包�
 msgid "Draft"
 msgstr "草稿"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:121
 msgid "Draft a cover letter for a software engineering position"
 msgstr "为软件工程师职位起草一封求职信"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:277
 msgid "Draft an email, report, or essay..."
 msgstr "起草邮件、报告或文章..."
 
@@ -11288,7 +11317,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1932
+#: src/features/chat/thread/composer-input.tsx:1969
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -11341,7 +11370,7 @@ msgstr "复制所选（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:300
-#: src/features/chat/thread/media-gallery-view.tsx:559
+#: src/features/chat/thread/media-gallery-view.tsx:567
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "时长"
@@ -11428,7 +11457,7 @@ msgstr "例如：财务规划"
 msgid "e.g., Make it more concise, add technical details, improve clarity, add examples..."
 msgstr "例如：更简洁、添加技术细节、提高清晰度、添加示例..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:241
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:244
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "例如：更简洁、添加技术细节、提高清晰度..."
 
@@ -11436,7 +11465,7 @@ msgstr "例如：更简洁、添加技术细节、提高清晰度..."
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "例如：更简洁、要求 Markdown 输出、添加安全规则..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:304
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:307
 msgid "e.g., Make it stricter about JSON output, add a code example..."
 msgstr "例如：对 JSON 输出更严格、添加代码示例..."
 
@@ -11473,7 +11502,7 @@ msgstr "每个连接都有自己的 Webhook 地址，应用会将新消息发送
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "每个 Discord 频道会在 Neore Chat 中创建一个单独的对话。AI 会在频道中自动回复。"
 
-#: src/features/projects/components/project-rule-files.tsx:430
+#: src/features/projects/components/project-rule-files.tsx:578
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "“{name}”中的每个文件模式必须在一行内，且最多 {limit} 个字符。"
 
@@ -11563,8 +11592,8 @@ msgstr "边缘引导生成"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:688
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:827
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:726
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:865
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -11601,8 +11630,8 @@ msgstr "编辑集合"
 msgid "Edit comment"
 msgstr "编辑评论"
 
-#: src/features/chat/thread/composer-input.tsx:330
-#: src/features/chat/thread/composer-input.tsx:342
+#: src/features/chat/thread/composer-input.tsx:332
+#: src/features/chat/thread/composer-input.tsx:344
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -13056,11 +13085,11 @@ msgstr "过期时间：{expiresAt}"
 msgid "Expiring soon"
 msgstr "即将过期"
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:280
 msgid "Explain a concept in simple terms..."
 msgstr "用简单的话解释一个概念..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:83
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Explain the causes and effects of climate change"
 msgstr "解释气候变化的成因和影响"
 
@@ -13101,7 +13130,7 @@ msgstr "导出捆绑包"
 msgid "Export cancelled"
 msgstr "导出已取消"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:294
+#: src/features/chat/signed-out/signed-out-chat.tsx:295
 msgid "Export chat"
 msgstr "导出聊天"
 
@@ -13242,11 +13271,11 @@ msgstr "Facebook 和 Instagram 广告活动管理与分析"
 msgid "Facebook Post"
 msgstr "Facebook 帖子"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:58
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:61
 msgid "Fact Check"
 msgstr "事实核查"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:66
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "事实核查：糖会导致儿童多动吗？"
 
@@ -13315,7 +13344,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1562
+#: src/features/chat/thread/composer-input.tsx:1586
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -13351,7 +13380,7 @@ msgstr "连接失败"
 msgid "Failed to connect {name}"
 msgstr "连接 {name} 失败"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:140
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:165
 msgid "Failed to copy"
 msgstr "复制失败"
 
@@ -13449,7 +13478,7 @@ msgid "Failed to delete project"
 msgstr "删除项目失败"
 
 #: src/features/prompts/components/prompt-list.tsx:243
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:294
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
 msgid "Failed to delete prompt"
 msgstr "删除提示词失败"
 
@@ -13725,7 +13754,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1594
+#: src/features/chat/thread/composer-input.tsx:1618
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -13794,7 +13823,7 @@ msgid "Failed to save preset"
 msgstr "保存预设失败"
 
 #: src/features/prompts/components/prompt-list.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:454
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:492
 msgid "Failed to save prompt"
 msgstr "保存提示词失败"
 
@@ -13927,7 +13956,7 @@ msgstr "更新端点失败"
 msgid "Failed to update favorite"
 msgstr "更新收藏失败"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:306
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:344
 msgid "Failed to update favorite status"
 msgstr "更新收藏状态失败"
 
@@ -14391,7 +14420,7 @@ msgstr "收藏的页面"
 
 #: src/features/pages/components/pages-sidebar.tsx:194
 #: src/features/prompts/components/prompt-list.tsx:439
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:602
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:640
 msgid "Favorites"
 msgstr "收藏"
 
@@ -14504,7 +14533,7 @@ msgstr "归档到其他项目"
 msgid "File input"
 msgstr "文件输入"
 
-#: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/projects/components/project-rule-files.tsx:323
 msgid "File patterns, one per line"
 msgstr "文件模式（每行一个）"
 
@@ -14711,11 +14740,11 @@ msgstr "在对话中查找"
 msgid "Find in Thread"
 msgstr "在对话中查找"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:93
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
 msgid "Find the best restaurants near me for Italian cuisine"
 msgstr "帮我找附近最好的意大利餐厅"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:99
 msgid "Find tutorials on how to learn Python programming"
 msgstr "查找学习 Python 编程的教程"
 
@@ -14778,7 +14807,7 @@ msgstr "鱼眼，极度畸变"
 msgid "Fit view"
 msgstr "适应视图"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:32
+#: src/features/canvas/components/canvas-toolbar.tsx:33
 msgid "Fix grammar"
 msgstr "修正语法"
 
@@ -14921,6 +14950,10 @@ msgstr "例如：“专注于 Python 最佳实践”“保持专业语气”或�
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "例如：“标题不超过四个词”“用德语写标题”或“以动词开头”。"
 
+#: src/features/projects/components/project-rule-files.tsx:313
+msgid "For example: how we write database migrations"
+msgstr "例如：我们如何编写数据库迁移"
+
 #: src/features/develop/components/guide-tab.tsx:161
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "例如：重点检查错误处理，跳过生成的文件。"
@@ -15056,9 +15089,9 @@ msgstr "免费"
 
 #: src/features/prompts/components/prompt-list.tsx:159
 #: src/features/prompts/components/prompt-list.tsx:225
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:452
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:497
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:560
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:490
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:535
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:598
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "免费账号最多只能有 3 个提示词。升级到 Pro 可无限创建提示词。"
 
@@ -15068,7 +15101,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "免费账号最多只能有 5 个技能。升级到 Pro 可无限创建技能。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:584
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "免费账号最多可创建 3 个提示词。升级到 Pro 可无限创建提示词。"
 
@@ -15451,7 +15484,7 @@ msgstr "使用阿里巴巴最新一代 Wan 模型的通用视频生成"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:264
 #: src/features/chat/sidebar/thread-sidebar.tsx:145
-#: src/features/chat/thread/generation-model-menu.tsx:166
+#: src/features/chat/thread/generation-model-menu.tsx:167
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:153
@@ -15462,7 +15495,7 @@ msgstr "生成"
 msgid "Generate 4 images with different models and compare them side by side"
 msgstr "用不同模型生成 4 张图片并并排对比"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:111
 msgid "Generate a storyboard for a short documentary"
 msgstr "为一部短纪录片生成分镜"
 
@@ -15486,7 +15519,7 @@ msgstr "根据文本提示词生成图像并放大 4 倍"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "生成一张温馨阅读角的图像，带有暖色灯光和绿植。"
 
-#: src/features/chat/thread/composer.tsx:280
+#: src/features/chat/thread/composer.tsx:282
 msgid "Generate an image or video..."
 msgstr "生成图像或视频..."
 
@@ -15498,7 +15531,7 @@ msgstr "生成音频"
 msgid "Generate from a description"
 msgstr "根据描述生成"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:122
 msgid "Generate ideas for a creative writing story"
 msgstr "为创意写作故事构思点子"
 
@@ -15506,7 +15539,7 @@ msgstr "为创意写作故事构思点子"
 msgid "Generate image"
 msgstr "生成图像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:612
+#: src/features/chat/thread/media-gallery-view.tsx:620
 #: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "生成图像"
@@ -15524,7 +15557,7 @@ msgstr "用 FLUX 和 Stable Diffusion 生成图像，用 Runway 和 Luma 创作�
 msgid "Generate random seed"
 msgstr "生成随机种子"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:72
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
 msgid "Generate unique business ideas for 2025"
 msgstr "为 2025 年构思独特的商业点子"
 
@@ -15532,7 +15565,7 @@ msgstr "为 2025 年构思独特的商业点子"
 msgid "Generate video"
 msgstr "生成视频"
 
-#: src/features/chat/thread/media-gallery-view.tsx:612
+#: src/features/chat/thread/media-gallery-view.tsx:620
 #: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "生成视频"
@@ -15554,7 +15587,7 @@ msgstr "使用 <0>{0}</0> 生成"
 msgid "Generate Workflow with AI"
 msgstr "用 AI 生成工作流"
 
-#: src/features/chat/thread/media-gallery-view.tsx:231
+#: src/features/chat/thread/media-gallery-view.tsx:232
 msgid "Generated image"
 msgstr "生成的图像"
 
@@ -15562,15 +15595,15 @@ msgstr "生成的图像"
 msgid "Generated Image"
 msgstr "生成的图像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "Generated images will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的图像将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:243
+#: src/features/chat/thread/media-gallery-view.tsx:244
 msgid "Generated video"
 msgstr "生成的视频"
 
-#: src/features/chat/thread/media-gallery-view.tsx:346
+#: src/features/chat/thread/media-gallery-view.tsx:354
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
@@ -15583,7 +15616,7 @@ msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:479
-#: src/features/chat/thread/media-gallery-view.tsx:395
+#: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
@@ -15596,7 +15629,7 @@ msgid "Generating response"
 msgstr "正在生成回复"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:480
-#: src/features/chat/thread/media-gallery-view.tsx:395
+#: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "正在生成视频..."
 
@@ -15607,7 +15640,7 @@ msgstr "正在生成视频..."
 msgid "Generating..."
 msgstr "正在生成..."
 
-#: src/features/chat/thread/generation-model-menu.tsx:166
+#: src/features/chat/thread/generation-model-menu.tsx:167
 msgid "Generating…"
 msgstr "正在生成…"
 
@@ -15741,7 +15774,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab 密钥令牌（X-Gitlab-Token）"
 
-#: src/features/projects/components/project-rule-files.tsx:438
+#: src/features/projects/components/project-rule-files.tsx:586
 msgid "Give every rule file a name."
 msgstr "请为每个规则文件命名。"
 
@@ -15821,7 +15854,7 @@ msgstr "上一页"
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:352
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:353
 msgid "Go to reply"
 msgstr "转到回复"
 
@@ -16438,7 +16471,7 @@ msgstr "帮助"
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "帮我写一封专业的邮件，向新团队介绍自己。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:115
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
 msgid "Help me write a professional email to my manager"
 msgstr "帮我给经理写一封专业的邮件"
 
@@ -16478,12 +16511,12 @@ msgstr "隐藏附加内容"
 msgid "Hide column"
 msgstr "隐藏列"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:250
-#: src/features/chat/thread/composer-followup-suggestions.tsx:266
+#: src/features/chat/thread/composer-followup-suggestions.tsx:253
+#: src/features/chat/thread/composer-followup-suggestions.tsx:269
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:200
+#: src/features/chat/browser-live-view/browser-live-view.tsx:231
 msgid "Hide live view"
 msgstr ""
 
@@ -16942,7 +16975,7 @@ msgid "Ideal for simple classification and extraction"
 msgstr "非常适合简单的分类和提取任务"
 
 #: src/features/admin/components/feedback-admin-page.tsx:169
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:69
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:72
 msgid "Ideas"
 msgstr "创意"
 
@@ -16992,7 +17025,7 @@ msgstr "插画"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -17058,7 +17091,7 @@ msgid "Image generation"
 msgstr "图像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
-#: src/features/chat/thread/media-gallery-view.tsx:342
+#: src/features/chat/thread/media-gallery-view.tsx:350
 #: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
@@ -17248,6 +17281,10 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
+#: src/features/projects/components/project-rule-files.tsx:824
+msgid "Import files"
+msgstr "导入文件"
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "继续导入"
@@ -17259,6 +17296,10 @@ msgstr "导入 Notion 导出文件（.zip）"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
+
+#: src/features/projects/components/project-rule-files.tsx:834
+msgid "Import rule folder"
+msgstr "导入规则文件夹"
 
 #: src/features/skills/components/skill-import-dialog.tsx:158
 msgid "Import skill"
@@ -17323,11 +17364,11 @@ msgstr "正在从 {0} 导入..."
 msgid "Imprint"
 msgstr "法律声明"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:340
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:343
 msgid "Improve"
 msgstr "优化"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:65
+#: src/features/canvas/components/canvas-toolbar.tsx:66
 msgid "Improve layout"
 msgstr "改进布局"
 
@@ -17368,7 +17409,7 @@ msgstr "运动动态优于 Kling 2.x"
 msgid "Improved multimodal reasoning"
 msgstr "多模态推理能力提升"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:258
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:261
 msgid "Improved Prompt"
 msgstr "优化后的提示词"
 
@@ -17396,7 +17437,7 @@ msgstr "正在优化提示词..."
 msgid "Improving your prompt..."
 msgstr "正在优化你的提示词..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:337
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:340
 msgid "Improving..."
 msgstr "正在优化..."
 
@@ -17613,7 +17654,7 @@ msgstr "输入 token"
 msgid "Input:"
 msgstr "输入："
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
 msgid "Insert a saved prompt"
 msgstr "插入已保存的提示词"
 
@@ -17625,7 +17666,7 @@ msgstr "在右侧插入列"
 msgid "Insert column before"
 msgstr "在左侧插入列"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:608
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:611
 msgid "Insert Prompt"
 msgstr "插入提示词"
 
@@ -17689,7 +17730,7 @@ msgstr "指令型"
 msgid "instructions"
 msgstr "指令"
 
-#: src/features/projects/components/project-rule-files.tsx:295
+#: src/features/projects/components/project-rule-files.tsx:341
 #: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17702,9 +17743,9 @@ msgstr "指令"
 msgid "Instructions"
 msgstr "指令"
 
-#: src/features/projects/components/project-rule-files.tsx:594
-msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
-msgstr "添加到此项目聊天中的指令：始终添加，或仅在聊天的附件匹配 **/*.sql 等模式时添加。"
+#: src/features/projects/components/project-rule-files.tsx:752
+msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
+msgstr "添加到此项目聊天中的说明：始终应用、仅当聊天附件匹配 **/*.sql 等模式时应用，或由聊天在需要时读取。"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -17814,7 +17855,7 @@ msgstr "密码无效"
 msgid "Invalid password. Please try again."
 msgstr "密码无效，请重试。"
 
-#: src/routes/(chat)/chat/index.tsx:163
+#: src/routes/(chat)/chat/index.tsx:165
 msgid "Invalid thread ID"
 msgstr "对话 ID 无效"
 
@@ -17925,11 +17966,11 @@ msgstr "受邀加入"
 msgid "Invites"
 msgstr "邀请"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:66
 msgid "Invoke a skill"
 msgstr "调用技能"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:641
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:644
 msgid "Invoke Skill"
 msgstr "调用技能"
 
@@ -17963,7 +18004,7 @@ msgstr "{0} 可以免费使用吗？"
 msgid "Is it compatible with the OpenAI SDK?"
 msgstr "它与 OpenAI SDK 兼容吗？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:60
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
 msgid "Is it true that drinking 8 glasses of water daily is necessary?"
 msgstr "每天必须喝 8 杯水是真的吗？"
 
@@ -17971,7 +18012,7 @@ msgstr "每天必须喝 8 杯水是真的吗？"
 msgid "Is my data private?"
 msgstr "我的数据是私密的吗？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:67
 msgid "Is the claim about 5G causing health issues supported by science?"
 msgstr "关于 5G 导致健康问题的说法有科学依据吗？"
 
@@ -18131,7 +18172,7 @@ msgstr "评委得分"
 msgid "Judge: {0}"
 msgstr "评委：{0}"
 
-#: src/features/chat/thread/thread.tsx:112
+#: src/features/chat/thread/thread.tsx:113
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
 msgid "Jump to my last message"
 msgstr "跳转到我的上一条消息"
@@ -18407,14 +18448,14 @@ msgid "Landscape (2x wide)"
 msgstr "横向（2 倍宽）"
 
 #: src/features/chat/thread/composer-image-settings.tsx:36
-#: src/features/chat/thread/media-gallery-view.tsx:52
+#: src/features/chat/thread/media-gallery-view.tsx:53
 msgid "Landscape (photo)"
 msgstr "横向（照片）"
 
 #: src/features/chat/thread/composer-image-settings.tsx:37
 #: src/features/chat/thread/composer-video-settings.tsx:29
-#: src/features/chat/thread/media-gallery-view.tsx:53
-#: src/features/chat/thread/media-gallery-view.tsx:78
+#: src/features/chat/thread/media-gallery-view.tsx:54
+#: src/features/chat/thread/media-gallery-view.tsx:79
 msgid "Landscape (standard)"
 msgstr "横向（标准）"
 
@@ -18423,7 +18464,7 @@ msgid "Landscape (ultra-wide)"
 msgstr "横向（超宽）"
 
 #: src/features/chat/thread/composer-video-settings.tsx:30
-#: src/features/chat/thread/media-gallery-view.tsx:75
+#: src/features/chat/thread/media-gallery-view.tsx:76
 msgid "Landscape (wide)"
 msgstr "横向（宽）"
 
@@ -19145,7 +19186,7 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:236
+#: src/features/chat/browser-live-view/browser-live-view.tsx:267
 msgid "Live view of the agent's browser (read-only)"
 msgstr ""
 
@@ -19574,7 +19615,7 @@ msgid "Log out"
 msgstr "退出登录"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
-#: src/features/chat/signed-out/signed-out-chat.tsx:284
+#: src/features/chat/signed-out/signed-out-chat.tsx:285
 #: src/features/layout/components/app-sidebar.tsx:61
 #: src/features/layout/components/app-sidebar.tsx:74
 #: src/features/marketing/components/gateway-navbar.tsx:90
@@ -19668,7 +19709,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:902
+#: src/features/chat/thread/composer-input.tsx:904
 msgid "Long text was attached as a file."
 msgstr "长文本已作为文件附加。"
 
@@ -19843,11 +19884,11 @@ msgstr "设为管理员"
 msgid "Make default"
 msgstr "设为默认"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:30
+#: src/features/canvas/components/canvas-toolbar.tsx:31
 msgid "Make longer"
 msgstr "加长"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:29
+#: src/features/canvas/components/canvas-toolbar.tsx:30
 msgid "Make shorter"
 msgstr "缩短"
 
@@ -20442,8 +20483,8 @@ msgstr "已在 {hostLabel} 上合并。"
 msgid "Merging…"
 msgstr "正在合并…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:302
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:622
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:303
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:624
 msgid "Message"
 msgstr "消息"
 
@@ -20584,7 +20625,7 @@ msgstr "麦克风 {shortId}"
 
 #: src/features/chat/thread/composer-voice-input.tsx:95
 #: src/features/chat/thread/composer-voice-input.tsx:147
-#: src/features/chat/voice-mode/voice-mode-controller.tsx:82
+#: src/features/chat/voice-mode/voice-mode-controller.tsx:84
 msgid "Microphone access denied. Please allow microphone access in your browser settings."
 msgstr "麦克风访问被拒绝。请在浏览器设置中允许访问麦克风。"
 
@@ -20788,7 +20829,7 @@ msgid "Mobile app icon"
 msgstr "移动应用图标"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:224
+#: src/features/chat/thread/composer.tsx:226
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -20842,7 +20883,7 @@ msgstr "模型明细"
 msgid "Model comparison"
 msgstr "模型对比"
 
-#: src/features/chat/core/hooks/use-comparison-chat.ts:122
+#: src/features/chat/core/hooks/use-comparison-chat.ts:128
 #: src/features/workflow/templates/index.ts:258
 msgid "Model Comparison"
 msgstr "模型对比"
@@ -21069,8 +21110,8 @@ msgstr "更多操作"
 
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/prompt-list-view.tsx:192
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:671
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:810
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:709
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:848
 msgid "More actions for {0}"
 msgstr "{0} 的更多操作"
 
@@ -21183,11 +21224,11 @@ msgstr "将{label}在星标中下移"
 msgid "Move {label} up in starred"
 msgstr "将{label}在星标中上移"
 
-#: src/features/projects/components/project-rule-files.tsx:254
+#: src/features/projects/components/project-rule-files.tsx:274
 msgid "Move {name} down"
 msgstr "下移 {name}"
 
-#: src/features/projects/components/project-rule-files.tsx:251
+#: src/features/projects/components/project-rule-files.tsx:271
 msgid "Move {name} up"
 msgstr "上移 {name}"
 
@@ -21414,7 +21455,7 @@ msgstr "名称"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:228
+#: src/features/projects/components/project-rule-files.tsx:256
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -21524,7 +21565,7 @@ msgid "Native text-to-video at frontier quality"
 msgstr "前沿品质的原生文生视频"
 
 #: src/features/chat/thread/composer-image-settings.tsx:54
-#: src/features/chat/thread/media-gallery-view.tsx:66
+#: src/features/chat/thread/media-gallery-view.tsx:67
 msgid "Natural"
 msgstr "自然"
 
@@ -21644,7 +21685,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Neore 智能体"
 
-#: src/features/chat/thread/composer.tsx:690
+#: src/features/chat/thread/composer.tsx:695
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore 可能会出错。请核实重要信息。"
 
@@ -21824,7 +21865,7 @@ msgstr "新聊天"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:49
-#: src/features/chat/signed-out/signed-out-chat.tsx:305
+#: src/features/chat/signed-out/signed-out-chat.tsx:306
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:285
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:159
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
@@ -22029,12 +22070,12 @@ msgstr "下一个匹配项"
 msgid "Next option"
 msgstr "下一个选项"
 
-#: src/features/chat/thread/composer.tsx:241
+#: src/features/chat/thread/composer.tsx:243
 msgid "Next output mode"
 msgstr "下一个输出模式"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:883
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:921
 msgid "Next page"
 msgstr "下一页"
 
@@ -22371,7 +22412,7 @@ msgid "No icon found"
 msgstr "未找到图标"
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
-#: src/features/chat/thread/media-gallery-view.tsx:343
+#: src/features/chat/thread/media-gallery-view.tsx:351
 msgid "No images yet"
 msgstr "还没有图片"
 
@@ -22398,6 +22439,10 @@ msgstr "未找到语言"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:62
 msgid "No lens selected"
 msgstr "未选择镜头"
+
+#: src/features/projects/components/project-rule-files.tsx:532
+msgid "No Markdown files were found to import."
+msgstr "未找到可导入的 Markdown 文件。"
 
 #: src/features/chat/thread/find/thread-find-bar.tsx:186
 msgid "No matches"
@@ -22441,7 +22486,7 @@ msgstr "无麦克风"
 
 #: ../../packages/ui/src/components/ai-elements/mic-selector.tsx:183
 #: src/features/chat/thread/composer-voice-input.tsx:97
-#: src/features/chat/voice-mode/voice-mode-controller.tsx:83
+#: src/features/chat/voice-mode/voice-mode-controller.tsx:85
 msgid "No microphone found."
 msgstr "未找到麦克风。"
 
@@ -22553,7 +22598,7 @@ msgstr "没有可用的项目。请先创建一个项目。"
 msgid "No prompt"
 msgstr "无提示词"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:577
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "未找到与“{searchQuery}”匹配的提示词"
 
@@ -22562,8 +22607,8 @@ msgid "No prompts found matching your search."
 msgstr "未找到与搜索匹配的提示词。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:541
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:577
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:579
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts yet"
 msgstr "还没有提示词"
 
@@ -22618,7 +22663,7 @@ msgstr "还没有回复"
 msgid "No results"
 msgstr "无结果"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:669
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:672
 msgid "No results found"
 msgstr "未找到结果"
 
@@ -22683,7 +22728,7 @@ msgstr "此演示文稿中未找到幻灯片。"
 msgid "No sorting applied"
 msgstr "未应用排序"
 
-#: src/features/chat/voice-mode/voice-mode-controller.tsx:147
+#: src/features/chat/voice-mode/voice-mode-controller.tsx:150
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "未检测到语音。免提模式已停止。"
 
@@ -22741,7 +22786,7 @@ msgstr "此分组中没有对话"
 msgid "No threads were active in that date range."
 msgstr "该日期范围内没有活跃的对话。"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:273
+#: src/features/chat/signed-out/signed-out-chat.tsx:274
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:904
 msgid "No threads yet"
 msgstr "还没有对话"
@@ -22800,7 +22845,7 @@ msgstr "未找到变量"
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "还没有版本。编辑时会自动保存版本。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:343
+#: src/features/chat/thread/media-gallery-view.tsx:351
 msgid "No videos yet"
 msgstr "还没有视频"
 
@@ -24160,7 +24205,7 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:207
+#: src/features/chat/browser-live-view/browser-live-view.tsx:238
 msgid "Opening the live view…"
 msgstr ""
 
@@ -24193,7 +24238,7 @@ msgstr "优化被拒绝"
 msgid "Optimization style"
 msgstr "优化风格"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:41
+#: src/features/canvas/components/canvas-toolbar.tsx:42
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 #: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
@@ -24519,7 +24564,7 @@ msgstr "输出格式"
 msgid "Output is not loaded in this view."
 msgstr "此视图未加载输出。"
 
-#: src/features/chat/thread/composer.tsx:252
+#: src/features/chat/thread/composer.tsx:254
 msgid "Output Mode"
 msgstr "输出模式"
 
@@ -25151,7 +25196,7 @@ msgstr "WhatsApp > API Setup 中的电话号码 ID"
 msgid "Photo"
 msgstr "照片"
 
-#: src/features/chat/thread/media-gallery-view.tsx:68
+#: src/features/chat/thread/media-gallery-view.tsx:69
 msgid "Photographic"
 msgstr "摄影"
 
@@ -25342,7 +25387,7 @@ msgstr "计划"
 msgid "Plan"
 msgstr "计划"
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:276
 msgid "Plan a project or brainstorm ideas..."
 msgstr "规划项目或头脑风暴..."
 
@@ -25401,10 +25446,10 @@ msgid "Please log in to configure variables"
 msgstr "请登录以配置变量"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:491
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:542
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:554
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:578
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:529
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:580
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:592
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:616
 msgid "Please log in to create prompts"
 msgstr "请登录以创建提示词"
 
@@ -25499,21 +25544,21 @@ msgid "Portrait (mobile)"
 msgstr "纵向（手机）"
 
 #: src/features/chat/thread/composer-image-settings.tsx:31
-#: src/features/chat/thread/media-gallery-view.tsx:50
+#: src/features/chat/thread/media-gallery-view.tsx:51
 msgid "Portrait (photo)"
 msgstr "纵向（照片）"
 
 #: src/features/chat/thread/composer-image-settings.tsx:30
 #: src/features/chat/thread/composer-video-settings.tsx:27
-#: src/features/chat/thread/media-gallery-view.tsx:49
-#: src/features/chat/thread/media-gallery-view.tsx:79
+#: src/features/chat/thread/media-gallery-view.tsx:50
+#: src/features/chat/thread/media-gallery-view.tsx:80
 msgid "Portrait (standard)"
 msgstr "纵向（标准）"
 
 #: src/features/chat/thread/composer-image-settings.tsx:32
 #: src/features/chat/thread/composer-video-settings.tsx:26
-#: src/features/chat/thread/media-gallery-view.tsx:51
-#: src/features/chat/thread/media-gallery-view.tsx:76
+#: src/features/chat/thread/media-gallery-view.tsx:52
+#: src/features/chat/thread/media-gallery-view.tsx:77
 msgid "Portrait (tall)"
 msgstr "纵向（高）"
 
@@ -25890,12 +25935,12 @@ msgstr "上一个匹配项"
 msgid "Previous option"
 msgstr "上一个选项"
 
-#: src/features/chat/thread/composer.tsx:207
+#: src/features/chat/thread/composer.tsx:209
 msgid "Previous output mode"
 msgstr "上一个输出模式"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:912
 msgid "Previous page"
 msgstr "上一页"
 
@@ -26111,8 +26156,8 @@ msgstr "专业"
 msgid "Professional"
 msgstr "专业"
 
-#: src/features/chat/thread/media-gallery-view.tsx:519
-#: src/features/chat/thread/media-gallery-view.tsx:598
+#: src/features/chat/thread/media-gallery-view.tsx:527
+#: src/features/chat/thread/media-gallery-view.tsx:606
 msgid "Professional Camera Controls"
 msgstr "专业相机控制"
 
@@ -26198,7 +26243,7 @@ msgstr "项目"
 msgid "Project actions"
 msgstr "项目操作"
 
-#: src/features/projects/components/project-rule-files.tsx:358
+#: src/features/projects/components/project-rule-files.tsx:404
 msgid "Project context"
 msgstr "项目上下文"
 
@@ -26248,19 +26293,19 @@ msgid "prompt"
 msgstr "提示词"
 
 #: ../../packages/ui/src/components/image-gallery.tsx:400
-#: src/features/chat/thread/media-gallery-view.tsx:433
+#: src/features/chat/thread/media-gallery-view.tsx:441
 #: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
 msgid "Prompt"
 msgstr "提示词"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:234
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:248
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:266
 msgid "Prompt added to input"
 msgstr "已将提示词添加到输入框"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:249
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:287
 msgid "Prompt added with placeholders"
 msgstr "已添加带占位符的提示词"
 
@@ -26281,7 +26326,7 @@ msgstr "提示词已复制"
 msgid "Prompt copied to clipboard"
 msgstr "提示词已复制到剪贴板"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:444
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:482
 msgid "Prompt created"
 msgstr "提示词已创建"
 
@@ -26290,7 +26335,7 @@ msgid "Prompt created successfully"
 msgstr "提示词已创建"
 
 #: src/features/prompts/components/prompt-list.tsx:240
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:290
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:328
 msgid "Prompt deleted"
 msgstr "提示词已删除"
 
@@ -26298,7 +26343,7 @@ msgstr "提示词已删除"
 msgid "Prompt format"
 msgstr "提示词格式"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:355
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:358
 msgid "Prompt improved"
 msgstr "提示词已优化"
 
@@ -26322,7 +26367,7 @@ msgstr "提示词链接已复制"
 msgid "Prompt link copied. It names no model, so it opens on the reader's model."
 msgstr "提示词链接已复制。它未指定模型，因此会使用阅读者的模型打开。"
 
-#: src/features/prompts/hooks/use-prompt-loader.tsx:104
+#: src/features/prompts/hooks/use-prompt-loader.tsx:114
 msgid "Prompt loaded"
 msgstr "提示词已加载"
 
@@ -26338,7 +26383,7 @@ msgstr "要在所有模型上运行的提示词..."
 msgid "Prompt Tokens"
 msgstr "提示词 token"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:431
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:469
 msgid "Prompt updated"
 msgstr "提示词已更新"
 
@@ -26358,7 +26403,7 @@ msgstr "提示词变量"
 #: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:479
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
 msgid "Prompts"
 msgstr "提示词"
 
@@ -26570,7 +26615,7 @@ msgid "Put several agents with their own roles in one thread. A review panel can
 msgstr "将多个各具角色的智能体放在同一对话中。审查小组可从安全和性能角度检查更改，辩论则可在综合前论证双方观点。"
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
-#: src/features/chat/thread/media-gallery-view.tsx:473
+#: src/features/chat/thread/media-gallery-view.tsx:481
 msgid "Quality"
 msgstr "质量"
 
@@ -26880,7 +26925,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:287
+#: src/features/chat/thread/composer-input.tsx:289
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -27277,7 +27322,7 @@ msgstr "引用"
 msgid "References"
 msgstr "参考"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:314
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:317
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
@@ -27288,7 +27333,7 @@ msgstr "改进"
 msgid "Refine Edge Detection"
 msgstr "精细边缘检测"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:294
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:297
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "根据反馈改进（可选）"
@@ -27511,10 +27556,10 @@ msgstr "记住我"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:349
-#: src/features/chat/thread/composer-input.tsx:361
-#: src/features/chat/thread/composer-input.tsx:415
-#: src/features/chat/thread/composer-input.tsx:424
+#: src/features/chat/thread/composer-input.tsx:351
+#: src/features/chat/thread/composer-input.tsx:363
+#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:426
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:323
@@ -27647,7 +27692,7 @@ msgstr "从收藏中移除"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:697
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
 msgid "Remove from Favorites"
 msgstr "从收藏中移除"
 
@@ -28013,7 +28058,7 @@ msgstr "研究"
 
 #: src/features/chat/tags/thread-categories.ts:17
 #: src/features/chat/tags/thread-category-filter.tsx:19
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:80
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:83
 #: src/features/skills/components/skill-form-dialog.tsx:123
 msgid "Research"
 msgstr "研究"
@@ -28022,7 +28067,7 @@ msgstr "研究"
 msgid "Research a topic"
 msgstr "研究一个主题"
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:278
 msgid "Research a topic in depth..."
 msgstr "深入研究一个主题..."
 
@@ -28157,8 +28202,8 @@ msgstr "重启 Ollama（{0}）"
 msgid "Restore this version"
 msgstr "恢复此版本"
 
-#: src/features/chat/thread/restore-to-input-action.tsx:31
-#: src/features/chat/thread/restore-to-input-action.tsx:31
+#: src/features/chat/thread/restore-to-input-action.tsx:50
+#: src/features/chat/thread/restore-to-input-action.tsx:50
 msgid "Restore to input"
 msgstr "恢复到输入框"
 
@@ -28292,11 +28337,11 @@ msgstr "立即重试"
 msgid "Retry the device check"
 msgstr "重新检查设备"
 
-#: src/features/chat/thread/composer-input.tsx:438
+#: src/features/chat/thread/composer-input.tsx:440
 msgid "Retry upload"
 msgstr "重试上传"
 
-#: src/features/chat/thread/composer-input.tsx:433
+#: src/features/chat/thread/composer-input.tsx:435
 msgid "Retry upload of {attachmentName}"
 msgstr "重试上传 {attachmentName}"
 
@@ -28313,7 +28358,7 @@ msgid "Retrying…"
 msgstr "正在重试…"
 
 #. placeholder {0}: retryCount + 1
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:216
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:219
 msgid "Retrying... (Attempt {0})"
 msgstr "正在重试...（第 {0} 次尝试）"
 
@@ -28621,15 +28666,15 @@ msgid "Rubric"
 msgstr "评分标准"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:198
+#: src/features/projects/components/project-rule-files.tsx:217
 msgid "Rule file {0}"
 msgstr "规则文件 {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:592
+#: src/features/projects/components/project-rule-files.tsx:750
 msgid "Rule files"
 msgstr "规则文件"
 
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:732
 msgid "Rule files saved."
 msgstr "规则文件已保存。"
 
@@ -28962,7 +29007,7 @@ msgstr "保存图像"
 msgid "Save login"
 msgstr "保存登录信息"
 
-#: src/features/projects/components/project-rule-files.tsx:694
+#: src/features/projects/components/project-rule-files.tsx:906
 msgid "Save or discard your rule file changes first."
 msgstr "请先保存或放弃你对规则文件的更改。"
 
@@ -28974,7 +29019,7 @@ msgstr "保存预设"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "保存可复用的系统提示词，并将其绑定到特定模型。使用“优化”按钮，通过提示词优化器改进每个预设。"
 
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:872
 msgid "Save rule files"
 msgstr "保存规则文件"
 
@@ -29052,7 +29097,7 @@ msgstr "正在保存工具…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:872
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29143,7 +29188,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1521
+#: src/features/chat/thread/composer-input.tsx:1545
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -29168,7 +29213,7 @@ msgstr "向左滚动一页列"
 msgid "Scroll right one page of columns"
 msgstr "向右滚动一页列"
 
-#: src/features/chat/thread/thread.tsx:118
+#: src/features/chat/thread/thread.tsx:119
 msgid "Scroll to bottom"
 msgstr "滚动到底部"
 
@@ -29186,7 +29231,7 @@ msgid "search"
 msgstr "搜索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:91
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:94
 msgid "Search"
 msgstr "搜索"
 
@@ -29241,7 +29286,7 @@ msgstr "搜索文件和聊天..."
 msgid "Search for an icon..."
 msgstr "搜索图标..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:95
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:98
 msgid "Search for the latest news about space exploration"
 msgstr "搜索太空探索的最新消息"
 
@@ -29319,12 +29364,12 @@ msgstr "搜索或创建变量..."
 msgid "Search pages"
 msgstr "搜索页面"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:555
 msgid "Search prompts"
 msgstr "搜索提示词"
 
 #: src/features/prompts/components/prompt-list.tsx:511
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:520
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:558
 msgid "Search prompts..."
 msgstr "搜索提示词..."
 
@@ -29373,7 +29418,7 @@ msgstr "搜索歌曲、艺人和专辑"
 msgid "Search Stack Overflow for programming help"
 msgstr "在 Stack Overflow 上搜索编程帮助"
 
-#: src/features/chat/thread/composer-search-suggestions.tsx:72
+#: src/features/chat/thread/composer-search-suggestions.tsx:75
 msgid "Search suggestions"
 msgstr "搜索建议"
 
@@ -29732,7 +29777,7 @@ msgstr "选择你的消息"
 msgid "Selected {requestNoun}"
 msgstr "已选{requestNoun}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:357
+#: src/features/chat/thread/media-gallery-view.tsx:365
 msgid "Selected reference"
 msgstr "已选参考"
 
@@ -30328,8 +30373,8 @@ msgstr "显示所有任务"
 msgid "Show attached content"
 msgstr "显示附加内容"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:250
-#: src/features/chat/thread/composer-followup-suggestions.tsx:266
+#: src/features/chat/thread/composer-followup-suggestions.tsx:253
+#: src/features/chat/thread/composer-followup-suggestions.tsx:269
 msgid "Show follow-up suggestions"
 msgstr "显示后续建议"
 
@@ -30447,7 +30492,7 @@ msgstr "显示 {0} 个用户，还有更多用户。"
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:865
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:903
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "显示第 {0}-{1} 个提示词，共 {2} 个"
 
@@ -30535,7 +30580,7 @@ msgstr "请登录账号以撰写指南。"
 msgid "Sign in to fork this workflow"
 msgstr "登录以复刻此工作流"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:274
+#: src/features/chat/signed-out/signed-out-chat.tsx:275
 msgid "Sign in to see your chats."
 msgstr "登录以查看你的对话。"
 
@@ -30679,7 +30724,7 @@ msgstr "简洁居中卡片"
 msgid "Simple, transparent <0>pricing</0>."
 msgstr "简单透明的<0>定价</0>。"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:35
+#: src/features/canvas/components/canvas-toolbar.tsx:36
 msgid "Simplify"
 msgstr "简化"
 
@@ -31107,7 +31152,7 @@ msgstr "升序"
 msgid "Sort by"
 msgstr "排序依据"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:51
+#: src/features/canvas/components/canvas-toolbar.tsx:52
 msgid "Sort data"
 msgstr "排序数据"
 
@@ -31308,7 +31353,7 @@ msgstr "语音"
 #. placeholder {0}: errorText(error)
 #. placeholder {0}: event.error
 #: src/features/chat/thread/composer-voice-input.tsx:149
-#: src/features/chat/voice-mode/voice-mode-controller.tsx:84
+#: src/features/chat/voice-mode/voice-mode-controller.tsx:86
 msgid "Speech recognition error: {0}"
 msgstr "语音识别错误：{0}"
 
@@ -31318,7 +31363,7 @@ msgid "Speech recognition error: {message}"
 msgstr "语音识别错误：{message}"
 
 #: src/features/chat/thread/composer-voice-input.tsx:111
-#: src/features/chat/voice-mode/voice-mode-controller.tsx:85
+#: src/features/chat/voice-mode/voice-mode-controller.tsx:87
 msgid "Speech recognition is not supported in your browser"
 msgstr "你的浏览器不支持语音识别"
 
@@ -31399,8 +31444,8 @@ msgstr "sql"
 #: src/features/canvas/components/design-preset-selector.tsx:89
 #: src/features/chat/thread/composer-image-settings.tsx:29
 #: src/features/chat/thread/composer-video-settings.tsx:25
-#: src/features/chat/thread/media-gallery-view.tsx:48
-#: src/features/chat/thread/media-gallery-view.tsx:77
+#: src/features/chat/thread/media-gallery-view.tsx:49
+#: src/features/chat/thread/media-gallery-view.tsx:78
 msgid "Square"
 msgstr "方形"
 
@@ -31467,7 +31512,7 @@ msgid "Stable, consistent frame output"
 msgstr "稳定、一致的帧输出"
 
 #: src/features/appearance/components/appearance-controls.tsx:119
-#: src/features/chat/thread/media-gallery-view.tsx:59
+#: src/features/chat/thread/media-gallery-view.tsx:60
 #: src/features/marketing/components/model-detail-page.tsx:36
 msgid "Standard"
 msgstr "标准"
@@ -31561,7 +31606,7 @@ msgstr "开始新聊天（{0}）"
 msgid "Start a new chat to get started"
 msgstr "新建聊天即可开始"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:67
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:68
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "开始新的上下文：之前的消息不再发送给模型"
 
@@ -32271,7 +32316,7 @@ msgid "style"
 msgstr "风格"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
-#: src/features/chat/thread/media-gallery-view.tsx:494
+#: src/features/chat/thread/media-gallery-view.tsx:502
 #: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "风格"
@@ -32314,7 +32359,7 @@ msgid "Style-consistent video generation guided by reference images to maintain 
 msgstr "以参考图像引导、保持视觉连贯的风格一致视频生成"
 
 #. placeholder {0}: styleLabels.user[style].label
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:231
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:234
 msgid "Style: {0}"
 msgstr "风格：{0}"
 
@@ -32390,11 +32435,11 @@ msgstr "成功标准不能超过 {CRITERIA_MAX} 个字符"
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "已成功从 {0} 导入 {imported} 个对话"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:73
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:76
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "提出减少塑料垃圾的创新方案"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:105
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "为科技类 YouTube 频道提供视频创意"
 
@@ -32407,7 +32452,7 @@ msgstr "推荐"
 msgid "Suggested answers"
 msgstr "建议的答案"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:641
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
@@ -32440,7 +32485,7 @@ msgstr "总结我今天的笔记"
 msgid "Summarise my notes in three bullets."
 msgstr "用三个要点总结我的笔记。"
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:275
 msgid "Summarize a document or URL..."
 msgstr "总结一篇文档或一个 URL..."
 
@@ -32456,7 +32501,7 @@ msgstr "每天早上总结我的收件箱"
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "总结我的收件箱并突出紧急事项。使用 {PAYLOAD_TOKEN} 获取 Webhook 数据。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:89
 msgid "Summarize the history of the internet"
 msgstr "总结互联网的发展史"
 
@@ -32562,7 +32607,7 @@ msgstr "旋涡状焦外，复古"
 msgid "Switch Account"
 msgstr "切换账号"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
 msgid "Switch AI model"
 msgstr "切换 AI 模型"
 
@@ -32578,7 +32623,7 @@ msgstr "只需一个参数即可在 OpenAI、Google、Anthropic 等之间切换�
 msgid "switch model"
 msgstr "切换模型"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:565
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:568
 msgid "Switch Model"
 msgstr "切换模型"
 
@@ -33037,7 +33082,7 @@ msgid "Temporary chat"
 msgstr "临时聊天"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
-#: src/features/chat/signed-out/signed-out-chat.tsx:299
+#: src/features/chat/signed-out/signed-out-chat.tsx:300
 msgid "Temporary Chat"
 msgstr "临时聊天"
 
@@ -33124,7 +33169,7 @@ msgstr "文本"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33181,7 +33226,7 @@ msgstr "文字方向已设为 LTR"
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:323
+#: src/features/chat/thread/composer-input.tsx:325
 msgid "Text document"
 msgstr "文本文档"
 
@@ -33484,7 +33529,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:197
+#: src/features/chat/browser-live-view/browser-live-view.tsx:214
 msgid "The agent is using a browser"
 msgstr ""
 
@@ -33614,7 +33659,7 @@ msgstr "更改被拒绝"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技能。"
 
-#: src/features/chat/thread/composer-input.tsx:1002
+#: src/features/chat/thread/composer-input.tsx:1004
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "粘贴内容准备好之前聊天已切换，因此未插入。"
 
@@ -33650,8 +33695,8 @@ msgstr "命令行未登录。你可以关闭此标签页。"
 msgid "The comparison could not be loaded."
 msgstr "无法加载对比结果。"
 
-#: src/features/chat/thread/composer-input.tsx:1010
-#: src/features/chat/thread/composer-input.tsx:1032
+#: src/features/chat/thread/composer-input.tsx:1012
+#: src/features/chat/thread/composer-input.tsx:1034
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "粘贴准备好之前输入框已被锁定，因此未插入。"
 
@@ -33694,6 +33739,10 @@ msgstr "数据集、其用例及所有运行记录都将被删除。"
 #: src/features/develop/components/pull-request-view.tsx:148
 msgid "The description is cut short."
 msgstr "描述已被截断。"
+
+#: src/features/projects/components/project-rule-files.tsx:572
+msgid "The description of \"{name}\" must be at most {limit} characters on one line."
+msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
 
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
@@ -33769,6 +33818,10 @@ msgstr "文件仍在附件中，会随你的消息一起发送。"
 #: src/features/evals/components/import-cases-dialog.tsx:101
 msgid "The file was not imported:"
 msgstr "文件未导入："
+
+#: src/features/projects/components/project-rule-files.tsx:554
+msgid "The files could not be read."
+msgstr "无法读取这些文件。"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:322
 msgid "The filters and the signature come from the event. Only the provider's own deliveries for it run."
@@ -33907,7 +33960,7 @@ msgstr "无法加载图标。"
 msgid "The imported file appears to be empty."
 msgstr "导入的文件似乎是空的。"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:287
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:290
 msgid "The improved prompt will appear here..."
 msgstr "优化后的提示词将显示在这里..."
 
@@ -33939,7 +33992,7 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:218
+#: src/features/chat/browser-live-view/browser-live-view.tsx:249
 msgid "The live view could not be opened."
 msgstr ""
 
@@ -33947,7 +34000,7 @@ msgstr ""
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:212
+#: src/features/chat/browser-live-view/browser-live-view.tsx:243
 msgid "The live view is not available right now."
 msgstr ""
 
@@ -34007,7 +34060,7 @@ msgstr "与此机器人的每个新聊天开始时使用的模式。你仍可以
 msgid "The model asks to use a tool you set to Ask. The run stops before the tool executes."
 msgstr "模型请求使用你设为“询问”的工具。运行将在工具执行前停止。"
 
-#: src/features/chat/core/hooks/use-prompt-link-draft.ts:160
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:162
 msgid "The model in the link is not available. The chat keeps its model."
 msgstr "链接中的模型不可用。聊天将保留其原有模型。"
 
@@ -34017,7 +34070,7 @@ msgstr "链接中的模型不可用。聊天将保留其原有模型。"
 msgid "The model picker now lists {0} models from {1}"
 msgstr "模型选择器现已列出 {1} 的 {0} 个模型"
 
-#: src/features/chat/thread/composer-input.tsx:1456
+#: src/features/chat/thread/composer-input.tsx:1480
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "上传期间模型选择已更改，因此消息未发送。请按发送按钮发送。"
 
@@ -34082,7 +34135,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "该页面、所有子页面、评论及版本历史都将被删除。此操作无法撤销。"
 
-#: src/features/chat/thread/composer-input.tsx:1058
+#: src/features/chat/thread/composer-input.tsx:1060
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "粘贴的文本无法附加，也未被插入。"
 
@@ -34175,7 +34228,7 @@ msgstr "重试耗时比预期更长"
 msgid "The right model, every time."
 msgstr "每次都用对模型。"
 
-#: src/features/projects/components/project-rule-files.tsx:599
+#: src/features/projects/components/project-rule-files.tsx:757
 msgid "The rule files could not be loaded."
 msgstr "无法加载规则文件。"
 
@@ -34252,11 +34305,11 @@ msgstr "两次输入的口令不一致。"
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:636
+#: src/features/chat/thread/composer-input.tsx:638
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
-#: src/features/chat/thread/composer-input.tsx:1469
+#: src/features/chat/thread/composer-input.tsx:1493
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "上传已完成，但消息未发送。请按发送按钮发送。"
 
@@ -34344,7 +34397,7 @@ msgstr "这些记忆因与你的消息相关，已被加入此回复的 AI 上�
 msgid "These providers will never be used for your requests."
 msgstr "这些提供商将永远不会用于处理你的请求。"
 
-#: src/features/projects/components/project-rule-files.tsx:406
+#: src/features/projects/components/project-rule-files.tsx:461
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "这些规则文件在此期间已被更改。请放弃你的更改以查看已保存的版本，然后重新编辑。"
 
@@ -35049,7 +35102,7 @@ msgstr "此对话已关联了所能保留的最多拉取请求数。"
 msgid "This thread changed since, so this was not applied."
 msgstr "此对话此后已发生变化，因此未应用此操作。"
 
-#: src/routes/(chat)/chat/index.tsx:168
+#: src/routes/(chat)/chat/index.tsx:170
 msgid "This thread has been deleted"
 msgstr "此对话已被删除"
 
@@ -35104,7 +35157,7 @@ msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:300
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:920
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:958
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "这将永久删除提示词“{0}”。此操作无法撤销。"
 
@@ -35189,7 +35242,7 @@ msgstr "对话已设为公开"
 msgid "Thread management"
 msgstr "对话管理"
 
-#: src/routes/(chat)/chat/index.tsx:173
+#: src/routes/(chat)/chat/index.tsx:175
 msgid "Thread not found or you don't have access to it"
 msgstr "未找到对话，或你无权访问"
 
@@ -35369,7 +35422,7 @@ msgstr "今天"
 msgid "Today, {label}"
 msgstr "今天，{label}"
 
-#: src/features/projects/components/project-rule-files.tsx:447
+#: src/features/projects/components/project-rule-files.tsx:596
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "这些规则文件合计超过 {limit} MB。请缩短或删除其中一些。"
 
@@ -35515,7 +35568,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:218
+#: src/features/chat/browser-live-view/browser-live-view.tsx:249
 msgid "Too many live views were opened. Try again later."
 msgstr ""
 
@@ -35754,7 +35807,7 @@ msgstr "转换后的图像"
 msgid "Translate"
 msgstr "翻译"
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:281
 msgid "Translate text to another language..."
 msgstr "将文本翻译成其他语言..."
 
@@ -35918,8 +35971,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:222
-#: src/features/chat/browser-live-view/browser-live-view.tsx:289
+#: src/features/chat/browser-live-view/browser-live-view.tsx:253
+#: src/features/chat/browser-live-view/browser-live-view.tsx:337
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36115,9 +36168,9 @@ msgstr "输入以搜索"
 msgid "Type your answer…"
 msgstr "输入你的回答…"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1922
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
+#: src/features/chat/signed-out/signed-out-chat.tsx:250
+#: src/features/chat/thread/composer-input.tsx:1959
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:203
 msgid "Type your message..."
 msgstr "输入你的消息..."
 
@@ -36286,7 +36339,7 @@ msgstr "下划线"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:904
+#: src/features/chat/thread/composer-input.tsx:906
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -36538,7 +36591,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1777
+#: src/features/chat/thread/composer-input.tsx:1814
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -36732,14 +36785,14 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:430
-#: src/features/chat/thread/composer-input.tsx:681
-#: src/features/chat/thread/composer-input.tsx:1689
+#: src/features/chat/thread/composer-input.tsx:432
+#: src/features/chat/thread/composer-input.tsx:683
+#: src/features/chat/thread/composer-input.tsx:1720
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1682
+#: src/features/chat/thread/composer-input.tsx:1713
 msgid "Upload failed: {0}"
 msgstr "上传失败：{0}"
 
@@ -36789,7 +36842,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:367
+#: src/features/chat/thread/composer-input.tsx:369
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -36966,7 +37019,7 @@ msgstr "从 MCP 客户端使用"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "只能使用小写字母、数字和单个连字符"
 
-#: src/features/chat/thread/media-gallery-view.tsx:623
+#: src/features/chat/thread/media-gallery-view.tsx:631
 msgid "Use Original Prompt"
 msgstr "使用原始提示词"
 
@@ -37319,7 +37372,7 @@ msgstr "验证"
 msgid "Verify Code"
 msgstr "验证代码"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:61
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "核实这一说法：“在太空中可以看到中国的长城”"
 
@@ -37455,7 +37508,7 @@ msgstr "视频"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:133
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -37507,7 +37560,7 @@ msgstr "视频生成"
 msgid "Video generation"
 msgstr "视频生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:342
+#: src/features/chat/thread/media-gallery-view.tsx:350
 #: src/features/marketing/components/model-detail-page.tsx:95
 msgid "Video Generation"
 msgstr "视频生成"
@@ -37550,7 +37603,7 @@ msgstr "视频转视频"
 msgid "video understanding"
 msgstr "视频理解"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:102
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:105
 msgid "Videos"
 msgstr "视频"
 
@@ -37841,7 +37894,7 @@ msgid "Vitesse"
 msgstr "Vitesse"
 
 #: src/features/chat/thread/composer-image-settings.tsx:53
-#: src/features/chat/thread/media-gallery-view.tsx:65
+#: src/features/chat/thread/media-gallery-view.tsx:66
 msgid "Vivid"
 msgstr "鲜艳"
 
@@ -37994,7 +38047,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:200
+#: src/features/chat/browser-live-view/browser-live-view.tsx:231
 msgid "Watch live"
 msgstr ""
 
@@ -38182,27 +38235,27 @@ msgstr "威尔士语"
 msgid "Welsh (UK)"
 msgstr "威尔士语（英国）"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:77
 msgid "What are some creative date night ideas?"
 msgstr "有哪些有创意的约会点子？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:110
 msgid "What are the best practices for video editing?"
 msgstr "视频剪辑有哪些最佳实践？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:100
 msgid "What are the current trends in web development?"
 msgstr "当前 Web 开发有哪些趋势？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:88
 msgid "What are the key findings from recent AI research papers?"
 msgstr "近期 AI 研究论文有哪些重要发现？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:82
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
 msgid "What are the latest developments in quantum computing?"
 msgstr "量子计算有哪些最新进展？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:94
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
 msgid "What are the top-rated productivity apps in 2025?"
 msgstr "2025 年评分最高的效率应用有哪些？"
 
@@ -38305,7 +38358,7 @@ msgstr "用户从应用发送的内容，最新的在前"
 msgid "what we store"
 msgstr "我们存储的内容"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:228
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:231
 msgid "What would you like to improve? (optional)"
 msgstr "你想改进什么？（可选）"
 
@@ -38322,7 +38375,7 @@ msgstr "新功能"
 msgid "What's the latency overhead?"
 msgstr "延迟开销是多少？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:62
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:65
 msgid "What's the scientific evidence for the health benefits of meditation?"
 msgstr "冥想对健康的益处有哪些科学证据？"
 
@@ -38358,9 +38411,14 @@ msgstr "当新事实与旧事实冲突时，旧记忆会被更新、取代，或
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "当回复因更新或故障而中断时，它会从上一个已完成的步骤继续，最多 3 次。在工具运行期间被中断的回复永远不会继续。"
 
-#: src/features/projects/components/project-rule-files.tsx:270
+#: src/features/projects/components/project-rule-files.tsx:290
 msgid "When files match"
 msgstr "文件匹配时"
+
+#: src/features/projects/components/project-rule-files.tsx:294
+#: src/features/projects/components/project-rule-files.tsx:458
+msgid "When needed"
+msgstr "需要时"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
@@ -38373,6 +38431,10 @@ msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 #: src/features/skills/components/skill-form-dialog.tsx:261
 msgid "When should the assistant use this skill?"
 msgstr "助手应在什么时候使用此技能？"
+
+#: src/features/projects/components/project-rule-files.tsx:301
+msgid "When to read it"
+msgstr "何时读取"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
@@ -38398,7 +38460,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:276
+#: src/features/chat/browser-live-view/browser-live-view.tsx:324
 msgid "Whether the agent is using a browser could not be checked."
 msgstr ""
 
@@ -38577,7 +38639,7 @@ msgstr "世界知识"
 msgid "Write"
 msgstr "写入"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:117
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:120
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "为电商网站写一段有吸引力的产品描述"
 
@@ -38585,7 +38647,7 @@ msgstr "为电商网站写一段有吸引力的产品描述"
 msgid "Write a summary, or add a comment, before you submit this review."
 msgstr "提交此审查之前，请写一段摘要或添加一条评论。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:106
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:109
 msgid "Write a video description for a product launch"
 msgstr "为产品发布写一段视频描述"
 
@@ -38605,7 +38667,7 @@ msgstr "在聊天旁撰写长篇内容"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，无需切换工具。"
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:274
 msgid "Write some code for me..."
 msgstr "帮我写点代码..."
 
@@ -38623,7 +38685,7 @@ msgstr "开始写作，或输入“/”调用命令…"
 
 #: src/features/chat/tags/thread-categories.ts:18
 #: src/features/chat/tags/thread-category-filter.tsx:18
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:113
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:116
 msgid "Writing"
 msgstr "写作"
 
@@ -38798,8 +38860,8 @@ msgstr "你没有监视任何仓库。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 
-#: src/features/chat/thread/composer-input.tsx:1116
-#: src/features/chat/thread/composer-input.tsx:1230
+#: src/features/chat/thread/composer-input.tsx:1119
+#: src/features/chat/thread/composer-input.tsx:1244
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"
@@ -38955,7 +39017,7 @@ msgstr "你已处理完所有通知。"
 msgid "You're all set!"
 msgstr "一切就绪！"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:205
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:208
 msgid "You're offline. Please check your connection."
 msgstr "你已离线，请检查网络连接。"
 
@@ -38972,7 +39034,7 @@ msgid "You've been invited to join an organization"
 msgstr "你受邀加入一个组织"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:547
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:585
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "你已达到免费账号 3 个提示词的上限。升级到 Pro 以创建更多。"
 
@@ -39123,7 +39185,7 @@ msgstr "你的数据导出已就绪"
 msgid "Your display name for your account"
 msgstr "你账号的显示名称"
 
-#: src/features/chat/core/hooks/use-prompt-link-draft.ts:130
+#: src/features/chat/core/hooks/use-prompt-link-draft.ts:131
 msgid "Your draft is kept. The prompt from the link was not added."
 msgstr "你的草稿已保留。链接中的提示词未被添加。"
 
@@ -39144,12 +39206,12 @@ msgid "Your First Chat"
 msgstr "你的第一次聊天"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:746
+#: src/features/chat/thread/composer-input.tsx:748
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:739
+#: src/features/chat/thread/composer-input.tsx:741
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
@@ -39182,7 +39244,7 @@ msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 msgid "Your message"
 msgstr "你的消息"
 
-#: src/features/chat/thread/composer-input.tsx:1441
+#: src/features/chat/thread/composer-input.tsx:1465
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "上传期间消息已更改，因此未发送。请按发送按钮发送。"
 

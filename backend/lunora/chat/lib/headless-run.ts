@@ -62,13 +62,14 @@ import { getMaxSteps } from "./auto-continue";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import { closeMCPClients } from "./mcp-tools";
-import type { SearchMode } from "./tool-builder";
+import { modelSupportsTools, type SearchMode } from "./tool-builder";
 import { servesUser } from "../../lib/shard-context";
 import { resolveTimeZone } from "../../memory/reflection-logic";
 import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
+import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
 
 /** No tools, so no permission keys or fingerprints: typed, so the union with the built tools' maps stays a plain record. */
 const NO_PERMISSION_KEYS: Record<string, string> = {};
@@ -151,6 +152,12 @@ export interface HeadlessRunOptions {
     pauseForApproval?: { subAgentRunId: Id<"subAgentRuns"> };
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
     personalization: "full" | "none";
+    /**
+     * The `auto` rule files of the project the run is for (`runProjectFor`), and that project: with tools, the run lists them
+     * after `system` and may read them with `instruction_read` while its tools keep that one (`buildAgentTools`); without, neither. A pause records the
+     * project, so its continuation reads that project's files.
+     */
+    projectInstructions?: { instructions: ReadonlyArray<RunInstruction>; projectId: string; systemWithoutInstructions?: string };
     /** Omitted when continuing a thread: its latest message is the prompt. */
     prompt?: string;
     /** Reasoning effort on the chat's 0-100 scale; wins over the skill's. Unset leaves it to the skill, then the model. */
@@ -293,6 +300,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
               botLookup: { botId: options.botId, threadId: modeThreadId },
               headless: true,
               ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
+              // Only for a model that calls tools: the list without the tool would name files nothing can read.
+              ...(modelSupportsTools(model) && options.projectInstructions && { instructions: options.projectInstructions.instructions }),
               ...(options.approvedTools && { headlessApproved: options.approvedTools }),
               ...(options.pauseForApproval && { headlessCanAsk: true }),
               model,
@@ -328,6 +337,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
         const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
+        // Listed only while the run still offers `instruction_read`: the cap, the bot's selection, a skill, the permissions or the
+        // allowlist may have removed it like any other tool.
+        const instructions = Object.hasOwn(runTools, INSTRUCTION_READ_TOOL) ? (options.projectInstructions?.instructions ?? []) : [];
         const agent = await getAgent(model, {
             backupModelId,
             customProvider,
@@ -346,7 +358,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         });
 
         const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
-        const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
+        // A run that lists none takes the project text chosen without the list's cost, when that differs.
+        const runSystem = (instructions.length === 0 && options.projectInstructions?.systemWithoutInstructions) || options.system;
+        const extraParts = [runSystem, renderInstructionList(instructions), memoryContext].filter((part): part is string => !!part);
         // Without extra parts the agent falls back to its own instructions.
         const system = extraParts.length > 0 ? [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") : undefined;
         const shouldAutoContinue = options.maxSteps === undefined;
@@ -491,6 +505,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 model,
                 // The continuation's cap reads it when the thread has no stored organization (`readRunPermissionCap`).
                 ...(options.organizationId && { organizationId: options.organizationId }),
+                // The project the listed `auto` files came from (`resumeApprovedRun` reads that one's again).
+                ...(instructions.length > 0 && options.projectInstructions && { projectId: options.projectInstructions.projectId }),
                 ...((options.reasoningEffort ?? skill?.config?.reasoningEffort) !== undefined && {
                     reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 }),

@@ -71,6 +71,11 @@ export const vToolRunConfig = v.object({
     /** The organization the paused run was started from, which caps its continuation when its thread has no stored one. */
     organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
     /**
+     * The project whose `auto` rule files the paused run listed and offered `instruction_read` over: the continuation reads
+     * that project's files anew, with its access check, never the project the thread is in by then. Absent: no such tool.
+     */
+    projectId: v.optional(v.string().max(MAX_LENGTH.id)),
+    /**
      * The prompt row the paused run answered. The continuation's stream is keyed on the approval id, so this is
      * how a goal recognises the resumed run as its own round (`chat/goals/internal.ts#runPromptId`).
      */

@@ -42,6 +42,7 @@ import {
     renderRuleFiles,
     type RuleFile,
     ruleFilesRevision,
+    type RunInstruction,
     selectRuleFiles,
 } from "./rule-files";
 
@@ -225,11 +226,22 @@ export const writableProject = async (
 };
 
 /**
- * The text a run takes from a project's rule files (`readProjectRuleFiles`), given the names of the files its message
- * attaches (`paths`; none for a task): what every run path uses, chat, edit, group and task runs alike, so the per-run
- * cap (`selectRuleFiles`) and the logging apply to each the same way. Only counts are logged, never text.
+ * What a run takes from a project's rule files (`readProjectRuleFiles`), given the names of the files its message
+ * attaches (`paths`; none for a task): the text of its `always` and matching `glob` files, and the `auto` files it lists
+ * (`instructions`, empty for none), which a caller that offers `instruction_read` lists after the text
+ * (`renderInstructionList`). What every run path uses, chat, edit, group and task runs alike, so the per-run cap
+ * (`selectRuleFiles`, the list counted in it) and the logging apply to each the same way. Only counts are logged, never text.
+ * A run that ends up showing no list (no `instruction_read`: no tools, the cap, a bot's selection, an edit or group run)
+ * takes `textWithoutInstructions` instead, the text selected without the list's cost: present only when a list is
+ * offered and its cost left something out or cut it, so it is never sent twice for nothing; with none listed, `text` is
+ * that text already. The over-budget log describes the listing selection.
  */
-export const projectRunContext = (context: QueryCtx, projectId: Id<"projects">, files: RuleFile[], paths: string[]): string | null => {
+export const projectRunContext = (
+    context: QueryCtx,
+    projectId: Id<"projects">,
+    files: RuleFile[],
+    paths: string[],
+): { instructions: RunInstruction[]; text: string | null; textWithoutInstructions?: string } => {
     const selected = selectRuleFiles(files, paths);
 
     if (selected.omitted > 0 || selected.truncated || selected.matchingCut) {
@@ -241,7 +253,17 @@ export const projectRunContext = (context: QueryCtx, projectId: Id<"projects">, 
         });
     }
 
-    return renderRuleFiles(selected.files);
+    const text = renderRuleFiles(selected.files);
+    // Only beside a list: a selection that lists none is already the one made without it (`selectRuleFiles`).
+    const textWithoutInstructions = selected.instructions.length > 0 ? renderRuleFiles(selectRuleFiles(files, paths, false).files) : null;
+
+    return {
+        instructions: selected.instructions.map((file) => {
+            return { content: file.content, description: file.description ?? "", id: file.id, title: file.title };
+        }),
+        text,
+        ...(textWithoutInstructions !== null && textWithoutInstructions !== text && { textWithoutInstructions }),
+    };
 };
 
 /** File names read for one run's pattern match, at most: a message attaches no more (`MAX_ATTACHED_FILES`). */
@@ -301,11 +323,21 @@ const attachmentNamesForRun = async (context: QueryCtx, fileIds: ReadonlyArray<I
  * A project's instructions for a run on behalf of `userId`, under the same access rule as `createThread` (owner or
  * organization member): its `always` rule files, and its `glob` files that match the names of `fileIds`, the files the
  * run's message attaches. Its legacy `context` is the first `always` file, so a project without rule files gives
- * exactly its `context`. Within the per-run budget (`selectRuleFiles`); only counts are logged, never text.
+ * exactly its `context`; and its `auto` files, listed and read by `instruction_read` (`projectRunContext`), all from
+ * this one read. Within the per-run budget (`selectRuleFiles`); only counts are logged, never text.
  */
 export const getProjectContextForRun = internalQuery
     .input({ fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_RUN_FILE_IDS)), projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.string(), v.null()))
+    .output(
+        v.union(
+            v.null(),
+            v.object({
+                instructions: v.array(v.object({ content: v.string(), description: v.string(), id: v.string(), title: v.string() })),
+                text: v.union(v.string(), v.null()),
+                textWithoutInstructions: v.optional(v.string()),
+            }),
+        ),
+    )
     .query(async ({ args: { fileIds, projectId, userId }, ctx: context }) => {
         // Both on the primary: the first save writes the rule-file row and clears `context` together, so a project row and
         // a rule-file row read from replicas at different points could leave the run, anyone's, with no instructions.
@@ -347,9 +379,10 @@ export const listProjectRuleFiles = authQuery
                 files: v.array(
                     v.object({
                         content: v.string(),
+                        description: v.optional(v.string()),
                         globs: v.optional(v.array(v.string())),
                         id: v.string(),
-                        mode: v.union(v.literal("always"), v.literal("glob")),
+                        mode: v.union(v.literal("always"), v.literal("auto"), v.literal("glob")),
                         title: v.string(),
                     }),
                 ),
@@ -401,9 +434,10 @@ export const setProjectRuleFiles = authMutation
             .array(
                 v.object({
                     content: v.string().max(MAX_RULE_FILE_LENGTH),
+                    description: v.optional(v.string().max(MAX_LENGTH.short)),
                     globs: v.optional(v.array(v.string().max(MAX_LENGTH.short)).max(RULE_GLOBS_INPUT_MAX)),
                     id: v.string().max(MAX_RULE_ID_LENGTH),
-                    mode: v.union(v.literal("always"), v.literal("glob")),
+                    mode: v.union(v.literal("always"), v.literal("auto"), v.literal("glob")),
                     title: v.string().max(MAX_LENGTH.short),
                 }),
             )
@@ -415,9 +449,10 @@ export const setProjectRuleFiles = authMutation
             files: v.array(
                 v.object({
                     content: v.string(),
+                    description: v.optional(v.string()),
                     globs: v.optional(v.array(v.string())),
                     id: v.string(),
-                    mode: v.union(v.literal("always"), v.literal("glob")),
+                    mode: v.union(v.literal("always"), v.literal("auto"), v.literal("glob")),
                     title: v.string(),
                 }),
             ),
@@ -455,9 +490,9 @@ export const setProjectRuleFiles = authMutation
         const normalized = kept
             ? normalizeRuleFiles(
                   ruleFiles.filter((file) => file.id !== kept),
-                  { alongside: 1 },
+                  { alongside: 1, stored: current },
               )
-            : normalizeRuleFiles(ruleFiles);
+            : normalizeRuleFiles(ruleFiles, { stored: current });
         // The `context` text this save carries into the list, marked carried in the same write, so one the clear below
         // fails to remove is not read a second time.
         const carried = kept ? undefined : project.context;
@@ -475,6 +510,7 @@ export const setProjectRuleFiles = authMutation
         await markRuleFilesSaved(context.db, projectId, context.now, { clearContext: carried });
 
         context.log.event("projects.set_rule_files", {
+            autoFiles: normalized.filter((file) => file.mode === "auto").length,
             globFiles: normalized.filter((file) => file.mode === "glob").length,
             projectId,
             ruleFiles: normalized.length,
