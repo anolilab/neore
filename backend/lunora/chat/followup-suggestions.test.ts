@@ -54,6 +54,7 @@ const REACHED = "getAgent reached";
 
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "agent_sharing", await import("../agent/sharing"));
     registerModule(registry, "auth_functions", await import("../auth/functions"));
     registerModule(registry, "agent_followup_suggestions", await import("../agent/followup-suggestions"));
 });

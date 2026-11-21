@@ -4881,13 +4881,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                 }
 
                 // The model reads the reply's whole turn, its user prompt included, however many pages it spans; the first page's older rows follow.
+                // The rows come newest first, and the model reads a conversation in order: they are reversed here.
                 const modelMessages = docsToModelMessages(
                     followupModelRows(
                         rowsAfterContextReset(turnRows, contextReset).filter(
                             (messageDocument) => messageDocument.message?.role === "user" || messageDocument.message?.role === "assistant",
                         ),
                         filteredMessageDocuments,
-                    ),
+                    ).toReversed(),
                 );
 
                 // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
@@ -4895,6 +4896,17 @@ export const generateFollowupSuggestionsForThread = internalAction
                 const liveThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
                 if (!liveThread || liveThread.deletedAt !== undefined || liveThread.deletingAt !== undefined) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // A collaborator whose access was removed since the job read the thread is not sent to a model under it.
+                if (
+                    userId !== ownerUserId &&
+                    !(await context.runQuery(internal.agent.sharing.getThreadAccess, { threadId: threadId as Id<"threads">, userId }))
+                ) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The actor's access was removed, not sending: ${threadId}`);
                     await giveBackPaidClaim();
 
                     return;
