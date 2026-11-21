@@ -32,14 +32,15 @@ const sourceOf = (part: PartLike): string | undefined => {
 };
 
 /**
- * An image's storage path: the path of its signed link, without host or signature, which stays the same when the link is
- * signed again. `undefined` for an image with no link to our storage (a `data:` URL).
+ * An image's key: the host and path of its link, without scheme or signature, which stay the same when the link is
+ * signed again, and tell apart two hosts serving the same path. `undefined` for an image with no web link (a `data:`
+ * URL). Not a link itself: nothing signs or serves it.
  */
 export const imageKeyOf = (source: string): string | undefined => {
     try {
         const url = new URL(source);
 
-        return url.protocol === "http:" || url.protocol === "https:" ? url.pathname : undefined;
+        return url.protocol === "http:" || url.protocol === "https:" ? `${url.host}${url.pathname}` : undefined;
     } catch {
         return undefined;
     }
@@ -60,14 +61,17 @@ export const findPinnedImage = (
     const images = [...imageOrdinals(parts)].map(([partIndex, ordinal]) => {
         return { ordinal, part: parts[partIndex] as PartLike };
     });
-    const found =
+    const matching =
         imageKey === undefined
-            ? images.find((image) => image.ordinal === imageIndex)
-            : images.find((image) => {
+            ? images.filter((image) => image.ordinal === imageIndex)
+            : images.filter((image) => {
                   const source = sourceOf(image.part);
 
                   return source !== undefined && imageKeyOf(source) === imageKey;
               });
+    // Several images with one key (the same file twice): the pin's place among them decides; when it does not, the label
+    // shows rather than some other one of them.
+    const found = matching.length > 1 ? matching.find((image) => image.ordinal === imageIndex) : matching[0];
     const source = found ? sourceOf(found.part) : undefined;
 
     if (!found || !source || found.part.nsfwStatus === "blocked" || found.part.nsfwStatus === "checking") {

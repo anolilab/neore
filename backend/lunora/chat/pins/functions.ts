@@ -65,7 +65,8 @@ export const createPin = authMutation
     .use(rateLimit("pins/create"))
     .input({
         imageIndex: v.optional(v.number().int().min(0).max(MAX_PINNED_IMAGE_INDEX)),
-        // The image's storage path, matched against the message's images when the pin is shown; never signed or served.
+        // The image's key (host and path, no signature), matched against the message's images when the pin is shown; never
+        // signed or served.
         imageKey: v.optional(v.string().max(MAX_LENGTH.short)),
         // Absent or "message" pins the whole message; "image" pins the image at `imageIndex`.
         kind: v.optional(vPinKind),

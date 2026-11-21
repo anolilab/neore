@@ -75,9 +75,25 @@ describe(findPinnedImage, () => {
             ],
         };
 
-        expect(findPinnedImage([before], "m6", 1, "/agent-files/b")?.url).toBe(pinned);
-        expect(findPinnedImage([after], "m6", 1, "/agent-files/b")?.url).toBe("https://api.test/agent-files/b?sig=2");
-        expect(findPinnedImage([after], "m6", 0, "/agent-files/a")).toBeNull();
+        expect(findPinnedImage([before], "m6", 1, "api.test/agent-files/b")?.url).toBe(pinned);
+        expect(findPinnedImage([after], "m6", 1, "api.test/agent-files/b")?.url).toBe("https://api.test/agent-files/b?sig=2");
+        expect(findPinnedImage([after], "m6", 0, "api.test/agent-files/a")).toBeNull();
+    });
+
+    it("tells apart two hosts serving one path, and lets the place decide between copies of one file", () => {
+        const reply2 = {
+            id: "m9",
+            parts: [
+                { image: "https://cdn.example/logo.png", type: "image" },
+                { image: "https://api.test/logo.png?sig=1", type: "image" },
+                { image: "https://api.test/logo.png?sig=1", type: "image" },
+            ],
+        };
+
+        expect(findPinnedImage([reply2], "m9", 1, "api.test/logo.png")?.url).toBe("https://api.test/logo.png?sig=1");
+        expect(findPinnedImage([reply2], "m9", 0, "cdn.example/logo.png")?.url).toBe("https://cdn.example/logo.png");
+        // Two copies of one key and a place that is neither of them: the label, not a guess.
+        expect(findPinnedImage([reply2], "m9", 0, "api.test/logo.png")).toBeNull();
     });
 
     it("keeps finding the pinned image after an edit removes the text before it", () => {
@@ -104,7 +120,7 @@ describe(findPinnedImage, () => {
 
 describe(imageKeyOf, () => {
     it("keeps a stored image's path, without host or signature, and nothing for an inline image", () => {
-        expect(imageKeyOf("https://api.test/agent-files/abc?sig=1&exp=2")).toBe("/agent-files/abc");
+        expect(imageKeyOf("https://api.test/agent-files/abc?sig=1&exp=2")).toBe("api.test/agent-files/abc");
         expect(imageKeyOf("data:image/png;base64,iVBORw0KGgo=")).toBeUndefined();
         expect(imageKeyOf("not a url")).toBeUndefined();
     });
