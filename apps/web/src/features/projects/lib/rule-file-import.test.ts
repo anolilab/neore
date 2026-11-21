@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { importRuleFiles, needsMode, toImportedRuleFile } from "./rule-file-import";
+import { importRuleFiles, importRuleTexts, needsMode, toImportedRuleFile } from "./rule-file-import";
 
 describe("toImportedRuleFile", () => {
-    it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "repo/claude.md"])("imports %s whole as one always file under its own name", (path) => {
+    it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "claude.md"])("imports %s whole as one always file under its own name", (path) => {
         const text = "---\ndescription: kept as text\n---\nBe brief.";
 
         expect(toImportedRuleFile(path, text)).toStrictEqual({
@@ -11,7 +11,21 @@ describe("toImportedRuleFile", () => {
             description: "",
             mode: "always",
             patterns: "",
-            title: path.split("/").at(-1),
+            title: path,
+        });
+    });
+
+    it.each([
+        ["rules/AGENTS.md", "AGENTS"],
+        [".agents/rules/claude.md", "claude"],
+        [String.raw`rules\GEMINI.md`, "GEMINI"],
+    ])("reads %s, in a folder, by its front matter like any rule file", (path, title) => {
+        expect(toImportedRuleFile(path, "---\nglobs: src/**\n---\nOnly src.")).toStrictEqual({
+            content: "Only src.",
+            description: "",
+            mode: "glob",
+            patterns: "src/**",
+            title,
         });
     });
 
@@ -170,7 +184,45 @@ describe("toImportedRuleFile", () => {
     });
 });
 
+describe("importRuleTexts", () => {
+    it("counts every entry past the room as skipped, in path order, reading none of them", async () => {
+        const unread = () => {
+            throw new Error("read past the room");
+        };
+
+        await expect(
+            importRuleTexts(
+                [
+                    { path: "rules/c.md", text: unread },
+                    { path: "rules/a.md", text: () => "A" },
+                    { path: "rules/b.md", text: unread },
+                ],
+                1,
+            ),
+        ).resolves.toStrictEqual({ imported: [{ content: "A", description: "", mode: "auto", patterns: "", title: "a" }], skipped: 2 });
+    });
+});
+
 describe("importRuleFiles", () => {
+    it("reads a picked folder's top-level instruction file whole, and one in its rules folder by front matter", async () => {
+        const inFolder = (path: string, text: string) => {
+            const file = new File([text], path.split("/").at(-1)!);
+
+            Object.defineProperty(file, "webkitRelativePath", { value: path });
+
+            return file;
+        };
+        const front = "---\ndescription: On deploys\n---\nSteps.";
+
+        await expect(importRuleFiles([inFolder("repo/AGENTS.md", front), inFolder("repo/rules/CLAUDE.md", front)], 5)).resolves.toStrictEqual({
+            imported: [
+                { content: front, description: "", mode: "always", patterns: "", title: "AGENTS.md" },
+                { content: "Steps.", description: "On deploys", mode: "auto", patterns: "", title: "CLAUDE" },
+            ],
+            skipped: 0,
+        });
+    });
+
     it("imports in path order up to the room left and counts the rest", async () => {
         const files = [new File(["B"], "b.md"), new File(["A"], "a.md"), new File(["x"], "x.txt"), new File(["C"], "c.md")];
 

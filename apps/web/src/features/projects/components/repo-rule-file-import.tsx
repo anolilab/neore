@@ -4,7 +4,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { MAX_RULE_FILES } from "@neore/backend/rule-file-limits";
+import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES } from "@neore/backend/rule-file-limits";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import { Label } from "@neore/ui/components/label";
@@ -35,6 +35,12 @@ const GIT_SUFFIX = /\.git$/u;
 
 /** A repository URL as the person reads it: its path on the host. */
 const repoName = (url: string): string => url.replace(HOST_PREFIX, "").replace(GIT_SUFFIX, "");
+
+/**
+ * Whether a found file may hold more characters than a rule file may: its bytes say so only past that many (a character
+ * is one byte or more), so it is offered but not ticked, and the read refuses it if it does.
+ */
+const mayBeTooLong = (file: FoundFile): boolean => !file.tooLarge && file.size > MAX_RULE_FILE_LENGTH;
 
 /**
  * Rule files from one of the project's repositories (`listRepoRuleFiles`, `readRepoRuleFiles`): the person picks the
@@ -129,7 +135,7 @@ const RepoRuleFileImport: FC<{
                 }
 
                 setFound(outcome.files);
-                setPicked(new Set(outcome.files.filter((file) => !file.tooLarge).map((file) => file.path)));
+                setPicked(new Set(outcome.files.filter((file) => !file.tooLarge && !mayBeTooLong(file)).map((file) => file.path)));
 
                 return undefined;
             })
@@ -139,22 +145,25 @@ const RepoRuleFileImport: FC<{
     };
 
     const importPicked = () => {
-        const paths = [...picked].slice(0, MAX_RULE_FILES);
+        // In the order the import takes them: the first a project can hold are read, the rest counted as left out.
+        const all = [...picked].toSorted((left, right) => left.localeCompare(right));
+        const paths = all.slice(0, MAX_RULE_FILES);
 
         request.current += 1;
         const asked = request.current;
 
         runImport(async () => {
-            const outcome = await readFiles({ ...repoArgs, paths });
+            // A read that failed is said in the panel, as a refusal is.
+            const outcome = await readFiles({ ...repoArgs, paths }).catch(() => undefined);
 
-            // Cancelled or closed meanwhile: nothing is added.
+            // Cancelled or closed meanwhile: nothing is added, nothing said.
             if (asked !== request.current) {
                 return null;
             }
 
-            if (outcome.status !== "ok") {
+            if (outcome?.status !== "ok") {
                 // Said in the panel, which stays open for another try; nothing is applied.
-                setFailure(outcome.status);
+                setFailure(outcome?.status ?? "unknown");
 
                 return null;
             }
@@ -164,7 +173,7 @@ const RepoRuleFileImport: FC<{
 
             toggle(false);
 
-            return { ...read, unreadable: outcome.files.length - texts.length };
+            return { ...read, skipped: read.skipped + all.length - paths.length, unreadable: outcome.files.length - texts.length };
         });
     };
 
@@ -225,6 +234,7 @@ const RepoRuleFileImport: FC<{
                                 />
                                 <span className="font-mono text-xs">{file.path}</span>
                                 {file.tooLarge && <span className="text-muted-foreground text-xs">{t`(too large)`}</span>}
+                                {mayBeTooLong(file) && <span className="text-muted-foreground text-xs">{t`(may be too long)`}</span>}
                             </Label>
                         </li>
                     ))}

@@ -108,7 +108,10 @@ export const ReadOnly: Story = {
     },
 };
 
-/** The project's repository: its instruction files are listed for the owner to pick, and an AGENTS.md lands as one always draft. */
+/**
+ * The project's repository: its instruction files are listed for the owner to pick (one that may be too long offered
+ * unticked), and an AGENTS.md lands as one always draft.
+ */
 export const ImportFromRepo: Story = {
     parameters: {
         msw: {
@@ -117,6 +120,7 @@ export const ImportFromRepo: Story = {
                     files: [
                         { path: "AGENTS.md", size: 32, tooLarge: false },
                         { path: "rules/huge.md", size: 900_000, tooLarge: true },
+                        { path: "rules/wide.md", size: 300_000, tooLarge: false },
                     ],
                     status: "ok",
                 }),
@@ -134,6 +138,7 @@ export const ImportFromRepo: Story = {
 
         await expect(found.getByRole("checkbox", { name: "AGENTS.md" })).toBeChecked();
         await expect(found.getByRole("checkbox", { name: /huge/u })).toHaveAttribute("aria-disabled", "true");
+        await expect(found.getByRole("checkbox", { name: /wide\.md\s*\(may be too long\)/u })).not.toBeChecked();
         await userEvent.click(canvas.getByRole("button", { name: "Import selected" }));
 
         const imported = within(await canvas.findByRole("listitem", { name: "AGENTS.md" }));

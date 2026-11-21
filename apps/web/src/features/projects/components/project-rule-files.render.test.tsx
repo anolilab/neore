@@ -82,6 +82,7 @@ vi.mock("@/features/auth/lib/utilities", () => {
 
 const NEEDS_A_PATTERN = /needs at least one pattern/u;
 const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
+const WIDE_FILE = /^rules\/wide\.md\s*\(may be too long\)$/u;
 
 const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
     render(
@@ -1008,5 +1009,102 @@ describe("project rule files imported from the project's repository", () => {
         await waitFor(() => expect(opener).toHaveProperty("disabled", false));
         expect(screen.queryByRole("listitem", { name: "AGENTS.md" })).toBeNull();
         expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(2);
+    });
+
+    it("says nothing of a read that fails after the person cancelled it", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({ files: [{ path: "AGENTS.md", size: 20, tooLarge: false }], status: "ok" });
+        backend.repoRead.mockImplementation(async () => {
+            await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
+
+            throw new Error("network");
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+        const opener = await screen.findByRole("button", { name: "Import from repository" });
+
+        await waitFor(() => expect(opener).toHaveProperty("disabled", false));
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.queryByText("The files could not be read.")).toBeNull();
+    });
+
+    it("reads the first files a project holds of a larger selection and says how many were left out", async () => {
+        const user = userEvent.setup();
+        const paths = Array.from({ length: 23 }, (_, index) => `rules/r${String(index).padStart(2, "0")}.md`);
+
+        backend.repos = [REPO];
+        backend.listed = { canEdit: true, files: [], revision: "r1" };
+        backend.repoList.mockResolvedValue({
+            files: paths.toReversed().map((path) => {
+                return { path, size: 10, tooLarge: false };
+            }),
+            status: "ok",
+        });
+        backend.repoRead.mockImplementation(async ({ paths: asked }: { paths: string[] }) => {
+            return {
+                files: asked.map((path) => {
+                    return { path, status: "ok", text: "---\nalwaysApply: true\n---\nText" };
+                }),
+                status: "ok",
+            };
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+
+        expect(backend.repoRead).toHaveBeenCalledWith({ paths: paths.slice(0, 20), projectId: "p1", repoId: "repo1" });
+        expect(
+            await screen.findByText("20 rule files imported. Review, then save. 3 files were left out. A project holds at most 20 rule files."),
+        ).toBeTruthy();
+    });
+
+    it("offers a file whose bytes may hold too many characters unticked, and leaves out files a save would refuse as too large", async () => {
+        const user = userEvent.setup();
+        const paths = Array.from({ length: 13 }, (_, index) => `rules/r${String(index).padStart(2, "0")}.md`);
+        const text = (path: string) => (path === "rules/r00.md" ? "a".repeat(100_001) : `${path} ${"b".repeat(90_000)}`);
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            files: [
+                ...paths.map((path) => {
+                    return { path, size: 10, tooLarge: false };
+                }),
+                { path: "rules/wide.md", size: 300_000, tooLarge: false },
+            ],
+            status: "ok",
+        });
+        backend.repoRead.mockImplementation(async ({ paths: asked }: { paths: string[] }) => {
+            return {
+                files: asked.map((path) => {
+                    return { path, status: "ok", text: `---\nalwaysApply: true\n---\n${text(path)}` };
+                }),
+                status: "ok",
+            };
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const found = await screen.findByRole("list", { name: "Files found" });
+
+        expect(within(found).getByRole("checkbox", { name: WIDE_FILE }).getAttribute("aria-checked")).toBe("false");
+
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(backend.repoRead).toHaveBeenCalledWith({ paths, projectId: "p1", repoId: "repo1" });
+        // Eleven of 90 KB fit beside the two saved files; the one past a file's length and the twelfth, past 1 MB, do not.
+        expect(
+            await screen.findByText(
+                "11 rule files imported. Review, then save. 2 files were left out as too large: a rule file holds at most 100,000 characters, and all of a project's together at most 1 MB.",
+            ),
+        ).toBeTruthy();
+        expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(13);
     });
 });

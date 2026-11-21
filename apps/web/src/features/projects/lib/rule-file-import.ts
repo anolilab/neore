@@ -1,6 +1,6 @@
 /**
- * Rule files from uploaded Markdown: an `AGENTS.md`, `CLAUDE.md` or `GEMINI.md` becomes one `always` file under its own
- * name; the files of a rule folder take their mode from their front matter, read strictly: `alwaysApply: true` → always,
+ * Rule files from uploaded Markdown: an `AGENTS.md`, `CLAUDE.md` or `GEMINI.md` at the top (of the repository, or of the
+ * folder picked) becomes one `always` file under its own name; the files of a rule folder, one of those names included, take their mode from their front matter, read strictly: `alwaysApply: true` → always,
  * else `globs` → applied when files match, else a `description` → read when needed. A file that says none of these is
  * read when needed with no description, which the editor will not save until the person says when, or picks another mode.
  * The text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
@@ -319,13 +319,17 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
 /** Whether `name` (a path's last part) is one of the root instruction files. */
 export const isRootInstructionFile = (name: string): boolean => ROOT_INSTRUCTION_FILES.has(name.toLowerCase());
 
-/** One uploaded file as a rule file, or `null` for one that is not Markdown. `path` is its name or its path in a folder. */
+/**
+ * One imported file as a rule file, or `null` for one that is not Markdown. `path` is its path from the top of what was
+ * imported: only a root instruction file there is `always` whole; in a folder it is read like any rule file.
+ */
 export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile | null => {
-    const name = path.slice(path.replaceAll("\\", "/").lastIndexOf("/") + 1);
+    const slash = path.replaceAll("\\", "/").lastIndexOf("/");
+    const name = path.slice(slash + 1);
     // A byte-order mark would hide the front matter.
     const text = raw.startsWith("\u{FEFF}") ? raw.slice(1) : raw;
 
-    if (isRootInstructionFile(name)) {
+    if (slash === -1 && isRootInstructionFile(name)) {
         return { content: text, description: "", mode: "always", patterns: "", title: name };
     }
 
@@ -389,14 +393,21 @@ export const importRuleTexts = async (
     return { imported, skipped };
 };
 
+/** A picked folder's file by its path in that folder, the folder's own name dropped; a single file by its name. */
+const pathInPick = (file: File): string => {
+    const path = file.webkitRelativePath;
+
+    return path ? path.slice(path.indexOf("/") + 1) : file.name;
+};
+
 /**
- * The rule files of the uploaded `files`, in name order, at most `room` of them: those past it are counted in `skipped`,
+ * The rule files of the uploaded `files`, in path order, at most `room` of them: those past it are counted in `skipped`,
  * files that are not Markdown are left out.
  */
 export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<{ imported: ImportedRuleFile[]; skipped: number }> =>
     importRuleTexts(
         files.map((file) => {
-            return { path: file.webkitRelativePath || file.name, text: () => file.text() };
+            return { path: pathInPick(file), text: () => file.text() };
         }),
         room,
     );

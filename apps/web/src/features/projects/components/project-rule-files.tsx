@@ -470,13 +470,13 @@ const ProjectRuleFiles: FC<{
     const [importing, setImporting] = useState(false);
     // The list, its revision and the draft as last rendered: an import applies onto them once its files are read, never
     // onto the ones it started with (a save, an edit or a read may have landed meanwhile).
-    const latest = useRef({ draft, revision: data?.revision ?? "", savedFiles });
+    const latest = useRef({ draft, keptLegacyId, revision: data?.revision ?? "", savedFiles });
     // Bumped by Discard: an import still reading then adds nothing.
     const importGeneration = useRef(0);
 
     // Before any later event's handler can run, so an import never applies onto a list older than the one shown.
     useLayoutEffect(() => {
-        latest.current = { draft, revision: data?.revision ?? "", savedFiles };
+        latest.current = { draft, keptLegacyId, revision: data?.revision ?? "", savedFiles };
     });
 
     const change = (next: RuleFileDraft[]) => {
@@ -491,23 +491,41 @@ const ProjectRuleFiles: FC<{
 
     const applyImport = (read: RepoImportResult) => {
         // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
-        // room left now is taken.
+        // room left now is taken. A file a save would refuse for its length, or for the list's size with those before
+        // it, is left out and said, as the save would measure it.
         const now = latest.current;
         const base = now.draft ?? now.savedFiles;
-        const added = read.imported.slice(0, Math.max(0, MAX_RULE_FILES - base.length));
-        const skipped = read.skipped + read.imported.length - added.length;
+        const added: RuleFileDraft[] = [];
+        let { skipped } = read;
+        let tooLarge = 0;
+        let bytes = ruleFilesStoredBytes(
+            toSaved(
+                base.filter((file) => file.id !== now.keptLegacyId),
+                legacyTitle,
+            ),
+        );
+
+        for (const file of read.imported) {
+            const draftFile = { ...file, id: crypto.randomUUID() };
+            // What it adds to the stored list: its JSON, and a comma after the one before it.
+            const cost = ruleFilesStoredBytes(toSaved([draftFile], legacyTitle)) - (bytes > 2 ? 1 : 2);
+
+            if (base.length + added.length >= MAX_RULE_FILES) {
+                skipped += 1;
+            } else if (file.content.length > MAX_RULE_FILE_LENGTH || bytes + cost > MAX_RULE_FILES_BYTES) {
+                tooLarge += 1;
+            } else {
+                added.push(draftFile);
+                bytes += cost;
+            }
+        }
 
         if (added.length > 0) {
             if (now.draft === null) {
                 setBaseRevision(now.revision);
             }
 
-            setDraft([
-                ...base,
-                ...added.map((file) => {
-                    return { ...file, id: crypto.randomUUID() };
-                }),
-            ]);
+            setDraft([...base, ...added]);
             setStatus("");
         }
 
@@ -519,8 +537,19 @@ const ProjectRuleFiles: FC<{
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
         const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
         const unreadable = t`${plural(read.unreadable, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large.`;
+        const length = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
+        const size = formatNumber(MAX_RULE_FILES_BYTES / 1_000_000, i18n.locale);
+        const tooLargeNote = t`${plural(tooLarge, { one: "# file was left out as too large", other: "# files were left out as too large" })}: a rule file holds at most ${length} characters, and all of a project's together at most ${size} MB.`;
 
-        setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : []), ...(read.unreadable > 0 ? [unreadable] : [])].join(" "));
+        setImportNote(
+            [
+                ...addedNote,
+                ...(toSet > 0 ? [setNote] : []),
+                ...(skipped > 0 ? [left] : []),
+                ...(tooLarge > 0 ? [tooLargeNote] : []),
+                ...(read.unreadable > 0 ? [unreadable] : []),
+            ].join(" "),
+        );
     };
 
     /**
@@ -538,7 +567,8 @@ const ProjectRuleFiles: FC<{
         read()
             // An import a Discard overtook adds nothing.
             .then((result) => (result && generation === importGeneration.current ? applyImport(result) : undefined))
-            .catch(() => setImportNote(t`The files could not be read.`))
+            // One a Discard overtook says nothing either.
+            .catch(() => (generation === importGeneration.current ? setImportNote(t`The files could not be read.`) : undefined))
             .then(() => setImporting(false))
             .catch(() => undefined);
     };

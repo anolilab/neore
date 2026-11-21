@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { HostApiError } from "./origin-fetch";
 import type { HostRequest } from "./origin-fetch";
-import { isImportablePath, listRepoRuleFiles, readRepoRuleFiles, REPO_RULE_FILE_MAX_BYTES, REPO_RULE_FILES_READ_BYTES } from "./repo-rule-files";
+import { MAX_RULE_FILE_LENGTH } from "../projects/rule-file-limits";
+import {
+    CONTENTS_LIST_LIMIT,
+    isImportablePath,
+    listRepoRuleFiles,
+    readRepoRuleFiles,
+    REPO_RULE_FILE_MAX_BYTES,
+    REPO_RULE_FILES_READ_BYTES,
+} from "./repo-rule-files";
 
 const ADDRESS = { name: "hello", owner: "octo", ref: "main" };
 const BASE = "/repos/octo/hello/contents";
@@ -74,6 +82,44 @@ describe(listRepoRuleFiles, () => {
         expect(calls).toStrictEqual([{ path: BASE, query: {} }]);
     });
 
+    it("lists a folder the contents API cuts at its limit from its git tree, symlinks as files", async () => {
+        const filler = Array.from({ length: CONTENTS_LIST_LIMIT }, (_, index) => file(`a${String(index)}.txt`));
+        const { calls, request } = fakeHost({
+            [`${BASE}/rules`]: filler,
+            [`/repos/octo/hello/git/trees/${encodeURIComponent("main:")}`]: {
+                tree: [
+                    { mode: "100644", path: "zz.txt", size: 1, type: "blob" },
+                    { mode: "120000", path: "CLAUDE.md", size: 9, type: "blob" },
+                    { mode: "040000", path: "rules", type: "tree" },
+                ],
+                truncated: false,
+            },
+            [`/repos/octo/hello/git/trees/${encodeURIComponent("main:rules")}`]: { tree: [{ mode: "100644", path: "sql.md", size: 5, type: "blob" }] },
+            [BASE]: filler,
+        });
+
+        await expect(listRepoRuleFiles(request, ADDRESS)).resolves.toStrictEqual([
+            { path: "CLAUDE.md", size: 9, tooLarge: false },
+            { path: "rules/sql.md", size: 5, tooLarge: false },
+        ]);
+        expect(calls.map((call) => call.path)).toStrictEqual([
+            BASE,
+            `/repos/octo/hello/git/trees/${encodeURIComponent("main:")}`,
+            `${BASE}/rules`,
+            `/repos/octo/hello/git/trees/${encodeURIComponent("main:rules")}`,
+        ]);
+    });
+
+    it("lists the default branch's tree when no branch is named", async () => {
+        const filler = Array.from({ length: CONTENTS_LIST_LIMIT }, (_, index) => file(`a${String(index)}.txt`));
+        const { request } = fakeHost({
+            [`/repos/octo/hello/git/trees/${encodeURIComponent("HEAD:")}`]: { tree: [{ path: "AGENTS.md", size: 3, type: "blob" }] },
+            [BASE]: filler,
+        });
+
+        await expect(listRepoRuleFiles(request, { name: "hello", owner: "octo" })).resolves.toStrictEqual([{ path: "AGENTS.md", size: 3, tooLarge: false }]);
+    });
+
     it("passes on a host failure of the root listing", async () => {
         const { request } = fakeHost({});
 
@@ -121,6 +167,25 @@ describe(readRepoRuleFiles, () => {
         expect(reads.filter((read) => read.status === "ok")).toHaveLength(fitting + 1);
         expect(reads.at(-1)).toStrictEqual({ path: "rules/d.md", status: "ok", text: "small" });
         expect(reads[fitting]).toStrictEqual({ path: paths[fitting], status: "too_large" });
+    });
+
+    it("refuses a file longer than a rule file may be, spending none of the budget on it", async () => {
+        const sized = (size: number) => {
+            return { content: "", encoding: "base64", size, type: "file" };
+        };
+        const { request } = fakeHost({
+            [`${BASE}/rules/a.md`]: encoded("a".repeat(MAX_RULE_FILE_LENGTH + 1)),
+            [`${BASE}/rules/b.md`]: sized(REPO_RULE_FILE_MAX_BYTES),
+            [`${BASE}/rules/c.md`]: sized(REPO_RULE_FILE_MAX_BYTES),
+            [`${BASE}/rules/d.md`]: sized(REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES),
+        });
+
+        await expect(readRepoRuleFiles(request, ADDRESS, ["rules/a.md", "rules/b.md", "rules/c.md", "rules/d.md"])).resolves.toStrictEqual([
+            { path: "rules/a.md", status: "too_large" },
+            { path: "rules/b.md", status: "ok", text: "" },
+            { path: "rules/c.md", status: "ok", text: "" },
+            { path: "rules/d.md", status: "ok", text: "" },
+        ]);
     });
 
     it("refuses a file the host will not send whole", async () => {

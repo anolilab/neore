@@ -83,5 +83,7 @@
 - **Import from a repository** (`rule-file-repo.ts`, `source-control/repo-rule-files.ts`): two actions, list then read,
   with the person's own GitHub token, for whoever may save the rule files (`repoForRuleFileImport`) and a repository the
   project lists. They read only `isImportablePath` paths (root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, Markdown right in
-  one `RULE_FOLDERS` folder), within `REPO_RULE_FILE_MAX_BYTES` each and `REPO_RULE_FILES_READ_BYTES` together, and
-  store nothing: the editor turns the text into drafts with the upload's rules (`importRuleTexts`).
+  one `RULE_FOLDERS` folder; a folder past the contents API's 1,000 entries from its git tree), within
+  `REPO_RULE_FILE_MAX_BYTES` and `MAX_RULE_FILE_LENGTH` characters each and `REPO_RULE_FILES_READ_BYTES` together, and
+  store nothing: the editor turns the text into drafts with the upload's rules (`importRuleTexts`; an instruction-file
+  name is `always` only at the top), leaving out and counting what a save would refuse (count, length, list size).
