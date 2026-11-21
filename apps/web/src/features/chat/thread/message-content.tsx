@@ -20,6 +20,7 @@ import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
 import useMCPToolMeta from "@/features/chat/core/hooks/use-mcp-tool-meta";
 import LinkPreviewSlot from "@/features/chat/link-preview/link-preview-slot";
+import PinnableImage from "@/features/chat/pins/pinnable-image";
 import ToolAutoApproval from "@/features/chat/thread/tool-auto-approval";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
 import KnowledgeSourceGroup from "@/features/knowledge/components/knowledge-source-group";
@@ -134,12 +135,18 @@ interface MessageContentProps {
     className?: string;
     isStreaming?: boolean;
     message: UIMessage;
+
+    /**
+     * Whether an image of the reply can be pinned (default: yes). Off where a pin would not land in this chat's pins: a
+     * reply still streaming has no saved id yet, and a comparison column is another thread.
+     */
+    pinImages?: boolean;
 }
 
 // Memoized, with a `components` object that only changes with the MCP tool
 // metadata: chat-ui's MessageContent is memoized too, and a fresh object per
 // render would re-render every message's content for nothing.
-const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, message }) => {
+const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, message, pinImages = true }) => {
     const { t } = useLingui();
     const toolMeta = useMCPToolMeta(message.parts.some((part: UIMessage["parts"][number]) => resolveMcpToolName(part) !== null));
     // Stable per locale, so the memoized chat-ui renderer is not re-rendered for it.
@@ -168,6 +175,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
         return {
             DeviceToolCall,
             DocumentArtifact,
+            ...(pinImages && { Image: PinnableImage }),
             McpApp,
             PresentationArtifact,
             SandboxFiles,
@@ -178,7 +186,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
             toolViews: TOOL_VIEWS,
             toolWidgets: TOOL_WIDGETS,
         };
-    }, [toolMeta]);
+    }, [pinImages, toolMeta]);
 
     return (
         <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>

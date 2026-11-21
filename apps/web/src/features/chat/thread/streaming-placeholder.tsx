@@ -741,7 +741,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
             <div className={cn("streaming-placeholder-compact", className)}>
                 <div className="message-text">
                     <ImageOpenContext value={null}>
-                        <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                        <MessageContent isStreaming={isStreaming} message={streamingMessage} pinImages={false} />
                     </ImageOpenContext>
                 </div>
                 {isStreaming && <ToolProgressRows state={toolProgress} />}
@@ -766,7 +766,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                     {speaker && <SpeakerChip className="mb-1" name={speaker.name} />}
                     <div className="message-text text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading)">
                         <ImageOpenContext value={null}>
-                            <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                            <MessageContent isStreaming={isStreaming} message={streamingMessage} pinImages={false} />
                         </ImageOpenContext>
                     </div>
                     {isStreaming && <ToolProgressRows state={toolProgress} />}

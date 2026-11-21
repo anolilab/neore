@@ -174,7 +174,7 @@ const ModelColumn: FC<{
                                     <ChatThreadIdentityContext value={columnThreadContext}>
                                         {/* The page's gallery holds its own chat's images, not the column's: here they stay plain. */}
                                         <ImageOpenContext value={null}>
-                                            <MessageContent message={assistant} />
+                                            <MessageContent message={assistant} pinImages={false} />
                                         </ImageOpenContext>
                                     </ChatThreadIdentityContext>
                                 </ChatThreadContext>
