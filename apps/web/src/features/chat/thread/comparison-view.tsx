@@ -28,6 +28,7 @@ import type { FC } from "react";
 import { use, useMemo } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+import { BrowserLiveViewHereContext } from "@/features/chat/browser-live-view/control-request";
 import { ChatThreadContext, ChatThreadIdentityContext } from "@/features/chat/core/context/chat-context-hooks";
 import type { ThreadData } from "@/features/chat/core/context/chat-context-types";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -172,10 +173,12 @@ const ModelColumn: FC<{
                             <div className="prose prose-sm dark:prose-invert max-w-none px-6 py-4">
                                 <ChatThreadContext value={columnThreadContext}>
                                     <ChatThreadIdentityContext value={columnThreadContext}>
-                                        {/* The page's gallery holds its own chat's images, not the column's: here they stay plain. */}
-                                        <ImageOpenContext value={null}>
-                                            <MessageContent message={assistant} pinImages={false} />
-                                        </ImageOpenContext>
+                                        {/* No live view card in a column: a "Needs you" card points to the model's own chat. The page's gallery holds its own chat's images, not the column's: here they stay plain. */}
+                                        <BrowserLiveViewHereContext value={false}>
+                                            <ImageOpenContext value={null}>
+                                                <MessageContent message={assistant} pinImages={false} />
+                                            </ImageOpenContext>
+                                        </BrowserLiveViewHereContext>
                                     </ChatThreadIdentityContext>
                                 </ChatThreadContext>
                             </div>

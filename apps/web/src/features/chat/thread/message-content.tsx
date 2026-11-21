@@ -43,6 +43,7 @@ const LazySubAgentToolView = lazy(() => import("@/features/sub-agents/components
 const LazySandboxFiles = lazy(() => import("@/features/chat/thread/sandbox-files"));
 const LazyCodingAgentToolView = lazy(() => import("@/features/coding-agents/components/coding-agent-tool-view"));
 const LazyDeviceToolCall = lazy(() => import("@/features/devices/components/device-tool-call"));
+const LazyBrowserHumanCheck = lazy(() => import("@/features/chat/browser-live-view/browser-human-check"));
 const LazyPresentationArtifact = lazy(() =>
     import("@/features/slides").then((m) => {
         return { default: m.PresentationArtifact };
@@ -110,6 +111,13 @@ const DeviceToolCall: FC<{ part: ToolPart }> = (props) => (
     </Suspense>
 );
 
+// The agent's browser reached a page only a person can clear: the "Needs you" card, with its live browser status.
+const BrowserHumanCheck: FC<{ part: ToolPart }> = (props) => (
+    <Suspense fallback={null}>
+        <LazyBrowserHumanCheck {...props} />
+    </Suspense>
+);
+
 const SandboxFiles: FC<SandboxOutputs> = (props) => (
     <Suspense fallback={null}>
         <LazySandboxFiles {...props} />
@@ -173,6 +181,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
     );
     const components = useMemo(() => {
         return {
+            BrowserHumanCheck,
             DeviceToolCall,
             DocumentArtifact,
             ...(pinImages && { Image: PinnableImage }),

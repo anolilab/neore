@@ -17,6 +17,8 @@ import type { ChangeEvent, FC, FormEvent } from "react";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { onBrowserControlRequest } from "@/features/chat/browser-live-view/control-request";
+import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/status-clock";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 /**
@@ -103,29 +105,6 @@ const failureReasonOf = (error: unknown): FailureReason => {
 };
 
 const CLOSED: View = { kind: "closed" };
-
-/** The longest delay a browser timer keeps (2^31 − 1 ms, about 24.8 days); a longer one fires at once. */
-const MAX_TIMER_DELAY_MS = 2_147_483_647;
-
-/** True once `until` has passed; re-renders at that moment, so the card leaves without a new server answer. */
-const usePassed = (until: number | undefined): boolean => {
-    const [now, setNow] = useState(() => Date.now());
-
-    useEffect(() => {
-        if (until === undefined || until <= now) {
-            return undefined;
-        }
-
-        // From the real time, not the last render's: a later `until` would otherwise fire late by the time between. A
-        // far-off `until` waits in steps of the longest delay a timer keeps; each step re-arms for what is left.
-        const delay = Math.min(Math.max(0, until - Date.now()) + 50, MAX_TIMER_DELAY_MS);
-        const timer = setTimeout(() => setNow(Date.now()), delay);
-
-        return () => clearTimeout(timer);
-    }, [until, now]);
-
-    return until !== undefined && until <= now;
-};
 
 type Asked = { attempt: number; browserId: string; connectBy: number; mode: Mode; renewed: boolean };
 
@@ -308,6 +287,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const [loadedAt, setLoadedAt] = useState(0);
     const mounted = useRef(false);
     const frame = useRef<HTMLIFrameElement>(null);
+    const section = useRef<HTMLElement>(null);
     const leaving = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const expanded = view.kind !== "closed";
     // Whether this tab's lease is still live, judged on the server's clock and moved onto this device's once per status
@@ -937,6 +917,37 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             .catch((error: unknown) => navigationFailed(navigation, error));
     };
 
+    const mayTakeControl = canControl && !youControl && !controlledByOther;
+    const takingControl = view.kind === "opening" && view.mode === "control";
+
+    const startControl = (): void => {
+        noticeTurn.current += 1;
+        setNotice(undefined);
+        setAddressError(undefined);
+        setAddress(openedUrl ?? currentUrl ?? "");
+        ask(false, "control");
+    };
+
+    // A "Needs you" card in the chat (`browser-human-check.tsx`) asks for control: the same as this card's own button.
+    const controlRequested = useEffectEvent((requested: string): boolean => {
+        if (requested !== threadId) {
+            return false;
+        }
+
+        // The card is there, so the request is answered, whether or not control can be taken now: the card says why not.
+        const reduceMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+        section.current?.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "nearest" });
+
+        if (mayTakeControl && !takingControl) {
+            startControl();
+        }
+
+        return true;
+    });
+
+    useEffect(() => onBrowserControlRequest(controlRequested), []);
+
     const framed =
         view.kind === "open" && !view.stale && !isForOtherBrowser(view, browserId) && !controlledByOther && (view.mode === "watch" || youControl)
             ? view
@@ -944,7 +955,11 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const inControlView = framed?.mode === "control";
 
     return (
-        <section aria-labelledby={headingId} className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
+        <section
+            aria-labelledby={headingId}
+            className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50"
+            ref={section}
+        >
             <div className="flex flex-wrap items-center gap-2">
                 <Globe aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -974,21 +989,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                         {t`Hand back`}
                     </Button>
                 )}
-                {canControl && !youControl && !controlledByOther && (
-                    <Button
-                        aria-controls={viewId}
-                        className={TOUCH_TARGET}
-                        disabled={view.kind === "opening" && view.mode === "control"}
-                        onClick={() => {
-                            noticeTurn.current += 1;
-                            setNotice(undefined);
-                            setAddressError(undefined);
-                            setAddress(openedUrl ?? currentUrl ?? "");
-                            ask(false, "control");
-                        }}
-                        size="sm"
-                        type="button"
-                    >
+                {mayTakeControl && (
+                    <Button aria-controls={viewId} className={TOUCH_TARGET} disabled={takingControl} onClick={startControl} size="sm" type="button">
                         {t`Take control`}
                     </Button>
                 )}
@@ -1109,18 +1111,8 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     const headingId = useId();
     const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
     const browser = status.data;
-    // The answer's deadlines are on the server's clock: each is moved onto this device's clock by how far the server's
-    // was ahead when the answer came (late by the answer's way here, so a deadline is never taken as passed early). When
-    // it came is kept per answer (`now` names it): a live query's refetch hands back the same push with a later
-    // `dataUpdatedAt`, which would move every deadline later and bring back a card whose grant has ended.
-    const [received, setReceived] = useState<{ at: number; now: number } | undefined>(undefined);
-
-    if (browser && received?.now !== browser.now) {
-        setReceived({ at: status.dataUpdatedAt, now: browser.now });
-    }
-
-    const receivedAt = browser && received?.now === browser.now ? received.at : status.dataUpdatedAt;
-    const skew = browser ? browser.now - receivedAt : 0;
+    // The answer's deadlines are on the server's clock: each is moved onto this device's clock (`useStatusSkew`).
+    const skew = useStatusSkew(browser?.now, status.dataUpdatedAt);
     const local = (at: number | undefined): number | undefined => (at === undefined ? undefined : at - skew);
     // The card's own lease keeps the browser alive past an `idleUntil` whose push has not come yet.
     const [hold, setHold] = useState<number | undefined>(undefined);

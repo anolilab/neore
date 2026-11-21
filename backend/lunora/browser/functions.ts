@@ -8,8 +8,10 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { isUniqueViolation } from "../lib/error-helpers";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import { controlStateOf, watchableSessionId } from "./live-view-logic";
 // ── Utility ─────────────────────────────────────────────────────────────
 
@@ -342,6 +344,100 @@ export const closeSession = internalMutation
                 status: status ?? "completed",
             }),
         );
+    });
+
+// ── Human checks (`human-check.ts`) ──────────────────────────────────────
+
+const askKind = (row: { inText?: boolean; reported?: boolean } | null): "detected" | "detected_in_text" | "reported" | null => {
+    if (row === null) {
+        return null;
+    }
+
+    if (row.reported === true) {
+        return "reported";
+    }
+
+    return row.inText === true ? "detected_in_text" : "detected";
+};
+
+/** How the person was asked about `site` in this run, else (with `askedSince`) the thread's latest ask since then; `null` for none. */
+export const wasHumanCheckAsked = internalQuery
+    .input({ askedSince: v.optional(v.number()), run: v.string(), site: v.string(), threadId: v.id("threads") })
+    .output(v.union(v.literal("detected"), v.literal("detected_in_text"), v.literal("reported"), v.null()))
+    .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
+        const inRun = await ctx.db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
+            .first();
+
+        if (inRun !== null || askedSince === undefined) {
+            return askKind(inRun);
+        }
+
+        const recent = await ctx.db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", site).gte("askedAt", askedSince))
+            .order("desc")
+            .first();
+
+        return askKind(recent);
+    });
+
+/**
+ * The person is asked about `site` once per run: `true` for the first ask, which records it, `false` when another
+ * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
+ * insert that loses answers `false`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
+ * collaborator's id there would outlive their account and escape the owner's erasure); a thread with no owner names
+ * the shard it lives on. A thread that is gone asks nobody.
+ * A report on a site the run already asked about (a sign-in wall after a check) marks that ask `reported`: what the
+ * person handed back then shows no marker either way.
+ */
+export const claimHumanCheckAsk = internalMutation
+    .input({ inText: v.optional(v.boolean()), reported: v.optional(v.boolean()), run: v.string(), site: v.string(), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args: { inText, reported, run, site, threadId }, ctx }) => {
+        const thread = await ctx.db.get("threads", threadId);
+
+        if (!thread) {
+            return false;
+        }
+
+        if (reported === true) {
+            const asked = await ctx.db
+                .query("browserHumanChecks")
+                .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
+                .first();
+
+            if (asked !== null) {
+                if (asked.reported !== true) {
+                    await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
+                }
+
+                return false;
+            }
+        }
+
+        try {
+            await ctx.db.insert("browserHumanChecks", {
+                askedAt: ctx.now,
+                ...(inText === true && reported !== true && { inText }),
+                ...(reported === true && { reported }),
+                run,
+                site,
+                threadId,
+                // An ownerless thread (an anonymous one) lives on the shard serving it: the row names that shard's key, and
+                // goes with the thread when it is deleted.
+                userId: thread.userId ?? currentShard() ?? ROOT_SHARD_KEY,
+            });
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                return false;
+            }
+
+            throw error;
+        }
+
+        return true;
     });
 
 // ── Browser Extension Functions (Phase 2) ───────────────────────────────
