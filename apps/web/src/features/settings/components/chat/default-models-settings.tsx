@@ -61,7 +61,7 @@ interface ModelSelectProps<Field extends string> {
     value: string | undefined;
 }
 
-const ModelSelect = <Field extends string>({
+export const ModelSelect = <Field extends string>({
     description,
     disabled,
     emptyLabel,

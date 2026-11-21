@@ -15,6 +15,8 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_TOOLS, SUB_AGENT_SKILL_SLUG_MAX, SUB_AGENT_TASK_MAX, WORKER_NAME_MAX } from "../../sub-agents/logic";
+import type { SubAgentRoleName } from "../../sub-agents/roles";
+import { SUB_AGENT_ROLE_NAMES } from "../../sub-agents/roles";
 
 /** A computer, and the (agent, folder) pair it offered, to run a worker on. */
 export interface DelegateHostInput {
@@ -27,6 +29,7 @@ export interface DelegateToSubAgentInput {
     host?: DelegateHostInput;
     name?: string;
     persistent?: boolean;
+    role?: SubAgentRoleName;
     skill?: string;
     task: string;
     tools?: string[];
@@ -52,6 +55,7 @@ const delegateToSubAgentTool = createTool<DelegateToSubAgentInput, DelegateToSub
     description: `Delegate a self-contained piece of work to a sub-agent that runs on its own, in its own thread, while you continue.
 Use it for work that splits cleanly off the conversation — researching one side question, drafting a section, comparing options — especially several independent pieces at once (up to ${String(SUB_AGENT_MAX_CONCURRENT)} at a time). Do not use it for a quick answer you can give yourself.
 - task: everything the sub-agent needs to know; it cannot see this conversation and cannot ask questions.
+- role: optional; one of the roles under SUB-AGENT ROLES in your instructions, when the work is that kind. The sub-agent then runs on the model the user chose for it. Leave it out when no such list is there.
 - skill: optional slug of one of the user's enabled skills for the sub-agent to run as.
 - tools: optional list of tool names to restrict the sub-agent to; omit it for its normal tool set. A sub-agent never gets a tool you do not have.
 - host: with persistent, run the worker on a coding agent on one of the user's computers: the computer's id and the agent and folder it offered (they must all be approved on that computer; every start asks the user). Omit it for a worker in the cloud.
@@ -88,6 +92,7 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
             ...(parentModel !== undefined && { parentModel }),
             parentThreadId: context.threadId,
             ...(input.persistent && { leadTools, name: input.name, persistent: true }),
+            ...(input.role && { role: input.role }),
             ...(input.skill && { skillSlug: input.skill }),
             task: input.task,
             ...(input.tools && { toolAllowlist: input.tools }),
@@ -121,6 +126,7 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
                 .meta({ description: "Run the worker on a coding agent on one of the user's computers (persistent only; asks the user)" }),
             name: z.string().min(1).max(WORKER_NAME_MAX).optional().meta({ description: "A short name for the worker (persistent only)" }),
             persistent: z.boolean().optional().meta({ description: "Start a worker the user can open and message, which keeps its context between messages" }),
+            role: z.enum(SUB_AGENT_ROLE_NAMES).optional().meta({ description: "The kind of work, from SUB-AGENT ROLES; runs on the user's model for it" }),
             skill: z.string().min(1).max(SUB_AGENT_SKILL_SLUG_MAX).optional().meta({ description: "Slug of an enabled skill for the sub-agent to use" }),
             task: z.string().min(1).max(SUB_AGENT_TASK_MAX).meta({ description: "The task, with all the context the sub-agent needs" }),
             tools: z

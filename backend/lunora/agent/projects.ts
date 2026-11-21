@@ -27,6 +27,7 @@ import { listThreadItem } from "./threads";
 import { eraseProjectRepositories, eraseProjectRuleFiles, markProjectRuleFilesErasing } from "../projects/gdpr";
 import { mayEditProject } from "../projects/edit-access";
 import { forViewer } from "../projects/machine-location";
+import type { SubAgentRoles } from "../sub-agents/roles";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -49,6 +50,11 @@ export const publicProject = (project: Doc<"projects">): ProjectDocument =>
     // Safe cast: optional fields are never null at runtime (only undefined).
     // The column builders generate null|T types in TypeScript only.
     project as unknown as ProjectDocument;
+
+/** Writes a project's sub-agent role overrides; the caller checked it may (`projects/functions.ts:setProjectSubAgentRole`). */
+export const writeProjectSubAgentRoles = async (db: MutationCtx["db"], project: Doc<"projects">, subAgentRoles: SubAgentRoles, now: number): Promise<void> => {
+    await patchRow(db, "projects", project, { subAgentRoles, updatedAt: now });
+};
 
 export const getProject = query
     .input({ projectId: v.id("projects") })
