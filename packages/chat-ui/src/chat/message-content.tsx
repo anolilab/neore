@@ -37,7 +37,9 @@ import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
+import { browserImageKey, codeImageKey } from "../utils/thread-images";
 import { toolImageSource } from "../utils/tool-image-source";
+import { GalleryImage } from "./gallery-image";
 import PageContextChip from "./page-context-chip";
 import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
@@ -527,7 +529,7 @@ interface CodeExecutionOutput {
     unsavedMedia?: number;
 }
 
-const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const CodeExecutionResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const [isCodeExpanded, setIsCodeExpanded] = useState(false);
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
@@ -599,7 +601,12 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
 
                             return source === undefined ? null : (
                                 <div className="flex justify-center border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <img alt={t`Code output`} className="max-w-full rounded" src={source} />
+                                    <GalleryImage
+                                        alt={t`Code output`}
+                                        className="max-w-full rounded"
+                                        imageKey={codeImageKey(messageId, part.toolCallId, index)}
+                                        src={source}
+                                    />
                                 </div>
                             );
                         }
@@ -661,7 +668,7 @@ const DOCUMENT_ARTIFACT_TOOLS = new Set(["tool-createDocument", "tool-deepResear
 /** Tools that render their own card or ask the person something; never folded into a summary. */
 const UNFOLDABLE_TOOLS = new Set(["tool-askUser", "tool-browser", "tool-codeExecution", "tool-createPresentation", "tool-updateSlide"]);
 
-const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const BrowserToolResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
     const isError = part.state === "output-error";
@@ -725,7 +732,13 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
                 </div>
                 {/* Screenshot */}
-                <img alt={output.title || t`Browser screenshot`} className="w-full" src={screenshotSource} />
+                <GalleryImage
+                    alt={output.title || t`Browser screenshot`}
+                    buttonClassName="block w-full"
+                    className="w-full"
+                    imageKey={browserImageKey(messageId, part.toolCallId)}
+                    src={screenshotSource}
+                />
             </div>
         );
     }
@@ -1006,7 +1019,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                             : null;
 
                     if (part.type === "tool-codeExecution") {
-                        renderedParts.push(<CodeExecutionResultView key={key} part={toolPart} />);
+                        renderedParts.push(<CodeExecutionResultView key={key} messageId={message.id} part={toolPart} />);
 
                         if (sandboxOutputs && SandboxFiles) {
                             renderedParts.push(<SandboxFiles key={`${key}-files`} {...sandboxOutputs} />);
@@ -1017,7 +1030,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
                     // Special rendering for browser tool — show live status or screenshot result
                     if (part.type === "tool-browser") {
-                        renderedParts.push(<BrowserToolResultView key={key} part={toolPart} />);
+                        renderedParts.push(<BrowserToolResultView key={key} messageId={message.id} part={toolPart} />);
                         break;
                     }
 
