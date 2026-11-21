@@ -25,11 +25,11 @@ msgstr " · モデル: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- INSERT --"
 msgstr "-- 挿入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
@@ -89,11 +89,11 @@ msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {max
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。この種類のファイルは最大 {maxMegabytes} MB までです。"
 
-#: src/features/projects/components/project-rule-files.tsx:436
+#: src/features/projects/components/project-rule-files.tsx:584
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "「{name}」のファイルパターンが {limit} 個を超えています。いくつか削除するか、別のファイルに移してください。"
 
-#: src/features/projects/components/project-rule-files.tsx:425
+#: src/features/projects/components/project-rule-files.tsx:567
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "「{name}」は {limit} 文字を超えています。短くするか、複数のファイルに分けてください。"
 
@@ -348,6 +348,11 @@ msgstr "{0, plural, other {# 件の必須または不明なチェックが失敗
 #: src/features/develop/components/checks-tab.tsx:104
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 件の必須または不明なチェックがまだ実行中です}}"
+
+#. placeholder {0}: added.length
+#: src/features/projects/components/project-rule-files.tsx:534
+msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
+msgstr "{0, plural, other {# 件のルールファイルをインポートしました。}} 確認してから保存してください。"
 
 #. placeholder {0}: executions.length
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:217
@@ -1428,6 +1433,10 @@ msgstr "{server} · {until} まで"
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, other {#個のファイルをインポートできず、除外されました}}"
 
+#: src/features/projects/components/project-rule-files.tsx:537
+msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
+msgstr "{skipped, plural, other {# 件のファイルは追加されませんでした。}} 1 つのプロジェクトに入るルールファイルは最大 {limit} 件です。"
+
 #: src/features/workflow/hooks/use-workflow-transfer.ts:55
 msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
 msgstr "{skipped, plural, other {#個のファイルをエクスポートに含めることができませんでした}}"
@@ -1486,6 +1495,10 @@ msgstr "{toolId} の API キーを削除しました"
 msgid "{toolId} API key saved"
 msgstr "{toolId} の API キーを保存しました"
 
+#: src/features/projects/components/project-rule-files.tsx:535
+msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
+msgstr "{toSet, plural, other {# 件のファイルは適用するタイミングを指定していません}}。説明を追加するか、別のモードを選んでください。"
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:30
 msgid "{total, plural, one {Used # tool · {tail}} other {Used # tools · {tail}}}"
 msgstr "{total, plural, other {# 個のツールを使用 · {tail}}}"
@@ -1515,7 +1528,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "トークン使用量で OpenRouter 第 1 位"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:894
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:906
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
@@ -1865,13 +1878,17 @@ msgstr "あなたと一緒に考えるドキュメントエディター。"
 msgid "A few questions first"
 msgstr "まずはいくつか質問させてください"
 
-#: src/features/projects/components/project-rule-files.tsx:432
+#: src/features/projects/components/project-rule-files.tsx:580
 msgid "A file applied when files match needs at least one pattern."
 msgstr "「ファイルが一致したとき」に適用するファイルには、パターンが 1 つ以上必要です。"
 
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
 msgstr "所有者だけが読めるファイル（キーチェーンは利用できません）"
+
+#: src/features/projects/components/project-rule-files.tsx:574
+msgid "A file read when needed needs a line saying when to read it."
+msgstr "必要なときに読むファイルには、いつ読むかを示す 1 行が必要です。"
 
 #: src/features/skills/components/skill-import-dialog.tsx:202
 msgid "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not."
@@ -1986,7 +2003,7 @@ msgstr "引用符の外のプレースホルダーまたは @メンションは�
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "1 つのプロジェクトに登録できるリポジトリは最大 {MAX_REPOSITORIES} 件です。"
 
-#: src/features/projects/components/project-rule-files.tsx:452
+#: src/features/projects/components/project-rule-files.tsx:601
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "1 つのプロジェクトに入れられるルールファイルは最大 {limit} 個です。先に 1 つ削除してください。"
 
@@ -2024,9 +2041,13 @@ msgstr "メモリを使った返信には「使用されたメモリ」の一覧
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "ルーティングまたはメンションされたターンの発言者は最大 3 人です。並列ターンは最大 4 件の回答と統合を行い、ディベートは最大 3 ラウンドまで進みます。"
 
-#: src/features/projects/components/project-rule-files.tsx:442
+#: src/features/projects/components/project-rule-files.tsx:591
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "ルールファイルの名前は最大 {limit} 文字です。"
+
+#: src/features/projects/components/project-rule-files.tsx:587
+msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
+msgstr "ルールファイルの名前は「id:」で始めることはできません。「{name}」の名前を変更してください。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:25
 msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
@@ -2550,7 +2571,7 @@ msgstr "プロジェクトを追加"
 msgid "Add project on {0}"
 msgstr "{0} 上にプロジェクトを追加"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:513
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:525
 msgid "Add prompt"
 msgstr "プロンプトを追加"
 
@@ -2588,7 +2609,7 @@ msgstr "一貫性を保つために参照画像を追加"
 msgid "Add row"
 msgstr "行を追加"
 
-#: src/features/projects/components/project-rule-files.tsx:652
+#: src/features/projects/components/project-rule-files.tsx:814
 msgid "Add rule file"
 msgstr "ルールファイルを追加"
 
@@ -2644,7 +2665,7 @@ msgstr "お気に入りに追加"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:862
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 msgid "Add to Favorites"
 msgstr "お気に入りに追加"
 
@@ -3397,7 +3418,7 @@ msgid "All Organization"
 msgstr "組織全体"
 
 #: src/features/prompts/components/prompt-list.tsx:463
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:767
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:779
 msgid "All Prompts"
 msgstr "すべてのプロンプト"
 
@@ -3533,8 +3554,8 @@ msgstr "すでにこのスレッドにリンクされています。"
 msgid "Also viewing"
 msgstr "他の閲覧者"
 
-#: src/features/projects/components/project-rule-files.tsx:266
-#: src/features/projects/components/project-rule-files.tsx:608
+#: src/features/projects/components/project-rule-files.tsx:286
+#: src/features/projects/components/project-rule-files.tsx:455
 msgid "Always"
 msgstr "常に"
 
@@ -3594,6 +3615,10 @@ msgstr "エージェント（スキル）"
 #: src/features/tasks/components/task-form-dialog.tsx:207
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "エージェントがタスクを自律的に処理し、その後検証役が結果を成功基準と照らし合わせます。"
+
+#: src/features/projects/components/project-rule-files.tsx:820
+msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
+msgstr "AGENTS.md、CLAUDE.md、GEMINI.md ファイル、またはその他の Markdown ファイル"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:13
 msgid "An approval card asks to allow a tool. A pointer clicks Approve, the status changes to running, and the result appears."
@@ -3941,7 +3966,7 @@ msgstr "公式アカウントの基本設定にある AppID"
 msgid "Application Error"
 msgstr "アプリケーションエラー"
 
-#: src/features/projects/components/project-rule-files.tsx:262
+#: src/features/projects/components/project-rule-files.tsx:282
 msgid "Applies"
 msgstr "適用"
 
@@ -5381,8 +5406,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:914
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1114
+#: src/features/chat/browser-live-view/browser-live-view.tsx:944
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
 msgid "Browser"
 msgstr "ブラウザー"
 
@@ -5867,7 +5892,7 @@ msgstr "候補となる事実は、種類（アイデンティティ、好み、
 msgid "Cannot be exported: {0}"
 msgstr "エクスポートできません: {0}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:185
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:197
 #: src/features/prompts/hooks/use-prompt-loader.tsx:65
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "プロンプトを使用できません：{errorMessages}"
@@ -6229,6 +6254,10 @@ msgstr "チャット"
 #: src/features/knowledge/components/project-knowledge-collections.tsx:49
 msgid "Chats in this project search these collections and cite them."
 msgstr "このプロジェクトのチャットはこれらのコレクションを検索し、引用します。"
+
+#: src/features/projects/components/project-rule-files.tsx:317
+msgid "Chats see the name and this line, and read the file when it applies."
+msgstr "チャットには名前とこの行が表示され、該当するときにファイルを読みます。"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:654
 #: src/features/settings/components/chat/native-providers-settings.tsx:725
@@ -6630,7 +6659,7 @@ msgstr "モデルをクリア"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:551
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
 #: src/features/vault/components/empty-states.tsx:21
 msgid "Clear search"
 msgstr "検索をクリア"
@@ -8101,11 +8130,11 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:461
+#: src/features/chat/browser-live-view/browser-live-view.tsx:471
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "ブラウザーの操作はエージェントに戻りました。まだ操作権があることをサーバーが時間内に確認できませんでした。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:462
+#: src/features/chat/browser-live-view/browser-live-view.tsx:472
 msgid "Control of the browser is back with the agent."
 msgstr "ブラウザーの操作はエージェントに戻りました。"
 
@@ -8237,7 +8266,7 @@ msgstr "最後のコードブロックをコピーしました"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:150
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:162
 msgid "Copied to clipboard"
 msgstr "クリップボードにコピーしました"
 
@@ -8262,8 +8291,8 @@ msgid "Copy"
 msgstr "コピー"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:675
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:814
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:687
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:826
 msgid "Copy {0} to clipboard"
 msgstr "{0} をクリップボードにコピー"
 
@@ -8376,8 +8405,8 @@ msgstr "このシークレットは今すぐコピーして、Webhook の送信�
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:691
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:830
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:703
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:842
 msgid "Copy to clipboard"
 msgstr "クリップボードにコピー"
 
@@ -9014,7 +9043,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "日常的な動画用途の大部分をカバー"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:597
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:609
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "作成"
@@ -10072,8 +10101,8 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #: src/features/pages/components/pages-sidebar.tsx:281
 #: src/features/prompts/components/prompt-item.tsx:228
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:747
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:886
 #: src/features/settings/components/chat/bots-settings.tsx:508
 #: src/features/settings/components/chat/bots-settings.tsx:562
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
@@ -10129,7 +10158,7 @@ msgstr "{fileName} を削除"
 msgid "Delete {itemName}"
 msgstr "{itemName} を削除"
 
-#: src/features/projects/components/project-rule-files.tsx:257
+#: src/features/projects/components/project-rule-files.tsx:277
 msgid "Delete {name}"
 msgstr "{name} を削除"
 
@@ -10256,7 +10285,7 @@ msgstr "プロジェクトを削除"
 
 #: src/features/prompts/components/prompt-item.tsx:308
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:956
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:968
 msgid "Delete Prompt"
 msgstr "プロンプトを削除"
 
@@ -10852,7 +10881,7 @@ msgid "Discard"
 msgstr "破棄"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:684
+#: src/features/projects/components/project-rule-files.tsx:893
 msgid "Discard changes"
 msgstr "変更を破棄"
 
@@ -11481,7 +11510,7 @@ msgstr "接続ごとに独自の Webhook アドレスが割り当てられ、ア
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Discord の各チャンネルごとに、Neore Chat に別々のスレッドが作成されます。AI はチャンネル内で自動的に応答します。"
 
-#: src/features/projects/components/project-rule-files.tsx:430
+#: src/features/projects/components/project-rule-files.tsx:578
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "「{name}」の各ファイルパターンは 1 行で最大 {limit} 文字にしてください。"
 
@@ -11571,8 +11600,8 @@ msgstr "エッジに沿った生成"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:714
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:853
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:726
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:865
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -13359,7 +13388,7 @@ msgstr "接続できませんでした"
 msgid "Failed to connect {name}"
 msgstr "{name} に接続できませんでした"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:153
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:165
 msgid "Failed to copy"
 msgstr "コピーできませんでした"
 
@@ -13457,7 +13486,7 @@ msgid "Failed to delete project"
 msgstr "プロジェクトを削除できませんでした"
 
 #: src/features/prompts/components/prompt-list.tsx:243
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:320
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
 msgid "Failed to delete prompt"
 msgstr "プロンプトを削除できませんでした"
 
@@ -13802,7 +13831,7 @@ msgid "Failed to save preset"
 msgstr "プリセットを保存できませんでした"
 
 #: src/features/prompts/components/prompt-list.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:480
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:492
 msgid "Failed to save prompt"
 msgstr "プロンプトを保存できませんでした"
 
@@ -13935,7 +13964,7 @@ msgstr "エンドポイントを更新できませんでした"
 msgid "Failed to update favorite"
 msgstr "お気に入りを更新できませんでした"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:344
 msgid "Failed to update favorite status"
 msgstr "お気に入りの状態を更新できませんでした"
 
@@ -14399,7 +14428,7 @@ msgstr "お気に入りのページ"
 
 #: src/features/pages/components/pages-sidebar.tsx:194
 #: src/features/prompts/components/prompt-list.tsx:439
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:628
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:640
 msgid "Favorites"
 msgstr "お気に入り"
 
@@ -14512,7 +14541,7 @@ msgstr "別のプロジェクトに保存"
 msgid "File input"
 msgstr "ファイル入力"
 
-#: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/projects/components/project-rule-files.tsx:323
 msgid "File patterns, one per line"
 msgstr "ファイルパターン（1 行に 1 つ）"
 
@@ -14929,6 +14958,10 @@ msgstr "例：「Python のベストプラクティスを重視する」「プ�
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "例：「タイトルは 4 語以内にする」「タイトルはドイツ語で書く」「動詞で始める」。"
 
+#: src/features/projects/components/project-rule-files.tsx:313
+msgid "For example: how we write database migrations"
+msgstr "例: データベースのマイグレーションの書き方"
+
 #: src/features/develop/components/guide-tab.tsx:161
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "例：エラー処理を重点的に確認し、生成されたファイルは省略する。"
@@ -15064,9 +15097,9 @@ msgstr "無料"
 
 #: src/features/prompts/components/prompt-list.tsx:159
 #: src/features/prompts/components/prompt-list.tsx:225
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:478
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:523
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:586
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:490
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:535
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:598
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "無料アカウントのプロンプトは 3 個までです。Pro にアップグレードすると無制限に使えます。"
 
@@ -15076,7 +15109,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "無料アカウントのスキルは 5 個までです。Pro にアップグレードすると無制限に使えます。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:572
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:584
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "無料アカウントで作成できるプロンプトは 3 個までです。Pro にアップグレードすると無制限に作成できます。"
 
@@ -15749,7 +15782,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab シークレットトークン（X-Gitlab-Token）"
 
-#: src/features/projects/components/project-rule-files.tsx:438
+#: src/features/projects/components/project-rule-files.tsx:586
 msgid "Give every rule file a name."
 msgstr "すべてのルールファイルに名前を付けてください。"
 
@@ -15761,7 +15794,7 @@ msgstr "このページへのアクセス権を付与するか、読み取り専
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "グローバルなアナリストリサーチ、市場分析、投資データ"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
 msgid "Go"
 msgstr "移動"
 
@@ -15833,7 +15866,7 @@ msgstr "前のページへ"
 msgid "Go to Prompts"
 msgstr "プロンプトへ移動"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:352
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:353
 msgid "Go to reply"
 msgstr "返信に移動"
 
@@ -16340,7 +16373,7 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "ハンド（パン）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:937
+#: src/features/chat/browser-live-view/browser-live-view.tsx:967
 msgid "Hand back"
 msgstr "操作を返す"
 
@@ -16499,7 +16532,7 @@ msgstr "列を非表示"
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "Hide live view"
 msgstr "ライブビューを隠す"
 
@@ -17264,6 +17297,10 @@ msgstr "ChatGPT、Google Gemini、Claude、Neore のデータエクスポート�
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
+#: src/features/projects/components/project-rule-files.tsx:825
+msgid "Import files"
+msgstr "ファイルをインポート"
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "さらにインポート"
@@ -17275,6 +17312,10 @@ msgstr "Notion のエクスポートをインポート（.zip）"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "一度にインポートできるのは 1 種類のエクスポートだけです。"
+
+#: src/features/projects/components/project-rule-files.tsx:835
+msgid "Import rule folder"
+msgstr "ルールフォルダーをインポート"
 
 #: src/features/skills/components/skill-import-dialog.tsx:158
 msgid "Import skill"
@@ -17705,7 +17746,7 @@ msgstr "指示追従型"
 msgid "instructions"
 msgstr "指示"
 
-#: src/features/projects/components/project-rule-files.tsx:295
+#: src/features/projects/components/project-rule-files.tsx:341
 #: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17718,9 +17759,9 @@ msgstr "指示"
 msgid "Instructions"
 msgstr "指示"
 
-#: src/features/projects/components/project-rule-files.tsx:594
-msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
-msgstr "このプロジェクトのチャットに追加される指示です。常に、またはチャットの添付ファイルが **/*.sql などのパターンに一致した場合のみ追加されます。"
+#: src/features/projects/components/project-rule-files.tsx:753
+msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
+msgstr "このプロジェクトのチャットに追加される指示です。常に、チャットの添付ファイルが **/*.sql などのパターンに一致するときのみ、またはチャットが必要なときに読むかを選べます。"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -18198,7 +18239,7 @@ msgstr "カザフスタン"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "古いシークレットを 24 時間引き続き受け付ける"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:970
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1000
 msgid "Keep control"
 msgstr "操作を続ける"
 
@@ -19165,11 +19206,11 @@ msgstr "ライブプレビュー — コンポーネントのストリーミン�
 msgid "Live preview — updating as the artifact streams"
 msgstr "ライブプレビュー — アーティファクトのストリーミングに合わせて更新中"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Live view of the agent's browser (read-only)"
 msgstr "エージェントのブラウザーのライブビュー（閲覧のみ）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Live view of the agent's browser (you have control)"
 msgstr "エージェントのブラウザーのライブビュー（操作中）"
 
@@ -20466,8 +20507,8 @@ msgstr "{hostLabel} 上でマージされました。"
 msgid "Merging…"
 msgstr "マージ中…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:302
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:622
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:303
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:624
 msgid "Message"
 msgstr "メッセージ"
 
@@ -21093,8 +21134,8 @@ msgstr "その他のアクション"
 
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/prompt-list-view.tsx:192
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:697
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:836
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:709
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:848
 msgid "More actions for {0}"
 msgstr "{0} のその他のアクション"
 
@@ -21207,11 +21248,11 @@ msgstr "{label} をスター内で下へ移動"
 msgid "Move {label} up in starred"
 msgstr "{label} をスター内で上へ移動"
 
-#: src/features/projects/components/project-rule-files.tsx:254
+#: src/features/projects/components/project-rule-files.tsx:274
 msgid "Move {name} down"
 msgstr "{name} を下へ移動"
 
-#: src/features/projects/components/project-rule-files.tsx:251
+#: src/features/projects/components/project-rule-files.tsx:271
 msgid "Move {name} up"
 msgstr "{name} を上へ移動"
 
@@ -21438,7 +21479,7 @@ msgstr "名前"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:228
+#: src/features/projects/components/project-rule-files.tsx:256
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -22058,7 +22099,7 @@ msgid "Next output mode"
 msgstr "次の出力モード"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:909
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:921
 msgid "Next page"
 msgstr "次のページ"
 
@@ -22403,7 +22444,7 @@ msgstr "画像はまだありません"
 msgid "No indexed files available. Files are still being processed."
 msgstr "インデックス済みのファイルはありません。ファイルはまだ処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:997
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "しばらく入力がありません。1 分以内に操作がエージェントに戻ります。"
 
@@ -22426,6 +22467,10 @@ msgstr "言語が見つかりません"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:62
 msgid "No lens selected"
 msgstr "レンズが選択されていません"
+
+#: src/features/projects/components/project-rule-files.tsx:532
+msgid "No Markdown files were found to import."
+msgstr "インポートできる Markdown ファイルが見つかりませんでした。"
 
 #: src/features/chat/thread/find/thread-find-bar.tsx:186
 msgid "No matches"
@@ -22581,7 +22626,7 @@ msgstr "利用可能なプロジェクトがありません。先にプロジェ
 msgid "No prompt"
 msgstr "プロンプトなし"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "「{searchQuery}」に一致するプロンプトは見つかりませんでした"
 
@@ -22590,8 +22635,8 @@ msgid "No prompts found matching your search."
 msgstr "検索に一致するプロンプトは見つかりませんでした。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:567
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:579
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts yet"
 msgstr "プロンプトはまだありません"
 
@@ -24188,11 +24233,11 @@ msgstr "プルリクエストを作成しています…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "会話なしでアシスタントを開くと、空のチャットではなく最新の会話に移動します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:978
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
 msgid "Opening the live view…"
 msgstr "ライブビューを開いています…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1033
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
 msgid "Opening the page. This can take up to a minute."
 msgstr "ページを開いています。最大 1 分ほどかかることがあります。"
 
@@ -24630,7 +24675,7 @@ msgstr "{currentPage} / {totalPages} ページ"
 msgid "Page added. It is being fetched and indexed."
 msgstr "ページを追加しました。取得とインデックス作成を行っています。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1012
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "ページのアドレス"
@@ -25434,10 +25479,10 @@ msgid "Please log in to configure variables"
 msgstr "変数を設定するにはサインインしてください"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:568
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:529
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:580
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:604
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:592
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:616
 msgid "Please log in to create prompts"
 msgstr "プロンプトを作成するにはサインインしてください"
 
@@ -25928,7 +25973,7 @@ msgid "Previous output mode"
 msgstr "前の出力モード"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:900
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:912
 msgid "Previous page"
 msgstr "前のページ"
 
@@ -26231,7 +26276,7 @@ msgstr "プロジェクト"
 msgid "Project actions"
 msgstr "プロジェクトの操作"
 
-#: src/features/projects/components/project-rule-files.tsx:358
+#: src/features/projects/components/project-rule-files.tsx:404
 msgid "Project context"
 msgstr "プロジェクトのコンテキスト"
 
@@ -26288,12 +26333,12 @@ msgstr "プロンプト"
 msgid "Prompt"
 msgstr "プロンプト"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:236
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:254
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:248
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:266
 msgid "Prompt added to input"
 msgstr "プロンプトを入力欄に追加しました"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:275
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:287
 msgid "Prompt added with placeholders"
 msgstr "プレースホルダー付きでプロンプトを追加しました"
 
@@ -26314,7 +26359,7 @@ msgstr "プロンプトをコピーしました"
 msgid "Prompt copied to clipboard"
 msgstr "プロンプトをクリップボードにコピーしました"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:470
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:482
 msgid "Prompt created"
 msgstr "プロンプトを作成しました"
 
@@ -26323,7 +26368,7 @@ msgid "Prompt created successfully"
 msgstr "プロンプトを作成しました"
 
 #: src/features/prompts/components/prompt-list.tsx:240
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:316
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:328
 msgid "Prompt deleted"
 msgstr "プロンプトを削除しました"
 
@@ -26371,7 +26416,7 @@ msgstr "すべてのモデルで実行するプロンプト..."
 msgid "Prompt Tokens"
 msgstr "プロンプトトークン"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:457
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:469
 msgid "Prompt updated"
 msgstr "プロンプトを更新しました"
 
@@ -26391,7 +26436,7 @@ msgstr "プロンプト変数"
 #: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:505
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
 msgid "Prompts"
 msgstr "プロンプト"
 
@@ -27680,7 +27725,7 @@ msgstr "お気に入りから削除"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:723
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
 msgid "Remove from Favorites"
 msgstr "お気に入りから削除"
 
@@ -28190,8 +28235,8 @@ msgstr "Ollama を再起動（{0}）"
 msgid "Restore this version"
 msgstr "このバージョンを復元"
 
-#: src/features/chat/thread/restore-to-input-action.tsx:43
-#: src/features/chat/thread/restore-to-input-action.tsx:43
+#: src/features/chat/thread/restore-to-input-action.tsx:50
+#: src/features/chat/thread/restore-to-input-action.tsx:50
 msgid "Restore to input"
 msgstr "入力欄に戻す"
 
@@ -28654,15 +28699,15 @@ msgid "Rubric"
 msgstr "ルーブリック"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:198
+#: src/features/projects/components/project-rule-files.tsx:217
 msgid "Rule file {0}"
 msgstr "ルールファイル {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:592
+#: src/features/projects/components/project-rule-files.tsx:751
 msgid "Rule files"
 msgstr "ルールファイル"
 
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:733
 msgid "Rule files saved."
 msgstr "ルールファイルを保存しました。"
 
@@ -28995,7 +29040,7 @@ msgstr "画像を保存"
 msgid "Save login"
 msgstr "ログインを保存"
 
-#: src/features/projects/components/project-rule-files.tsx:694
+#: src/features/projects/components/project-rule-files.tsx:907
 msgid "Save or discard your rule file changes first."
 msgstr "先にルールファイルの変更を保存または破棄してください。"
 
@@ -29007,7 +29052,7 @@ msgstr "プリセットを保存"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "再利用可能なシステムプロンプトを保存し、特定のモデルに紐付けます。「最適化」ボタンで、プロンプトオプティマイザーを使って各プリセットを改善できます。"
 
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:873
 msgid "Save rule files"
 msgstr "ルールファイルを保存"
 
@@ -29085,7 +29130,7 @@ msgstr "ツールを保存中…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:873
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29352,12 +29397,12 @@ msgstr "変数を検索または作成..."
 msgid "Search pages"
 msgstr "ページを検索"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:543
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:555
 msgid "Search prompts"
 msgstr "プロンプトを検索"
 
 #: src/features/prompts/components/prompt-list.tsx:511
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:558
 msgid "Search prompts..."
 msgstr "プロンプトを検索..."
 
@@ -30480,7 +30525,7 @@ msgstr "{0} 人のユーザーを表示中。さらにユーザーがいます�
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:891
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:903
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "{2} 件中 {0}〜{1} 件のプロンプトを表示中"
 
@@ -31100,8 +31145,8 @@ msgstr "この実行の一部の画像を保存できませんでした。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "一部のステップに料金データがありませんでした。合計は最小値です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:918
-#: src/features/chat/browser-live-view/browser-live-view.tsx:990
+#: src/features/chat/browser-live-view/browser-live-view.tsx:948
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "Someone else has control of this browser."
 msgstr "このブラウザーは別の人が操作しています。"
 
@@ -32441,7 +32486,7 @@ msgstr "おすすめ"
 msgid "Suggested answers"
 msgstr "回答の候補"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:641
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
@@ -32781,7 +32826,7 @@ msgstr "台湾"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "入力画像の背景を削除し、スタイル転送を適用"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:955
+#: src/features/chat/browser-live-view/browser-live-view.tsx:985
 msgid "Take control"
 msgstr "操作を代わる"
 
@@ -32789,7 +32834,7 @@ msgstr "操作を代わる"
 msgid "Take turns"
 msgstr "順番に回答"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:328
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
 msgid "Taking control is not available while impersonating."
 msgstr "なりすまし中はブラウザーを操作できません。"
 
@@ -33418,11 +33463,12 @@ msgid "That message was already sent."
 msgstr "そのメッセージはすでに送信されています。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:856
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
 msgid "That page could not be opened: {0}"
 msgstr "そのページを開けませんでした: {0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:876
+#: src/features/chat/browser-live-view/browser-live-view.tsx:620
+#: src/features/chat/browser-live-view/browser-live-view.tsx:906
 msgid "That page could not be opened."
 msgstr "そのページを開けませんでした。"
 
@@ -33527,7 +33573,7 @@ msgstr "エージェントはその選択肢を提示していません"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "エージェントがガイドを作成せずに終了しました。もう一度作成してください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:989
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1019
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "エージェントがブラウザー操作を終えるところです。1 分以上かかることがあります。少ししてからもう一度お試しください。"
 
@@ -33539,7 +33585,7 @@ msgstr "エージェントはまだセッションを開いています。しば
 msgid "The agent is still working on the last message."
 msgstr "エージェントはまだ最後のメッセージを処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:915
+#: src/features/chat/browser-live-view/browser-live-view.tsx:945
 msgid "The agent is using a browser"
 msgstr "エージェントがブラウザーを使用しています"
 
@@ -33563,11 +33609,11 @@ msgstr "エージェントはファイルを変更しませんでした。"
 msgid "The agent on your computer is reading the change…"
 msgstr "お使いのコンピュータ上のエージェントが変更を読み取っています…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:850
+#: src/features/chat/browser-live-view/browser-live-view.tsx:880
 msgid "The agent's browser closed while the page loaded."
 msgstr "ページの読み込み中にエージェントのブラウザーが閉じられました。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:733
+#: src/features/chat/browser-live-view/browser-live-view.tsx:762
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "エージェントのブラウザーが置き換えられ、操作はエージェントに戻りました。もう一度操作を代わることができます。"
 
@@ -33641,7 +33687,7 @@ msgstr "ボットのツールを保存しました"
 msgid "The browser cannot read this video to capture a frame"
 msgstr "ブラウザーがこの動画を読み取れないため、フレームをキャプチャできません"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:825
+#: src/features/chat/browser-live-view/browser-live-view.tsx:855
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "ブラウザーを返せませんでした。2 分間入力がないと、エージェントに自動的に戻ります。"
 
@@ -33762,6 +33808,10 @@ msgstr "データセット、そのケース、およびすべての実行が削
 msgid "The description is cut short."
 msgstr "説明が途中で切れています。"
 
+#: src/features/projects/components/project-rule-files.tsx:572
+msgid "The description of \"{name}\" must be at most {limit} characters on one line."
+msgstr "\"{name}\" の説明は 1 行で最大 {limit} 文字にしてください。"
+
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
@@ -33836,6 +33886,10 @@ msgstr "ファイルは添付されたままで、メッセージと一緒に送
 #: src/features/evals/components/import-cases-dialog.tsx:101
 msgid "The file was not imported:"
 msgstr "ファイルはインポートされませんでした："
+
+#: src/features/projects/components/project-rule-files.tsx:554
+msgid "The files could not be read."
+msgstr "ファイルを読み込めませんでした。"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:322
 msgid "The filters and the signature come from the event. Only the provider's own deliveries for it run."
@@ -34006,7 +34060,7 @@ msgstr "リンクが間違っているか、所有者が会話を非公開にし
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "リンクが間違っているか、所有者がページの公開を停止したか削除した可能性があります。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:998
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
 msgid "The live view could not be opened."
 msgstr "ライブビューを開けませんでした。"
 
@@ -34014,7 +34068,7 @@ msgstr "ライブビューを開けませんでした。"
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:983
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1013
 msgid "The live view is not available right now."
 msgstr "現在ライブビューは利用できません。"
 
@@ -34145,7 +34199,7 @@ msgstr "ページエージェントがこのページを編集できませんで
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "ページには相手のバージョンが表示されています。残したい内容があれば、自分のバージョンからコピーしてください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1038
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
 msgid "The page you opened is still loading."
 msgstr "開いたページはまだ読み込み中です。"
 
@@ -34246,7 +34300,7 @@ msgstr "再試行に予想より時間がかかっています"
 msgid "The right model, every time."
 msgstr "いつでも、最適なモデルを。"
 
-#: src/features/projects/components/project-rule-files.tsx:599
+#: src/features/projects/components/project-rule-files.tsx:758
 msgid "The rule files could not be loaded."
 msgstr "ルールファイルを読み込めませんでした。"
 
@@ -34415,7 +34469,7 @@ msgstr "これらのメモリはメッセージに一致したため、この返
 msgid "These providers will never be used for your requests."
 msgstr "これらのプロバイダーがリクエストに使われることはありません。"
 
-#: src/features/projects/components/project-rule-files.tsx:406
+#: src/features/projects/components/project-rule-files.tsx:461
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "これらのルールファイルはその間に変更されました。変更を破棄して保存済みの内容を表示してから、もう一度編集してください。"
 
@@ -35175,7 +35229,7 @@ msgstr "プロジェクトと関連するすべてのスレッドが完全に削
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:300
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:946
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:958
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "プロンプト「{0}」が完全に削除されます。この操作は元に戻せません。"
 
@@ -35440,7 +35494,7 @@ msgstr "今日"
 msgid "Today, {label}"
 msgstr "今日、{label}"
 
-#: src/features/projects/components/project-rule-files.tsx:447
+#: src/features/projects/components/project-rule-files.tsx:596
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "これらのルールファイルの合計が {limit} MB を超えています。いくつか短くするか削除してください。"
 
@@ -35586,7 +35640,7 @@ msgstr "試行回数が多すぎます。数秒待ってから、もう一度お
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:997
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
 msgid "Too many live views were opened. Try again later."
 msgstr "ライブビューを開いた回数が多すぎます。後でもう一度お試しください。"
 
@@ -35989,8 +36043,8 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1002
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1129
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1159
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36188,7 +36242,7 @@ msgstr "回答を入力…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
 #: src/features/chat/thread/composer-input.tsx:1959
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:203
 msgid "Type your message..."
 msgstr "メッセージを入力..."
 
@@ -38065,7 +38119,7 @@ msgstr "ここから続けますか？"
 msgid "Watch"
 msgstr "監視"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "Watch live"
 msgstr "ライブで見る"
 
@@ -38429,9 +38483,14 @@ msgstr "新しい事実が古い事実と矛盾する場合、古いメモリは
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "更新や障害で返信が途切れた場合、最後に完了したステップから最大 3 回まで続行します。ツールの実行中に中断された返信は続行されません。"
 
-#: src/features/projects/components/project-rule-files.tsx:270
+#: src/features/projects/components/project-rule-files.tsx:290
 msgid "When files match"
 msgstr "ファイルが一致したとき"
+
+#: src/features/projects/components/project-rule-files.tsx:294
+#: src/features/projects/components/project-rule-files.tsx:458
+msgid "When needed"
+msgstr "必要なとき"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
@@ -38444,6 +38503,10 @@ msgstr "設定すると、これらのプロバイダーのみ使用されます
 #: src/features/skills/components/skill-form-dialog.tsx:261
 msgid "When should the assistant use this skill?"
 msgstr "アシスタントはどんなときにこのスキルを使うべきですか？"
+
+#: src/features/projects/components/project-rule-files.tsx:301
+msgid "When to read it"
+msgstr "読むタイミング"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
@@ -38469,7 +38532,7 @@ msgstr "思考が<0/><1>行動に変わる場所。</1>"
 msgid "Where you stay in control"
 msgstr "コントロールを保てる場面"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1116
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "エージェントがブラウザーを使用しているか確認できませんでした。"
 
@@ -38936,7 +38999,8 @@ msgstr "これらはエージェントビルダーで選択した連携です。
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "実行が完了したとき、レビューが必要なとき、または失敗したときに通知を受け取ります。完了した実行はそのチャットにリンクされ、レビューが必要な実行はタスクボードにリンクされます。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:804
+#: src/features/chat/browser-live-view/browser-live-view.tsx:505
+#: src/features/chat/browser-live-view/browser-live-view.tsx:834
 msgid "You handed the browser back to the agent."
 msgstr "ブラウザーの操作をエージェントに返しました。"
 
@@ -38994,7 +39058,7 @@ msgstr "今日のメッセージ数の上限に達しました。後でもう一
 msgid "You have used today's translations. Try again later."
 msgstr "本日の翻訳の上限に達しました。後でもう一度お試しください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:328
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
 msgid "You may not take control of this browser."
 msgstr "このブラウザーを操作する権限がありません。"
 
@@ -39002,9 +39066,9 @@ msgstr "このブラウザーを操作する権限がありません。"
 msgid "You need to sign in to access this page."
 msgstr "このページにアクセスするにはサインインが必要です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:495
-#: src/features/chat/browser-live-view/browser-live-view.tsx:804
-#: src/features/chat/browser-live-view/browser-live-view.tsx:852
+#: src/features/chat/browser-live-view/browser-live-view.tsx:510
+#: src/features/chat/browser-live-view/browser-live-view.tsx:834
+#: src/features/chat/browser-live-view/browser-live-view.tsx:882
 msgid "You no longer have control of the browser."
 msgstr "このブラウザーの操作権はもうありません。"
 
@@ -39057,7 +39121,7 @@ msgid "You've been invited to join an organization"
 msgstr "組織への招待が届いています"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:573
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:585
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "無料アカウントのプロンプト上限（3 個）に達しました。さらに作成するには Pro にアップグレードしてください。"
 
@@ -39159,7 +39223,7 @@ msgstr "自分のチャットと {0}"
 msgid "Your chats and the bots you chose"
 msgstr "自分のチャットと選択したボット"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1047
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "ビュー内でのクリック、入力、スクロールはブラウザーに送られます。操作を返すまでエージェントは待機します。"
 

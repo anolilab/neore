@@ -17,6 +17,7 @@ export const vNotTypedDraft = v.union(
     v.literal("improvedPrompt"),
     v.literal("galleryPrompt"),
     v.literal("organizationValue"),
+    v.literal("collaborator"),
 );
 
 /** A send's `draftFrom` (`not-typed-text.ts#DraftFrom`): a draft's source, or `impersonated`. */

@@ -776,7 +776,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome; ownerId?: string }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -794,6 +794,7 @@ export const gateThreadActionHandler = async (
         botId: thread?.botId,
         ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
         outcome,
+        ...(thread && { ownerId: thread.userId }),
         ...(isHostRunThread(thread) && { hostRun: true }),
     };
 };
@@ -812,6 +813,7 @@ export const gateThreadAction = internalQuery
             hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
             outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
+            ownerId: v.optional(v.string()),
         }),
     )
     .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));
@@ -4841,12 +4843,14 @@ export const streamAsync = internalAction
 
         if (appThread?.projectId) {
             // The access `createThread` applied (owner or organization member), not the owner-only read.
-            projectContext =
-                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
-                    ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
-                    projectId: appThread.projectId as Id<"projects">,
-                    userId,
-                })) ?? undefined;
+            // This run has no tools, so the `auto` files are neither listed nor read.
+            const project = await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
+                projectId: appThread.projectId as Id<"projects">,
+                userId,
+            });
+
+            projectContext = project?.textWithoutInstructions ?? project?.text ?? undefined;
         }
 
         // Get model definition

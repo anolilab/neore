@@ -43,6 +43,7 @@ import {
     finishRun,
     isAgentRunError,
     loadRunContext,
+    longestContextCharacters,
     mayExtractMemory,
     memoryToCarry,
     readResumeInterruptedRuns,
@@ -77,10 +78,11 @@ import { MAX_LENGTH } from "../lib/validators";
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
-import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
+import { getToolsForModelAndMode, modelSupportsTools, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { vAskUserAnswers } from "./tools/ask-user-validators";
+import { INSTRUCTION_READ_TOOL, renderInstructionList } from "../projects/rule-files";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
@@ -386,9 +388,7 @@ export const runStreamingAgent = internalAction
                                 getAgentForUser(ctx, userId, preRouteModel, thread?.language),
                             ]);
                             const systemCharacters =
-                                (fallbackAgent.options.instructions ?? "").length +
-                                run.contextParts.join("\n\n").length +
-                                (invokedSkill?.instructions.length ?? 0);
+                                (fallbackAgent.options.instructions ?? "").length + longestContextCharacters(run) + (invokedSkill?.instructions.length ?? 0);
 
                             return {
                                 contextTokens: history.contextTokens + Math.ceil(estimateTokensFromCharacters(systemCharacters)),
@@ -500,6 +500,11 @@ export const runStreamingAgent = internalAction
                 // Built-ins + MCP tools, with the user's per-tool permissions applied
                 // (`off` removed, `ask` gated behind a tool-approval request) — and
                 // the run context started above.
+                const projectInstructions = runContextPromise.then((context) => context.projectInstructions);
+
+                // Awaited only by a run that builds tools under no `off` cap; the failure itself surfaces through `runContextPromise`.
+                projectInstructions.catch(() => undefined);
+
                 const [toolResult, runContext] = await Promise.all([
                     allowTools
                         ? buildAgentTools(ctx, {
@@ -508,6 +513,9 @@ export const runStreamingAgent = internalAction
                               autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                               // Interactive: the user's devices, if this thread may reach them.
                               deviceThreadId: threadId,
+                              // Offered as a candidate like any built-in, only to a model that calls tools. A failed context read
+                              // fails the run through `runContextPromise` below, and makes `buildAgentTools` close what it connected.
+                              ...(modelSupportsTools(model) && { instructions: projectInstructions }),
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
@@ -539,8 +547,12 @@ export const runStreamingAgent = internalAction
 
                 mcpClients = toolResult.mcpClients;
 
+                // The project's `auto` rule files are listed only while the run still offers `instruction_read` to read them: the
+                // cap, a bot's selection, a skill or the user's permissions may have removed it like any other tool.
+                const instructions = Object.hasOwn(toolResult.tools, INSTRUCTION_READ_TOOL) ? runContext.projectInstructions : [];
                 const tools = toolRuns.wrap(toolResult.tools, new Set(toolResult.repeatable));
-                const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
+                const { prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
+                const contextParts = instructions.length > 0 ? runContext.contextParts : runContext.contextPartsWithoutInstructions;
 
                 setResearchDepth(ctx, effectiveResearchDepth);
                 setDispatchOrigin(ctx, origin ?? "lead");
@@ -614,7 +626,8 @@ export const runStreamingAgent = internalAction
 
                 // Memory, knowledge base, project context and the thread's own
                 // instructions — then a note about attached documents.
-                const additionalParts = [...contextParts];
+                const instructionList = renderInstructionList(instructions);
+                const additionalParts = [...contextParts, ...(instructionList ? [instructionList] : [])];
 
                 if (fileIds && fileIds.length > 0) {
                     additionalParts.push(
@@ -866,6 +879,8 @@ export const runStreamingAgent = internalAction
                             memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                             model,
                             promptMessageId: messageId,
+                            // The project the listed `auto` files came from: the continuation reads that one's, not the thread's then.
+                            ...(instructions.length > 0 && appThread?.projectId && { projectId: appThread.projectId }),
                             reasoningEffort: threadReasoningEffort,
                             // The reply is named by its first stream; every continuation inherits it.
                             replyKey: streamId,

@@ -25,11 +25,11 @@ msgstr " · modello: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# riga} other {# righe}}, {1, plural, one {# colonna} other {# colonne}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- INSERT --"
 msgstr "-- INSERISCI --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- NORMAL --"
 msgstr "-- NORMALE --"
 
@@ -89,11 +89,11 @@ msgstr "«{fileName}» è troppo grande. I documenti possono essere al massimo d
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "«{fileName}» è troppo grande. I file di questo tipo possono essere al massimo di {maxMegabytes} MB."
 
-#: src/features/projects/components/project-rule-files.tsx:436
+#: src/features/projects/components/project-rule-files.tsx:584
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "\"{name}\" ha più di {limit} pattern di file. Rimuovine alcuni o spostali in un altro file."
 
-#: src/features/projects/components/project-rule-files.tsx:425
+#: src/features/projects/components/project-rule-files.tsx:567
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "\"{name}\" supera i {limit} caratteri. Accorcialo o dividilo in più file."
 
@@ -348,6 +348,11 @@ msgstr "{0, plural, one {# controllo obbligatorio o sconosciuto non è riuscito}
 #: src/features/develop/components/checks-tab.tsx:104
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, one {# controllo obbligatorio o sconosciuto è ancora in corso} other {# controlli obbligatori o sconosciuti sono ancora in corso}}"
+
+#. placeholder {0}: added.length
+#: src/features/projects/components/project-rule-files.tsx:534
+msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
+msgstr "{0, plural, one {# file di regole importato.} other {# file di regole importati.}} Controlla, poi salva."
 
 #. placeholder {0}: executions.length
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:217
@@ -1428,6 +1433,10 @@ msgstr "{server} · fino a {until}"
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, one {# file non è stato importato ed è stato escluso} other {# file non sono stati importati e sono stati esclusi}}"
 
+#: src/features/projects/components/project-rule-files.tsx:537
+msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
+msgstr "{skipped, plural, one {# file è stato escluso.} other {# file sono stati esclusi.}} Un progetto contiene al massimo {limit} file di regole."
+
 #: src/features/workflow/hooks/use-workflow-transfer.ts:55
 msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
 msgstr "{skipped, plural, one {# file non è stato incluso nell’esportazione} other {# file non sono stati inclusi nell’esportazione}}"
@@ -1486,6 +1495,10 @@ msgstr "Chiave API {toolId} rimossa"
 msgid "{toolId} API key saved"
 msgstr "Chiave API {toolId} salvata"
 
+#: src/features/projects/components/project-rule-files.tsx:535
+msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
+msgstr "{toSet, plural, one {# file non indica quando si applica} other {# file non indicano quando si applicano}}: imposta una descrizione o un’altra modalità."
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:30
 msgid "{total, plural, one {Used # tool · {tail}} other {Used # tools · {tail}}}"
 msgstr "{total, plural, one {Usato # strumento · {tail}} other {Usati # strumenti · {tail}}}"
@@ -1515,7 +1528,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "N. 1 su OpenRouter per utilizzo di token"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:894
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:906
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, one {# preferito} other {# preferiti}}"
 
@@ -1865,13 +1878,17 @@ msgstr "Un editor di documenti che pensa con te."
 msgid "A few questions first"
 msgstr "Prima qualche domanda"
 
-#: src/features/projects/components/project-rule-files.tsx:432
+#: src/features/projects/components/project-rule-files.tsx:580
 msgid "A file applied when files match needs at least one pattern."
 msgstr "Un file applicato quando i file corrispondono richiede almeno un pattern."
 
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
 msgstr "Un file che solo il proprietario può leggere (nessun portachiavi disponibile)"
+
+#: src/features/projects/components/project-rule-files.tsx:574
+msgid "A file read when needed needs a line saying when to read it."
+msgstr "Un file letto quando serve ha bisogno di una riga che dica quando leggerlo."
 
 #: src/features/skills/components/skill-import-dialog.tsx:202
 msgid "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not."
@@ -1986,7 +2003,7 @@ msgstr "Un segnaposto o una @menzione fuori dalle virgolette qui viene letto com
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "Un progetto può elencare al massimo {MAX_REPOSITORIES} repository."
 
-#: src/features/projects/components/project-rule-files.tsx:452
+#: src/features/projects/components/project-rule-files.tsx:601
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "Un progetto contiene al massimo {limit} file di regole. Rimuovine prima uno."
 
@@ -2024,9 +2041,13 @@ msgstr "Una risposta che ha usato memorie mostra un elenco «Memorie usate», co
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "Un turno instradato o con menzioni ha al massimo tre interlocutori. Un turno parallelo ha fino a quattro risposte e una sintesi, e un dibattito arriva fino a tre round."
 
-#: src/features/projects/components/project-rule-files.tsx:442
+#: src/features/projects/components/project-rule-files.tsx:591
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "Il nome di un file di regole può avere al massimo {limit} caratteri."
+
+#: src/features/projects/components/project-rule-files.tsx:587
+msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
+msgstr "Il nome di un file di regole non può iniziare con \"id:\". Rinomina \"{name}\"."
 
 #: src/features/marketing/use-cases/use-case-data.ts:25
 msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
@@ -2550,7 +2571,7 @@ msgstr "Aggiungi progetto"
 msgid "Add project on {0}"
 msgstr "Aggiungi progetto su {0}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:513
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:525
 msgid "Add prompt"
 msgstr "Aggiungi prompt"
 
@@ -2588,7 +2609,7 @@ msgstr "Aggiungi immagini di riferimento per mantenere la coerenza"
 msgid "Add row"
 msgstr "Aggiungi riga"
 
-#: src/features/projects/components/project-rule-files.tsx:652
+#: src/features/projects/components/project-rule-files.tsx:814
 msgid "Add rule file"
 msgstr "Aggiungi file di regole"
 
@@ -2644,7 +2665,7 @@ msgstr "Aggiungi ai preferiti"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:862
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 msgid "Add to Favorites"
 msgstr "Aggiungi ai preferiti"
 
@@ -3397,7 +3418,7 @@ msgid "All Organization"
 msgstr "Tutta l'organizzazione"
 
 #: src/features/prompts/components/prompt-list.tsx:463
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:767
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:779
 msgid "All Prompts"
 msgstr "Tutti i prompt"
 
@@ -3533,8 +3554,8 @@ msgstr "Già collegata a questo thread."
 msgid "Also viewing"
 msgstr "Stanno visualizzando anche"
 
-#: src/features/projects/components/project-rule-files.tsx:266
-#: src/features/projects/components/project-rule-files.tsx:608
+#: src/features/projects/components/project-rule-files.tsx:286
+#: src/features/projects/components/project-rule-files.tsx:455
 msgid "Always"
 msgstr "Sempre"
 
@@ -3594,6 +3615,10 @@ msgstr "Un agente (skill)"
 #: src/features/tasks/components/task-form-dialog.tsx:207
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "Un agente svolge l'attività in autonomia, poi un verificatore controlla il risultato rispetto ai tuoi criteri di successo."
+
+#: src/features/projects/components/project-rule-files.tsx:820
+msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
+msgstr "Un file AGENTS.md, CLAUDE.md o GEMINI.md, o altri file Markdown"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:13
 msgid "An approval card asks to allow a tool. A pointer clicks Approve, the status changes to running, and the result appears."
@@ -3941,7 +3966,7 @@ msgstr "AppID dalla configurazione di base del tuo Official Account"
 msgid "Application Error"
 msgstr "Errore dell'applicazione"
 
-#: src/features/projects/components/project-rule-files.tsx:262
+#: src/features/projects/components/project-rule-files.tsx:282
 msgid "Applies"
 msgstr "Si applica"
 
@@ -5381,8 +5406,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Sfoglia, duplica e rielabora i workflow condivisi dalla community"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:914
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1114
+#: src/features/chat/browser-live-view/browser-live-view.tsx:944
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
 msgid "Browser"
 msgstr "Browser"
 
@@ -5867,7 +5892,7 @@ msgstr "I fatti candidati vengono salvati con un tipo: identità, preferenza, co
 msgid "Cannot be exported: {0}"
 msgstr "Impossibile esportare: {0}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:185
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:197
 #: src/features/prompts/hooks/use-prompt-loader.tsx:65
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "Impossibile usare il prompt: {errorMessages}"
@@ -6229,6 +6254,10 @@ msgstr "Chat"
 #: src/features/knowledge/components/project-knowledge-collections.tsx:49
 msgid "Chats in this project search these collections and cite them."
 msgstr "Le chat di questo progetto cercano in queste raccolte e le citano."
+
+#: src/features/projects/components/project-rule-files.tsx:317
+msgid "Chats see the name and this line, and read the file when it applies."
+msgstr "Le chat vedono il nome e questa riga, e leggono il file quando serve."
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:654
 #: src/features/settings/components/chat/native-providers-settings.tsx:725
@@ -6630,7 +6659,7 @@ msgstr "Rimuovi modello"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:551
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
 #: src/features/vault/components/empty-states.tsx:21
 msgid "Clear search"
 msgstr "Cancella ricerca"
@@ -8101,11 +8130,11 @@ msgstr "Controlla la profondità di campo con l'apertura"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Controlla come vengono mostrate le tue informazioni personali nell'interfaccia."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:461
+#: src/features/chat/browser-live-view/browser-live-view.tsx:471
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "Il controllo del browser è tornato all'agente: il server non ha confermato in tempo che lo hai ancora."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:462
+#: src/features/chat/browser-live-view/browser-live-view.tsx:472
 msgid "Control of the browser is back with the agent."
 msgstr "Il controllo del browser è tornato all'agente."
 
@@ -8237,7 +8266,7 @@ msgstr "Ultimo blocco di codice copiato"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:150
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:162
 msgid "Copied to clipboard"
 msgstr "Copiato negli appunti"
 
@@ -8262,8 +8291,8 @@ msgid "Copy"
 msgstr "Copia"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:675
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:814
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:687
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:826
 msgid "Copy {0} to clipboard"
 msgstr "Copia {0} negli appunti"
 
@@ -8376,8 +8405,8 @@ msgstr "Copia ora questo segreto e conservalo presso il mittente del webhook. No
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:691
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:830
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:703
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:842
 msgid "Copy to clipboard"
 msgstr "Copia negli appunti"
 
@@ -9014,7 +9043,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "Copre la maggior parte dei casi d'uso video quotidiani"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:597
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:609
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "Crea"
@@ -10072,8 +10101,8 @@ msgstr "Delega attività a Devin, l'ingegnere del software IA"
 #: src/features/pages/components/pages-sidebar.tsx:281
 #: src/features/prompts/components/prompt-item.tsx:228
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:747
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:886
 #: src/features/settings/components/chat/bots-settings.tsx:508
 #: src/features/settings/components/chat/bots-settings.tsx:562
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
@@ -10129,7 +10158,7 @@ msgstr "Elimina {fileName}"
 msgid "Delete {itemName}"
 msgstr "Elimina {itemName}"
 
-#: src/features/projects/components/project-rule-files.tsx:257
+#: src/features/projects/components/project-rule-files.tsx:277
 msgid "Delete {name}"
 msgstr "Elimina {name}"
 
@@ -10256,7 +10285,7 @@ msgstr "Elimina progetto"
 
 #: src/features/prompts/components/prompt-item.tsx:308
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:956
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:968
 msgid "Delete Prompt"
 msgstr "Elimina prompt"
 
@@ -10852,7 +10881,7 @@ msgid "Discard"
 msgstr "Scarta"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:684
+#: src/features/projects/components/project-rule-files.tsx:893
 msgid "Discard changes"
 msgstr "Scarta le modifiche"
 
@@ -11481,7 +11510,7 @@ msgstr "Ogni connessione ha il proprio indirizzo webhook, a cui l’app invia i 
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Ogni canale Discord crea una conversazione separata in Neore Chat. L'IA risponderà automaticamente nel canale."
 
-#: src/features/projects/components/project-rule-files.tsx:430
+#: src/features/projects/components/project-rule-files.tsx:578
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "Ogni pattern di file in \"{name}\" deve avere al massimo {limit} caratteri su una sola riga."
 
@@ -11571,8 +11600,8 @@ msgstr "Generazione guidata dai bordi"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:714
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:853
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:726
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:865
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -13359,7 +13388,7 @@ msgstr "Connessione non riuscita"
 msgid "Failed to connect {name}"
 msgstr "Impossibile collegare {name}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:153
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:165
 msgid "Failed to copy"
 msgstr "Impossibile copiare"
 
@@ -13457,7 +13486,7 @@ msgid "Failed to delete project"
 msgstr "Impossibile eliminare il progetto"
 
 #: src/features/prompts/components/prompt-list.tsx:243
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:320
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
 msgid "Failed to delete prompt"
 msgstr "Impossibile eliminare il prompt"
 
@@ -13802,7 +13831,7 @@ msgid "Failed to save preset"
 msgstr "Impossibile salvare il preset"
 
 #: src/features/prompts/components/prompt-list.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:480
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:492
 msgid "Failed to save prompt"
 msgstr "Impossibile salvare il prompt"
 
@@ -13935,7 +13964,7 @@ msgstr "Impossibile aggiornare l'endpoint"
 msgid "Failed to update favorite"
 msgstr "Impossibile aggiornare il preferito"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:344
 msgid "Failed to update favorite status"
 msgstr "Impossibile aggiornare lo stato di preferito"
 
@@ -14399,7 +14428,7 @@ msgstr "Pagine preferite"
 
 #: src/features/pages/components/pages-sidebar.tsx:194
 #: src/features/prompts/components/prompt-list.tsx:439
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:628
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:640
 msgid "Favorites"
 msgstr "Preferiti"
 
@@ -14512,7 +14541,7 @@ msgstr "Archivia in un altro progetto"
 msgid "File input"
 msgstr "Input file"
 
-#: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/projects/components/project-rule-files.tsx:323
 msgid "File patterns, one per line"
 msgstr "Pattern di file, uno per riga"
 
@@ -14929,6 +14958,10 @@ msgstr "Ad esempio: \"Concentrati sulle best practice di Python\", \"Mantieni un
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "Ad esempio: \"Titoli di meno di quattro parole\", \"Scrivi i titoli in tedesco\" oppure \"Inizia con un verbo\"."
 
+#: src/features/projects/components/project-rule-files.tsx:313
+msgid "For example: how we write database migrations"
+msgstr "Ad esempio: come scriviamo le migrazioni del database"
+
 #: src/features/develop/components/guide-tab.tsx:161
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "Ad esempio: guarda con attenzione la gestione degli errori, salta i file generati."
@@ -15064,9 +15097,9 @@ msgstr "Gratis"
 
 #: src/features/prompts/components/prompt-list.tsx:159
 #: src/features/prompts/components/prompt-list.tsx:225
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:478
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:523
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:586
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:490
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:535
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:598
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "Gli account gratuiti sono limitati a 3 prompt. Passa a Pro per avere prompt illimitati."
 
@@ -15076,7 +15109,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "Gli account gratuiti sono limitati a 5 skill. Passa a Pro per avere skill illimitate."
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:572
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:584
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "Gli account gratuiti possono creare fino a 3 prompt. Passa a Pro per avere prompt illimitati."
 
@@ -15749,7 +15782,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "Token segreto GitLab (X-Gitlab-Token)"
 
-#: src/features/projects/components/project-rule-files.tsx:438
+#: src/features/projects/components/project-rule-files.tsx:586
 msgid "Give every rule file a name."
 msgstr "Dai un nome a ogni file di regole."
 
@@ -15761,7 +15794,7 @@ msgstr "Dai accesso a questa pagina ad altre persone o pubblica un link di sola 
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "Ricerche di analisti globali, analisi di mercato e dati sugli investimenti"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
 msgid "Go"
 msgstr "Vai"
 
@@ -15833,7 +15866,7 @@ msgstr "Vai alla pagina precedente"
 msgid "Go to Prompts"
 msgstr "Vai ai prompt"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:352
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:353
 msgid "Go to reply"
 msgstr "Vai alla risposta"
 
@@ -16340,7 +16373,7 @@ msgstr "A"
 msgid "Hand (pan)"
 msgstr "Mano (sposta)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:937
+#: src/features/chat/browser-live-view/browser-live-view.tsx:967
 msgid "Hand back"
 msgstr "Restituisci"
 
@@ -16499,7 +16532,7 @@ msgstr "Nascondi colonna"
 msgid "Hide follow-up suggestions"
 msgstr "Nascondi suggerimenti di follow-up"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "Hide live view"
 msgstr "Nascondi vista dal vivo"
 
@@ -17264,6 +17297,10 @@ msgstr "Importa conversazioni da ChatGPT, Google Gemini, Claude, un’esportazio
 msgid "Import failed"
 msgstr "Importazione non riuscita"
 
+#: src/features/projects/components/project-rule-files.tsx:825
+msgid "Import files"
+msgstr "Importa file"
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "Importa altro"
@@ -17275,6 +17312,10 @@ msgstr "Importa esportazione Notion (.zip)"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "Importa un tipo di export alla volta."
+
+#: src/features/projects/components/project-rule-files.tsx:835
+msgid "Import rule folder"
+msgstr "Importa cartella di regole"
 
 #: src/features/skills/components/skill-import-dialog.tsx:158
 msgid "Import skill"
@@ -17705,7 +17746,7 @@ msgstr "instruct"
 msgid "instructions"
 msgstr "istruzioni"
 
-#: src/features/projects/components/project-rule-files.tsx:295
+#: src/features/projects/components/project-rule-files.tsx:341
 #: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17718,9 +17759,9 @@ msgstr "istruzioni"
 msgid "Instructions"
 msgstr "Istruzioni"
 
-#: src/features/projects/components/project-rule-files.tsx:594
-msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
-msgstr "Istruzioni aggiunte alle chat di questo progetto: sempre, oppure solo quando i file allegati alla chat corrispondono a un pattern come **/*.sql."
+#: src/features/projects/components/project-rule-files.tsx:753
+msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
+msgstr "Istruzioni aggiunte alle chat di questo progetto: sempre, solo quando i file allegati alla chat corrispondono a un modello come **/*.sql, oppure lette dalla chat quando le servono."
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -18198,7 +18239,7 @@ msgstr "Kazakistan"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "Continua ad accettare il vecchio segreto per 24 ore"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:970
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1000
 msgid "Keep control"
 msgstr "Mantieni il controllo"
 
@@ -19165,11 +19206,11 @@ msgstr "Anteprima dal vivo: viene mostrata quando il componente ha finito lo str
 msgid "Live preview — updating as the artifact streams"
 msgstr "Anteprima dal vivo: si aggiorna durante lo streaming dell'artefatto"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Live view of the agent's browser (read-only)"
 msgstr "Vista dal vivo del browser dell'agente (sola lettura)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Live view of the agent's browser (you have control)"
 msgstr "Vista dal vivo del browser dell'agente (hai il controllo)"
 
@@ -20466,8 +20507,8 @@ msgstr "Unita su {hostLabel}."
 msgid "Merging…"
 msgstr "Unione in corso…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:302
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:622
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:303
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:624
 msgid "Message"
 msgstr "Messaggio"
 
@@ -21093,8 +21134,8 @@ msgstr "Altre azioni"
 
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/prompt-list-view.tsx:192
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:697
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:836
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:709
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:848
 msgid "More actions for {0}"
 msgstr "Altre azioni per {0}"
 
@@ -21207,11 +21248,11 @@ msgstr "Sposta {label} giù tra i contrassegnati"
 msgid "Move {label} up in starred"
 msgstr "Sposta {label} su tra i contrassegnati"
 
-#: src/features/projects/components/project-rule-files.tsx:254
+#: src/features/projects/components/project-rule-files.tsx:274
 msgid "Move {name} down"
 msgstr "Sposta giù {name}"
 
-#: src/features/projects/components/project-rule-files.tsx:251
+#: src/features/projects/components/project-rule-files.tsx:271
 msgid "Move {name} up"
 msgstr "Sposta su {name}"
 
@@ -21438,7 +21479,7 @@ msgstr "nome"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:228
+#: src/features/projects/components/project-rule-files.tsx:256
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -22058,7 +22099,7 @@ msgid "Next output mode"
 msgstr "Modalità di output successiva"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:909
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:921
 msgid "Next page"
 msgstr "Pagina successiva"
 
@@ -22403,7 +22444,7 @@ msgstr "Ancora nessuna immagine"
 msgid "No indexed files available. Files are still being processed."
 msgstr "Nessun file indicizzato disponibile. I file sono ancora in elaborazione."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:997
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "Nessun input da un po': il controllo torna all'agente tra meno di un minuto."
 
@@ -22426,6 +22467,10 @@ msgstr "Nessuna lingua trovata"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:62
 msgid "No lens selected"
 msgstr "Nessun obiettivo selezionato"
+
+#: src/features/projects/components/project-rule-files.tsx:532
+msgid "No Markdown files were found to import."
+msgstr "Non è stato trovato nessun file Markdown da importare."
 
 #: src/features/chat/thread/find/thread-find-bar.tsx:186
 msgid "No matches"
@@ -22581,7 +22626,7 @@ msgstr "Nessun progetto disponibile. Crea prima un progetto."
 msgid "No prompt"
 msgstr "Nessun prompt"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "Nessun prompt corrisponde a \"{searchQuery}\""
 
@@ -22590,8 +22635,8 @@ msgid "No prompts found matching your search."
 msgstr "Nessun prompt corrisponde alla tua ricerca."
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:567
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:579
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts yet"
 msgstr "Ancora nessun prompt"
 
@@ -24188,11 +24233,11 @@ msgstr "Apertura della pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Aprire l'assistente senza una conversazione ti porta alla più recente invece che a una chat vuota."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:978
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
 msgid "Opening the live view…"
 msgstr "Apertura della vista dal vivo…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1033
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
 msgid "Opening the page. This can take up to a minute."
 msgstr "Apertura della pagina. Può richiedere fino a un minuto."
 
@@ -24630,7 +24675,7 @@ msgstr "Pagina {currentPage} di {totalPages}"
 msgid "Page added. It is being fetched and indexed."
 msgstr "Pagina aggiunta. È in corso il recupero e l’indicizzazione."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1012
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "Indirizzo della pagina"
@@ -25434,10 +25479,10 @@ msgid "Please log in to configure variables"
 msgstr "Accedi per configurare le variabili"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:568
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:529
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:580
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:604
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:592
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:616
 msgid "Please log in to create prompts"
 msgstr "Accedi per creare prompt"
 
@@ -25928,7 +25973,7 @@ msgid "Previous output mode"
 msgstr "Modalità di output precedente"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:900
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:912
 msgid "Previous page"
 msgstr "Pagina precedente"
 
@@ -26231,7 +26276,7 @@ msgstr "Progetto"
 msgid "Project actions"
 msgstr "Azioni del progetto"
 
-#: src/features/projects/components/project-rule-files.tsx:358
+#: src/features/projects/components/project-rule-files.tsx:404
 msgid "Project context"
 msgstr "Contesto del progetto"
 
@@ -26288,12 +26333,12 @@ msgstr "prompt"
 msgid "Prompt"
 msgstr "Prompt"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:236
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:254
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:248
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:266
 msgid "Prompt added to input"
 msgstr "Prompt aggiunto all'input"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:275
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:287
 msgid "Prompt added with placeholders"
 msgstr "Prompt aggiunto con segnaposto"
 
@@ -26314,7 +26359,7 @@ msgstr "Prompt copiato"
 msgid "Prompt copied to clipboard"
 msgstr "Prompt copiato negli appunti"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:470
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:482
 msgid "Prompt created"
 msgstr "Prompt creato"
 
@@ -26323,7 +26368,7 @@ msgid "Prompt created successfully"
 msgstr "Prompt creato"
 
 #: src/features/prompts/components/prompt-list.tsx:240
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:316
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:328
 msgid "Prompt deleted"
 msgstr "Prompt eliminato"
 
@@ -26371,7 +26416,7 @@ msgstr "Prompt da eseguire su tutti i modelli..."
 msgid "Prompt Tokens"
 msgstr "Token del prompt"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:457
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:469
 msgid "Prompt updated"
 msgstr "Prompt aggiornato"
 
@@ -26391,7 +26436,7 @@ msgstr "Variabili del prompt"
 #: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:505
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
 msgid "Prompts"
 msgstr "Prompt"
 
@@ -27680,7 +27725,7 @@ msgstr "Rimuovi dai preferiti"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:723
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
 msgid "Remove from Favorites"
 msgstr "Rimuovi dai preferiti"
 
@@ -28190,8 +28235,8 @@ msgstr "Riavvia Ollama ({0})"
 msgid "Restore this version"
 msgstr "Ripristina questa versione"
 
-#: src/features/chat/thread/restore-to-input-action.tsx:43
-#: src/features/chat/thread/restore-to-input-action.tsx:43
+#: src/features/chat/thread/restore-to-input-action.tsx:50
+#: src/features/chat/thread/restore-to-input-action.tsx:50
 msgid "Restore to input"
 msgstr "Ripristina nell'input"
 
@@ -28654,15 +28699,15 @@ msgid "Rubric"
 msgstr "Rubrica"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:198
+#: src/features/projects/components/project-rule-files.tsx:217
 msgid "Rule file {0}"
 msgstr "File di regole {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:592
+#: src/features/projects/components/project-rule-files.tsx:751
 msgid "Rule files"
 msgstr "File di regole"
 
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:733
 msgid "Rule files saved."
 msgstr "File di regole salvati."
 
@@ -28995,7 +29040,7 @@ msgstr "Salva immagine"
 msgid "Save login"
 msgstr "Salva accesso"
 
-#: src/features/projects/components/project-rule-files.tsx:694
+#: src/features/projects/components/project-rule-files.tsx:907
 msgid "Save or discard your rule file changes first."
 msgstr "Salva o scarta prima le modifiche ai file di regole."
 
@@ -29007,7 +29052,7 @@ msgstr "Salva preset"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Salva prompt di sistema riutilizzabili e associali a modelli specifici. Usa il pulsante Ottimizza per perfezionare ogni preset con l'ottimizzatore di prompt."
 
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:873
 msgid "Save rule files"
 msgstr "Salva i file di regole"
 
@@ -29085,7 +29130,7 @@ msgstr "Salvataggio degli strumenti…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:873
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29352,12 +29397,12 @@ msgstr "Cerca o crea una variabile..."
 msgid "Search pages"
 msgstr "Cerca pagine"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:543
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:555
 msgid "Search prompts"
 msgstr "Cerca prompt"
 
 #: src/features/prompts/components/prompt-list.tsx:511
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:558
 msgid "Search prompts..."
 msgstr "Cerca prompt..."
 
@@ -30480,7 +30525,7 @@ msgstr "Visualizzati {0} utenti. Sono disponibili altri utenti."
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:891
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:903
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "Prompt da {0} a {1} di {2}"
 
@@ -31100,8 +31145,8 @@ msgstr "Alcune immagini di questa esecuzione non sono state salvate."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Per alcuni passaggi mancano i dati sui prezzi; il totale è un minimo."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:918
-#: src/features/chat/browser-live-view/browser-live-view.tsx:990
+#: src/features/chat/browser-live-view/browser-live-view.tsx:948
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "Someone else has control of this browser."
 msgstr "Qualcun altro ha il controllo di questo browser."
 
@@ -32441,7 +32486,7 @@ msgstr "Suggeriti"
 msgid "Suggested answers"
 msgstr "Risposte suggerite"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:641
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggerimento disponibile, premi Freccia destra per accettarlo"
 
@@ -32781,7 +32826,7 @@ msgstr "Taiwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Prendi un’immagine in input, rimuovi lo sfondo, poi applica un trasferimento di stile"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:955
+#: src/features/chat/browser-live-view/browser-live-view.tsx:985
 msgid "Take control"
 msgstr "Prendi il controllo"
 
@@ -32789,7 +32834,7 @@ msgstr "Prendi il controllo"
 msgid "Take turns"
 msgstr "A turno"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:328
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
 msgid "Taking control is not available while impersonating."
 msgstr "Non è possibile prendere il controllo durante l'impersonificazione."
 
@@ -33418,11 +33463,12 @@ msgid "That message was already sent."
 msgstr "Quel messaggio è già stato inviato."
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:856
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
 msgid "That page could not be opened: {0}"
 msgstr "Impossibile aprire la pagina: {0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:876
+#: src/features/chat/browser-live-view/browser-live-view.tsx:620
+#: src/features/chat/browser-live-view/browser-live-view.tsx:906
 msgid "That page could not be opened."
 msgstr "Impossibile aprire la pagina."
 
@@ -33527,7 +33573,7 @@ msgstr "l’agente non offre quella scelta"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "L’agente ha terminato senza fornire una guida. Scrivila di nuovo."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:989
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1019
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "L'agente sta completando un'azione nel browser, che può durare più di un minuto. Riprova tra poco."
 
@@ -33539,7 +33585,7 @@ msgstr "L’agente sta ancora aprendo la sua sessione. Riprova tra un attimo."
 msgid "The agent is still working on the last message."
 msgstr "L’agente sta ancora lavorando all’ultimo messaggio."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:915
+#: src/features/chat/browser-live-view/browser-live-view.tsx:945
 msgid "The agent is using a browser"
 msgstr "L'agente sta usando un browser"
 
@@ -33563,11 +33609,11 @@ msgstr "L'agente non ha modificato alcun file."
 msgid "The agent on your computer is reading the change…"
 msgstr "L’agente sul tuo computer sta leggendo la modifica…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:850
+#: src/features/chat/browser-live-view/browser-live-view.tsx:880
 msgid "The agent's browser closed while the page loaded."
 msgstr "Il browser dell'agente si è chiuso durante il caricamento della pagina."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:733
+#: src/features/chat/browser-live-view/browser-live-view.tsx:762
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "Il browser dell'agente è stato sostituito e il controllo è tornato all'agente. Puoi riprendere il controllo."
 
@@ -33641,7 +33687,7 @@ msgstr "Gli strumenti del bot sono stati salvati"
 msgid "The browser cannot read this video to capture a frame"
 msgstr "Il browser non riesce a leggere questo video per catturare un fotogramma"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:825
+#: src/features/chat/browser-live-view/browser-live-view.tsx:855
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "Non è stato possibile restituire il browser. L'agente lo riprende da solo dopo due minuti senza input."
 
@@ -33762,6 +33808,10 @@ msgstr "Il dataset, i suoi casi e tutte le sue esecuzioni vengono rimossi."
 msgid "The description is cut short."
 msgstr "La descrizione è troncata."
 
+#: src/features/projects/components/project-rule-files.tsx:572
+msgid "The description of \"{name}\" must be at most {limit} characters on one line."
+msgstr "La descrizione di \"{name}\" deve avere al massimo {limit} caratteri su una sola riga."
+
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "L'app desktop funziona su macOS, Windows e Linux. I programmi di installazione sono allegati a una release desktop su GitHub e compaiono lì quando la release viene pubblicata."
@@ -33836,6 +33886,10 @@ msgstr "Il file è ancora allegato e verrà inviato con il tuo messaggio."
 #: src/features/evals/components/import-cases-dialog.tsx:101
 msgid "The file was not imported:"
 msgstr "Il file non è stato importato:"
+
+#: src/features/projects/components/project-rule-files.tsx:554
+msgid "The files could not be read."
+msgstr "Non è stato possibile leggere i file."
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:322
 msgid "The filters and the signature come from the event. Only the provider's own deliveries for it run."
@@ -34006,7 +34060,7 @@ msgstr "Il link potrebbe essere errato oppure il proprietario ha reso privata la
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Il link potrebbe essere errato oppure il proprietario ha annullato la pubblicazione o eliminato la pagina."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:998
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
 msgid "The live view could not be opened."
 msgstr "Impossibile aprire la vista dal vivo."
 
@@ -34014,7 +34068,7 @@ msgstr "Impossibile aprire la vista dal vivo."
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:983
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1013
 msgid "The live view is not available right now."
 msgstr "La vista dal vivo non è disponibile al momento."
 
@@ -34145,7 +34199,7 @@ msgstr "L'agente della pagina non è riuscito a modificare questa pagina"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "La pagina ora mostra l'altra versione. Copia dalla tua tutto ciò che vuoi conservare."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1038
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
 msgid "The page you opened is still loading."
 msgstr "La pagina che hai aperto è ancora in caricamento."
 
@@ -34246,7 +34300,7 @@ msgstr "Il nuovo tentativo sta richiedendo più tempo del previsto"
 msgid "The right model, every time."
 msgstr "Il modello giusto, ogni volta."
 
-#: src/features/projects/components/project-rule-files.tsx:599
+#: src/features/projects/components/project-rule-files.tsx:758
 msgid "The rule files could not be loaded."
 msgstr "Impossibile caricare i file di regole."
 
@@ -34415,7 +34469,7 @@ msgstr "Questi ricordi sono stati aggiunti al contesto dell'IA per questa rispos
 msgid "These providers will never be used for your requests."
 msgstr "Questi provider non verranno mai usati per le tue richieste."
 
-#: src/features/projects/components/project-rule-files.tsx:406
+#: src/features/projects/components/project-rule-files.tsx:461
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "Questi file di regole sono stati modificati nel frattempo. Scarta le tue modifiche per vedere quelli salvati, poi modificali di nuovo."
 
@@ -35175,7 +35229,7 @@ msgstr "Il progetto e tutte le conversazioni associate verranno eliminati defini
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:300
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:946
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:958
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "Il prompt \"{0}\" verrà eliminato definitivamente. Questa azione non può essere annullata."
 
@@ -35440,7 +35494,7 @@ msgstr "Oggi"
 msgid "Today, {label}"
 msgstr "Oggi, {label}"
 
-#: src/features/projects/components/project-rule-files.tsx:447
+#: src/features/projects/components/project-rule-files.tsx:596
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "Insieme, questi file di regole superano {limit} MB. Accorciane o rimuovine alcuni."
 
@@ -35586,7 +35640,7 @@ msgstr "Troppi tentativi. Attendi qualche secondo, poi riprova."
 msgid "too many files"
 msgstr "troppi file"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:997
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
 msgid "Too many live views were opened. Try again later."
 msgstr "Sono state aperte troppe viste dal vivo. Riprova più tardi."
 
@@ -35989,8 +36043,8 @@ msgstr "Prova a modificare i termini di ricerca."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1002
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1129
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1159
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36188,7 +36242,7 @@ msgstr "Scrivi la tua risposta…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
 #: src/features/chat/thread/composer-input.tsx:1959
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:203
 msgid "Type your message..."
 msgstr "Scrivi il tuo messaggio..."
 
@@ -38065,7 +38119,7 @@ msgstr "Vuoi continuare da qui?"
 msgid "Watch"
 msgstr "Monitora"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "Watch live"
 msgstr "Guarda dal vivo"
 
@@ -38429,9 +38483,14 @@ msgstr "Quando un nuovo fatto è in conflitto con uno vecchio, la vecchia memori
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Quando una risposta viene interrotta da un aggiornamento o da un’interruzione del servizio, continua dall’ultimo passaggio completato, fino a 3 volte. Una risposta interrotta mentre uno strumento era in esecuzione non viene mai continuata."
 
-#: src/features/projects/components/project-rule-files.tsx:270
+#: src/features/projects/components/project-rule-files.tsx:290
 msgid "When files match"
 msgstr "Quando i file corrispondono"
+
+#: src/features/projects/components/project-rule-files.tsx:294
+#: src/features/projects/components/project-rule-files.tsx:458
+msgid "When needed"
+msgstr "Quando serve"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
@@ -38444,6 +38503,10 @@ msgstr "Se impostato, verranno usati solo questi provider. Lascia vuoto per cons
 #: src/features/skills/components/skill-form-dialog.tsx:261
 msgid "When should the assistant use this skill?"
 msgstr "Quando dovrebbe usare questa skill l'assistente?"
+
+#: src/features/projects/components/project-rule-files.tsx:301
+msgid "When to read it"
+msgstr "Quando leggerlo"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
@@ -38469,7 +38532,7 @@ msgstr "Dove i pensieri<0/><1>diventano azioni.</1>"
 msgid "Where you stay in control"
 msgstr "Dove resti tu al comando"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1116
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Impossibile verificare se l'agente sta usando un browser."
 
@@ -38936,7 +38999,8 @@ msgstr "Hai scelto queste integrazioni nel builder dell'agente. Ognuna si apre p
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "Ricevi una notifica quando un’esecuzione termina, richiede la tua revisione o fallisce. Un’esecuzione terminata rimanda alla sua chat, e una che richiede revisione rimanda alla bacheca delle attività."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:804
+#: src/features/chat/browser-live-view/browser-live-view.tsx:505
+#: src/features/chat/browser-live-view/browser-live-view.tsx:834
 msgid "You handed the browser back to the agent."
 msgstr "Hai restituito il browser all'agente."
 
@@ -38994,7 +39058,7 @@ msgstr "Hai esaurito i messaggi di oggi. Riprova più tardi."
 msgid "You have used today's translations. Try again later."
 msgstr "Hai esaurito le traduzioni di oggi. Riprova più tardi."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:328
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
 msgid "You may not take control of this browser."
 msgstr "Non puoi prendere il controllo di questo browser."
 
@@ -39002,9 +39066,9 @@ msgstr "Non puoi prendere il controllo di questo browser."
 msgid "You need to sign in to access this page."
 msgstr "Devi accedere per visualizzare questa pagina."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:495
-#: src/features/chat/browser-live-view/browser-live-view.tsx:804
-#: src/features/chat/browser-live-view/browser-live-view.tsx:852
+#: src/features/chat/browser-live-view/browser-live-view.tsx:510
+#: src/features/chat/browser-live-view/browser-live-view.tsx:834
+#: src/features/chat/browser-live-view/browser-live-view.tsx:882
 msgid "You no longer have control of the browser."
 msgstr "Non hai più il controllo del browser."
 
@@ -39057,7 +39121,7 @@ msgid "You've been invited to join an organization"
 msgstr "Sei stato invitato a unirti a un'organizzazione"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:573
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:585
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "Hai raggiunto il limite di 3 prompt dell'account gratuito. Passa a Pro per crearne altri."
 
@@ -39159,7 +39223,7 @@ msgstr "Le tue chat e {0}"
 msgid "Your chats and the bots you chose"
 msgstr "Le tue chat e i bot che hai scelto"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1047
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "I tuoi clic, la digitazione e lo scorrimento nella vista arrivano al browser. L'agente aspetta finché non lo restituisci."
 

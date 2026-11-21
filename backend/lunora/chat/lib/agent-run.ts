@@ -41,6 +41,7 @@ import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
+import { systemContextKinds } from "./system-context-kinds";
 import { injectsUntrustedContext } from "./low-risk-approval";
 import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
@@ -77,6 +78,7 @@ import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
 import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
+import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -472,6 +474,13 @@ const retrieveKnowledgeContext = async (
 };
 
 /**
+ * Characters of the longest context a run of `context` may append: which of its two kinds it sends is known only once its
+ * tools are built (`instruction_read` may be removed), so an Auto route, chosen before, is sized for the longer.
+ */
+export const longestContextCharacters = (context: { contextParts: string[]; contextPartsWithoutInstructions: string[] }): number =>
+    Math.max(context.contextParts.join("\n\n").length, context.contextPartsWithoutInstructions.join("\n\n").length);
+
+/**
  * The per-user context an interactive run reads before it starts: preferences
  * and personalization, the thread's settings, the user's provider keys, and the
  * extra system-prompt context — relevant memories, knowledge-base excerpts,
@@ -541,33 +550,30 @@ export const loadRunContext = async (
     ]);
 
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;
-    const contextParts: string[] = [];
+    const partsWith = (projectText: string | null | undefined): string[] =>
+        [
+            memoryContext?.context,
+            knowledgeContext?.context,
+            projectText ? `PROJECT CONTEXT:\n${projectText}` : undefined,
+            bot ? `BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}` : undefined,
+            customSystemPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}` : undefined,
+        ].filter((part): part is string => !!part);
+    const contextParts = partsWith(project?.text);
 
-    if (memoryContext?.context) {
-        contextParts.push(memoryContext.context);
-    }
-
-    if (knowledgeContext?.context) {
-        contextParts.push(knowledgeContext.context);
-    }
-
-    if (project) {
-        contextParts.push(`PROJECT CONTEXT:\n${project}`);
-    }
-
-    if (bot) {
-        contextParts.push(`BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}`);
-    }
-
-    if (customSystemPrompt) {
-        contextParts.push(`ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}`);
-    }
+    const personalization = toPersonalization(prefs);
+    // The thread's stored instructions win over the request's (`customSystemPrompt` above).
+    const systemPromptSource = threadSettings?.customSystemPrompt === undefined ? "request" : "thread";
 
     return {
         /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
         botId: bot?.botId,
-        /** Appended to the agent's instructions, in this order. */
+        /** Appended to the agent's instructions, in this order, by a run that lists the project's `auto` files. */
         contextParts,
+        /**
+         * The same parts for a run that lists none of them (`projectInstructions` unused): its project text is chosen without the
+         * list's cost (`projectRunContext`), so the list never takes room from files that run is given.
+         */
+        contextPartsWithoutInstructions: project?.textWithoutInstructions === undefined ? contextParts : partsWith(project.textWithoutInstructions),
         /** The passages behind the `[n]` citations; `afterRun` records them on the reply. */
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
@@ -576,19 +582,35 @@ export const loadRunContext = async (
             backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
-            personalization: toPersonalization(prefs),
+            personalization,
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
+        /**
+         * The project's `auto` rule files, from the same read: a run whose tools keep `instruction_read` over them
+         * (`buildAgentTools`) lists them after `contextParts` (`renderInstructionList`); one that does not leaves them out.
+         */
+        projectInstructions: project?.instructions ?? [],
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
+        /** One kind per piece of the system prompt above, for the saved-login verdict (`system-context-kinds.ts`). */
+        systemContext: systemContextKinds({
+            bot,
+            knowledge: Boolean(knowledgeContext?.context),
+            memories: Boolean(memoryContext?.context),
+            personalization: personalization !== undefined || Boolean(prefs.location) || Boolean(prefs.language),
+            personalizationByImpersonator: prefs.personalizationByImpersonator,
+            project: Boolean(project),
+            systemPrompt: customSystemPrompt ? systemPromptSource : undefined,
+            threadLanguage: Boolean(args.threadLanguage),
+        }),
         threadSettings,
         /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
         untrustedContext: injectsUntrustedContext({
             knowledge: knowledgeContext?.context,
             memory: memoryContext?.context,
-            project: project ?? undefined,
+            project: [project?.text, renderInstructionList(project?.instructions ?? [])].filter(Boolean).join("\n\n") || undefined,
             threadPrompt: threadSettings?.customSystemPrompt,
         }),
         userProviderKeys,
@@ -596,6 +618,20 @@ export const loadRunContext = async (
 };
 
 export type RunContext = Awaited<ReturnType<typeof loadRunContext>>;
+
+/**
+ * The `auto` rule files of `projectId`, the project a paused run listed them from, for `userId` (`getProjectContextForRun`,
+ * with its access check): none when the run recorded no project, or the user can no longer reach it.
+ */
+const readProjectInstructions = async (ctx: ActionCtx, projectId: string | undefined, userId: string): Promise<RunInstruction[]> => {
+    if (!projectId) {
+        return [];
+    }
+
+    const project = await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: projectId as Id<"projects">, userId });
+
+    return project?.instructions ?? [];
+};
 
 /** A saved tool result, cut down for memory extraction. */
 const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summary: string; toolName: string }[] => {
@@ -1346,6 +1382,15 @@ export const resumeApprovedRun = async (
           })
         : null;
 
+    // A paused run that offered `instruction_read` offers it again, over the `auto` files of the project it listed them from
+    // (`config.projectId`), read anew: never the project the thread was moved to meanwhile. A file removed since, or a
+    // project no longer reachable, is answered as not found, never an unknown tool. Built with the other tools, so the
+    // permissions that apply now still remove it.
+    const resumeInstructions = config.toolNames.includes(INSTRUCTION_READ_TOOL) ? readProjectInstructions(ctx, config.projectId, userId) : undefined;
+
+    // A run whose tools are all removed never awaits it; a failed read still fails a run that does.
+    resumeInstructions?.catch(() => undefined);
+
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
@@ -1353,6 +1398,7 @@ export const resumeApprovedRun = async (
             botLookup,
             // A person just answered in the chat; a sub-agent child is still rebuilt headless below.
             deviceThreadId: threadId,
+            ...(resumeInstructions && { instructions: resumeInstructions }),
             ...(subAgentChild && {
                 headless: true,
                 headlessCanAsk: true,

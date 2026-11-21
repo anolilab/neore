@@ -3,7 +3,7 @@
 ## INVARIANTS
 
 - **Rule files** (`projectRuleFiles` table, `rule-files.ts`, `rule-file-rows.ts`) — the owner's instructions for a
-  project's runs, at most `MAX_RULE_FILES`, each `always` or `glob`. One `.global()` row per project holds the whole
+  project's runs, at most `MAX_RULE_FILES`, each `always`, `glob` or `auto`. One `.global()` row per project holds the whole
   list, OFF the `projects` row: a metered `.global()` read is charged the whole row whatever it `select`s, so on the
   project row every list, pin, read and export would pay for up to 1 MB. Only the editor (`listProjectRuleFiles`), a
   run's setup (`getProjectContextForRun`, `tasks/internal.ts#runProjectFor`), a save and the export read it, always
@@ -42,6 +42,24 @@
   `MAX_RULE_TEXT_PER_RUN`, separators and the cut marker counted, is cut (marked) and later files left out, except a
   legacy `context`, which is never cut, as before, and not counted, so files kept beside it still reach runs. Only
   counts are logged, never file text.
+- An `auto` file has a one-line `description` (`MAX_RULE_DESCRIPTION_LENGTH`). `selectRuleFiles` returns them apart
+  (`instructions`), each costing its line of `renderInstructionList` (the header with the first) against
+  `MAX_RULE_TEXT_PER_RUN`, never its text; an empty one is not listed. Their text travels with the run's one read
+  (`getProjectContextForRun`, `runProjectFor`), and the model reads one with `instruction_read`
+  (`chat/tools/instruction-read.ts`), built per run over those files: no database read, never another project's. It is
+  a built-in candidate of `buildAgentTools` (`instructions`), so the cap, a skill, the permissions and an allowlist
+  remove it like any tool; a bot's `allow` list keeps it, only an `exclude` naming it or an empty `allow` removes it; only a run whose tools still hold it lists them: a chat run with
+  tools, its approval continuation (read anew from the project its snapshot recorded, `config.projectId`, never the
+  thread's project by then), and a task run (`projectInstructions` on `runHeadlessAgent`). Edit (`streamAsync`) and group
+  runs take the text only. A run that lists none takes `textWithoutInstructions` when present, the text chosen
+  without the list's cost (`selectRuleFiles(…, false)`); a line that does not fit is skipped, never ends the selection,
+  so one that lists none is that text already. Triggers have no project. Names may repeat, and may be another file's id: a name or bare id
+  that fits more than one file is answered with their ids, never a guess; `id:<id>` names one file or none, never a
+  name, and a save refuses a name opening it (`isRuleTitleReserved`) unless the file has it saved already: one saved
+  before the check keeps it, the rest of the list still saves, and it is read by its id only (listed as
+  `id:<its id>`, `listedName`).
+- Never a `defineMigration` on `projectRuleFiles`: a shard's data migration has no `.global()` store (`adminWriter` in
+  `_generated/shard.ts`), so it fails there. Keep a new field optional, so every stored row still fits.
 - Glob matching is `matchesGlob`, never a `RegExp` built from a pattern: one constant-cost step per (pattern, path)
   position, spent from a per-run budget (`GLOB_MATCH_STEPS_PER_RUN`); past it nothing more matches.
 - Size: `normalizeRuleFiles` caps the list at `MAX_RULE_FILES_BYTES` of stored JSON, which keeps the rule-file row

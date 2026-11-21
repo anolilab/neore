@@ -9,6 +9,7 @@ import {
     getAllCommonVariables,
     hasVariables,
     highlightVariables,
+    impersonatedValueNames,
     isSystemManagedVariable,
     organizationValueNames,
     parseVariableMatch,
@@ -286,6 +287,17 @@ describe("getAllCommonVariables", () => {
 
     it("should translate the descriptions", () => {
         expect(getAllCommonVariables(i18n)).toContainEqual({ description: "«User's display name»", name: "user.name" });
+    });
+});
+
+describe("values an admin wrote while acting as the person", () => {
+    it("names them, whoever's row they came from, and nothing else", () => {
+        const names = impersonatedValueNames({ brand: "organization", site: "impersonated", tone: "user" });
+
+        expect(names).toStrictEqual(new Set(["site"]));
+        expect(fillsAnyOf("Sign in to {{site}}", { site: "bank" }, names)).toBe(true);
+        expect(fillsAnyOf("Sign in to {{site}}", { site: "bank" }, names, { site: "mine" })).toBe(false);
+        expect(impersonatedValueNames(undefined)).toStrictEqual(new Set());
     });
 });
 

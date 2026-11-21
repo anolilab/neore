@@ -25,11 +25,11 @@ msgstr " · 模型：{modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}，{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- INSERT --"
 msgstr "-- 插入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
 msgid "-- NORMAL --"
 msgstr "-- 普通 --"
 
@@ -89,11 +89,11 @@ msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
-#: src/features/projects/components/project-rule-files.tsx:436
+#: src/features/projects/components/project-rule-files.tsx:584
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "“{name}”的文件模式超过 {limit} 个。请删除一些，或移到另一个文件中。"
 
-#: src/features/projects/components/project-rule-files.tsx:425
+#: src/features/projects/components/project-rule-files.tsx:567
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "“{name}”超过 {limit} 个字符。请缩短，或拆分为多个文件。"
 
@@ -348,6 +348,11 @@ msgstr "{0, plural, other {# 项必需或未知检查失败}}"
 #: src/features/develop/components/checks-tab.tsx:104
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 项必需或未知检查仍在运行}}"
+
+#. placeholder {0}: added.length
+#: src/features/projects/components/project-rule-files.tsx:534
+msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
+msgstr "{0, plural, other {已导入 # 个规则文件。}} 请检查后保存。"
 
 #. placeholder {0}: executions.length
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:217
@@ -1428,6 +1433,10 @@ msgstr "{server} · 截至 {until}"
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, other {有 # 个文件无法导入，已被跳过}}"
 
+#: src/features/projects/components/project-rule-files.tsx:537
+msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
+msgstr "{skipped, plural, other {有 # 个文件未导入。}} 一个项目最多包含 {limit} 个规则文件。"
+
 #: src/features/workflow/hooks/use-workflow-transfer.ts:55
 msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
 msgstr "{skipped, plural, other {有 # 个文件无法包含在导出中}}"
@@ -1486,6 +1495,10 @@ msgstr "{toolId} API 密钥已移除"
 msgid "{toolId} API key saved"
 msgstr "{toolId} API 密钥已保存"
 
+#: src/features/projects/components/project-rule-files.tsx:535
+msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
+msgstr "{toSet, plural, other {# 个文件未说明何时适用}}：请设置描述或选择其他模式。"
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:30
 msgid "{total, plural, one {Used # tool · {tail}} other {Used # tools · {tail}}}"
 msgstr "{total, plural, other {已使用 # 个工具 · {tail}}}"
@@ -1515,7 +1528,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "OpenRouter token 用量排名第一"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:894
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:906
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {# 个收藏}}"
 
@@ -1865,13 +1878,17 @@ msgstr "与你一起思考的文档编辑器。"
 msgid "A few questions first"
 msgstr "先回答几个问题"
 
-#: src/features/projects/components/project-rule-files.tsx:432
+#: src/features/projects/components/project-rule-files.tsx:580
 msgid "A file applied when files match needs at least one pattern."
 msgstr "“文件匹配时”应用的规则文件至少需要一个模式。"
 
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
 msgstr "仅所有者可读取的文件（无可用的钥匙串）"
+
+#: src/features/projects/components/project-rule-files.tsx:574
+msgid "A file read when needed needs a line saying when to read it."
+msgstr "按需读取的文件需要一行说明何时读取它。"
 
 #: src/features/skills/components/skill-import-dialog.tsx:202
 msgid "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not."
@@ -1986,7 +2003,7 @@ msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在�
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "一个项目最多可列出 {MAX_REPOSITORIES} 个仓库。"
 
-#: src/features/projects/components/project-rule-files.tsx:452
+#: src/features/projects/components/project-rule-files.tsx:601
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "一个项目最多包含 {limit} 个规则文件。请先删除一个。"
 
@@ -2024,9 +2041,13 @@ msgstr "使用了记忆的回复会显示“已使用的记忆”列表，方便
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "经路由或被提及的一轮最多有三位发言者。并行一轮最多有四个回答和一份综合结果，辩论最多进行三轮。"
 
-#: src/features/projects/components/project-rule-files.tsx:442
+#: src/features/projects/components/project-rule-files.tsx:591
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "规则文件的名称最多 {limit} 个字符。"
+
+#: src/features/projects/components/project-rule-files.tsx:587
+msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
+msgstr "规则文件的名称不能以“id:”开头。请重命名“{name}”。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:25
 msgid "A run never writes into a chat that is locked or shared by link. It starts a new chat instead, and the task says why."
@@ -2550,7 +2571,7 @@ msgstr "添加项目"
 msgid "Add project on {0}"
 msgstr "在 {0} 上添加项目"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:513
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:525
 msgid "Add prompt"
 msgstr "添加提示词"
 
@@ -2588,7 +2609,7 @@ msgstr "添加参考图以保持一致性"
 msgid "Add row"
 msgstr "添加行"
 
-#: src/features/projects/components/project-rule-files.tsx:652
+#: src/features/projects/components/project-rule-files.tsx:814
 msgid "Add rule file"
 msgstr "添加规则文件"
 
@@ -2644,7 +2665,7 @@ msgstr "添加到收藏"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:862
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 msgid "Add to Favorites"
 msgstr "添加到收藏"
 
@@ -3397,7 +3418,7 @@ msgid "All Organization"
 msgstr "整个组织"
 
 #: src/features/prompts/components/prompt-list.tsx:463
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:767
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:779
 msgid "All Prompts"
 msgstr "所有提示词"
 
@@ -3533,8 +3554,8 @@ msgstr "已关联到此对话。"
 msgid "Also viewing"
 msgstr "同时在看"
 
-#: src/features/projects/components/project-rule-files.tsx:266
-#: src/features/projects/components/project-rule-files.tsx:608
+#: src/features/projects/components/project-rule-files.tsx:286
+#: src/features/projects/components/project-rule-files.tsx:455
 msgid "Always"
 msgstr "始终"
 
@@ -3594,6 +3615,10 @@ msgstr "智能体（技能）"
 #: src/features/tasks/components/task-form-dialog.tsx:207
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "智能体会自主处理任务，然后由验证器根据你的成功标准检查结果。"
+
+#: src/features/projects/components/project-rule-files.tsx:820
+msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
+msgstr "AGENTS.md、CLAUDE.md 或 GEMINI.md 文件，或其他 Markdown 文件"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:13
 msgid "An approval card asks to allow a tool. A pointer clicks Approve, the status changes to running, and the result appears."
@@ -3941,7 +3966,7 @@ msgstr "公众号“基本配置”中的 AppID"
 msgid "Application Error"
 msgstr "应用错误"
 
-#: src/features/projects/components/project-rule-files.tsx:262
+#: src/features/projects/components/project-rule-files.tsx:282
 msgid "Applies"
 msgstr "应用方式"
 
@@ -5381,8 +5406,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:914
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1114
+#: src/features/chat/browser-live-view/browser-live-view.tsx:944
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
 msgid "Browser"
 msgstr "浏览器"
 
@@ -5867,7 +5892,7 @@ msgstr "候选事实会按类型保存：身份、偏好、情境、活动或经
 msgid "Cannot be exported: {0}"
 msgstr "无法导出：{0}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:185
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:197
 #: src/features/prompts/hooks/use-prompt-loader.tsx:65
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "无法使用提示词：{errorMessages}"
@@ -6229,6 +6254,10 @@ msgstr "聊天"
 #: src/features/knowledge/components/project-knowledge-collections.tsx:49
 msgid "Chats in this project search these collections and cite them."
 msgstr "此项目中的聊天会搜索并引用这些集合。"
+
+#: src/features/projects/components/project-rule-files.tsx:317
+msgid "Chats see the name and this line, and read the file when it applies."
+msgstr "聊天会看到名称和这一行，并在适用时读取该文件。"
 
 #: src/features/settings/components/chat/custom-providers-settings.tsx:654
 #: src/features/settings/components/chat/native-providers-settings.tsx:725
@@ -6630,7 +6659,7 @@ msgstr "清除模型"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:551
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:563
 #: src/features/vault/components/empty-states.tsx:21
 msgid "Clear search"
 msgstr "清除搜索"
@@ -8101,11 +8130,11 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:461
+#: src/features/chat/browser-live-view/browser-live-view.tsx:471
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "浏览器的控制权已交还给智能体：服务器未能及时确认你仍拥有控制权。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:462
+#: src/features/chat/browser-live-view/browser-live-view.tsx:472
 msgid "Control of the browser is back with the agent."
 msgstr "浏览器的控制权已交还给智能体。"
 
@@ -8237,7 +8266,7 @@ msgstr "已复制最后一个代码块"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:150
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:162
 msgid "Copied to clipboard"
 msgstr "已复制到剪贴板"
 
@@ -8262,8 +8291,8 @@ msgid "Copy"
 msgstr "复制"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:675
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:814
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:687
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:826
 msgid "Copy {0} to clipboard"
 msgstr "复制 {0} 到剪贴板"
 
@@ -8376,8 +8405,8 @@ msgstr "请立即复制此密钥并保存到你的 Webhook 发送方。之后将
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:691
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:830
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:703
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:842
 msgid "Copy to clipboard"
 msgstr "复制到剪贴板"
 
@@ -9014,7 +9043,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "覆盖大多数日常视频使用场景"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:597
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:609
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "创建"
@@ -10072,8 +10101,8 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/pages/components/pages-sidebar.tsx:281
 #: src/features/prompts/components/prompt-item.tsx:228
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:747
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:886
 #: src/features/settings/components/chat/bots-settings.tsx:508
 #: src/features/settings/components/chat/bots-settings.tsx:562
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
@@ -10129,7 +10158,7 @@ msgstr "删除 {fileName}"
 msgid "Delete {itemName}"
 msgstr "删除 {itemName}"
 
-#: src/features/projects/components/project-rule-files.tsx:257
+#: src/features/projects/components/project-rule-files.tsx:277
 msgid "Delete {name}"
 msgstr "删除 {name}"
 
@@ -10256,7 +10285,7 @@ msgstr "删除项目"
 
 #: src/features/prompts/components/prompt-item.tsx:308
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:956
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:968
 msgid "Delete Prompt"
 msgstr "删除提示词"
 
@@ -10852,7 +10881,7 @@ msgid "Discard"
 msgstr "放弃"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:684
+#: src/features/projects/components/project-rule-files.tsx:893
 msgid "Discard changes"
 msgstr "放弃更改"
 
@@ -11481,7 +11510,7 @@ msgstr "每个连接都有自己的 Webhook 地址，应用会将新消息发送
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "每个 Discord 频道会在 Neore Chat 中创建一个单独的对话。AI 会在频道中自动回复。"
 
-#: src/features/projects/components/project-rule-files.tsx:430
+#: src/features/projects/components/project-rule-files.tsx:578
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "“{name}”中的每个文件模式必须在一行内，且最多 {limit} 个字符。"
 
@@ -11571,8 +11600,8 @@ msgstr "边缘引导生成"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:714
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:853
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:726
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:865
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -13359,7 +13388,7 @@ msgstr "连接失败"
 msgid "Failed to connect {name}"
 msgstr "连接 {name} 失败"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:153
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:165
 msgid "Failed to copy"
 msgstr "复制失败"
 
@@ -13457,7 +13486,7 @@ msgid "Failed to delete project"
 msgstr "删除项目失败"
 
 #: src/features/prompts/components/prompt-list.tsx:243
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:320
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
 msgid "Failed to delete prompt"
 msgstr "删除提示词失败"
 
@@ -13802,7 +13831,7 @@ msgid "Failed to save preset"
 msgstr "保存预设失败"
 
 #: src/features/prompts/components/prompt-list.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:480
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:492
 msgid "Failed to save prompt"
 msgstr "保存提示词失败"
 
@@ -13935,7 +13964,7 @@ msgstr "更新端点失败"
 msgid "Failed to update favorite"
 msgstr "更新收藏失败"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:344
 msgid "Failed to update favorite status"
 msgstr "更新收藏状态失败"
 
@@ -14399,7 +14428,7 @@ msgstr "收藏的页面"
 
 #: src/features/pages/components/pages-sidebar.tsx:194
 #: src/features/prompts/components/prompt-list.tsx:439
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:628
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:640
 msgid "Favorites"
 msgstr "收藏"
 
@@ -14512,7 +14541,7 @@ msgstr "归档到其他项目"
 msgid "File input"
 msgstr "文件输入"
 
-#: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/projects/components/project-rule-files.tsx:323
 msgid "File patterns, one per line"
 msgstr "文件模式（每行一个）"
 
@@ -14929,6 +14958,10 @@ msgstr "例如：“专注于 Python 最佳实践”“保持专业语气”或�
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "例如：“标题不超过四个词”“用德语写标题”或“以动词开头”。"
 
+#: src/features/projects/components/project-rule-files.tsx:313
+msgid "For example: how we write database migrations"
+msgstr "例如：我们如何编写数据库迁移"
+
 #: src/features/develop/components/guide-tab.tsx:161
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "例如：重点检查错误处理，跳过生成的文件。"
@@ -15064,9 +15097,9 @@ msgstr "免费"
 
 #: src/features/prompts/components/prompt-list.tsx:159
 #: src/features/prompts/components/prompt-list.tsx:225
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:478
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:523
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:586
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:490
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:535
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:598
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "免费账号最多只能有 3 个提示词。升级到 Pro 可无限创建提示词。"
 
@@ -15076,7 +15109,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "免费账号最多只能有 5 个技能。升级到 Pro 可无限创建技能。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:572
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:584
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "免费账号最多可创建 3 个提示词。升级到 Pro 可无限创建提示词。"
 
@@ -15749,7 +15782,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab 密钥令牌（X-Gitlab-Token）"
 
-#: src/features/projects/components/project-rule-files.tsx:438
+#: src/features/projects/components/project-rule-files.tsx:586
 msgid "Give every rule file a name."
 msgstr "请为每个规则文件命名。"
 
@@ -15761,7 +15794,7 @@ msgstr "授予他人访问此页面的权限，或发布一个只读链接。"
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
 msgid "Go"
 msgstr "前往"
 
@@ -15833,7 +15866,7 @@ msgstr "上一页"
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:352
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:353
 msgid "Go to reply"
 msgstr "转到回复"
 
@@ -16340,7 +16373,7 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:937
+#: src/features/chat/browser-live-view/browser-live-view.tsx:967
 msgid "Hand back"
 msgstr "交还"
 
@@ -16499,7 +16532,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "Hide live view"
 msgstr "隐藏实时画面"
 
@@ -17264,6 +17297,10 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
+#: src/features/projects/components/project-rule-files.tsx:825
+msgid "Import files"
+msgstr "导入文件"
+
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
 msgstr "继续导入"
@@ -17275,6 +17312,10 @@ msgstr "导入 Notion 导出文件（.zip）"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
+
+#: src/features/projects/components/project-rule-files.tsx:835
+msgid "Import rule folder"
+msgstr "导入规则文件夹"
 
 #: src/features/skills/components/skill-import-dialog.tsx:158
 msgid "Import skill"
@@ -17705,7 +17746,7 @@ msgstr "指令型"
 msgid "instructions"
 msgstr "指令"
 
-#: src/features/projects/components/project-rule-files.tsx:295
+#: src/features/projects/components/project-rule-files.tsx:341
 #: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17718,9 +17759,9 @@ msgstr "指令"
 msgid "Instructions"
 msgstr "指令"
 
-#: src/features/projects/components/project-rule-files.tsx:594
-msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
-msgstr "添加到此项目聊天中的指令：始终添加，或仅在聊天的附件匹配 **/*.sql 等模式时添加。"
+#: src/features/projects/components/project-rule-files.tsx:753
+msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
+msgstr "添加到此项目聊天中的说明：始终应用、仅当聊天附件匹配 **/*.sql 等模式时应用，或由聊天在需要时读取。"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -18198,7 +18239,7 @@ msgstr "哈萨克斯坦"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "继续接受旧密钥 24 小时"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:970
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1000
 msgid "Keep control"
 msgstr "保持控制"
 
@@ -19165,11 +19206,11 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Live view of the agent's browser (read-only)"
 msgstr "智能体浏览器的实时画面（只读）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Live view of the agent's browser (you have control)"
 msgstr "智能体浏览器的实时画面（由你控制）"
 
@@ -20466,8 +20507,8 @@ msgstr "已在 {hostLabel} 上合并。"
 msgid "Merging…"
 msgstr "正在合并…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:302
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:622
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:303
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:624
 msgid "Message"
 msgstr "消息"
 
@@ -21093,8 +21134,8 @@ msgstr "更多操作"
 
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/prompt-list-view.tsx:192
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:697
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:836
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:709
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:848
 msgid "More actions for {0}"
 msgstr "{0} 的更多操作"
 
@@ -21207,11 +21248,11 @@ msgstr "将{label}在星标中下移"
 msgid "Move {label} up in starred"
 msgstr "将{label}在星标中上移"
 
-#: src/features/projects/components/project-rule-files.tsx:254
+#: src/features/projects/components/project-rule-files.tsx:274
 msgid "Move {name} down"
 msgstr "下移 {name}"
 
-#: src/features/projects/components/project-rule-files.tsx:251
+#: src/features/projects/components/project-rule-files.tsx:271
 msgid "Move {name} up"
 msgstr "上移 {name}"
 
@@ -21438,7 +21479,7 @@ msgstr "名称"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:228
+#: src/features/projects/components/project-rule-files.tsx:256
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -22058,7 +22099,7 @@ msgid "Next output mode"
 msgstr "下一个输出模式"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:909
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:921
 msgid "Next page"
 msgstr "下一页"
 
@@ -22403,7 +22444,7 @@ msgstr "还没有图片"
 msgid "No indexed files available. Files are still being processed."
 msgstr "没有已索引的文件。文件仍在处理中。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:997
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
@@ -22426,6 +22467,10 @@ msgstr "未找到语言"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:62
 msgid "No lens selected"
 msgstr "未选择镜头"
+
+#: src/features/projects/components/project-rule-files.tsx:532
+msgid "No Markdown files were found to import."
+msgstr "未找到可导入的 Markdown 文件。"
 
 #: src/features/chat/thread/find/thread-find-bar.tsx:186
 msgid "No matches"
@@ -22581,7 +22626,7 @@ msgstr "没有可用的项目。请先创建一个项目。"
 msgid "No prompt"
 msgstr "无提示词"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "未找到与“{searchQuery}”匹配的提示词"
 
@@ -22590,8 +22635,8 @@ msgid "No prompts found matching your search."
 msgstr "未找到与搜索匹配的提示词。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:567
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:579
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:615
 msgid "No prompts yet"
 msgstr "还没有提示词"
 
@@ -24188,11 +24233,11 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:978
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
 msgid "Opening the live view…"
 msgstr "正在打开实时画面…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1033
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
 msgid "Opening the page. This can take up to a minute."
 msgstr "正在打开页面，最多可能需要一分钟。"
 
@@ -24630,7 +24675,7 @@ msgstr "第 {currentPage} 页，共 {totalPages} 页"
 msgid "Page added. It is being fetched and indexed."
 msgstr "已添加网页，正在获取并建立索引。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1012
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "页面地址"
@@ -25434,10 +25479,10 @@ msgid "Please log in to configure variables"
 msgstr "请登录以配置变量"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:568
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:529
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:580
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:604
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:592
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:616
 msgid "Please log in to create prompts"
 msgstr "请登录以创建提示词"
 
@@ -25928,7 +25973,7 @@ msgid "Previous output mode"
 msgstr "上一个输出模式"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:900
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:912
 msgid "Previous page"
 msgstr "上一页"
 
@@ -26231,7 +26276,7 @@ msgstr "项目"
 msgid "Project actions"
 msgstr "项目操作"
 
-#: src/features/projects/components/project-rule-files.tsx:358
+#: src/features/projects/components/project-rule-files.tsx:404
 msgid "Project context"
 msgstr "项目上下文"
 
@@ -26288,12 +26333,12 @@ msgstr "提示词"
 msgid "Prompt"
 msgstr "提示词"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:236
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:254
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:248
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:266
 msgid "Prompt added to input"
 msgstr "已将提示词添加到输入框"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:275
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:287
 msgid "Prompt added with placeholders"
 msgstr "已添加带占位符的提示词"
 
@@ -26314,7 +26359,7 @@ msgstr "提示词已复制"
 msgid "Prompt copied to clipboard"
 msgstr "提示词已复制到剪贴板"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:470
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:482
 msgid "Prompt created"
 msgstr "提示词已创建"
 
@@ -26323,7 +26368,7 @@ msgid "Prompt created successfully"
 msgstr "提示词已创建"
 
 #: src/features/prompts/components/prompt-list.tsx:240
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:316
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:328
 msgid "Prompt deleted"
 msgstr "提示词已删除"
 
@@ -26371,7 +26416,7 @@ msgstr "要在所有模型上运行的提示词..."
 msgid "Prompt Tokens"
 msgstr "提示词 token"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:457
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:469
 msgid "Prompt updated"
 msgstr "提示词已更新"
 
@@ -26391,7 +26436,7 @@ msgstr "提示词变量"
 #: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:505
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
 msgid "Prompts"
 msgstr "提示词"
 
@@ -27680,7 +27725,7 @@ msgstr "从收藏中移除"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:723
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
 msgid "Remove from Favorites"
 msgstr "从收藏中移除"
 
@@ -28190,8 +28235,8 @@ msgstr "重启 Ollama（{0}）"
 msgid "Restore this version"
 msgstr "恢复此版本"
 
-#: src/features/chat/thread/restore-to-input-action.tsx:43
-#: src/features/chat/thread/restore-to-input-action.tsx:43
+#: src/features/chat/thread/restore-to-input-action.tsx:50
+#: src/features/chat/thread/restore-to-input-action.tsx:50
 msgid "Restore to input"
 msgstr "恢复到输入框"
 
@@ -28654,15 +28699,15 @@ msgid "Rubric"
 msgstr "评分标准"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:198
+#: src/features/projects/components/project-rule-files.tsx:217
 msgid "Rule file {0}"
 msgstr "规则文件 {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:592
+#: src/features/projects/components/project-rule-files.tsx:751
 msgid "Rule files"
 msgstr "规则文件"
 
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:733
 msgid "Rule files saved."
 msgstr "规则文件已保存。"
 
@@ -28995,7 +29040,7 @@ msgstr "保存图像"
 msgid "Save login"
 msgstr "保存登录信息"
 
-#: src/features/projects/components/project-rule-files.tsx:694
+#: src/features/projects/components/project-rule-files.tsx:907
 msgid "Save or discard your rule file changes first."
 msgstr "请先保存或放弃你对规则文件的更改。"
 
@@ -29007,7 +29052,7 @@ msgstr "保存预设"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "保存可复用的系统提示词，并将其绑定到特定模型。使用“优化”按钮，通过提示词优化器改进每个预设。"
 
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:873
 msgid "Save rule files"
 msgstr "保存规则文件"
 
@@ -29085,7 +29130,7 @@ msgstr "正在保存工具…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:667
+#: src/features/projects/components/project-rule-files.tsx:873
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29352,12 +29397,12 @@ msgstr "搜索或创建变量..."
 msgid "Search pages"
 msgstr "搜索页面"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:543
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:555
 msgid "Search prompts"
 msgstr "搜索提示词"
 
 #: src/features/prompts/components/prompt-list.tsx:511
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:558
 msgid "Search prompts..."
 msgstr "搜索提示词..."
 
@@ -30480,7 +30525,7 @@ msgstr "显示 {0} 个用户，还有更多用户。"
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:891
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:903
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "显示第 {0}-{1} 个提示词，共 {2} 个"
 
@@ -31100,8 +31145,8 @@ msgstr "此次运行中的部分图像无法保存。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:918
-#: src/features/chat/browser-live-view/browser-live-view.tsx:990
+#: src/features/chat/browser-live-view/browser-live-view.tsx:948
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "Someone else has control of this browser."
 msgstr "其他人正在控制此浏览器。"
 
@@ -32441,7 +32486,7 @@ msgstr "推荐"
 msgid "Suggested answers"
 msgstr "建议的答案"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:641
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
@@ -32781,7 +32826,7 @@ msgstr "台湾"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "输入一张图像，移除背景，然后应用风格迁移"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:955
+#: src/features/chat/browser-live-view/browser-live-view.tsx:985
 msgid "Take control"
 msgstr "接管控制"
 
@@ -32789,7 +32834,7 @@ msgstr "接管控制"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:328
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
@@ -33418,11 +33463,12 @@ msgid "That message was already sent."
 msgstr "该消息已发送。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:856
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
 msgid "That page could not be opened: {0}"
 msgstr "无法打开该页面：{0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:876
+#: src/features/chat/browser-live-view/browser-live-view.tsx:620
+#: src/features/chat/browser-live-view/browser-live-view.tsx:906
 msgid "That page could not be opened."
 msgstr "无法打开该页面。"
 
@@ -33527,7 +33573,7 @@ msgstr "智能体未提供该选项"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "智能体已结束，但未给出指南。请重新撰写。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:989
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1019
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "智能体正在完成一项浏览器操作，可能需要一分钟以上。请稍后再试。"
 
@@ -33539,7 +33585,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:915
+#: src/features/chat/browser-live-view/browser-live-view.tsx:945
 msgid "The agent is using a browser"
 msgstr "智能体正在使用浏览器"
 
@@ -33563,11 +33609,11 @@ msgstr "智能体未更改任何文件。"
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:850
+#: src/features/chat/browser-live-view/browser-live-view.tsx:880
 msgid "The agent's browser closed while the page loaded."
 msgstr "页面加载期间，智能体的浏览器已关闭。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:733
+#: src/features/chat/browser-live-view/browser-live-view.tsx:762
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
@@ -33641,7 +33687,7 @@ msgstr "已保存机器人的工具"
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:825
+#: src/features/chat/browser-live-view/browser-live-view.tsx:855
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "无法交还浏览器。两分钟内没有输入后，它会自动回到智能体手中。"
 
@@ -33762,6 +33808,10 @@ msgstr "数据集、其用例及所有运行记录都将被删除。"
 msgid "The description is cut short."
 msgstr "描述已被截断。"
 
+#: src/features/projects/components/project-rule-files.tsx:572
+msgid "The description of \"{name}\" must be at most {limit} characters on one line."
+msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
+
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "桌面应用支持 macOS、Windows 和 Linux。安装包附在 GitHub 上的桌面版发布中，发布后会在那里显示。"
@@ -33836,6 +33886,10 @@ msgstr "文件仍在附件中，会随你的消息一起发送。"
 #: src/features/evals/components/import-cases-dialog.tsx:101
 msgid "The file was not imported:"
 msgstr "文件未导入："
+
+#: src/features/projects/components/project-rule-files.tsx:554
+msgid "The files could not be read."
+msgstr "无法读取这些文件。"
 
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:322
 msgid "The filters and the signature come from the event. Only the provider's own deliveries for it run."
@@ -34006,7 +34060,7 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:998
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
 msgid "The live view could not be opened."
 msgstr "无法打开实时画面。"
 
@@ -34014,7 +34068,7 @@ msgstr "无法打开实时画面。"
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:983
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1013
 msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
@@ -34145,7 +34199,7 @@ msgstr "页面智能体无法编辑此页面"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "页面现在显示的是另一个版本。请从你的版本中复制想保留的内容。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1038
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
 msgid "The page you opened is still loading."
 msgstr "你打开的页面仍在加载。"
 
@@ -34246,7 +34300,7 @@ msgstr "重试耗时比预期更长"
 msgid "The right model, every time."
 msgstr "每次都用对模型。"
 
-#: src/features/projects/components/project-rule-files.tsx:599
+#: src/features/projects/components/project-rule-files.tsx:758
 msgid "The rule files could not be loaded."
 msgstr "无法加载规则文件。"
 
@@ -34415,7 +34469,7 @@ msgstr "这些记忆因与你的消息相关，已被加入此回复的 AI 上�
 msgid "These providers will never be used for your requests."
 msgstr "这些提供商将永远不会用于处理你的请求。"
 
-#: src/features/projects/components/project-rule-files.tsx:406
+#: src/features/projects/components/project-rule-files.tsx:461
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "这些规则文件在此期间已被更改。请放弃你的更改以查看已保存的版本，然后重新编辑。"
 
@@ -35175,7 +35229,7 @@ msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:300
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:946
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:958
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "这将永久删除提示词“{0}”。此操作无法撤销。"
 
@@ -35440,7 +35494,7 @@ msgstr "今天"
 msgid "Today, {label}"
 msgstr "今天，{label}"
 
-#: src/features/projects/components/project-rule-files.tsx:447
+#: src/features/projects/components/project-rule-files.tsx:596
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "这些规则文件合计超过 {limit} MB。请缩短或删除其中一些。"
 
@@ -35586,7 +35640,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:997
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
 msgid "Too many live views were opened. Try again later."
 msgstr "打开的实时画面过多，请稍后再试。"
 
@@ -35989,8 +36043,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1002
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1129
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1159
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36188,7 +36242,7 @@ msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
 #: src/features/chat/thread/composer-input.tsx:1959
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:203
 msgid "Type your message..."
 msgstr "输入你的消息..."
 
@@ -38065,7 +38119,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:932
+#: src/features/chat/browser-live-view/browser-live-view.tsx:962
 msgid "Watch live"
 msgstr "观看实时画面"
 
@@ -38429,9 +38483,14 @@ msgstr "当新事实与旧事实冲突时，旧记忆会被更新、取代，或
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "当回复因更新或故障而中断时，它会从上一个已完成的步骤继续，最多 3 次。在工具运行期间被中断的回复永远不会继续。"
 
-#: src/features/projects/components/project-rule-files.tsx:270
+#: src/features/projects/components/project-rule-files.tsx:290
 msgid "When files match"
 msgstr "文件匹配时"
+
+#: src/features/projects/components/project-rule-files.tsx:294
+#: src/features/projects/components/project-rule-files.tsx:458
+msgid "When needed"
+msgstr "需要时"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
@@ -38444,6 +38503,10 @@ msgstr "设置后，只会使用这些提供商。留空则允许全部。"
 #: src/features/skills/components/skill-form-dialog.tsx:261
 msgid "When should the assistant use this skill?"
 msgstr "助手应在什么时候使用此技能？"
+
+#: src/features/projects/components/project-rule-files.tsx:301
+msgid "When to read it"
+msgstr "何时读取"
 
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
@@ -38469,7 +38532,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1116
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "无法检查智能体是否正在使用浏览器。"
 
@@ -38936,7 +38999,8 @@ msgstr "这些是你在智能体构建器中选择的集成。每一个都会先
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "运行完成、需要你审阅或失败时，你会收到通知。已完成的运行会链接到其聊天，需要审阅的运行会链接到任务看板。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:804
+#: src/features/chat/browser-live-view/browser-live-view.tsx:505
+#: src/features/chat/browser-live-view/browser-live-view.tsx:834
 msgid "You handed the browser back to the agent."
 msgstr "你已将浏览器交还给智能体。"
 
@@ -38994,7 +39058,7 @@ msgstr "你今天的消息额度已用完。请稍后再试。"
 msgid "You have used today's translations. Try again later."
 msgstr "今天的翻译次数已用完。请稍后再试。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:328
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
 msgid "You may not take control of this browser."
 msgstr "你无法控制此浏览器。"
 
@@ -39002,9 +39066,9 @@ msgstr "你无法控制此浏览器。"
 msgid "You need to sign in to access this page."
 msgstr "你需要登录才能访问此页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:495
-#: src/features/chat/browser-live-view/browser-live-view.tsx:804
-#: src/features/chat/browser-live-view/browser-live-view.tsx:852
+#: src/features/chat/browser-live-view/browser-live-view.tsx:510
+#: src/features/chat/browser-live-view/browser-live-view.tsx:834
+#: src/features/chat/browser-live-view/browser-live-view.tsx:882
 msgid "You no longer have control of the browser."
 msgstr "你已不再控制此浏览器。"
 
@@ -39057,7 +39121,7 @@ msgid "You've been invited to join an organization"
 msgstr "你受邀加入一个组织"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:573
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:585
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "你已达到免费账号 3 个提示词的上限。升级到 Pro 以创建更多。"
 
@@ -39159,7 +39223,7 @@ msgstr "你的聊天和 {0}"
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1047
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "你在画面中的点击、输入和滚动都会发送到浏览器。在你交还之前，智能体会等待。"
 

@@ -28,14 +28,16 @@ import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { mcpToolOrigin } from "./mcp-tool-fingerprint";
-import { getMCPTools } from "./mcp-tools";
+import { closeMCPClients, getMCPTools } from "./mcp-tools";
 import { isSafeToRepeat } from "./repeatable-tools";
 import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
 import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
+import { instructionReadTool } from "../tools/instruction-read";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
+import { INSTRUCTION_READ_TOOL, type RunInstruction } from "../../projects/rule-files";
 import { getToolsForModelAndMode, listBuiltInTools, PULL_REQUEST_TOOLS } from "./tool-builder";
 import { readRunPermissionCap } from "./run-permission-cap";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
@@ -76,6 +78,14 @@ export interface BuildAgentToolsOptions {
     headlessApproved?: ReadonlyArray<string>;
     /** Headless only: keep `ask` tools for a run that pauses for its owner's answer (`ToolPermissionOptions.headlessCanAsk`). */
     headlessCanAsk?: boolean;
+    /**
+     * The project's `auto` rule files the run lists: offers `instruction_read` over them as one more built-in candidate, so the
+     * organization's cap, a skill's disabled tools, a bot's selection and the user's permissions remove it like any other.
+     * Omitted or empty, no such tool; a snapshot rebuild that names the tool keeps it over an empty list, so a file removed since
+     * is answered as not found. The caller lists the files only when the result still has the tool. A promise, because the
+     * files come with the run's context, which loads while the tools are built.
+     */
+    instructions?: Promise<ReadonlyArray<RunInstruction>> | ReadonlyArray<RunInstruction>;
     /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
     mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
@@ -183,6 +193,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         headless,
         headlessApproved,
         headlessCanAsk,
+        instructions,
         mcpProgress,
         mcpServerNames,
         model,
@@ -356,7 +367,19 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
               }),
     ]);
 
-    let candidates: ToolSet = { ...builtInTools, ...mcpResult.tools, ...deviceResult.tools };
+    // The servers are connected by now: a failed read of the files closes them before it fails the run.
+    const listed = await Promise.resolve(instructions).catch(async (error: unknown) => {
+        await closeMCPClients(mcpResult.clients);
+
+        throw error;
+    });
+    let candidates: ToolSet = {
+        ...builtInTools,
+        ...mcpResult.tools,
+        ...deviceResult.tools,
+        // Last, so no server's tool of the same name takes its place.
+        ...(listed && (listed.length > 0 || snapshot) && { [INSTRUCTION_READ_TOOL]: instructionReadTool(listed) }),
+    };
 
     if (snapshot) {
         const allowed = new Set(snapshot.toolNames);
@@ -370,6 +393,16 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
+
+    // The project's instruction files are the run's context, not a capability a bot picks: an `allow` list naming other tools
+    // keeps them. An `exclude` naming `instruction_read` removes them (`bots/functions.ts` accepts the name), and so does an
+    // empty `allow` list, no tools at all, which a selection that could not be read is too.
+    const instructionRead: ToolSet =
+        Object.hasOwn(candidates, INSTRUCTION_READ_TOOL) &&
+        botToolSelection?.allow?.length !== 0 &&
+        !(botToolSelection?.exclude ?? []).includes(INSTRUCTION_READ_TOOL)
+            ? { [INSTRUCTION_READ_TOOL]: candidates[INSTRUCTION_READ_TOOL]! }
+            : {};
 
     // The bot's own pick, by built-in name or `<server key>:tool` (`bots/tool-selectors.ts`: a server's stable key, so a rename
     // keeps its selectors matching); it only removes, so every rule below still applies.
@@ -385,6 +418,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         return device && { server: deviceServerKey(device.deviceId) ?? "", tool: device.toolName };
     });
+
+    candidates = { ...candidates, ...instructionRead };
 
     // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
     // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector

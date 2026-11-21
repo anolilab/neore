@@ -9,7 +9,8 @@
  * Where a composer draft the owner did not type came from. The web client names it when it sends (`draft-origin.ts`): a link,
  * the desktop shell, someone else's saved prompt, forwarded messages, a reply sent on as a prompt (Generate image or video),
  * a suggestion (the model's follow-ups, the welcome screen's), the prompt improver's rewrite, a gallery item's stored
- * prompt, and an organization's value filled into a prompt (a variable default, its name).
+ * prompt, an organization's value filled into a prompt (a variable default, its name), and another person's message in a
+ * shared chat put back into the composer (Restore to input).
  */
 export const NOT_TYPED_DRAFTS = [
     "promptLink",
@@ -21,6 +22,7 @@ export const NOT_TYPED_DRAFTS = [
     "improvedPrompt",
     "galleryPrompt",
     "organizationValue",
+    "collaborator",
 ] as const;
 
 export type NotTypedDraft = (typeof NOT_TYPED_DRAFTS)[number];

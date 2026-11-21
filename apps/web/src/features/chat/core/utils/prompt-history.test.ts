@@ -34,14 +34,54 @@ describe(buildPromptHistoryMarks, () => {
         };
 
         expect(
-            buildPromptHistoryMarks([
-                { role: "user", text: "a colleague's prompt" },
-                marked,
-                { role: "user", text: "a colleague's prompt" },
-                { parts: [{ text: "mine", type: "text" }], role: "user" },
-                { ...marked, role: "assistant" },
-            ]),
+            buildPromptHistoryMarks(
+                [
+                    { role: "user", text: "a colleague's prompt", userId: "owner-1" },
+                    marked,
+                    { role: "user", text: "a colleague's prompt", userId: "owner-1" },
+                    { parts: [{ text: "mine", type: "text" }], role: "user", userId: "owner-1" },
+                    { ...marked, role: "assistant" },
+                ],
+                "owner-1",
+            ),
         ).toStrictEqual(new Map([["a colleague's prompt", "sharedPrompt"]]));
+    });
+
+    it("marks a collaborator's message in a shared chat, and none of the viewer's own", () => {
+        expect(
+            buildPromptHistoryMarks(
+                [
+                    { role: "user", text: "theirs", userId: "collaborator-1" },
+                    { role: "user", text: "mine", userId: "owner-1" },
+                    { role: "user", status: "pending", text: "just sent" },
+                    { role: "user", status: "success", text: "saved naming nobody" },
+                    { role: "assistant", text: "a reply", userId: "collaborator-1" },
+                ],
+                "owner-1",
+            ),
+        ).toStrictEqual(
+            new Map([
+                ["saved naming nobody", "collaborator"],
+                ["theirs", "collaborator"],
+            ]),
+        );
+        // A saved mark still wins over `collaborator`, whichever comes first.
+        expect(
+            buildPromptHistoryMarks(
+                [
+                    { role: "user", text: "twice", userId: "collaborator-1" },
+                    {
+                        parts: [{ providerMetadata: { neore: { notTyped: { impersonated: true } } }, text: "twice", type: "text" }],
+                        role: "user",
+                        userId: "owner-1",
+                    },
+                    { role: "user", text: "twice", userId: "collaborator-1" },
+                ],
+                "owner-1",
+            ),
+        ).toStrictEqual(new Map([["twice", "impersonated"]]));
+        // Before the session is known, any saved message counts as someone else's.
+        expect(buildPromptHistoryMarks([{ role: "user", text: "mine", userId: "owner-1" }], undefined)).toStrictEqual(new Map([["mine", "collaborator"]]));
     });
 
     it("keeps an admin's mark on a prompt they wrote as the owner, over a draft's", () => {
@@ -50,7 +90,10 @@ describe(buildPromptHistoryMarks, () => {
         };
 
         expect(
-            buildPromptHistoryMarks([byAdmin({ impersonated: true }, "sent as you"), byAdmin({ draft: "promptLink", impersonated: true }, "a link, as you")]),
+            buildPromptHistoryMarks(
+                [byAdmin({ impersonated: true }, "sent as you"), byAdmin({ draft: "promptLink", impersonated: true }, "a link, as you")],
+                "owner-1",
+            ),
         ).toStrictEqual(
             new Map([
                 ["a link, as you", "impersonated"],

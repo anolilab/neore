@@ -13,6 +13,7 @@ import type { DraftFrom } from "@neore/backend/not-typed-text";
 import type { FC } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatMessages } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { composerDraftFrom } from "@/features/chat/core/utils/draft-origin";
@@ -21,10 +22,11 @@ import { buildPromptHistoryEntries, buildPromptHistoryMarks, isStillRecalled, na
 
 export const PromptHistorySource: FC<{ onEntries: (entries: string[], marks: ReadonlyMap<string, DraftFrom>) => void }> = ({ onEntries }) => {
     const { messages } = useChatMessages();
+    const viewerId = useAuthSession().data?.user?.id;
 
     useEffect(() => {
-        onEntries(buildPromptHistoryEntries(messages), buildPromptHistoryMarks(messages));
-    }, [onEntries, messages]);
+        onEntries(buildPromptHistoryEntries(messages), buildPromptHistoryMarks(messages, viewerId));
+    }, [onEntries, messages, viewerId]);
 
     return null;
 };
