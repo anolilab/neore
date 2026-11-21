@@ -1344,7 +1344,7 @@ describe("project rule files imported from the project's repository", () => {
         expect(within(found).getByRole("checkbox", { name: COPY_OF_A }).getAttribute("aria-checked")).toBe("false");
     });
 
-    it("reads the same bytes at the root and in the rules folder as two files, one always and one by its front matter", async () => {
+    it("reads a rules-folder link to a root file as two files, one always and one by its front matter", async () => {
         const user = userEvent.setup();
         const text = "---\nglobs: src/**/*.ts\n---\nUse pnpm.";
 
@@ -1354,7 +1354,8 @@ describe("project rule files imported from the project's repository", () => {
             commit: COMMIT,
             files: [
                 { path: "AGENTS.md", sha: "sha-shared", size: 40, tooLarge: false },
-                { path: "rules/AGENTS.md", sha: "sha-shared", size: 40, tooLarge: false },
+                // A link to the root file: still read by its front matter, so another draft.
+                { linkOf: "AGENTS.md", path: "rules/AGENTS.md", sha: "sha-shared", size: 40, tooLarge: false },
             ],
             status: "ok",
             truncated: false,
