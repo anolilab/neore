@@ -49,6 +49,8 @@ const ComposerFollowupSuggestions: FC = () => {
     const crpc = useCRPC();
 
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    // The reply the loaded suggestions are for: when the reply on screen changes, the chips wait for the effect below and do not show.
+    const [suggestionsReplyId, setSuggestionsReplyId] = useState<string | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const isFirstLoadRef = useRef(true);
@@ -72,7 +74,7 @@ const ComposerFollowupSuggestions: FC = () => {
     );
 
     // Determine if we should show the suggestions
-    const shouldShow = shouldFetchConditions && suggestions.length > 0 && !lockedWithoutProof;
+    const shouldShow = shouldFetchConditions && suggestions.length > 0 && !lockedWithoutProof && suggestionsReplyId === lastMessage?.id;
 
     // The newest `/clear` divider: suggestions loaded before it are for the context it ended, so they go with it.
     const lastResetId = useMemo(() => messages.findLast((message) => isClearDivider(message))?.id, [messages]);
@@ -91,6 +93,7 @@ const ComposerFollowupSuggestions: FC = () => {
         userManuallyOpenedRef.current = false;
         previousSuggestionsRef.current = [];
         setSuggestions([]);
+        setSuggestionsReplyId(undefined);
         setIsOpen(false);
     }, [threadId, lastResetId]);
 
@@ -112,6 +115,7 @@ const ComposerFollowupSuggestions: FC = () => {
         const cachedForReply = cachedFollowups && cachedFollowups.lastMessageId === lastMessage?.id ? cachedFollowups : null;
 
         setSuggestions(cachedForReply ? cachedForReply.suggestions : []);
+        setSuggestionsReplyId(cachedForReply ? lastMessage?.id : undefined);
     }, [shouldFetchConditions, cachedFollowups, isFetchingCached, lastMessage?.id]);
 
     // Handle new suggestions arriving
