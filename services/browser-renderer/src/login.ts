@@ -638,7 +638,8 @@ export type SignInResult =
 
     /**
      * `sessionClosed`: the page could not be made clean of the password within the hold, so the caller must close the
-     * session. `submitted` can be true here: the sign-in went out before the step that failed, so it must not be resent.
+     * session and say so after `error`. `submitted` can be true here: the sign-in went out before the step that failed,
+     * so it must not be resent.
      * `scriptSignIn`: the site signs in from a script that reads the field, which never holds the password: trying again
      * cannot help.
      */
@@ -748,11 +749,39 @@ interface Answer {
  * read over the DevTools protocol where no script of the page reaches, with its address: `null` when the page no longer
  * shows the document that load committed (a script navigated it away), a redirect of it passed through another origin
  * than `origin`, a service worker answered, it is not `text/html`, or its body is not kept (over `MAX_SERVED_BYTES`,
- * which the browser then drops, or gone) or not text the browser decoded. Throws when the load fails; `detach()` lets
- * go of it.
+ * which the browser then drops, or gone) or not text the browser decoded. Every command of the load ends by `timeout`.
+ * Throws when the load fails; `detach(ms)` lets go of it, `false` when that did not end within `ms` (the session may
+ * still hold it).
  */
-const loadServed = async (page: Page, { origin, timeout, url }: { origin: string; timeout: number; url: string }) => {
-    const session = await page.context().newCDPSession(page);
+const loadServed = async (page: Page, { now, origin, timeout, url }: { now: () => number; origin: string; timeout: number; url: string }) => {
+    const until = now() + timeout;
+    /** `promise`, or the load given up once its time is out. */
+    const inTime = async <T>(promise: Promise<T>): Promise<T> => {
+        const settled = await within(
+            promise.then((value) => {
+                return { value };
+            }),
+            until - now(),
+            null,
+        );
+
+        if (!settled) {
+            throw new Error("The login page did not load in time");
+        }
+
+        return settled.value;
+    };
+    let isLate = false;
+    const opening = page.context().newCDPSession(page);
+
+    // One that opens late is let go of as it opens.
+    opening.then(async (opened) => (isLate ? opened.detach() : undefined)).catch(() => undefined);
+
+    const session = await inTime(opening).catch((error: unknown) => {
+        isLate = true;
+
+        throw error;
+    });
     const answers = new Map<string, Answer>();
     // Loads that asked another origin on the way, by a redirect: that hop chose the page.
     const strayed = new Set<string>();
@@ -768,25 +797,37 @@ const loadServed = async (page: Page, { origin, timeout, url }: { origin: string
         }
     });
 
-    const detach = async (): Promise<void> => {
-        await session.detach().catch(() => undefined);
-    };
+    const detach = async (ms: number): Promise<boolean> =>
+        within(
+            session
+                .detach()
+                .then(() => true)
+                .catch(() => false),
+            ms,
+            false,
+        );
 
     let loaderId: string | undefined;
+    let stopAt: number | undefined;
 
     try {
-        await session.send("Network.enable", { maxResourceBufferSize: MAX_SERVED_BYTES, maxTotalBufferSize: MAX_SERVED_BYTES * 4 });
+        await inTime(session.send("Network.enable", { maxResourceBufferSize: MAX_SERVED_BYTES, maxTotalBufferSize: MAX_SERVED_BYTES * 4 }));
         // A response a script of the site had cached (with headers of its own choosing) is not the site's answer to this load.
-        await session.send("Network.setCacheDisabled", { cacheDisabled: true });
+        await inTime(session.send("Network.setCacheDisabled", { cacheDisabled: true }));
 
         const loaded = page
-            .waitForEvent("domcontentloaded", { timeout })
+            .waitForEvent("domcontentloaded", { timeout: Math.max(1, until - now()) })
             .then(() => true)
             .catch(() => false);
-        const navigated = await within(session.send("Page.navigate", { url }), timeout, null);
+        const navigated = await within(session.send("Page.navigate", { url }), until - now(), null);
 
         if (!navigated) {
-            await session.send("Page.stopLoading").catch(() => undefined);
+            stopAt = now() + CLOSE_MS;
+            await within(
+                session.send("Page.stopLoading").catch(() => undefined),
+                CLOSE_MS,
+                undefined,
+            );
 
             throw new Error("The login page did not load in time");
         }
@@ -802,7 +843,8 @@ const loadServed = async (page: Page, { origin, timeout, url }: { origin: string
             throw new Error("The login page did not load in time");
         }
     } catch (error) {
-        await detach();
+        // Stopping the load and letting go of it share one second, the part of the cleanup's time a failed load takes.
+        await detach((stopAt ?? now() + CLOSE_MS) - now());
 
         throw error;
     }
@@ -1006,9 +1048,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     let lock: ChannelLock | undefined;
     let isLocking = false;
     let isStalled = false;
+    let isLoadHeld = false;
 
     /** A step of the lock's setup, ended by the hold: one that does not settle in time has the tab closed with the session. */
-    const settle = async <T>(start: () => Promise<T>): Promise<T> => {
+    const settle = async <T>(start: () => Promise<T>, why = "The browser could not be locked for the sign-in in time, so nothing was typed"): Promise<T> => {
         // The time first: a step started and then given no time would run on unheld.
         const ms = left(pageTimeout);
         const settled = await within(
@@ -1022,7 +1065,25 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         if (!settled) {
             isStalled = true;
 
-            throw new Error("The browser could not be locked for the sign-in in time, so nothing was typed and the browser session was closed");
+            throw new Error(why);
+        }
+
+        return settled.value;
+    };
+
+    /** A read of the page before the password is typed, ended by the hold: a page that does not answer has nothing typed. */
+    const answered = async <T>(start: () => Promise<T>): Promise<T> => {
+        const ms = left(pageTimeout);
+        const settled = await within(
+            start().then((value) => {
+                return { value };
+            }),
+            ms,
+            null,
+        );
+
+        if (!settled) {
+            throw new Error("The login page did not answer in time, so the password was not typed");
         }
 
         return settled.value;
@@ -1037,7 +1098,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
     const findFields = async () => {
-        const load = await loadServed(page, { origin, timeout: left(navTimeout), url });
+        const load = await loadServed(page, { now, origin, timeout: left(navTimeout), url });
 
         try {
             const landed = offSite();
@@ -1057,7 +1118,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return "No password field is on the page";
             }
 
-            const form = await field.evaluate(checkForm, { isAscii, origin, submit: false });
+            const form = await answered(async () => field.evaluate(checkForm, { isAscii, origin, submit: false }));
 
             if (form === "no-form") {
                 return "The password field is not in a form, so nothing was typed or sent";
@@ -1094,26 +1155,29 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             }
 
             // The form's controls in document order, those outside it by a `form` attribute included.
-            const userHandle = await field.evaluateHandle((input) => {
-                const { form: owner } = input as HTMLInputElement;
-                // Read by the prototype's getter: a control named `elements` hides the form's own.
-                const controls = owner
-                    ? (Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "elements")?.get?.call(owner) as HTMLFormControlsCollection)
-                    : [];
-                const before = [...controls].filter(
-                    (candidate): candidate is HTMLInputElement =>
-                        candidate instanceof HTMLInputElement &&
-                        ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
-                        candidate.getClientRects().length > 0 &&
-                        Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
-                );
+            const userHandle = await answered(async () =>
+                field.evaluateHandle((input) => {
+                    const { form: owner } = input as HTMLInputElement;
+                    // Read by the prototype's getter: a control named `elements` hides the form's own.
+                    const controls = owner
+                        ? (Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "elements")?.get?.call(owner) as HTMLFormControlsCollection)
+                        : [];
+                    const before = [...controls].filter(
+                        (candidate): candidate is HTMLInputElement =>
+                            candidate instanceof HTMLInputElement &&
+                            ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
+                            candidate.getClientRects().length > 0 &&
+                            Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
+                    );
 
-                return before.at(-1) ?? null;
-            });
+                    return before.at(-1) ?? null;
+                }),
+            );
 
             return { field, target, user: userHandle.asElement() };
         } finally {
-            await load.detach();
+            // Within the steps' time: a DevTools session that does not let go of the load fails the sign-in closed.
+            isLoadHeld = !(await load.detach(Math.min(CLOSE_MS, deadline - CLEANUP_MS - now())));
         }
     };
 
@@ -1121,6 +1185,11 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         // A password field drops line breaks: the browser would never send one.
         if (LINE_BREAK_RE.test(password)) {
             return failed("The saved password has a line break, which a password field cannot hold, so nothing was typed");
+        }
+
+        // The username is typed before the guard holds, where the page reads it.
+        if (username.toLowerCase().includes(password.toLowerCase())) {
+            return failed("The saved username holds the saved password, which the page could read from the username field, so nothing was typed");
         }
 
         // Before the page loads: each socket it opens is then one the guard can close, and no worker, window or WebRTC
@@ -1144,6 +1213,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return failed("Too little time was left to sign in, so nothing was typed. Try it again.");
         }
 
+        if (isLoadHeld) {
+            return failed("The browser did not let go of the login page in time, so nothing was typed");
+        }
+
         const { field, target, user } = found;
 
         if (user) {
@@ -1156,27 +1229,38 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return failed(`${moved}, so the password was not typed`);
         }
 
-        if (!(await field.evaluate((input) => input.isConnected && (input as HTMLInputElement).type === "password"))) {
+        if (!(await answered(async () => field.evaluate((input) => input.isConnected && (input as HTMLInputElement).type === "password")))) {
             return failed("The password field changed before it was typed into, so it was left empty");
         }
 
         // The browser sends a rule set's loads itself: one the page lock could not take out would carry what the page
         // puts in a link.
-        if (await locked.speculates()) {
+        if (await answered(async () => locked.speculates())) {
             return failed("The login page holds speculation rules that cannot be taken out, so the password was not typed");
         }
 
-        const timeout = left(pageTimeout);
-
         // The page gets a stand-in, never the password: the guard puts the password into the form's own POST as it
         // leaves, so no script of the page (nor a request it makes the browser send) can read it.
-        const maxLength = await field.evaluate((input) => (input as HTMLInputElement).maxLength);
+        const maxLength = await answered(async () => field.evaluate((input) => (input as HTMLInputElement).maxLength));
         const longest = maxLength > 0 ? Math.max(maxLength, password.length) : Infinity;
         const stand = standIn(Math.min(Math.max(password.length, STAND_IN_LENGTH), longest), password);
 
-        guard = await armGuard(page, { form: target, lock: locked, origin, password, stand });
+        // A guard that is armed only after its time is taken down as it arrives; the tab goes with the session meanwhile.
+        let isGuardLate = false;
+
+        guard = await settle(async () => {
+            const arming = armGuard(page, { form: target, lock: locked, origin, password, stand });
+
+            arming.then(async (late) => (isGuardLate ? late.disarm() : undefined)).catch(() => undefined);
+
+            return arming;
+        }, "The browser could not be locked down for the send in time, so the password was not typed").catch((error: unknown) => {
+            isGuardLate = true;
+
+            throw error;
+        });
         // One call sets the whole value: no keystroke can land after the hold.
-        await field.fill(stand, { timeout });
+        await field.fill(stand, { timeout: left(pageTimeout) });
         // A page with an unload listener is never kept in the back/forward cache, where the filled form would wait.
         await within(
             page.evaluate(() => window.addEventListener("unload", () => undefined)).catch(() => undefined),
@@ -1338,7 +1422,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         );
 
         return {
-            error: "The password could not be cleared from the page in time, so the browser session was closed",
+            error: "The password could not be cleared from the page in time",
             sessionClosed: true,
             submitted: guard.submitted(),
             success: false,

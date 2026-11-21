@@ -42,9 +42,13 @@ export type BrowserLoginResponse = {
      */
     scriptSignIn?: boolean;
     /**
-     * The password could not be cleared from the page within the hold, so the page and the browser session were closed and no sessionId is returned
+     * The browser session is gone and no sessionId is returned: the password could not be cleared from the page within the hold, so the page and the session were closed (the close was confirmed), or the session named could not be reconnected
      */
     sessionClosed?: boolean;
+    /**
+     * The browser session had to be closed, but its close failed or did not end within the hold: it may still be open and must not be used again. No sessionId is returned
+     */
+    sessionCloseUnconfirmed?: boolean;
     /**
      * A password field is still on the page after sending: the sign-in may have failed
      */

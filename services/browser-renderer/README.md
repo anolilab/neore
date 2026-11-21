@@ -98,12 +98,12 @@ that swaps it, a key or the path, points the button elsewhere, changes the encod
 another page, or hides the site's login form so that another of its forms is filled, has nothing typed. Faking what the
 page reports gains nothing either: what goes out is held to the served action and field name. Nothing is typed, with a
 result saying the browser cannot check where the form sends the password, when that HTML cannot be read whole (no
-body, a service worker's answer, not `text/html`, over 2 MB, or bytes the browser does not hand back as text, as it does
+body, a service worker's answer, not `text/html`, over 2 MB, a tag of more than 256 attributes or more parsing than about 0.2 s of it (parse5 is not interrupted, and its work grows with the square of the nesting), or bytes the browser does not hand back as text, as it does
 not for Shift_JIS or an undeclared charset with non-ASCII bytes), when a redirect of the load passed through another
 site, or when the site's first password field is in no form parse5 sees (a form inside a table, which the browser's
 parser ties to its fields without holding them). A page with password forms to more than one place (a sign-up form
 beside the login form), one of the page's password forms whose submit buttons go to different places (a search form without a password field may have buttons that disagree), a login form only in a declarative shadow root,
-and a `url` that differs from the tab's address only by its fragment are refused too. The capture has been run
+and a `url` that differs from the tab's address only by its fragment are refused too, as is a saved username that holds the password (in any case), since the username is typed before the guard holds. The capture has been run
 against Playwright's Chromium only, not yet on Browser Rendering; there, a body it does not hand back refuses every
 sign-in rather than allow one. Not covered: a script can still change the other fields of the body (a hidden field, or the username), as the site's own scripts do, or send a form of its own with the stand-in in the password field's name to the same action; a site where such a field alone picks what the password signs into would take the password for the
 script's choice. The same goes for a 307 or 308 redirect of the POST to another address of the same site, which carries
@@ -124,7 +124,7 @@ Not covered: the stand-in's length tells the page the length of a password longe
 server shows the password in another spelling than those `isClean` knows, or only to a later request, has its scripts
 read it. A lock that cannot be set up whole leaves the tab on `about:blank`, and one that does not settle in time closes the session. An answer to the sign-in with an HTTP error status is reported as sent, not signed in. A `/login` whose browser is not ready in time, or whose page cannot be set up, closes only a browser it launched: a
 session it reconnected to is left to its keepAlive, as `/action` leaves it. `/login` holds its session alone against other calls of the same isolate (a `409` for an `/action`
-on it); a call from another isolate is not excluded. A session it must close stays held until the close ends, while the answer goes out within the hold.
+on it); a call from another isolate is not excluded. A session it must close stays held until the close ends, while the answer goes out within the hold: `sessionClosed` once the browser confirmed the close, else `sessionCloseUnconfirmed` (the session may still be open, and one whose close failed stays held for the isolate's life). The DevTools session that reads the served page must let go of it within the hold, or nothing is typed; each read of the page before the password is typed has its own time limit, and a guard for the send that is not set up in time closes the session.
 
 `test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with
 cross-site frames in their own process, and needs

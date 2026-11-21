@@ -151,9 +151,9 @@ describe("POST /login", () => {
         await expect(response.json()).resolves.toMatchObject({ sessionClosed: true, success: false });
     });
 
-    it("answers within its budget when closing a session it must close does not end, and keeps that session held", async () => {
-        const { env, pending } = binding();
-        // A page whose sign-in cannot be locked in time (its sockets are never gated), so the session must be closed.
+    /** Signs in on `sessionId` with a page whose lock never sets up (its sockets are never gated), so the session must be closed. */
+    const mustClose = async (close: () => Promise<void>, sessionId: string) => {
+        const { env, pending, started } = binding();
         const context = {
             route: async () => undefined,
             routeWebSocket: async () =>
@@ -162,25 +162,84 @@ describe("POST /login", () => {
                 }),
         };
         const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
-        const close = vi.fn(
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close, contexts: () => [{ pages: () => [page] }], sessionId: () => sessionId });
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        return { answer: await response, env, started };
+    };
+
+    /** Whether a call on `sessionId` gets to the browser: one refused as busy never connects. */
+    const isFree = async ({ env, started }: Awaited<ReturnType<typeof mustClose>>, sessionId: string): Promise<boolean> => {
+        const before = started.length;
+
+        post(env, "/action", { action: "extract", sessionId }).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        return started.length > before;
+    };
+
+    it("says the session is closed once its close is confirmed, and lets go of it", async () => {
+        const close = vi.fn(async () => undefined);
+        const signedIn = await mustClose(close, "closed");
+        const { answer } = signedIn;
+
+        expect(answer.status).toBe(200);
+        await expect(answer.json()).resolves.toMatchObject({
+            error: expect.stringContaining("so the browser session was closed"),
+            sessionClosed: true,
+            success: false,
+        });
+        expect(close).toHaveBeenCalledOnce();
+        await expect(isFree(signedIn, "closed")).resolves.toBe(true);
+    });
+
+    it("keeps a session whose close ends after the answer held until it ends", async () => {
+        const closed = Promise.withResolvers<undefined>();
+        const signedIn = await mustClose(async () => closed.promise, "late");
+
+        await expect(signedIn.answer.json()).resolves.toMatchObject({ sessionCloseUnconfirmed: true });
+        await expect(isFree(signedIn, "late")).resolves.toBe(false);
+
+        closed.resolve(undefined);
+
+        await expect(isFree(signedIn, "late")).resolves.toBe(true);
+    });
+
+    it.each([
+        [
+            "does not end",
+            "stalled",
             async () =>
                 new Promise<void>(() => {
                     // Never settles.
                 }),
-        );
-        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "held" });
-
-        await vi.advanceTimersByTimeAsync(0);
-        pending[0]?.({ close, contexts: () => [{ pages: () => [page] }], sessionId: () => "held" });
-        await vi.advanceTimersByTimeAsync(20_000);
-
-        const answer = await response;
+        ],
+        [
+            "fails",
+            "failed",
+            async () => {
+                throw new Error("close failed");
+            },
+        ],
+    ])("answers within its budget when closing a session it must close %s, says it may still be open, and keeps it held", async (_how, sessionId, onClose) => {
+        const close = vi.fn(onClose);
+        const { answer, env } = await mustClose(close, sessionId);
 
         expect(answer.status).toBe(200);
-        await expect(answer.json()).resolves.toMatchObject({ sessionClosed: true, success: false });
+
+        const body: unknown = await answer.json();
+
+        expect(body).toMatchObject({ error: expect.stringContaining("may still be open"), sessionCloseUnconfirmed: true, success: false });
+        expect(body).not.toHaveProperty("sessionClosed");
+        expect(body).not.toHaveProperty("sessionId");
         expect(close).toHaveBeenCalledOnce();
 
-        const action = await post(env, "/action", { action: "extract", sessionId: "held" });
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        const action = await post(env, "/action", { action: "extract", sessionId });
 
         expect(action.status).toBe(409);
     });

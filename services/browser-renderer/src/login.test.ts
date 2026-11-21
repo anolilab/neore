@@ -104,6 +104,21 @@ describe(signIn, () => {
         vi.useRealTimers();
     });
 
+    it("types nothing when the username holds the password, in any case", async () => {
+        const page = { url: () => "about:blank" } as unknown as Page;
+        const result = await signIn(page, {
+            deadline: Date.now() + 30_000,
+            navTimeout: 10_000,
+            origin: "https://id.example",
+            pageTimeout: 5000,
+            password: SECRET,
+            url: "https://id.example/login",
+            username: `ann-${SECRET.toUpperCase()}`,
+        });
+
+        expect(result).toMatchObject({ error: expect.stringContaining("username holds the saved password"), submitted: false, success: false });
+    });
+
     it("closes the session when the lock's setup does not settle in time", async () => {
         vi.useFakeTimers();
 

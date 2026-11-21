@@ -578,6 +578,9 @@ const loginSchema = z.object({
 
 type Browser = import("@cloudflare/playwright").Browser;
 
+/** A sentence's closing full stop, dropped before more is said after it. */
+const TRAILING_STOP_RE = /\.$/u;
+
 /** `promise`, or `null` once `ms` passed. */
 const settledWithin = async <T>(promise: Promise<T>, ms: number): Promise<T | null> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -696,7 +699,7 @@ app.post("/login", async (c) => {
 
     const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - LOGIN_MARGIN_MS;
 
-    let closing: Promise<void> | undefined;
+    let closing: Promise<boolean> | undefined;
 
     try {
         const { body: answer, status } = await logIn(c.env, {
@@ -714,11 +717,14 @@ app.post("/login", async (c) => {
         return c.json(answer, status);
     } finally {
         if (closing) {
-            // A close still under way: the session stays held until it ends, so nothing else uses it meanwhile.
-            const held = closing.finally(() => {
-                if (sessionId) {
+            // A close still under way: the session stays held until it ends, so nothing else uses it meanwhile. One
+            // that fails keeps it held for the isolate's life.
+            const held = closing.then((hasClosed) => {
+                if (hasClosed && sessionId) {
                     signingIn.delete(sessionId);
                 }
+
+                return hasClosed;
             });
 
             try {
@@ -734,7 +740,8 @@ app.post("/login", async (c) => {
 
 /**
  * The sign-in of `/login`, the browser setup included, ended by `deadline`; the browser is closed when it must be. A close
- * that has not ended by the end of the hold is handed to `hold` and the answer goes out without waiting for it.
+ * that has not ended by the end of the hold, or that failed, is handed to `hold` (`false` when it fails) and the answer
+ * goes out without waiting for it, saying `sessionCloseUnconfirmed` instead of `sessionClosed`.
  */
 const logIn = async (
     env: Env,
@@ -748,7 +755,7 @@ const logIn = async (
         username,
     }: {
         deadline: number;
-        hold: (closing: Promise<void>) => void;
+        hold: (closing: Promise<boolean>) => void;
         origin: string;
         password: string;
         sessionId: string | undefined;
@@ -784,34 +791,43 @@ const logIn = async (
     }
 
     const { browser, page } = ready;
-    let shouldCloseSession = !ready.sessionId;
+    let result: Awaited<ReturnType<typeof signIn>>;
 
     try {
-        const result = await signIn(page, { deadline, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
-
-        if (!result.success && result.sessionClosed) {
-            shouldCloseSession = true;
-
-            return { body: result, status: 200 } as const;
-        }
-
-        return { body: { ...result, sessionId: ready.sessionId }, status: 200 } as const;
+        result = await signIn(page, { deadline, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
     } catch (error) {
         // Before anything was typed (`signIn` handles every error after): the session holds no password.
         return { body: { error: scrub(error), sessionId: opened?.sessionId, success: false }, status: 500 } as const;
-    } finally {
-        if (shouldCloseSession) {
-            const closing = browser.close().catch(() => undefined);
-            const isClosed = await settledWithin(
-                closing.then(() => true),
-                deadline + LOGIN_MARGIN_MS - Date.now(),
-            );
-
-            if (!isClosed) {
-                hold(closing);
-            }
-        }
     }
+
+    if (result.success || !result.sessionClosed) {
+        return { body: { ...result, sessionId: ready.sessionId }, status: 200 } as const;
+    }
+
+    // Closed only once the browser says so: a close that fails or does not end in time leaves a session that may
+    // still be open, which this isolate never lends out again.
+    const closing = browser
+        .close()
+        .then(() => true)
+        .catch(() => false);
+    const isClosed = await settledWithin(closing, deadline + LOGIN_MARGIN_MS - Date.now());
+    const reason = result.error.replace(TRAILING_STOP_RE, "");
+
+    if (isClosed) {
+        return { body: { ...result, error: `${reason}, so the browser session was closed` }, status: 200 } as const;
+    }
+
+    hold(closing);
+
+    return {
+        body: {
+            ...result,
+            error: `${reason}. The browser session could not be confirmed closed and may still be open, so do not use it again`,
+            sessionClosed: undefined,
+            sessionCloseUnconfirmed: true,
+        },
+        status: 200,
+    } as const;
 };
 
 // Health check

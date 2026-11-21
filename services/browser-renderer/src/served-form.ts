@@ -3,13 +3,117 @@
  * script of the page reaches. `checkForm` in `login.ts` reads the same values from the live page; the two must agree
  * exactly before anything is typed.
  */
-import type { DefaultTreeAdapterTypes } from "parse5";
-import { parse } from "parse5";
+import type { DefaultTreeAdapterMap, DefaultTreeAdapterTypes, TreeAdapter } from "parse5";
+import { defaultTreeAdapter, Parser, Tokenizer } from "parse5";
 
 type Element = DefaultTreeAdapterTypes.Element;
 type ParentNode = DefaultTreeAdapterTypes.ParentNode;
 
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+
+/** The most attributes a served tag is read with: the parser looks each new one up among those before it. */
+export const MAX_TAG_ATTRIBUTES = 256;
+
+/**
+ * The most work the parser does for a served page, about 0.2 s of it: each tag costs the open elements and open
+ * formatting elements it may walk (more for each attribute a formatting element compares), each element made and each
+ * attribute given to one. Nothing interrupts the parse, and its work grows with the square of the nesting.
+ */
+export const MAX_PARSE_WORK = 20_000_000;
+
+/** Thrown inside the parser when a page is past a limit. */
+const TOO_LARGE = new Error("The served page is too large to read");
+
+/**
+ * The parser's tokenizer: tells `onTag` of each tag before the parser takes it, and refuses a tag of more than
+ * `MAX_TAG_ATTRIBUTES` attributes before it looks the next one up.
+ */
+class BoundedTokenizer extends Tokenizer {
+    private readonly onTag: (attributes: number) => void;
+
+    public constructor(
+        options: ConstructorParameters<typeof Tokenizer>[0],
+        handler: ConstructorParameters<typeof Tokenizer>[1],
+        onTag: (attributes: number) => void,
+    ) {
+        super(options, handler);
+        this.onTag = onTag;
+    }
+
+    protected override _leaveAttrName(): void {
+        const token = this.currentToken;
+
+        if (token && "attrs" in token && token.attrs.length >= MAX_TAG_ATTRIBUTES) {
+            throw TOO_LARGE;
+        }
+
+        super._leaveAttrName();
+    }
+
+    protected override emitCurrentTagToken(): void {
+        const token = this.currentToken;
+
+        this.onTag(token && "attrs" in token ? token.attrs.length : 0);
+        super.emitCurrentTagToken();
+    }
+}
+
+/** `html` parsed within `MAX_PARSE_WORK`, or `null` when it takes more. */
+const parseBounded = (html: string): DefaultTreeAdapterTypes.Document | null => {
+    let work = 0;
+    const spend = (amount: number): void => {
+        work += amount;
+
+        if (work > MAX_PARSE_WORK) {
+            throw TOO_LARGE;
+        }
+    };
+    // Set once the parser is: text and tags cost the open elements and open formatting elements they may walk.
+    let walk = (): number => 1;
+    const treeAdapter: TreeAdapter<DefaultTreeAdapterMap> = {
+        ...defaultTreeAdapter,
+        adoptAttributes: (recipient, attributes) => {
+            // A set of the recipient's attributes is built each time: dearer than a step of a walk.
+            spend(8 * (recipient.attrs.length + attributes.length));
+            defaultTreeAdapter.adoptAttributes(recipient, attributes);
+        },
+        createElement: (tagName, namespaceURI, attributes) => {
+            spend(1 + attributes.length);
+
+            return defaultTreeAdapter.createElement(tagName, namespaceURI, attributes);
+        },
+        // Text first reopens the formatting elements not open, looking each up among the open elements.
+        insertText: (parentNode, text) => {
+            spend(walk());
+            defaultTreeAdapter.insertText(parentNode, text);
+        },
+        insertTextBefore: (parentNode, text, referenceNode) => {
+            spend(walk());
+            defaultTreeAdapter.insertTextBefore(parentNode, text, referenceNode);
+        },
+    };
+
+    // `Parser.parse`, with the bounded tokenizer in place of its own before it reads anything.
+    const parser = new Parser<DefaultTreeAdapterMap>({ treeAdapter });
+
+    walk = () => parser.openElements.stackTop + 1 + parser.activeFormattingElements.entries.length;
+    parser.tokenizer = new BoundedTokenizer(parser.options, parser, (attributes) => {
+        // A start or end tag can walk every open element, and a formatting one every open formatting element.
+        spend(walk() + parser.activeFormattingElements.entries.length * attributes);
+    });
+
+    try {
+        parser.tokenizer.write(html, true);
+    } catch (error) {
+        if (error === TOO_LARGE) {
+            return null;
+        }
+
+        throw error;
+    }
+
+    return parser.document;
+};
 
 /** Where a form sends a password field, as both the live page and the served HTML spell it. */
 export interface FormTarget {
@@ -46,43 +150,45 @@ const attribute = (element: Element, name: string): string | null => element.att
 
 const isHtml = (element: Element, tag: string): boolean => element.tagName === tag && element.namespaceURI === HTML_NAMESPACE;
 
+/** An element in document order, with what its ancestors make of it. */
+interface Placed {
+    element: Element;
+    /** The nearest form around it. */
+    form: Element | null;
+    /** In a disabled fieldset, and not in that fieldset's first legend. */
+    isFenced: boolean;
+}
+
 /**
- * The elements of `root` in document order: each with its ancestors, nearest last. A depth-first walk, so an element's
- * descendants come right after it.
+ * The elements of `root` in document order. A depth-first walk, so an element's descendants come right after it; each
+ * carries only what its ancestors decide, never their list, which would grow with each level of nesting.
  */
-const inOrder = (root: ParentNode): { ancestors: Element[]; element: Element }[] => {
-    const found: { ancestors: Element[]; element: Element }[] = [];
-    const stack: { ancestors: Element[]; node: Element }[] = [];
-    const push = (ancestors: Element[], node: ParentNode): void => {
+const inOrder = (root: ParentNode): Placed[] => {
+    const found: Placed[] = [];
+    const stack: Placed[] = [];
+    const push = (node: ParentNode, { form, isFenced }: Omit<Placed, "element">): void => {
         const children = ("childNodes" in node ? node.childNodes : []).filter((child): child is Element => "tagName" in child);
+        const isFence = "tagName" in node && isHtml(node, "fieldset") && attribute(node, "disabled") !== null;
+        const legend = isFence ? children.find((child) => isHtml(child, "legend")) : undefined;
+        const nearest = "tagName" in node && isHtml(node, "form") ? node : form;
 
         for (const child of children.toReversed()) {
-            stack.push({ ancestors, node: child });
+            stack.push({ element: child, form: nearest, isFenced: isFenced || (isFence && child !== legend) });
         }
     };
 
-    push([], root);
+    push(root, { form: null, isFenced: false });
 
     for (let entry = stack.pop(); entry; entry = stack.pop()) {
-        found.push({ ancestors: entry.ancestors, element: entry.node });
-        push([...entry.ancestors, entry.node], entry.node);
+        found.push(entry);
+        push(entry.element, entry);
     }
 
     return found;
 };
 
 /** Whether a control is disabled: its own `disabled`, or a disabled fieldset's, unless it sits in that fieldset's first legend. */
-const isDisabled = (element: Element, ancestors: Element[]): boolean =>
-    attribute(element, "disabled") !== null ||
-    ancestors.some((fieldset, at) => {
-        if (!isHtml(fieldset, "fieldset") || attribute(fieldset, "disabled") === null) {
-            return false;
-        }
-
-        const legend = fieldset.childNodes.find((child): child is Element => "tagName" in child && isHtml(child, "legend"));
-
-        return legend === undefined || ancestors[at + 1] !== legend;
-    });
+const isDisabled = ({ element, isFenced }: Placed): boolean => attribute(element, "disabled") !== null || isFenced;
 
 /** The fields of a destination: where the form goes, how and in which window. The field's name and place are compared apart. */
 const isSameDestination = (one: Omit<FormTarget, "name">, other: Omit<FormTarget, "name">): boolean =>
@@ -93,10 +199,18 @@ const isSameDestination = (one: Omit<FormTarget, "name">, other: Omit<FormTarget
  * whose form's enabled submit buttons would send it to different places), read the way
  * `checkForm` reads the live page: the form owner by the `form` attribute or the nearest form around it, the first enabled
  * submit button of that form, and the addresses against the first `<base href>` or `url`. A form the parser ties to a field
- * it does not hold (a form in a table) is not seen, so that field is in no form here.
+ * it does not hold (a form in a table) is not seen, so that field is in no form here. A page with a tag of more than
+ * `MAX_TAG_ATTRIBUTES` attributes, or that takes more than `MAX_PARSE_WORK` to parse, is not read: its first field
+ * counts as in no form.
  */
 export const servedForms = (html: string, url: string): (FormTarget | typeof AMBIGUOUS | null)[] => {
-    const elements = inOrder(parse(html));
+    const document = parseBounded(html);
+
+    if (!document) {
+        return [null];
+    }
+
+    const elements = inOrder(document);
     const html5 = elements.filter(({ element }) => element.namespaceURI === HTML_NAMESPACE);
     const baseHref = html5.find(({ element }) => isHtml(element, "base") && attribute(element, "href") !== null);
     const href = baseHref ? (attribute(baseHref.element, "href") ?? "") : null;
@@ -112,7 +226,7 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
         }
     }
 
-    const ownerOf = ({ ancestors, element }: { ancestors: Element[]; element: Element }): Element | null => {
+    const ownerOf = ({ element, form }: Placed): Element | null => {
         const named = attribute(element, "form");
 
         if (named !== null) {
@@ -121,7 +235,7 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
             return owner && isHtml(owner, "form") ? owner : null;
         }
 
-        return ancestors.findLast((ancestor) => isHtml(ancestor, "form")) ?? null;
+        return form;
     };
 
     const typeOf = (element: Element): string => attribute(element, "type")?.toLowerCase() ?? "";
@@ -133,7 +247,7 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
         const isSubmit = isHtml(entry.element, "button")
             ? !["button", "reset"].includes(typeOf(entry.element))
             : isHtml(entry.element, "input") && ["image", "submit"].includes(typeOf(entry.element));
-        const form = isSubmit && !isDisabled(entry.element, entry.ancestors) ? ownerOf(entry) : null;
+        const form = isSubmit && !isDisabled(entry) ? ownerOf(entry) : null;
 
         if (form) {
             // Appended in place: a copy for each button would be quadratic in a form's buttons.

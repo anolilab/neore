@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FormTarget } from "./served-form";
-import { AMBIGUOUS, servedForms, servedTarget } from "./served-form";
+import { AMBIGUOUS, MAX_TAG_ATTRIBUTES, servedForms, servedTarget } from "./served-form";
 
 const URL_OF_PAGE = "https://id.example/login?x=1";
 
@@ -29,6 +29,43 @@ describe(servedForms, () => {
         expect(servedForms(html, URL_OF_PAGE)).toStrictEqual([
             { ...LIVE, action: "https://id.example/session", enctype: "multipart/form-data", target: "_self" },
         ]);
+    });
+
+    it("takes a button in a disabled fieldset's first legend as enabled, unless an outer fieldset disables it", () => {
+        const inLegend = (outer: string): string =>
+            `<form action="/form">${FIELDS}<fieldset ${outer}><fieldset disabled><legend><button formaction="/session?session_code=Kq7aB9xZ2mQ4">x</button></legend></fieldset></fieldset></form>`;
+
+        expect(servedForms(inLegend(""), URL_OF_PAGE)).toStrictEqual([LIVE]);
+        expect(servedForms(inLegend("disabled"), URL_OF_PAGE)).toStrictEqual([{ ...LIVE, action: "https://id.example/form" }]);
+    });
+
+    it("reads a page nested a thousand deep", () => {
+        const html = `${"<div>".repeat(1000)}<form method="post" action="/session?session_code=Kq7aB9xZ2mQ4">${FIELDS}<button>Go</button></form>`;
+
+        expect(servedForms(html, URL_OF_PAGE)).toStrictEqual([LIVE]);
+    });
+
+    it.each([
+        ["elements nested deep", "<div>".repeat(7000)],
+        // Each text reopens every formatting element still open: far more elements than there are tags.
+        [
+            "formatting elements reopened around each text",
+            `<div>${Array.from({ length: 1000 }, (_, at) => `<b a${at}>`).join("")}</div>${"<div>x</div>".repeat(20_000)}`,
+        ],
+        ["end tags that match no open element", `${"<span>".repeat(1000)}${"</zz>".repeat(30_000)}`],
+        ["formatting elements that differ in one attribute", Array.from({ length: 7000 }, (_, at) => `<b z=${at}>`).join("")],
+        // Each text looks the formatting element at the foot up among all the open elements.
+        ["texts under a formatting element deep down", `<b>${"<span>".repeat(3000)}${"x<!---->".repeat(10_000)}`],
+    ])("does not read a page whose %s take the parser past its work limit", (_what, markup) => {
+        expect(servedForms(`${markup}<form action="/session">${FIELDS}</form>`, URL_OF_PAGE)).toStrictEqual([null]);
+    });
+
+    it("does not read a page with a tag of more attributes than it looks up in time", () => {
+        const tagOf = (count: number): string => `<div ${Array.from({ length: count }, (_, at) => `a${at}`).join(" ")}></div>`;
+        const form = `<form method="post" action="/session?session_code=Kq7aB9xZ2mQ4">${FIELDS}<button>Go</button></form>`;
+
+        expect(servedForms(`${tagOf(MAX_TAG_ATTRIBUTES)}${form}`, URL_OF_PAGE)).toStrictEqual([LIVE]);
+        expect(servedForms(`${tagOf(MAX_TAG_ATTRIBUTES + 1)}${form}`, URL_OF_PAGE)).toStrictEqual([null]);
     });
 
     it("resolves against the first base address and takes the first base target", () => {

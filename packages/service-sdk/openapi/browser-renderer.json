@@ -177,7 +177,11 @@
                     },
                     "sessionClosed": {
                         "type": "boolean",
-                        "description": "The password could not be cleared from the page within the hold, so the page and the browser session were closed and no sessionId is returned"
+                        "description": "The browser session is gone and no sessionId is returned: the password could not be cleared from the page within the hold, so the page and the session were closed (the close was confirmed), or the session named could not be reconnected"
+                    },
+                    "sessionCloseUnconfirmed": {
+                        "type": "boolean",
+                        "description": "The browser session had to be closed, but its close failed or did not end within the hold: it may still be open and must not be used again. No sessionId is returned"
                     },
                     "passwordFieldRemains": {
                         "type": "boolean",
