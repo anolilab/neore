@@ -4554,19 +4554,30 @@ const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPAT
 const MIN_MODEL_BUDGET_MS = 10 * 1000;
 
 /**
- * The cache write of a paid reply whose first write failed. One write per dispatch: a write that throws is retried by the scheduler's own
- * policy (with backoff), and a refused write (a newer reply) returns quietly. No model call and no charge is made here.
+ * The write of a reply's suggestions, and its Text unit, when the job's first write failed. A write that throws is retried by the
+ * scheduler's own policy (with backoff). The unit is taken only when the write landed: a refused write (a newer reply) takes none.
+ * No model call is made here.
  */
 export const retryFollowupCache = internalAction
     .input({
+        chargedUserId: v.string().max(MAX_LENGTH.id),
         lastMessageId: v.string().max(MAX_LENGTH.id),
         order: v.number(),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         replyAt: v.number(),
+        requestId: v.string().max(MAX_LENGTH.long),
         suggestions: v.array(v.string().max(MAX_LENGTH.long)),
         threadId: v.string().max(MAX_LENGTH.id),
     })
     .action(async ({ args, ctx }) => {
-        await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, args);
+        const { chargedUserId, organizationId, requestId, ...write } = args;
+        const written = await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, write);
+
+        if (!written) {
+            return;
+        }
+
+        await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId, requestId, userId: chargedUserId });
     });
 
 export const generateFollowupSuggestionsForThread = internalAction
@@ -4900,23 +4911,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
-                // The Text unit is taken only now, once the model has produced suggestions: a run that makes no call pays nothing. A refused
-                // charge gives the claim back, and the output is dropped. The charge is keyed per reply, so a retry is not charged twice.
-                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-                    kind: "Text",
-                    organizationId: threadData.organizationId ?? undefined,
-                    requestId: replyChargeKey,
-                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
-                    userId: chargedUserId,
-                });
-
-                if (!charged) {
-                    await giveBackPaidClaim();
-
-                    return;
-                }
-
-                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached.
+                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached. It checks the
+                // reply is still the newest in the same write, so a reply overtaken since the model call is refused with no unit taken.
                 const cacheWrite = {
                     lastMessageId,
                     order: newest.order,
@@ -4928,13 +4924,36 @@ export const generateFollowupSuggestionsForThread = internalAction
                 try {
                     await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, cacheWrite);
                 } catch (cacheError) {
-                    // The charge is taken and the suggestions are in hand: the write is retried with them, no model call and no second charge.
-                    // The claim stays held for the retries, so a run does not call the model again for this reply meanwhile.
+                    // The suggestions are in hand: the scheduler writes them and takes the unit, with no model call and no second charge.
+                    // The claim stays held for that, so a run does not call the model again for this reply meanwhile.
                     chatLogger.error(`[generateFollowupSuggestionsForThread] Cache write failed, retrying it: ${threadId}`, cacheError);
-                    await context.scheduler.runAfter(0, internal.chat.functions.retryFollowupCache, cacheWrite);
+                    await context.scheduler.runAfter(0, internal.chat.functions.retryFollowupCache, {
+                        ...cacheWrite,
+                        // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                        chargedUserId,
+                        organizationId: threadData.organizationId ?? undefined,
+                        requestId: replyChargeKey,
+                    });
+                    paid.cached = true;
+
+                    return;
                 }
 
+                // Written, so the reply's suggestions are shown and the claim is kept whatever the charge does. The Text unit is taken
+                // now; it is keyed per reply, so a retry is not charged twice. A refused charge leaves the written suggestions in place.
                 paid.cached = true;
+
+                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                    kind: "Text",
+                    organizationId: threadData.organizationId ?? undefined,
+                    requestId: replyChargeKey,
+                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                    userId: chargedUserId,
+                });
+
+                if (!charged) {
+                    chatLogger.warn(`[generateFollowupSuggestionsForThread] The Text unit was refused after the suggestions were written: ${threadId}`);
+                }
 
                 chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
             } finally {

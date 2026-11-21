@@ -195,6 +195,34 @@ describe("a late run cannot replace a newer cache", () => {
 
         await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-later", suggestions: ["later?"] });
     });
+
+    // The write reports whether it landed: the unit is taken for a written reply only, so a refused one is charged nothing.
+    it("reports true for a written reply and false for a refused one", async () => {
+        await expect(
+            harness.action(
+                async (context: any) =>
+                    await context.runMutation(cacheFollowupSuggestions, {
+                        lastMessageId: "reply-new",
+                        order: 5,
+                        replyAt: 5,
+                        suggestions: ["newer?"],
+                        threadId,
+                    }),
+            ),
+        ).resolves.toBe(true);
+        await expect(
+            harness.action(
+                async (context: any) =>
+                    await context.runMutation(cacheFollowupSuggestions, {
+                        lastMessageId: "reply-old",
+                        order: 3,
+                        replyAt: 3,
+                        suggestions: ["older?"],
+                        threadId,
+                    }),
+            ),
+        ).resolves.toBe(false);
+    });
 });
 
 describe("a model request in flight holds the chat's lock", () => {

@@ -215,14 +215,14 @@ export const cacheFollowupSuggestions = internalMutation
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args: { lastMessageId, order, replyAt, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         // A deleted thread keeps no suggestions, and a hard delete marks `deletingAt` first, so that window keeps none either.
         if (!thread || thread.deletedAt || thread.deletingAt !== undefined) {
-            return null;
+            return false;
         }
 
         const existing = await context.db
@@ -236,7 +236,7 @@ export const cacheFollowupSuggestions = internalMutation
 
             // A newer reply's suggestions are already stored: this older run must not replace them.
             if (olderTurn || olderSibling) {
-                return null;
+                return false;
             }
 
             await context.db.patch("followupSuggestions", existing._id, {
@@ -258,5 +258,5 @@ export const cacheFollowupSuggestions = internalMutation
             });
         }
 
-        return null;
+        return true;
     });
