@@ -3,7 +3,8 @@
  * thread. Authorship alone is not enough — a collaborator downgraded to view
  * (or revoked) still authored their old messages — so the route also needs
  * WRITE access to the thread, and the body's `threadId` (which picked the
- * shard) must be the message's own.
+ * shard) must be the message's own. Past that gate, only the message's author or
+ * the thread's owner may generate: the owner regenerates a collaborator's prompt.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +25,8 @@ const MESSAGE_ID = "k57a1b2c3d4e5f6g7h8j9k0m1n2p3q4r";
 const THREAD_ID = "k17a1b2c3d4e5f6g7h8j9k0m1n2p3q4r";
 const OTHER_THREAD_ID = "k27a1b2c3d4e5f6g7h8j9k0m1n2p3q4r";
 const COLLABORATOR = "collaborator-1";
+const OWNER = "owner-1";
+const OTHER_COLLABORATOR = "collaborator-2";
 
 const post = (body: Record<string, unknown>) =>
     new Request("https://x/chat/media", {
@@ -71,8 +74,8 @@ describe("/chat/media on a shared thread", () => {
         expect(runMutation).not.toHaveBeenCalled();
     });
 
-    it("goes on to the daily charge with write access (control)", async () => {
-        runQuery.mockResolvedValueOnce({ outcome: "ok" });
+    it("goes on to the daily charge for the author with write access (control)", async () => {
+        runQuery.mockResolvedValueOnce({ outcome: "ok", ownerId: OWNER });
 
         const response = await mediaGenerationHttpAction({ runMutation, runQuery } as never, post({ threadId: THREAD_ID }));
 
@@ -80,5 +83,26 @@ describe("/chat/media on a shared thread", () => {
         expect(response.status).toBe(403);
         expect(await response.json()).toMatchObject({ error: "DAILY_IMAGE_LIMIT_REACHED" });
         expect(runMutation).toHaveBeenCalledOnce();
+    });
+
+    it("lets the thread's owner regenerate a collaborator's prompt", async () => {
+        currentUser.value = { _id: OWNER, isAnonymous: false };
+        runQuery.mockResolvedValueOnce({ outcome: "ok", ownerId: OWNER });
+
+        const response = await mediaGenerationHttpAction({ runMutation, runQuery } as never, post({ threadId: THREAD_ID }));
+
+        expect(await response.json()).toMatchObject({ error: "DAILY_IMAGE_LIMIT_REACHED" });
+        expect(runMutation).toHaveBeenCalledOnce();
+    });
+
+    it("refuses another collaborator with write access who is neither the author nor the owner", async () => {
+        currentUser.value = { _id: OTHER_COLLABORATOR, isAnonymous: false };
+        runQuery.mockResolvedValueOnce({ outcome: "ok", ownerId: OWNER });
+
+        const response = await mediaGenerationHttpAction({ runMutation, runQuery } as never, post({ threadId: THREAD_ID }));
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toStrictEqual({ error: "Forbidden" });
+        expect(runMutation).not.toHaveBeenCalled();
     });
 });

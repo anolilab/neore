@@ -776,7 +776,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome; ownerId?: string }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -794,6 +794,7 @@ export const gateThreadActionHandler = async (
         botId: thread?.botId,
         ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
         outcome,
+        ...(thread && { ownerId: thread.userId }),
         ...(isHostRunThread(thread) && { hostRun: true }),
     };
 };
@@ -812,6 +813,7 @@ export const gateThreadAction = internalQuery
             hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
             outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
+            ownerId: v.optional(v.string()),
         }),
     )
     .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));

@@ -2321,12 +2321,7 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         return Response.json({ error: "Message does not belong to this thread" }, { headers: { "Content-Type": "application/json" }, status: 400 });
     }
 
-    // Only the message's author may generate for it...
-    if (message.userId !== authenticatedUserId) {
-        return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
-    }
-
-    // ...and only while they may still WRITE to the thread: authorship outlives a
+    // Only a caller who may still WRITE to the thread may generate: authorship outlives a
     // grant, so a collaborator downgraded to view (or revoked) must not start paid
     // generations that land as replies in the owner's thread. As `/chat/start`.
     const access = await context.runQuery(internal.chat.functions.gateThreadAction, {
@@ -2341,6 +2336,12 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
     }
 
     if (access.outcome !== "ok") {
+        return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
+    }
+
+    // ...and only the message's author or the thread's owner: a collaborator's prompt row names the
+    // collaborator, and the owner regenerates it (`/chat/start` allows only the owner to regenerate).
+    if (message.userId !== authenticatedUserId && access.ownerId !== authenticatedUserId) {
         return Response.json({ error: "Forbidden" }, { headers: { "Content-Type": "application/json" }, status: 403 });
     }
 
