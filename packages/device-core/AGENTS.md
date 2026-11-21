@@ -16,13 +16,13 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
 - No sandbox → REFUSE unless the user disabled "Require sandbox…" (`allowUnsandboxedShell`, absent = required).
 - Allow rules, shared folders, that setting and local MCP servers live ONLY in Rust.
 - The pairing secret crosses the page exactly once (`registerDevice` → `device_pair`). HMAC vectors are pinned on BOTH sides — change one, update both.
-- **Global instruction files** (`src/global_instructions.rs`, desktop only, a host never plans them): a fixed list under
-  `$HOME`, picked by id, never a path. Resolved at plan time (the prompt shows where a link leads) and again at run
-  (changed = refused); the real file must be a regular `.md` inside `$HOME`, and neither it nor the link in a shared
-  folder (planned AND current, read under the save lock); opened via `fs::open_confined`, then the handle must be the
-  approved dev/inode (Windows: the approved real path) and not hard-linked (Unix); 48 KiB each, always asked
-  (`can_always_allow`); the desktop words it as the person's request (`apps/desktop/src/device/prompt-origin.ts`).
-  Never add a path from the request.
+- **Global instruction files** (`src/global_instructions.rs`, desktop only, a host never plans them): a fixed list
+  under `$HOME`, picked by id, never a path. Resolved at plan time (the prompt shows where a link leads) and again at
+  run (changed = refused); links walked one by one (≤ 8, each inside `$HOME` or root-owned), and no place on the chain
+  in a shared folder (planned AND current, read under the save lock); the real file is a regular `.md` inside `$HOME`;
+  opened via `fs::open_confined`, then the handle must be the approved dev/inode (Windows: the approved real path) and
+  not hard-linked (Unix); 48 KiB each, always asked (`can_always_allow`); the desktop words it as the person's request
+  (`apps/desktop/src/device/prompt-origin.ts`). Never add a path from the request.
 - **`device-core` has two halves**: `actions.rs` imports no pairing/envelope/approval/keychain; `engine.rs` verifies, asks, then calls it. The paired half is the default `keychain` feature.
 - `neore-host --stdio` is built `--no-default-features`, trusts only its pipe and re-checks folders and sandbox on its own machine. New tools/changed results go in `tests/common/actions.json`. Desktop main-process calls use `HostTransport`.
 - **Servers over SSH**: a server's secret lives only in this desktop's keychain (`store.rs`, one entry per device id); everything for it is verified and signed on the desktop after the same local approval (no "Always allow"). The relay's desktop-id comparison is NOT the security control.

@@ -5,18 +5,20 @@
 //!
 //! Each file is resolved when the call is planned, so the prompt shows where a link really leads, and again when it
 //! runs: a file that resolves elsewhere by then, or is another file there, is refused. The run checks against the
-//! shared folders it was planned with AND those saved when it runs, and opens what it resolved without following a
-//! link swapped in since or waiting on a FIFO, then reads only a regular file that is still the one approved (its
-//! device and inode on Unix; Windows has no stable id in `std`, so there the open handle's real path must be the
-//! approved one, and a named pipe cannot sit in the home folder). A file with another name (a hard link, which a
-//! shared folder could hold) is refused on Unix; Windows does not check that. It is read only when it resolves, links followed, to a
-//! regular Markdown file inside the home folder and outside every shared folder (the agent can write there), and is
-//! at most [`MAX_FILE_BYTES`]. One read returns what fits in one result ([`MAX_OUTPUT_BYTES`]); a file that does not
-//! fit is named as left out, never cut.
+//! shared folders it was planned with AND those saved when it runs, and opens what it resolved without following a link
+//! swapped in since or waiting on a FIFO, then reads only a regular file that is still the one approved (its device and
+//! inode on Unix; Windows has no stable id in `std`, so there the open handle's real path must be the approved one, and
+//! a named pipe cannot sit in the home folder). A file with another name (a hard link, which a shared folder could
+//! hold) is refused on Unix; Windows does not check that. Links are followed one at a time, at most [`MAX_LINKS`], and
+//! every place on the way (each link, each name, and where it ends) must be outside every shared folder (the agent can
+//! write there, so it could re-point a link there), each link inside the home folder or owned by the system; on Windows
+//! the same walk sees symbolic links and junctions, whatever `read_link` reads. It is read only when it ends at a
+//! regular Markdown file inside the home folder of at most [`MAX_FILE_BYTES`]. One read returns what fits in one result
+//! ([`MAX_OUTPUT_BYTES`]); a file that does not fit is named as left out, never cut.
 
 use std::fs::{self, File, Metadata};
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde_json::{json, Value};
 
@@ -334,33 +336,137 @@ fn fit(entries: &mut [Value]) {
     }
 }
 
-/// Where one allowlisted file leads. Links are followed, but the file they end at must be a regular Markdown file
-/// inside `home` (already canonical); neither it nor the link may sit in a shared folder, where the agent could
-/// change it or re-point it.
-fn resolve(home: &Path, file: &GlobalFile, roots: &[PathBuf]) -> Resolved {
-    let path = home.join(file.relative);
+/// Links followed on the way to one file; a longer chain, or a loop, is refused.
+const MAX_LINKS: usize = 8;
 
-    if fs::symlink_metadata(&path).is_err() {
-        return Resolved::Missing;
+const SHARED: &str = "it is in a folder shared with the assistant";
+const OUTSIDE_HOME: &str = "it links outside the home folder";
+
+/// Follows `path` one name at a time, as the system would, so that every place on the way is seen: each name is
+/// joined to its folder's real path and refused when that place is in a shared folder (the agent could re-point a
+/// link there, or put one there), and each link must sit inside `home`. `Ok(None)` is a name that is not there.
+/// The place returned is the real path of the last name, which is not a link.
+fn walk(
+    home: &Path,
+    path: &Path,
+    shared: impl Fn(&Path) -> bool,
+) -> Result<Option<PathBuf>, &'static str> {
+    let mut pending: Vec<PathBuf> = path
+        .components()
+        .rev()
+        .map(|part| PathBuf::from(part.as_os_str()))
+        .collect();
+    let mut resolved = PathBuf::new();
+    let mut links = 0;
+
+    while let Some(part) = pending.pop() {
+        match part.components().next() {
+            Some(Component::Prefix(_)) => resolved = part,
+            Some(Component::RootDir) => {
+                // A rooted link target keeps the drive it was reached on (Windows); on Unix this is `/`.
+                let mut root = PathBuf::new();
+
+                if let Some(Component::Prefix(prefix)) = resolved.components().next() {
+                    root.push(prefix.as_os_str());
+                }
+
+                root.push(Component::RootDir.as_os_str());
+                resolved = root;
+            }
+            // `resolved` holds no link, so its parent is the real one; `..` after a file fails as it would for the
+            // system.
+            Some(Component::ParentDir) if resolved.is_dir() => {
+                resolved.pop();
+            }
+            Some(Component::ParentDir) => return Ok(None),
+            Some(Component::Normal(name)) => {
+                // The folder's real path, in the same form as `home` and the shared roots (Windows: `\\?\`).
+                let Ok(folder) = fs::canonicalize(&resolved) else {
+                    return Ok(None);
+                };
+                let here = folder.join(name);
+
+                if shared(&here) {
+                    return Err(SHARED);
+                }
+
+                match fs::symlink_metadata(&here) {
+                    Err(_) => return Ok(None),
+                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                        links += 1;
+
+                        if links > MAX_LINKS {
+                            return Err("it goes through too many links");
+                        }
+
+                        if !here.starts_with(home) && !system_owned(&folder, &metadata) {
+                            return Err(OUTSIDE_HOME);
+                        }
+
+                        let Ok(target) = fs::read_link(&here) else {
+                            return Ok(None);
+                        };
+
+                        resolved = folder;
+                        // A relative target continues from the link's folder; a rooted one starts over.
+                        pending.extend(
+                            target
+                                .components()
+                                .rev()
+                                .map(|part| PathBuf::from(part.as_os_str())),
+                        );
+                    }
+                    Ok(_) => resolved = here,
+                }
+            }
+            Some(Component::CurDir) | None => {}
+        }
     }
 
-    let Ok(real) = fs::canonicalize(&path) else {
-        return Resolved::Missing;
+    // Windows keeps the spelling a name was reached by, but the handle's real path, checked on open, has the one on
+    // disk.
+    #[cfg(windows)]
+    let resolved = fs::canonicalize(&resolved).unwrap_or(resolved);
+
+    Ok(Some(resolved))
+}
+
+/// A link outside the home folder that no one but the system can change: it and its folder belong to root, and the
+/// folder is not writable by anyone else (`/home -> var/home`, a link in the Nix store). Windows follows none.
+fn system_owned(folder: &Path, link: &Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        link.uid() == 0
+            && fs::metadata(folder)
+                .is_ok_and(|folder| folder.uid() == 0 && folder.mode() & 0o022 == 0)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (folder, link);
+
+        false
+    }
+}
+
+/// Where one allowlisted file leads. Links are followed by [`walk`], which refuses a chain with any link or place in
+/// a shared folder; the file it ends at must be a regular Markdown file inside `home` (already canonical) and not in
+/// a shared folder either.
+fn resolve(home: &Path, file: &GlobalFile, roots: &[PathBuf]) -> Resolved {
+    let shared = |place: &Path| roots.iter().any(|root| place.starts_with(root));
+    let real = match walk(home, &home.join(file.relative), shared) {
+        Ok(Some(real)) => real,
+        Ok(None) => return Resolved::Missing,
+        Err(reason) => return Resolved::Refused(reason),
     };
-    // The link itself, its folders resolved: a folder linked into a shared one puts the link there.
-    let link = path
-        .parent()
-        .and_then(|parent| fs::canonicalize(parent).ok())
-        .map(|parent| parent.join(file.name));
 
     if !real.starts_with(home) {
-        return Resolved::Refused("it links outside the home folder");
+        return Resolved::Refused(OUTSIDE_HOME);
     }
 
-    let shared = |place: &Path| roots.iter().any(|root| place.starts_with(root));
-
-    if shared(&real) || link.as_deref().is_some_and(shared) {
-        return Resolved::Refused("it is in a folder shared with the assistant");
+    if shared(&real) {
+        return Resolved::Refused(SHARED);
     }
 
     if !real
@@ -796,6 +902,114 @@ mod tests {
             );
             assert!(entry.get("text").is_none());
         }
+    }
+
+    /// A link in a shared folder halfway along: the agent could re-point it at any Markdown file in home.
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_chain_through_a_link_in_a_shared_folder() {
+        use std::os::unix::fs::symlink;
+
+        let (dir, home) = home("shared-middle");
+
+        put(&home, "notes/private.md", "private");
+        fs::create_dir_all(home.join("work")).unwrap();
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        symlink(home.join("notes/private.md"), home.join("work/claude.md")).unwrap();
+        symlink(home.join("work/claude.md"), home.join(".claude/CLAUDE.md")).unwrap();
+        // A link outside home on the way back in: no longer a place the home-folder rule covers.
+        fs::create_dir_all(home.join(".codex")).unwrap();
+        symlink(home.join("notes/private.md"), dir.join("hop.md")).unwrap();
+        symlink(dir.join("hop.md"), home.join(".codex/AGENTS.md")).unwrap();
+
+        let got: Vec<Value> = serde_json::from_str(
+            &plan(
+                READ_TOOL,
+                &json!({ "files": ["claude", "codex"] }),
+                Some(home.clone()),
+                &[home.join("work")],
+            )
+            .unwrap()
+            .run(&[]),
+        )
+        .unwrap();
+
+        assert_eq!(got[0]["reason"], json!(SHARED));
+        assert_eq!(got[1]["reason"], json!(OUTSIDE_HOME));
+        assert!(got.iter().all(|entry| entry.get("text").is_none()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn follows_a_chain_of_links_outside_the_shared_folders() {
+        use std::os::unix::fs::symlink;
+
+        let (_dir, home) = home("chain");
+
+        put(&home, "dotfiles/real/claude.md", "mine");
+        fs::create_dir_all(home.join("work")).unwrap();
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        // Relative targets, one with `..`, resolved from each link's own folder.
+        symlink("real/claude.md", home.join("dotfiles/claude.md")).unwrap();
+        symlink("../dotfiles/claude.md", home.join(".claude/CLAUDE.md")).unwrap();
+
+        let request = plan(
+            READ_TOOL,
+            &json!({ "files": ["claude"] }),
+            Some(home.clone()),
+            &[home.join("work")],
+        )
+        .unwrap();
+        let got: Vec<Value> = serde_json::from_str(&request.run(&[])).unwrap();
+
+        assert_eq!(got[0]["text"], json!("mine"));
+        assert!(request.detail().contains(&format!(
+            "(links to {})",
+            home.join("dotfiles/real/claude.md").display()
+        )));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_loop_and_a_chain_past_the_link_limit() {
+        use std::os::unix::fs::symlink;
+
+        let (_dir, home) = home("too-many");
+
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        symlink(home.join("loop.md"), home.join(".claude/CLAUDE.md")).unwrap();
+        symlink(home.join(".claude/CLAUDE.md"), home.join("loop.md")).unwrap();
+
+        put(&home, "chain/end.md", "end");
+        fs::create_dir_all(home.join(".codex")).unwrap();
+        symlink(home.join("chain/end.md"), home.join("chain/0.md")).unwrap();
+
+        for hop in 1..MAX_LINKS {
+            symlink(
+                home.join(format!("chain/{}.md", hop - 1)),
+                home.join(format!("chain/{hop}.md")),
+            )
+            .unwrap();
+        }
+
+        // The whole limit still reads; one more link does not.
+        fs::create_dir_all(home.join(".gemini")).unwrap();
+        symlink(
+            home.join(format!("chain/{}.md", MAX_LINKS - 2)),
+            home.join(".gemini/GEMINI.md"),
+        )
+        .unwrap();
+        symlink(
+            home.join(format!("chain/{}.md", MAX_LINKS - 1)),
+            home.join(".codex/AGENTS.md"),
+        )
+        .unwrap();
+
+        let got = read(&home, &["claude", "codex", "gemini"]);
+
+        assert_eq!(got[0]["reason"], json!("it goes through too many links"));
+        assert_eq!(got[1]["reason"], json!("it goes through too many links"));
+        assert_eq!(got[2]["text"], json!("end"));
     }
 
     #[cfg(unix)]
