@@ -7,7 +7,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseClaim } from "../lib/claim-once";
+import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { loadActivePathTail } from "./branch-rows";
 
@@ -134,6 +134,25 @@ export const admitFollowupSuggestions = internalMutation
  * Gives a reply's claim back, when its charge was refused or its run failed before the cache: a later run may ask again. Only the claim
  * this run took (`claimedAt`) is freed: a run whose claim lapsed must not free the claim a later run has taken on the same key.
  */
+/**
+ * Renews a reply's claim for another hour from now, while its cache write is still being retried: a later run for the same reply
+ * then finds the claim held and does not call the model again. Only the claim that took the reply renews it.
+ */
+export const holdFollowupClaim = internalMutation
+    .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.boolean())
+    .mutation(
+        async ({ args: { claimedAt, lastMessageId, threadId, userId }, ctx: context }) =>
+            await holdClaim(
+                context,
+                FOLLOWUP_CLAIM_SCOPE,
+                `${threadId}:${lastMessageId}`,
+                claimedAt,
+                holdTtlFrom(claimedAt, FOLLOWUP_CLAIM_TTL_MS, context.now),
+                userId,
+            ),
+    );
+
 export const releaseFollowupSuggestions = internalMutation
     .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
     .output(v.null())

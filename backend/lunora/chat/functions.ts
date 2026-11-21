@@ -4582,6 +4582,7 @@ const FOLLOWUP_CACHE_RETRY = { backoff: "exponential", baseMs: 5000, forever: tr
 export const retryFollowupCache = internalAction
     .input({
         chargedUserId: v.string().max(MAX_LENGTH.id),
+        claimedAt: v.number(),
         lastMessageId: v.string().max(MAX_LENGTH.id),
         order: v.number(),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
@@ -4591,7 +4592,16 @@ export const retryFollowupCache = internalAction
         threadId: v.string().max(MAX_LENGTH.id),
     })
     .action(async ({ args, ctx }) => {
-        const { chargedUserId, organizationId, requestId, ...write } = args;
+        const { chargedUserId, claimedAt, organizationId, requestId, ...write } = args;
+
+        // The reply's claim is renewed before each attempt, so no second model call can start while this write is still outstanding.
+        await ctx.runMutation(internal.agent.followup_suggestions.holdFollowupClaim, {
+            claimedAt,
+            lastMessageId: write.lastMessageId,
+            threadId: write.threadId,
+            userId: chargedUserId,
+        });
+
         const written = await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, write);
 
         if (!written) {
@@ -4994,6 +5004,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                             ...cacheWrite,
                             // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
                             chargedUserId,
+                            claimedAt: paid.claimedAt,
                             organizationId: threadData.organizationId ?? undefined,
                             requestId: replyChargeKey,
                         },

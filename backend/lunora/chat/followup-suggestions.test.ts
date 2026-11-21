@@ -15,6 +15,7 @@ import {
     cacheFollowupSuggestions,
     endFollowupDispatch,
     followupDispatchInFlight,
+    holdFollowupClaim,
     followupInFlight,
     followupModelRows,
     getCachedFollowupSuggestionsHandler,
@@ -143,6 +144,18 @@ describe("one paid call per reply", () => {
     it("the first run of a reply is admitted, a second run of the same reply is not", async () => {
         await expect(admit("reply-1")).resolves.toEqual(expect.any(Number));
         await expect(admit("reply-1")).resolves.toBeNull();
+    });
+
+    // The cache retry renews the claim that took the reply, and only that one: another claim time renews nothing.
+    it("renews the claim that took a reply, and not any other", async () => {
+        const claimedAt = (await admit("reply-renew")) as number;
+        const hold = async (at: number) =>
+            await harness.action(
+                async (context: any) => await context.runMutation(holdFollowupClaim, { claimedAt: at, lastMessageId: "reply-renew", threadId, userId: OWNER }),
+            );
+
+        await expect(hold(claimedAt)).resolves.toBe(true);
+        await expect(hold(claimedAt + 1)).resolves.toBe(false);
     });
 
     it("the next reply is admitted on its own claim", async () => {
