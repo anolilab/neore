@@ -32,10 +32,10 @@ describe(collectThreadImages, () => {
         ]);
 
         expect(images).toEqual([
-            { alt: "sketch.png", key: "m1:0", messageId: "m1", src: "https://api.test/files/sketch?sig=1" },
-            { alt: "Pricing", key: browserImageKey("call-1"), messageId: "m2", src: `data:image/png;base64,${PNG}` },
-            { alt: "Code output image", key: codeImageKey("call-2", 1), messageId: "m2", src: "https://api.test/files/chart?sig=1" },
-            { alt: "Image", key: "m2:3", messageId: "m2", src: "https://api.test/files/owl?sig=1" },
+            { alt: "sketch.png", key: "m1:0", kind: "file", messageId: "m1", src: "https://api.test/files/sketch?sig=1" },
+            { alt: "Pricing", key: browserImageKey("call-1"), kind: "browser", messageId: "m2", src: `data:image/png;base64,${PNG}` },
+            { key: codeImageKey("call-2", 1), kind: "code", messageId: "m2", src: "https://api.test/files/chart?sig=1" },
+            { alt: undefined, key: "m2:3", kind: "file", messageId: "m2", src: "https://api.test/files/owl?sig=1" },
         ]);
     });
 

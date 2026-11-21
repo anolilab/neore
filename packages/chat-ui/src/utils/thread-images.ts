@@ -9,9 +9,11 @@ import { toolImageSource } from "./tool-image-source";
  */
 
 export interface ThreadImage {
-    alt: string;
+    /** The image's own name (a page title, a file name), if it has one; the gallery words the rest by `kind`, translated. */
+    alt?: string;
     /** Stable across re-renders: a tool image by its call (`tool:<call>[:<result>]`), a file by message and part. */
     key: string;
+    kind: "browser" | "code" | "file";
     messageId: string;
     src: string;
 }
@@ -55,7 +57,7 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): Thr
             ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
             : undefined;
 
-        return src ? [{ alt: output?.title || output?.url || "Browser screenshot", key: browserImageKey(part.toolCallId), messageId, src }] : [];
+        return src ? [{ alt: output?.title || output?.url || undefined, key: browserImageKey(part.toolCallId), kind: "browser", messageId, src }] : [];
     }
 
     if (part.type === "tool-codeExecution" && part.toolCallId) {
@@ -66,7 +68,7 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): Thr
             const src =
                 result.type === "image" ? toolImageSource({ inline: result.value, mediaType: `image/${result.format || "png"}`, url: result.url }) : undefined;
 
-            return src ? [{ alt: "Code output image", key: codeImageKey(toolCallId, index), messageId, src }] : [];
+            return src ? [{ key: codeImageKey(toolCallId, index), kind: "code", messageId, src }] : [];
         });
     }
 
@@ -77,13 +79,13 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): Thr
     const key = `${messageId}:${String(partIndex)}`;
 
     if (part.type === "image" && typeof part.image === "string" && part.image.length > 0) {
-        return [{ alt: part.filename || "Image", key, messageId, src: part.image }];
+        return [{ alt: part.filename || undefined, key, kind: "file", messageId, src: part.image }];
     }
 
     const fileUrl = part.url || part.data;
 
     if (part.type === "file" && part.mediaType?.startsWith("image/") === true && fileUrl) {
-        return [{ alt: part.filename || "Image", key, messageId, src: fileUrl }];
+        return [{ alt: part.filename || undefined, key, kind: "file", messageId, src: fileUrl }];
     }
 
     return [];

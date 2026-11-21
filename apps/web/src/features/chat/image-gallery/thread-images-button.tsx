@@ -27,7 +27,12 @@ const ThreadImagesButton: FC<{ threadId: string | undefined }> = ({ threadId }) 
         <Tooltip>
             <TooltipTrigger
                 render={
-                    <Button aria-label={t`Images in this chat (${images.length})`} onClick={() => openAt(threadId, null)} size="icon" variant="ghost">
+                    <Button
+                        aria-label={t`Images in this chat (${images.length})`}
+                        onClick={(event) => openAt(threadId, null, event.currentTarget)}
+                        size="icon"
+                        variant="ghost"
+                    >
                         <ImagesIcon aria-hidden="true" className="h-4 w-4" />
                     </Button>
                 }

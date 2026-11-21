@@ -26,7 +26,7 @@ export const GalleryImage: FC<{ alt: string; buttonClassName?: string; className
         <button
             aria-label={t`Open ${alt} in the image gallery`}
             className={cn("focus-visible:ring-ring cursor-zoom-in rounded focus-visible:ring-2 focus-visible:outline-none", buttonClassName)}
-            onClick={() => open(imageKey)}
+            onClick={(event) => open(imageKey, event.currentTarget)}
             type="button"
         >
             <img alt="" className={className} src={src} />

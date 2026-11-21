@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /** The chat's image gallery: opens at the chosen image, steps with the arrow keys and thumbnails, and jumps to the message. */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scrollToMessage = vi.hoisted(() => vi.fn());
@@ -32,9 +32,9 @@ const { useImageGalleryStore } = await import("./image-gallery-store");
 const { default: ThreadImageGallery, galleryIndexOf, galleryStep } = await import("./thread-image-gallery");
 
 const IMAGES = [
-    { alt: "Pricing page", key: "tool:call-1", messageId: "m1", src: "https://api.test/one" },
-    { alt: "Chart", key: "tool:call-2:0", messageId: "m2", src: "https://api.test/two" },
-    { alt: "Logo", key: "m3:1", messageId: "m3", src: "https://api.test/three" },
+    { alt: "Pricing page", key: "tool:call-1", kind: "browser" as const, messageId: "m1", src: "https://api.test/one" },
+    { alt: "Chart", key: "tool:call-2:0", kind: "code" as const, messageId: "m2", src: "https://api.test/two" },
+    { alt: "Logo", key: "m3:1", kind: "file" as const, messageId: "m3", src: "https://api.test/three" },
 ];
 
 const PREVIEW_NAME = /^(Pricing page|Chart|Logo)$/u;
@@ -72,7 +72,7 @@ describe(galleryStep, () => {
 describe("ThreadImageGallery", () => {
     beforeEach(() => {
         scrollToMessage.mockReset();
-        useImageGalleryStore.setState({ shown: null });
+        useImageGalleryStore.setState({ opener: null, shown: null });
     });
 
     it("stays closed until an image is opened", () => {
@@ -180,5 +180,53 @@ describe("ThreadImageGallery", () => {
 
         expect(scrollToMessage).toHaveBeenCalledWith("m3", { threadId: "t1" });
         expect(useImageGalleryStore.getState().shown).toBeNull();
+    });
+
+    it("names an image with no name of its own by its kind", () => {
+        const nameless = [
+            { key: "tool:call-9", kind: "browser" as const, messageId: "m1", src: "https://api.test/a" },
+            { key: "tool:call-8:0", kind: "code" as const, messageId: "m1", src: "https://api.test/b" },
+        ];
+
+        render(<ThreadImageGallery images={nameless} threadId="t1" />);
+        openAt(null);
+
+        expect(screen.getByRole("img", { name: "Browser screenshot" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Image 2: Code output" })).toBeTruthy();
+    });
+
+    it("hands the focus back to the control that opened it when it closes, even one a click did not focus", async () => {
+        const opener = document.createElement("button");
+
+        opener.textContent = "Images";
+        document.body.appendChild(opener);
+        // Safari does not focus a clicked button: the click hands the control over instead.
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        act(() => {
+            useImageGalleryStore.getState().openAt("t1", null, opener);
+        });
+
+        expect(useImageGalleryStore.getState().opener).toBe(opener);
+
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+        await waitFor(() => {
+            // eslint-disable-next-line testing-library/no-node-access -- the assertion is about where the focus went
+            expect(document.activeElement).toBe(opener);
+        });
+        opener.remove();
+    });
+
+    it("keeps the opener of an open gallery while it steps through the images", () => {
+        const opener = document.createElement("button");
+
+        document.body.appendChild(opener);
+        opener.focus();
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt(null);
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "ArrowRight" });
+
+        expect(useImageGalleryStore.getState().opener).toBe(opener);
+        opener.remove();
     });
 });

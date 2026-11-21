@@ -19,7 +19,7 @@ const ChatImageGallery: FC<{ children: ReactNode }> = ({ children }) => {
     const { threadId } = useChatThreadIdentity();
     const images = useThreadImages();
     const openAt = useImageGalleryStore((state) => state.openAt);
-    const openImage = useMemo(() => (threadId ? (key: string) => openAt(threadId, key) : null), [openAt, threadId]);
+    const openImage = useMemo(() => (threadId ? (key: string, opener?: HTMLElement) => openAt(threadId, key, opener) : null), [openAt, threadId]);
 
     return (
         <ImageOpenContext value={openImage}>

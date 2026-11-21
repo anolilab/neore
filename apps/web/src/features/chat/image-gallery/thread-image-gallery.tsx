@@ -57,11 +57,46 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
     const shown = useImageGalleryStore((state) => (state.shown?.threadId === threadId ? state.shown : null));
     const openAt = useImageGalleryStore((state) => state.openAt);
     const close = useImageGalleryStore((state) => state.close);
+    const opener = useImageGalleryStore((state) => state.opener);
     const previewRef = useRef<HTMLDivElement>(null);
+    // Set by Go to message: the jump focuses the message, so the close must not hand focus back to the opener.
+    const keepFocusOnCloseRef = useRef(false);
     // Set by a key pressed in the zoomable preview: the next image replaces it, so the focus moves to that one.
     const refocusPreviewRef = useRef(false);
 
     const isOpen = shown !== null && images.length > 0;
+
+    /** An image's name: its own (a page title, a file name), else its kind, in the viewer's language. */
+    const labelOf = (image: ThreadImage): string => {
+        if (image.alt) {
+            return image.alt;
+        }
+
+        switch (image.kind) {
+            case "browser": {
+                return t`Browser screenshot`;
+            }
+
+            case "code": {
+                return t`Code output`;
+            }
+
+            default: {
+                return t`Image`;
+            }
+        }
+    };
+
+    // Focus goes back to the control that opened the gallery while it is still on the page; else the dialog's default.
+    const finalFocus = (): HTMLElement | boolean => {
+        if (keepFocusOnCloseRef.current) {
+            keepFocusOnCloseRef.current = false;
+
+            return false;
+        }
+
+        return opener?.isConnected ? opener : true;
+    };
     const index = galleryIndexOf(images, shown?.key ?? null);
     const current = images[index];
     const currentKey = current?.key;
@@ -113,6 +148,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
             return;
         }
 
+        keepFocusOnCloseRef.current = true;
         close();
         // The thread, so in the split view the pane of this chat scrolls, not the focused one.
         scrollToMessage(current.messageId, { threadId });
@@ -127,7 +163,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
             }}
             open={isOpen}
         >
-            <DialogPopup className="flex max-h-[90vh] w-full max-w-5xl flex-col gap-3 p-4" onKeyDown={handleKeyDown}>
+            <DialogPopup className="flex max-h-[90vh] w-full max-w-5xl flex-col gap-3 p-4" finalFocus={finalFocus} onKeyDown={handleKeyDown}>
                 <DialogTitle className="text-sm font-medium">{t`Images in this chat`}</DialogTitle>
                 {current && (
                     <>
@@ -135,7 +171,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
                             {t`Image ${index + 1} of ${images.length}`}
                         </p>
                         <div className="relative flex h-[60vh] min-h-0 items-center justify-center" ref={previewRef}>
-                            <ZoomableImage alt={current.alt} className="h-full w-full" key={current.key} src={current.src} />
+                            <ZoomableImage alt={labelOf(current)} className="h-full w-full" key={current.key} src={current.src} />
                             <Button
                                 aria-label={t`Previous image`}
                                 className="absolute top-1/2 left-2 -translate-y-1/2"
@@ -163,7 +199,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
                                     <li className="shrink-0" key={image.key}>
                                         <button
                                             aria-current={position === index ? "true" : undefined}
-                                            aria-label={t`Image ${position + 1}: ${image.alt}`}
+                                            aria-label={t`Image ${position + 1}: ${labelOf(image)}`}
                                             className={cn(
                                                 "focus-visible:ring-ring block size-16 overflow-hidden rounded border-2 focus-visible:ring-2 focus-visible:outline-none",
                                                 position === index ? "border-primary" : "border-transparent opacity-70 hover:opacity-100",
