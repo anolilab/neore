@@ -325,6 +325,18 @@ export const setRunTurn = (ctx: object, turn: Partial<RunTurn> | undefined): voi
 };
 
 /**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runToolSources`: the source of each tool
+ * the run offers, read off its permission key (`builtin:…`, `mcp:…`, `connector:…`, `device:…`), never off its name; a
+ * key with no source reads as `unknown`. A continuation passes the keys its snapshot recorded too, so a tool the step
+ * that made the call was offered still counts after it is gone; a snapshot that recorded none sets none.
+ */
+export const setRunToolSources = (ctx: object, ...permissionKeys: ReadonlyArray<Record<string, string> | undefined>): void => {
+    (ctx as { runToolSources?: ReadonlyArray<string> }).runToolSources = permissionKeys.includes(undefined)
+        ? undefined
+        : permissionKeys.flatMap((keys) => Object.values(keys ?? {}).map((key) => (key.includes(":") ? key.slice(0, key.indexOf(":")) : "unknown")));
+};
+
+/**
  * The organization whose policy caps this run's tools. A sub-agent it dispatches records it when the parent thread has no
  * stored organization, so the child is capped as the run was.
  */
@@ -1573,6 +1585,7 @@ export const resumeApprovedRun = async (
         setRunStartedBy(ctx, config.startedBy);
         // And what the saved-login verdict needs of that turn: a snapshot without any of it sets none.
         setRunTurn(ctx, { impersonated: config.impersonated, promptMessageId: config.promptMessageId, systemContext: config.systemContext });
+        setRunToolSources(ctx, config.toolPermissionKeys, toolResult.permissionKeys);
         setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
 
         const stopping = new AbortController();

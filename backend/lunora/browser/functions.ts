@@ -45,6 +45,19 @@ export const getActiveSession = internalQuery
     })
     .query(async ({ args: { threadId }, ctx }) => await activeThreadSession(ctx.db, threadId));
 
+/** The owner's allowed and blocked domains for the agent's browser (`aiUserPreferences.browserSettings`), for `validateDomain`. */
+export const getBrowserDomainSettings = internalQuery
+    .input({ userId: v.string() })
+    .output(v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }))
+    .query(async ({ args, ctx }) => {
+        const preferences = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .first();
+
+        return preferences?.browserSettings ?? {};
+    });
+
 export const createSession = internalMutation
     .input({
         connectUrl: v.optional(v.string()),

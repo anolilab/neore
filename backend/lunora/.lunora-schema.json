@@ -4262,6 +4262,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"login\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"navigate\""
             },
             {

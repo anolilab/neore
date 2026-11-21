@@ -399,7 +399,16 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"]),
 
     browserActions: defineTable({
-        action: v.union(v.literal("navigate"), v.literal("screenshot"), v.literal("click"), v.literal("type"), v.literal("extract"), v.literal("scroll")),
+        // `login`: a saved-login fill (`chat/tools/site-login-node.ts`). Its row names the site, never the username or password.
+        action: v.union(
+            v.literal("navigate"),
+            v.literal("screenshot"),
+            v.literal("click"),
+            v.literal("type"),
+            v.literal("extract"),
+            v.literal("scroll"),
+            v.literal("login"),
+        ),
         /**
          * A person in control of the browser did this: the session's `owner`, or a `collaborator` they shared the chat
          * with; absent: the agent. A kind, never a user id: a collaborator's id here would outlive their account.
