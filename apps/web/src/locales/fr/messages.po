@@ -85,11 +85,11 @@ msgstr "« {fileName} » est trop volumineux. Les documents ne peuvent pas dépa
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "« {fileName} » est trop volumineux. Les fichiers de ce type ne peuvent pas dépasser {maxMegabytes} Mo."
 
-#: src/features/projects/components/project-rule-files.tsx:584
+#: src/features/projects/components/project-rule-files.tsx:671
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "« {name} » a plus de {limit} motifs de fichier. Supprimez-en quelques-uns ou déplacez-les dans un autre fichier."
 
-#: src/features/projects/components/project-rule-files.tsx:567
+#: src/features/projects/components/project-rule-files.tsx:654
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "« {name} » dépasse {limit} caractères. Raccourcissez-le ou répartissez-le sur plusieurs fichiers."
 
@@ -122,6 +122,10 @@ msgstr "({jobFailed} en échec)"
 msgid "(attachments only)"
 msgstr "(pièces jointes uniquement)"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:238
+msgid "(broken link: what it links to could not be found)"
+msgstr "(lien cassé : sa cible est introuvable)"
+
 #: src/features/settings/components/chat/default-models-settings.tsx:116
 msgid "(default)"
 msgstr "(par défaut)"
@@ -147,9 +151,29 @@ msgstr "(attendu)"
 msgid "(filtered from {unfilteredRows})"
 msgstr "(filtré sur {unfilteredRows})"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:239
+msgid "(link not followed: this repository holds more links than one search follows)"
+msgstr "(lien non suivi : ce dépôt contient plus de liens qu'une recherche n'en suit)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:242
+msgid "(link not followed: what it links to has too long a name)"
+msgstr "(lien non suivi : le nom de sa cible est trop long)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:241
+msgid "(links through too many other links)"
+msgstr "(passe par trop d'autres liens)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:240
+msgid "(links to a file outside the ones listed here)"
+msgstr "(pointe vers un fichier hors de ceux listés ici)"
+
 #: src/features/chat/forward/forward-selection-bar.tsx:70
 msgid "(maximum reached)"
 msgstr "(maximum atteint)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:436
+msgid "(may be too long)"
+msgstr "(peut-être trop long)"
 
 #: src/features/settings/components/chat/usage-settings.tsx:502
 msgid "(microdollars; 1,000,000 = $1)"
@@ -183,9 +207,17 @@ msgstr "(facultatif)"
 msgid "(required)"
 msgstr "(obligatoire)"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:245
+msgid "(same file as {path})"
+msgstr "(même fichier que {path})"
+
 #: src/features/knowledge/components/project-knowledge-collections.tsx:65
 msgid "(shared)"
 msgstr "(partagée)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:434
+msgid "(too large)"
+msgstr "(trop volumineux)"
 
 #: src/features/tasks/components/tasks-page.tsx:182
 msgid "(unavailable skill)"
@@ -233,6 +265,11 @@ msgstr "{0, plural, one {# emoji trouvé} other {# emoji trouvés}}"
 #: src/features/chat/thread/host-changes.tsx:53
 msgid "{0, plural, one {# file changed} other {# files changed}}"
 msgstr "{0, plural, one {# fichier modifié} other {# fichiers modifiés}}"
+
+#. placeholder {0}: read.notRead
+#: src/features/projects/components/project-rule-files.tsx:574
+msgid "{0, plural, one {# file was not read this time} other {# files were not read this time}}: import again to add the rest."
+msgstr "{0, plural, one {# fichier n'a pas été lu cette fois} other {# fichiers n'ont pas été lus cette fois}} : importez à nouveau pour ajouter le reste."
 
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
@@ -356,7 +393,7 @@ msgid "{0, plural, one {# result} other {# results}}, {1}"
 msgstr "{0, plural, one {# résultat} other {# résultats}}, {1}"
 
 #. placeholder {0}: added.length
-#: src/features/projects/components/project-rule-files.tsx:534
+#: src/features/projects/components/project-rule-files.tsx:554
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
 msgstr "{0, plural, one {# fichier de règles importé.} other {# fichiers de règles importés.}} Vérifiez, puis enregistrez."
 
@@ -964,6 +1001,10 @@ msgstr "{done} sur {total} tâches terminées. En cours : {inProgress}"
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, one {# pièce jointe supprimée au rechargement} other {# pièces jointes supprimées au rechargement}}"
 
+#: src/features/projects/components/project-rule-files.tsx:573
+msgid "{duplicates, plural, one {# file was left out as the same file as another picked} other {# files were left out as the same file as another picked}}: the same text would apply twice."
+msgstr "{duplicates, plural, one {# fichier a été laissé de côté, car c’est le même fichier qu’un autre choisi} other {# fichiers ont été laissés de côté, car c’est le même fichier qu’un autre choisi}} : le même texte s’appliquerait deux fois."
+
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:123
 msgid "{duration, plural, one {Thought for # second} other {Thought for # seconds}}"
 msgstr "{duration, plural, one {Réflexion pendant # seconde} other {Réflexion pendant # secondes}}"
@@ -1244,6 +1285,10 @@ msgstr "{modelCount, plural, one {Demandez n’importe quoi à # modèle...} oth
 msgid "{months}mo ago"
 msgstr "il y a {months} mois"
 
+#: src/features/projects/components/project-rule-files.tsx:563
+msgid "{more, plural, one {# more} other {# more}}"
+msgstr "{more, plural, one {# autre} other {# autres}}"
+
 #: ../../packages/ui/src/components/file-renderers/json-viewer.tsx:221
 msgid "{moreCount, plural, one {# more item} other {# more items}}"
 msgstr "{moreCount, plural, one {# élément de plus} other {# éléments de plus}}"
@@ -1393,6 +1438,10 @@ msgstr "{providerName} · votre propre compte Bedrock ({region})"
 msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
 msgstr "{refusedLabel} n'a pas le format demandé par cette requête, rien n'a donc été enregistré. Saisissez-le à nouveau."
 
+#: src/features/projects/components/project-rule-files.tsx:583
+msgid "{renamed, plural, one {# name opened with id:, which names a file by its id, so it now opens with id-} other {# names opened with id:, which names a file by its id, so they now open with id-}} instead."
+msgstr "{renamed, plural, one {# nom commençait par id:, qui désigne un fichier par son identifiant : il commence désormais par id-} other {# noms commençaient par id:, qui désigne un fichier par son identifiant : ils commencent désormais par id-}}."
+
 #: src/features/settings/components/chat/usage-settings.tsx:395
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
@@ -1450,17 +1499,21 @@ msgstr "{selectedCount} sur {MAX_PARALLEL} sélectionnés"
 msgid "{server} · until {until}"
 msgstr "{server} · jusqu’à {until}"
 
+#: src/features/projects/components/project-rule-files.tsx:582
+msgid "{shortened, plural, one {# name was} other {# names were}} shortened to {titleLimit} characters."
+msgstr "{shortened, plural, one {# nom a été raccourci} other {# noms ont été raccourcis}} à {titleLimit} caractères."
+
 #: src/features/workflow/hooks/use-workflow-transfer.ts:77
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, one {# fichier n’a pas pu être importé et a été ignoré} other {# fichiers n’ont pas pu être importés et ont été ignorés}}"
 
-#: src/features/projects/components/project-rule-files.tsx:537
-msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
-msgstr "{skipped, plural, one {# fichier a été ignoré.} other {# fichiers ont été ignorés.}} Un projet contient au plus {limit} fichiers de règles."
-
 #: src/features/workflow/hooks/use-workflow-transfer.ts:55
 msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
 msgstr "{skipped, plural, one {# fichier n’a pas pu être inclus dans l’export} other {# fichiers n’ont pas pu être inclus dans l’export}}"
+
+#: src/features/projects/components/project-rule-files.tsx:568
+msgid "{skippedCount, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files. Left out: {skippedNames}."
+msgstr "{skippedCount, plural, one {# fichier a été ignoré.} other {# fichiers ont été ignorés.}} Un projet contient au plus {limit} fichiers de règles. Ignorés : {skippedNames}."
 
 #: ../../packages/chat-ui/src/chat/presentation-artifact.tsx:51
 msgid "{slideCount, plural, one {# slide} other {# slides}}"
@@ -1508,6 +1561,10 @@ msgstr "{title} : {0}"
 msgid "{title}: {0}. {exitText}"
 msgstr "{title} : {0}. {exitText}"
 
+#: src/features/projects/components/project-rule-files.tsx:579
+msgid "{tooLargeCount, plural, one {# file was left out as too large} other {# files were left out as too large}}: a rule file holds at most {length} characters, and all of a project's together at most {size} MB. Too large: {tooLargeNames}."
+msgstr "{tooLargeCount, plural, one {# fichier a été laissé de côté, trop volumineux} other {# fichiers ont été laissés de côté, trop volumineux}} : un fichier de règles contient au plus {length} caractères, et tous ceux d’un projet ensemble au plus {size} Mo. Trop volumineux : {tooLargeNames}."
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:522
 msgid "{toolId} API key removed"
 msgstr "Clé API {toolId} supprimée"
@@ -1516,7 +1573,7 @@ msgstr "Clé API {toolId} supprimée"
 msgid "{toolId} API key saved"
 msgstr "Clé API {toolId} enregistrée"
 
-#: src/features/projects/components/project-rule-files.tsx:535
+#: src/features/projects/components/project-rule-files.tsx:555
 msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
 msgstr "{toSet, plural, one {# fichier n’indique pas quand il s’applique} other {# fichiers n’indiquent pas quand ils s’appliquent}} : définissez une description ou un autre mode."
 
@@ -1527,6 +1584,10 @@ msgstr "{total, plural, one {# outil utilisé · {tail}} other {# outils utilis�
 #: src/features/settings/components/chat/usage-activity-heatmap.tsx:112
 msgid "{totalReplies} on {activeDays} in the last year, {totalCost} spent."
 msgstr "{totalReplies} sur {activeDays} au cours de l’année écoulée, {totalCost} dépensés."
+
+#: src/features/projects/components/project-rule-files.tsx:571
+msgid "{unreadableCount, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large. Not read: {unreadableNames}."
+msgstr "{unreadableCount, plural, one {# fichier n’a pas pu être lu} other {# fichiers n’ont pas pu être lus}} : absent du dépôt ou trop volumineux. Non lus : {unreadableNames}."
 
 #: src/features/workflow/components/collab/node-lock-indicator.tsx:27
 msgid "{userName} is editing"
@@ -1899,7 +1960,7 @@ msgstr "Un éditeur de documents qui réfléchit avec vous."
 msgid "A few questions first"
 msgstr "Quelques questions d’abord"
 
-#: src/features/projects/components/project-rule-files.tsx:580
+#: src/features/projects/components/project-rule-files.tsx:667
 msgid "A file applied when files match needs at least one pattern."
 msgstr "Un fichier appliqué quand des fichiers correspondent nécessite au moins un motif."
 
@@ -1907,7 +1968,7 @@ msgstr "Un fichier appliqué quand des fichiers correspondent nécessite au moin
 msgid "A file only its owner can read (no keychain available)"
 msgstr "Un fichier que seul son propriétaire peut lire (aucun trousseau disponible)"
 
-#: src/features/projects/components/project-rule-files.tsx:574
+#: src/features/projects/components/project-rule-files.tsx:661
 msgid "A file read when needed needs a line saying when to read it."
 msgstr "Un fichier lu au besoin doit avoir une ligne indiquant quand le lire."
 
@@ -2024,7 +2085,7 @@ msgstr "Un marqueur ou une @mention hors guillemets est lu comme null ici ; cett
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "Un projet peut lister au plus {MAX_REPOSITORIES} dépôts."
 
-#: src/features/projects/components/project-rule-files.tsx:601
+#: src/features/projects/components/project-rule-files.tsx:688
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "Un projet contient au maximum {limit} fichiers de règles. Supprimez-en un d’abord."
 
@@ -2062,11 +2123,11 @@ msgstr "Une réponse qui a utilisé des souvenirs affiche la liste « Souvenirs 
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "Un tour acheminé ou mentionné compte au plus trois intervenants. Un tour parallèle donne jusqu’à quatre réponses et une synthèse, et un débat va jusqu’à trois tours."
 
-#: src/features/projects/components/project-rule-files.tsx:591
+#: src/features/projects/components/project-rule-files.tsx:678
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "Le nom d’un fichier de règles peut comporter au maximum {limit} caractères."
 
-#: src/features/projects/components/project-rule-files.tsx:587
+#: src/features/projects/components/project-rule-files.tsx:674
 msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
 msgstr "Le nom d’un fichier de règles ne peut pas commencer par « id: ». Renommez « {name} »."
 
@@ -2634,7 +2695,7 @@ msgstr "Ajoutez des images de référence pour garantir la cohérence"
 msgid "Add row"
 msgstr "Ajouter une ligne"
 
-#: src/features/projects/components/project-rule-files.tsx:814
+#: src/features/projects/components/project-rule-files.tsx:912
 msgid "Add rule file"
 msgstr "Ajouter un fichier de règles"
 
@@ -3590,8 +3651,8 @@ msgstr "Déjà lié à ce fil."
 msgid "Also viewing"
 msgstr "Consultent aussi"
 
-#: src/features/projects/components/project-rule-files.tsx:286
-#: src/features/projects/components/project-rule-files.tsx:455
+#: src/features/projects/components/project-rule-files.tsx:291
+#: src/features/projects/components/project-rule-files.tsx:460
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:311
 msgid "Always"
 msgstr "Toujours"
@@ -3653,7 +3714,7 @@ msgstr "Un agent (compétence)"
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "Un agent traite la tâche en autonomie, puis un vérificateur contrôle le résultat par rapport à vos critères de réussite."
 
-#: src/features/projects/components/project-rule-files.tsx:820
+#: src/features/projects/components/project-rule-files.tsx:918
 msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
 msgstr "Un fichier AGENTS.md, CLAUDE.md ou GEMINI.md, ou d'autres fichiers Markdown"
 
@@ -4011,7 +4072,7 @@ msgstr "AppID depuis la configuration de base de votre compte officiel"
 msgid "Application Error"
 msgstr "Erreur de l’application"
 
-#: src/features/projects/components/project-rule-files.tsx:282
+#: src/features/projects/components/project-rule-files.tsx:287
 msgid "Applies"
 msgstr "S’applique"
 
@@ -5864,6 +5925,7 @@ msgstr "Canada"
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
+#: src/features/projects/components/repo-rule-file-import.tsx:461
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -6323,7 +6385,7 @@ msgstr "Discussions"
 msgid "Chats in this project search these collections and cite them."
 msgstr "Les conversations de ce projet recherchent dans ces collections et les citent."
 
-#: src/features/projects/components/project-rule-files.tsx:317
+#: src/features/projects/components/project-rule-files.tsx:322
 msgid "Chats see the name and this line, and read the file when it applies."
 msgstr "Les discussions voient le nom et cette ligne, et lisent le fichier quand il s'applique."
 
@@ -7803,6 +7865,10 @@ msgstr "Connecter l’extension"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:45
 msgid "Connect Feishu / Lark"
 msgstr "Connecter Feishu / Lark"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:230
+msgid "Connect GitHub in Settings → Connectors to import from a repository."
+msgstr "Connectez GitHub dans Paramètres → Connecteurs pour importer depuis un dépôt."
 
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:55
 msgid "Connect LINE"
@@ -10256,7 +10322,7 @@ msgstr "Supprimer {fileName}"
 msgid "Delete {itemName}"
 msgstr "Supprimer {itemName}"
 
-#: src/features/projects/components/project-rule-files.tsx:277
+#: src/features/projects/components/project-rule-files.tsx:282
 msgid "Delete {name}"
 msgstr "Supprimer {name}"
 
@@ -10984,7 +11050,7 @@ msgid "Discard"
 msgstr "Ignorer"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:893
+#: src/features/projects/components/project-rule-files.tsx:992
 msgid "Discard changes"
 msgstr "Abandonner les modifications"
 
@@ -11632,7 +11698,7 @@ msgstr "Chaque connexion a sa propre adresse de webhook, et l’application lui 
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Chaque canal Discord crée une conversation distincte dans Neore Chat. L’IA répondra automatiquement dans le canal."
 
-#: src/features/projects/components/project-rule-files.tsx:578
+#: src/features/projects/components/project-rule-files.tsx:665
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "Chaque motif de fichier de « {name} » doit comporter au maximum {limit} caractères, sur une seule ligne."
 
@@ -14671,7 +14737,7 @@ msgstr "Classer dans un autre projet"
 msgid "File input"
 msgstr "Entrée de fichier"
 
-#: src/features/projects/components/project-rule-files.tsx:323
+#: src/features/projects/components/project-rule-files.tsx:328
 msgid "File patterns, one per line"
 msgstr "Motifs de fichier, un par ligne"
 
@@ -14741,6 +14807,10 @@ msgstr ""
 #: src/lib/native/native-bridge.tsx:84
 msgid "Files dropped earlier for another account were not attached. Drop them again."
 msgstr ""
+
+#: src/features/projects/components/repo-rule-file-import.tsx:414
+msgid "Files found"
+msgstr "Fichiers trouvés"
 
 #: src/features/settings/components/privacy/data-access.tsx:52
 msgid "Files:"
@@ -14871,6 +14941,10 @@ msgstr "Finalisation..."
 #: src/features/settings/components/chat/mcp/popular-servers.ts:163
 msgid "Financial data and bank connection APIs"
 msgstr "API de données financières et de connexion bancaire"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:457
+msgid "Find files"
+msgstr "Rechercher les fichiers"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:182
 msgid "Find in table..."
@@ -15101,7 +15175,7 @@ msgstr "Par exemple : « Mettre l’accent sur les bonnes pratiques Python », �
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "Par exemple : « Titres de moins de quatre mots », « Rédiger les titres en allemand » ou « Commencer par un verbe »."
 
-#: src/features/projects/components/project-rule-files.tsx:313
+#: src/features/projects/components/project-rule-files.tsx:318
 msgid "For example: how we write database migrations"
 msgstr "Par exemple : comment nous écrivons les migrations de base de données"
 
@@ -15209,6 +15283,11 @@ msgstr "Transférer"
 #: src/features/chat/forward/forward-dialog.tsx:108
 msgid "Forward to a new chat"
 msgstr "Transférer vers une nouvelle discussion"
+
+#. placeholder {0}: found.length
+#: src/features/projects/components/repo-rule-file-import.tsx:403
+msgid "Found {0, plural, one {# file} other {# files}}."
+msgstr "{0, plural, one {# fichier trouvé} other {# fichiers trouvés}}."
 
 #: src/features/marketing/data/models-data.ts:412
 msgid "Foundation of Google's leading Veo 3.x series"
@@ -15914,6 +15993,14 @@ msgstr "Image GIF"
 msgid "GitHub"
 msgstr "GitHub"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:228
+msgid "GitHub did not answer. Try again in a moment."
+msgstr "GitHub n’a pas répondu. Réessayez dans un instant."
+
+#: src/features/projects/components/repo-rule-file-import.tsx:232
+msgid "GitHub is limiting requests. Try again in a few minutes."
+msgstr "GitHub limite les requêtes. Réessayez dans quelques minutes."
+
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:72
 msgid "GitHub-style (X-Hub-Signature-256)"
 msgstr "Style GitHub (X-Hub-Signature-256)"
@@ -15926,7 +16013,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "Jeton secret GitLab (X-Gitlab-Token)"
 
-#: src/features/projects/components/project-rule-files.tsx:586
+#: src/features/projects/components/project-rule-files.tsx:673
 msgid "Give every rule file a name."
 msgstr "Donnez un nom à chaque fichier de règles."
 
@@ -17477,9 +17564,14 @@ msgstr "Importez des conversations depuis ChatGPT, Google Gemini, Claude, une ex
 msgid "Import failed"
 msgstr "Échec de l’import"
 
-#: src/features/projects/components/project-rule-files.tsx:825
+#: src/features/projects/components/project-rule-files.tsx:923
 msgid "Import files"
 msgstr "Importer des fichiers"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:214
+#: src/features/projects/components/repo-rule-file-import.tsx:372
+msgid "Import from repository"
+msgstr "Importer depuis le dépôt"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
@@ -17493,9 +17585,13 @@ msgstr "Importer un export Notion (.zip)"
 msgid "Import one kind of export at a time."
 msgstr "Importez un seul type d'export à la fois."
 
-#: src/features/projects/components/project-rule-files.tsx:835
+#: src/features/projects/components/project-rule-files.tsx:933
 msgid "Import rule folder"
 msgstr "Importer un dossier de règles"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:453
+msgid "Import selected"
+msgstr "Importer la sélection"
 
 #: src/features/skills/components/skill-import-dialog.tsx:158
 msgid "Import skill"
@@ -17926,7 +18022,7 @@ msgstr "instruct"
 msgid "instructions"
 msgstr "instructions"
 
-#: src/features/projects/components/project-rule-files.tsx:341
+#: src/features/projects/components/project-rule-files.tsx:346
 #: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17939,7 +18035,7 @@ msgstr "instructions"
 msgid "Instructions"
 msgstr "Instructions"
 
-#: src/features/projects/components/project-rule-files.tsx:753
+#: src/features/projects/components/project-rule-files.tsx:851
 msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
 msgstr "Instructions ajoutées aux discussions de ce projet : toujours, seulement quand les fichiers joints correspondent à un modèle comme **/*.sql, ou lues par la discussion quand elle en a besoin."
 
@@ -19961,6 +20057,10 @@ msgstr "Channel access token longue durée depuis l’onglet Messaging API de vo
 msgid "Longest the answer may take, in milliseconds"
 msgstr "Durée maximale de la réponse, en millisecondes"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:401
+msgid "Looking for instruction files..."
+msgstr "Recherche des fichiers d'instructions..."
+
 #: src/features/projects/components/add-project-dialog.tsx:538
 msgid "Looking for machines…"
 msgstr "Recherche de machines…"
@@ -19968,6 +20068,19 @@ msgstr "Recherche de machines…"
 #: src/features/local-models/components/ollama-model-manager.tsx:166
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "Recherche d’Ollama sur {baseUrl}…"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:457
+msgid "Looking..."
+msgstr "Recherche..."
+
+#: src/features/projects/components/repo-rule-file-import.tsx:396
+msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, and for a rules folder."
+msgstr "Recherche AGENTS.md, CLAUDE.md et GEMINI.md à la racine du dépôt, ainsi qu’un dossier de règles."
+
+#. placeholder {0}: repoName(chosen.url)
+#: src/features/projects/components/repo-rule-file-import.tsx:397
+msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
+msgstr "Recherche AGENTS.md, CLAUDE.md et GEMINI.md à la racine de {0}, ainsi qu’un dossier de règles."
 
 #: src/features/marketing/data/models-data.ts:44
 #: src/features/marketing/data/models-data.ts:447
@@ -21450,11 +21563,11 @@ msgstr "Descendre {label} parmi les étoilés"
 msgid "Move {label} up in starred"
 msgstr "Monter {label} parmi les étoilés"
 
-#: src/features/projects/components/project-rule-files.tsx:274
+#: src/features/projects/components/project-rule-files.tsx:279
 msgid "Move {name} down"
 msgstr "Descendre {name}"
 
-#: src/features/projects/components/project-rule-files.tsx:271
+#: src/features/projects/components/project-rule-files.tsx:276
 msgid "Move {name} up"
 msgstr "Monter {name}"
 
@@ -21681,7 +21794,7 @@ msgstr "nom"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:256
+#: src/features/projects/components/project-rule-files.tsx:261
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -21868,7 +21981,7 @@ msgstr "À relire par moi"
 msgid "Needs review"
 msgstr "À vérifier"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:114
+#: src/features/chat/browser-live-view/browser-human-check.tsx:116
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22659,6 +22772,10 @@ msgstr "Aucun fichier indexé disponible. Les fichiers sont encore en cours de t
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "Aucune saisie depuis un moment : le contrôle revient à l'agent dans moins d'une minute."
 
+#: src/features/projects/components/repo-rule-file-import.tsx:402
+msgid "No instruction files were found in this repository."
+msgstr "Aucun fichier d’instructions n’a été trouvé dans ce dépôt."
+
 #: ../../packages/ui/src/components/image-gallery.tsx:489
 msgid "No items"
 msgstr "Aucun élément"
@@ -22679,7 +22796,7 @@ msgstr "Aucune langue trouvée"
 msgid "No lens selected"
 msgstr "Aucun objectif sélectionné"
 
-#: src/features/projects/components/project-rule-files.tsx:532
+#: src/features/projects/components/project-rule-files.tsx:552
 msgid "No Markdown files were found to import."
 msgstr "Aucun fichier Markdown à importer n'a été trouvé."
 
@@ -22796,7 +22913,7 @@ msgstr "Aucun ordinateur associé pour l’instant."
 msgid "No pending invitations"
 msgstr "Aucune invitation en attente"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:153
+#: src/features/chat/browser-live-view/browser-human-check.tsx:155
 msgid "No picture of the page could be taken. Take control to see it in the live view."
 msgstr "Aucune image de la page n'a pu être prise. Prenez le contrôle pour la voir dans la vue en direct."
 
@@ -23737,6 +23854,10 @@ msgstr "Continuez seulement si vous venez de lancer `neore login --device`, et s
 msgid "Only continue if you started this just now by running `neore-host pair` on a machine you own, and the code above matches the one it shows. The machine tells you where it actually stored the secret when it is done."
 msgstr "Continuez seulement si vous venez de lancer `neore-host pair` sur un ordinateur qui vous appartient, et si le code ci-dessus correspond à celui qu’il affiche. L’ordinateur vous indique où il a réellement stocké le secret une fois terminé."
 
+#: src/features/projects/components/repo-rule-file-import.tsx:234
+msgid "Only GitHub repositories can be imported from."
+msgstr "Seuls les dépôts GitHub peuvent être importés."
+
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
 msgstr "Dans une seule exécution"
@@ -23777,7 +23898,7 @@ msgstr "S’exécute uniquement quand chaque filtre correspond au corps JSON. Ut
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Seuls des modèles du même type peuvent être comparés. Effacez la sélection pour changer de type."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:98
+#: src/features/chat/browser-live-view/browser-human-check.tsx:100
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Seule une personne pouvant écrire dans ce chat peut prendre le contrôle du navigateur."
 
@@ -24166,7 +24287,7 @@ msgstr "Ouvrir la conversation du sous-agent"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "Ouvrir la recherche de la liste des fils et y placer le focus ({0})"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:101
+#: src/features/chat/browser-live-view/browser-human-check.tsx:103
 msgid "Open this model's chat on its own to take control of its browser."
 msgstr "Ouvrez le chat de ce modèle seul pour prendre le contrôle de son navigateur."
 
@@ -26534,7 +26655,7 @@ msgstr "Projet"
 msgid "Project actions"
 msgstr "Actions du projet"
 
-#: src/features/projects/components/project-rule-files.tsx:404
+#: src/features/projects/components/project-rule-files.tsx:409
 msgid "Project context"
 msgstr "Contexte du projet"
 
@@ -28256,6 +28377,7 @@ msgid "Repositories"
 msgstr "Dépôts"
 
 #: src/features/projects/components/project-repositories.tsx:383
+#: src/features/projects/components/repo-rule-file-import.tsx:376
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "Dépôt"
@@ -28969,15 +29091,15 @@ msgid "Rubric"
 msgstr "Grille d’évaluation"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:217
+#: src/features/projects/components/project-rule-files.tsx:222
 msgid "Rule file {0}"
 msgstr "Fichier de règles {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:751
+#: src/features/projects/components/project-rule-files.tsx:849
 msgid "Rule files"
 msgstr "Fichiers de règles"
 
-#: src/features/projects/components/project-rule-files.tsx:733
+#: src/features/projects/components/project-rule-files.tsx:826
 msgid "Rule files saved."
 msgstr "Fichiers de règles enregistrés."
 
@@ -29310,7 +29432,7 @@ msgstr "Enregistrer l’image"
 msgid "Save login"
 msgstr "Enregistrer l’identifiant"
 
-#: src/features/projects/components/project-rule-files.tsx:907
+#: src/features/projects/components/project-rule-files.tsx:1006
 msgid "Save or discard your rule file changes first."
 msgstr "Enregistrez ou abandonnez d’abord les modifications de vos fichiers de règles."
 
@@ -29322,7 +29444,7 @@ msgstr "Enregistrer le préréglage"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Enregistrez des prompts système réutilisables et associez-les à des modèles spécifiques. Utilisez le bouton Optimiser pour affiner chaque préréglage avec l’optimiseur de prompts."
 
-#: src/features/projects/components/project-rule-files.tsx:873
+#: src/features/projects/components/project-rule-files.tsx:972
 msgid "Save rule files"
 msgstr "Enregistrer les fichiers de règles"
 
@@ -29400,7 +29522,7 @@ msgstr "Enregistrement des outils…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:873
+#: src/features/projects/components/project-rule-files.tsx:972
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -31421,7 +31543,7 @@ msgstr "Certaines images de cette exécution n'ont pas pu être enregistrées."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Certaines étapes n’avaient pas de données tarifaires ; le total est un minimum."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:96
+#: src/features/chat/browser-live-view/browser-human-check.tsx:98
 #: src/features/chat/browser-live-view/browser-live-view.tsx:970
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1029
 msgid "Someone else has control of this browser."
@@ -33116,12 +33238,12 @@ msgstr "Taïwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Prendre une image en entrée, supprimer l’arrière-plan, puis appliquer un transfert de style"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:147
+#: src/features/chat/browser-live-view/browser-human-check.tsx:149
 #: src/features/chat/browser-live-view/browser-live-view.tsx:994
 msgid "Take control"
 msgstr "Prendre le contrôle"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:120
+#: src/features/chat/browser-live-view/browser-human-check.tsx:122
 msgid "Take control, clear it, then hand the browser back."
 msgstr "Prenez le contrôle, validez la vérification, puis rendez le navigateur."
 
@@ -33912,11 +34034,11 @@ msgstr "L’agent sur votre ordinateur lit la modification…"
 msgid "The agent's browser closed while the page loaded."
 msgstr "Le navigateur de l'agent s'est fermé pendant le chargement de la page."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:118
+#: src/features/chat/browser-live-view/browser-human-check.tsx:120
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "Le navigateur de l’agent est arrivé sur une page de {site} que seule une personne peut franchir. L’agent attend et n’essaiera pas de la contourner."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:117
+#: src/features/chat/browser-live-view/browser-human-check.tsx:119
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "Le navigateur de l’agent est arrivé sur une page que seule une personne peut franchir. L’agent attend et n’essaiera pas de la contourner."
 
@@ -33990,7 +34112,7 @@ msgstr "Le bot définit le modèle de ce chat."
 msgid "The bot's tools were saved"
 msgstr "Les outils du bot ont été enregistrés"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:92
+#: src/features/chat/browser-live-view/browser-human-check.tsx:94
 msgid "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
 msgstr "Impossible de prendre le contrôle du navigateur pour le moment. Demandez à l’agent de regarder à nouveau la page si elle est encore nécessaire."
 
@@ -34002,11 +34124,11 @@ msgstr "Le navigateur ne peut pas lire cette vidéo pour capturer une image"
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "Le navigateur n'a pas pu être rendu. L'agent le récupère de lui-même après deux minutes sans saisie."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:85
+#: src/features/chat/browser-live-view/browser-human-check.tsx:87
 msgid "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows."
 msgstr "Le navigateur a été fermé, cette vérification ne peut donc plus être effectuée ici. Une fois la réponse de l’agent terminée, demandez-lui de réessayer : il ouvre un nouveau navigateur et vous redemande au cas où la vérification s’afficherait encore."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:89
+#: src/features/chat/browser-live-view/browser-human-check.tsx:91
 msgid "The browser has since moved on from {site}, so this check is no longer open."
 msgstr "Le navigateur a depuis quitté {site}, cette vérification n'est donc plus en cours."
 
@@ -34127,7 +34249,7 @@ msgstr "Le jeu de données, ses cas et toutes ses exécutions sont supprimés."
 msgid "The description is cut short."
 msgstr "La description est tronquée."
 
-#: src/features/projects/components/project-rule-files.tsx:572
+#: src/features/projects/components/project-rule-files.tsx:659
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "La description de \"{name}\" doit faire au plus {limit} caractères sur une seule ligne."
 
@@ -34210,7 +34332,7 @@ msgstr "Le fichier n’a pas été importé :"
 msgid "The files arrived while the account changed, so they were not attached. Drop them again."
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:554
+#: src/features/projects/components/project-rule-files.tsx:625
 msgid "The files could not be read."
 msgstr "Les fichiers n'ont pas pu être lus."
 
@@ -34551,6 +34673,10 @@ msgstr "L’aperçu s’arrête après {0} enregistrements et {1} lignes en erre
 msgid "The previous secret is still accepted until {0}."
 msgstr "Le secret précédent reste accepté jusqu’au {0}."
 
+#: src/features/projects/components/repo-rule-file-import.tsx:171
+msgid "The project's repositories could not be loaded, so importing from one is not available."
+msgstr "Les dépôts du projet n'ont pas pu être chargés : l'import depuis un dépôt n'est pas disponible."
+
 #: src/features/evals/components/save-eval-case-action.tsx:81
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "Le prompt devient l’entrée du cas et cette réponse la réponse attendue. Modifiez l’un ou l’autre avant d’enregistrer."
@@ -34595,6 +34721,14 @@ msgstr "La réponse est encore en cours. Réessayez quand elle sera terminée."
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "La réponse s'est arrêtée, mais l'arrêt n'a pas atteint l'ordinateur : l'agent peut encore tourner. Utilisez « Envoyer ensuite » une fois qu'il s'est arrêté."
 
+#: src/features/projects/components/repo-rule-file-import.tsx:233
+msgid "The repository could not be read."
+msgstr "Le dépôt n’a pas pu être lu."
+
+#: src/features/projects/components/repo-rule-file-import.tsx:231
+msgid "The repository or its branch was not found."
+msgstr "Le dépôt ou sa branche est introuvable."
+
 #: src/features/marketing/use-cases/use-case-data.ts:60
 msgid "The request is saved with the message, so the card is still there after a reload."
 msgstr "La demande est enregistrée avec le message, la carte reste donc présente après un rechargement."
@@ -34623,9 +34757,14 @@ msgstr "La nouvelle tentative prend plus de temps que prévu"
 msgid "The right model, every time."
 msgstr "Le bon modèle, à chaque fois."
 
-#: src/features/projects/components/project-rule-files.tsx:758
+#: src/features/projects/components/project-rule-files.tsx:856
 msgid "The rule files could not be loaded."
 msgstr "Les fichiers de règles n’ont pas pu être chargés."
+
+#. placeholder {0}: listing.omitted
+#: src/features/projects/components/repo-rule-file-import.tsx:410
+msgid "The rules folder holds {0, plural, one {# more file} other {# more files}} than this list shows."
+msgstr "Le dossier de règles contient {0, plural, one {# fichier de plus} other {# fichiers de plus}} que cette liste n'en affiche."
 
 #: src/features/marketing/use-cases/use-case-data.ts:37
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
@@ -34792,7 +34931,7 @@ msgstr "Ces souvenirs ont été ajoutés au contexte de l’IA pour cette répon
 msgid "These providers will never be used for your requests."
 msgstr "Ces fournisseurs ne seront jamais utilisés pour vos requêtes."
 
-#: src/features/projects/components/project-rule-files.tsx:461
+#: src/features/projects/components/project-rule-files.tsx:466
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "Ces fichiers de règles ont été modifiés entre-temps. Abandonnez vos modifications pour voir ceux qui sont enregistrés, puis modifiez-les à nouveau."
 
@@ -34986,7 +35125,7 @@ msgstr "Ce chat est verrouillé. Déverrouillez-le pour envoyer."
 msgid "This chat is too long to compact."
 msgstr "Ce chat est trop long pour être compacté."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:87
+#: src/features/chat/browser-live-view/browser-human-check.tsx:89
 msgid "This check was for an earlier browser, which the agent no longer uses."
 msgstr "Cette vérification concernait un navigateur précédent, que l'agent n'utilise plus."
 
@@ -35407,6 +35546,10 @@ msgstr "Cela supprime les fichiers du modèle de votre ordinateur. Vous pourrez 
 #: src/features/projects/components/project-repositories.tsx:177
 msgid "This repository is already listed."
 msgstr "Ce dépôt figure déjà dans la liste."
+
+#: src/features/projects/components/repo-rule-file-import.tsx:406
+msgid "This repository is too large for GitHub to list in full, so some instruction files may be missing here."
+msgstr "Ce dépôt est trop volumineux pour que GitHub le liste entièrement : certains fichiers d'instructions peuvent donc manquer ici."
 
 #: src/features/projects/components/project-repositories.tsx:192
 msgid "This repository URL is too long."
@@ -35839,7 +35982,7 @@ msgstr "Aujourd’hui"
 msgid "Today, {label}"
 msgstr "Aujourd’hui, {label}"
 
-#: src/features/projects/components/project-rule-files.tsx:596
+#: src/features/projects/components/project-rule-files.tsx:683
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "Ensemble, ces fichiers de règles dépassent {limit} Mo. Raccourcissez-en ou supprimez-en certains."
 
@@ -36401,7 +36544,7 @@ msgstr "Essayez d’ajuster vos termes de recherche."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:52
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-human-check.tsx:137
+#: src/features/chat/browser-live-view/browser-human-check.tsx:139
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1041
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1158
 #: src/features/chat/guest-links/guest-page.tsx:269
@@ -36412,6 +36555,7 @@ msgstr "Essayez d’ajuster vos termes de recherche."
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
+#: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:415
 #: src/features/vault/components/site-logins.tsx:531
@@ -38763,11 +38907,11 @@ msgstr "À quoi le guide doit-il être attentif ?"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Ce que l'agent a demandé à vos appareils au cours des 30 derniers jours."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:157
+#: src/features/chat/browser-live-view/browser-human-check.tsx:159
 msgid "What the agent's browser sees"
 msgstr "Ce que voit le navigateur de l’agent"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:157
+#: src/features/chat/browser-live-view/browser-human-check.tsx:159
 msgid "What the agent's browser sees on {site}"
 msgstr "Ce que voit le navigateur de l’agent sur {site}"
 
@@ -38854,12 +38998,12 @@ msgstr "Quand un nouveau fait contredit un ancien, l’ancien souvenir est mis �
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Quand une réponse est coupée par une mise à jour ou une panne, elle reprend à sa dernière étape terminée, jusqu’à 3 fois. Une réponse interrompue pendant l’exécution d’un outil n’est jamais reprise."
 
-#: src/features/projects/components/project-rule-files.tsx:290
+#: src/features/projects/components/project-rule-files.tsx:295
 msgid "When files match"
 msgstr "Quand des fichiers correspondent"
 
-#: src/features/projects/components/project-rule-files.tsx:294
-#: src/features/projects/components/project-rule-files.tsx:458
+#: src/features/projects/components/project-rule-files.tsx:299
+#: src/features/projects/components/project-rule-files.tsx:463
 msgid "When needed"
 msgstr "Au besoin"
 
@@ -38879,7 +39023,7 @@ msgstr "Quand l’assistant doit-il utiliser cette compétence ?"
 msgid "When to delegate"
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:301
+#: src/features/projects/components/project-rule-files.tsx:306
 msgid "When to read it"
 msgstr "Quand le lire"
 
@@ -38911,7 +39055,7 @@ msgstr "Là où vous gardez le contrôle"
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Impossible de vérifier si l'agent utilise un navigateur."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:80
+#: src/features/chat/browser-live-view/browser-human-check.tsx:82
 msgid "Whether the browser is still open could not be checked."
 msgstr "Impossible de vérifier si le navigateur est toujours ouvert."
 
@@ -39391,7 +39535,7 @@ msgstr "Vous recevez une notification quand une exécution se termine, nécessit
 msgid "You handed the browser back to the agent."
 msgstr "Vous avez rendu le navigateur à l'agent."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:94
+#: src/features/chat/browser-live-view/browser-human-check.tsx:96
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "Vous avez le contrôle. Validez la vérification dans la vue en direct, puis rendez le navigateur."
 
@@ -39694,6 +39838,14 @@ msgstr "Votre avis n’a pas pu être envoyé. Réessayez."
 #: src/features/marketing/components/tutorials-page.tsx:33
 msgid "Your First Chat"
 msgstr "Votre premier chat"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:227
+msgid "Your GitHub account cannot read this repository."
+msgstr "Votre compte GitHub ne peut pas lire ce dépôt."
+
+#: src/features/projects/components/repo-rule-file-import.tsx:229
+msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Connectors."
+msgstr "Votre connexion à GitHub a expiré. Reconnectez GitHub dans Paramètres → Connecteurs."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
 #: src/features/chat/thread/composer-input.tsx:745
