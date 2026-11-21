@@ -43,7 +43,10 @@ const addressFor = async (
     return github ? { name: github.repo, owner: github.owner, ...(repo.defaultBranch && { ref: repo.defaultBranch }) } : null;
 };
 
-/** The instruction files the repository holds at one commit, by path and size, and whether a tree was cut; none read yet. */
+/**
+ * The instruction files the repository holds at one commit, by path and size (a link not followed with why), whether
+ * a tree was cut, and how many of the rules folder's files are past the listing's cap; none read yet.
+ */
 export const listRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
     .input(vRepoArgs)
@@ -54,11 +57,14 @@ export const listRepoRuleFiles = authAction
                 files: v.array(
                     v.object({
                         path: v.string().max(MAX_LENGTH.long),
-                        refused: v.optional(v.literal("link")),
+                        refused: v.optional(
+                            v.union(v.literal("broken"), v.literal("budget"), v.literal("outside"), v.literal("too_deep"), v.literal("too_long")),
+                        ),
                         size: v.number(),
                         tooLarge: v.boolean(),
                     }),
                 ),
+                omitted: v.optional(v.number()),
                 status: v.literal("ok"),
                 truncated: v.boolean(),
             }),
@@ -78,6 +84,7 @@ export const listRepoRuleFiles = authAction
 
         ctx.log.event("projects.rule_files.repo_list", {
             count: outcome.status === "ok" ? outcome.files.length : 0,
+            omitted: outcome.status === "ok" ? (outcome.omitted ?? 0) : 0,
             status: outcome.status,
             truncated: outcome.status === "ok" && outcome.truncated,
         });

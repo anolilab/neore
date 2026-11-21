@@ -6,6 +6,8 @@ import { MAX_RULE_FILE_LENGTH } from "../projects/rule-file-limits";
 import {
     isImportablePath,
     listRepoRuleFiles,
+    MAX_LISTED_FOLDER_FILES,
+    MAX_LINKS_FOLLOWED,
     readRepoRuleFiles,
     REPO_RULE_FILE_MAX_BYTES,
     REPO_RULE_FILES_READ_BYTES,
@@ -184,9 +186,10 @@ describe(listRepoRuleFiles, () => {
                 { path: "AGENTS.md", size: 7, tooLarge: false },
                 // Listed with its target's size: the read takes the target's blob.
                 { path: "CLAUDE.md", size: 7, tooLarge: false },
-                { path: "GEMINI.md", refused: "link", size: 4, tooLarge: false },
-                { path: "rules/escape.md", refused: "link", size: 16, tooLarge: false },
-                { path: "rules/loop.md", refused: "link", size: 7, tooLarge: false },
+                { path: "GEMINI.md", refused: "outside", size: 4, tooLarge: false },
+                { path: "rules/escape.md", refused: "outside", size: 16, tooLarge: false },
+                // A loop is a chain past the depth.
+                { path: "rules/loop.md", refused: "too_deep", size: 7, tooLarge: false },
                 { path: "rules/style.md", size: 7, tooLarge: false },
             ],
             truncated: false,
@@ -213,18 +216,75 @@ describe(listRepoRuleFiles, () => {
         const { files } = await listRepoRuleFiles(request, ADDRESS);
 
         expect(files.map((file) => [file.path, file.refused ?? "ok"])).toStrictEqual([
-            [".rules/a.md", "link"],
+            [".rules/a.md", "outside"],
             [".rules/b.md", "ok"],
             // Five links from deep0 to the file, one past the limit; four from deep1.
-            [".rules/deep0.md", "link"],
+            [".rules/deep0.md", "too_deep"],
             [".rules/deep1.md", "ok"],
             [".rules/deep2.md", "ok"],
             [".rules/deep3.md", "ok"],
             [".rules/deep4.md", "ok"],
-            [".rules/long.md", "link"],
+            [".rules/long.md", "too_long"],
         ]);
         expect(calls.map((call) => call.path)).not.toContain(`${REPO}/git/blobs/blob-.rules_long.md`);
         expect(calls.map((call) => call.path)).not.toContain(`${REPO}/git/blobs/blob-rules_skipped.md`);
+    });
+
+    it("lists a link to a listed path that is not there, or whose own blob the host does not send, as broken", async () => {
+        const routes = repoAt({ "CLAUDE.md": { link: "AGENTS.md" }, "GEMINI.md": { link: "CLAUDE.md" }, "rules/a.md": { link: "gone.md" } });
+
+        routes[`${REPO}/git/blobs/blob-GEMINI.md`] = { content: "", encoding: "none" };
+
+        const { files } = await listRepoRuleFiles(fakeHost({ ...routes, [`${REPO}/commits`]: commits }).request, ADDRESS);
+
+        expect(files.map((file) => [file.path, file.refused])).toStrictEqual([
+            ["CLAUDE.md", "broken"],
+            ["GEMINI.md", "broken"],
+            ["rules/a.md", "broken"],
+        ]);
+    });
+
+    it("lists the links past what one listing follows as such, in path order, the same at the read", async () => {
+        const files: Record<string, FakeFile> = { "AGENTS.md": "# Rules", "rules/target.md": "# Rules" };
+        const links = Array.from({ length: MAX_LINKS_FOLLOWED + 2 }, (_, index) => `rules/l${String(index).padStart(2, "0")}.md`);
+
+        // The tree out of path order, so only the listing's own order decides which links it follows.
+        for (const path of links.toReversed()) {
+            files[path] = { link: "target.md" };
+        }
+
+        // A root link is followed before the folder's, whose links would use the budget up first.
+        files["CLAUDE.md"] = { link: "AGENTS.md" };
+
+        const host = fakeHost({ ...repoAt(files), [`${REPO}/commits`]: commits });
+        const listing = await listRepoRuleFiles(host.request, ADDRESS);
+
+        expect(listing.files.filter((file) => file.refused === "budget").map((file) => file.path)).toStrictEqual(links.slice(MAX_LINKS_FOLLOWED - 1));
+        expect(listing.files.find((file) => file.path === "CLAUDE.md")).toStrictEqual({ path: "CLAUDE.md", size: 7, tooLarge: false });
+        expect(listing.files.filter((file) => file.refused === undefined)).toHaveLength(MAX_LINKS_FOLLOWED + 2);
+        await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, [links[0]!, links.at(-1)!])).resolves.toStrictEqual([
+            { path: links[0], status: "ok", text: "# Rules" },
+            { path: links.at(-1), status: "refused" },
+        ]);
+    });
+
+    it("lists every root file and the rules folder's first files by path up to the cap, counting the rest, and reads only those listed", async () => {
+        const files: Record<string, FakeFile> = { "AGENTS.md": "# Rules" };
+        const folderFiles = Array.from({ length: MAX_LISTED_FOLDER_FILES + 3 }, (_, index) => `.rules/f${String(index).padStart(3, "0")}.md`);
+
+        for (const path of folderFiles.toReversed()) {
+            files[path] = "rule";
+        }
+
+        const host = fakeHost({ ...repoAt(files), [`${REPO}/commits`]: commits });
+        const listing = await listRepoRuleFiles(host.request, ADDRESS);
+
+        expect(listing.omitted).toBe(3);
+        expect(listing.files.map((file) => file.path)).toStrictEqual([...folderFiles.slice(0, MAX_LISTED_FOLDER_FILES), "AGENTS.md"]);
+        await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, [folderFiles[0]!, folderFiles.at(-1)!])).resolves.toStrictEqual([
+            { path: folderFiles[0], status: "ok", text: "rule" },
+            { path: folderFiles.at(-1), status: "missing" },
+        ]);
     });
 
     it("lists no entry without a size, whose bytes could not be checked before reading it", async () => {

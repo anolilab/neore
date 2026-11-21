@@ -118,6 +118,10 @@ msgstr "（{jobFailed} 个失败）"
 msgid "(attachments only)"
 msgstr "（仅附件）"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:138
+msgid "(broken link: what it links to could not be found)"
+msgstr "（链接已损坏：找不到其目标）"
+
 #: src/features/settings/components/chat/default-models-settings.tsx:116
 msgid "(default)"
 msgstr "（默认）"
@@ -143,15 +147,27 @@ msgstr "（预期）"
 msgid "(filtered from {unfilteredRows})"
 msgstr "（从 {unfilteredRows} 行中筛选）"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:263
-msgid "(links to a file that is not an instruction file)"
-msgstr "（链接到的文件不是说明文件）"
+#: src/features/projects/components/repo-rule-file-import.tsx:139
+msgid "(link not followed: this repository holds more links than one search follows)"
+msgstr "（未跟随链接：此仓库中的链接数超过一次搜索可跟随的数量）"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:142
+msgid "(link not followed: what it links to has too long a name)"
+msgstr "（未跟随链接：其目标名称过长）"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:141
+msgid "(links through too many other links)"
+msgstr "（经过的其他链接过多）"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:140
+msgid "(links to a file outside the ones listed here)"
+msgstr "（指向此处所列文件之外的文件）"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:70
 msgid "(maximum reached)"
 msgstr "（已达上限）"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:264
+#: src/features/projects/components/repo-rule-file-import.tsx:282
 msgid "(may be too long)"
 msgstr "(可能过长)"
 
@@ -191,7 +207,7 @@ msgstr "（必填）"
 msgid "(shared)"
 msgstr "（共享）"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:262
+#: src/features/projects/components/repo-rule-file-import.tsx:280
 msgid "(too large)"
 msgstr "（太大）"
 
@@ -5817,7 +5833,7 @@ msgstr "加拿大"
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
-#: src/features/projects/components/repo-rule-file-import.tsx:286
+#: src/features/projects/components/repo-rule-file-import.tsx:304
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -7745,7 +7761,7 @@ msgstr "连接扩展程序"
 msgid "Connect Feishu / Lark"
 msgstr "连接 Feishu / Lark"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:125
+#: src/features/projects/components/repo-rule-file-import.tsx:130
 msgid "Connect GitHub in Settings → Connectors to import from a repository."
 msgstr "请在“设置 → 连接器”中连接 GitHub，以便从仓库导入。"
 
@@ -14629,7 +14645,7 @@ msgstr "锁定的聊天中无法附加文件。"
 msgid "Files changed by this turn"
 msgstr "本轮更改的文件"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:242
+#: src/features/projects/components/repo-rule-file-import.tsx:260
 msgid "Files found"
 msgstr "找到的文件"
 
@@ -14763,7 +14779,7 @@ msgstr "正在收尾..."
 msgid "Financial data and bank connection APIs"
 msgstr "金融数据与银行连接 API"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:282
+#: src/features/projects/components/repo-rule-file-import.tsx:300
 msgid "Find files"
 msgstr "查找文件"
 
@@ -15102,7 +15118,7 @@ msgid "Forward to a new chat"
 msgstr "转发到新聊天"
 
 #. placeholder {0}: found.length
-#: src/features/projects/components/repo-rule-file-import.tsx:236
+#: src/features/projects/components/repo-rule-file-import.tsx:249
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "找到 {0, plural, other {# 个文件}}。"
 
@@ -15809,11 +15825,11 @@ msgstr "GIF 图像"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:123
+#: src/features/projects/components/repo-rule-file-import.tsx:128
 msgid "GitHub did not answer. Try again in a moment."
 msgstr "GitHub 没有响应。请稍后重试。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:127
+#: src/features/projects/components/repo-rule-file-import.tsx:132
 msgid "GitHub is limiting requests. Try again in a few minutes."
 msgstr "GitHub 正在限制请求。请几分钟后重试。"
 
@@ -17348,8 +17364,8 @@ msgstr "导入失败"
 msgid "Import files"
 msgstr "导入文件"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:111
-#: src/features/projects/components/repo-rule-file-import.tsx:206
+#: src/features/projects/components/repo-rule-file-import.tsx:116
+#: src/features/projects/components/repo-rule-file-import.tsx:219
 msgid "Import from repository"
 msgstr "从仓库导入"
 
@@ -17369,7 +17385,7 @@ msgstr "每次只能导入一种导出。"
 msgid "Import rule folder"
 msgstr "导入规则文件夹"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:278
+#: src/features/projects/components/repo-rule-file-import.tsx:296
 msgid "Import selected"
 msgstr "导入所选文件"
 
@@ -19833,16 +19849,16 @@ msgstr "正在查找设备…"
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "正在 {baseUrl} 查找 Ollama…"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:282
+#: src/features/projects/components/repo-rule-file-import.tsx:300
 msgid "Looking..."
 msgstr "正在查找..."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:230
+#: src/features/projects/components/repo-rule-file-import.tsx:243
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, and for a rules folder."
 msgstr "在仓库根目录中查找 AGENTS.md、CLAUDE.md 和 GEMINI.md，以及规则文件夹。"
 
 #. placeholder {0}: repoName(chosen.url)
-#: src/features/projects/components/repo-rule-file-import.tsx:231
+#: src/features/projects/components/repo-rule-file-import.tsx:244
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "在 {0} 的根目录中查找 AGENTS.md、CLAUDE.md 和 GEMINI.md，以及规则文件夹。"
 
@@ -22517,7 +22533,7 @@ msgstr "没有已索引的文件。文件仍在处理中。"
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:235
+#: src/features/projects/components/repo-rule-file-import.tsx:248
 msgid "No instruction files were found in this repository."
 msgstr "此仓库中没有找到指令文件。"
 
@@ -23590,7 +23606,7 @@ msgstr "仅当你刚刚通过运行 `neore login --device` 发起了此操作，
 msgid "Only continue if you started this just now by running `neore-host pair` on a machine you own, and the code above matches the one it shows. The machine tells you where it actually stored the secret when it is done."
 msgstr "仅当你刚刚在自己拥有的设备上运行 `neore-host pair` 发起了此操作，且上方验证码与该设备显示的一致时，才可继续。完成后，设备会告诉你密钥实际存储的位置。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:129
+#: src/features/projects/components/repo-rule-file-import.tsx:134
 msgid "Only GitHub repositories can be imported from."
 msgstr "只能从 GitHub 仓库导入。"
 
@@ -28075,7 +28091,7 @@ msgid "Repositories"
 msgstr "仓库"
 
 #: src/features/projects/components/project-repositories.tsx:383
-#: src/features/projects/components/repo-rule-file-import.tsx:210
+#: src/features/projects/components/repo-rule-file-import.tsx:223
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "代码仓库"
@@ -34346,11 +34362,11 @@ msgstr "回复仍在运行。请在其完成后重试。"
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "回复已停止，但停止指令未能到达电脑，代理可能仍在运行。它停止后，请点击“发送下一条”。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:128
+#: src/features/projects/components/repo-rule-file-import.tsx:133
 msgid "The repository could not be read."
 msgstr "无法读取该仓库。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:126
+#: src/features/projects/components/repo-rule-file-import.tsx:131
 msgid "The repository or its branch was not found."
 msgstr "找不到该仓库或其分支。"
 
@@ -34385,6 +34401,11 @@ msgstr "每次都用对模型。"
 #: src/features/projects/components/project-rule-files.tsx:810
 msgid "The rule files could not be loaded."
 msgstr "无法加载规则文件。"
+
+#. placeholder {0}: listing.omitted
+#: src/features/projects/components/repo-rule-file-import.tsx:256
+msgid "The rules folder holds {0, plural, one {# more file} other {# more files}} than this list shows."
+msgstr "规则文件夹中还有 {0, plural, other {# 个}}文件未在此列表中显示。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:37
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
@@ -35151,7 +35172,7 @@ msgstr "这会从你的电脑中删除模型文件。你以后可以重新拉取
 msgid "This repository is already listed."
 msgstr "此仓库已在列表中。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:239
+#: src/features/projects/components/repo-rule-file-import.tsx:252
 msgid "This repository is too large for GitHub to list in full, so some instruction files may be missing here."
 msgstr "此仓库太大，GitHub 无法完整列出，因此这里可能缺少部分指令文件。"
 
@@ -39382,11 +39403,11 @@ msgstr "无法发送你的反馈，请重试。"
 msgid "Your First Chat"
 msgstr "你的第一次聊天"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:122
+#: src/features/projects/components/repo-rule-file-import.tsx:127
 msgid "Your GitHub account cannot read this repository."
 msgstr "你的 GitHub 账户无法读取此仓库。"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:124
+#: src/features/projects/components/repo-rule-file-import.tsx:129
 msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Connectors."
 msgstr "你的 GitHub 登录已过期。请在“设置 → 连接器”中重新连接 GitHub。"
 

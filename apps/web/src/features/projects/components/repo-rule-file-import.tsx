@@ -26,8 +26,11 @@ export interface RepoImportResult {
     unreadable: number;
 }
 
-/** `refused`: a symlink leading outside the rule-file paths, listed but never read. */
-type FoundFile = { path: string; refused?: "link"; size: number; tooLarge: boolean };
+/** Why a symlink is not followed (`LinkRefusal` in `source-control/repo-rule-files.ts`): listed, never read. */
+type LinkRefusal = "broken" | "budget" | "outside" | "too_deep" | "too_long";
+
+/** `refused`: a symlink not followed, with why. */
+type FoundFile = { path: string; refused?: LinkRefusal; size: number; tooLarge: boolean };
 
 /** Whether a found file can be picked at all. */
 const isPickable = (file: FoundFile): boolean => !file.tooLarge && file.refused === undefined;
@@ -36,6 +39,8 @@ const isPickable = (file: FoundFile): boolean => !file.tooLarge && file.refused 
 interface Listing {
     commit: string | undefined;
     files: FoundFile[];
+    /** Files of the rules folder past what one listing holds, not shown. */
+    omitted: number;
     repoId: string;
     truncated: boolean;
 }
@@ -129,6 +134,14 @@ const RepoRuleFileImport: FC<{
         unsupported_host: t`Only GitHub repositories can be imported from.`,
     };
 
+    const refusalText: Record<LinkRefusal, string> = {
+        broken: t`(broken link: what it links to could not be found)`,
+        budget: t`(link not followed: this repository holds more links than one search follows)`,
+        outside: t`(links to a file outside the ones listed here)`,
+        too_deep: t`(links through too many other links)`,
+        too_long: t`(link not followed: what it links to has too long a name)`,
+    };
+
     const look = () => {
         request.current += 1;
         const asked = request.current;
@@ -149,7 +162,7 @@ const RepoRuleFileImport: FC<{
                     return undefined;
                 }
 
-                setListed({ commit: outcome.commit, files: outcome.files, repoId: listedRepo, truncated: outcome.truncated });
+                setListed({ commit: outcome.commit, files: outcome.files, omitted: outcome.omitted ?? 0, repoId: listedRepo, truncated: outcome.truncated });
                 setPicked(new Set(outcome.files.filter((file) => isPickable(file) && !mayBeTooLong(file)).map((file) => file.path)));
 
                 return undefined;
@@ -238,6 +251,11 @@ const RepoRuleFileImport: FC<{
             {listing?.truncated && (
                 <p className="text-muted-foreground text-sm">{t`This repository is too large for GitHub to list in full, so some instruction files may be missing here.`}</p>
             )}
+            {listing && listing.omitted > 0 && (
+                <p className="text-muted-foreground text-sm">
+                    {t`The rules folder holds ${plural(listing.omitted, { one: "# more file", other: "# more files" })} than this list shows.`}
+                </p>
+            )}
             {found && found.length > 0 && (
                 <ul aria-label={t`Files found`} className="space-y-2">
                     {found.map((file) => (
@@ -260,9 +278,7 @@ const RepoRuleFileImport: FC<{
                                 />
                                 <span className="font-mono text-xs">{file.path}</span>
                                 {file.tooLarge && <span className="text-muted-foreground text-xs">{t`(too large)`}</span>}
-                                {file.refused === "link" && (
-                                    <span className="text-muted-foreground text-xs">{t`(links to a file that is not an instruction file)`}</span>
-                                )}
+                                {file.refused && <span className="text-muted-foreground text-xs">{refusalText[file.refused]}</span>}
                                 {mayBeTooLong(file) && <span className="text-muted-foreground text-xs">{t`(may be too long)`}</span>}
                             </Label>
                         </li>

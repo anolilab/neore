@@ -150,6 +150,48 @@ export const ImportFromRepo: Story = {
     },
 };
 
+/**
+ * Links not followed, each with why, and a rules folder holding more files than one listing shows: none can be picked,
+ * and the panel says how many are not listed.
+ */
+export const RepoLinksNotFollowed: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: withRepo({
+                    commit: "c".repeat(40),
+                    files: [
+                        { path: "AGENTS.md", size: 32, tooLarge: false },
+                        { path: "CLAUDE.md", refused: "broken", size: 9, tooLarge: false },
+                        { path: "GEMINI.md", refused: "outside", size: 4, tooLarge: false },
+                        { path: "rules/budget.md", refused: "budget", size: 9, tooLarge: false },
+                        { path: "rules/chain.md", refused: "too_deep", size: 9, tooLarge: false },
+                        { path: "rules/long.md", refused: "too_long", size: 2000, tooLarge: false },
+                    ],
+                    omitted: 12,
+                    status: "ok",
+                    truncated: false,
+                }),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(await canvas.findByRole("button", { name: "Import from repository" }));
+        await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
+
+        const found = within(await canvas.findByRole("list", { name: "Files found" }));
+
+        await expect(found.getByRole("checkbox", { name: /CLAUDE\.md\s*\(broken link: what it links to could not be found\)/u })).toHaveAttribute(
+            "aria-disabled",
+            "true",
+        );
+        await expect(found.getByRole("checkbox", { name: /chain\.md\s*\(links through too many other links\)/u })).toHaveAttribute("aria-disabled", "true");
+        await expect(canvas.getByText("The rules folder holds 12 more files than this list shows.")).toBeVisible();
+    },
+};
+
 /** The repository holds no instruction files: said in the panel, nothing added. */
 export const RepoWithoutInstructionFiles: Story = {
     parameters: { msw: { handlers: { lunora: withRepo({ files: [], status: "ok", truncated: false }) } } },

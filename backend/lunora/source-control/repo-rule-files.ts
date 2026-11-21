@@ -14,8 +14,11 @@
  * fork network).
  *
  * A symlink is a blob holding its target's path. It is followed only to another path of the same listing (a root
- * instruction file, or a file of the rules folder listed), inside the repository, at most `MAX_LINK_HOPS` links deep; any other is listed as `refused` and never read: the contents API
- * would follow `AGENTS.md → .env` and hand over `.env`.
+ * instruction file, or a file of the rules folder listed), inside the repository, at most `MAX_LINK_HOPS` links deep; any other is listed as `refused`, with why
+ * ({@link LinkRefusal}), and never read: the contents API would follow `AGENTS.md → .env` and hand over `.env`.
+ *
+ * A listing holds every root instruction file and at most `MAX_LISTED_FOLDER_FILES` of the rules folder's, the first by
+ * path; it counts the rest (`omitted`). A read lists the same way, so a file a listing offered stays readable.
  */
 import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES_BYTES, RULE_FILE_FRONT_MATTER } from "../projects/rule-file-limits";
 import type { HostRequest } from "./origin-fetch";
@@ -50,10 +53,20 @@ export const MAX_LINKS_FOLLOWED = 20;
 /** A link's target path, in bytes, at most: a longer one is refused unread. */
 const MAX_LINK_TARGET_BYTES = 1024;
 
+/** A rules folder's files one listing holds, at most, the first by path: well past the files a project can hold. */
+export const MAX_LISTED_FOLDER_FILES = 100;
+
+/**
+ * Why a symlink is not followed: it leads outside the listing's paths or the repository (`outside`), to nothing there
+ * (`broken`), through more than {@link MAX_LINK_HOPS} links or round a loop (`too_deep`), past what one listing follows
+ * ({@link MAX_LINKS_FOLLOWED}, `budget`), or its target's path is past {@link MAX_LINK_TARGET_BYTES} (`too_long`).
+ */
+export type LinkRefusal = "broken" | "budget" | "outside" | "too_deep" | "too_long";
+
 export interface RepoRuleFileEntry {
     path: string;
-    /** Set for a symlink that leads outside the rule-file paths (or nowhere): listed, never read. */
-    refused?: "link";
+    /** Set for a symlink not followed, with why: listed, never read. */
+    refused?: LinkRefusal;
     size: number;
     tooLarge: boolean;
 }
@@ -62,6 +75,8 @@ export interface RepoRuleFileListing {
     /** The commit listed, which a read then reads at; absent for a repository with no commit yet. */
     commit?: string;
     files: RepoRuleFileEntry[];
+    /** Files of the rules folder past {@link MAX_LISTED_FOLDER_FILES}, not listed; absent when none. */
+    omitted?: number;
     /** Whether a tree the listing read was cut by the host, so a file may be missing from `files`. */
     truncated: boolean;
 }
@@ -98,6 +113,9 @@ interface Found {
     blob?: Blob;
     entry: RepoRuleFileEntry;
 }
+
+/** Where a link led: the file a read takes, or why it is not followed. */
+type Followed = { blob: Blob } | { refused: LinkRefusal };
 
 const repoPath = ({ name, owner }: RepoAddress): string => `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
@@ -257,34 +275,51 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
 
     /**
      * The file `blob` at `path` leads to: itself, or a link's final target when every hop is a path `offers` accepts;
-     * else `undefined`.
+     * else why not.
      */
-    const follow = async (path: string, blob: Blob, offers: (target: string) => boolean): Promise<Blob | undefined> => {
+    const follow = async (path: string, blob: Blob, offers: (target: string) => boolean): Promise<Followed> => {
         let at = path;
-        let current: Blob | undefined = blob;
+        let current = blob;
 
-        for (let hop = 0; hop <= MAX_LINK_HOPS; hop += 1) {
-            if (!current?.link) {
-                return current;
+        for (let hop = 0; ; hop += 1) {
+            if (!current.link) {
+                return { blob: current };
             }
 
-            if (hop === MAX_LINK_HOPS || linksLeft <= 0 || current.size > MAX_LINK_TARGET_BYTES) {
-                return undefined;
+            if (hop === MAX_LINK_HOPS) {
+                return { refused: "too_deep" };
+            }
+
+            if (current.size > MAX_LINK_TARGET_BYTES) {
+                return { refused: "too_long" };
+            }
+
+            if (linksLeft <= 0) {
+                return { refused: "budget" };
             }
 
             linksLeft -= 1;
             const content = await readBlob(request, address, current.sha);
-            const target = content === undefined ? undefined : resolveLinkTarget(at, content);
+
+            if (content === undefined) {
+                return { refused: "broken" };
+            }
+
+            const target = resolveLinkTarget(at, content);
 
             if (target === undefined || !offers(target)) {
-                return undefined;
+                return { refused: "outside" };
+            }
+
+            const next = await blobAt(target);
+
+            if (!next) {
+                return { refused: "broken" };
             }
 
             at = target;
-            current = await blobAt(target);
+            current = next;
         }
-
-        return undefined;
     };
 
     /** The blobs of the folder `folder` (`""` for the root) at an importable path, links not yet followed. */
@@ -302,19 +337,24 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
         });
 
     /**
-     * The root instruction files and the Markdown files of the first rules folder holding any (not its subfolders),
-     * links followed only to a path of the same listing: a root file, or a file of that folder.
+     * The root instruction files and the first {@link MAX_LISTED_FOLDER_FILES} Markdown files, by path, of the first
+     * rules folder holding any (not its subfolders), links followed only to a path of the same listing: a root file, or
+     * a file of that folder (one past the cap included, as it is there). `omitted` counts the folder's files past it.
      */
-    const list = async (): Promise<Found[]> => {
-        let candidates = importableIn("", root);
+    const list = async (): Promise<{ found: Found[]; omitted: number }> => {
+        let candidates = importableIn("", root).toSorted((left, right) => left.path.localeCompare(right.path));
         let chosen: string | undefined;
+        let omitted = 0;
 
         for (const folder of RULE_FOLDERS) {
             const tree = await treeAt(folder);
             const files = tree ? importableIn(folder, tree) : [];
 
             if (files.length > 0) {
-                candidates = [...candidates, ...files];
+                const first = files.toSorted((left, right) => left.path.localeCompare(right.path)).slice(0, MAX_LISTED_FOLDER_FILES);
+
+                candidates = [...candidates, ...first];
+                omitted = files.length - first.length;
                 chosen = folder;
                 break;
             }
@@ -325,17 +365,19 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
             (!target.includes("/") || (chosen !== undefined && target.startsWith(`${chosen}/`) && !target.slice(chosen.length + 1).includes("/")));
         const found: Found[] = [];
 
+        // Root files first, then the folder's, each by path: the links one listing follows are the same every time it
+        // lists this commit, and a folder's links never spend the budget a root file's link needs.
         for (const { blob, path } of candidates) {
-            const file = await follow(path, blob, offers);
+            const followed = await follow(path, blob, offers);
 
             found.push(
-                file
-                    ? { blob: file, entry: { path, size: file.size, tooLarge: file.size > REPO_RULE_FILE_MAX_BYTES } }
-                    : { entry: { path, refused: "link", size: blob.size, tooLarge: false } },
+                "blob" in followed
+                    ? { blob: followed.blob, entry: { path, size: followed.blob.size, tooLarge: followed.blob.size > REPO_RULE_FILE_MAX_BYTES } }
+                    : { entry: { path, refused: followed.refused, size: blob.size, tooLarge: false } },
             );
         }
 
-        return found.toSorted((left, right) => left.entry.path.localeCompare(right.entry.path));
+        return { found: found.toSorted((left, right) => left.entry.path.localeCompare(right.entry.path)), omitted };
     };
 
     return { list, truncated: () => truncated };
@@ -353,9 +395,9 @@ export const listRepoRuleFiles = async (request: HostRequest, address: RepoAddre
     }
 
     const atHead = snapshot(request, address, await readTree(request, address, head.tree));
-    const files = await atHead.list();
+    const { found, omitted } = await atHead.list();
 
-    return { commit: head.commit, files: files.map((file) => file.entry), truncated: atHead.truncated() };
+    return { commit: head.commit, files: found.map((file) => file.entry), ...(omitted > 0 && { omitted }), truncated: atHead.truncated() };
 };
 
 /**
@@ -392,7 +434,7 @@ export const readRepoRuleFiles = async (
     }
 
     const atCommit = snapshot(request, address, await readTree(request, address, rootSha));
-    const offered = await atCommit.list();
+    const { found: offered } = await atCommit.list();
     const listed = new Map(offered.map((file) => [file.entry.path, file]));
     const reads: RepoRuleFileRead[] = [];
     let left = REPO_RULE_FILES_READ_BYTES;

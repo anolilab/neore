@@ -82,7 +82,7 @@ vi.mock("@/features/auth/lib/utilities", () => {
 
 const NEEDS_A_PATTERN = /needs at least one pattern/u;
 const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
-const REFUSED_LINK = /^GEMINI\.md\s*\(links to a file that is not an instruction file\)$/u;
+const REFUSED_LINK = /^GEMINI\.md\s*\(links to a file outside the ones listed here\)$/u;
 const WIDE_FILE = /^rules\/wide\.md\s*\(may be too long\)$/u;
 
 const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
@@ -942,7 +942,7 @@ describe("project rule files imported from the project's repository", () => {
             truncated: false,
             files: [
                 { path: "AGENTS.md", size: 20, tooLarge: false },
-                { path: "GEMINI.md", refused: "link", size: 4, tooLarge: false },
+                { path: "GEMINI.md", refused: "outside", size: 4, tooLarge: false },
                 { path: "rules/huge.md", size: 900_000, tooLarge: true },
             ],
             status: "ok",
@@ -975,6 +975,45 @@ describe("project rule files imported from the project's repository", () => {
         expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(3);
         expect(backend.save).not.toHaveBeenCalled();
         expect(screen.getByText("1 rule file imported. Review, then save.")).toBeTruthy();
+    });
+
+    it("says why each link was not followed, and how many of the rules folder's files are not listed", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [
+                { path: "rules/a.md", refused: "broken", size: 4, tooLarge: false },
+                { path: "rules/b.md", refused: "budget", size: 4, tooLarge: false },
+                { path: "rules/c.md", refused: "outside", size: 4, tooLarge: false },
+                { path: "rules/d.md", refused: "too_deep", size: 4, tooLarge: false },
+                { path: "rules/e.md", refused: "too_long", size: 2000, tooLarge: false },
+            ],
+            omitted: 7,
+            status: "ok",
+            truncated: false,
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const found = await screen.findByRole("list", { name: "Files found" });
+
+        // A link not followed: listed with why, never picked or read.
+        for (const name of [
+            "rules/a.md (broken link: what it links to could not be found)",
+            "rules/b.md (link not followed: this repository holds more links than one search follows)",
+            "rules/c.md (links to a file outside the ones listed here)",
+            "rules/d.md (links through too many other links)",
+            "rules/e.md (link not followed: what it links to has too long a name)",
+        ]) {
+            const box = within(found).getByRole("checkbox", { name: (accessible) => accessible.replaceAll(/\s/gu, "") === name.replaceAll(" ", "") });
+
+            expect(box.getAttribute("aria-disabled")).toBe("true");
+        }
+
+        expect(screen.getByText("The rules folder holds 7 more files than this list shows.")).toBeTruthy();
     });
 
     it("says why the repository could not be read and adds nothing", async () => {

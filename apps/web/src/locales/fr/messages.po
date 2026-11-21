@@ -118,6 +118,10 @@ msgstr "({jobFailed} en échec)"
 msgid "(attachments only)"
 msgstr "(pièces jointes uniquement)"
 
+#: src/features/projects/components/repo-rule-file-import.tsx:138
+msgid "(broken link: what it links to could not be found)"
+msgstr "(lien cassé : sa cible est introuvable)"
+
 #: src/features/settings/components/chat/default-models-settings.tsx:116
 msgid "(default)"
 msgstr "(par défaut)"
@@ -143,15 +147,27 @@ msgstr "(attendu)"
 msgid "(filtered from {unfilteredRows})"
 msgstr "(filtré sur {unfilteredRows})"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:263
-msgid "(links to a file that is not an instruction file)"
-msgstr "(renvoie vers un fichier qui n’est pas un fichier d’instructions)"
+#: src/features/projects/components/repo-rule-file-import.tsx:139
+msgid "(link not followed: this repository holds more links than one search follows)"
+msgstr "(lien non suivi : ce dépôt contient plus de liens qu'une recherche n'en suit)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:142
+msgid "(link not followed: what it links to has too long a name)"
+msgstr "(lien non suivi : le nom de sa cible est trop long)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:141
+msgid "(links through too many other links)"
+msgstr "(passe par trop d'autres liens)"
+
+#: src/features/projects/components/repo-rule-file-import.tsx:140
+msgid "(links to a file outside the ones listed here)"
+msgstr "(pointe vers un fichier hors de ceux listés ici)"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:70
 msgid "(maximum reached)"
 msgstr "(maximum atteint)"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:264
+#: src/features/projects/components/repo-rule-file-import.tsx:282
 msgid "(may be too long)"
 msgstr "(peut-être trop long)"
 
@@ -191,7 +207,7 @@ msgstr "(obligatoire)"
 msgid "(shared)"
 msgstr "(partagée)"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:262
+#: src/features/projects/components/repo-rule-file-import.tsx:280
 msgid "(too large)"
 msgstr "(trop volumineux)"
 
@@ -5817,7 +5833,7 @@ msgstr "Canada"
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
-#: src/features/projects/components/repo-rule-file-import.tsx:286
+#: src/features/projects/components/repo-rule-file-import.tsx:304
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -7745,7 +7761,7 @@ msgstr "Connecter l’extension"
 msgid "Connect Feishu / Lark"
 msgstr "Connecter Feishu / Lark"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:125
+#: src/features/projects/components/repo-rule-file-import.tsx:130
 msgid "Connect GitHub in Settings → Connectors to import from a repository."
 msgstr "Connectez GitHub dans Paramètres → Connecteurs pour importer depuis un dépôt."
 
@@ -14629,7 +14645,7 @@ msgstr "Impossible de joindre des fichiers dans un chat verrouillé."
 msgid "Files changed by this turn"
 msgstr "Fichiers modifiés par ce tour"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:242
+#: src/features/projects/components/repo-rule-file-import.tsx:260
 msgid "Files found"
 msgstr "Fichiers trouvés"
 
@@ -14763,7 +14779,7 @@ msgstr "Finalisation..."
 msgid "Financial data and bank connection APIs"
 msgstr "API de données financières et de connexion bancaire"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:282
+#: src/features/projects/components/repo-rule-file-import.tsx:300
 msgid "Find files"
 msgstr "Rechercher les fichiers"
 
@@ -15102,7 +15118,7 @@ msgid "Forward to a new chat"
 msgstr "Transférer vers une nouvelle discussion"
 
 #. placeholder {0}: found.length
-#: src/features/projects/components/repo-rule-file-import.tsx:236
+#: src/features/projects/components/repo-rule-file-import.tsx:249
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "{0, plural, one {# fichier trouvé} other {# fichiers trouvés}}."
 
@@ -15809,11 +15825,11 @@ msgstr "Image GIF"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:123
+#: src/features/projects/components/repo-rule-file-import.tsx:128
 msgid "GitHub did not answer. Try again in a moment."
 msgstr "GitHub n’a pas répondu. Réessayez dans un instant."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:127
+#: src/features/projects/components/repo-rule-file-import.tsx:132
 msgid "GitHub is limiting requests. Try again in a few minutes."
 msgstr "GitHub limite les requêtes. Réessayez dans quelques minutes."
 
@@ -17348,8 +17364,8 @@ msgstr "Échec de l’import"
 msgid "Import files"
 msgstr "Importer des fichiers"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:111
-#: src/features/projects/components/repo-rule-file-import.tsx:206
+#: src/features/projects/components/repo-rule-file-import.tsx:116
+#: src/features/projects/components/repo-rule-file-import.tsx:219
 msgid "Import from repository"
 msgstr "Importer depuis le dépôt"
 
@@ -17369,7 +17385,7 @@ msgstr "Importez un seul type d'export à la fois."
 msgid "Import rule folder"
 msgstr "Importer un dossier de règles"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:278
+#: src/features/projects/components/repo-rule-file-import.tsx:296
 msgid "Import selected"
 msgstr "Importer la sélection"
 
@@ -19833,16 +19849,16 @@ msgstr "Recherche de machines…"
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "Recherche d’Ollama sur {baseUrl}…"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:282
+#: src/features/projects/components/repo-rule-file-import.tsx:300
 msgid "Looking..."
 msgstr "Recherche..."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:230
+#: src/features/projects/components/repo-rule-file-import.tsx:243
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, and for a rules folder."
 msgstr "Recherche AGENTS.md, CLAUDE.md et GEMINI.md à la racine du dépôt, ainsi qu’un dossier de règles."
 
 #. placeholder {0}: repoName(chosen.url)
-#: src/features/projects/components/repo-rule-file-import.tsx:231
+#: src/features/projects/components/repo-rule-file-import.tsx:244
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "Recherche AGENTS.md, CLAUDE.md et GEMINI.md à la racine de {0}, ainsi qu’un dossier de règles."
 
@@ -22517,7 +22533,7 @@ msgstr "Aucun fichier indexé disponible. Les fichiers sont encore en cours de t
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "Aucune saisie depuis un moment : le contrôle revient à l'agent dans moins d'une minute."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:235
+#: src/features/projects/components/repo-rule-file-import.tsx:248
 msgid "No instruction files were found in this repository."
 msgstr "Aucun fichier d’instructions n’a été trouvé dans ce dépôt."
 
@@ -23590,7 +23606,7 @@ msgstr "Continuez seulement si vous venez de lancer `neore login --device`, et s
 msgid "Only continue if you started this just now by running `neore-host pair` on a machine you own, and the code above matches the one it shows. The machine tells you where it actually stored the secret when it is done."
 msgstr "Continuez seulement si vous venez de lancer `neore-host pair` sur un ordinateur qui vous appartient, et si le code ci-dessus correspond à celui qu’il affiche. L’ordinateur vous indique où il a réellement stocké le secret une fois terminé."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:129
+#: src/features/projects/components/repo-rule-file-import.tsx:134
 msgid "Only GitHub repositories can be imported from."
 msgstr "Seuls les dépôts GitHub peuvent être importés."
 
@@ -28075,7 +28091,7 @@ msgid "Repositories"
 msgstr "Dépôts"
 
 #: src/features/projects/components/project-repositories.tsx:383
-#: src/features/projects/components/repo-rule-file-import.tsx:210
+#: src/features/projects/components/repo-rule-file-import.tsx:223
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
 msgstr "Dépôt"
@@ -34346,11 +34362,11 @@ msgstr "La réponse est encore en cours. Réessayez quand elle sera terminée."
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "La réponse s'est arrêtée, mais l'arrêt n'a pas atteint l'ordinateur : l'agent peut encore tourner. Utilisez « Envoyer ensuite » une fois qu'il s'est arrêté."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:128
+#: src/features/projects/components/repo-rule-file-import.tsx:133
 msgid "The repository could not be read."
 msgstr "Le dépôt n’a pas pu être lu."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:126
+#: src/features/projects/components/repo-rule-file-import.tsx:131
 msgid "The repository or its branch was not found."
 msgstr "Le dépôt ou sa branche est introuvable."
 
@@ -34385,6 +34401,11 @@ msgstr "Le bon modèle, à chaque fois."
 #: src/features/projects/components/project-rule-files.tsx:810
 msgid "The rule files could not be loaded."
 msgstr "Les fichiers de règles n’ont pas pu être chargés."
+
+#. placeholder {0}: listing.omitted
+#: src/features/projects/components/repo-rule-file-import.tsx:256
+msgid "The rules folder holds {0, plural, one {# more file} other {# more files}} than this list shows."
+msgstr "Le dossier de règles contient {0, plural, one {# fichier de plus} other {# fichiers de plus}} que cette liste n'en affiche."
 
 #: src/features/marketing/use-cases/use-case-data.ts:37
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
@@ -35151,7 +35172,7 @@ msgstr "Cela supprime les fichiers du modèle de votre ordinateur. Vous pourrez 
 msgid "This repository is already listed."
 msgstr "Ce dépôt figure déjà dans la liste."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:239
+#: src/features/projects/components/repo-rule-file-import.tsx:252
 msgid "This repository is too large for GitHub to list in full, so some instruction files may be missing here."
 msgstr "Ce dépôt est trop volumineux pour que GitHub le liste entièrement : certains fichiers d'instructions peuvent donc manquer ici."
 
@@ -39382,11 +39403,11 @@ msgstr "Votre avis n’a pas pu être envoyé. Réessayez."
 msgid "Your First Chat"
 msgstr "Votre premier chat"
 
-#: src/features/projects/components/repo-rule-file-import.tsx:122
+#: src/features/projects/components/repo-rule-file-import.tsx:127
 msgid "Your GitHub account cannot read this repository."
 msgstr "Votre compte GitHub ne peut pas lire ce dépôt."
 
-#: src/features/projects/components/repo-rule-file-import.tsx:124
+#: src/features/projects/components/repo-rule-file-import.tsx:129
 msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Connectors."
 msgstr "Votre connexion à GitHub a expiré. Reconnectez GitHub dans Paramètres → Connecteurs."
 
