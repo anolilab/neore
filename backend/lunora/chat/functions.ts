@@ -4875,7 +4875,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                 );
 
                 // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
-                // Narrows the window to this read; deletion does not yet wait for an in-flight suggestion (see the PR thread).
+                // Narrows the window to this read; the delete actions refuse while a suggestion is in flight (`followupInFlight`).
                 const liveThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
                 if (!liveThread || liveThread.deletedAt !== undefined || liveThread.deletingAt !== undefined) {
@@ -4911,8 +4911,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
-                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached. It checks the
-                // reply is still the newest in the same write, so a reply overtaken since the model call is refused with no unit taken.
+                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached. The newest-reply
+                // check above is not part of that write, so a reply overtaken in between can still be written; the unit is taken after it.
                 const cacheWrite = {
                     lastMessageId,
                     order: newest.order,
