@@ -20,6 +20,9 @@ const HAS_EXTENSION = /\.[a-z0-9]{1,8}$/iu;
 const EXTENSION_BY_TYPE: Record<string, string> = {
     "application/json": "json",
     "application/pdf": "pdf",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/zip": "zip",
     "audio/mpeg": "mp3",
     "audio/wav": "wav",

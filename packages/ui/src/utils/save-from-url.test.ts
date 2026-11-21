@@ -36,6 +36,8 @@ describe(saveName, () => {
     it.each([
         ["report.pdf", "application/pdf", "report.pdf"],
         ["chart", "image/png", "chart.png"],
+        ["Report", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Report.docx"],
+        ["Budget", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Budget.xlsx"],
         [undefined, "image/jpeg; charset=binary", "download.jpg"],
         ["  ", undefined, "download"],
         ["notes", "application/x-unknown", "notes"],

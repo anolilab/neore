@@ -147,6 +147,8 @@ describe("saving a message's files", () => {
 
         expect(link.getAttribute("href")).toBe("https://api.test/agent-files/chart?sig=1");
         expect(link.getAttribute("download")).toBe("chart.png");
+        // Shown on hover or focus, and always where nothing can hover (a touch screen).
+        expect(link.className).toContain("[@media(hover:none)]:opacity-100");
     });
 
     it("saves the image under its own name, not the storage URL's", async () => {

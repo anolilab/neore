@@ -434,10 +434,10 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
                 loading="lazy"
                 src={part.image}
             />
-            {/* Top left, so an override's own button (a pin) can take the top right. */}
+            {/* Top left, so an override's own button (a pin) can take the top right. Always shown where nothing can hover. */}
             <a
                 aria-label={part.filename ? t`Download ${part.filename}` : t`Download image`}
-                className="bg-background/80 hover:bg-background absolute top-2 left-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within/image:opacity-100 group-hover/image:opacity-100 focus-visible:opacity-100"
+                className="bg-background/80 hover:bg-background absolute top-2 left-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within/image:opacity-100 group-hover/image:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                 download={part.filename ?? ""}
                 href={part.image}
                 onClick={saveOnClick(part.image, part.filename, "image")}
