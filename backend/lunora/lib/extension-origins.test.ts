@@ -94,6 +94,15 @@ describe("parseTrustedExtensionRedirectUris", () => {
         ]);
     });
 
+    it("reads a Chrome extension id, bare or as its origin, as the id's redirect URI", () => {
+        const id = "b".repeat(32);
+
+        expect(parseTrustedExtensionRedirectUris(`${id}, chrome-extension://${id}/,${NATIVE_REDIRECT_URI}`)).toEqual([
+            `https://${id}.chromiumapp.org/`,
+            NATIVE_REDIRECT_URI,
+        ]);
+    });
+
     it("drops anything a web page could receive", () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -133,6 +142,7 @@ describe("carryRetiredExtensionOrigins", () => {
     it.each([
         ["no Chrome origin", "chrome-extension://not-an-id,moz-extension://x", undefined],
         ["an already listed URI, copied without its slash", `chrome-extension://${ID}/`, `https://${ID}.chromiumapp.org`],
+        ["an id already listed bare", `chrome-extension://${ID}`, ID],
         ["nothing", undefined, undefined],
     ])("moves nothing for %s", (_label, origins, redirectUris) => {
         expect(carryRetiredExtensionOrigins(origins, redirectUris)).toEqual({ added: [], value: redirectUris, withheld: [] });

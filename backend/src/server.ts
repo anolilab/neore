@@ -26,8 +26,8 @@ import { ensureGlobalTables } from "../lunora/auth/lib/ensure-global-tables.js";
 import httpApp, { getAllowedOrigins } from "../lunora/http.js";
 import type { ApiKeyAuthApi } from "../lunora/public-api/identity.js";
 import { isPublicApiPath, resolveApiKeyIdentity } from "../lunora/public-api/identity.js";
-import { requestBearer, requestWsTicket } from "../lunora/lib/request-bearer.js";
-import { handleWsTicketRequest, purgeExpiredWsTickets, redeemWsTicket } from "../lunora/lib/ws-ticket.js";
+import { requestBearer } from "../lunora/lib/request-bearer.js";
+import { handleWsTicketRequest, purgeExpiredWsTickets, resolveWsTicketIdentity } from "../lunora/lib/ws-ticket.js";
 import { runInShard } from "../lunora/lib/shard-context.js";
 import { shardScopedSchedulerNamespace } from "../lunora/lib/shard-scheduler.js";
 import { withoutStage } from "./queue-stage.js";
@@ -286,20 +286,11 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
 
     // The live-query socket's upgrade (and its re-authentication) carries a
     // single-use ticket instead of a bearer (`lib/ws-ticket.ts`): a browser cannot set
-    // headers on a `WebSocket`, and the URL is logged. A spent,
-    // expired or forged ticket falls through to the cookie, like a
-    // stale bearer does.
-    const ticket = requestWsTicket(request);
+    // headers on a `WebSocket`, and the URL is logged. A refused ticket falls
+    // through to the session on the upgrade only (`resolveWsTicketIdentity`).
+    const identity = await resolveWsTicketIdentity(request, env.DB, async (sessionRequest) => await resolveSessionIdentity(env, sessionRequest));
 
-    if (ticket !== undefined) {
-        const identity = await redeemWsTicket(env.DB, ticket);
-
-        if (identity) {
-            return { ...identity };
-        }
-    }
-
-    return await resolveSessionIdentity(env, request);
+    return identity ? { ...identity } : null;
 };
 
 // workerd (`lunora dev`) does not implement Durable Object jurisdictions, and the schema pins the

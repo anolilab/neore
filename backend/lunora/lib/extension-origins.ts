@@ -50,6 +50,30 @@ export const NATIVE_REDIRECT_URI = "neore://auth/callback";
  */
 export const MOBILE_REDIRECT_URI = "neore-mobile://auth/callback";
 
+const CHROME_EXTENSION_ID = /^(?:chrome-extension:\/\/)?(?<id>[a-p]{32})\/?$/;
+
+/**
+ * One `TRUSTED_EXTENSION_REDIRECT_URIS` entry as the URI it stands for. A Chrome
+ * extension id, bare (as `chrome://extensions` shows it) or as
+ * `chrome-extension://<id>`, is `https://<id>.chromiumapp.org/`, the URI
+ * `identity.getRedirectURL()` derives from it. `getRedirectURL()` ends in "/";
+ * a value copied without it gets one. The native callbacks stay as written.
+ */
+const normalizeRedirectUri = (entry: string): string => {
+    const uri = entry.trim();
+    const chromeId = CHROME_EXTENSION_ID.exec(uri)?.groups?.["id"];
+
+    if (chromeId) {
+        return `https://${chromeId}.chromiumapp.org/`;
+    }
+
+    if (!uri || uri === NATIVE_REDIRECT_URI || uri === MOBILE_REDIRECT_URI || uri.endsWith("/")) {
+        return uri;
+    }
+
+    return `${uri}/`;
+};
+
 /**
  * `TRUSTED_EXTENSION_REDIRECT_URIS` → the exact redirect URIs the extension
  * sign-in flow may deliver a code to.
@@ -86,7 +110,7 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
     const entries = trimmed.split(",");
 
     for (const entry of entries) {
-        let uri = entry.trim();
+        const uri = normalizeRedirectUri(entry);
 
         if (!uri) {
             continue;
@@ -95,11 +119,6 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
         if (uri === NATIVE_REDIRECT_URI || uri === MOBILE_REDIRECT_URI) {
             uris.push(uri);
             continue;
-        }
-
-        // `getRedirectURL()` ends in "/"; accept the value copied without it.
-        if (!uri.endsWith("/")) {
-            uri += "/";
         }
 
         if (EXTENSION_REDIRECT_URI.test(uri)) {
@@ -113,8 +132,6 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
 
     return [...new Set(uris)];
 };
-
-const RETIRED_CHROME_ORIGIN = /^chrome-extension:\/\/(?<id>[a-p]{32})\/?$/;
 
 /** The entries a `TRUSTED_EXTENSION_REDIRECT_URIS` value lists, as written; unset is the default. */
 const listedRedirectUris = (raw: string | undefined): string[] => {
@@ -152,13 +169,13 @@ export const carryRetiredExtensionOrigins = (
 ): { added: string[]; value: string | undefined; withheld: string[] } => {
     const off = redirectUris?.trim().toLowerCase() === "none";
     const current = listedRedirectUris(redirectUris);
-    const listed = new Set(current.map((entry) => (entry.endsWith("/") ? entry : `${entry}/`)));
+    const listed = new Set(current.map((entry) => normalizeRedirectUri(entry)));
     const added: string[] = [];
     const entries = origins?.split(",") ?? [];
 
     for (const entry of entries) {
-        const id = RETIRED_CHROME_ORIGIN.exec(entry.trim())?.groups?.["id"];
-        const uri = id && `https://${id}.chromiumapp.org/`;
+        const origin = entry.trim();
+        const uri = origin.startsWith("chrome-extension://") && CHROME_EXTENSION_ID.test(origin) ? normalizeRedirectUri(origin) : undefined;
 
         if (uri && !listed.has(uri)) {
             listed.add(uri);

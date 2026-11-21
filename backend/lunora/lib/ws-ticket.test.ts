@@ -9,6 +9,7 @@ import {
     purgeExpiredWsTickets,
     redeemWsTicket,
     resetWsTicketTableForTests,
+    resolveWsTicketIdentity,
     WS_TICKET_PATH,
     WS_TICKET_TTL_MS,
 } from "./ws-ticket";
@@ -196,6 +197,25 @@ describe(handleWsTicketRequest, () => {
         await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ sessionId: "s1", userId: "u1" });
     });
 
+    it("refuses an app grant's bearer once the grant is revoked, so its sockets are cut at the next re-check", async () => {
+        const database = createDatabase();
+        const grantBearer = async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        };
+
+        const live = await handleWsTicketRequest(post(), database, grantBearer);
+
+        expect(live?.status).toBe(200);
+
+        // Sign-out revokes the grant's session; the JWT itself stays valid until it expires.
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("sa");
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('web', 'user-a', ?)`).run(Date.now() + 60_000);
+
+        const revoked = await handleWsTicketRequest(post(), database, grantBearer);
+
+        expect(revoked?.status).toBe(401);
+    });
+
     it("refuses an anonymous caller", async () => {
         const response = await handleWsTicketRequest(post(), createDatabase(), async () => null);
 
@@ -216,5 +236,57 @@ describe(handleWsTicketRequest, () => {
                 return { userId: "u1" };
             }),
         ).resolves.toBeUndefined();
+    });
+});
+
+describe(resolveWsTicketIdentity, () => {
+    const upgrade = (ticket: string) => new Request(`http://x/_lunora/ws?token=${ticket}`, { headers: { Upgrade: "websocket" } });
+    const reauth = (ticket: string) => new Request(`http://x/_lunora/ws/reauth?shard=u1&token=${ticket}`, { method: "POST" });
+    // The bearer or cookie that rode the same request: another account's, to show it never takes the socket over.
+    const cookie = async () => {
+        return { userId: "user-b" };
+    };
+
+    beforeEach(() => {
+        resetWsTicketTableForTests();
+    });
+
+    it("resolves a live ticket to the user it was minted for, on the upgrade and on a re-authentication", async () => {
+        const database = createDatabase();
+
+        await expect(resolveWsTicketIdentity(upgrade(await issueWsTicket(database, { userId: "u1" })), database, cookie)).resolves.toStrictEqual({
+            userId: "u1",
+        });
+        await expect(resolveWsTicketIdentity(reauth(await issueWsTicket(database, { userId: "u1" })), database, cookie)).resolves.toStrictEqual({
+            userId: "u1",
+        });
+    });
+
+    it("lets a refused ticket on the upgrade fall through to the session", async () => {
+        await expect(resolveWsTicketIdentity(upgrade("forged"), createDatabase(), cookie)).resolves.toStrictEqual({ userId: "user-b" });
+    });
+
+    it("ends the authentication of a re-authentication whose ticket is forged, spent, expired or revoked", async () => {
+        const database = createDatabase();
+        const spent = await issueWsTicket(database, { userId: "u1" });
+
+        await redeemWsTicket(database, spent);
+
+        const expired = await issueWsTicket(database, { userId: "u1" }, Date.now() - WS_TICKET_TTL_MS - 1);
+        const revoked = await issueWsTicket(database, { sessionId: "s1", userId: "u1" });
+
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("s1");
+
+        for (const ticket of ["forged", spent, expired, revoked]) {
+            await expect(resolveWsTicketIdentity(reauth(ticket), database, cookie)).resolves.toBeNull();
+        }
+    });
+
+    it("leaves a request with no ticket to the session", async () => {
+        await expect(
+            resolveWsTicketIdentity(new Request("http://x/_lunora/ws/reauth?shard=u1", { method: "POST" }), createDatabase(), cookie),
+        ).resolves.toStrictEqual({
+            userId: "user-b",
+        });
     });
 });

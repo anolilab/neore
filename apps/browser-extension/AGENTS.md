@@ -11,4 +11,5 @@ The rules for working in `apps/browser-extension/`. The protocol and the reasoni
 - A Chrome install updated from the cookie build is told once to connect (`migrateFromCookieSession` on `runtime.onInstalled`, `neore.reconnectNeeded`). Keep the migration mark (`neore.authMigration`) so it runs once per install.
 - A Chrome build signs in only when the backend lists `https://<id>.chromiumapp.org/` in `TRUSTED_EXTENSION_REDIRECT_URIS`. That one list also holds the desktop and mobile callbacks, and a value replaces it whole: add the Chrome URI to what is set, and list the Firefox URI when it was unset.
 - Live queries: the socket signs in with a ticket minted for the bearer (`wireLiveSocket`, `@neore/client-runtime`); no cookie rides it.
+- Every bearer goes to `lunora.setAuthToken(token, userId)` (`src/lib/auth-token-sync.ts`): without the subject a refresh reads as another user and the offline queue is dropped.
 - The bearer cache and anything written after a round trip are keyed to the grant: a refresh or revoke that answers after another sign-in never touches the newer grant.

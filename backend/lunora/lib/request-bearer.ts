@@ -42,7 +42,9 @@ export const requestBearer = (request: Request): string | undefined => {
 export const requestWsTicket = (request: Request): string | undefined => {
     const url = new URL(request.url);
     const isUpgrade = request.headers.get("Upgrade")?.toLowerCase() === "websocket" && url.pathname === LUNORA_WS_PATH;
-    const isReauth = request.method === "POST" && url.pathname === LUNORA_WS_REAUTH_PATH;
 
-    return isUpgrade || isReauth ? url.searchParams.get("token") || undefined : undefined;
+    return isUpgrade || isWsReauth(request) ? url.searchParams.get("token") || undefined : undefined;
 };
+
+/** Whether this is the `POST` that re-authenticates an open live-query socket. */
+export const isWsReauth = (request: Request): boolean => request.method === "POST" && new URL(request.url).pathname === LUNORA_WS_REAUTH_PATH;

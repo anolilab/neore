@@ -68,9 +68,10 @@ openssl rsa -in dev-key.pem -pubout -outform DER | base64 -w0   # → key
 ```
 
 Add the output as `key: '<base64>'` to the object `manifest.config.ts` returns,
-reload the unpacked extension, and put the id `chrome://extensions` now shows
-into `TRUSTED_EXTENSION_REDIRECT_URIS`. The key is public — it only fixes the
-id. A Web Store build does not need it: the store assigns the id.
+reload the unpacked extension, and add `https://<id>.chromiumapp.org/`, with
+the id `chrome://extensions` now shows, to `TRUSTED_EXTENSION_REDIRECT_URIS`.
+Keep the entries already there. A bare id is read as that URI too. The key is
+public — it only fixes the id. A Web Store build does not need it: the store assigns the id.
 
 ## Commands
 

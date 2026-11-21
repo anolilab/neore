@@ -1,5 +1,7 @@
 import type { D1DatabaseLike } from "@lunora/d1";
 
+import { isWsReauth, requestWsTicket } from "./request-bearer";
+
 /** Where the browser mints a ticket before each live-query socket (re)connect. */
 export const WS_TICKET_PATH = "/_lunora/ws-ticket";
 
@@ -151,14 +153,62 @@ export const redeemWsTicket = async (database: TicketDatabase, ticket: string, n
 };
 
 /**
+ * Who a request's live-query ticket stands for, else `fallback` (the bearer,
+ * then the cookie).
+ *
+ * A spent, expired or forged ticket on the socket's UPGRADE falls through, the
+ * way a stale bearer does: a web socket under a cookie still connects. On the
+ * re-authentication of an open socket it does not. The ticket is the credential
+ * that request presents, so a refused one ends the socket's authentication: the
+ * runtime answers 401, and the socket lapses at its revalidation deadline
+ * instead of being kept signed in by whatever else rode the request.
+ */
+export const resolveWsTicketIdentity = async <Identity>(
+    request: Request,
+    database: TicketDatabase,
+    fallback: (request: Request) => Promise<Identity | null>,
+): Promise<Identity | WsTicketIdentity | null> => {
+    const ticket = requestWsTicket(request);
+
+    if (ticket === undefined) {
+        return await fallback(request);
+    }
+
+    const identity = await redeemWsTicket(database, ticket);
+
+    if (identity) {
+        return identity;
+    }
+
+    return isWsReauth(request) ? null : await fallback(request);
+};
+
+/** Whether the app-grant sign-in a bearer stands for (`gsid`) still exists. A failed read refuses. */
+const hasGrantSession = async (database: TicketDatabase, grantSessionId: string, userId: string): Promise<boolean> => {
+    try {
+        const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`).bind(grantSessionId, userId).first();
+
+        return row !== null;
+    } catch {
+        return false;
+    }
+};
+
+/**
  * `POST /_lunora/ws-ticket` — answers `{ ticket }` for an authenticated caller,
  * 401 for anyone else. `undefined` for every other request, so the caller falls
  * through to the app.
+ *
+ * An app grant's JWT (`grantSessionId`, from `gsid`) outlives a revoke until it
+ * expires, and its ticket names no session (`gsid` is never `sessionId`), so the
+ * redeem would accept it while the user has any other session. The mint
+ * therefore checks the grant itself: once it is revoked, no ticket is minted,
+ * and the grant's open sockets are cut at their next re-authentication.
  */
 export const handleWsTicketRequest = async (
     request: Request,
     database: TicketDatabase,
-    resolveIdentity: (request: Request) => Promise<WsTicketIdentity | null>,
+    resolveIdentity: (request: Request) => Promise<(WsTicketIdentity & { grantSessionId?: string }) | null>,
 ): Promise<Response | undefined> => {
     if (new URL(request.url).pathname !== WS_TICKET_PATH) {
         return undefined;
@@ -172,7 +222,7 @@ export const handleWsTicketRequest = async (
 
     const identity = await resolveIdentity(request);
 
-    if (!identity) {
+    if (!identity || (identity.grantSessionId !== undefined && !(await hasGrantSession(database, identity.grantSessionId, identity.userId)))) {
         return Response.json({ error: { code: "UNAUTHENTICATED", message: "A ticket needs a signed-in caller" } }, { headers, status: 401 });
     }
 
