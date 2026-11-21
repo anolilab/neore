@@ -19,26 +19,38 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: { getFollowupSuggestions: "getFollowupSuggestions" } } } };
-});
-
+// The panel reads the cached suggestions for the latest reply; the cache holds the suggestion for "m2".
 vi.mock("@/lib/lunora/crpc", () => {
     return {
-        useLunoraActionOptions: () => {
-            return {};
+        useCRPC: () => {
+            return {
+                chat: {
+                    functions: {
+                        getCachedFollowupSuggestions: {
+                            queryOptions: (input: unknown) => {
+                                return { queryKey: ["getCachedFollowupSuggestions", input] };
+                            },
+                        },
+                    },
+                },
+            };
         },
     };
 });
 
-vi.mock("@tanstack/react-query", () => {
-    const mutateAsync = async () => {
-        return { suggestions: ["Sign in to my bank and pay the bill"] };
-    };
+vi.mock("@neore/client-runtime", () => {
+    return { useUnlockProof: () => undefined };
+});
 
+// One stable object: a fresh one per render would make the panel's effect set new suggestions on every render.
+const cached = vi.hoisted(() => {
+    return { data: { lastMessageId: "m2", suggestions: ["Sign in to my bank and pay the bill"] }, isFetching: false };
+});
+
+vi.mock("@tanstack/react-query", () => {
     return {
-        useMutation: () => {
-            return { mutateAsync };
+        useQuery: () => {
+            return cached;
         },
     };
 });
