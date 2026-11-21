@@ -182,4 +182,38 @@ describe("getGlobalInstructionsCall", () => {
         expect(logged).toMatchObject({ _id: callId, decision: "once", status: "completed", toolName: "instructions_read" });
         expect(logged).not.toHaveProperty("threadId");
     });
+
+    it("reports a result it cannot read as failed, not as one that found no files", async () => {
+        const { deviceId, secret } = await pairedDesktop(ownerId);
+        const { callId } = await start(ownerId, { deviceId, files: ["claude"] });
+
+        await as(ownerId).mutation(functions.claimDeviceCall as never, { callId, deviceId } as never);
+
+        // A list cut mid-entry, as a capped result would be.
+        const output = JSON.stringify([{ id: "claude", name: "CLAUDE.md", path: "~/.claude/CLAUDE.md", status: "read", text: "be brief" }]).slice(0, 40);
+        const payload = JSON.stringify({ callId, decision: "once", deviceId, kind: "result", output, status: "completed", v: 1 });
+
+        await as(ownerId).mutation(
+            functions.completeDeviceCall as never,
+            { callId, deviceId, payload, signature: await signDevicePayload(secret, "result", payload) } as never,
+        );
+
+        await expect(read(ownerId, callId)).resolves.toEqual({ error: "The computer's answer could not be read", status: "failed" });
+    });
+});
+
+describe("parseGlobalInstructionFiles", () => {
+    it("reads a cut list, a non-list and a list of only unknown entries as unreadable, and an empty list as no files", () => {
+        expect(globalInstructions.parseGlobalInstructionFiles('[{"id":"claude","status":"re')).toBeUndefined();
+        expect(globalInstructions.parseGlobalInstructionFiles('{"id":"claude"}')).toBeUndefined();
+        expect(
+            globalInstructions.parseGlobalInstructionFiles(
+                JSON.stringify([
+                    { id: "claude", status: "newer" },
+                    { id: "ssh", status: "read" },
+                ]),
+            ),
+        ).toBeUndefined();
+        expect(globalInstructions.parseGlobalInstructionFiles("[]")).toEqual([]);
+    });
 });

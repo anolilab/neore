@@ -223,8 +223,7 @@ impl Request {
     /// with: a JSON list in [`FILES`] order.
     pub fn run(&self, current: &[PathBuf]) -> String {
         let roots: Vec<PathBuf> = self.roots.iter().chain(current).cloned().collect();
-        let mut used = 2;
-        let entries: Vec<Value> = self
+        let mut entries: Vec<Value> = self
             .resolved
             .iter()
             .map(|(file, planned)| {
@@ -264,28 +263,74 @@ impl Request {
                             Ok(text) => {
                                 entry["status"] = json!("read");
                                 entry["text"] = json!(text);
-
-                                // What does not fit in this one result is left out whole, never cut.
-                                let length = entry.to_string().len() + 1;
-
-                                if used + length > MAX_OUTPUT_BYTES {
-                                    entry
-                                        .as_object_mut()
-                                        .map(|object| object.remove("text"));
-                                    entry["status"] = json!("left_out");
-                                }
                             }
                         }
                     }
                 }
 
-                used += entry.to_string().len() + 1;
-
                 entry
             })
             .collect();
 
+        fit(&mut entries);
+
         Value::Array(entries).to_string()
+    }
+}
+
+/// An entry without its text: a read becomes `left_out`, anything else stays as it is.
+fn without_text(entry: &Value) -> Value {
+    let mut bare = entry.clone();
+
+    if bare
+        .as_object_mut()
+        .and_then(|object| object.remove("text"))
+        .is_some()
+    {
+        bare["status"] = json!("left_out");
+    }
+
+    bare
+}
+
+/// Keeps a read's text only while the list, with every later entry at its text-less size, still fits in one result
+/// ([`MAX_OUTPUT_BYTES`]): what does not fit is left out whole, and the list is never cut. Sizes are exact: compact
+/// JSON is `[`, the entries joined by `,`, then `]`.
+fn fit(entries: &mut [Value]) {
+    let total = |entries: &[Value]| {
+        2 + entries.len().saturating_sub(1)
+            + entries
+                .iter()
+                .map(|entry| entry.to_string().len())
+                .sum::<usize>()
+    };
+    let bare: Vec<usize> = entries
+        .iter()
+        .map(|entry| without_text(entry).to_string().len())
+        .collect();
+    let mut used = 2 + entries.len().saturating_sub(1);
+    let mut rest: usize = bare.iter().sum();
+
+    for (entry, bare) in entries.iter_mut().zip(bare) {
+        rest -= bare;
+
+        if entry.get("text").is_some() && used + entry.to_string().len() + rest > MAX_OUTPUT_BYTES {
+            *entry = without_text(entry);
+        }
+
+        used += entry.to_string().len();
+    }
+
+    // Only a backstop: the reservation above already keeps the list within the cap.
+    while total(entries) > MAX_OUTPUT_BYTES {
+        match entries
+            .iter_mut()
+            .rev()
+            .find(|entry| entry.get("text").is_some())
+        {
+            Some(entry) => *entry = without_text(entry),
+            None => break,
+        }
     }
 }
 
@@ -602,6 +647,82 @@ mod tests {
         assert_eq!(got[1]["status"], json!("left_out"));
         assert!(got[1].get("text").is_none());
         assert_eq!(got[2]["text"], json!("small"));
+    }
+
+    fn read_entry(id: &str, length: usize) -> Value {
+        json!({ "id": id, "name": "X.md", "path": "~/x/X.md", "size": length, "status": "read", "text": "a".repeat(length) })
+    }
+
+    /// Entries without text after a read: what the old budget appended unchecked.
+    fn after() -> Vec<Value> {
+        vec![
+            json!({ "id": "codex", "name": "AGENTS.md", "path": "~/.codex/AGENTS.md", "status": "missing" }),
+            json!({ "id": "gemini", "name": "GEMINI.md", "path": "~/.gemini/GEMINI.md", "status": "refused", "reason": CHANGED }),
+            json!({ "id": "windsurf", "name": "global_rules.md", "path": "~/.codeium/windsurf/memories/global_rules.md", "status": "missing" }),
+        ]
+    }
+
+    fn fitted(length: usize) -> (String, Vec<Value>) {
+        let mut entries = vec![read_entry("claude", length)];
+
+        entries.extend(after());
+        fit(&mut entries);
+
+        let output = Value::Array(entries).to_string();
+        let got = serde_json::from_str(&output).unwrap();
+
+        (output, got)
+    }
+
+    /// The longest read that still fits with [`after`]: the whole list is then exactly the cap.
+    fn longest_fitting() -> usize {
+        let mut entries = vec![read_entry("claude", 0)];
+
+        entries.extend(after());
+
+        let mut length = MAX_OUTPUT_BYTES - Value::Array(entries).to_string().len();
+
+        while fitted(length).1[0]["status"] != json!("read") {
+            length -= 1;
+        }
+
+        length
+    }
+
+    #[test]
+    fn keeps_a_read_that_fits_with_the_entries_after_it() {
+        let length = longest_fitting();
+        let (output, got) = fitted(length);
+
+        assert_eq!(output.len(), MAX_OUTPUT_BYTES);
+        assert_eq!(got[0]["status"], json!("read"));
+        assert_eq!(got[0]["text"].as_str().unwrap().len(), length);
+    }
+
+    #[test]
+    fn leaves_out_a_read_that_fits_alone_but_not_with_the_entries_after_it() {
+        let length = longest_fitting() + 1;
+        // Alone it fits, so only the room kept for the later entries leaves it out.
+        assert!(
+            Value::Array(vec![read_entry("claude", length)])
+                .to_string()
+                .len()
+                <= MAX_OUTPUT_BYTES
+        );
+
+        let (output, got) = fitted(length);
+
+        assert!(output.len() <= MAX_OUTPUT_BYTES);
+        assert_eq!(got[0]["status"], json!("left_out"));
+        assert!(got[0].get("text").is_none());
+        assert_eq!(got[0]["size"], json!(length));
+        assert_eq!(
+            got[1..]
+                .iter()
+                .map(|entry| entry["status"].clone())
+                .collect::<Vec<_>>(),
+            [json!("missing"), json!("refused"), json!("missing")]
+        );
     }
 
     #[cfg(unix)]

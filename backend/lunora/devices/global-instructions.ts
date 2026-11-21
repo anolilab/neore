@@ -69,7 +69,7 @@ export const parseGlobalInstructionFiles = (output: string | undefined): FileEnt
         return undefined;
     }
 
-    return parsed.flatMap((raw: unknown): FileEntry[] => {
+    const files = parsed.flatMap((raw: unknown): FileEntry[] => {
         const entry = (raw ?? {}) as Record<string, unknown>;
 
         if (typeof entry.id !== "string" || !IDS.has(entry.id) || typeof entry.status !== "string" || !STATUSES.has(entry.status)) {
@@ -92,6 +92,9 @@ export const parseGlobalInstructionFiles = (output: string | undefined): FileEnt
             },
         ];
     });
+
+    // Entries were sent but none is one this side knows: unreadable, not "no files".
+    return files.length === 0 && parsed.length > 0 ? undefined : files;
 };
 
 /**
@@ -206,6 +209,11 @@ export const getGlobalInstructionsCall = authQuery
         }
 
         const files = call.status === "completed" ? parseGlobalInstructionFiles(call.output) : undefined;
+
+        // A result the device sent but this side cannot read is a failed import, never one that found no files.
+        if (files === undefined && call.status === "completed") {
+            return { error: "The computer's answer could not be read", status: "failed" as const };
+        }
 
         return {
             status: call.status,
