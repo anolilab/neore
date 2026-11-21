@@ -43,7 +43,7 @@ const harness = vi.hoisted(() => {
 
             return { messages: [], thread: { _id: "thread-1" } };
         }),
-        setWsToken: () => {},
+        setWsTicket: () => {},
         subscribe: vi.fn(),
     };
 

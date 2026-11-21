@@ -1,24 +1,27 @@
-import { useEffect, useState } from "react";
-
+import { hasCookieBuildReads } from "./cookie-build-trace";
 import { APP_URL, LUNORA_URL } from "./env";
+import { GrantRemovalError } from "./grant-removal-error";
 
 /*
- * Sign-in for the Firefox build, which cannot use the web app's session cookie.
+ * Sign-in for both builds. Neither uses the web app's session cookie: the
+ * server must be able to tell the extension's sends from the web app's, and
+ * Firefox gives every install its own random `moz-extension://<uuid>` origin,
+ * which no backend could trust for credentialed CORS anyway.
  *
- * Every Firefox install has its own random `moz-extension://<uuid>` origin, so
- * the backend has no origin to trust for credentialed CORS. It does not need
- * one: with `host_permissions` for the backend, requests from extension pages
- * are exempt from CORS, and the backend only checks `Origin` on requests that
- * carry a cookie. So this build never sends cookies (`credentials: 'omit'`) —
- * only bearer tokens — and gets its token through an authorization-code flow
- * with PKCE, driven by `identity.launchWebAuthFlow` (server side:
- * `backend/lunora/auth/extension-grant.ts`):
+ * With `host_permissions` for the backend, requests from extension pages are
+ * exempt from CORS, and the backend only checks `Origin` on requests that carry
+ * a cookie — and refuses an extension origin's cookie outright
+ * (`backend/src/extension-cookie.ts`). So the extension never sends cookies
+ * (`credentials: 'omit'`, here and in `lunora-client.ts`), only bearer tokens,
+ * and gets its token through an authorization-code flow with PKCE driven by
+ * `identity.launchWebAuthFlow` (server side: `backend/lunora/auth/extension-grant.ts`):
  *
  * 1. Generate a verifier; open `APP_URL/auth/extension` with its S256 challenge,
- *    `identity.getRedirectURL()` and a random `state`.
+ *    `identity.getRedirectURL()` (`https://<id>.chromiumapp.org/` in Chrome,
+ *    `https://<hash>.extensions.allizom.org/` in Firefox) and a random `state`.
  * 2. The user signs in on the web app — any method — and approves. The page
- *    redirects to the redirect URI with a one-time `code`; Firefox intercepts it
- *    and resolves `launchWebAuthFlow` with that URL, never loading it.
+ *    redirects to the redirect URI with a one-time `code`; the browser intercepts
+ *    it and resolves `launchWebAuthFlow` with that URL, never loading it.
  * 3. POST code + verifier to `/extension/auth/exchange` for a session token (the
  *    "grant"), kept in `storage.local`.
  * 4. Trade the grant for a short-lived JWT at `/extension/auth/token` whenever a
@@ -35,12 +38,23 @@ export interface GrantUser {
     name: string;
 }
 
-interface StoredGrant {
+export interface StoredGrant {
+    /**
+     * Random, minted per sign-in: names this grant without being its secret.
+     * Grants stored before it existed lack it (`grantKey`).
+     */
+    id?: string;
     token: string;
     user: GrantUser;
 }
 
-const STORAGE_KEY = "neore.extensionGrant";
+export const STORAGE_KEY = "neore.extensionGrant";
+
+/** Set once a Chrome install that rode the web cookie has been told to connect; cleared by a sign-in. */
+export const RECONNECT_KEY = "neore.reconnectNeeded";
+
+/** Written on the first run of a build that signs in through the grant, so the check below runs once per install. */
+const MIGRATION_KEY = "neore.authMigration";
 
 const toBase64Url = (bytes: Uint8Array): string => {
     let binary = "";
@@ -143,12 +157,123 @@ export const readGrant = async (): Promise<StoredGrant | undefined> => {
     return stored[STORAGE_KEY] as StoredGrant | undefined;
 };
 
-const writeGrant = async (grant: StoredGrant): Promise<void> => {
-    await chrome.storage.local.set({ [STORAGE_KEY]: grant });
+/** One name for every context of this extension (panel, popup, service worker): they share the lock. */
+const GRANT_LOCK = "neore.extensionGrant";
+
+/**
+ * Runs `step` alone among every grant write in this extension. Storage has no
+ * compare-and-set, so a check and the write it guards hold this lock together:
+ * nothing (a sign-out in another panel, say) lands between them. Without the
+ * Web Locks API (never in a supported browser) the step runs unguarded.
+ */
+const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => {
+    const locks = globalThis.navigator?.locks as LockManager | undefined;
+
+    return locks ? await locks.request(GRANT_LOCK, step) : await step();
 };
 
-const clearGrant = async (): Promise<void> => {
-    await chrome.storage.local.remove(STORAGE_KEY);
+const writeGrant = async (grant: StoredGrant): Promise<void> => {
+    await withGrantLock(async () => {
+        await chrome.storage.local.set({ [STORAGE_KEY]: grant });
+    });
+};
+
+/**
+ * Change the grant `token` names, and only while it is the stored one. A
+ * refresh or a revoke answers after a round trip, by which time another panel
+ * may have signed out or in again: what it writes or clears must be for the
+ * grant it started with. `change` returns the new grant, or `undefined` to
+ * remove it.
+ */
+const updateGrantIf = async (token: string, change: (stored: StoredGrant) => StoredGrant | undefined): Promise<void> => {
+    await withGrantLock(async () => {
+        const stored = await readGrant();
+
+        if (stored?.token !== token) {
+            return;
+        }
+
+        const next = change(stored);
+
+        await (next ? chrome.storage.local.set({ [STORAGE_KEY]: next }) : chrome.storage.local.remove(STORAGE_KEY));
+    });
+};
+
+/** Changes with every sign-in, so a cache or an effect keyed on it never outlives the grant. */
+export const grantKey = (grant: StoredGrant): string => grant.id ?? grant.user.id;
+
+/**
+ * Run from `runtime.onInstalled`. The Chrome build used to ride the web app's
+ * cookie and stored no grant, so an UPDATE that finds no grant and no migration
+ * mark may be an install that was signed in that way. Only one whose read cache
+ * holds something (`hadCookieSession`, by default `hasCookieBuildReads`) was:
+ * the sign-in page then says why it is back, once. A fresh install, a Firefox
+ * one (it always held a grant), one nobody signed in to, and every later update
+ * only write the mark.
+ */
+export const migrateFromCookieSession = async (input: { hadCookieSession?: () => Promise<boolean>; isFirefox: boolean; reason: string }): Promise<void> => {
+    const stored = await chrome.storage.local.get([MIGRATION_KEY, STORAGE_KEY]);
+
+    if (Object.hasOwn(stored, MIGRATION_KEY)) {
+        return;
+    }
+
+    const mayHaveSession = input.reason === "update" && !input.isFirefox && !Object.hasOwn(stored, STORAGE_KEY);
+    // A probe that fails says nothing about a sign-in: no notice, rather than one for nobody.
+    const hadSession = mayHaveSession && (await (input.hadCookieSession ?? hasCookieBuildReads)().catch(() => false));
+
+    await withGrantLock(async () => {
+        // A sign-in that finished while the cache was read needs no notice.
+        const needsReconnect = hadSession && (await readGrant()) === undefined;
+
+        await chrome.storage.local.set({ [MIGRATION_KEY]: 1, ...(needsReconnect && { [RECONNECT_KEY]: true }) });
+    });
+};
+
+export const readReconnectNeeded = async (): Promise<boolean> => {
+    const stored = await chrome.storage.local.get(RECONNECT_KEY);
+
+    return stored[RECONNECT_KEY] === true;
+};
+
+/**
+ * Calls `onChange` with whether the reconnect notice is due, now and whenever
+ * that changes. The panel can open before `runtime.onInstalled` has written the
+ * mark, so one read at mount would miss it. Returns the unsubscribe.
+ */
+export const watchReconnectNeeded = (onChange: (needed: boolean) => void): (() => void) => {
+    let changed = false;
+
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+        if (area !== "local" || !Object.hasOwn(changes, RECONNECT_KEY)) {
+            return;
+        }
+
+        changed = true;
+        onChange(changes[RECONNECT_KEY]?.newValue === true);
+    };
+
+    chrome.storage.onChanged.addListener(listener);
+
+    const load = async () => {
+        const needed = await readReconnectNeeded().catch(() => false);
+
+        // A change that arrived first is newer than this read.
+        if (!changed) {
+            onChange(needed);
+        }
+    };
+
+    void load();
+
+    return () => {
+        chrome.storage.onChanged.removeListener(listener);
+    };
+};
+
+/** Forget the grant `token` names, and only that one. */
+const clearGrant = async (token: string): Promise<void> => {
+    await updateGrantIf(token, () => undefined);
 };
 
 /**
@@ -186,7 +311,8 @@ export const signInWithWebAuthFlow = async (): Promise<GrantUser> => {
 
     const { token, user } = (await response.json()) as StoredGrant;
 
-    await writeGrant({ token, user });
+    await writeGrant({ id: randomToken(), token, user });
+    await chrome.storage.local.remove(RECONNECT_KEY);
 
     return user;
 };
@@ -198,9 +324,7 @@ export const signInWithWebAuthFlow = async (): Promise<GrantUser> => {
  * the web app's session list — so the grant is dropped and the panel falls back
  * to the sign-in page.
  */
-export const requestGrantAccessToken = async (): Promise<string | null> => {
-    const grant = await readGrant();
-
+export const requestGrantAccessToken = async (grant: StoredGrant | undefined): Promise<string | null> => {
     if (!grant) {
         return null;
     }
@@ -210,7 +334,7 @@ export const requestGrantAccessToken = async (): Promise<string | null> => {
 
         if (response.status === 401) {
             await response.body?.cancel();
-            await clearGrant();
+            await clearGrant(grant.token);
 
             return null;
         }
@@ -226,7 +350,9 @@ export const requestGrantAccessToken = async (): Promise<string | null> => {
         // Keep the shown profile current without rewriting storage (and notifying
         // every listener) on each refresh.
         if (JSON.stringify(user) !== JSON.stringify(grant.user)) {
-            await writeGrant({ token: grant.token, user });
+            await updateGrantIf(grant.token, (stored) => {
+                return { ...stored, user };
+            });
         }
 
         return token;
@@ -235,53 +361,39 @@ export const requestGrantAccessToken = async (): Promise<string | null> => {
     }
 };
 
-/** Revoke the session server-side, then forget it. Forgets it even if the revoke fails. */
-export const signOutGrant = async (): Promise<void> => {
+/**
+ * Revoke the session of the grant `key` names (`grantKey`), then forget it.
+ * Forgets it even if the revoke fails, but not a grant a sign-in stored while
+ * the revoke was out. `"replaced"` when another grant is stored now: it is left
+ * alone, unrevoked. A failed removal rejects with `GrantRemovalError`.
+ */
+export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> => {
     const grant = await readGrant();
 
-    try {
-        if (grant) {
-            const response = await postBackend("/extension/auth/revoke", { token: grant.token });
+    if (!grant) {
+        return "signed-out";
+    }
 
-            await response.body?.cancel();
-        }
+    if (grantKey(grant) !== key) {
+        return "replaced";
+    }
+
+    let revoked = false;
+
+    try {
+        const response = await postBackend("/extension/auth/revoke", { token: grant.token });
+
+        revoked = response.ok;
+        await response.body?.cancel();
     } catch {
         // Offline: the session expires on its own; the local copy goes regardless.
-    } finally {
-        await clearGrant();
     }
-};
 
-/** The stored grant's user, kept in step with `storage.local`. `undefined` while loading. */
-export const useGrantUser = (): { isPending: boolean; user: GrantUser | null } => {
-    const [user, setUser] = useState<GrantUser | null | undefined>(undefined);
+    try {
+        await clearGrant(grant.token);
+    } catch (error) {
+        throw new GrantRemovalError(error, revoked);
+    }
 
-    useEffect(() => {
-        let cancelled = false;
-
-        const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-            if (area === "local" && Object.hasOwn(changes, STORAGE_KEY)) {
-                setUser((changes[STORAGE_KEY]?.newValue as StoredGrant | undefined)?.user ?? null);
-            }
-        };
-
-        chrome.storage.onChanged.addListener(listener);
-
-        const load = async () => {
-            const grant = await readGrant();
-
-            if (!cancelled) {
-                setUser(grant?.user ?? null);
-            }
-        };
-
-        void load();
-
-        return () => {
-            cancelled = true;
-            chrome.storage.onChanged.removeListener(listener);
-        };
-    }, []);
-
-    return { isPending: user === undefined, user: user ?? null };
+    return "signed-out";
 };

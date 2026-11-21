@@ -88,6 +88,7 @@ the files from the root down to their working directory, so **read the file for 
 | Storybook: stories, MSW fixtures, page stories, a11y in CI                          | `apps/web/src/storybook/AGENTS.md`                      |
 | Web auth (session reads), chat UI, local models                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md` |
 | Desktop shell, dictation, ACP registry installs; mobile app; UI components          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md` |
+| Browser extension: sign-in through the app grant, no cookies                        | `apps/browser-extension/AGENTS.md`                      |
 | Device execution, sandbox, SSH servers, `neore-host`                                | `packages/device-core/AGENTS.md`                        |
 | Dev servers, build, deploy, pnpm, vis; review checklist and test rules for a PR      | `docs/agents/{local-dev,build-and-deploy,tooling,review-checklist,testing}.md` |
 

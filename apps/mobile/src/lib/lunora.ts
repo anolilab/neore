@@ -1,8 +1,7 @@
 import { createInMemoryPersistence, createInMemoryQueryCache, LunoraClient } from "@lunora/client";
-import { createWsTicketMinter } from "@neore/client-runtime";
+import { createWsTicketMinter, wireLiveSocket } from "@neore/client-runtime";
 
 import { loadConfig } from "./config";
-import { wireLiveSocket } from "./live-socket";
 
 /**
  * The one Lunora client for the app. Hermes has no IndexedDB, so the browser's
