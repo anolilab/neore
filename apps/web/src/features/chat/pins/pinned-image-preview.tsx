@@ -7,6 +7,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { imageOrdinals } from "@neore/chat-ui/utils/image-ordinals";
+import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import { ImageIcon } from "lucide-react";
 import type { FC } from "react";
 
@@ -49,11 +50,14 @@ const hashOf = (text: string): string => {
     return `${first.toString(36)}${second.toString(36)}`;
 };
 
+/** The backend's origin, which serves our signed storage links. Read raw, like `thread/message-content.tsx`. */
+const STORAGE_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | undefined);
+
 /**
- * An image's key, kept with its pin to find it again: a hash, so no address of the file is stored. A signed link to our
- * own storage (`sig`) is keyed by its path alone, which stays the same when it is signed again or the app's domain
- * moves; another host's image by its host and path, so two hosts serving one path stay apart. `undefined` for an image
- * with no web link (a `data:` URL).
+ * An image's key, kept with its pin to find it again: a hash, so no address of the file is stored. A signed link
+ * (`sig`) served by our backend is keyed by its path alone, which stays the same when it is signed again or the app's
+ * domain moves; any other image, a signed one from another host included, by its host and path, so two hosts serving
+ * one path stay apart. `undefined` for an image with no web link (a `data:` URL).
  */
 export const imageKeyOf = (source: string): string | undefined => {
     try {
@@ -63,7 +67,9 @@ export const imageKeyOf = (source: string): string | undefined => {
             return undefined;
         }
 
-        return hashOf(url.searchParams.has("sig") ? `storage ${url.pathname}` : `${url.host} ${url.pathname}`);
+        const ours = url.searchParams.has("sig") && STORAGE_ORIGINS.includes(url.origin);
+
+        return hashOf(ours ? `storage ${url.pathname}` : `${url.host} ${url.pathname}`);
     } catch {
         return undefined;
     }

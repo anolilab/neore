@@ -27,6 +27,8 @@ vi.mock("@/features/chat/core/context/chat-context-hooks", () => {
     };
 });
 
+vi.stubEnv("VITE_LUNORA_URL", "https://api.test");
+
 const { default: PinnedImagePreview, findPinnedImage, imageKeyOf } = await import("./pinned-image-preview");
 
 const reply = {
@@ -123,15 +125,23 @@ describe(findPinnedImage, () => {
 });
 
 describe(imageKeyOf, () => {
-    it("keys a stored image by its path whatever the domain, another host's by host and path, and an inline one not at all", () => {
+    it("keys a stored image by its path whatever the domain, another host's by host and path, and an inline one not at all", async () => {
         const key = imageKeyOf("https://api.test/agent-files/abc?sig=1&exp=2");
 
-        // The same file signed again, or served after the app's domain moved: the same key, and no address in it.
+        // The same file signed again: the same key, and no address in it.
         expect(imageKeyOf("https://api.test/agent-files/abc?sig=9&exp=5")).toBe(key);
-        expect(imageKeyOf("https://new.example/agent-files/abc?sig=1")).toBe(key);
         expect(key).not.toContain("agent-files");
-        // Another host's image: its host counts.
+        // Another host's image: its host counts, even when that host signs its links too.
         expect(imageKeyOf("https://cdn.one/a.png")).not.toBe(imageKeyOf("https://cdn.two/a.png"));
+        expect(imageKeyOf("https://cdn.example/agent-files/abc?sig=1")).not.toBe(key);
+
+        // After the app's domain moved, our storage serves the same file from the new backend: the same key.
+        vi.stubEnv("VITE_LUNORA_URL", "https://new.example");
+        vi.resetModules();
+
+        const moved = await import("./pinned-image-preview");
+
+        expect(moved.imageKeyOf("https://new.example/agent-files/abc?sig=1")).toBe(key);
         expect(imageKeyOf("data:image/png;base64,iVBORw0KGgo=")).toBeUndefined();
         expect(imageKeyOf("not a url")).toBeUndefined();
     });
