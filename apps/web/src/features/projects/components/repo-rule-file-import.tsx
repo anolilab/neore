@@ -405,11 +405,11 @@ const RepoRuleFileImport: FC<{
             )}
             <div className="flex flex-wrap gap-2">
                 {found && found.length > 0 ? (
-                    <Button disabled={disabled || picked.size === 0} onClick={importPicked} size="sm" type="button">
+                    <Button disabled={disabled || picked.size === 0} focusableWhenDisabled onClick={importPicked} size="sm" type="button">
                         {t`Import selected`}
                     </Button>
                 ) : (
-                    <Button disabled={looking} onClick={look} size="sm" type="button">
+                    <Button disabled={looking} focusableWhenDisabled onClick={look} size="sm" type="button">
                         {looking ? t`Looking...` : t`Find files`}
                     </Button>
                 )}

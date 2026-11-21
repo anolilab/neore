@@ -937,6 +937,31 @@ describe("project rule files imported from the project's repository", () => {
         expect(screen.queryByRole("button", { name: "Import from repository" })).toBeNull();
     });
 
+    it("keeps keyboard focus on the search button while it looks and after the files are found", async () => {
+        const user = userEvent.setup();
+        const listing: { resolve: (value: unknown) => void } = { resolve: () => {} };
+
+        backend.repos = [REPO];
+        // The tsconfig lib and the configured Node range predate `Promise.withResolvers`.
+        backend.repoList.mockReturnValue(
+            new Promise((resolve) => {
+                listing.resolve = resolve;
+            }),
+        );
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Looking..." }));
+
+        listing.resolve({ commit: COMMIT, files: [{ path: "AGENTS.md", sha: "sha-agents", size: 20, tooLarge: false }], status: "ok", truncated: false });
+        await screen.findByRole("list", { name: "Files found" });
+
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Import selected" }));
+    });
+
     it("reads nothing before the person asks, shows what was found, and imports an AGENTS.md as one always draft", async () => {
         const user = userEvent.setup();
 
