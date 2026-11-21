@@ -59,7 +59,7 @@ describe(signIn, () => {
     let evil: Awaited<ReturnType<typeof site>>;
     let login: Awaited<ReturnType<typeof site>>;
     /** What the login site serves at `/` and answers at `/session`; each case sets them. */
-    const fixture: { onSession: Handler; page: string } = { onSession: () => undefined, page: "" };
+    const fixture: { home: string; onSession: Handler; page: string } = { home: "", onSession: () => undefined, page: "" };
 
     beforeAll(async () => {
         browser = await chromium.launch();
@@ -68,7 +68,7 @@ describe(signIn, () => {
             if (request.url === "/session") {
                 fixture.onSession(request, response, body);
             } else if (request.url === "/home") {
-                html(response, "<h1>Home</h1>");
+                html(response, fixture.home);
             } else {
                 html(response, fixture.page);
             }
@@ -86,6 +86,7 @@ describe(signIn, () => {
         page = await context.newPage();
         evil.hits.length = 0;
         login.hits.length = 0;
+        fixture.home = "<h1>Home</h1>";
         fixture.onSession = (_request, response) => {
             response.writeHead(303, { location: "/home" });
             response.end();
@@ -209,6 +210,46 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ error: expect.stringContaining("in this window"), submitted: false, success: false });
         expect(await page.inputValue("[name=user]")).toBe("");
+    });
+
+    it("signs in when the page it lands on embeds another site", async () => {
+        fixture.page = loginForm();
+        fixture.home = `<h1>Home</h1><iframe src="${evil.origin}/widget"></iframe>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
+        expect(evil.hits.filter((hit) => hit.body !== "")).toStrictEqual([]);
+    });
+
+    it("reports a login page shown again as a password field that remains", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            response.writeHead(303, { location: "/" });
+            response.end();
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ passwordFieldRemains: true, submitted: true, success: true });
+    });
+
+    it("types nothing into a form that a base element sends to another window", async () => {
+        fixture.page = `<base target="_blank">${loginForm()}`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("in this window"), submitted: false, success: false });
+        expect(await page.inputValue("[name=user]")).toBe("");
+    });
+
+    it("blocks a form a submit handler sends to another window", async () => {
+        fixture.page = loginForm(`document.forms[0].addEventListener("submit", () => { document.forms[0].target = "_blank"; });`);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
     });
 
     it.each([307, 308])("fails a %i redirect that would carry the password to another site", async (status) => {

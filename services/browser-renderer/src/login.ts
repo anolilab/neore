@@ -2,7 +2,7 @@
  * Saved-login fill: the browser half of `/login`. Kept apart from the Worker so a test can drive it against a local
  * Chromium (`login.browser.test.ts`).
  */
-import type { CDPSession, Page, Request, Route } from "@cloudflare/playwright";
+import type { CDPSession, Page, Request, Response, Route } from "@cloudflare/playwright";
 
 /** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
 export const originOf = (url: string): string | null => {
@@ -106,22 +106,38 @@ const hasSecret = (body: string, secret: string): boolean => body.includes(JSON.
 
 /**
  * Blocks every way out of `origin` for the tab until `disarm()`, from before the password is typed until it is cleared:
- * every request to another origin is aborted (frames and popups too, as the route is the context's), a 307 or 308
- * redirect, which would carry a POST body on, is failed when it points elsewhere, and a new page (a popup) is closed.
- * `attempt()` names the first blocked request that could have carried the password (a navigation, a body or such a
- * redirect); `sent()` is the first request to `origin` after `expectSubmit()` that carries the password (the form's
- * own, or a script's that sends it). A guard that cannot be set up whole is taken down again before the error is thrown.
+ * only `page` itself may reach `origin`, every other request is aborted (another origin, or any page the context opens),
+ * a 307 or 308 redirect, which would carry a POST body on, is failed when it points elsewhere, and a new page (a popup)
+ * is closed. Until the answer to the form's own navigation arrives (the document that held the password is being
+ * replaced; blocking goes on), `attempt()` names the first blocked request that could have carried the password (a
+ * navigation, a body or such a redirect). `sent()` is the first request to
+ * `origin` after `expectSubmit()` that sends the form: the main frame's own POST, or a script's request carrying the
+ * password. A guard that cannot be set up whole is taken down again before the error is thrown.
  */
 const armGuard = async (page: Page, origin: string, password: string) => {
     let isExpecting = false;
+    let isCounting = true;
     let sent: Request | null = null;
     let attempt: string | null = null;
+
+    /** A service worker's request has no frame: it is not the page's. */
+    const frameOf = (request: Request) => {
+        try {
+            return request.frame();
+        } catch {
+            return null;
+        }
+    };
+
+    const isFormSend = (request: Request): boolean =>
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        ((request.isNavigationRequest() && frameOf(request) === page.mainFrame()) || hasSecret(request.postData() ?? "", password));
 
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();
 
-        if (originOf(request.url()) === origin) {
-            if (isExpecting && !sent && hasSecret(request.postData() ?? "", password)) {
+        if (frameOf(request)?.page() === page && originOf(request.url()) === origin) {
+            if (isExpecting && !sent && isFormSend(request)) {
                 sent = request;
             }
 
@@ -130,15 +146,36 @@ const armGuard = async (page: Page, origin: string, password: string) => {
             return;
         }
 
-        if (request.isNavigationRequest() || request.postDataBuffer() !== null) {
+        if (isCounting && (request.isNavigationRequest() || request.postDataBuffer() !== null)) {
             attempt ??= `a request to ${originOf(request.url()) ?? "another site"}`;
         }
 
         await route.abort("blockedbyclient");
     };
 
+    /** The final answer to the form's own navigation, after any redirects: what loads from here is the next page's. */
+    const onResponse = (response: Response): void => {
+        let request: Request | null = response.request();
+        const status = response.status();
+
+        if (!sent?.isNavigationRequest() || (status >= 300 && status < 400)) {
+            return;
+        }
+
+        while (request && request !== sent) {
+            request = request.redirectedFrom();
+        }
+
+        if (request) {
+            isCounting = false;
+        }
+    };
+
     const onPage = (opened: Page): void => {
-        attempt ??= "a new window";
+        if (isCounting) {
+            attempt ??= "a new window";
+        }
+
         opened.close().catch(() => undefined);
     };
 
@@ -146,6 +183,7 @@ const armGuard = async (page: Page, origin: string, password: string) => {
 
     const disarm = async (): Promise<void> => {
         page.context().off("page", onPage);
+        page.off("response", onResponse);
         await page
             .context()
             .unroute("**/*", onRoute)
@@ -156,6 +194,7 @@ const armGuard = async (page: Page, origin: string, password: string) => {
     try {
         await page.context().route("**/*", onRoute);
         page.context().on("page", onPage);
+        page.on("response", onResponse);
         cdp = await page.context().newCDPSession(page);
 
         const session = cdp;
@@ -165,7 +204,10 @@ const armGuard = async (page: Page, origin: string, password: string) => {
             const target = location === undefined ? undefined : originOf(new URL(location, event.request.url).href);
 
             if (isRedirectElsewhere(event.responseStatusCode, target, origin)) {
-                attempt ??= `a redirect to ${target ?? "another site"}`;
+                if (isCounting) {
+                    attempt ??= `a redirect to ${target ?? "another site"}`;
+                }
+
                 session.send("Fetch.failRequest", { errorReason: "BlockedByClient", requestId: event.requestId }).catch(() => undefined);
             } else {
                 session.send("Fetch.continueRequest", { requestId: event.requestId }).catch(() => undefined);
@@ -232,7 +274,12 @@ const checkForm = (input: Element, { origin, submit }: { origin: string; submit:
     const button = form.querySelector<HTMLButtonElement | HTMLInputElement>('button:not([type]), button[type="submit" i], input[type="submit" i]');
     const named = button?.getAttribute("formmethod") ?? form.getAttribute("method");
     const action = new URL(button?.getAttribute("formaction") ?? form.getAttribute("action") ?? "", document.baseURI);
-    const target = (button?.getAttribute("formtarget") ?? form.getAttribute("target") ?? "").toLowerCase();
+    const target = (
+        button?.getAttribute("formtarget") ??
+        form.getAttribute("target") ??
+        document.querySelector("base[target]")?.getAttribute("target") ??
+        ""
+    ).toLowerCase();
 
     if ((named ?? "post").toLowerCase() !== "post" || action.origin !== origin || !["", "_self"].includes(target)) {
         return "off-site";
@@ -273,11 +320,11 @@ const findPassword = async (page: Page, password: string) => {
 
 /**
  * Takes the password out of the page: leaves the document that had it for `about:blank` while the guard still blocks
- * every other origin (no script of that document runs after), then loads the address again by GET, never resending the
- * form, when `timeout` leaves time for it, and looks: a field that holds the password again (a page that saved it) fails. Throws when the page is not
- * verifiably clean: it must not be used again. Whether a password field is on the page: the sign-in may have failed.
+ * every other origin (its `pagehide` and `unload` handlers run under the guard), then loads the address again by GET,
+ * never resending the form, when `timeout` leaves time for it, and looks: a field that holds the password again (a page
+ * that saved it) fails. Throws when the page is not verifiably clean: it must not be used again.
  */
-const clearPassword = async (page: Page, password: string, timeout: number | null, guard: Awaited<ReturnType<typeof armGuard>>): Promise<boolean> => {
+const clearPassword = async (page: Page, password: string, timeout: number | null, guard: Awaited<ReturnType<typeof armGuard>>): Promise<void> => {
     const address = page.url();
 
     try {
@@ -288,7 +335,7 @@ const clearPassword = async (page: Page, password: string, timeout: number | nul
 
     // No time left in the hold for the load: the page stays blank, which is clean.
     if (timeout === null || originOf(address) === null) {
-        return false;
+        return;
     }
 
     await page.goto(address, { timeout, waitUntil: "domcontentloaded" });
@@ -298,9 +345,16 @@ const clearPassword = async (page: Page, password: string, timeout: number | nul
     if (after.holds) {
         throw new Error("A field holds the password again");
     }
-
-    return after.hasPasswordField;
 };
+
+/** `promise`, or `fallback` once `ms` passed: a page can keep any call waiting. */
+const within = async <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([
+        promise,
+        new Promise<T>((resolve) => {
+            setTimeout(resolve, ms, fallback);
+        }),
+    ]);
 
 /**
  * Sign in with a saved login, in one call so nothing a page shows in between can steer it: open `url`, check the page is
@@ -424,7 +478,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         // Listened for before the send: a fast server can have the next page loaded before the send returns.
         // eslint-disable-next-line unicorn/no-declarations-before-early-exit -- it must exist before the form is sent
-        const nextPage = page.waitForEvent("domcontentloaded", { timeout: left(SEND_WAIT_MS * 2) }).catch(() => undefined);
+        const nextPage = page
+            .waitForEvent("domcontentloaded", { timeout: left(SEND_WAIT_MS * 2) })
+            .then(() => true)
+            .catch(() => false);
 
         if ((await field.evaluate(checkForm, { origin, submit: true })) !== "ok") {
             return failed(`The login form changed to send the password elsewhere than ${origin} by POST, so it was not sent`);
@@ -442,9 +499,15 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             // The form's own navigation: the page it leads to. A script's request: its answer, then a moment for what the
             // script does with it.
             if (sent.isNavigationRequest()) {
-                await nextPage;
+                if (!(await nextPage)) {
+                    return failed("The site did not answer the sign-in in time");
+                }
             } else {
-                await sent.response().catch(() => undefined);
+                await within(
+                    sent.response().catch(() => null),
+                    left(SEND_WAIT_MS),
+                    null,
+                );
                 await page.waitForTimeout(Math.min(1500, Math.max(0, deadline - now())));
             }
         }
@@ -467,15 +530,32 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         return result;
     }
 
-    const title = result.success ? scrub(await page.title().catch(() => "")) : "";
+    // Read before the cleanup leaves the page: where the sign-in landed, and whether it shows a password field again.
+    const title = result.success
+        ? scrub(
+              await within(
+                  page.title().catch(() => ""),
+                  2000,
+                  "",
+              ),
+          )
+        : "";
     const landedAt = scrub(page.url());
+    const hasPasswordField = result.success
+        ? await within(
+              findPassword(page, password)
+                  .then((state) => state.hasPasswordField)
+                  .catch(() => true),
+              2000,
+              true,
+          )
+        : false;
 
     // Whatever happened once the password was typed, it leaves the page before anything else can read the page.
     const reloadMs = deadline - now();
-    let hasPasswordField: boolean;
 
     try {
-        hasPasswordField = await clearPassword(page, password, reloadMs > 1000 ? Math.min(navTimeout, reloadMs) : null, guard);
+        await clearPassword(page, password, reloadMs > 1000 ? Math.min(navTimeout, reloadMs) : null, guard);
     } catch {
         return {
             error: "The password could not be cleared from the page, so the browser session was closed",
