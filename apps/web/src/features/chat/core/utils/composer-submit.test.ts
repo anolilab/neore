@@ -92,7 +92,22 @@ describe(requestComposerAttach, () => {
         const stop = onComposerAttachRequest("u2", handler);
 
         expect(handler).not.toHaveBeenCalled();
-        expect(hasPendingComposerAttach()).toBe(false);
+        expect(hasPendingComposerAttach("u2")).toBe(false);
+
+        stop();
+    });
+
+    it("joins a drop made while the session loaded with the next drop, under that drop's account", () => {
+        const early = new File(["a"], "a.txt");
+        const later = new File(["b"], "b.txt");
+
+        requestComposerAttach({ files: [early] });
+        requestComposerAttach({ accountId: "u1", files: [later] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u1", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: "u1", files: [early, later] });
 
         stop();
     });
@@ -108,6 +123,26 @@ describe(requestComposerAttach, () => {
         expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: undefined, files: [file] });
 
         stop();
+    });
+});
+
+describe(hasPendingComposerAttach, () => {
+    beforeEach(() => {
+        drainAttach();
+    });
+
+    it("counts only files waiting for this account, or for an account not known yet", () => {
+        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
+
+        expect(hasPendingComposerAttach("u1")).toBe(true);
+        expect(hasPendingComposerAttach(undefined)).toBe(true);
+        expect(hasPendingComposerAttach("u2")).toBe(false);
+    });
+
+    it("counts a drop made while the session loaded for any account", () => {
+        requestComposerAttach({ files: [new File(["a"], "a.txt")] });
+
+        expect(hasPendingComposerAttach("u2")).toBe(true);
     });
 });
 
@@ -137,10 +172,10 @@ describe(withdrawComposerAttach, () => {
 
         requestComposerAttach({ accountId: "u1", files: [file] });
 
-        expect(hasPendingComposerAttach()).toBe(true);
+        expect(hasPendingComposerAttach("u1")).toBe(true);
 
         withdrawComposerAttach([file]);
 
-        expect(hasPendingComposerAttach()).toBe(false);
+        expect(hasPendingComposerAttach("u1")).toBe(false);
     });
 });

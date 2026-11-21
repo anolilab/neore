@@ -64,6 +64,8 @@ const ChatPage = () => {
     const { data: userSettings } = useUserSettings();
     const { data: activeOrganization, isPending: isOrgPending } = useAuthActiveOrganization();
     const { data: sessionData, isPending: isSessionPending } = useAuthSession();
+    // Dropped files waiting for this account's composer hold the resume-last-chat redirect (`hasPendingComposerAttach`).
+    const sessionUserId = sessionData?.user?.id;
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
     const resumeLastChat =
@@ -147,7 +149,7 @@ const ChatPage = () => {
             ((focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value.trim() !== "") ||
             (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "") ||
             // Files dropped on the sidebar or the dock icon wait for this page's composer.
-            hasPendingComposerAttach();
+            hasPendingComposerAttach(sessionUserId);
 
         if (hasDraft) {
             return;
@@ -156,7 +158,7 @@ const ChatPage = () => {
         if (latestThreadId) {
             void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
         }
-    }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat]);
+    }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat, sessionUserId]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {

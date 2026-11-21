@@ -32,20 +32,37 @@ export interface ComposerAttachRequest {
 
 const composerAttachChannel = createRequestChannel<ComposerAttachRequest>();
 
+/** Whether a request for `requestAccountId` belongs to `accountId`: a request made before the session was known belongs to any. */
+const isForAccount = (requestAccountId: string | undefined, accountId: string | undefined): boolean =>
+    requestAccountId === undefined || accountId === undefined || requestAccountId === accountId;
+
 /**
  * Files dropped on the dock icon or the sidebar's thread list. The new-thread composer attaches them through its normal
  * upload path; nothing is sent. Drops that arrive before the composer takes them are joined, so a second drop does not
- * replace the first; a drop for another account replaces the held one, so files never mix across accounts.
+ * replace the first, and a drop made while the session loaded joins the next one, taking its account. Only a drop for
+ * another known account replaces the held one, so files never mix across accounts.
  */
 export const requestComposerAttach = (request: ComposerAttachRequest): void => {
     const held = composerAttachChannel.store.getState().pending?.payload;
-    const files = held && held.accountId === request.accountId ? [...held.files, ...request.files] : request.files;
 
-    composerAttachChannel.request({ accountId: request.accountId, files });
+    if (held && isForAccount(held.accountId, request.accountId)) {
+        composerAttachChannel.request({ accountId: held.accountId ?? request.accountId, files: [...held.files, ...request.files] });
+
+        return;
+    }
+
+    composerAttachChannel.request({ accountId: request.accountId, files: request.files });
 };
 
-/** Whether dropped files still wait for the new-chat composer: the resume-last-chat redirect must not leave them behind. */
-export const hasPendingComposerAttach = (): boolean => composerAttachChannel.store.getState().pending !== null;
+/**
+ * Whether dropped files wait for the new-chat composer of `accountId` (any account while it is not known yet): the
+ * resume-last-chat redirect must not leave them behind. A request for another account does not count; that composer drops it.
+ */
+export const hasPendingComposerAttach = (accountId: string | undefined): boolean => {
+    const { pending } = composerAttachChannel.store.getState();
+
+    return pending !== null && isForAccount(pending.payload.accountId, accountId);
+};
 
 /** Takes `files` back from a request still waiting, for a drop whose new chat could not open. */
 export const withdrawComposerAttach = (files: ReadonlyArray<File>): void => {
