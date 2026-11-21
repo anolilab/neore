@@ -670,7 +670,10 @@ impl DeviceState {
                     });
                 }
 
+                // An absolute deadline: the waits below (the save lock) count against it, so nothing starts once
+                // the request has expired, however long they took.
                 let remaining = call.expires_at.saturating_sub(now_ms());
+                let deadline = std::time::Instant::now() + Duration::from_millis(remaining);
 
                 let still_paired = self
                     .settings()
@@ -696,11 +699,11 @@ impl DeviceState {
                         )
                     }
                     _ if remaining == 0 => {
-                        Outcome::failed(decision, "approved after the request expired")
+                        Outcome::failed(decision, EXPIRED_BEFORE_START)
                     }
                     _ => {
                         self.emit_progress(&pairing.secret, &pairing.device_id, &call.call_id, "running");
-                        run_action(self, action, Duration::from_millis(remaining), decision)
+                        run_action(self, action, deadline, decision, &pairing)
                     }
                 }
             }
@@ -1170,22 +1173,39 @@ impl Outcome {
 fn run_action(
     state: &DeviceState,
     action: Action,
-    remaining: Duration,
+    deadline: std::time::Instant,
     decision: &'static str,
+    pairing: &Pairing,
 ) -> Outcome {
     if matches!(action, Action::GlobalInstructions(_)) {
-        return read_outside_settings_lock(state, decision, remaining, |roots| {
-            actions::run(action, roots, remaining, Some(&state.mcp))
-        });
+        return read_outside_settings_lock(
+            state,
+            decision,
+            (deadline, pairing),
+            |roots, remaining| actions::run(action, roots, remaining, Some(&state.mcp)),
+        );
     }
 
     let roots = shareable_roots(&state.settings().roots);
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+
+    if remaining.is_zero() {
+        return Outcome::failed(decision, EXPIRED_BEFORE_START);
+    }
 
     Outcome::of(
         decision,
         actions::run(action, &roots, remaining, Some(&state.mcp)),
     )
 }
+
+/// Why an approved call never started: the request expired first (waiting for the save lock counts).
+const EXPIRED_BEFORE_START: &str = "approved after the request expired";
+
+/// Why an approved instruction-file read did not run or came back with nothing: the computer was unpaired or paired
+/// again since the call was approved.
+const PAIRING_CHANGED: &str =
+    "the computer was unpaired or paired again since the call was approved";
 
 /// Why an instruction-file read came back with nothing: the owner changed the settings while it ran.
 const SETTINGS_CHANGED_DURING_READ: &str =
@@ -1194,31 +1214,42 @@ const SETTINGS_CHANGED_DURING_READ: &str =
 /// Runs `read` (an instruction-file read) against the folders shared when it starts, WITHOUT holding the save lock,
 /// so a read stalled on a hung mount never blocks a settings change. Its result is kept only if no settings update was
 /// saved meanwhile (the generation, bumped under the save lock by every one): a folder shared during the read can
-/// never have been left out of its check. Nor does it start once `remaining` ran out waiting for that lock. Nothing
-/// under the lock touches the disk: the folders are resolved (canonicalised, which a hung mount stalls) after it.
+/// never have been left out of its check. The call's `pairing` must still be the saved one both when the snapshot is
+/// taken and when the result is kept (an unpair or re-pair since the approval check refuses it), and the read never
+/// starts at or past `deadline`, however long the lock took. Nothing under the lock touches the disk: the folders are resolved (canonicalised,
+/// which a hung mount stalls) after it.
 fn read_outside_settings_lock(
     state: &DeviceState,
     decision: &'static str,
-    remaining: Duration,
-    read: impl FnOnce(&[PathBuf]) -> actions::Outcome,
+    (deadline, pairing): (std::time::Instant, &Pairing),
+    read: impl FnOnce(&[PathBuf], Duration) -> actions::Outcome,
 ) -> Outcome {
-    let started = std::time::Instant::now();
     let (generation, saved) = {
         let _guard = state.save_lock.lock().unwrap();
+        let current = state.settings();
 
-        (
-            state.generation.load(Ordering::SeqCst),
-            state.settings().roots,
-        )
+        if current.pairing.as_ref() != Some(pairing) {
+            return Outcome::failed(decision, PAIRING_CHANGED);
+        }
+
+        (state.generation.load(Ordering::SeqCst), current.roots)
     };
 
-    if started.elapsed() >= remaining {
-        return Outcome::failed(decision, "approved after the request expired");
+    let roots = shareable_roots(&saved);
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+
+    if remaining.is_zero() {
+        return Outcome::failed(decision, EXPIRED_BEFORE_START);
     }
 
-    let done = read(&shareable_roots(&saved));
-    // Only `settings_update` changes the shared folders, and it bumps the generation under the lock once saved.
+    let done = read(&roots, remaining);
+    // Only `settings_update` changes the shared folders, and it bumps the generation under the lock once saved. A
+    // pairing is saved without a bump, so it is compared on its own.
     let _guard = state.save_lock.lock().unwrap();
+
+    if state.settings().pairing.as_ref() != Some(pairing) {
+        return Outcome::failed(decision, PAIRING_CHANGED);
+    }
 
     if state.generation.load(Ordering::SeqCst) != generation {
         return Outcome::failed(decision, SETTINGS_CHANGED_DURING_READ);
@@ -1747,16 +1778,16 @@ mod tests {
     /// voids its result; one that finishes with the settings untouched keeps it.
     #[test]
     fn a_stalled_instruction_read_never_blocks_settings_and_loses_its_result_to_a_change() {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-stalled-read-{}", std::process::id()));
+        let (state, dir, _) = paired_state("stalled-read");
         let shared = dir.join("shared");
-        let _ = stdfs::remove_dir_all(&dir);
         stdfs::create_dir_all(&shared).unwrap();
 
-        let state = Arc::new(DeviceState::new(&dir, Box::new(|_| {})));
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
 
         assert_eq!(
-            read_outside_settings_lock(&state, "once", Duration::from_secs(60), |_| {
+            read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
                 actions::Outcome::completed("files".to_owned())
             })
             .output
@@ -1768,9 +1799,10 @@ mod tests {
         let (release, released) = std::sync::mpsc::channel::<()>();
         let reader = {
             let state = Arc::clone(&state);
+            let pairing = pairing.clone();
 
             std::thread::spawn(move || {
-                read_outside_settings_lock(&state, "once", Duration::from_secs(60), move |roots| {
+                read_outside_settings_lock(&state, "once", (deadline, &pairing), move |roots, _| {
                     assert!(roots.is_empty());
                     started_tx.send(()).unwrap();
                     released.recv().unwrap();
@@ -1794,6 +1826,83 @@ mod tests {
         assert_eq!(outcome.status, "failed");
         assert!(outcome.output.is_none());
         assert_eq!(outcome.error.as_deref(), Some(SETTINGS_CHANGED_DURING_READ));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// The deadline is a point in time fixed before `approval_holds` waits for the save lock (`execute`), and the read
+    /// checks it again after its own wait: a deadline that passed while the lock was held never starts the read.
+    #[test]
+    fn an_instruction_read_never_starts_past_a_deadline_that_ran_out_during_the_lock_wait() {
+        let (state, dir, _) = paired_state("read-past-deadline");
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let deadline = std::time::Instant::now();
+
+        let held = state.save_lock.lock().unwrap();
+        let reader = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || {
+                read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+                    panic!("the read started after the request expired")
+                })
+            })
+        };
+        drop(held);
+
+        let outcome = reader.join().unwrap();
+
+        assert_eq!(outcome.status, "failed");
+        assert_eq!(outcome.error.as_deref(), Some(EXPIRED_BEFORE_START));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// An unpair (or a re-pair) saved after the approval was checked refuses the read before it starts, and one saved
+    /// while it runs voids its result, though a pairing is saved without a generation bump.
+    #[test]
+    fn an_instruction_read_never_runs_for_a_pairing_that_is_gone() {
+        let (state, dir, _) = paired_state("read-after-unpair");
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+
+        state
+            .settings_update(serde_json::from_value(json!({ "unpair": true })).unwrap())
+            .unwrap();
+
+        let outcome = read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+            panic!("the read ran after the computer was unpaired")
+        });
+
+        assert_eq!(outcome.status, "failed");
+        assert_eq!(outcome.error.as_deref(), Some(PAIRING_CHANGED));
+
+        // Re-paired while the read runs: the generation is unchanged, the pairing is not.
+        state
+            .change_settings(|settings| {
+                settings.pairing = Some(pairing.clone());
+                Ok(())
+            })
+            .unwrap();
+        let outcome = read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+            state
+                .change_settings(|settings| {
+                    settings.pairing = Some(Pairing {
+                        device_id: "dev2".into(),
+                        ..pairing.clone()
+                    });
+                    Ok(())
+                })
+                .unwrap();
+
+            actions::Outcome::completed("files".to_owned())
+        });
+
+        assert_eq!(outcome.status, "failed");
+        assert!(outcome.output.is_none());
+        assert_eq!(outcome.error.as_deref(), Some(PAIRING_CHANGED));
 
         let _ = stdfs::remove_dir_all(&dir);
     }
