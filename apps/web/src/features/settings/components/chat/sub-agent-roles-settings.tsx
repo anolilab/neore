@@ -74,6 +74,23 @@ const EFFORT_SAVE_DELAY_MS = 400;
 /** The value "everywhere" in the scope picker: the user's own roles. */
 const ALL_CHATS = "all";
 
+/** A picker entry for a saved model the list no longer offers, so the picker shows it rather than "Off". */
+const unofferedModel = (id: string): GatewayModel => {
+    return {
+        desc: "",
+        enabled: true,
+        id,
+        mode: "text",
+        modelApiId: id,
+        name: id,
+        provider: "unknown",
+        regions: [],
+        supportsFileInput: false,
+        supportsMultimodal: false,
+        supportsTools: false,
+    };
+};
+
 /** `config` without the empty fields, or `null` when nothing is left: the server stores no empty role. */
 const compact = (config: RoleConfig): RoleConfig | null => {
     const entries = Object.entries(config).filter(([, value]) => value !== undefined);
@@ -107,6 +124,9 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
     const effortTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const effectiveModelId = own.model ?? inherited?.model;
     const effectiveModel = models.find((model) => model.id === effectiveModelId);
+    // A plan that lapsed, or a project owner's model this member cannot run: the role stays set, but no run will start.
+    const isUnoffered = effectiveModelId !== undefined && effectiveModel === undefined;
+    const pickerModels = own.model && models.every((model) => model.id !== own.model) ? [...models, unofferedModel(own.model)] : models;
     const effectiveMode = own.mode ?? inherited?.mode ?? "prefer";
     const [draft, setDraftState] = useState(own.instructions ?? "");
     const draftRef = useRef(draft);
@@ -206,6 +226,14 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
 
     const inheritedModelName = inherited?.model ? (models.find((model) => model.id === inherited.model)?.name ?? inherited.model) : undefined;
     const inheritLabel = inheritedModelName ? t`Your default (${inheritedModelName})` : t`Your default (off)`;
+    let modelDescription = t`Off until you pick a model.`;
+
+    if (isUnoffered) {
+        modelDescription = t`This model cannot run for you, so the role is not offered to the assistant. Pick another one.`;
+    } else if (effectiveModelId) {
+        modelDescription = t`Delegated ${roleLabel.toLowerCase()} work runs on this model.`;
+    }
+
     let rolePlaceholder = t`Added after the built-in instructions for this role, e.g. "Check every change against our style guide."`;
 
     if (isProject && own.instructions === "") {
@@ -240,12 +268,12 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
             </CardHeader>
             <CardContent className="space-y-4">
                 <ModelSelect
-                    description={effectiveModelId ? t`Delegated ${roleLabel.toLowerCase()} work runs on this model.` : t`Off until you pick a model.`}
+                    description={modelDescription}
                     disabled={readOnly}
                     emptyLabel={isProject ? inheritLabel : t`Off`}
                     field={name}
                     label={t`Model`}
-                    models={models}
+                    models={pickerModels}
                     onChange={(_field, modelId) => save({ model: modelId ?? undefined })}
                     value={own.model}
                 />

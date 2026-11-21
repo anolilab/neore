@@ -625,7 +625,9 @@ export const setProjectSubAgentRole = authMutation
     .output(v.null())
     .mutation(async ({ args: { config, projectId, role }, ctx: context }) => {
         const { userId } = context.user;
-        const project = await writableProject(context, projectId, userId);
+        // On the primary: the save writes the whole map back, so it must hold a save a moment ago; and a member removed a
+        // moment ago must not pass on a lagging replica.
+        const project = await writableProject(context, projectId, userId, { primary: true });
 
         if (!project) {
             throw new LunoraError("NOT_FOUND", "Project not found");

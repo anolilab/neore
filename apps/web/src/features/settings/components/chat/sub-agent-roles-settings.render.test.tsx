@@ -364,4 +364,12 @@ describe("SubAgentRolesSettings", () => {
         });
         expect(state.setSubAgentRole.mock.calls[0]?.[0]).toStrictEqual({ config: { instructions: "Name the trade-offs." }, role: "architecture" });
     });
+
+    it("shows a saved model the picker no longer offers, and says it cannot run", async () => {
+        state.roles = { review: { model: "model-gone" } };
+        renderSettings();
+
+        expect(await screen.findByText("This model cannot run for you, so the role is not offered to the assistant. Pick another one.")).toBeDefined();
+        expect(screen.getAllByText("model-gone").length).toBeGreaterThan(0);
+    });
 });
