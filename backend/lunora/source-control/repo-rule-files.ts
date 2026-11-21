@@ -19,9 +19,9 @@
  *
  * A listing holds every root instruction file and at most `MAX_LISTED_FOLDER_FILES` of the rules folder's, the first by
  * path; it counts the rest (`omitted`), and gives each file it would read the blob SHA it reads (a link's final
- * target's). A read lists the same way without following links: it takes a file's own blob when that is the SHA given,
- * and a link's only when the SHA given is that of a file a link may lead to, so it reads only files the listing could
- * offer (a link is not tied to its own target: one the listing refused may be read as another of those files).
+ * target's). A read lists the same way: it takes a file's own blob when that is the SHA given, and a link's when the
+ * SHA given is that of a file the listing offers by its own path (unfollowed: the link may be read as any of those), or
+ * that of the file the link, followed again, leads to (one past the cap), so it reads only what the listing offered.
  *
  * Both run under {@link HOST_FETCHES_PER_IMPORT} host requests, redirect hops and a 401's repeat included
  * ({@link fetchBudget}): past it a link is refused (`budget`) and a file is `not_read`, never a failed request.
@@ -62,7 +62,8 @@ export const MAX_LINKS_FOLLOWED = 16;
  * session check's five lookups, the rate limit, the repository, and the grant with a token refresh and its store, then
  * again for a 401's forced refresh): 28 + 14 = 42, under the cap with 8 to spare. A listing spends at most 6 on the
  * commit and its trees and {@link MAX_LINKS_FOLLOWED} on links, so without a redirect a repeat always has its trees; a
- * read 6 and one per file picked (at most 20), so one without a 401 or a redirect reads them all. A redirect (a renamed
+ * read 6 and one per file picked (at most 20), so one without a 401 or a redirect reads them all, unless it follows a
+ * link again to a file past the listing's cap (a hop each, from the same count). A redirect (a renamed
  * repository answers each request with one, at most two hops) spends from the same count, so it still works while
  * requests are left; past them a link is `budget` and a file `not_read`, and a listing whose own walk is cut short
  * fails as the host's error.
@@ -171,8 +172,8 @@ interface Blob {
     size: number;
 }
 
-/** Where a link led: the file a read takes and its path, or why it is not followed. */
-type Followed = { at: string; blob: Blob } | { refused: LinkRefusal };
+/** Where a link led: the file a read takes and its path, or why it is not followed (`spent`: the host requests ran out). */
+type Followed = { at: string; blob: Blob } | { refused: LinkRefusal; spent?: true };
 
 const repoPath = ({ name, owner }: RepoAddress): string => `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
@@ -223,8 +224,11 @@ const readTree = async (request: HostRequest, address: RepoAddress, sha: string)
     return { entries: Array.isArray(body.tree) ? (body.tree as TreeEntry[]) : [], truncated: body.truncated === true };
 };
 
-/** `content`, base64, decoded as UTF-8 (a byte-order mark dropped), or `undefined` when it is not base64. */
-const decodeBase64 = (content: string): string | undefined => {
+/**
+ * `content`, base64, decoded as UTF-8, or `undefined` when it is not base64. A byte-order mark is dropped from text, and
+ * kept in a link's target (`keepBom`): there it is part of the name, so `\u{FEFF}AGENTS.md` never leads to `AGENTS.md`.
+ */
+const decodeBase64 = (content: string, keepBom = false): string | undefined => {
     let binary: string;
 
     try {
@@ -233,16 +237,16 @@ const decodeBase64 = (content: string): string | undefined => {
         return undefined;
     }
 
-    return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.codePointAt(0)!));
+    return new TextDecoder("utf-8", { fatal: false, ignoreBOM: keepBom }).decode(Uint8Array.from(binary, (character) => character.codePointAt(0)!));
 };
 
-/** The text of the blob `sha`, or `undefined` when the host sends it otherwise than as base64 (or no longer has it). */
-const readBlob = async (request: HostRequest, address: RepoAddress, sha: string): Promise<string | undefined> => {
+/** The text of the blob `sha` (a link's, its mark kept), or `undefined` when the host sends it otherwise than as base64 (or no longer has it). */
+const readBlob = async (request: HostRequest, address: RepoAddress, sha: string, link = false): Promise<string | undefined> => {
     try {
         const response = await request(`${repoPath(address)}/git/blobs/${encodeURIComponent(sha)}`);
         const body = (await response.json()) as { content?: unknown; encoding?: unknown };
 
-        return body.encoding === "base64" && typeof body.content === "string" ? decodeBase64(body.content) : undefined;
+        return body.encoding === "base64" && typeof body.content === "string" ? decodeBase64(body.content, link) : undefined;
     } catch (error) {
         if (isNotFound(error)) {
             return undefined;
@@ -265,9 +269,13 @@ export const isImportablePath = (path: string): boolean => {
     return slash === -1 ? ROOT_FILES.has(name.toLowerCase()) : (RULE_FOLDERS as ReadonlyArray<string>).includes(folder) && MARKDOWN_FILE.test(name);
 };
 
+/** A target naming a folder (`AGENTS.md/`, `rules/.`, `..`): no file, whatever is there. */
+const DIRECTORY_FORM = /(?:^|\/)\.{0,2}$/u;
+
 /**
- * The repository path the link at `linkPath` leads to when it holds `target`, or `undefined` for one that is absolute
- * or climbs out of the repository's root.
+ * The repository path the link at `linkPath` leads to when it holds `target`, or `undefined` for one that is absolute,
+ * climbs out of the repository's root, or climbs back through a part it named itself (`x/../AGENTS.md`: that part's
+ * kind is never checked, and a file there would leave the link leading nowhere).
  */
 export const resolveLinkTarget = (linkPath: string, target: string): string | undefined => {
     if (target.startsWith("/") || target.includes("\\") || target.includes("\0")) {
@@ -275,16 +283,18 @@ export const resolveLinkTarget = (linkPath: string, target: string): string | un
     }
 
     const parts = linkPath.split("/").slice(0, -1);
+    let named = 0;
 
     for (const segment of target.split("/")) {
         if (segment === "..") {
-            if (parts.length === 0) {
+            if (parts.length === 0 || named > 0) {
                 return undefined;
             }
 
             parts.pop();
         } else if (segment !== "" && segment !== ".") {
             parts.push(segment);
+            named += 1;
         }
     }
 
@@ -359,16 +369,16 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
             let content: string | undefined;
 
             try {
-                content = await readBlob(request, address, current.sha);
+                content = await readBlob(request, address, current.sha, true);
             } catch (error) {
                 if (error instanceof FetchBudgetSpent) {
-                    return { refused: "budget" };
+                    return { refused: "budget", spent: true };
                 }
 
                 throw error;
             }
 
-            if (content === undefined) {
+            if (content === undefined || DIRECTORY_FORM.test(content)) {
                 return { refused: "broken" };
             }
 
@@ -407,7 +417,8 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
      * The root instruction files and the first {@link MAX_LISTED_FOLDER_FILES} Markdown files, by path, of the first
      * rules folder holding any, or whose cut tree may (not its subfolders), links not yet followed; `omitted` counts the folder's files past
      * the cap. `offers` accepts the paths a link may lead to: a root file, or a file of that folder (one past the cap
-     * included, as it is there), whose files, links left out, are `targets` by blob SHA.
+     * included, as it is there), whose files, links left out, are `targets` by blob SHA; `offered` holds those the
+     * listing offers by their own path.
      */
     const scan = async () => {
         const rootFiles = importableIn("", root);
@@ -436,9 +447,9 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
         const offers = (target: string): boolean =>
             isImportablePath(target) &&
             (!target.includes("/") || (chosen !== undefined && target.startsWith(`${chosen}/`) && !target.slice(chosen.length + 1).includes("/")));
-        const targets = new Map([...rootFiles, ...folderFiles].filter(({ blob }) => !blob.link).map(({ blob }) => [blob.sha, blob]));
+        const byShaOf = (files: { blob: Blob }[]) => new Map(files.filter(({ blob }) => !blob.link).map(({ blob }) => [blob.sha, blob]));
 
-        return { candidates, offers, omitted, targets };
+        return { candidates, offered: byShaOf(candidates), offers, omitted, targets: byShaOf([...rootFiles, ...folderFiles]) };
     };
 
     /** The files {@link scan} finds, links followed only to a path `offers` accepts. */
@@ -467,7 +478,7 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
         return { files: files.toSorted((left, right) => left.path.localeCompare(right.path)), omitted };
     };
 
-    return { list, scan, truncated: () => truncated };
+    return { follow, list, scan, truncated: () => truncated };
 };
 
 /**
@@ -507,20 +518,38 @@ export interface RepoRuleFilePick {
 }
 
 /**
+ * What the tries of one read action share: the bytes still to download ({@link REPO_RULE_FILES_READ_BYTES} at first),
+ * and each blob already downloaded, by SHA, so a 401's repeat neither downloads one again nor starts a fresh budget.
+ */
+export interface RepoReadLedger {
+    blobs: Map<string, string | undefined>;
+    bytesLeft: number;
+}
+
+export const repoReadLedger = (): RepoReadLedger => {
+    return { blobs: new Map(), bytesLeft: REPO_RULE_FILES_READ_BYTES };
+};
+
+/**
  * The text of each of `picks` (paths already checked by {@link isImportablePath}) at `commit` (the listing's), in order,
- * as that commit's listing holds them, links not followed: a file's own blob when its SHA is the one given, a link's
- * target when the SHA given is that of a file it may lead to (a root instruction file, or one of the rules folder
- * listed). One it does not list (gone, another rules folder, or a commit this repository does not hold), or whose SHA
- * is another, is `missing`; a link with no such SHA `refused`. One past its own limits (bytes, then characters as the
- * import counts them, {@link fitsRuleFile}) or past what the read has left is `too_large` and spends nothing; a later
- * one may still fit. Once `request` throws {@link FetchBudgetSpent}, every file it would still read is `not_read`.
+ * as that commit's listing holds them: a file's own blob when its SHA is the one given; a link's when the SHA given is
+ * that of a file the listing offers by its own path (unread: any of those may be read), or else that of a file the link
+ * leads to there (a rules folder's past the listing's cap: followed again, so only the link the listing offered it
+ * under reads it). One it does not list (gone, another rules folder, or a commit this repository does not hold), or
+ * whose SHA is another, is `missing`; a link with no such SHA `refused`. One past its own byte limit, or what the read
+ * has left to download or return, is `too_large`; a later one may still fit. A blob's bytes are charged before it is
+ * downloaded, so one then longer than a rule file may be ({@link fitsRuleFile}, `too_large`) still spends them. Once
+ * `request` throws {@link FetchBudgetSpent}, every file it would still read is `not_read`. The tries of one action pass
+ * one `ledger`.
  */
 export const readRepoRuleFiles = async (
     request: HostRequest,
     address: RepoAddress,
     commit: string,
     picks: ReadonlyArray<RepoRuleFilePick>,
+    ledger: RepoReadLedger = repoReadLedger(),
 ): Promise<RepoRuleFileRead[]> => {
+    let at: ReturnType<typeof snapshot>;
     let scanned: Awaited<ReturnType<ReturnType<typeof snapshot>["scan"]>>;
 
     try {
@@ -532,7 +561,8 @@ export const readRepoRuleFiles = async (
             });
         }
 
-        scanned = await snapshot(request, address, await readTree(request, address, rootSha)).scan();
+        at = snapshot(request, address, await readTree(request, address, rootSha));
+        scanned = await at.scan();
     } catch (error) {
         if (error instanceof FetchBudgetSpent) {
             return picks.map(({ path }) => {
@@ -548,6 +578,33 @@ export const readRepoRuleFiles = async (
     let left = REPO_RULE_FILES_READ_BYTES;
     let spent = false;
 
+    /** The blob a link at `path` reads for `sha`, `budget` when following it is past the host requests left. */
+    const linkBlob = async (path: string, link: Blob, sha: string | undefined): Promise<Blob | "budget" | undefined> => {
+        if (sha === undefined) {
+            return undefined;
+        }
+
+        if (scanned.offered.has(sha)) {
+            return scanned.offered.get(sha);
+        }
+
+        if (!scanned.targets.has(sha)) {
+            return undefined;
+        }
+
+        if (spent) {
+            return "budget";
+        }
+
+        const followed = await at.follow(path, link, scanned.offers);
+
+        if ("refused" in followed) {
+            return followed.spent ? "budget" : undefined;
+        }
+
+        return followed.blob.sha === sha ? followed.blob : undefined;
+    };
+
     for (const { path, sha } of picks) {
         const own = listed.get(path);
 
@@ -556,38 +613,60 @@ export const readRepoRuleFiles = async (
             continue;
         }
 
-        const target = own.link && sha !== undefined ? scanned.targets.get(sha) : undefined;
-        const blob = own.link ? target : own;
+        const blob = own.link ? await linkBlob(path, own, sha) : own;
+
+        if (blob === "budget") {
+            spent = true;
+            reads.push({ path, status: "not_read" });
+            continue;
+        }
 
         if (!blob) {
             reads.push({ path, status: "refused" });
             continue;
         }
 
-        if (blob.size > REPO_RULE_FILE_MAX_BYTES || blob.size > left) {
+        const downloaded = ledger.blobs.has(blob.sha);
+
+        if (blob.size > REPO_RULE_FILE_MAX_BYTES || blob.size > left || (!downloaded && blob.size > ledger.bytesLeft)) {
             reads.push({ path, status: "too_large" });
             continue;
         }
 
-        if (spent) {
-            reads.push({ path, status: "not_read" });
-            continue;
-        }
-
-        let text: string | undefined;
-
-        // One at a time, so the read stops spending at its budget.
-        try {
-            text = await readBlob(request, address, blob.sha);
-        } catch (error) {
-            if (!(error instanceof FetchBudgetSpent)) {
-                throw error;
+        if (!downloaded) {
+            if (spent) {
+                reads.push({ path, status: "not_read" });
+                continue;
             }
 
-            spent = true;
-            reads.push({ path, status: "not_read" });
-            continue;
+            // Charged before the download: what the host sends counts, kept or not.
+            ledger.bytesLeft -= blob.size;
+
+            // One at a time, so the read stops spending at its budget.
+            try {
+                const fetched = await readBlob(request, address, blob.sha);
+
+                ledger.blobs.set(blob.sha, fetched);
+
+                // A blob the host no longer sends (or not as base64) is not counted: no text of it is kept.
+                if (fetched === undefined) {
+                    ledger.bytesLeft += blob.size;
+                }
+            } catch (error) {
+                // Nothing came, so no bytes were spent on it.
+                ledger.bytesLeft += blob.size;
+
+                if (!(error instanceof FetchBudgetSpent)) {
+                    throw error;
+                }
+
+                spent = true;
+                reads.push({ path, status: "not_read" });
+                continue;
+            }
         }
+
+        const text = ledger.blobs.get(blob.sha);
 
         if (text === undefined) {
             reads.push({ path, status: "missing" });

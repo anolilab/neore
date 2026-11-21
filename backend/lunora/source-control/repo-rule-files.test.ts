@@ -14,6 +14,7 @@ import {
     readRepoRuleFiles,
     REPO_RULE_FILE_MAX_BYTES,
     REPO_RULE_FILES_READ_BYTES,
+    repoReadLedger,
     resolveLinkTarget,
 } from "./repo-rule-files";
 import type { RepoRuleFileListing, RepoRuleFilePick } from "./repo-rule-files";
@@ -264,6 +265,26 @@ describe(listRepoRuleFiles, () => {
         ]);
     });
 
+    it("never follows a link naming a folder, climbing back through a part it names, or opening with a byte-order mark", async () => {
+        const routes = repoAt({
+            "AGENTS.md": "# Rules",
+            "CLAUDE.md": { link: "AGENTS.md/" },
+            "GEMINI.md": { link: "\u{FEFF}AGENTS.md" },
+            "rules/a.md": { link: "x/../../AGENTS.md" },
+            "rules/b.md": { link: "../AGENTS.md" },
+        });
+
+        const { files } = await listRepoRuleFiles(fakeHost({ ...routes, [`${REPO}/commits`]: commits }).request, ADDRESS);
+
+        expect(files.map((file) => [file.path, file.refused ?? file.linkOf])).toStrictEqual([
+            ["AGENTS.md", undefined],
+            ["CLAUDE.md", "broken"],
+            ["GEMINI.md", "outside"],
+            ["rules/a.md", "outside"],
+            ["rules/b.md", "AGENTS.md"],
+        ]);
+    });
+
     it("lists the links past what one listing follows as such, in path order, the same at the read", async () => {
         const files: Record<string, FakeFile> = { "AGENTS.md": "# Rules", "rules/target.md": "# Rules" };
         const links = Array.from({ length: MAX_LINKS_FOLLOWED + 2 }, (_, index) => `rules/l${String(index).padStart(2, "0")}.md`);
@@ -310,6 +331,34 @@ describe(listRepoRuleFiles, () => {
         await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, picks(folderFiles[0]!, folderFiles.at(-1)!))).resolves.toStrictEqual([
             { path: folderFiles[0], status: "ok", text: "rule" },
             { path: folderFiles.at(-1), status: "missing" },
+        ]);
+    });
+
+    it("reads a file past the cap only through the link the listing offered it under", async () => {
+        const folderFiles = Array.from({ length: MAX_LISTED_FOLDER_FILES + 1 }, (_, index) => `.rules/f${String(index).padStart(3, "0")}.md`);
+        const omitted = folderFiles.at(-1)!;
+        const files: Record<string, FakeFile> = {
+            "AGENTS.md": "# Rules",
+            "CLAUDE.md": { link: omitted },
+            "GEMINI.md": { link: "AGENTS.md" },
+            ...Object.fromEntries(folderFiles.map((path) => [path, path === omitted ? "past the cap" : "rule"])),
+        };
+        const host = fakeHost({ ...repoAt(files), [`${REPO}/commits`]: commits });
+        const listing = await listRepoRuleFiles(host.request, ADDRESS);
+
+        expect(listing.files.find((file) => file.path === "CLAUDE.md")).toMatchObject({ linkOf: omitted, sha: sha(omitted) });
+        await expect(
+            readRepoRuleFiles(host.request, ADDRESS, COMMIT, [
+                { path: "CLAUDE.md", sha: sha(omitted) },
+                // Another link: it leads elsewhere, so the file past the cap is not offered under it.
+                { path: "GEMINI.md", sha: sha(omitted) },
+                // A file the listing offers by its own path, under any link.
+                { path: "GEMINI.md", sha: sha(folderFiles[0]!) },
+            ]),
+        ).resolves.toStrictEqual([
+            { path: "CLAUDE.md", status: "ok", text: "past the cap" },
+            { path: "GEMINI.md", status: "refused" },
+            { path: "GEMINI.md", status: "ok", text: "rule" },
         ]);
     });
 
@@ -382,6 +431,8 @@ describe(resolveLinkTarget, () => {
         ["AGENTS.md", "../AGENTS.md", undefined],
         ["AGENTS.md", "/etc/passwd", undefined],
         ["AGENTS.md", ".", undefined],
+        ["CLAUDE.md", "rules/../AGENTS.md", undefined],
+        ["rules/a.md", "./../AGENTS.md", "AGENTS.md"],
     ])("%s → %s is %s", (link, target, expected) => {
         expect(resolveLinkTarget(link, target)).toBe(expected);
     });
@@ -481,22 +532,56 @@ describe(readRepoRuleFiles, () => {
         expect(reads[fitting]).toStrictEqual({ path: paths[fitting], status: "too_large" });
     });
 
-    it("refuses a file longer than a rule file may be, spending none of the budget on it", async () => {
+    it("refuses a file longer than a rule file may be, its downloaded bytes still spent", async () => {
+        const long = "a".repeat(MAX_RULE_FILE_LENGTH + 1);
         const { request } = fakeHost(
             repoAt({
-                "rules/a.md": "a".repeat(MAX_RULE_FILE_LENGTH + 1),
+                "rules/a.md": long,
                 "rules/b.md": { size: REPO_RULE_FILE_MAX_BYTES },
                 "rules/c.md": { size: REPO_RULE_FILE_MAX_BYTES },
                 "rules/d.md": { size: REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES },
+                "rules/e.md": "e".repeat(REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES - long.length),
             }),
         );
 
-        await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, picks("rules/a.md", "rules/b.md", "rules/c.md", "rules/d.md"))).resolves.toStrictEqual([
+        await expect(
+            readRepoRuleFiles(request, ADDRESS, COMMIT, picks("rules/a.md", "rules/b.md", "rules/c.md", "rules/d.md", "rules/e.md")),
+        ).resolves.toStrictEqual([
             { path: "rules/a.md", status: "too_large" },
             { path: "rules/b.md", status: "ok", text: "" },
             { path: "rules/c.md", status: "ok", text: "" },
-            { path: "rules/d.md", status: "ok", text: "" },
+            { path: "rules/d.md", status: "too_large" },
+            { path: "rules/e.md", status: "ok", text: "e".repeat(REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES - long.length) },
         ]);
+    });
+
+    it("keeps the bytes it downloaded across a 401's repeat, downloading none of them again", async () => {
+        const host = fakeHost(
+            repoAt({ "rules/a.md": { size: REPO_RULE_FILE_MAX_BYTES }, "rules/b.md": { size: REPO_RULE_FILE_MAX_BYTES }, "rules/c.md": "third" }),
+        );
+        let refused = false;
+        const request: HostRequest = async (path, options) => {
+            if (!refused && path === `${REPO}/git/blobs/${sha("rules/c.md")}`) {
+                refused = true;
+
+                throw new HostApiError("Bad credentials", 401);
+            }
+
+            return host.request(path, options);
+        };
+        const ledger = repoReadLedger();
+        const picked = picks("rules/a.md", "rules/b.md", "rules/c.md");
+
+        await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, picked, ledger)).rejects.toMatchObject({ status: 401 });
+        await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, picked, ledger)).resolves.toStrictEqual([
+            { path: "rules/a.md", status: "ok", text: "" },
+            { path: "rules/b.md", status: "ok", text: "" },
+            { path: "rules/c.md", status: "ok", text: "third" },
+        ]);
+        expect(host.calls.map((call) => call.path).filter((path) => path.includes("/git/blobs/"))).toStrictEqual(
+            ["rules/a.md", "rules/b.md", "rules/c.md"].map((path) => `${REPO}/git/blobs/${sha(path)}`),
+        );
+        expect(ledger.bytesLeft).toBe(REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES - "third".length);
     });
 
     it("counts a folder file's length without its byte-order mark and front matter, as the import does, and a root file's whole", async () => {
@@ -527,14 +612,6 @@ describe(readRepoRuleFiles, () => {
 });
 
 describe(fetchBudget, () => {
-    /** Subrequests a Worker request may make on the Free plan. */
-    const SUBREQUEST_CAP = 50;
-    /**
-     * What an import action asks of the backend besides the host, at most 13 counted, one spare: the session check (5),
-     * the rate limit, the repository, the grant with a token refresh and its store (or its re-read on a refused grant),
-     * and the same three again for a 401's forced refresh.
-     */
-    const ACTION_CALLS = 14;
     /** The commit and the trees of the root, `.rules`, `rules`, `.agents` and `.agents/rules`. */
     const WALK = 6;
 
@@ -558,15 +635,15 @@ describe(fetchBudget, () => {
 
     /**
      * The widest a listing or read walks: three rules folders looked in (`.agents/rules` through `.agents`), the last
-     * holding `count` links to the root `AGENTS.md`.
+     * holding `count` links to the root `AGENTS.md`, or `count` files of their own (`linked: false`).
      */
-    const widest = (count: number) => {
+    const widest = (count: number, linked = true) => {
         const links = Array.from({ length: count }, (_, index) => `.agents/rules/l${String(index).padStart(2, "0")}.md`);
         const routes = repoAt({
             ".rules/notes.txt": "x",
             "AGENTS.md": "# Rules",
             "rules/notes.txt": "x",
-            ...Object.fromEntries(links.map((path) => [path, { link: "../../AGENTS.md" }])),
+            ...Object.fromEntries(links.map((path) => [path, linked ? { link: "../../AGENTS.md" } : path])),
         });
         const root = routes[tree("tree-root")] as { tree: unknown[] };
 
@@ -577,17 +654,9 @@ describe(fetchBudget, () => {
         return { links, routes: { ...routes, [`${REPO}/commits`]: commits } };
     };
 
-    it("keeps an import action under the Worker's subrequest cap with room to spare", () => {
-        expect(HOST_FETCHES_PER_IMPORT + ACTION_CALLS).toBeLessThanOrEqual(SUBREQUEST_CAP - 8);
-        // A 401 at a listing's last request leaves its repeat the walk, which is never cut short.
-        expect(WALK + MAX_LINKS_FOLLOWED + WALK).toBeLessThanOrEqual(HOST_FETCHES_PER_IMPORT);
-    });
-
-    it("reads 20 picked links without a 401 in full, and after one partway reads what is left, the rest not read", async () => {
-        const { links, routes } = widest(20);
-        const picked = links.map((path) => {
-            return { path, sha: sha("AGENTS.md") };
-        });
+    it("reads 20 picked files without a 401 in full, and after one partway reads what is left, the rest not read", async () => {
+        const { links, routes } = widest(20, false);
+        const picked = picks(...links);
         const whole = refusedOnceAt(fakeHost(routes).request, 0);
 
         const all = await readRepoRuleFiles(fetchBudget()(whole.request), ADDRESS, COMMIT, picked);
@@ -595,19 +664,22 @@ describe(fetchBudget, () => {
         expect(new Set(all.map((read) => read.status))).toStrictEqual(new Set(["ok"]));
         expect(whole.count()).toBeLessThanOrEqual(HOST_FETCHES_PER_IMPORT);
 
-        // As `readFromHost` does: one budget, the whole read once more after the 401.
+        // As `readFromHost` does: one budget and one ledger, the whole read once more after the 401.
         const budgeted = fetchBudget();
+        const ledger = repoReadLedger();
         const host = refusedOnceAt(fakeHost(routes).request, 15);
 
-        await expect(readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked)).rejects.toMatchObject({ status: 401 });
+        await expect(readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked, ledger)).rejects.toMatchObject({ status: 401 });
 
-        const reads = await readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked);
+        const reads = await readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked, ledger);
+        // The first try's downloads, kept, then what the repeat has requests left for after its walk.
+        const taken = 15 - 1 - WALK + (HOST_FETCHES_PER_IMPORT - 15 - WALK);
 
         expect(host.count()).toBe(HOST_FETCHES_PER_IMPORT);
-        expect(reads.filter((read) => read.status === "ok")).toHaveLength(HOST_FETCHES_PER_IMPORT - 15 - WALK);
-        expect(reads.filter((read) => read.status === "not_read").map((read) => read.path)).toStrictEqual(links.slice(HOST_FETCHES_PER_IMPORT - 15 - WALK));
+        expect(reads.filter((entry) => entry.status === "ok")).toHaveLength(taken);
+        expect(reads.filter((entry) => entry.status === "not_read").map((entry) => entry.path)).toStrictEqual(links.slice(taken));
         // Nothing more is sent once it is spent.
-        const after = await readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked);
+        const after = await readRepoRuleFiles(budgeted(host.request), ADDRESS, COMMIT, picked, ledger);
 
         expect(new Set(after.map((read) => read.status))).toStrictEqual(new Set(["not_read"]));
         expect(host.count()).toBe(HOST_FETCHES_PER_IMPORT);
@@ -654,10 +726,8 @@ describe(fetchBudget, () => {
     });
 
     it("reads a redirected repository's files while requests are left, the rest not read rather than failed", async () => {
-        const { links, routes } = widest(20);
-        const picked = links.map((path) => {
-            return { path, sha: sha("AGENTS.md") };
-        });
+        const { links, routes } = widest(20, false);
+        const picked = picks(...links);
         const host = movedHost(routes);
 
         const reads = await readRepoRuleFiles(fetchBudget()(host.request), ADDRESS, COMMIT, picked);

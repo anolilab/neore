@@ -123,17 +123,23 @@ const sameFileAs = (files: ReadonlyArray<FoundFile>): Map<string, string> => {
 /**
  * Rule files from one of the project's repositories (`listRepoRuleFiles`, `readRepoRuleFiles`): the person picks the
  * repository, sees which instruction files it holds, picks them, and `runImport` reads them and adds them as drafts (`null`: a failure the panel shows, nothing added).
+ * `isCurrent` says whether the import is still wanted (a Discard drops it): one that is not changes nothing here either.
  * Nothing is read from the repository before a click. Hidden when the project lists no repository.
  */
 const RepoRuleFileImport: FC<{
     disabled: boolean;
     projectId: string;
-    runImport: (read: () => Promise<RepoImportResult | null>) => void;
+    runImport: (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>) => void;
 }> = ({ disabled, projectId, runImport }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
-    const { data: repositories } = useQuery(crpc.projects.functions.listProjectRepos.queryOptions({ projectId: projectId as Id<"projects"> }));
+    const {
+        data: repositories,
+        isError: reposFailed,
+        isFetching: reposLoading,
+        refetch: refetchRepos,
+    } = useQuery(crpc.projects.functions.listProjectRepos.queryOptions({ projectId: projectId as Id<"projects"> }));
     const listFiles = useAction(api.projects.rule_file_repo.listRepoRuleFiles);
     const readFiles = useAction(api.projects.rule_file_repo.readRepoRuleFiles);
     const [open, setOpen] = useState(false);
@@ -144,7 +150,8 @@ const RepoRuleFileImport: FC<{
     const latestPicks = useRef<ReadonlySet<string>>(picked);
     const pickChanges = useRef(0);
     const [looking, setLooking] = useState(false);
-    const [failure, setFailure] = useState<Failure | "unknown" | undefined>(undefined);
+    // With the repository it is about: one a refresh replaced meanwhile shows none.
+    const [failure, setFailure] = useState<{ reason: Failure | "unknown"; repoId: string } | undefined>(undefined);
     // Counts the panel's requests: an answer to one a switch, a Cancel or a newer request overtook is dropped.
     const request = useRef(0);
     const triggerId = useId();
@@ -156,6 +163,26 @@ const RepoRuleFileImport: FC<{
             document.querySelector<HTMLElement>(`#${CSS.escape(open ? headingId : triggerId)}`)?.focus();
         }
     }, [focusRequest, headingId, open, triggerId]);
+
+    if (!repositories && reposFailed) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="text-destructive text-sm" role="alert">
+                    {t`The project's repositories could not be loaded, so importing from one is not available.`}
+                </p>
+                <Button
+                    disabled={reposLoading}
+                    focusableWhenDisabled
+                    onClick={() => refetchRepos().catch(() => undefined)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
+                    {t`Try again`}
+                </Button>
+            </div>
+        );
+    }
 
     /** Opens or closes the panel, dropping whatever it was asking for. */
     const toggle = (next: boolean) => {
@@ -194,6 +221,7 @@ const RepoRuleFileImport: FC<{
     const listing = listed?.repoId === chosen.id ? listed : undefined;
     const found = listing?.files;
     const duplicateOf = sameFileAs(found ?? []);
+    const shownFailure = failure?.repoId === chosen.id ? failure.reason : undefined;
 
     const failureText: Record<Failure | "unknown", string> = {
         forbidden: t`Your GitHub account cannot read this repository.`,
@@ -231,7 +259,7 @@ const RepoRuleFileImport: FC<{
                 }
 
                 if (outcome.status !== "ok") {
-                    setFailure(outcome.status);
+                    setFailure({ reason: outcome.status, repoId: listedRepo });
 
                     return undefined;
                 }
@@ -247,7 +275,7 @@ const RepoRuleFileImport: FC<{
 
                 return undefined;
             })
-            .catch(() => (asked === request.current ? setFailure("unknown") : undefined))
+            .catch(() => (asked === request.current ? setFailure({ reason: "unknown", repoId: listedRepo }) : undefined))
             .then(() => (asked === request.current ? setLooking(false) : undefined))
             .catch(() => undefined);
     };
@@ -261,7 +289,7 @@ const RepoRuleFileImport: FC<{
 
         // The repository and commit listed: a branch moved since, or another repository chosen, never changes what is read.
         const readArgs = { commit, projectId: projectId as Id<"projects">, repoId: listing.repoId as Id<"projectRepositories"> };
-        // Each with the blob its listing found, so the read need not follow links again.
+        // Each with the blob its listing found, so the read follows a link again only to a file past the listing's cap.
         const byPath = new Map(listing.files.map((file) => [file.path, file]));
         // In the order the import takes them, one pick of each draft (a link is its target's text, read the same way):
         // the first a project can hold are read, the rest left out.
@@ -281,18 +309,20 @@ const RepoRuleFileImport: FC<{
         const asked = request.current;
         const changesAtRead = pickChanges.current;
 
-        runImport(async () => {
+        // A new try: an earlier one's failure is no longer what happened.
+        setFailure(undefined);
+        runImport(async (isCurrent) => {
             // A read that failed is said in the panel, as a refusal is.
             const outcome = await readFiles({ ...readArgs, files }).catch(() => undefined);
 
-            // Cancelled or closed meanwhile: nothing is added, nothing said.
-            if (asked !== request.current) {
+            // Cancelled, closed or discarded meanwhile: nothing is added, nothing said, the panel left as it is.
+            if (asked !== request.current || !isCurrent()) {
                 return null;
             }
 
             if (outcome?.status !== "ok") {
                 // Said in the panel, which stays open for another try; nothing is applied.
-                setFailure(outcome?.status ?? "unknown");
+                setFailure({ reason: outcome?.status ?? "unknown", repoId: readArgs.repoId });
 
                 return null;
             }
@@ -315,12 +345,12 @@ const RepoRuleFileImport: FC<{
                 return !answered.has(path) && (key === undefined || !answeredKeys.has(key));
             });
 
-            if (pickChanges.current !== changesAtRead && left.length > 0) {
-                // Picks changed while it read stay as the person left them, less those.
-                choose(new Set(left), false);
-            } else if (notRead.length > 0) {
-                // Open with only those ticked, so importing again adds the rest and nothing twice.
-                choose(new Set(notRead), false);
+            // Picks changed while it read stay as the person left them, less those, even none; else only those not read
+            // stay ticked, so importing again adds the rest and nothing twice.
+            const stillPicked = pickChanges.current === changesAtRead ? notRead : left;
+
+            if (stillPicked.length > 0 || notRead.length > 0) {
+                choose(new Set(stillPicked), false);
             } else {
                 toggle(false);
             }
@@ -328,7 +358,8 @@ const RepoRuleFileImport: FC<{
             return {
                 ...read,
                 duplicates,
-                notRead: notRead.length,
+                // Those still ticked: the note says to import them again.
+                notRead: notRead.filter((path) => stillPicked.includes(path)).length,
                 skipped: [...read.skipped, ...all.slice(MAX_RULE_FILES)],
                 unreadable: outcome.files.flatMap((file) => (file.status === "ok" || file.status === "not_read" ? [] : [file.path])),
             };
@@ -367,6 +398,7 @@ const RepoRuleFileImport: FC<{
             </p>
             {/* Kept mounted, so a screen reader announces what the search found. */}
             <p className={found?.length === 0 ? "text-sm" : "sr-only"} role="status">
+                {looking && t`Looking for instruction files...`}
                 {found?.length === 0 && t`No instruction files were found in this repository.`}
                 {found && found.length > 0 && t`Found ${plural(found.length, { one: "# file", other: "# files" })}.`}
             </p>
@@ -410,9 +442,9 @@ const RepoRuleFileImport: FC<{
                     ))}
                 </ul>
             )}
-            {failure && (
+            {shownFailure && (
                 <p className="text-destructive text-sm" role="alert">
-                    {failureText[failure]}
+                    {failureText[shownFailure]}
                 </p>
             )}
             <div className="flex flex-wrap gap-2">

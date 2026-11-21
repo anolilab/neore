@@ -21,6 +21,7 @@ import {
     isImportablePath,
     listRepoRuleFiles as listFiles,
     readRepoRuleFiles as readFiles,
+    repoReadLedger,
 } from "../source-control/repo-rule-files";
 import type { RepoAddress } from "../source-control/repo-rule-files";
 import { vFailed } from "../source-control/validators";
@@ -163,10 +164,11 @@ export const readRepoRuleFiles = authAction
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         // Each path once.
         const picks = [...new Map(args.files.map((file) => [file.path, file])).values()];
-        // One budget for both tries: a 401's repeat spends what the first left.
+        // One budget for both tries, requests and bytes: a 401's repeat spends what the first left, and reuses its blobs.
         const budgeted = fetchBudget();
+        const ledger = repoReadLedger();
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
-            return { files: await readFiles(budgeted(request), address, args.commit, picks) };
+            return { files: await readFiles(budgeted(request), address, args.commit, picks, ledger) };
         });
 
         ctx.log.event("projects.rule_files.repo_read", {

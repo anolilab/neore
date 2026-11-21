@@ -46,10 +46,11 @@ export type RuleFileRefusal = (typeof RULE_FILE_REFUSALS)[keyof typeof RULE_FILE
 
 /**
  * A rule file's front matter as an import reads it, an empty block included: after blank lines, its fences may end in
- * spaces, its lines in CRLF. The upload (`rule-file-import.ts` in the web app) and the repository read
+ * spaces, its lines in CRLF. An empty block closes at the fence right after its first (the lazy `??`), never at a later
+ * one with text between. The upload (`rule-file-import.ts` in the web app) and the repository read
  * (`source-control/repo-rule-files.ts`) both count a file's length without it, as the save does.
  */
-export const RULE_FILE_FRONT_MATTER = /^(?:[\t ]*\r?\n)*---[\t ]*\r?\n(?:([\s\S]*?)\r?\n)?---[\t ]*(?:\r?\n|$)/u;
+export const RULE_FILE_FRONT_MATTER = /^(?:[\t ]*\r?\n)*---[\t ]*\r?\n(?:([\s\S]*?)\r?\n)??---[\t ]*(?:\r?\n|$)/u;
 
 const LINE_BREAK_OR_NUL = /[\0\n\r]/u;
 

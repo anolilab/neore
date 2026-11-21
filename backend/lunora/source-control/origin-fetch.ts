@@ -208,6 +208,11 @@ export const createBoundRequester = ({
                 throw new HostApiError("The host sent a redirect that is not a URL", 0);
             }
 
+            // Judged before the hop is charged: a redirect elsewhere is refused whatever the caller has left.
+            if (url.origin !== boundOrigin) {
+                throw new HostApiError("The request left the host's origin", 0);
+            }
+
             options.beforeRedirect?.();
         }
     };

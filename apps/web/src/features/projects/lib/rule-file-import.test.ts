@@ -55,6 +55,9 @@ describe("toImportedRuleFile", () => {
         expect(plain).toMatchObject({ content: "No front matter.", description: "", mode: "auto", title: "plain" });
         expect(needsMode(plain!)).toBe(true);
         expect(toImportedRuleFile("rules/empty.md", "---\n---\nBody.")).toMatchObject({ content: "Body.", description: "", mode: "auto" });
+        // An empty block ends at its first closing fence, after blank lines too.
+        expect(toImportedRuleFile("rules/empty.md", "---\n---\nKeep this.\n---\nTail.")).toMatchObject({ content: "Keep this.\n---\nTail." });
+        expect(toImportedRuleFile("rules/empty.md", "\n---\n---\nBody.")).toMatchObject({ content: "Body." });
         expect(toImportedRuleFile("rules/odd.md", "---\nalwaysApply: sometimes\n---\nBody.")).toMatchObject({ mode: "auto" });
         // A comment after the value is not part of it.
         expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false # on request\n---\nBody.")).toMatchObject({ description: "", mode: "auto" });

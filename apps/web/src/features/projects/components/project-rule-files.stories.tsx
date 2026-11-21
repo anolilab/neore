@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunora, lunoraAnswered, lunoraHandlers } from "@/storybook/lunora";
+import { lunora, lunoraAnswered, lunoraError, lunoraHandlers } from "@/storybook/lunora";
 
 import ProjectRuleFiles from "./project-rule-files";
 
@@ -237,5 +237,28 @@ export const RepoNotConnected: Story = {
         await userEvent.click(canvas.getByRole("button", { name: "Find files" }));
 
         await expect(await canvas.findByRole("alert")).toHaveTextContent("Connect GitHub in Settings → Connectors to import from a repository.");
+    },
+};
+
+/** The project's repositories could not be loaded: the import says so and offers to load them again, never hides. */
+export const RepositoriesNotLoaded: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ruleFiles(true),
+                    lunoraError(api.projects.functions.listProjectRepos, "TOO_MANY_REQUESTS", "Slow down.", 429),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent(
+            "The project's repositories could not be loaded, so importing from one is not available.",
+        );
+        await expect(canvas.getByRole("button", { name: "Try again" })).toBeVisible();
     },
 };

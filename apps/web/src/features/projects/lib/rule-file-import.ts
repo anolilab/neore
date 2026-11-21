@@ -306,8 +306,9 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
         fields.set(key, key === "globs" ? globsOf(parts) : [isBlock ? value : unquoted(value)]);
     }
 
-    // Blank lines, then a `---` rule: a block that sets nothing there is the text's own, kept whole.
-    if (fields.size === 0 && !match[0].startsWith("-")) {
+    // Blank lines, then a `---` rule: a block with text that sets nothing there is the text's own, kept whole. An
+    // empty one is front matter all the same, dropped as the repository read counts it.
+    if (fields.size === 0 && !match[0].startsWith("-") && (match[1] ?? "").trim() !== "") {
         return { body: text, fields };
     }
 

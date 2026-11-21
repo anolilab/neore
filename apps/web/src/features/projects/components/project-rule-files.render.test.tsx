@@ -40,6 +40,8 @@ const backend = vi.hoisted(() => {
         repoList: vi.fn(),
         repoRead: vi.fn(),
         repos: [] as { id: string; isDefault: boolean; revision: number; url: string }[],
+        // When set, how the repositories' read answers instead of with `repos`.
+        reposRead: undefined as (() => Promise<unknown>) | undefined,
         save: vi.fn(),
     };
 });
@@ -61,7 +63,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                         listProjectRepos: {
                             queryOptions: (args: unknown) => {
-                                return { queryFn: async () => structuredClone(backend.repos), queryKey: ["listProjectRepos", args] };
+                                return {
+                                    queryFn: async () => await (backend.reposRead?.() ?? structuredClone(backend.repos)),
+                                    queryKey: ["listProjectRepos", args],
+                                };
                             },
                         },
                         setProjectRuleFiles: {
@@ -87,19 +92,28 @@ const LINKED_COPY = /^CLAUDE\.md\s*\(same file as AGENTS\.md\)$/u;
 const LINK_TO_Z = /^rules\/a\.md\s*\(same file as rules\/z\.md\)$/u;
 const REFUSED_LINK = /^GEMINI\.md\s*\(links to a file outside the ones listed here\)$/u;
 const WIDE_FILE = /^rules\/wide\.md\s*\(may be too long\)$/u;
+const AT_ROOT_OF_API = /at the root of acme\/api/u;
+const ONE_NOT_READ = /1 file was not read this time/u;
 
-const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
-    render(
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+/** The client of the editor last rendered, to refresh what it read. */
+const rendered = { queryClient: new QueryClient() };
+
+const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) => {
+    rendered.queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    return render(
+        <QueryClientProvider client={rendered.queryClient}>
             <ProjectRuleFiles onDirtyChange={onDirtyChange} onSavingChange={onSavingChange} projectId="p1" />
         </QueryClientProvider>,
     );
+};
 
 beforeEach(() => {
     translations.clear();
     backend.save.mockReset();
     backend.read = undefined;
     backend.repos = [];
+    backend.reposRead = undefined;
     backend.repoList.mockReset();
     backend.repoRead.mockReset();
     backend.save.mockImplementation(async ({ ruleFiles }: { ruleFiles: unknown[] }) => {
@@ -955,6 +969,8 @@ describe("project rule files imported from the project's repository", () => {
 
         // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
         expect(document.activeElement).toBe(screen.getByRole("button", { name: "Looking..." }));
+        // Said in the status region too: a changed button name alone is not reliably announced.
+        expect(within(screen.getByTestId("repo-rule-file-import")).getByRole("status").textContent).toBe("Looking for instruction files...");
 
         listing.resolve({ commit: COMMIT, files: [{ path: "AGENTS.md", sha: "sha-agents", size: 20, tooLarge: false }], status: "ok", truncated: false });
         await screen.findByRole("list", { name: "Files found" });
@@ -989,6 +1005,8 @@ describe("project rule files imported from the project's repository", () => {
 
         const found = await screen.findByRole("list", { name: "Files found" });
 
+        // Listing reads no file's text: only the click below does.
+        expect(backend.repoRead).not.toHaveBeenCalled();
         expect(within(found).getByRole("checkbox", { name: "AGENTS.md" }).getAttribute("aria-checked")).toBe("true");
         expect(within(found).getByRole("checkbox", { name: HUGE_FILE }).getAttribute("aria-disabled")).toBe("true");
         // A symlink to a file that is not an instruction file: listed, never picked or read.
@@ -1067,11 +1085,17 @@ describe("project rule files imported from the project's repository", () => {
 
         backend.repos = [REPO];
         backend.repoList.mockResolvedValue({ commit: COMMIT, files: [{ path: "AGENTS.md", size: 20, tooLarge: false }], status: "ok", truncated: false });
+        let settled = false;
+
         // Answers only once the panel is closed: the read lands after the Cancel.
         backend.repoRead.mockImplementation(async () => {
-            await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
+            try {
+                await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
 
-            return { files: [{ path: "AGENTS.md", status: "ok", text: "Use pnpm." }], status: "ok" };
+                return { files: [{ path: "AGENTS.md", status: "ok", text: "Use pnpm." }], status: "ok" };
+            } finally {
+                settled = true;
+            }
         });
         renderEditor();
         await user.click(await screen.findByRole("button", { name: "Import from repository" }));
@@ -1083,7 +1107,8 @@ describe("project rule files imported from the project's repository", () => {
 
         // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
         await waitFor(() => expect(document.activeElement).toBe(opener));
-        await waitFor(() => expect(opener).toHaveProperty("disabled", false));
+        await waitFor(() => expect(settled).toBe(true));
+        await waitFor(() => expect(opener.getAttribute("aria-disabled")).not.toBe("true"));
         expect(screen.queryByRole("listitem", { name: "AGENTS.md" })).toBeNull();
         expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(2);
     });
@@ -1093,10 +1118,16 @@ describe("project rule files imported from the project's repository", () => {
 
         backend.repos = [REPO];
         backend.repoList.mockResolvedValue({ commit: COMMIT, files: [{ path: "AGENTS.md", size: 20, tooLarge: false }], status: "ok", truncated: false });
-        backend.repoRead.mockImplementation(async () => {
-            await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
+        let settled = false;
 
-            throw new Error("network");
+        backend.repoRead.mockImplementation(async () => {
+            try {
+                await waitFor(() => expect(screen.queryByTestId("repo-rule-file-import")).toBeNull());
+
+                throw new Error("network");
+            } finally {
+                settled = true;
+            }
         });
         renderEditor();
         await user.click(await screen.findByRole("button", { name: "Import from repository" }));
@@ -1106,9 +1137,163 @@ describe("project rule files imported from the project's repository", () => {
 
         const opener = await screen.findByRole("button", { name: "Import from repository" });
 
-        await waitFor(() => expect(opener).toHaveProperty("disabled", false));
+        await waitFor(() => expect(settled).toBe(true));
+        await waitFor(() => expect(opener.getAttribute("aria-disabled")).not.toBe("true"));
         expect(screen.queryByRole("alert")).toBeNull();
         expect(screen.queryByText("The files could not be read.")).toBeNull();
+    });
+
+    it("says when the project's repositories could not be loaded, and loads them on a retry", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.reposRead = async () => {
+            throw new Error("network");
+        };
+        renderEditor();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("The project's repositories could not be loaded, so importing from one is not available.");
+
+        backend.reposRead = undefined;
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByRole("button", { name: "Import from repository" })).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("shows a search's failure only for the repository it searched", async () => {
+        const user = userEvent.setup();
+        const listing: { resolve: (value: unknown) => void } = { resolve: () => {} };
+
+        backend.repos = [REPO];
+        backend.repoList.mockReturnValue(
+            new Promise((resolve) => {
+                listing.resolve = resolve;
+            }),
+        );
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        // A refresh replaces the repository while the search runs.
+        backend.repos = [{ id: "repo2", isDefault: true, revision: 0, url: "https://github.com/acme/api.git" }];
+        await rendered.queryClient.invalidateQueries({ queryKey: ["listProjectRepos"] });
+        await screen.findByText(AT_ROOT_OF_API);
+        listing.resolve({ status: "not_found" });
+
+        await waitFor(() => expect(screen.getByRole("button", { name: "Find files" }).getAttribute("aria-disabled")).not.toBe("true"));
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("clears an earlier read's failure when the person tries again", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: ["a", "b"].map((name) => {
+                return { path: `rules/${name}.md`, sha: `sha-${name}`, size: 10, tooLarge: false };
+            }),
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockResolvedValueOnce({ status: "rate_limited" });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("GitHub is limiting requests. Try again in a few minutes.");
+
+        backend.repoRead.mockResolvedValueOnce({
+            files: [
+                { path: "rules/a.md", status: "ok", text: "---\nalwaysApply: true\n---\nText" },
+                { path: "rules/b.md", status: "not_read" },
+            ],
+            status: "ok",
+        });
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(await screen.findByText(ONE_NOT_READ)).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("leaves the panel as it is when the person discards their changes while a read runs", async () => {
+        const user = userEvent.setup();
+        const reading: { resolve: (value: unknown) => void } = { resolve: () => {} };
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [{ path: "AGENTS.md", sha: "sha-agents", size: 20, tooLarge: false }],
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockReturnValue(
+            new Promise((resolve) => {
+                reading.resolve = resolve;
+            }),
+        );
+        renderEditor();
+        const names = await screen.findAllByRole("textbox", { name: "Name" });
+
+        await user.type(names[0]!, " edited");
+        await user.click(screen.getByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+        reading.resolve({ status: "rate_limited" });
+
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import selected" }).getAttribute("aria-disabled")).not.toBe("true"));
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(
+            within(screen.getByRole("list", { name: "Files found" }))
+                .getByRole("checkbox", { name: "AGENTS.md" })
+                .getAttribute("aria-checked"),
+        ).toBe("true");
+    });
+
+    it("keeps nothing ticked when the person unticked what a read left unread", async () => {
+        const user = userEvent.setup();
+        const reading: { resolve: (value: unknown) => void } = { resolve: () => {} };
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: ["a", "b"].map((name) => {
+                return { path: `rules/${name}.md`, sha: `sha-${name}`, size: 10, tooLarge: false };
+            }),
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockReturnValue(
+            new Promise((resolve) => {
+                reading.resolve = resolve;
+            }),
+        );
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+
+        const found = screen.getByRole("list", { name: "Files found" });
+
+        await user.click(within(found).getByRole("checkbox", { name: "rules/b.md" }));
+        reading.resolve({
+            files: [
+                { path: "rules/a.md", status: "ok", text: "---\nalwaysApply: true\n---\nText" },
+                { path: "rules/b.md", status: "not_read" },
+            ],
+            status: "ok",
+        });
+
+        expect(await screen.findByText("1 rule file imported. Review, then save.")).toBeTruthy();
+        expect(within(found).getByRole("checkbox", { name: "rules/a.md" }).getAttribute("aria-checked")).toBe("false");
+        expect(within(found).getByRole("checkbox", { name: "rules/b.md" }).getAttribute("aria-checked")).toBe("false");
     });
 
     it("reads the first files a project holds of a larger selection and names the first few left out", async () => {
@@ -1337,7 +1522,8 @@ describe("project rule files imported from the project's repository", () => {
             status: "ok",
         });
 
-        expect(await screen.findByText("1 rule file imported. Review, then save. 2 files were not read this time: import again to add the rest.")).toBeTruthy();
+        // Only rules/b.md is still ticked of the two not read.
+        expect(await screen.findByText("1 rule file imported. Review, then save. 1 file was not read this time: import again to add the rest.")).toBeTruthy();
         expect(within(found).getByRole("checkbox", { name: "rules/a.md" }).getAttribute("aria-checked")).toBe("false");
         expect(within(found).getByRole("checkbox", { name: "rules/b.md" }).getAttribute("aria-checked")).toBe("true");
         expect(within(found).getByRole("checkbox", { name: "rules/c.md" }).getAttribute("aria-checked")).toBe("false");

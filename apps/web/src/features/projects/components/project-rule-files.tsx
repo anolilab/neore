@@ -599,19 +599,21 @@ const ProjectRuleFiles: FC<{
      * Adds what `read` imports as unsaved drafts, up to the project's limit; the person saves them like any edit. One
      * import at a time: one asked for while another reads is dropped.
      */
-    const runImport = (read: () => Promise<RepoImportResult | null>) => {
+    const runImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>) => {
         if (importing) {
             return;
         }
 
         const generation = importGeneration.current;
 
+        const isCurrent = () => generation === importGeneration.current;
+
         setImporting(true);
-        read()
+        read(isCurrent)
             // An import a Discard overtook adds nothing.
-            .then((result) => (result && generation === importGeneration.current ? applyImport(result) : undefined))
+            .then((result) => (result && isCurrent() ? applyImport(result) : undefined))
             // One a Discard overtook says nothing either.
-            .catch(() => (generation === importGeneration.current ? setImportNote(t`The files could not be read.`) : undefined))
+            .catch(() => (isCurrent() ? setImportNote(t`The files could not be read.`) : undefined))
             .then(() => setImporting(false))
             .catch(() => undefined);
     };
