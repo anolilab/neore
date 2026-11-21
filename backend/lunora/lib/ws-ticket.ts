@@ -129,16 +129,19 @@ export const issueWsTicket = async (database: TicketDatabase, identity: WsTicket
     return ticket;
 };
 
-/** Whether the session `id` of `userId` still exists. A failed read counts as gone. */
-const sessionExists = async (database: TicketDatabase, id: string, userId: string): Promise<boolean> => {
+/** Whether the session `id` of `userId` still exists; `"unknown"` when the read failed. */
+const lookUpSession = async (database: TicketDatabase, id: string, userId: string): Promise<boolean | "unknown"> => {
     try {
         const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`).bind(id, userId).first();
 
         return row !== null;
     } catch {
-        return false;
+        return "unknown";
     }
 };
+
+/** Whether the session `id` of `userId` still exists. A failed read counts as gone. */
+const sessionExists = async (database: TicketDatabase, id: string, userId: string): Promise<boolean> => (await lookUpSession(database, id, userId)) === true;
 
 /**
  * Whether every sign-in a ticket was minted under still exists: its web session
@@ -256,8 +259,23 @@ export const handleWsTicketRequest = async (
 
     const identity = await resolveIdentity(request);
 
-    if (!identity || (identity.grantSessionId !== undefined && !(await sessionExists(database, identity.grantSessionId, identity.userId)))) {
+    if (!identity) {
         return Response.json({ error: { code: "UNAUTHENTICATED", message: "A ticket needs a signed-in caller" } }, { headers, status: 401 });
+    }
+
+    if (identity.grantSessionId !== undefined) {
+        const grant = await lookUpSession(database, identity.grantSessionId, identity.userId);
+
+        // A failed read is not a sign-out: a 401 would open the socket anonymously, a 503 makes the client retry.
+        if (grant === "unknown") {
+            console.warn("ws-ticket: the grant's session could not be read; answering 503");
+
+            return Response.json({ error: { code: "UNAVAILABLE", message: "Try again shortly" } }, { headers, status: 503 });
+        }
+
+        if (!grant) {
+            return Response.json({ error: { code: "UNAUTHENTICATED", message: "A ticket needs a signed-in caller" } }, { headers, status: 401 });
+        }
     }
 
     const ticket = await issueWsTicket(database, { grantSessionId: identity.grantSessionId, sessionId: identity.sessionId, userId: identity.userId });

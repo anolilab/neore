@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 import type { D1PreparedStatementLike } from "@lunora/d1";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import {
     handleWsTicketRequest,
@@ -240,6 +240,33 @@ describe(handleWsTicketRequest, () => {
         const revoked = await handleWsTicketRequest(post(), database, grantBearer);
 
         expect(revoked?.status).toBe(401);
+    });
+
+    it("answers 503, not 401, when the grant's session cannot be read, so the client retries instead of connecting anonymously", async () => {
+        const database = createDatabase();
+        const failing = {
+            ...database,
+            prepare: (sql: string) => {
+                if (sql.includes(`FROM "session"`)) {
+                    throw new Error("D1 unavailable");
+                }
+
+                return database.prepare(sql);
+            },
+        };
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        const response = await handleWsTicketRequest(post(), failing, async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        });
+
+        expect(response?.status).toBe(503);
+        expect(warn).toHaveBeenCalledOnce();
+        await expect(response!.json()).resolves.not.toHaveProperty("ticket");
     });
 
     it("refuses at redeem a grant's ticket minted just before the revoke", async () => {
