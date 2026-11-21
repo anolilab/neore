@@ -212,7 +212,7 @@ const main = async () => {
 
     console.log(`Node.js ${nodeVersion}`);
 
-    const { carryRetiredExtensionOrigins, SHIPPED_FIREFOX_REDIRECT_URI } = await import("../backend/lunora/lib/extension-origins.ts");
+    const { carryRetiredExtensionOrigins } = await import("../backend/lunora/lib/extension-origins.ts");
 
     // 2. Check pnpm install
     if (!fs.existsSync(path.join(rootDir, "node_modules"))) {
@@ -495,14 +495,20 @@ const main = async () => {
     // Browser extension. Optional, and only asked on a terminal: a piped or CI
     // run keeps whatever is there (possibly nothing, which just means the
     // Chrome build cannot sign in). The id appears on the extension's card once
-    // apps/browser-extension/dist is loaded unpacked at chrome://extensions. A
-    // value replaces the backend's default (the shipped Firefox add-on), so
-    // that URI is listed too.
-    if (process.stdin.isTTY && !backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"]) {
+    // apps/browser-extension/dist is loaded unpacked at chrome://extensions.
+    // Asked whenever the list has no Chrome redirect yet; the URI is added to
+    // what is there (an unset list starts from the shipped Firefox add-on, the
+    // backend's default), and `none` (sign-in off on purpose) is left alone.
+    const redirectUris = backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"];
+
+    if (process.stdin.isTTY && redirectUris?.trim().toLowerCase() !== "none" && !(redirectUris ?? "").includes(".chromiumapp.org")) {
         const extensionId = await ask("\n  Unpacked browser extension ID (chrome://extensions, leave blank to skip)");
 
         if (/^[a-p]{32}$/.test(extensionId)) {
-            backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] = `https://${extensionId}.chromiumapp.org/,${SHIPPED_FIREFOX_REDIRECT_URI}`;
+            backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] = carryRetiredExtensionOrigins(
+                `chrome-extension://${extensionId}`,
+                redirectUris?.trim() || undefined,
+            ).value;
             backendChanged = true;
             console.log("  [set]   TRUSTED_EXTENSION_REDIRECT_URIS");
         } else if (extensionId) {
