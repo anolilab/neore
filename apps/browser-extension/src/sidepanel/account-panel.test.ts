@@ -50,36 +50,24 @@ describe(subscribeWhileCurrent, () => {
         return { state, subscribe };
     };
 
-    /** A seed that waits on `seeded`; `resolved` settles just after the panel had its chance to apply it. */
-    const seededOpen = (opened: string[]) => {
-        const seeded = Promise.withResolvers<undefined>();
-        const resolved: Promise<() => void>[] = [];
-        const resolve = (request: string) => {
-            const update = (async () => {
-                await seeded.promise;
+    it("opens a request that resolves while still subscribed", async () => {
+        const { state, subscribe } = fakeSubscription();
+        const opened: string[] = [];
+        let seeded: Promise<() => void> | undefined;
+
+        subscribeWhileCurrent(subscribe, (request) => {
+            seeded = (async () => {
+                await Promise.resolve();
 
                 return () => {
                     opened.push(request);
                 };
             })();
 
-            resolved.push(update);
-
-            return update;
-        };
-
-        return { resolve, resolved, seeded };
-    };
-
-    it("opens a request that resolves while still subscribed", async () => {
-        const { state, subscribe } = fakeSubscription();
-        const opened: string[] = [];
-        const { resolve, resolved, seeded } = seededOpen(opened);
-
-        subscribeWhileCurrent(subscribe, resolve);
+            return seeded;
+        });
         state.deliver?.("translate");
-        seeded.resolve(undefined);
-        await Promise.all(resolved);
+        await seeded;
 
         expect(opened).toEqual(["translate"]);
     });
@@ -87,13 +75,24 @@ describe(subscribeWhileCurrent, () => {
     it("drops a request that resolves after unsubscribing", async () => {
         const { state, subscribe } = fakeSubscription();
         const opened: string[] = [];
-        const { resolve, resolved, seeded } = seededOpen(opened);
-        const unsubscribe = subscribeWhileCurrent(subscribe, resolve);
+        let seeded: Promise<() => void> | undefined;
+
+        // Another account signs in while the settings read is still pending.
+        const unsubscribe = subscribeWhileCurrent(subscribe, (request) => {
+            seeded = (async () => {
+                await Promise.resolve();
+                unsubscribe();
+
+                return () => {
+                    opened.push(request);
+                };
+            })();
+
+            return seeded;
+        });
 
         state.deliver?.("translate");
-        unsubscribe();
-        seeded.resolve(undefined);
-        await Promise.all(resolved);
+        await seeded;
 
         expect(state.unsubscribed).toBe(true);
         expect(opened).toEqual([]);
