@@ -3412,14 +3412,18 @@ export const schema = defineSchema({
 
     threadPins: defineTable({
         createdAt: v.number(),
+        // A document pin's document (in the same thread) and its kind, which the pins tab shows as its icon.
+        documentId: v.optional(v.id("documents")),
+        documentKind: v.optional(v.string()),
         // An image pin's place among the message's images (`kind: "image"`, `imageOrdinals` in chat-ui); a message pin has none.
         imageIndex: v.optional(v.number()),
         // An image pin's key, a hash of where its image is stored (`imageKeyOf` in the web app): found wherever the image now
         // sits, which an image index alone cannot do when an earlier image is gone. No address is stored.
         imageKey: v.optional(v.string()),
-        // What is pinned: the whole message (absent, as every pin before images), or one image of it.
-        kind: v.optional(v.union(v.literal("message"), v.literal("image"))),
-        messageId: v.string(),
+        // What is pinned: the whole message (absent, as every pin before images), one image of it, or a document of the thread.
+        kind: v.optional(v.union(v.literal("message"), v.literal("image"), v.literal("document"))),
+        // The message a pin quotes. A document pin has one only when its document was made by a message.
+        messageId: v.optional(v.string()),
         messageRole: v.union(v.literal("user"), v.literal("assistant")),
         note: v.optional(v.string()),
         selectedText: v.optional(v.string()),
@@ -3430,6 +3434,8 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_thread", ["threadId"])
         .index("by_user_and_thread", ["userId", "threadId"])
+        // One document pin per person and document, so pinning the same document again finds it.
+        .index("by_user_and_document", ["userId", "documentId"])
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),

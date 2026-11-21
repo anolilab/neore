@@ -1,16 +1,20 @@
 /**
- * Pins hold a whole message or one image of a reply. A message pin is stored as every pin before images was (no kind),
- * an image pin names the part it pins, and a pin whose kind and part index do not fit together is refused.
+ * Pins hold a whole message, one image of a reply, or a finished visual or plan (a document) of the thread. A message pin
+ * is stored as every pin before images was (no kind), an image pin names the part it pins, and a pin whose kind and part
+ * index do not fit together is refused. A document pin is one per document and reads its title from the document.
  */
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../../_generated/dataModel";
 import schema from "../../schema";
-import { createPin, getThreadPins, isPinShapeValid } from "./functions";
+import { createDocumentPin, createPin, getThreadPins, isPinShapeValid } from "./functions";
 
 const OWNER = "user-owner";
 const SHAPE_ERROR = /An image pin names the part it pins/;
+const KIND_ERROR = /Only visuals and plans can be pinned/;
+const WRITING_ERROR = /still being written/;
+const NOT_FOUND_ERROR = /Document not found in this chat/;
 
 vi.mock("../../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -139,6 +143,87 @@ describe("image pins", () => {
             ).rejects.toThrow();
         }
 
+        expect(await pinsOf()).toHaveLength(0);
+    });
+});
+
+describe("document pins", () => {
+    const insertDocument = async (fields: { kind: string; status?: "idle" | "streaming"; threadId?: Id<"threads">; title?: string }) =>
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("documents", {
+                    kind: fields.kind,
+                    messageId: "m-doc",
+                    status: fields.status ?? "idle",
+                    threadId: fields.threadId ?? threadId,
+                    title: fields.title ?? "Fox logo",
+                    userId: OWNER,
+                    version: 1,
+                }),
+        );
+
+    const pinDocument = (documentId: string) => as(OWNER).mutation(createDocumentPin as never, { documentId, threadId } as never);
+
+    it("stores a visual with its title, its kind and the message that made it, and no image part", async () => {
+        const documentId = await insertDocument({ kind: "design", title: "Launch banner" });
+
+        await pinDocument(documentId);
+
+        const [pin] = await pinsOf();
+
+        expect(pin).toMatchObject({
+            documentId,
+            documentKind: "design",
+            kind: "document",
+            messageId: "m-doc",
+            messageRole: "assistant",
+            selectedText: "Launch banner",
+        });
+        expect(pin).not.toHaveProperty("imageIndex");
+    });
+
+    it("pins a plan written as a text document", async () => {
+        const documentId = await insertDocument({ kind: "text", title: "Migration plan" });
+
+        await pinDocument(documentId);
+
+        expect(await pinsOf()).toMatchObject([{ documentKind: "text", selectedText: "Migration plan" }]);
+    });
+
+    it("is one pin however often the same document is pinned", async () => {
+        const documentId = await insertDocument({ kind: "image" });
+
+        const first = await pinDocument(documentId);
+        const second = await pinDocument(documentId);
+
+        expect(second).toBe(first);
+        expect(await pinsOf()).toHaveLength(1);
+    });
+
+    it("refuses code and sheet documents, which are not pinned", async () => {
+        for (const kind of ["code", "sheet"]) {
+            const documentId = await insertDocument({ kind });
+
+            await expect(pinDocument(documentId)).rejects.toThrow(KIND_ERROR);
+        }
+
+        expect(await pinsOf()).toHaveLength(0);
+    });
+
+    it("refuses a document that is still being written", async () => {
+        const documentId = await insertDocument({ kind: "design", status: "streaming" });
+
+        await expect(pinDocument(documentId)).rejects.toThrow(WRITING_ERROR);
+        expect(await pinsOf()).toHaveLength(0);
+    });
+
+    it("refuses a document of another chat", async () => {
+        const otherThreadId = await harness.run(
+            async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Other", userId: OWNER }),
+        );
+        const documentId = await insertDocument({ kind: "design", threadId: otherThreadId as Id<"threads"> });
+
+        await expect(pinDocument(documentId)).rejects.toThrow(NOT_FOUND_ERROR);
         expect(await pinsOf()).toHaveLength(0);
     });
 });

@@ -28899,6 +28899,19 @@
           "optional": false,
           "unique": false
         },
+        "documentId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "documents"
+        },
+        "documentKind": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "imageIndex": {
           "kind": "number",
           "nullable": false,
@@ -28922,6 +28935,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"document\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"image\""
             },
             {
@@ -28936,7 +28956,7 @@
         "messageId": {
           "kind": "string",
           "nullable": false,
-          "optional": false,
+          "optional": true,
           "unique": false
         },
         "messageRole": {
@@ -28997,6 +29017,13 @@
         "by_thread": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_document": {
+          "fields": [
+            "userId",
+            "documentId"
           ],
           "unique": false
         },

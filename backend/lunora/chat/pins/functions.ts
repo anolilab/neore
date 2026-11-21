@@ -5,11 +5,15 @@ import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
+import { isPinnableDocumentKind } from "./pinnable";
 
 /** The highest image index an image pin may name; a reply has far fewer images. */
 export const MAX_PINNED_IMAGE_INDEX = 999;
 
+// What `createPin` takes: a document pin is made by `createDocumentPin` only.
 const vPinKind = v.union(v.literal("message"), v.literal("image"));
+// What a stored pin can be, as read back.
+const vStoredPinKind = v.union(v.literal("message"), v.literal("image"), v.literal("document"));
 
 /**
  * Whether a pin's kind and image fit together: an image pin names the image it pins (its index, and its storage path
@@ -29,10 +33,12 @@ export const getThreadPins = authQuery
                 _creationTime: v.number(),
                 _id: v.string(),
                 createdAt: v.number(),
+                documentId: v.optional(v.string()),
+                documentKind: v.optional(v.string()),
                 imageIndex: v.optional(v.number()),
                 imageKey: v.optional(v.string()),
-                kind: v.optional(vPinKind),
-                messageId: v.string(),
+                kind: v.optional(vStoredPinKind),
+                messageId: v.optional(v.string()),
                 messageRole: v.string(),
                 note: v.optional(v.string()),
                 selectedText: v.optional(v.string()),
@@ -104,6 +110,71 @@ export const createPin = authMutation
         });
 
         context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, kind: kind ?? "message", messageRole });
+
+        return pinId;
+    });
+
+/**
+ * Pins a finished visual or plan of the thread (`PINNABLE_DOCUMENT_KINDS`). The label is the document's own title, read
+ * here rather than sent, and the pin quotes the message that made the document when it has one. Pinning a document that
+ * is already pinned returns that pin, so one document is one pin.
+ */
+export const createDocumentPin = authMutation
+    .use(rateLimit("pins/create"))
+    .input({
+        documentId: v.string().max(MAX_LENGTH.id),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(v.string())
+    .mutation(async ({ args: { documentId, threadId, unlockProof }, ctx: context }) => {
+        const { userId } = context.user;
+        const { now } = context;
+
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        if (thread && isThreadLocked(thread)) {
+            throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }));
+        }
+
+        const document = await context.db.get("documents", documentId as Id<"documents">);
+
+        if (!document || document.threadId !== threadId) {
+            throw new LunoraError("NOT_FOUND", "Document not found in this chat");
+        }
+
+        if (!isPinnableDocumentKind(document.kind)) {
+            throw new LunoraError("BAD_REQUEST", "Only visuals and plans can be pinned");
+        }
+
+        if (document.status === "streaming") {
+            throw new LunoraError("BAD_REQUEST", "A document still being written cannot be pinned yet");
+        }
+
+        const [existing] = await context.db
+            .query("threadPins")
+            .withIndex("by_user_and_document", (q) => q.eq("userId", userId).eq("documentId", document._id))
+            .take(1);
+
+        if (existing) {
+            return existing._id;
+        }
+
+        const pinId = await context.db.insert("threadPins", {
+            createdAt: now,
+            documentId: document._id,
+            documentKind: document.kind,
+            kind: "document",
+            messageId: document.messageId,
+            // Documents are made by the assistant, so the quoted message is an assistant message.
+            messageRole: "assistant",
+            selectedText: document.title,
+            threadId: threadId as Id<"threads">,
+            updatedAt: now,
+            userId,
+        });
+
+        context.log.event("chat.create_document_pin", { documentKind: document.kind });
 
         return pinId;
     });
