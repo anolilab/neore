@@ -33,11 +33,16 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { importRuleFiles, needsMode } from "../lib/rule-file-import";
+import { fitTitle, importRuleFiles, needsMode, unreservedTitle } from "../lib/rule-file-import";
+import type { RepoImportResult } from "./repo-rule-file-import";
+import RepoRuleFileImport from "./repo-rule-file-import";
 
 /** The id and name the backend gives a project's older single context (`LEGACY_CONTEXT_RULE_ID`). */
 const LEGACY_CONTEXT_ID = "context";
 const LEGACY_CONTEXT_TITLE = "Project context";
+
+/** How many files an import note names of those it left out; the rest are counted. */
+const NAMED_LEFT_OUT = 5;
 
 /** The backend's code for a refused call: its own `data.code` when it names one, else the standard `code`. */
 const errorCode = (error: unknown): unknown => {
@@ -468,13 +473,17 @@ const ProjectRuleFiles: FC<{
     const [importing, setImporting] = useState(false);
     // The list, its revision and the draft as last rendered: an import applies onto them once its files are read, never
     // onto the ones it started with (a save, an edit or a read may have landed meanwhile).
-    const latest = useRef({ draft, revision: data?.revision ?? "", savedFiles });
+    const latest = useRef({ draft, keptLegacyId, revision: data?.revision ?? "", savedFiles });
     // Bumped by Discard: an import still reading then adds nothing.
     const importGeneration = useRef(0);
+    // Bumped by each import that adds drafts: a save it lands during keeps them, and does not say the list is saved.
+    const importsApplied = useRef(0);
+    // Bumped by each import that leaves a note, drafts or not: a save it lands during keeps the note.
+    const importNotes = useRef(0);
 
     // Before any later event's handler can run, so an import never applies onto a list older than the one shown.
     useLayoutEffect(() => {
-        latest.current = { draft, revision: data?.revision ?? "", savedFiles };
+        latest.current = { draft, keptLegacyId, revision: data?.revision ?? "", savedFiles };
     });
 
     const change = (next: RuleFileDraft[]) => {
@@ -487,73 +496,151 @@ const ProjectRuleFiles: FC<{
         setImportNote("");
     };
 
-    /** Adds the picked Markdown files as unsaved drafts, up to the project's limit; the person saves them like any edit. */
-    const importPicked = async (event: ChangeEvent<HTMLInputElement>) => {
-        const input = event.currentTarget;
-        const picked = [...(input.files ?? [])];
-
-        // Cleared, so picking the same file again imports it again.
-        input.value = "";
-
-        if (picked.length === 0) {
-            return;
-        }
-
-        const generation = importGeneration.current;
-        // Up to the project's limit, not the room left now: a draft removed while the files are read frees room the import takes.
-        const read = await importRuleFiles(picked, MAX_RULE_FILES);
-
-        if (generation !== importGeneration.current) {
-            return;
-        }
-
+    const applyImport = (read: RepoImportResult) => {
         // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
-        // room left now is taken.
+        // room left now is taken. A file a save would refuse for its length, or for the list's size with those before
+        // it, is left out and said, as the save would measure it.
         const now = latest.current;
         const base = now.draft ?? now.savedFiles;
-        const added = read.imported.slice(0, Math.max(0, MAX_RULE_FILES - base.length));
-        const skipped = read.skipped + read.imported.length - added.length;
+        const added: RuleFileDraft[] = [];
+        const skipped = [...read.skipped];
+        const tooLarge: string[] = [];
+        let bytes = ruleFilesStoredBytes(
+            toSaved(
+                base.filter((file) => file.id !== now.keptLegacyId),
+                legacyTitle,
+            ),
+        );
+
+        // A name longer than a save takes (a repository's file name) is cut to fit, and told apart from the others.
+        const titles = new Set(base.map((file) => file.title));
+        let shortened = 0;
+        let renamed = 0;
+
+        for (const { path, ...file } of read.imported) {
+            // A name opening the id form, which a save refuses (a file named `id:setup.md`), is renamed and said.
+            const unreserved = unreservedTitle(file.title);
+            const title = fitTitle(unreserved, titles, MAX_RULE_TITLE_LENGTH);
+            const draftFile = { ...file, id: crypto.randomUUID(), title };
+            // What it adds to the stored list: its JSON, and a comma after the one before it.
+            const cost = ruleFilesStoredBytes(toSaved([draftFile], legacyTitle)) - (bytes > 2 ? 1 : 2);
+
+            if (base.length + added.length >= MAX_RULE_FILES) {
+                skipped.push(path);
+            } else if (file.content.length > MAX_RULE_FILE_LENGTH || bytes + cost > MAX_RULE_FILES_BYTES) {
+                tooLarge.push(path);
+            } else {
+                added.push(draftFile);
+                titles.add(title);
+                shortened += title === unreserved ? 0 : 1;
+                renamed += unreserved === file.title ? 0 : 1;
+                bytes += cost;
+            }
+        }
 
         if (added.length > 0) {
             if (now.draft === null) {
                 setBaseRevision(now.revision);
             }
 
-            setDraft([
-                ...base,
-                ...added.map((file) => {
-                    return { ...file, id: crypto.randomUUID() };
-                }),
-            ]);
+            importsApplied.current += 1;
+            setDraft([...base, ...added]);
             setStatus("");
         }
 
         const toSet = added.filter((file) => needsMode(file)).length;
-        const noneFound = read.imported.length === 0 ? [t`No Markdown files were found to import.`] : [];
+        const noneFound = read.imported.length === 0 && read.unreadable.length === 0 && read.notRead === 0 ? [t`No Markdown files were found to import.`] : [];
         const addedNote =
             added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
         const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
-        const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
+        // The files left out by name, so the person knows which to shorten or add by hand: the first few, then how many more.
+        const named = (paths: ReadonlyArray<string>): string => {
+            const more = paths.length - NAMED_LEFT_OUT;
+            const shown = paths.toSorted((left, right) => left.localeCompare(right)).slice(0, NAMED_LEFT_OUT);
 
-        setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : [])].join(" "));
+            return new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(
+                more > 0 ? [...shown, plural(more, { one: "# more", other: "# more" })] : shown,
+            );
+        };
+        const skippedCount = skipped.length;
+        const skippedNames = named(skipped);
+        const left = t`${plural(skippedCount, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files. Left out: ${skippedNames}.`;
+        const unreadableCount = read.unreadable.length;
+        const unreadableNames = named(read.unreadable);
+        const unreadable = t`${plural(unreadableCount, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large. Not read: ${unreadableNames}.`;
+        const { duplicates } = read;
+        const duplicatesNote = t`${plural(duplicates, { one: "# file was left out as the same file as another picked", other: "# files were left out as the same file as another picked" })}: the same text would apply twice.`;
+        const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;
+        const length = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
+        const size = formatNumber(MAX_RULE_FILES_BYTES / 1_000_000, i18n.locale);
+        const tooLargeCount = tooLarge.length;
+        const tooLargeNames = named(tooLarge);
+        const tooLargeNote = t`${plural(tooLargeCount, { one: "# file was left out as too large", other: "# files were left out as too large" })}: a rule file holds at most ${length} characters, and all of a project's together at most ${size} MB. Too large: ${tooLargeNames}.`;
+
+        const titleLimit = formatNumber(MAX_RULE_TITLE_LENGTH, i18n.locale);
+        const shortenedNote = t`${plural(shortened, { one: "# name was", other: "# names were" })} shortened to ${titleLimit} characters.`;
+        const renamedNote = t`${plural(renamed, { one: "# name opened with id:, which names a file by its id, so it now opens with id-", other: "# names opened with id:, which names a file by its id, so they now open with id-" })} instead.`;
+
+        importNotes.current += 1;
+        setImportNote(
+            [
+                ...addedNote,
+                ...(shortened > 0 ? [shortenedNote] : []),
+                ...(renamed > 0 ? [renamedNote] : []),
+                ...(toSet > 0 ? [setNote] : []),
+                ...(skipped.length > 0 ? [left] : []),
+                ...(tooLarge.length > 0 ? [tooLargeNote] : []),
+                ...(duplicates > 0 ? [duplicatesNote] : []),
+                ...(read.unreadable.length > 0 ? [unreadable] : []),
+                ...(read.notRead > 0 ? [notRead] : []),
+            ].join(" "),
+        );
     };
 
-    /** Reads the picked files, one import at a time. */
-    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+    /**
+     * Adds what `read` imports as unsaved drafts, up to the project's limit; the person saves them like any edit. One
+     * import at a time: one asked for while another reads is dropped.
+     */
+    const runImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>) => {
         if (importing) {
-            const input = event.currentTarget;
-
-            input.value = "";
-
             return;
         }
 
+        const generation = importGeneration.current;
+
+        const isCurrent = () => generation === importGeneration.current;
+
         setImporting(true);
-        importPicked(event)
-            .catch(() => setImportNote(t`The files could not be read.`))
+        read(isCurrent)
+            // An import a Discard overtook adds nothing.
+            .then((result) => (result && isCurrent() ? applyImport(result) : undefined))
+            .catch(() => {
+                // One a Discard overtook says nothing either.
+                if (!isCurrent()) {
+                    return;
+                }
+
+                importNotes.current += 1;
+                setImportNote(t`The files could not be read.`);
+            })
             .then(() => setImporting(false))
             .catch(() => undefined);
+    };
+
+    /** Reads the picked files: up to the project's limit, not the room left now, as a draft removed meanwhile frees room. */
+    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+        const input = event.currentTarget;
+        const picked = [...(input.files ?? [])];
+
+        // Cleared, so picking the same file again imports it again.
+        input.value = "";
+
+        if (picked.length > 0) {
+            runImport(async () => {
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, unreadable: [] };
+            });
+        }
     };
 
     /** How a refusal reads, for `file` when it names one; the editor's own check and the backend's word it alike. */
@@ -720,6 +807,8 @@ const ProjectRuleFiles: FC<{
         const submitted = draft;
         const ruleFiles = sentFiles();
         const keep = keptLegacyId === undefined ? {} : { keepContext: true };
+        const importsBefore = importsApplied.current;
+        const notesBefore = importNotes.current;
 
         try {
             const written = await saved.mutateAsync({ ...args, ...keep, revision: baseRevision, ruleFiles });
@@ -730,8 +819,17 @@ const ProjectRuleFiles: FC<{
             setDraft((current) => (current === submitted ? null : current));
             setBaseRevision(written.revision);
             setError(undefined);
-            setStatus(t`Rule files saved.`);
-            setImportNote("");
+
+            // An import that landed while the save ran left unsaved drafts on top of the list just saved, or a note saying
+            // why it added none: that note stays.
+            if (importsApplied.current === importsBefore) {
+                setStatus(t`Rule files saved.`);
+            }
+
+            if (importNotes.current === notesBefore) {
+                setImportNote("");
+            }
+
             refetch().catch(() => undefined);
         } catch (saveError) {
             // A limit the backend holds that this editor did not (an older client): worded and placed as the editor's own.
@@ -834,6 +932,7 @@ const ProjectRuleFiles: FC<{
                             <FolderUp aria-hidden="true" className="size-4" />
                             {t`Import rule folder`}
                         </Button>
+                        <RepoRuleFileImport disabled={importing || files.length >= MAX_RULE_FILES} projectId={projectId} runImport={runImport} />
                         <input
                             accept=".md,.mdc,.markdown,text/markdown"
                             aria-hidden="true"

@@ -1,10 +1,11 @@
 /**
- * Rule files from uploaded Markdown: an `AGENTS.md`, `CLAUDE.md` or `GEMINI.md` becomes one `always` file under its own
- * name; the files of a rule folder take their mode from their front matter, read strictly: `alwaysApply: true` → always,
+ * Rule files from uploaded Markdown: an `AGENTS.md`, `CLAUDE.md` or `GEMINI.md` at the top (of the repository, or of the
+ * folder picked) becomes one `always` file under its own name; the files of a rule folder, one of those names included, take their mode from their front matter, read strictly: `alwaysApply: true` → always,
  * else `globs` → applied when files match, else a `description` → read when needed. A file that says none of these is
  * read when needed with no description, which the editor will not save until the person says when, or picks another mode.
  * The text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
  */
+import { isRuleTitleReserved, RULE_FILE_FRONT_MATTER } from "@neore/backend/rule-file-limits";
 
 export interface ImportedRuleFile {
     content: string;
@@ -30,9 +31,6 @@ const QUOTE_START = /^["']/u;
 
 /** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
 const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
-
-/** The front matter, an empty block included: after blank lines, its fences may end in spaces, its lines in CRLF. */
-const FRONT_MATTER = /^(?:[\t ]*\r?\n)*---[\t ]*\r?\n(?:([\s\S]*?)\r?\n)?---[\t ]*(?:\r?\n|$)/u;
 
 /** Where a quoted scalar may open in a value: at its start, or after `[` or `,` in an inline list. */
 const QUOTE_OPENS_AFTER = new Set(["", ",", "["]);
@@ -236,7 +234,7 @@ const isIndented = (line: string): boolean => line.startsWith(" ") || line.start
  * list may also be given as `- item` lines after it.
  */
 const splitFrontMatter = (text: string): { body: string; fields: Map<string, string[]> } => {
-    const match = FRONT_MATTER.exec(text);
+    const match = RULE_FILE_FRONT_MATTER.exec(text);
     const fields = new Map<string, string[]>();
 
     if (!match) {
@@ -308,8 +306,9 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
         fields.set(key, key === "globs" ? globsOf(parts) : [isBlock ? value : unquoted(value)]);
     }
 
-    // Blank lines, then a `---` rule: a block that sets nothing there is the text's own, kept whole.
-    if (fields.size === 0 && !match[0].startsWith("-")) {
+    // Blank lines, then a `---` rule: a block with text that sets nothing there is the text's own, kept whole. An
+    // empty one is front matter all the same, dropped as the repository read counts it.
+    if (fields.size === 0 && !match[0].startsWith("-") && (match[1] ?? "").trim() !== "") {
         return { body: text, fields };
     }
 
@@ -319,13 +318,23 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
 /** Whether `name` (a path's last part) is one of the root instruction files. */
 export const isRootInstructionFile = (name: string): boolean => ROOT_INSTRUCTION_FILES.has(name.toLowerCase());
 
-/** One uploaded file as a rule file, or `null` for one that is not Markdown. `path` is its name or its path in a folder. */
+/**
+ * Whether the file at `path` (from the top of what was imported) is a root instruction file, imported whole as `always`:
+ * the same text elsewhere is read by its front matter, so it makes another rule file.
+ */
+export const isWholeInstructionFile = (path: string): boolean => !path.replaceAll("\\", "/").includes("/") && isRootInstructionFile(path);
+
+/**
+ * One imported file as a rule file, or `null` for one that is not Markdown. `path` is its path from the top of what was
+ * imported: only a root instruction file there is `always` whole; in a folder it is read like any rule file.
+ */
 export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile | null => {
-    const name = path.slice(path.replaceAll("\\", "/").lastIndexOf("/") + 1);
+    const slash = path.replaceAll("\\", "/").lastIndexOf("/");
+    const name = path.slice(slash + 1);
     // A byte-order mark would hide the front matter.
     const text = raw.startsWith("\u{FEFF}") ? raw.slice(1) : raw;
 
-    if (isRootInstructionFile(name)) {
+    if (isWholeInstructionFile(path)) {
         return { content: text, description: "", mode: "always", patterns: "", title: name };
     }
 
@@ -352,36 +361,108 @@ export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile 
     return { content: body, description, mode: "auto", patterns: "", title };
 };
 
+/** Whether the UTF-16 unit at `index` of `text` opens a surrogate pair, so a cut there would split a character. */
+const isHighSurrogate = (text: string, index: number): boolean => {
+    const code = text.codePointAt(index) ?? 0;
+
+    return code > 0xff_ff || (code >= 0xd8_00 && code <= 0xdb_ff);
+};
+
+/**
+ * `title` as a save takes it: one longer than `max` characters (a file's name, which a save would refuse) cut to fit,
+ * never inside a character, and told apart from each of `taken` by ` (2)`, ` (3)`… within `max`, so two long names
+ * that start alike stay two. A title that fits is kept as it is, a repeat included, as names may repeat.
+ */
+export const fitTitle = (title: string, taken: ReadonlySet<string>, max: number): string => {
+    if (title.trim().length <= max) {
+        return title;
+    }
+
+    const cut = (suffix: string): string => {
+        const end = max - suffix.length;
+        const head = title.slice(0, isHighSurrogate(title, end - 1) ? end - 1 : end).trimEnd();
+
+        return `${head}${suffix}`;
+    };
+
+    let candidate = cut("");
+    let copy = 1;
+
+    while (taken.has(candidate)) {
+        copy += 1;
+        candidate = cut(` (${String(copy)})`);
+    }
+
+    return candidate;
+};
+
+const ID_FORM_OPENING = /^(\s*id):/iu;
+
+/**
+ * `title` as a save takes it when it opens the id form (`id:`, {@link isRuleTitleReserved}), which a save refuses for a
+ * new name: that opening's colon becomes a hyphen (`id:setup` → `id-setup`), so the file keeps a name that reads as its
+ * own. Any other title is kept as it is.
+ */
+export const unreservedTitle = (title: string): string => (isRuleTitleReserved(title) ? title.replace(ID_FORM_OPENING, "$1-") : title);
+
 /** Whether an imported file said nothing of when it applies: a draft the person must finish before it saves. */
 export const needsMode = (file: Pick<ImportedRuleFile, "description" | "mode">): boolean => file.mode === "auto" && file.description.trim() === "";
 
-/**
- * The rule files of the uploaded `files`, in name order, at most `room` of them: those past it are counted in `skipped`,
- * files that are not Markdown are left out.
- */
-export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<{ imported: ImportedRuleFile[]; skipped: number }> => {
-    const pathOf = (file: File): string => file.webkitRelativePath || file.name;
-    const sorted = files.toSorted((left, right) => pathOf(left).localeCompare(pathOf(right)));
-    const imported: ImportedRuleFile[] = [];
-    let skipped = 0;
+/** What an import read: each rule file with the path it came from, and the paths past the room (`skipped`). */
+export interface ImportedRuleTexts {
+    imported: (ImportedRuleFile & { path: string })[];
+    skipped: string[];
+}
 
-    for (const file of sorted) {
+/**
+ * The rule files of `entries` (a path, and its text read on demand), in path order, at most `room` of them (those past it
+ * in `skipped`), files that are not Markdown left out: the upload ({@link importRuleFiles}) and the repository import
+ * share it.
+ */
+export const importRuleTexts = async (
+    entries: ReadonlyArray<{ path: string; text: () => Promise<string> | string }>,
+    room: number,
+): Promise<ImportedRuleTexts> => {
+    const sorted = entries.toSorted((left, right) => left.path.localeCompare(right.path));
+    const imported: ImportedRuleTexts["imported"] = [];
+    const skipped: string[] = [];
+
+    for (const entry of sorted) {
         // A name alone decides whether it is taken, before its text is read.
-        if (toImportedRuleFile(pathOf(file), "") === null) {
+        if (toImportedRuleFile(entry.path, "") === null) {
             continue;
         }
 
         if (imported.length >= room) {
-            skipped += 1;
+            skipped.push(entry.path);
             continue;
         }
 
-        const ruleFile = toImportedRuleFile(pathOf(file), await file.text());
+        const ruleFile = toImportedRuleFile(entry.path, await entry.text());
 
         if (ruleFile) {
-            imported.push(ruleFile);
+            imported.push({ ...ruleFile, path: entry.path });
         }
     }
 
     return { imported, skipped };
 };
+
+/** A picked folder's file by its path in that folder, the folder's own name dropped; a single file by its name. */
+const pathInPick = (file: File): string => {
+    const path = file.webkitRelativePath;
+
+    return path ? path.slice(path.indexOf("/") + 1) : file.name;
+};
+
+/**
+ * The rule files of the uploaded `files`, in path order, at most `room` of them: those past it are in `skipped`, files
+ * that are not Markdown are left out.
+ */
+export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<ImportedRuleTexts> =>
+    importRuleTexts(
+        files.map((file) => {
+            return { path: pathInPick(file), text: () => file.text() };
+        }),
+        room,
+    );

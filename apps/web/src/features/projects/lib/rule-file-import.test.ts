@@ -1,9 +1,10 @@
+import { isRuleTitleReserved } from "@neore/backend/rule-file-limits";
 import { describe, expect, it } from "vitest";
 
-import { importRuleFiles, needsMode, toImportedRuleFile } from "./rule-file-import";
+import { fitTitle, importRuleFiles, importRuleTexts, isWholeInstructionFile, needsMode, toImportedRuleFile, unreservedTitle } from "./rule-file-import";
 
 describe("toImportedRuleFile", () => {
-    it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "repo/claude.md"])("imports %s whole as one always file under its own name", (path) => {
+    it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "claude.md"])("imports %s whole as one always file under its own name", (path) => {
         const text = "---\ndescription: kept as text\n---\nBe brief.";
 
         expect(toImportedRuleFile(path, text)).toStrictEqual({
@@ -11,7 +12,21 @@ describe("toImportedRuleFile", () => {
             description: "",
             mode: "always",
             patterns: "",
-            title: path.split("/").at(-1),
+            title: path,
+        });
+    });
+
+    it.each([
+        ["rules/AGENTS.md", "AGENTS"],
+        [".agents/rules/claude.md", "claude"],
+        [String.raw`rules\GEMINI.md`, "GEMINI"],
+    ])("reads %s, in a folder, by its front matter like any rule file", (path, title) => {
+        expect(toImportedRuleFile(path, "---\nglobs: src/**\n---\nOnly src.")).toStrictEqual({
+            content: "Only src.",
+            description: "",
+            mode: "glob",
+            patterns: "src/**",
+            title,
         });
     });
 
@@ -40,6 +55,9 @@ describe("toImportedRuleFile", () => {
         expect(plain).toMatchObject({ content: "No front matter.", description: "", mode: "auto", title: "plain" });
         expect(needsMode(plain!)).toBe(true);
         expect(toImportedRuleFile("rules/empty.md", "---\n---\nBody.")).toMatchObject({ content: "Body.", description: "", mode: "auto" });
+        // An empty block ends at its first closing fence, after blank lines too.
+        expect(toImportedRuleFile("rules/empty.md", "---\n---\nKeep this.\n---\nTail.")).toMatchObject({ content: "Keep this.\n---\nTail." });
+        expect(toImportedRuleFile("rules/empty.md", "\n---\n---\nBody.")).toMatchObject({ content: "Body." });
         expect(toImportedRuleFile("rules/odd.md", "---\nalwaysApply: sometimes\n---\nBody.")).toMatchObject({ mode: "auto" });
         // A comment after the value is not part of it.
         expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false # on request\n---\nBody.")).toMatchObject({ description: "", mode: "auto" });
@@ -170,16 +188,96 @@ describe("toImportedRuleFile", () => {
     });
 });
 
+describe("isWholeInstructionFile", () => {
+    it("takes only a root instruction file, in any case, never one in a folder or another root file", () => {
+        expect(isWholeInstructionFile("AGENTS.md")).toBe(true);
+        expect(isWholeInstructionFile("claude.md")).toBe(true);
+        expect(isWholeInstructionFile("rules/AGENTS.md")).toBe(false);
+        expect(isWholeInstructionFile(String.raw`rules\GEMINI.md`)).toBe(false);
+        expect(isWholeInstructionFile("README.md")).toBe(false);
+    });
+});
+
+describe("importRuleTexts", () => {
+    it("lists every entry past the room as skipped, in path order, reading none of them", async () => {
+        const unread = () => {
+            throw new Error("read past the room");
+        };
+
+        await expect(
+            importRuleTexts(
+                [
+                    { path: "rules/c.md", text: unread },
+                    { path: "rules/a.md", text: () => "A" },
+                    { path: "rules/b.md", text: unread },
+                ],
+                1,
+            ),
+        ).resolves.toStrictEqual({
+            imported: [{ content: "A", description: "", mode: "auto", path: "rules/a.md", patterns: "", title: "a" }],
+            skipped: ["rules/b.md", "rules/c.md"],
+        });
+    });
+});
+
 describe("importRuleFiles", () => {
-    it("imports in path order up to the room left and counts the rest", async () => {
+    it("reads a picked folder's top-level instruction file whole, and one in its rules folder by front matter", async () => {
+        const inFolder = (path: string, text: string) => {
+            const file = new File([text], path.split("/").at(-1)!);
+
+            Object.defineProperty(file, "webkitRelativePath", { value: path });
+
+            return file;
+        };
+        const front = "---\ndescription: On deploys\n---\nSteps.";
+
+        await expect(importRuleFiles([inFolder("repo/AGENTS.md", front), inFolder("repo/rules/CLAUDE.md", front)], 5)).resolves.toStrictEqual({
+            imported: [
+                { content: front, description: "", mode: "always", path: "AGENTS.md", patterns: "", title: "AGENTS.md" },
+                { content: "Steps.", description: "On deploys", mode: "auto", path: "rules/CLAUDE.md", patterns: "", title: "CLAUDE" },
+            ],
+            skipped: [],
+        });
+    });
+
+    it("imports in path order up to the room left and lists the rest", async () => {
         const files = [new File(["B"], "b.md"), new File(["A"], "a.md"), new File(["x"], "x.txt"), new File(["C"], "c.md")];
 
         await expect(importRuleFiles(files, 2)).resolves.toStrictEqual({
             imported: [
-                { content: "A", description: "", mode: "auto", patterns: "", title: "a" },
-                { content: "B", description: "", mode: "auto", patterns: "", title: "b" },
+                { content: "A", description: "", mode: "auto", path: "a.md", patterns: "", title: "a" },
+                { content: "B", description: "", mode: "auto", path: "b.md", patterns: "", title: "b" },
             ],
-            skipped: 1,
+            skipped: ["c.md"],
         });
+    });
+});
+
+describe("fitTitle", () => {
+    it("keeps a name that fits as it is, a repeat included", () => {
+        expect(fitTitle("SQL", new Set(["SQL"]), 10)).toBe("SQL");
+    });
+
+    it("cuts a longer name to the limit, and tells apart one that starts like a name taken", () => {
+        expect(fitTitle("abcdefghijkl", new Set(), 10)).toBe("abcdefghij");
+        expect(fitTitle("abcdefghijkl", new Set(["abcdefghij"]), 10)).toBe("abcdef (2)");
+        expect(fitTitle("abcdefghijkl", new Set(["abcdef (2)", "abcdefghij"]), 10)).toBe("abcdef (3)");
+    });
+
+    it("never cuts inside a character", () => {
+        const cut = fitTitle(`abcdefghi${"😀".repeat(3)}`, new Set(), 10);
+
+        expect(cut).toBe("abcdefghi");
+        expect(cut.length).toBeLessThanOrEqual(10);
+    });
+});
+
+describe("unreservedTitle", () => {
+    it("turns a name opening the id form, in any case, into one a save takes, and keeps any other", () => {
+        expect(unreservedTitle("id:setup")).toBe("id-setup");
+        expect(unreservedTitle(" ID:setup")).toBe(" ID-setup");
+        expect(isRuleTitleReserved(unreservedTitle("id:setup"))).toBe(false);
+        expect(unreservedTitle("setup id:x")).toBe("setup id:x");
+        expect(unreservedTitle("idea")).toBe("idea");
     });
 });

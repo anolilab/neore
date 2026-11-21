@@ -873,6 +873,27 @@ export const listProjectRepos = authQuery
         return withDefault(await repoRows(context, projectId as Id<"projects">, { primary: true }));
     });
 
+/**
+ * One of a project's repositories, for importing its instruction files as rule files (`rule-file-repo.ts`): only for
+ * whoever may save the project's rule files ({@link projectWithEditableSettings}), else `null`, as for a missing one.
+ */
+export const repoForRuleFileImport = internalQuery
+    .input({ projectId: v.id("projects"), repoId: v.id("projectRepositories"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.null(), v.object({ defaultBranch: v.optional(v.string()), url: v.string() })))
+    .query(async ({ args: { projectId, repoId, userId }, ctx: context }) => {
+        if (!(await projectWithEditableSettings(context, projectId, userId, { primary: true }))) {
+            return null;
+        }
+
+        const repo = storedRow(await context.db.projectRepositories.findFirst({ consistency: "primary", where: { _id: repoId, projectId } }));
+
+        if (!repo || !isRepoRow(repo)) {
+            return null;
+        }
+
+        return { url: repo.url, ...(repo.defaultBranch && { defaultBranch: repo.defaultBranch }) };
+    });
+
 /** Rows one URL lookup reads per scope (the caller's own, each page of their organizations'). */
 const REPO_LOOKUP_LIMIT = MAX_PROJECT_REPOSITORIES;
 

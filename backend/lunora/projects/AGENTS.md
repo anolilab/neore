@@ -80,3 +80,21 @@
   `PROJECT_CONTEXT_EXPORT_BYTES` of the output (`gdpr/steps.ts`; a carried one is neither exported nor counted); one
   past it is left out, its project marked `ruleFilesOmitted` too. The rule files' read budget counts the bytes
   the triggers actually read (`collectAllTriggers` reports `readBytes`), not the triggers' allowance.
+- **Import from a repository** (`rule-file-repo.ts`, `source-control/repo-rule-files.ts`): two actions, list then read, with the person's own GitHub
+  token, for whoever may save the rule files (`repoForRuleFileImport`) and a repository the project lists. A listing pins one commit and walks git
+  trees by SHA (never `ref:path`, never recursive; a cut tree is reported as `truncated`, and a rules folder whose cut tree shows no Markdown is still
+  the one listed); the read takes that commit's SHA, never a branch, lists it again (found under this repository, `/git/commits/{sha}`) and reads only
+  what that listing offers, by the blob SHA it gave (a link's only when, followed again, it ends there: never as another listed file's SHA, so a
+  refused link stays refused; each hop a host request), never through the contents API. Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, every redirect
+  hop (`beforeRedirect`, charged after its origin is checked) and a 401's repeat included (`fetchBudget`, under the Workers 50-subrequest cap with its
+  own lookups): past it a link is `budget`, a file `not_read`, a listing whose walk is cut `host_error`, never a thrown error. A symlink is followed
+  only to another path of the same listing (a root file or the listed folder's), inside the repository (`resolveLinkTarget`); any other is listed
+  `refused` with why (`LinkRefusal`) and its target never read; a listing holds at most `MAX_LISTED_FOLDER_FILES` of the folder's files, by path, and
+  counts the rest (`omitted`). They read only `isImportablePath` paths (root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, Markdown right in one `RULE_FOLDERS`
+  folder), within `REPO_RULE_FILE_MAX_BYTES` and `MAX_RULE_FILE_LENGTH` characters each (a folder's file without its front matter,
+  `RULE_FILE_FRONT_MATTER`, as the import counts; a root file whole) and `REPO_RULE_FILES_READ_BYTES` downloaded, charged before each blob and kept
+  with the blobs across a 401's repeat (`repoReadLedger`), and store nothing: the editor turns the text into drafts with the upload's rules
+  (`importRuleTexts`; an instruction-file name is `always` only at the top), leaving out and counting what a save would refuse (count, length, list
+  size) and cutting a name past `MAX_RULE_TITLE_LENGTH` (`fitTitle`), renaming one a save reserves (`unreservedTitle`), and reading one pick per
+  `draftKey`: a link's target path (`linkOf`, else its own; never the blob SHA) plus root-or-rules-folder, so a link imports once, but equal bytes
+  under two names, or a root and a folder file linked together, stay two drafts.
