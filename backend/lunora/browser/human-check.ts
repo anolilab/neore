@@ -196,7 +196,8 @@ export const humanCheckLadder = async <R extends LadderResult>(
         return result.handedBack === true ? await afterHandBack(result, dependencies, readContent) : result;
     }
 
-    let site = humanCheckSite(result.url);
+    // The site the check was found on: what is asked about, whatever page a later look lands on.
+    const site = humanCheckSite(result.url);
 
     // One ask per site per reply: a second block is not waited out nor asked about again.
     if (await dependencies.wasAsked(site, "run")) {
@@ -214,18 +215,21 @@ export const humanCheckLadder = async <R extends LadderResult>(
         // A check found only in the text is looked for in the text again: a screenshot carries none.
         page = await dependencies.look(marker === "content" ? "extract" : "screenshot");
 
-        // The look was refused or failed (a person took control meanwhile, the browser closed): that is what the agent
-        // hears, never a clear page.
-        if (page.success !== true && page.handedBack !== true) {
+        // The look was refused or failed (a person took control meanwhile, the browser closed, also after a hand back):
+        // that is what the agent hears, never a clear page, and nobody is asked to take control of a browser that is gone.
+        if (page.success !== true) {
             return page;
         }
 
-        if (showsClear(page, marker, site)) {
-            // A person took control during the wait and handed back a clear page: the hand-back note already says so.
-            return page.handedBack === true ? page : withNote(page, humanCheckMessages.clearedOnItsOwn(site));
+        // A person took control during the wait and handed back a page that shows no check: they are not asked about the
+        // page they just gave back (an empty browser, another site), and the agent hears whether it is known to be clear.
+        if (page.handedBack === true && detectHumanCheck(page, marker === "content") === undefined) {
+            return showsClear(page, marker, site) ? page : withNote(page, humanCheckMessages.unknownAfterHandBack(site));
         }
 
-        site = humanCheckSite(page.url ?? result.url);
+        if (showsClear(page, marker, site)) {
+            return withNote(page, humanCheckMessages.clearedOnItsOwn(site));
+        }
     }
 
     const first = await dependencies.claimAsk(site);
@@ -271,6 +275,16 @@ const afterHandBack = async <R extends LadderResult>(result: R, dependencies: La
     }
 
     if (page.success === true && detectHumanCheck(page, true) !== undefined) {
+        const pageSite = humanCheckSite(page.url);
+
+        // The read landed on another site's check: that check is its own, asked about (or not) under its own site.
+        if (pageSite !== site) {
+            const own = await humanCheckLadder({ ...page, handedBack: undefined } as R, dependencies, { readContent: true });
+
+            // The hand-back note comes first, also when the ladder added none (Stop during its wait).
+            return result.error === undefined ? own : { ...own, error: own.error === undefined ? result.error : `${result.error} ${own.error}` };
+        }
+
         return { ...withNote(result, humanCheckMessages.alreadyAsked(site)), humanCheck: { site, status: "already_asked" }, success: false };
     }
 

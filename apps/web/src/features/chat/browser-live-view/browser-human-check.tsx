@@ -13,9 +13,9 @@ import { Button } from "@neore/ui/components/button";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
 import type { FC } from "react";
-import { useId, useState } from "react";
+import { use, useId, useState } from "react";
 
-import { requestBrowserControl } from "@/features/chat/browser-live-view/control-request";
+import { BrowserLiveViewHereContext, requestBrowserControl } from "@/features/chat/browser-live-view/control-request";
 import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -28,8 +28,11 @@ interface HumanCheckOutput {
     url?: string;
 }
 
-/** The card for the thread `threadId`; exported for stories and tests, which have no chat around it. */
-export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }> = ({ part, threadId }) => {
+/**
+ * The card for the thread `threadId`; exported for stories and tests, which have no chat around it. `liveViewHere`:
+ * whether the thread's live view card is on this page to take control through (see {@link BrowserLiveViewHereContext}).
+ */
+export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; threadId: string | undefined }> = ({ liveViewHere = true, part, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
@@ -59,6 +62,9 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
         state = t`Someone else has control of this browser.`;
     } else if (browser?.canControl === false) {
         state = t`Only someone who can write in this chat can take control of the browser.`;
+    } else if (!liveViewHere && browser !== undefined) {
+        // A comparison column has no live view card: an unanswered request would not mean the browser closed.
+        state = t`Open this model's chat on its own to take control of its browser.`;
     }
 
     const canAsk = browser !== undefined && browser !== null && state === undefined && threadId !== undefined;
@@ -125,8 +131,9 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
 
 const BrowserHumanCheck: FC<{ part: ToolPart }> = ({ part }) => {
     const { threadId } = useChatThreadIdentity();
+    const liveViewHere = use(BrowserLiveViewHereContext);
 
-    return <HumanCheckCard part={part} threadId={threadId} />;
+    return <HumanCheckCard liveViewHere={liveViewHere} part={part} threadId={threadId} />;
 };
 
 export default BrowserHumanCheck;

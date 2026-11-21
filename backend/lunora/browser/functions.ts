@@ -8,6 +8,7 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { isUniqueViolation } from "../lib/error-helpers";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { controlStateOf, watchableSessionId } from "./live-view-logic";
@@ -363,18 +364,23 @@ export const wasHumanCheckAsked = internalQuery
     .query(async ({ args: { run, site, threadId }, ctx }) => (await humanCheckAsk(ctx.db, threadId, site, run)) !== null);
 
 /**
- * The person is asked about `site` once per run: `true` for the first ask, which records it in the same transaction,
- * `false` when another action of the run asked already.
+ * The person is asked about `site` once per run: `true` for the first ask, which records it, `false` when another
+ * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
+ * insert that loses answers `false`.
  */
 export const claimHumanCheckAsk = internalMutation
     .input({ run: v.string(), site: v.string(), threadId: v.id("threads"), userId: v.string() })
     .output(v.boolean())
     .mutation(async ({ args: { run, site, threadId, userId }, ctx }) => {
-        if ((await humanCheckAsk(ctx.db, threadId, site, run)) !== null) {
-            return false;
-        }
+        try {
+            await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, run, site, threadId, userId });
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                return false;
+            }
 
-        await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, run, site, threadId, userId });
+            throw error;
+        }
 
         return true;
     });

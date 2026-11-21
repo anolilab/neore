@@ -21666,7 +21666,7 @@ msgstr "Braucht mein Review"
 msgid "Needs review"
 msgstr "Prüfung nötig"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:74
+#: src/features/chat/browser-live-view/browser-human-check.tsx:80
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22586,7 +22586,7 @@ msgstr "Noch kein Computer gekoppelt."
 msgid "No pending invitations"
 msgstr "Keine ausstehenden Einladungen"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:113
+#: src/features/chat/browser-live-view/browser-human-check.tsx:119
 msgid "No picture of the page could be taken. Take control to see it in the live view."
 msgstr "Von der Seite konnte kein Bild aufgenommen werden. Übernimm die Steuerung, um sie in der Live-Ansicht zu sehen."
 
@@ -22686,7 +22686,7 @@ msgstr "Für diesen Zeitraum wurden keine Antworten erfasst."
 msgid "No resolved comments."
 msgstr "Keine erledigten Kommentare."
 
-#: src/features/chat/thread/comparison-view.tsx:67
+#: src/features/chat/thread/comparison-view.tsx:68
 msgid "No response yet"
 msgstr "Noch keine Antwort"
 
@@ -23562,7 +23562,7 @@ msgstr "Nur ausführen, wenn jeder Filter zum JSON-Body passt. Verwende Punktpfa
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Nur Modelle desselben Typs können verglichen werden. Leere die Auswahl, um den Typ zu wechseln."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:61
+#: src/features/chat/browser-live-view/browser-human-check.tsx:64
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Nur wer in diesem Chat schreiben darf, kann die Steuerung des Browsers übernehmen."
 
@@ -23675,7 +23675,7 @@ msgstr "Eröffnung"
 msgid "Open {filename}"
 msgstr "{filename} öffnen"
 
-#: src/features/chat/thread/comparison-view.tsx:151
+#: src/features/chat/thread/comparison-view.tsx:152
 msgid "Open {modelName} in full thread"
 msgstr "{modelName} im vollständigen Thread öffnen"
 
@@ -23942,6 +23942,10 @@ msgstr "Thread des Sub-Agenten öffnen"
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:177
 msgid "Open the thread list search and focus it ({0})"
 msgstr "Suche in der Thread-Liste öffnen und fokussieren ({0})"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:67
+msgid "Open this model's chat on its own to take control of its browser."
+msgstr "Öffne den Chat dieses Modells einzeln, um seinen Browser zu steuern."
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:90
 msgid "Open thread"
@@ -29870,7 +29874,7 @@ msgstr "Senden"
 msgid "Send <0>X-Hub-Signature-256: sha256=<hex></0>, the HMAC-SHA256 of the raw request body keyed with the secret (the format GitHub webhooks use). This signature has no timestamp, so each one is accepted only once, for as long as the trigger exists; a delivery that did not run can be redelivered. Requests with the neore headers are rejected."
 msgstr "Sende <0>X-Hub-Signature-256: sha256=<hex></0>, den HMAC-SHA256 des rohen Request-Bodys mit dem Secret als Schlüssel (das Format, das GitHub-Webhooks verwenden). Diese Signatur hat keinen Zeitstempel, daher wird jede nur einmal akzeptiert, solange der Trigger existiert; eine Zustellung, die nicht ausgeführt wurde, kann erneut zugestellt werden. Anfragen mit den neore-Headern werden abgewiesen."
 
-#: src/features/chat/thread/comparison-view.tsx:68
+#: src/features/chat/thread/comparison-view.tsx:69
 msgid "Send a message below to start"
 msgstr "Sende eine Nachricht unten, um zu beginnen"
 
@@ -31158,7 +31162,7 @@ msgstr "Für einige Schritte gab es keine Preisdaten; die Summe ist ein Mindestw
 #~ msgid "Someone else has control of the browser."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:59
+#: src/features/chat/browser-live-view/browser-human-check.tsx:62
 #: src/features/chat/browser-live-view/browser-live-view.tsx:990
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1049
 msgid "Someone else has control of this browser."
@@ -32840,12 +32844,12 @@ msgstr "Taiwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Ein Eingabebild nehmen, den Hintergrund entfernen und dann eine Stilübertragung anwenden"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:107
+#: src/features/chat/browser-live-view/browser-human-check.tsx:113
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1014
 msgid "Take control"
 msgstr "Steuerung übernehmen"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:80
+#: src/features/chat/browser-live-view/browser-human-check.tsx:86
 msgid "Take control, clear it, then hand the browser back."
 msgstr "Übernimm die Steuerung, erledige die Prüfung und gib den Browser dann zurück."
 
@@ -33632,11 +33636,11 @@ msgstr "Der Agent auf deinem Computer liest die Änderung…"
 msgid "The agent's browser closed while the page loaded."
 msgstr "Der Browser des Agenten wurde geschlossen, während die Seite lud."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:78
+#: src/features/chat/browser-live-view/browser-human-check.tsx:84
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "Der Browser des Agenten ist auf {site} auf eine Seite gestoßen, die nur ein Mensch freigeben kann. Der Agent wartet und versucht nicht, sie zu umgehen."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:77
+#: src/features/chat/browser-live-view/browser-human-check.tsx:83
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "Der Browser des Agenten ist auf eine Seite gestoßen, die nur ein Mensch freigeben kann. Der Agent wartet und versucht nicht, sie zu umgehen."
 
@@ -33718,7 +33722,7 @@ msgstr "Der Browser kann dieses Video nicht lesen, um ein Bild aufzunehmen"
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "Der Browser konnte nicht zurückgegeben werden. Der Agent erhält ihn nach zwei Minuten ohne Eingabe von selbst zurück."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:55
+#: src/features/chat/browser-live-view/browser-human-check.tsx:58
 msgid "The browser has closed. Ask the agent to open the page again if it is still needed."
 msgstr "Der Browser wurde geschlossen. Bitte den Agenten, die Seite erneut zu öffnen, falls sie noch gebraucht wird."
 
@@ -36074,7 +36078,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-human-check.tsx:97
+#: src/features/chat/browser-live-view/browser-human-check.tsx:103
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1061
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1188
 #: src/features/chat/guest-links/guest-page.tsx:269
@@ -38432,11 +38436,11 @@ msgstr "Worauf soll der Leitfaden achten?"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Was der Agent in den letzten 30 Tagen von deinen Geräten verlangt hat."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:117
+#: src/features/chat/browser-live-view/browser-human-check.tsx:123
 msgid "What the agent's browser sees"
 msgstr "Was der Browser des Agenten sieht"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:117
+#: src/features/chat/browser-live-view/browser-human-check.tsx:123
 msgid "What the agent's browser sees on {site}"
 msgstr "Was der Browser des Agenten auf {site} sieht"
 
@@ -38576,7 +38580,7 @@ msgstr "Wo du die Kontrolle behältst"
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Ob der Agent einen Browser nutzt, konnte nicht geprüft werden."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:53
+#: src/features/chat/browser-live-view/browser-human-check.tsx:56
 msgid "Whether the browser is still open could not be checked."
 msgstr "Ob der Browser noch geöffnet ist, konnte nicht geprüft werden."
 
@@ -39048,7 +39052,7 @@ msgstr "Du erhältst eine Benachrichtigung, wenn ein Lauf endet, deine Prüfung 
 msgid "You handed the browser back to the agent."
 msgstr "Du hast den Browser an den Agenten zurückgegeben."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:57
+#: src/features/chat/browser-live-view/browser-human-check.tsx:60
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "Du hast die Steuerung. Erledige die Prüfung in der Live-Ansicht und gib den Browser dann zurück."
 

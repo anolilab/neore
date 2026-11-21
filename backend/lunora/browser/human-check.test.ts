@@ -22,6 +22,8 @@ const CLEARED_NOTE = /cleared on its own.*look at it before you act/su;
 const ASKED_NOTE = /asked in the chat.*Do not try to solve or get around it/su;
 const ALREADY_ASKED_NOTE = /already asked.*move on, or reach what you need another way/su;
 const CLEAR_AFTER_HAND_BACK_NOTE = /handed it back;.*no longer shows: the page looks clear\. Look at it before you act\./su;
+/** The hand-back note, then the ask about the other site the read landed on. */
+const HAND_BACK_THEN_OTHER_ASK_NOTE = /^The person had control.*other\.example\.org shows a check/su;
 const UNKNOWN_AFTER_HAND_BACK_NOTE = /cleared is unknown.*Look at the page before you act/su;
 
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
@@ -264,12 +266,45 @@ describe("humanCheckLadder", () => {
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
-    it("step 1: a blank page after the wait (a fresh browser once the session died) is not clear", async () => {
-        const { dependencies } = dependenciesFor([{ content: "", success: true, title: "", url: "about:blank" }]);
-        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+    it("step 1: a blank or clean page on another host after the wait is not clear, and the ask names the site the check was on", async () => {
+        for (const look of [
+            { content: "", success: true, title: "", url: "about:blank" },
+            { content: "Welcome back.", success: true, title: "Account", url: "https://login.example.net/" },
+        ]) {
+            const { asked, dependencies } = dependenciesFor([look]);
+            const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
 
-        expect(result.error).not.toMatch(CLEARED_NOTE);
-        expect(result.humanCheck?.status).toBe("asked");
+            expect(result.error).not.toMatch(CLEARED_NOTE);
+            expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
+            expect(asked).toEqual(new Set(["shop.example.com"]));
+        }
+    });
+
+    it("step 1: a person who took control during the wait and handed back an empty browser or another site is not asked", async () => {
+        for (const look of [
+            { content: "", success: true, title: "", url: "about:blank" },
+            { content: "Welcome back.", success: true, title: "Account", url: "https://login.example.net/" },
+        ]) {
+            const handed = { ...look, error: "The person had control of the browser and handed it back;", handedBack: true };
+            const { dependencies } = dependenciesFor([handed]);
+            const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+            expect(dependencies.claimAsk).not.toHaveBeenCalled();
+            expect(result.humanCheck).toBeUndefined();
+            expect(result.error).toMatch(UNKNOWN_AFTER_HAND_BACK_NOTE);
+        }
+    });
+
+    it("step 1: a look after the wait that fails after a hand back (the browser closed) asks nobody", async () => {
+        const closed: LadderResult = {
+            error: "The person had control of the browser and handed it back; The browser closed.",
+            handedBack: true,
+            success: false,
+        };
+        const { dependencies } = dependenciesFor([closed]);
+
+        await expect(humanCheckLadder(CHECK_PAGE, dependencies)).resolves.toBe(closed);
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
     it("step 1: a person who took control during the wait and handed back a clear page is not told it cleared on its own", async () => {
@@ -320,6 +355,34 @@ describe("humanCheckLadder", () => {
 
         expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
         expect(result.success).toBe(false);
+    });
+
+    it("step 3: a read after the hand back that lands on another site's check asks about that site, not the first", async () => {
+        const otherCheck: LadderResult = { content: "Verifying you are human.", success: true, title: "other.example.org", url: "https://other.example.org/" };
+        const { asked, dependencies } = dependenciesFor([otherCheck, otherCheck], new Set(["shop.example.com"]));
+        const result = await humanCheckLadder(
+            { ...CLEAR_PAGE, error: "The person had control of the browser and handed it back;", handedBack: true },
+            dependencies,
+        );
+
+        expect(result.humanCheck).toEqual({ site: "other.example.org", status: "asked" });
+        expect(result.error).toMatch(HAND_BACK_THEN_OTHER_ASK_NOTE);
+        expect(asked).toEqual(new Set(["other.example.org", "shop.example.com"]));
+    });
+
+    it("step 3: Stop during the wait for another site's check still tells the agent the person handed back", async () => {
+        const otherCheck: LadderResult = { content: "Verifying you are human.", success: true, title: "other.example.org", url: "https://other.example.org/" };
+        const { dependencies } = dependenciesFor([otherCheck], new Set(["shop.example.com"]));
+
+        dependencies.sleep.mockResolvedValueOnce(false);
+
+        const result = await humanCheckLadder(
+            { ...CLEAR_PAGE, error: "The person had control of the browser and handed it back;", handedBack: true },
+            dependencies,
+        );
+
+        expect(result.error).toBe("The person had control of the browser and handed it back;");
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
     it("step 3: a hand back on a site nobody was asked about adds nothing", async () => {
@@ -392,5 +455,16 @@ describe("the ask record", () => {
         await expect(wasAsked("r1", "a.example")).resolves.toBe(true);
         await expect(claim("r1", "b.example")).resolves.toBe(true);
         await expect(claim("r2", "a.example")).resolves.toBe(true);
+    });
+
+    it("lets one of two claims made at once for a site win, and records one row", async () => {
+        const claim = async () =>
+            await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId, userId: "u-1" }));
+
+        const claims = await Promise.all([claim(), claim(), claim()]);
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect());
+
+        expect(claims.filter(Boolean)).toHaveLength(1);
+        expect(rows).toHaveLength(1);
     });
 });

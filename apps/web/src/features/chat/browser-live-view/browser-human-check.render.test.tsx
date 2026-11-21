@@ -70,10 +70,10 @@ const running = (overrides: Record<string, unknown> = {}) => {
     return { browserId: "b-1", canControl: true, idleUntil: Date.now() + 60_000, now: Date.now(), ...overrides };
 };
 
-const show = (part: ToolPart = PART) =>
+const show = (part: ToolPart = PART, liveViewHere = true) =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-            <HumanCheckCard part={part} threadId="thread-1" />
+            <HumanCheckCard liveViewHere={liveViewHere} part={part} threadId="thread-1" />
         </QueryClientProvider>,
     );
 
@@ -112,6 +112,17 @@ describe("the Needs you card", () => {
 
         await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
         expect(screen.getByRole("status").textContent).toContain("The browser has closed.");
+        expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+    });
+
+    it("in a comparison column, which has no live view card, points to the model's own chat instead of saying the browser closed", async () => {
+        backend.browser = running();
+        show(PART, false);
+
+        await waitFor(() => {
+            expect(screen.getByRole("status").textContent).toContain("Open this model's chat on its own to take control");
+        });
+        expect(screen.getByRole("status").textContent).not.toContain("closed");
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
     });
 

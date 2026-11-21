@@ -73,6 +73,15 @@ export const BrowserGoneOnTakeControl: Story = {
     },
 };
 
+/** In a comparison column, which has no live view card, the card points to the model's own chat to take control. */
+export const InComparisonColumn: Story = {
+    args: { liveViewHere: false },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText(/Open this model's chat on its own/u)).toBeVisible();
+        await expect(canvas.queryByRole("button", { name: "Take control" })).toBeNull();
+    },
+};
+
 /** The person has control: the card tells them to clear the check and hand the browser back. */
 export const YouHaveControl: Story = {
     parameters: {

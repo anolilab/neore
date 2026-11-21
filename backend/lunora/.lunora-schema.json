@@ -4520,7 +4520,7 @@
             "site",
             "run"
           ],
-          "unique": false
+          "unique": true
         },
         "by_userId": {
           "fields": [

@@ -2,7 +2,15 @@
  * A "Needs you" card in the chat asks the live view card above the composer to take control of the thread's browser:
  * the card owns the lease and the view, so the request goes to it rather than to the backend directly.
  */
+import { createContext } from "react";
+
 type Listener = (threadId: string) => boolean;
+
+/**
+ * `false` where no live view card is mounted for the messages' thread (a comparison column, whose minimal composer has
+ * none): a "Needs you" card there offers no Take control and points to the model's own chat instead.
+ */
+export const BrowserLiveViewHereContext = createContext<boolean>(true);
 
 const listeners = new Set<Listener>();
 

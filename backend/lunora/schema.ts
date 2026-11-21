@@ -444,7 +444,8 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .shardBy("userId")
-        .index("by_threadId_site_run", ["threadId", "site", "run"])
+        // Unique: two actions of one reply that claim the same site at once insert one row, so the person is asked once.
+        .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
         .index("by_userId", ["userId"]),
 
     browserSessions: defineTable({
