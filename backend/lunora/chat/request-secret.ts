@@ -86,6 +86,7 @@ export const answerSecretRequest = authMutation
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
     .mutation(async ({ args: { approvalId, expectedUrl, more, threadId, unlockProof, value }, ctx }) => {
         const claim = await claimSecretAnswer(ctx, {
+            answeredByImpersonator: Boolean(ctx.user.impersonatedBy),
             approvalId,
             callerId: ctx.user.userId,
             expectedUrl,

@@ -49,8 +49,9 @@
   `promptMessageId`, `systemContext`; never `ToolCtx.promptMessageId`, which a resumed or approved run points at its own
   row), `stepMessages` as `ToolExecutionOptions.messages` holds them (never filtered) and `toolSources` with one entry
   per offered tool. `runTurn` is set whole or not at all (`setRunTurn`): `/chat/start` records `impersonated` from the
-  session on the job (none without a session), `runStreamingAgent` adds the prompt and the kinds, and the approval
-  snapshot and a pause's stored arguments carry them. Only that path sets it; every other run path (edit, group,
+  session on the job (none without a sign-in session), `runStreamingAgent` adds the prompt and the kinds, and the
+  approval snapshot and a pause's stored arguments carry them. An approval, question or secret answered by an admin
+  acting as the owner marks its continuation impersonated (`claimToolApproval`'s `answeredByImpersonator`). Only that path sets it; every other run path (edit, group,
   headless, aside, goal rounds) sets none, which refuses. `systemContext` is `loadRunContext`'s kinds plus
   `agentPromptKinds` for what `getAgent` and the run add: `agent-mode`, `search-mode` and `task-plan` are safe (our own
   text; the plan quotes only the prompt), `skills`, `skill-instructions` and `attached-documents` refuse. A new piece

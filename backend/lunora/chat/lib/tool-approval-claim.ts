@@ -178,9 +178,20 @@ export const SUB_AGENT_STILL_WORKING = "SUB_AGENT_STILL_WORKING";
 
 export const claimToolApproval = async (
     ctx: Pick<MutationCtx, "db">,
-    args: { approvalId: string; callerId: string; decision: ToolApprovalDecision; threadId: Id<"threads">; unlockProof?: string | null },
+    args: {
+        /**
+         * The answer came from an admin acting as the owner (`ctx.user.impersonatedBy`). Their session passes every check
+         * below as the owner's, so the continuation's turn is marked impersonated: an admin's answer unlocks no saved login.
+         */
+        answeredByImpersonator: boolean;
+        approvalId: string;
+        callerId: string;
+        decision: ToolApprovalDecision;
+        threadId: Id<"threads">;
+        unlockProof?: string | null;
+    },
 ): Promise<ClaimResult> => {
-    const { approvalId, callerId, decision, threadId, unlockProof } = args;
+    const { answeredByImpersonator, approvalId, callerId, decision, threadId, unlockProof } = args;
     // Through the access helper, so a write collaborator still gets the FORBIDDEN
     // below rather than a row-level-security NOT_FOUND, and the owner's thread is
     // admitted for the reads that follow.
@@ -275,7 +286,10 @@ export const claimToolApproval = async (
         status: decision === "deny" ? "denied" : "approved",
     });
 
-    return { config: run.config, kind: "claimed", ownerId: run.userId, runId: run._id, toolName: pending.toolName };
+    // Only ever widened to `true`: a further pause spreads this config, so every later continuation keeps it.
+    const config = answeredByImpersonator ? { ...run.config, impersonated: true } : run.config;
+
+    return { config, kind: "claimed", ownerId: run.userId, runId: run._id, toolName: pending.toolName };
 };
 
 /** Approval ids requested by a run, read from the messages it saved. */

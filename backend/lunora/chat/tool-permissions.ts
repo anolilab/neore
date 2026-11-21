@@ -920,7 +920,14 @@ export const respondToToolApproval = authMutation
     })
     .output(v.object({ alreadyResolved: v.boolean(), streamId: v.union(v.string(), v.null()) }))
     .mutation(async ({ args: { approvalId, decision, threadId, unlockProof }, ctx }) => {
-        const claim = await claimToolApproval(ctx, { approvalId, callerId: ctx.user.userId, decision, threadId, unlockProof });
+        const claim = await claimToolApproval(ctx, {
+            answeredByImpersonator: Boolean(ctx.user.impersonatedBy),
+            approvalId,
+            callerId: ctx.user.userId,
+            decision,
+            threadId,
+            unlockProof,
+        });
 
         if (claim.kind === "already-resolved") {
             return { alreadyResolved: true, streamId: claim.streamId };

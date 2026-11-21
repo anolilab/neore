@@ -768,7 +768,8 @@ for a schema table that is neither policed nor listed:
   an ALLOWLIST: anything not known to be safe refuses. The turn must be the owner's own at the app
   (`isOwnInteractiveTurn`: `startedBy` the owner, origin `lead`, not headless, not impersonated; a public API run records
   the key's owner as `startedBy`, so that alone is not enough). Impersonation is recorded on the run's job at `/chat/start`
-  from the session, never the body, and carried by a pause and an approval's snapshot; a run that recorded none, or a
+  from the session, never the body, and carried by a pause and an approval's snapshot; an approval, question or secret
+  answered while impersonating marks the continuation impersonated (`claimToolApproval`); a run that recorded none, or a
   turn missing its prompt or system-prompt kinds, gets no login (`ToolCtx.runTurn`, `siteLoginTurnOf`). Offered built-in
   tools only, its system prompt only the app's instructions, the owner's personalization, the teammate's instructions,
   our own agent and search mode text and the task plan (enabled skills, an invoked skill and the attached-documents note

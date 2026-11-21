@@ -80,6 +80,7 @@ const reply = async (answer: string | null, options: { approvalId?: string; call
     await harness.run(
         async (ctx: any) =>
             await claimAskUserAnswer(ctx, {
+                answeredByImpersonator: false,
                 approvalId: options.approvalId ?? "ask-1",
                 callerId: options.callerId ?? OWNER,
                 reply: answer === null ? { kind: "dismiss" } : { answer, kind: "answer" },
@@ -192,7 +193,14 @@ describe("resumed askUser", () => {
 
 const claimReply = async (askReply: AskUserReply) =>
     await harness.run(
-        async (ctx: any) => await claimAskUserAnswer(ctx, { approvalId: "ask-1", callerId: OWNER, reply: askReply, threadId: threadId as never }),
+        async (ctx: any) =>
+            await claimAskUserAnswer(ctx, {
+                answeredByImpersonator: false,
+                approvalId: "ask-1",
+                callerId: OWNER,
+                reply: askReply,
+                threadId: threadId as never,
+            }),
     );
 
 describe("askUser input", () => {

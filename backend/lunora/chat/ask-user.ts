@@ -78,6 +78,7 @@ export const answerAskUser = authMutation
         }
 
         const claim = await claimAskUserAnswer(ctx, {
+            answeredByImpersonator: Boolean(ctx.user.impersonatedBy),
             approvalId,
             callerId: ctx.user.userId,
             reply: askUserReply(answer, answers),

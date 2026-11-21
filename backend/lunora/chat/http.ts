@@ -1282,7 +1282,7 @@ const runChatStartOnShard = async (
 
         await enqueueJob(internal.chat.execute.runStreamingAgent, {
             // From the session read above, never the body: the saved-login verdict refuses an admin's turn by it. A send with
-            // no sign-in session to read (an API key, an app grant) records nothing, which is no answer and refuses too.
+            // no sign-in session to read (an API key) records nothing, which is no answer and refuses too.
             ...(placed !== undefined && { impersonated: placed.impersonating === true }),
             isAnonymous,
             messageId: run.messageId,
