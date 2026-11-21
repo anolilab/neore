@@ -55,13 +55,14 @@ describe("the suggested next prompt", () => {
         expect(ghostText(editor)).toBeNull();
     });
 
-    it("Right Arrow also inserts it", () => {
+    it("Right Arrow does not insert it: Tab alone takes the suggested prompt", () => {
         const editor = createEditor();
 
         editor.commands.setSuggestedPrompt(PROMPT);
         press(editor, "ArrowRight");
 
-        expect(editor.getText()).toBe(PROMPT);
+        expect(editor.getText()).toBe("");
+        expect(ghostText(editor)).toBe(PROMPT);
     });
 
     it("Escape dismisses it, and the draft stays empty", () => {

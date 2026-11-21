@@ -90,6 +90,8 @@ interface ComposerInputAreaProps {
     isUploading?: boolean;
     /** Max rows for editor */
     maxRows?: number;
+    /** The suggestion is held back while the composer holds attachments; see the editor. */
+    nextPromptHeld?: boolean;
     /** The chat the suggestion belongs to: the same text in another chat is placed again. */
     nextPromptScope?: string | null;
     /** The suggested next prompt after a reply, as ghost text; `null` or omit for none. See `ComposerTiptapEditor`. */
@@ -176,6 +178,7 @@ const ComposerInputArea = ({
     onSteer,
     onSubmit,
     nextPromptScope,
+    nextPromptHeld,
     nextPromptSuggestion,
     placeholder,
     ref,
@@ -315,6 +318,7 @@ const ComposerInputArea = ({
                         isHistoryRecalled={isHistoryRecalled}
                         isStreaming={isStreaming}
                         maxRows={maxRows}
+                        nextPromptHeld={nextPromptHeld}
                         nextPromptScope={nextPromptScope}
                         nextPromptSuggestion={nextPromptSuggestion}
                         onCancel={onCancel}

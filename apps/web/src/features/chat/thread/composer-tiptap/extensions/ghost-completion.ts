@@ -164,7 +164,8 @@ const GhostCompletion = Extension.create<GhostCompletionOptions>({
             ArrowRight: ({ editor }) => {
                 const ghost = getGhostCompletion(editor.state);
 
-                if (!canAcceptGhost(editor.state, ghost) || !acceptGhost(editor, ghost)) {
+                // The suggested prompt is Tab's alone; Right Arrow accepts an as-you-type completion.
+                if (ghost?.kind === "prompt" || !canAcceptGhost(editor.state, ghost) || !acceptGhost(editor, ghost)) {
                     return false;
                 }
 
