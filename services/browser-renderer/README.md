@@ -69,7 +69,13 @@ pnpm --filter browser-renderer test       # unit tests (scrubbing)
 pnpm --filter browser-renderer test:browser   # the saved-login fill against a local Chromium
 ```
 
-`test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins) and needs
+From before `/login` loads the login page until the password is cleared, the tab starts no worker, shared worker or new
+window, has no WebRTC, WebTransport, `WebSocketStream`, `fetchLater`, keepalive fetch or beacon, and cannot reach a
+service worker (`src/channels.ts`). Other tabs of the session are closed when it starts. A login page that needs any of
+these fails rather than signs in.
+
+`test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with
+cross-site frames in their own process, and needs
 Chromium (`pnpm --filter browser-renderer exec playwright install chromium`). CI's unit-test job installs no browser,
 so it runs only `test`. Deploys belong to CI (Alchemy); do not run the
 package's `deploy` script or `pnpm deploy`.

