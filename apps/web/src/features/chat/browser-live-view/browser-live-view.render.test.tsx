@@ -1565,13 +1565,15 @@ describe("BrowserLiveView", () => {
         });
 
         it.each([
-            ["fails", { code: "BAD_REQUEST", status: 400 }],
-            ["lands", true],
+            ["fails", { code: "BAD_REQUEST", status: 400 }, "You handed the browser back to the agent."],
+            ["lands", true, "You handed the browser back to the agent."],
+            ["finds the lease another tab's", false, "You no longer have control of the browser."],
         ] as const)(
-            "closes the interactive view when a renewal answers null while a hand back is out, and the hand back %s after",
-            async (_landing, answer) => {
+            "turns the view read-only when a renewal answers null while a hand back is out, and the hand back %s after",
+            async (_landing, answer, said) => {
                 vi.useFakeTimers({ shouldAdvanceTime: true });
                 controllable();
+                backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
                 const queryClient = mountCard();
 
                 await takeControl(queryClient, Date.now() + 40_000);
@@ -1594,26 +1596,57 @@ describe("BrowserLiveView", () => {
                 });
 
                 expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
-                expect(screen.getByText("You no longer have control of the browser.")).toBeTruthy();
+                expect(await screen.findByTitle(READ_ONLY_VIEW)).toBeTruthy();
+                expect(screen.getByText("You handed the browser back to the agent.")).toBeTruthy();
 
                 await act(async () => {
-                    if (answer === true) {
-                        handedBack[0]?.resolve(true);
+                    if (typeof answer === "boolean") {
+                        handedBack[0]?.resolve(answer);
                     } else {
                         handedBack[0]?.reject(answer);
                     }
                 });
 
                 expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
-                expect(screen.queryByTitle(READ_ONLY_VIEW)).toBeNull();
-                expect(screen.queryByText("You handed the browser back to the agent.")).toBeNull();
+                expect(screen.getByTitle(READ_ONLY_VIEW)).toBeTruthy();
+                expect(screen.getByText(said)).toBeTruthy();
                 expect(
                     screen.queryByText("The browser could not be handed back. The agent gets it back on its own after two minutes without input."),
                 ).toBeNull();
-                expect(screen.getByText("You no longer have control of the browser.")).toBeTruthy();
                 expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+                expect(backend.open).toHaveBeenCalledTimes(1);
             },
         );
+
+        it("keeps the read-only view a hand back landed in when a renewal still out answers null after it", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            const answers = heldRenewal();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+
+            expect(await screen.findByTitle(READ_ONLY_VIEW)).toBeTruthy();
+            expect(await screen.findByText("You handed the browser back to the agent.")).toBeTruthy();
+
+            await act(async () => {
+                answers[0]?.(null);
+            });
+
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByTitle(READ_ONLY_VIEW)).toBeTruthy();
+            expect(screen.getByText("You handed the browser back to the agent.")).toBeTruthy();
+            expect(screen.queryByText("You no longer have control of the browser.")).toBeNull();
+            expect(screen.getByRole("button", { name: "Take control" })).toBeTruthy();
+            expect(backend.open).toHaveBeenCalledTimes(1);
+        });
 
         it("takes the end an earlier renewal answered, though a later one failed first", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });

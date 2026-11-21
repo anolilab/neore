@@ -496,9 +496,17 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         const result = outcome.value;
 
-        // Another of the person's tabs took control since, or control ended. Also while a hand back is out: its answer
-        // then finds the claim gone and changes nothing, so a hand back that fails cannot leave the view open.
+        // Another of the person's tabs took control since, or control ended.
         if (result === null) {
+            // While a hand back is out, the view turns read-only as its landing would: the hand back's own answer may
+            // still name what happened, but one that fails finds the claim gone and cannot leave the view open.
+            if (returningRef.current === held) {
+                returnedControl(held);
+                setNotice(t`You handed the browser back to the agent.`);
+
+                return;
+            }
+
             endControl(t`You no longer have control of the browser.`);
 
             return;
@@ -803,7 +811,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     /**
      * The person hands back: the claim stays this tab's, and the view interactive, until the hand back lands, as the
      * server's lease does. One that did not land leaves the person in control, and says so, unless a renewal answered
-     * meanwhile that the claim is gone: the view has closed then, and the hand back's answer changes nothing.
+     * meanwhile that the claim is gone: the view is read-only then, and only a landed hand back's notice still counts.
      */
     const handBackNow = (): void => {
         const handing = claimRef.current;
