@@ -1,12 +1,12 @@
 /** An answer counts as the owner's only from a live, unmarked session of their own; anything else marks it. */
 import { describe, expect, it } from "vitest";
 
-import { callerSessionNotOwn } from "./caller-session";
+import { callerSessionMarks, callerSessionNotOwn } from "./caller-session";
 
 const NOW = 1_000_000;
 const OWNER = "user-owner";
 
-type SessionRow = { expiresAt: number; impersonatedBy?: string; userId: string };
+type SessionRow = { clientGrant?: string; expiresAt: number; impersonatedBy?: string; userId: string };
 
 const contextWith = (options: {
     identity?: { grantSessionId?: string; sessionId?: string; userId?: string } | null;
@@ -24,9 +24,32 @@ const contextWith = (options: {
 const liveSession = { expiresAt: NOW + 60_000, userId: OWNER };
 
 describe("callerSessionNotOwn", () => {
-    it("reads the owner's own live session as theirs", async () => {
+    it("reads the owner's own live session, and their desktop and phone apps' grants, as theirs", async () => {
         await expect(callerSessionNotOwn(contextWith({ identity: { sessionId: "s1" }, session: liveSession }))).resolves.toBe(false);
-        await expect(callerSessionNotOwn(contextWith({ identity: { grantSessionId: "g1" }, session: liveSession }))).resolves.toBe(false);
+
+        for (const clientGrant of ["desktop", "mobile"]) {
+            await expect(callerSessionNotOwn(contextWith({ identity: { grantSessionId: "g1" }, session: { ...liveSession, clientGrant } }))).resolves.toBe(
+                false,
+            );
+        }
+    });
+
+    it.each([
+        ["a browser extension's grant", "extension"],
+        ["a grant whose app was never recorded", undefined],
+        ["a grant naming an app nobody classified", "watch"],
+    ])("marks what %s sends as the extension's", async (_name, clientGrant) => {
+        const context = contextWith({ identity: { grantSessionId: "g1" }, session: { ...liveSession, ...(clientGrant !== undefined && { clientGrant }) } });
+
+        await expect(callerSessionMarks(context)).resolves.toStrictEqual({ draft: "extension" });
+        await expect(callerSessionNotOwn(context)).resolves.toBe(true);
+    });
+
+    it("marks an admin's steer impersonated and a confirmed own one with nothing", async () => {
+        await expect(callerSessionMarks(contextWith({ identity: { sessionId: "s1" }, impersonatedBy: "admin", session: liveSession }))).resolves.toStrictEqual({
+            impersonated: true,
+        });
+        await expect(callerSessionMarks(contextWith({ identity: { sessionId: "s1" }, session: liveSession }))).resolves.toStrictEqual({});
     });
 
     it.each([

@@ -29,7 +29,7 @@ import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError, v } from "lunorash/server";
 
 import { internalMutation } from "../_generated/server";
-import { callerSessionNotOwn } from "../auth/lib/caller-session";
+import { callerSessionMarks } from "../auth/lib/caller-session";
 import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { hasNotTypedMarks, mergeNotTypedMarks, notTypedMarksOfDraftFrom } from "../lib/not-typed-text";
@@ -100,8 +100,9 @@ export const steerRun = authMutation
         }
 
         const steerId = requestedId ?? ctx.newId();
-        // An admin acting as the owner, or a sign-in not readable as theirs, steers marked, as `/chat/start` saves their prompt.
-        const notTyped = mergeNotTypedMarks(notTypedMarksOfDraftFrom(draftFrom), (await callerSessionNotOwn(ctx)) ? { impersonated: true } : {});
+        // An admin acting as the owner, a sign-in not readable as theirs, or a browser extension's grant steers marked, as
+        // `/chat/start` saves their prompt (`callerSessionMarks`).
+        const notTyped = mergeNotTypedMarks(await callerSessionMarks(ctx), notTypedMarksOfDraftFrom(draftFrom));
         const steers = queueSteer(stream.steers ?? [], { id: steerId, sentAt: ctx.now, text });
 
         if (!steers) {

@@ -308,3 +308,16 @@ export const addApprovalRunTurn = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A run's stored arguments (`runArgs`, `pause.run`) gained an optional `systemContext` (`chat/lib/streaming-run-args.ts`),
+ * and a held steer's mark (`notTypedSteers`) the `extension` kind. Nothing to fill: a resume of a run stored without
+ * kinds runs as `unrecorded` and gets no saved login, and no stored mark names the new kind. A no-op, so `lunora prepare`
+ * records both in the baseline.
+ */
+export const addRunArgsSystemContext = defineMigration({
+    id: "add-run-args-system-context",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

@@ -50,11 +50,16 @@
   row), `stepMessages` as `ToolExecutionOptions.messages` holds them (never filtered) and `toolSources` with one entry
   per offered tool. `runTurn` is set whole or not at all (`setRunTurn`): `/chat/start` records `impersonated` from the
   session on the job (none without a sign-in session), `runStreamingAgent` adds the prompt and the kinds, and the
-  approval snapshot and a pause's stored arguments carry them. An approval, question or secret answered by an admin
+  approval snapshot and a pause's stored arguments carry them; a resume runs on the union of the stored kinds and the
+  rebuilt ones, never fewer (`resumedSystemContext`; stored none: `unrecorded`, refused). An approval, question or secret answered by an admin
   acting as the owner, or from a sign-in whose session row cannot be read as theirs (gone, expired), marks its continuation
   impersonated (`claimToolApproval`'s `answeredByImpersonator`); steers and local turns are marked by the same
-  check (`auth/lib/caller-session.ts#callerSessionNotOwn`). Only that path sets it; every other run path (edit, group,
-  headless, aside, goal rounds) sets none, which refuses. `systemContext` is `loadRunContext`'s kinds plus
+  check (`auth/lib/caller-session.ts#callerSessionMarks`). Only `/chat/start` sets `impersonated`; every other run path
+  (edit, group, headless, aside, goal rounds) sets none, which refuses. The owner's desktop and phone apps count as the
+  owner typing; a browser extension's grant does not (it relays page text): its sends are marked `extension`, its answers
+  and its `/chat/start` turn impersonated. The app is the session row's `clientGrant`, set by the code exchange from the
+  code's redirect URI, never the request; a grant naming none or an unknown one is the extension's
+  (`auth/lib/sign-in-standing.ts`). The Chrome build signs in with the web app's cookie `sid`, which cannot be told apart. `systemContext` is `loadRunContext`'s kinds plus
   `agentPromptKinds` for what `getAgent` and the run add: `agent-mode`, `search-mode` and `task-plan` are safe (our own
   text; the plan quotes only the prompt), `skills`, `skill-instructions` and `attached-documents` refuse. A new piece
   of the system prompt gets a kind of its own there. A failed read of the turn is a refusal.

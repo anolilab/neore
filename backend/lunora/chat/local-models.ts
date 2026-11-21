@@ -20,7 +20,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
-import { callerSessionNotOwn } from "../auth/lib/caller-session";
+import { callerSessionMarks } from "../auth/lib/caller-session";
 import { syncActiveAgent } from "../agent/agent-switch";
 import { getThreadRow } from "../agent/branch-rows";
 import { saveEditedSiblingHandler } from "../agent/branches";
@@ -47,6 +47,7 @@ import { requireOwnedThread } from "../agent/thread-read-access";
 import {
     type DraftFrom,
     mergeNotTypedMarks,
+    type NotTypedMarks,
     notTypedMarksOfDraftFrom,
     notTypedMarksOfMessage,
     userTextContent,
@@ -91,8 +92,8 @@ export const saveLocalTurnHandler = async (
     ctx: MutationContext,
     userId: string,
     args: SaveLocalTurnArgs,
-    /** An admin acting as the owner: the prompt is saved marked, as `/chat/start` saves theirs. */
-    { impersonated = false }: { impersonated?: boolean } = {},
+    /** What the caller's sign-in marks (`auth/lib/caller-session.ts#callerSessionMarks`): the prompt is saved with them, as `/chat/start` saves theirs. */
+    { sessionMarks = {} }: { sessionMarks?: NotTypedMarks } = {},
 ): Promise<SaveLocalTurnResult> => {
     // The browser sends what the person typed or said; hidden characters never become a saved turn.
     const prompt = stripHiddenText(args.prompt).text;
@@ -173,7 +174,7 @@ export const saveLocalTurnHandler = async (
         }
     }
 
-    const notTyped = mergeNotTypedMarks(notTypedMarksOfDraftFrom(args.draftFrom), impersonated ? { impersonated: true } : {});
+    const notTyped = mergeNotTypedMarks(sessionMarks, notTypedMarksOfDraftFrom(args.draftFrom));
     const userMessage = { ...buildLocalPromptMessage(prompt), message: { content: userTextContent(prompt, notTyped), role: "user" as const } };
     const replyMessage = buildLocalReplyMessage({
         error: args.error,
@@ -258,7 +259,7 @@ export const saveLocalTurn = authMutation
     })
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {
-        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { impersonated: await callerSessionNotOwn(ctx) });
+        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { sessionMarks: await callerSessionMarks(ctx) });
 
         ctx.log.event("chat.save_local_turn", { branched: args.branch !== undefined, newThread: args.threadId === undefined, outcome: args.outcome });
 

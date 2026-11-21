@@ -10,7 +10,9 @@
  * the desktop shell, someone else's saved prompt, forwarded messages, a reply sent on as a prompt (Generate image or video),
  * a suggestion (the model's follow-ups, the welcome screen's), the prompt improver's rewrite, a gallery item's stored
  * prompt, an organization's value filled into a prompt (a variable default, its name), and another person's message in a
- * shared chat put back into the composer (Restore to input).
+ * shared chat put back into the composer (Restore to input). The server also sets `extension` on whatever a browser
+ * extension's grant sends (it relays page and selection text, `auth/lib/sign-in-standing.ts`); a client may name it too,
+ * which only restricts.
  */
 export const NOT_TYPED_DRAFTS = [
     "promptLink",
@@ -23,6 +25,7 @@ export const NOT_TYPED_DRAFTS = [
     "galleryPrompt",
     "organizationValue",
     "collaborator",
+    "extension",
 ] as const;
 
 export type NotTypedDraft = (typeof NOT_TYPED_DRAFTS)[number];

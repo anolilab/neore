@@ -525,6 +525,20 @@ describe("/chat/start with text the owner did not type", () => {
         expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
     });
 
+    it("saves a prompt a browser extension's grant sends marked, and records the turn as not the owner's own", async () => {
+        const extension = {
+            "auth_session_organization:getSessionOrganizationForCap": async () => {
+                return { extension: true, organizationId: null };
+            },
+        };
+
+        await start({}, extension);
+        await start({ draftFrom: "promptLink" }, extension);
+
+        expect(saved.prompts.map((prompt) => prompt.message.content)).toStrictEqual([marked({ draft: "extension" }), marked({ draft: "extension" })]);
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
+    });
+
     it("refuses a draft source nobody named, before anything is saved or charged", async () => {
         expect((await start({ draftFrom: "typed" })).status).toBe(400);
         expect(saved.prompts).toStrictEqual([]);

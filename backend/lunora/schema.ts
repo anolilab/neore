@@ -2614,6 +2614,9 @@ export const schema = defineSchema({
     session: defineTable({
         activeOrganizationId: v.optional(v.string()),
         activeTeamId: v.optional(v.string()),
+        // Which app a grant's session was made for (`auth/lib/sign-in-standing.ts#ClientGrantKind`), set only by the code
+        // exchange from the code's redirect URI; unset on a web session. A browser extension's text is not the owner's typing.
+        clientGrant: v.optional(v.string()),
         createdAt: v.number(),
         expiresAt: v.number(),
         impersonatedBy: v.optional(v.string()),

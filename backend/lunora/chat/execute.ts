@@ -82,7 +82,7 @@ import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import { getToolsForModelAndMode, modelSupportsTools, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
-import { agentPromptKinds } from "./lib/system-context-kinds";
+import { agentPromptKinds, resumedSystemContext } from "./lib/system-context-kinds";
 import { vAskUserAnswers } from "./tools/ask-user-validators";
 import { INSTRUCTION_READ_TOOL, renderInstructionList } from "../projects/rule-files";
 import { pauseOnRateLimit } from "./lib/pause-run";
@@ -104,6 +104,7 @@ export const runStreamingAgent = internalAction
                 skill: goalSkill,
                 streamId,
                 streamingConfig,
+                systemContext: savedSystemContext,
                 threadId,
                 userId,
                 userPrompt,
@@ -650,19 +651,24 @@ export const runStreamingAgent = internalAction
                     );
                 }
 
-                // One kind per piece of the final system prompt: the context's, then what `getAgent` and the note above added.
-                const systemContext = [
-                    ...runContext.systemContext,
-                    ...agentPromptKinds({
-                        enabledSkills: skillRun.enabledSkills.length > 0,
-                        fileNote: Boolean(fileIds && fileIds.length > 0),
-                        hasAgentMode: agentMode.enableDatasource || agentMode.enableKnowledge || agentMode.enablePlanner,
-                        // The search mode picks the tools here; `getAgent` is not given it, so no citation rules are added.
-                        hasSearchMode: false,
-                        skillInstructions: Boolean(invokedSkill?.instructions),
-                        taskPlan: taskAnalysis !== undefined && taskAnalysis.taskType !== "general",
-                    }),
-                ];
+                // One kind per piece of the final system prompt: the context's, then what `getAgent` and the note above added. A
+                // resume also keeps every kind its first invocation recorded: a source removed meanwhile leaves its kind.
+                const systemContext = resumedSystemContext(
+                    [
+                        ...runContext.systemContext,
+                        ...agentPromptKinds({
+                            enabledSkills: skillRun.enabledSkills.length > 0,
+                            fileNote: Boolean(fileIds && fileIds.length > 0),
+                            hasAgentMode: agentMode.enableDatasource || agentMode.enableKnowledge || agentMode.enablePlanner,
+                            // The search mode picks the tools here; `getAgent` is not given it, so no citation rules are added.
+                            hasSearchMode: false,
+                            skillInstructions: Boolean(invokedSkill?.instructions),
+                            taskPlan: taskAnalysis !== undefined && taskAnalysis.taskType !== "general",
+                        }),
+                    ],
+                    savedSystemContext,
+                    resume !== undefined,
+                );
 
                 setRunTurn(ctx, { impersonated, promptMessageId: messageId, systemContext });
 
@@ -686,6 +692,7 @@ export const runStreamingAgent = internalAction
                     ...(goalSkill && { skill: goalSkill }),
                     streamId,
                     streamingConfig: routedModel === undefined ? streamingConfig : { ...streamingConfig, model: routedModel },
+                    systemContext,
                     threadId,
                     userId,
                     userPrompt,

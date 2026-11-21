@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SAFE_SYSTEM_CONTEXT } from "../../vault/site-login-turn";
-import { agentPromptKinds, type AgentPromptPieces, type SystemContextPieces, systemContextKinds } from "./system-context-kinds";
+import { agentPromptKinds, type AgentPromptPieces, resumedSystemContext, type SystemContextPieces, systemContextKinds } from "./system-context-kinds";
 
 const none: SystemContextPieces = {
     bot: null,
@@ -78,5 +78,27 @@ describe(agentPromptKinds, () => {
             expect(kinds).toHaveLength(1);
             expect(safe(kinds)).toBe(false);
         }
+    });
+});
+
+describe(resumedSystemContext, () => {
+    it("keeps a kind the first invocation recorded when a resume rebuilds the prompt without that source", () => {
+        // The first run had a skill enabled; the owner disabled it before the rate-limit resume.
+        const kinds = resumedSystemContext(["instructions"], ["instructions", "skills"], true);
+
+        expect(kinds).toStrictEqual(["instructions", "skills"]);
+        expect(safe(kinds)).toBe(false);
+    });
+
+    it("adds what the resume newly built", () => {
+        expect(resumedSystemContext(["instructions", "memories"], ["instructions"], true)).toStrictEqual(["instructions", "memories"]);
+    });
+
+    it("refuses a resume whose stored arguments recorded no kinds", () => {
+        expect(safe(resumedSystemContext(["instructions"], undefined, true))).toBe(false);
+    });
+
+    it("runs a first invocation on what it built", () => {
+        expect(resumedSystemContext(["instructions"], undefined, false)).toStrictEqual(["instructions"]);
     });
 });

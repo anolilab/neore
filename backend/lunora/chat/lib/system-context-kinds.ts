@@ -84,3 +84,14 @@ export const agentPromptKinds = (pieces: AgentPromptPieces): string[] => [
     ...(pieces.skillInstructions ? ["skill-instructions"] : []),
     ...(pieces.fileNote ? ["attached-documents"] : []),
 ];
+
+/** The kind a resume runs with when its stored arguments name no kinds: no allowlist holds it, so the verdict refuses. */
+export const UNRECORDED_SYSTEM_CONTEXT = "unrecorded";
+
+/**
+ * The kinds a run invocation runs with: what it built plus every kind its stored arguments recorded (`saved`), never
+ * fewer. A resume (`resuming`) whose arguments recorded none adds {@link UNRECORDED_SYSTEM_CONTEXT}.
+ */
+export const resumedSystemContext = (built: ReadonlyArray<string>, saved: ReadonlyArray<string> | undefined, resuming: boolean): string[] => [
+    ...new Set([...(saved ?? (resuming ? [UNRECORDED_SYSTEM_CONTEXT] : [])), ...built]),
+];

@@ -265,6 +265,25 @@ describe("deliverSteers and withdrawSteer", () => {
         expect(await deliver()).not.toHaveProperty("notTyped");
     });
 
+    it.each([
+        ["the desktop app", "desktop", undefined],
+        ["the phone app", "mobile", undefined],
+        ["a browser extension", "extension", { draft: "extension" }],
+        ["an app nobody recorded", undefined, { draft: "extension" }],
+    ])("delivers a steer from %s's grant marked by its session row's app", async (_name, clientGrant, notTyped) => {
+        const grantSessionId = sessions.get(OWNER);
+
+        if (clientGrant !== undefined) {
+            await harness.run(async (ctx: any) => await ctx.db.patch("session", grantSessionId, { clientGrant }));
+        }
+
+        await harness
+            .withIdentity({ grantSessionId, userId: OWNER } as never)
+            .mutation(steerRun as never, { streamId, text: "use the other file", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual(notTyped);
+    });
+
     it("delivers marked a steer whose sign-in's session is gone, as an ended impersonation's token", async () => {
         await harness.run(async (ctx: any) => await ctx.db.delete("session", sessions.get(OWNER)));
         await steer("use the other file");

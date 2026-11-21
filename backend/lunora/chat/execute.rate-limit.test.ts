@@ -25,7 +25,14 @@ import { RATE_LIMIT_RESUME_SLACK_MS } from "./lib/rate-limit-pause";
 const { enqueued, modelState, registry } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: Record<string, unknown>; delayMs: number | undefined }[],
-        modelState: { builtAgents: 0, groupConfig: null as unknown, model: undefined as unknown, withTools: false },
+        modelState: {
+            builtAgents: 0,
+            groupConfig: null as unknown,
+            model: undefined as unknown,
+            /** The tool context the run built its tools with, which it sets its turn on (`setRunTurn`). */
+            toolCtx: undefined as { runTurn?: { systemContext?: ReadonlyArray<string> } } | undefined,
+            withTools: false,
+        },
         registry: new Map<string, unknown>(),
     };
 });
@@ -100,7 +107,9 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
 
 vi.mock("./lib/agent-tools", () => {
     return {
-        buildAgentTools: vi.fn(async () => {
+        buildAgentTools: vi.fn(async (ctx: { runTurn?: { systemContext?: ReadonlyArray<string> } }) => {
+            modelState.toolCtx = ctx;
+
             return {
                 mcpClients: [],
                 mcpLabels: {},
@@ -136,6 +145,7 @@ vi.mock("./lib/get-agent", () => {
 });
 
 const { scheduleReplyUsage } = await import("../usage/schedule");
+const { loadRunContext } = await import("./lib/agent-run");
 const { runStreamingAgent } = await import("./execute");
 const { pauseRunForRateLimit, retryPausedRunsNow, stopActiveForThread } = await import("./streaming/persistent/library");
 
@@ -257,7 +267,7 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { impersonated?: boolean; resume?: string; skill?: { rawArgs: string; slug: string } } = {}) =>
+const run = async (extra: { impersonated?: boolean; resume?: string; skill?: { rawArgs: string; slug: string }; systemContext?: string[] } = {}) =>
     await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
@@ -442,6 +452,27 @@ describe("a provider rate limit on the first model call", () => {
         expect(enqueued).toHaveLength(1);
         // The resume re-enters with these arguments: without `impersonated` it would read as not known.
         expect(enqueued[0]!.args).toMatchObject({ impersonated: true, skill: { rawArgs: "the thread", slug: "summarise" } });
+    });
+
+    it("resumes with every system-prompt kind the first run had, though its source is gone by then", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+        modelState.withTools = true;
+        // The first run had memories in its system prompt; the owner turns them off before the resume.
+        vi.mocked(loadRunContext).mockImplementationOnce(async (...args) => {
+            const context = await vi.mocked(loadRunContext).getMockImplementation()!(...args);
+
+            return { ...context, systemContext: ["instructions", "memories"] };
+        });
+
+        await run({ impersonated: false });
+
+        expect(enqueued[0]!.args).toMatchObject({ systemContext: ["instructions", "memories"] });
+
+        const { pause } = await readState();
+
+        await run({ impersonated: false, resume: pause!.id, systemContext: enqueued[0]!.args.systemContext as string[] });
+
+        expect(modelState.toolCtx?.runTurn?.systemContext).toStrictEqual(["instructions", "memories"]);
     });
 
     it("ignores a redelivery of the original job while the run is paused", async () => {

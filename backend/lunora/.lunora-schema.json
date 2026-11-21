@@ -12,6 +12,7 @@
     "add-headless-approved",
     "add-headless-resume-bounds",
     "add-run-args-impersonated",
+    "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
@@ -20654,6 +20655,13 @@
                         "nullable": false,
                         "optional": false,
                         "unique": false,
+                        "literal": "\"extension\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
                         "literal": "\"forwarded\""
                       },
                       {
@@ -20928,6 +20936,20 @@
                       "unique": false
                     }
                   }
+                },
+                "systemContext": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "refined": true
                 },
                 "threadId": {
                   "kind": "string",
@@ -21247,6 +21269,20 @@
                   "unique": false
                 }
               }
+            },
+            "systemContext": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "threadId": {
               "kind": "string",
@@ -24270,6 +24306,12 @@
           "unique": false
         },
         "activeTeamId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "clientGrant": {
           "kind": "string",
           "nullable": false,
           "optional": true,
