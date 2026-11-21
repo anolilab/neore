@@ -395,6 +395,38 @@ describe("changing a project's rule files", () => {
         });
     });
 
+    it("gives a scheduled task the always files after an auto file whose line does not fit", async () => {
+        const [first, second, last] = ["x".repeat(99_900), "y".repeat(99_900), "z".repeat(100)];
+        const projectId = await project({
+            createdAt: 0,
+            ruleFiles: [
+                { content: first, id: "a", mode: "always", title: "A" },
+                { content: second, id: "b", mode: "always", title: "B" },
+                { content: "Run the script.", description: "d".repeat(300), id: "d", mode: "auto", title: "Deploy" },
+                { content: last, id: "c", mode: "always", title: "C" },
+            ],
+            title: "p",
+            userId: OWNER,
+        });
+        const taskId = await insert("tasks", {
+            attemptCount: 0,
+            cronExpression: "0 9 * * *",
+            dependsOn: [],
+            instructions: "Do it.",
+            maxRepairRounds: 0,
+            projectId,
+            recurring: true,
+            title: "t",
+            updatedAt: 0,
+            userId: OWNER,
+        });
+
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(runProjectFor as never, { taskId }))).resolves.toStrictEqual({
+            context: [first, second, last].join("\n\n"),
+            projectId,
+        });
+    });
+
     it("refuses an auto file without a description, naming it", async () => {
         const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
 

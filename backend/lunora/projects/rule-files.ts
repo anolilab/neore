@@ -258,8 +258,10 @@ export const renderInstructionList = (files: ReadonlyArray<Pick<RuleFile, "descr
  * one of `paths`, in `files`; every `auto` file in `instructions`, the ones the run lists and may read. Rendered
  * ({@link renderRuleFiles}, {@link renderInstructionList} after it), the text and the list stay within
  * {@link MAX_RULE_TEXT_PER_RUN}, the separators and the cut file's marker included: an `auto` file costs its line in the
- * list (the list's header with the first), never its text. The file that reaches the budget is cut there (marked), an
- * `auto` one left out whole, and the ones after it are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule files, and not counted: one
+ * list (the list's header with the first), never its text. An `auto` file whose line does not fit is left out and the
+ * next one tried; the other file that reaches the budget is cut there (marked) and the ones after it are left out. The
+ * skipped `auto` files and those after the cut are counted in `omitted`. So a selection that lists none has the `files`
+ * that `listsInstructions: false` gives. A legacy `context` is taken whole, as before rule files, and not counted: one
  * kept beside the files (`keepContext`) would otherwise leave them nothing. `matchingCut` says the matching budget ran
  * out, so some pattern was not tried. `listsInstructions: false` is for a run that shows no list: its `auto` files are
  * neither taken nor counted, so they leave the other files all of the budget.
@@ -300,8 +302,9 @@ export const selectRuleFiles = (
             // The list is one block: its header and the separator before it come with its first line.
             const cost = (instructions.length === 0 ? separator + INSTRUCTION_LIST_HEADER.length : 0) + 1 + instructionLine(file).length;
 
+            // A line that does not fit is left out, never the end: a shorter one or a file after it may still fit.
             if (cost > left) {
-                break;
+                continue;
             }
 
             instructions.push(file);
