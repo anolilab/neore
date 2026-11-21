@@ -34,11 +34,11 @@ export type BrowserLoginResponse = {
     url?: string;
     title?: string;
     /**
-     * The form was sent to the login's origin; false when nothing was sent (no form, the page held it back, or a step was refused)
+     * The sign-in went out to the login's origin: the form's own POST, or a script's fetch or XHR carrying the username and password. It can be true on a failure (the step after it failed): do not send it again. False when no sign-in request was seen
      */
     submitted?: boolean;
     /**
-     * The password could not be cleared from the page, so the browser session was closed and no sessionId is returned
+     * The password could not be cleared from the page within the hold, so the page and the browser session were closed and no sessionId is returned
      */
     sessionClosed?: boolean;
     /**
