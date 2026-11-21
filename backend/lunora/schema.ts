@@ -758,7 +758,9 @@ export const schema = defineSchema({
         signature: v.string(),
         status: vDeviceCallStatus,
         taintedBy: v.array(vDeviceTaintSource),
-        threadId: v.id("threads"),
+        // Absent for the one call no chat starts: the rule-file editor's read of global instruction files
+        // (`devices/global-instructions.ts`).
+        threadId: v.optional(v.id("threads")),
         // The AI SDK tool call this row answers, so the chat can show its state.
         toolCallId: v.optional(v.string()),
         toolName: v.string(),

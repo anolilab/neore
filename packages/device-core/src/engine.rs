@@ -25,6 +25,7 @@ use crate::actions::{
 };
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
+use crate::global_instructions;
 use crate::install::{Bundle, Root};
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox::{self, NetworkTier};
@@ -1003,6 +1004,7 @@ fn drop_rules_of_changed_servers(
 /// Tools that may never skip the prompt: they change things irreversibly.
 pub fn can_always_allow(tool: &str) -> bool {
     !matches!(tool, "shell_run" | "fs_write")
+        && !global_instructions::is_global_instructions_tool(tool)
 }
 
 /// `(skip the prompt, offer "Always allow")` for one call. Only a read-only tool
@@ -1078,6 +1080,12 @@ fn plan(
         allow_unsandboxed: settings.allow_unsandboxed_shell,
         network: settings.shell_network_tier(),
     };
+
+    // Not confined to the shared folders: a fixed list under the home folder, asked for every time (`can_always_allow`).
+    if global_instructions::is_global_instructions_tool(tool) {
+        return global_instructions::plan(tool, input, actions::canonical_home(), &roots)
+            .map(Action::GlobalInstructions);
+    }
 
     if let Some(planned) = plan_builtin(tool, input, &roots, shell) {
         return planned;
@@ -1650,6 +1658,43 @@ mod tests {
         assert_eq!(decide("shell_run", false, false, &rules), (false, false));
         assert_eq!(decide("fs_write", false, false, &rules), (false, false));
         assert_eq!(decide("fs_read", false, true, &rules), (true, true));
+    }
+
+    #[test]
+    fn global_instruction_reads_always_ask_and_need_no_shared_folder() {
+        let rules = vec![
+            "instructions_list".to_owned(),
+            "instructions_read".to_owned(),
+        ];
+
+        assert_eq!(
+            decide("instructions_list", false, true, &rules),
+            (false, false)
+        );
+        assert_eq!(
+            decide("instructions_read", false, true, &rules),
+            (false, false)
+        );
+
+        // No shared folder at all: the fixed list is planned under the home folder, never from a path in the input.
+        let settings = Settings::default();
+        let planned = plan(
+            "instructions_read",
+            &json!({ "files": ["claude"], "path": "/etc" }),
+            &settings,
+            &HashMap::new(),
+        );
+
+        assert!(
+            matches!(planned, Ok(Action::GlobalInstructions(ref request)) if request.read == Some(vec!["claude"]))
+        );
+        assert!(plan(
+            "instructions_read",
+            &json!({ "files": ["/etc/passwd"] }),
+            &settings,
+            &HashMap::new()
+        )
+        .is_err());
     }
 
     #[test]

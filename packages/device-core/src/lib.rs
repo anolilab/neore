@@ -34,6 +34,7 @@ pub mod engine;
 pub mod envelope;
 pub mod frame;
 pub mod fs;
+pub mod global_instructions;
 #[cfg(feature = "headless")]
 pub mod headless;
 #[cfg(feature = "keychain")]

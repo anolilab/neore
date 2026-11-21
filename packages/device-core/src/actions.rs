@@ -98,6 +98,8 @@ pub struct ShellSettings {
 /// exactly what will run (resolved paths, the command, the folder).
 #[derive(PartialEq)]
 pub enum Action {
+    /// The global instruction files, desktop only: [`crate::global_instructions`].
+    GlobalInstructions(crate::global_instructions::Request),
     List(PathBuf),
     Read(PathBuf),
     Write {
@@ -129,7 +131,7 @@ pub enum Action {
 impl Action {
     pub fn read_only(&self) -> bool {
         match self {
-            Action::List(_) | Action::Read(_) => true,
+            Action::GlobalInstructions(_) | Action::List(_) | Action::Read(_) => true,
             Action::Write { .. } | Action::Shell { .. } => false,
             Action::Mcp { read_only, .. } => *read_only,
         }
@@ -137,7 +139,10 @@ impl Action {
 
     pub fn kind(&self) -> &'static str {
         match self {
-            Action::List(_) | Action::Read(_) | Action::Write { .. } => "fs",
+            Action::GlobalInstructions(_)
+            | Action::List(_)
+            | Action::Read(_)
+            | Action::Write { .. } => "fs",
             Action::Shell { .. } => "shell",
             Action::Mcp { .. } => "mcp",
         }
@@ -145,6 +150,7 @@ impl Action {
 
     pub fn detail(&self) -> String {
         match self {
+            Action::GlobalInstructions(request) => request.detail(),
             Action::List(path) => format!("List the folder {}", path.display()),
             Action::Read(path) => format!("Read the file {}", path.display()),
             Action::Write {
@@ -349,6 +355,7 @@ pub fn run(
     mcp: Option<&McpManager>,
 ) -> Outcome {
     match action {
+        Action::GlobalInstructions(request) => Outcome::completed(request.run()),
         Action::List(path) => match fs::list(roots, &path) {
             Ok(listing) => {
                 Outcome::completed(serde_json::to_string_pretty(&listing).unwrap_or_default())
