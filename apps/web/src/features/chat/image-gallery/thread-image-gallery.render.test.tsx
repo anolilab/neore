@@ -112,6 +112,21 @@ describe("ThreadImageGallery", () => {
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
+    it("forgets only its own gone image, never another pane's newer selection", () => {
+        const store = useImageGalleryStore.getState();
+
+        store.openAt("t1", "m3:1");
+        // Another pane opens its gallery before this pane notices its image went away.
+        store.openAt("t2", "x:0");
+        store.closeIf("t1", "m3:1");
+
+        expect(useImageGalleryStore.getState().shown).toEqual({ key: "x:0", threadId: "t2" });
+
+        store.closeIf("t2", "x:0");
+
+        expect(useImageGalleryStore.getState().shown).toBeNull();
+    });
+
     it("does not open for another chat's image", () => {
         render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
         act(() => {

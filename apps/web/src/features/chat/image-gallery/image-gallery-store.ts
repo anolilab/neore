@@ -7,6 +7,8 @@ import { create } from "zustand";
  */
 interface ImageGalleryState {
     close: () => void;
+    /** Closes only while the selection is still this one: a pane forgetting its gone image never closes another's newer. */
+    closeIf: (threadId: string, key: string | null) => void;
 
     /**
      * Opens the gallery of `threadId` at `key`, or at its first image when `key` is `null`. `opener` is the clicked control:
@@ -29,6 +31,13 @@ const focusedControl = (): HTMLElement | null =>
 export const useImageGalleryStore = create<ImageGalleryState>()((set, get) => {
     return {
         close: () => set({ shown: null }),
+        closeIf: (threadId, key) => {
+            const { shown } = get();
+
+            if (shown?.threadId === threadId && shown.key === key) {
+                set({ shown: null });
+            }
+        },
         opener: null,
         // Stepping through an open gallery keeps the control that opened it.
         openAt: (threadId, key, opener) => set({ opener: opener ?? (get().shown === null ? focusedControl() : get().opener), shown: { key, threadId } }),

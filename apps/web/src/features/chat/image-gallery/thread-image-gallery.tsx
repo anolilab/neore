@@ -100,9 +100,9 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
     // so the dialog never opens again by itself if the image comes back. Only this chat's selection (`shown`) is read.
     useEffect(() => {
         if (shown !== null && !isOpen) {
-            close();
+            useImageGalleryStore.getState().closeIf(shown.threadId, shown.key);
         }
-    }, [close, isOpen, shown]);
+    }, [isOpen, shown]);
     const current = images[index];
     const currentKey = current?.key;
 
