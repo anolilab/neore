@@ -1008,12 +1008,14 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     let isStalled = false;
 
     /** A step of the lock's setup, ended by the hold: one that does not settle in time has the tab closed with the session. */
-    const settle = async <T>(step: Promise<T>): Promise<T> => {
+    const settle = async <T>(start: () => Promise<T>): Promise<T> => {
+        // The time first: a step started and then given no time would run on unheld.
+        const ms = left(pageTimeout);
         const settled = await within(
-            step.then((value) => {
+            start().then((value) => {
                 return { value };
             }),
-            left(pageTimeout),
+            ms,
             null,
         );
 
@@ -1077,7 +1079,11 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             const served = html ? servedForms(html.text, html.url) : [];
             const target = servedTarget(served, form);
 
-            if (html === null || served[0] === null || served.includes(AMBIGUOUS)) {
+            if (served.includes(AMBIGUOUS)) {
+                return "A form of the login page has submit buttons that send it to different places, so the agent's browser cannot check where the password goes; nothing was typed";
+            }
+
+            if (html === null || served[0] === null) {
                 return "The agent's browser cannot check where the login form sends the password (the page as the site sent it could not be read, or its first password field is in no form it can read), so nothing was typed";
             }
 
@@ -1119,12 +1125,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         // Before the page loads: each socket it opens is then one the guard can close, and no worker, window or WebRTC
         // connection of it runs past the lock.
-        await settle(gateSockets(page.context()));
+        await settle(async () => gateSockets(page.context()));
 
         // Its script is in the tab's document from the first command: one that fails part way leaves it there.
         isLocking = true;
 
-        const locked = await settle(lockChannels(page));
+        const locked = await settle(async () => lockChannels(page));
 
         lock = locked;
 
