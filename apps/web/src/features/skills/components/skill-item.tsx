@@ -3,6 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc } from "@neore/backend/dataModel";
+import type { StoredRow } from "@neore/backend/stored-row";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
@@ -20,7 +21,7 @@ export type ListedSkill = {
     enabled?: boolean;
     /** Another user's marketplace skill this user installed. Read-only here — fork to change it. */
     isInstalled?: boolean;
-} & Doc<"skills">;
+} & StoredRow<Doc<"skills">>;
 
 interface SkillItemProps {
     /** Owners may delete; organization admins may only edit (see `ListedSkill.canEdit`). */

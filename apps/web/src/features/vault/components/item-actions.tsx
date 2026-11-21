@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
+import { saveFromUrl } from "@neore/ui/utils/save-from-url";
 import { useMutation } from "@tanstack/react-query";
 import { Download, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -17,48 +18,6 @@ type Properties = {
     fileName: string;
     fileType: string;
     id: string;
-};
-
-const clickAnchor = (href: string, fileName: string): void => {
-    const anchor = document.createElement("a");
-
-    anchor.href = href;
-    anchor.download = fileName;
-    anchor.rel = "noopener";
-    anchor.target = "_blank";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-};
-
-/**
- * Saves `url` under `fileName`. The `download` attribute is ignored for a
- * cross-origin href, so the file is fetched into a blob first; when the bucket
- * does not answer CORS for this origin, the signed URL is opened directly and
- * the browser decides between showing and saving it.
- */
-const saveFromUrl = async (url: string, fileName: string): Promise<void> => {
-    let blobUrl: string | undefined;
-
-    try {
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            await response.body?.cancel();
-
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        blobUrl = URL.createObjectURL(await response.blob());
-    } catch {
-        clickAnchor(url, fileName);
-
-        return;
-    }
-
-    clickAnchor(blobUrl, fileName);
-    // Revoked on the next task: the click has already handed the blob to the download.
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
 };
 
 const ItemActions = ({ fileName, fileType: _fileType, id }: Properties) => {
@@ -78,7 +37,8 @@ const ItemActions = ({ fileName, fileType: _fileType, id }: Properties) => {
         try {
             const { url } = await getDownloadUrl({ attachmentId: id as Id<"files"> });
 
-            await saveFromUrl(url, fileName);
+            // The click's activation went on asking for the link, so the save waits for the file rather than give way to a tab.
+            await saveFromUrl(url, fileName, undefined, { headersDeadlineMs: null });
         } catch (error) {
             console.error("Download error:", error);
             showError(t`Failed to download file. Please try again.`);

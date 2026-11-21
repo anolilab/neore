@@ -15,22 +15,33 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { adminAction, adminMutation, adminQuery, rateLimit } from "../lib/crpc";
 import { withoutUndefined } from "../lib/patch";
 import { callOnShard } from "../lib/cross-shard";
+import { decryptKey, encryptKey } from "../lib/encryption";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
 import { MAX_LENGTH } from "../lib/validators";
 import {
     addMessageRow,
+    addThreadRow,
     approxRowBytes,
+    type BreakdownEntry,
     type CensusCursor,
+    classifyThread,
     FOOTPRINT_PAGE_SIZE,
     finishCurrentThread,
     forCursor,
+    keepTop,
+    knownClassFor,
+    largestRowsOf,
+    LARGEST_SHARD_COUNT,
+    LARGEST_THREAD_COUNT,
+    mergeBreakdowns,
     withRootShard,
     type FootprintState,
     MAX_SHARD_CALLS_PER_ACTION,
     type PendingShard,
     rootOnlyCensus,
     type ScanEntry,
+    type ThreadClass,
     SHARDS_PER_CALL,
     startCensus,
     startFootprint,
@@ -332,12 +343,33 @@ export const writeCleanupLog = internalMutation
 // =============================================================================
 // Measures how much conversation data each user shard stores. `measureShardPage` runs on the
 // shard it measures and reads one page per call (threads, then message rows); a caller continues
-// until `done`. `getShardFootprint` drives a page of the shard census and returns totals only:
-// no thread ids leave the admin path. Counts are approximate under concurrent writes.
+// until `done`. `getShardFootprint` drives a page of the shard census and returns totals only: no
+// thread ids or shard keys are in its fields. Its cursor holds shard keys and the scan's index positions,
+// which name threads, so it is sealed before it reaches the browser. Counts are approximate under concurrent writes.
+// Beside the totals it reports counts by thread group and age band (the readings the retention
+// plan's decisions need) and the sizes of the largest threads and shards, as bare numbers.
+
+/** A breakdown entry's fields, spread into each validator that carries one. */
+const breakdownEntryFields = {
+    approxBytes: v.number(),
+    group: v.union(v.literal("active"), v.literal("archived"), v.literal("other"), v.literal("pinned")),
+    largeToolBytes: v.number(),
+    largeToolRows: v.number(),
+    messageRows: v.number(),
+    sinceDays: v.number(),
+    threads: v.number(),
+    toolBytes: v.number(),
+};
 
 /** The scan state's fields, spread into each validator that carries it. */
 const footprintFields = {
     approxBytes: v.number(),
+    breakdown: v.array(v.object({ ...breakdownEntryFields })),
+    carriedLargestRows: v.array(v.number()),
+    currentClass: v.union(
+        v.object({ group: v.union(v.literal("active"), v.literal("archived"), v.literal("other"), v.literal("pinned")), sinceDays: v.number() }),
+        v.null(),
+    ),
     currentRows: v.number(),
     currentThreadId: v.union(v.string(), v.null()),
     cursor: v.union(v.string(), v.null()),
@@ -347,9 +379,13 @@ const footprintFields = {
     threads: v.number(),
 };
 
-/** One page of a shard's measurement. Message rows are read through their thread index, so a thread's rows arrive together. */
+/**
+ * One page of a shard's measurement. Message rows are read through their thread index, so a thread's rows arrive together,
+ * and each thread a page starts is read once, all of them side by side, so a page reads its rows plus at most one thread
+ * per row. `now` places each thread in its age band; the admin call passes the census's clock.
+ */
 export const measureShardPage = internalQuery
-    .input({ state: v.optional(v.object({ ...footprintFields })) })
+    .input({ now: v.number(), state: v.optional(v.object({ ...footprintFields })) })
     .output(v.object({ done: v.boolean(), pageRows: v.number(), state: v.object({ ...footprintFields }) }))
     .query(async ({ args, ctx }) => {
         const state: FootprintState = args.state ?? startFootprint();
@@ -360,31 +396,39 @@ export const measureShardPage = internalQuery
 
         if (state.phase === "threads") {
             const page = await ctx.db.query("threads").paginate({ cursor: state.cursor, numItems: FOOTPRINT_PAGE_SIZE });
-            let threadBytes = 0;
+            let next = state;
 
             for (const thread of page.page) {
-                threadBytes += approxRowBytes(thread);
+                next = addThreadRow(next, classifyThread(thread, args.now), approxRowBytes(thread));
             }
 
             return {
                 done: false,
                 pageRows: page.page.length,
-                state: {
-                    ...state,
-                    approxBytes: state.approxBytes + threadBytes,
-                    cursor: page.isDone ? null : page.continueCursor,
-                    phase: page.isDone ? "messages" : "threads",
-                    threads: state.threads + page.page.length,
-                },
+                state: { ...next, cursor: page.isDone ? null : page.continueCursor, phase: page.isDone ? "messages" : "threads" },
             };
         }
 
         const page = await ctx.db.query("messages").withIndex("by_threadId_order_stepOrder").paginate({ cursor: state.cursor, numItems: FOOTPRINT_PAGE_SIZE });
 
+        const startedThreads = [...new Set(page.page.map((row) => row.threadId))].filter((threadId) => knownClassFor(state, String(threadId)) === undefined);
+        const startedClasses = new Map(
+            await Promise.all(
+                startedThreads.map(async (threadId): Promise<[string, ThreadClass]> => [
+                    String(threadId),
+                    classifyThread(await ctx.db.get("threads", threadId), args.now),
+                ]),
+            ),
+        );
         let next = state;
 
         for (const row of page.page) {
-            next = addMessageRow(next, String(row.threadId), approxRowBytes(row));
+            const threadId = String(row.threadId);
+            // Rows are grouped by thread, so a row either continues the current thread or starts one read above.
+            const threadClass = knownClassFor(next, threadId) ?? (startedClasses.get(threadId) as ThreadClass);
+            const toolOutput = (row.message as { role?: unknown } | undefined)?.role === "tool";
+
+            next = addMessageRow(next, { bytes: approxRowBytes(row), threadClass, threadId, toolOutput });
         }
 
         if (page.isDone) {
@@ -420,35 +464,35 @@ const censusCursorValidator = v.object({
     census: v.union(v.string(), v.null()),
     censusDone: v.boolean(),
     pending: v.array(v.object({ failures: v.optional(v.number()), shardKey: v.string(), state: v.object({ ...footprintFields }) })),
+    startedAt: v.number(),
 });
 
-/** The opaque string an admin call returns and takes back. Callers never read it. */
-export const encodeCensusCursor = (cursor: CensusCursor): string => {
+/**
+ * The opaque string an admin call returns and takes back, sealed (AES-GCM, its own key purpose): the shard keys and
+ * index positions in it name users and threads, and the browser that holds it can neither read nor alter it.
+ */
+export const encodeCensusCursor = async (cursor: CensusCursor): Promise<string> => {
     const forBrowser = {
         ...cursor,
         pending: cursor.pending.map((entry) => {
             return { ...entry, state: forCursor(entry.state) };
         }),
     };
-    const bytes = new TextEncoder().encode(JSON.stringify(forBrowser));
-    let binary = "";
 
-    for (const byte of bytes) {
-        binary += String.fromCodePoint(byte);
-    }
-
-    return btoa(binary);
+    return await encryptKey(JSON.stringify(forBrowser), "census-cursor");
 };
 
-/** The census cursor an encoded string holds, or `undefined` when the string is not one this module wrote. */
-export const decodeCensusCursor = (encoded: string): CensusCursor | undefined => {
+/** The census cursor a sealed string holds, or `undefined` when the string is not one this module sealed. */
+export const decodeCensusCursor = async (encoded: string): Promise<CensusCursor | undefined> => {
+    // Only the current format: an unversioned string would be opened with the legacy master key.
+    if (!encoded.startsWith("v1:")) {
+        return undefined;
+    }
+
     let json: unknown;
 
     try {
-        const binary = atob(encoded);
-        const text = new TextDecoder().decode(Uint8Array.from(binary, (character) => character.codePointAt(0) ?? 0));
-
-        json = JSON.parse(text);
+        json = JSON.parse(await decryptKey(encoded, "census-cursor"));
     } catch {
         return undefined;
     }
@@ -461,6 +505,7 @@ export const decodeCensusCursor = (encoded: string): CensusCursor | undefined =>
 /** The census cursor after `page` of the census: the page's shards join the ones still pending. */
 const addCensusPage = (carried: CensusCursor, page: { continueCursor: string | null; isDone: boolean; shardKeys: string[] }): CensusCursor => {
     return {
+        ...carried,
         census: page.isDone ? null : page.continueCursor,
         censusDone: page.isDone,
         pending: [
@@ -472,18 +517,23 @@ const addCensusPage = (carried: CensusCursor, page: { continueCursor: string | n
     };
 };
 
-/** Reads one page of a shard. A failure is thrown, so the scan can count the shard as incomplete. */
-const readShardPage = async (entry: ScanEntry): Promise<{ done: boolean; state: FootprintState }> => {
-    const result = await callOnShard(internal.admin.cleanup.measureShardPage, { state: entry.state }, { shardKey: entry.shardKey });
+/** Reads one page of a shard at `now`. A failure is thrown, so the scan can count the shard as incomplete. */
+const readShardPage =
+    (now: number) =>
+    async (entry: ScanEntry): Promise<{ done: boolean; state: FootprintState }> => {
+        const result = await callOnShard(internal.admin.cleanup.measureShardPage, { now, state: entry.state }, { shardKey: entry.shardKey });
 
-    return { done: result.done, state: result.state };
-};
+        return { done: result.done, state: result.state };
+    };
 
 /**
  * Totals for the shards this call finished. A shard that is not finished yet is `pendingShards`: its
  * state travels in `continueCursor`, and its counts join the totals once a later call finishes it, so
  * no shard is counted twice. A shard that errors is `incompleteShards`, its counts are left out, and it
  * stays pending so a later call retries it. Continue with `continueCursor` until it is `null`.
+ *
+ * `breakdown`, `largestThreadRows` and `largestShardBytes` cover the same finished shards, so a caller merges pages
+ * the same way: sum the breakdown by group and age band, and keep the largest numbers of the two lists.
  */
 export const getShardFootprint = adminAction
     .use(rateLimit("admin/read"))
@@ -492,9 +542,14 @@ export const getShardFootprint = adminAction
         v.object({
             abandonedShards: v.number(),
             approxBytes: v.number(),
+            breakdown: v.array(v.object({ ...breakdownEntryFields })),
             continueCursor: v.union(v.string(), v.null()),
             incompleteShards: v.number(),
             isDone: v.boolean(),
+            /** The sizes of the largest finished shards, largest first. No shard key. */
+            largestShardBytes: v.array(v.number()),
+            /** The row counts of the largest finished threads, largest first. No thread id. */
+            largestThreadRows: v.array(v.number()),
             messageRows: v.number(),
             pendingShards: v.number(),
             shards: v.number(),
@@ -502,7 +557,7 @@ export const getShardFootprint = adminAction
         }),
     )
     .action(async ({ args, ctx }) => {
-        const carried: CensusCursor | undefined = args.cursor === undefined ? startCensus() : decodeCensusCursor(args.cursor);
+        const carried: CensusCursor | undefined = args.cursor === undefined ? startCensus(Date.now()) : await decodeCensusCursor(args.cursor);
 
         if (carried === undefined) {
             throw new LunoraError("INVALID_INPUT", "The footprint cursor is not valid. Start the measurement again without a cursor.");
@@ -533,14 +588,17 @@ export const getShardFootprint = adminAction
             return { shardKey, state, status: "active" };
         });
 
-        await runScanRounds(entries, readShardPage, MAX_SHARD_CALLS_PER_ACTION);
+        await runScanRounds(entries, readShardPage(cursor.startedAt), MAX_SHARD_CALLS_PER_ACTION);
 
         const totals = {
             abandonedShards: 0,
             approxBytes: 0,
+            breakdown: [] as BreakdownEntry[],
             continueCursor: null as string | null,
             incompleteShards: 0,
             isDone: false,
+            largestShardBytes: [] as number[],
+            largestThreadRows: [] as number[],
             messageRows: 0,
             pendingShards: 0,
             shards: 0,
@@ -556,6 +614,9 @@ export const getShardFootprint = adminAction
                 totals.approxBytes += entry.state.approxBytes;
                 totals.messageRows += entry.state.messageRows;
                 totals.threads += entry.state.threads;
+                totals.breakdown = mergeBreakdowns(totals.breakdown, entry.state.breakdown);
+                totals.largestShardBytes = keepTop([...totals.largestShardBytes, entry.state.approxBytes], LARGEST_SHARD_COUNT);
+                totals.largestThreadRows = keepTop([...totals.largestThreadRows, ...largestRowsOf(entry.state)], LARGEST_THREAD_COUNT);
             } else if (entry.status === "failed") {
                 // A page that read earlier in this call resets the count, so only the failures since then count.
                 const failures = (entry.succeeded ? 0 : (failuresBefore.get(entry.shardKey) ?? 0)) + 1;
@@ -578,7 +639,7 @@ export const getShardFootprint = adminAction
 
         totals.pendingShards = stillPending.length;
         totals.isDone = cursor.censusDone && stillPending.length === 0;
-        totals.continueCursor = totals.isDone ? null : encodeCensusCursor({ census: cursor.census, censusDone: cursor.censusDone, pending: stillPending });
+        totals.continueCursor = totals.isDone ? null : await encodeCensusCursor({ ...cursor, pending: stillPending });
 
         ctx.log.event("admin.shard_footprint_measured", {
             abandonedShards: totals.abandonedShards,

@@ -160,7 +160,7 @@ for a schema table that is neither policed nor listed:
 | `admin_audit_log.getAuditLogStats` | query | adminQuery | — | admin role | ok |
 | `admin_cleanup.executeCleanup` | action | adminAction | — | admin role | ok |
 | `admin_cleanup.getCleanupConfig` | query | adminQuery | cleanupConfigs | admin role | ok |
-| `admin_cleanup.getShardFootprint` | action | adminAction | — | admin role; reads each shard through internal `measureShardPage` and returns totals only | ok |
+| `admin_cleanup.getShardFootprint` | action | adminAction | — | admin role; reads each shard through internal `measureShardPage` and returns counts only: totals, a breakdown by thread group and age band, and the largest thread and shard sizes as bare numbers (no thread id or shard key) | ok |
 | `admin_cleanup.listCleanupLogs` | query | adminQuery | cleanupLogs | admin role | ok |
 | `admin_cleanup.previewCleanup` | query | adminQuery | cleanupConfigs | admin role | ok |
 | `admin_cleanup.updateCleanupConfig` | mutation | adminMutation | cleanupConfigs | admin role | ok |

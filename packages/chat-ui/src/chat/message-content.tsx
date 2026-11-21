@@ -22,7 +22,8 @@ import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-block
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins, { streamdownRehypePlugins } from "@neore/ui/hooks/use-streamdown-plugins";
 import { MarkdownBlockCacheContext } from "@neore/ui/utils/markdown-block-cache";
-import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
+import { safeImageDownloadUrl, saveOnClick } from "@neore/ui/utils/save-from-url";
+import { AlertCircle, ChevronDown, ChevronRight, Download, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
 import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -37,7 +38,9 @@ import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
+import { browserImageKey, codeImageKey } from "../utils/thread-images";
 import { toolImageSource } from "../utils/tool-image-source";
+import { GalleryImage } from "./gallery-image";
 import PageContextChip from "./page-context-chip";
 import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
@@ -424,8 +427,11 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
         return <NsfwBlockedPlaceholder nsfwStatus={part.nsfwStatus} />;
     }
 
+    // Only a link to a value safe to open on its own: a modified click skips the save helper's check.
+    const downloadUrl = safeImageDownloadUrl(part.image);
+
     return (
-        <div className="mb-4">
+        <div className="group/image relative mb-4 w-fit max-w-full">
             <img
                 alt={part.prompt || part.filename || t`Image`}
                 className="max-h-[400px] max-w-full rounded-lg object-contain"
@@ -433,6 +439,21 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
                 loading="lazy"
                 src={part.image}
             />
+            {/* Top left, so an override's own button (a pin) can take the top right. Always shown where nothing can hover. */}
+            {downloadUrl && (
+                <a
+                    aria-label={part.filename ? t`Download ${part.filename}` : t`Download image`}
+                    className="bg-background/80 hover:bg-background absolute top-2 left-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within/image:opacity-100 group-hover/image:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    download={part.filename ?? ""}
+                    href={downloadUrl}
+                    onClick={saveOnClick(downloadUrl, part.filename, "image")}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    title={t`Download image`}
+                >
+                    <Download aria-hidden="true" className="size-4" />
+                </a>
+            )}
             {part.prompt && (
                 <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs italic" title={part.prompt}>
                     {part.prompt}
@@ -527,7 +548,7 @@ interface CodeExecutionOutput {
     unsavedMedia?: number;
 }
 
-const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const CodeExecutionResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const [isCodeExpanded, setIsCodeExpanded] = useState(false);
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
@@ -599,7 +620,12 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
 
                             return source === undefined ? null : (
                                 <div className="flex justify-center border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <img alt={t`Code output`} className="max-w-full rounded" src={source} />
+                                    <GalleryImage
+                                        alt={t`Code output`}
+                                        className="max-w-full rounded"
+                                        imageKey={codeImageKey(messageId, part.toolCallId, index)}
+                                        src={source}
+                                    />
                                 </div>
                             );
                         }
@@ -661,7 +687,7 @@ const DOCUMENT_ARTIFACT_TOOLS = new Set(["tool-createDocument", "tool-deepResear
 /** Tools that render their own card or ask the person something; never folded into a summary. */
 const UNFOLDABLE_TOOLS = new Set(["tool-askUser", "tool-browser", "tool-codeExecution", "tool-createPresentation", "tool-updateSlide"]);
 
-const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const BrowserToolResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
     const isError = part.state === "output-error";
@@ -725,7 +751,13 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
                 </div>
                 {/* Screenshot */}
-                <img alt={output.title || t`Browser screenshot`} className="w-full" src={screenshotSource} />
+                <GalleryImage
+                    alt={output.title || t`Browser screenshot`}
+                    buttonClassName="block w-full"
+                    className="w-full"
+                    imageKey={browserImageKey(messageId, part.toolCallId)}
+                    src={screenshotSource}
+                />
             </div>
         );
     }
@@ -1006,7 +1038,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                             : null;
 
                     if (part.type === "tool-codeExecution") {
-                        renderedParts.push(<CodeExecutionResultView key={key} part={toolPart} />);
+                        renderedParts.push(<CodeExecutionResultView key={key} messageId={message.id} part={toolPart} />);
 
                         if (sandboxOutputs && SandboxFiles) {
                             renderedParts.push(<SandboxFiles key={`${key}-files`} {...sandboxOutputs} />);
@@ -1017,7 +1049,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
                     // Special rendering for browser tool — show live status or screenshot result
                     if (part.type === "tool-browser") {
-                        renderedParts.push(<BrowserToolResultView key={key} part={toolPart} />);
+                        renderedParts.push(<BrowserToolResultView key={key} messageId={message.id} part={toolPart} />);
                         break;
                     }
 

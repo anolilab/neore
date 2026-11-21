@@ -1,6 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { onComposerAttachRequest, onComposerSubmitRequest, requestComposerAttach, requestComposerSubmit } from "./composer-submit";
+import {
+    discardComposerAttachNotFor,
+    hasPendingComposerAttach,
+    onComposerAttachRequest,
+    onComposerSubmitRequest,
+    requestComposerAttach,
+    requestComposerSubmit,
+    withdrawComposerAttach,
+} from "./composer-submit";
 
 describe(requestComposerSubmit, () => {
     it("holds a request until the composer subscribes, then delivers it once", () => {
@@ -35,19 +43,223 @@ describe(requestComposerSubmit, () => {
     });
 });
 
+/** Takes whatever request is still pending, so each case starts from an empty channel. */
+const drainAttach = () => {
+    // A composer takes only its own account's request (or an untagged one): one for each account the cases use.
+    for (const accountId of ["u1", "u2"]) {
+        onComposerAttachRequest(accountId, () => {})();
+    }
+};
+
 describe(requestComposerAttach, () => {
-    it("joins drops that arrive before the composer takes them, so none is lost", () => {
+    beforeEach(() => {
+        drainAttach();
+    });
+
+    it("joins drops for one account that arrive before the composer takes them, so none is lost", () => {
         const first = new File(["a"], "a.txt");
         const second = new File(["b"], "b.txt");
 
-        requestComposerAttach({ files: [first] });
-        requestComposerAttach({ files: [second] });
+        requestComposerAttach({ accountId: "u1", files: [first] });
+
+        // Joined, so nothing is let go.
+        expect(requestComposerAttach({ accountId: "u1", files: [second] })).toBe(0);
 
         const handler = vi.fn();
-        const stop = onComposerAttachRequest(handler);
+        const stop = onComposerAttachRequest("u1", handler);
 
-        expect(handler).toHaveBeenCalledExactlyOnceWith({ files: [first, second] });
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: "u1", files: [first, second] });
 
         stop();
+    });
+
+    it("replaces a held drop with one for another account, never mixing their files", () => {
+        const mine = new File(["a"], "a.txt");
+        const theirs = new File(["b"], "b.txt");
+
+        expect(requestComposerAttach({ accountId: "u1", files: [mine] })).toBe(0);
+        // The held drop's one file is let go, and the caller is told so.
+        expect(requestComposerAttach({ accountId: "u2", files: [theirs] })).toBe(1);
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u2", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: "u2", files: [theirs] });
+
+        stop();
+    });
+
+    it("never hands files meant for another account to this account's composer", () => {
+        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u2", handler);
+
+        expect(handler).not.toHaveBeenCalled();
+        expect(hasPendingComposerAttach("u2")).toBe(false);
+
+        stop();
+    });
+
+    it("lets go of files left for another account once the account has changed, so they never come back later", () => {
+        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt"), new File(["b"], "b.txt")] });
+
+        expect(discardComposerAttachNotFor("u2")).toBe(2);
+
+        const back = vi.fn();
+        const stop = onComposerAttachRequest("u1", back);
+
+        expect(back).not.toHaveBeenCalled();
+
+        stop();
+    });
+
+    it("keeps the new account's drop, and a drop made before the session was known, when the account changes", () => {
+        requestComposerAttach({ accountId: "u2", files: [new File(["a"], "a.txt")] });
+
+        expect(discardComposerAttachNotFor("u2")).toBe(0);
+        expect(hasPendingComposerAttach("u2")).toBe(true);
+
+        drainAttach();
+        requestComposerAttach({ files: [new File(["b"], "b.txt")] });
+
+        expect(discardComposerAttachNotFor("u2")).toBe(0);
+        expect(hasPendingComposerAttach("u2")).toBe(true);
+    });
+
+    it("never lets an old account's composer that subscribes again take or drop the new account's files", () => {
+        const file = new File(["a"], "a.txt");
+
+        requestComposerAttach({ accountId: "u2", files: [file] });
+
+        // The old account's composer is still mounted and subscribes again (its effect re-ran) before u2's opens.
+        const old = vi.fn();
+
+        onComposerAttachRequest("u1", old)();
+
+        expect(old).not.toHaveBeenCalled();
+
+        const next = vi.fn();
+        const stop = onComposerAttachRequest("u2", next);
+
+        expect(next).toHaveBeenCalledExactlyOnceWith({ accountId: "u2", files: [file] });
+
+        stop();
+    });
+
+    it("leaves a new account's files for its composer while the old account's composer still listens", () => {
+        const oldComposer = vi.fn();
+        const stopOld = onComposerAttachRequest("u1", oldComposer);
+        const file = new File(["a"], "a.txt");
+
+        requestComposerAttach({ accountId: "u2", files: [file] });
+
+        expect(oldComposer).not.toHaveBeenCalled();
+
+        const newComposer = vi.fn();
+        const stopNew = onComposerAttachRequest("u2", newComposer);
+
+        expect(newComposer).toHaveBeenCalledExactlyOnceWith({ accountId: "u2", files: [file] });
+
+        stopOld();
+        stopNew();
+    });
+
+    it("joins a drop made while the session loaded with the next drop, under that drop's account", () => {
+        const early = new File(["a"], "a.txt");
+        const later = new File(["b"], "b.txt");
+
+        requestComposerAttach({ files: [early] });
+        requestComposerAttach({ accountId: "u1", files: [later] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u1", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: "u1", files: [early, later] });
+
+        stop();
+    });
+
+    it("never folds a later drop with no account into a held drop for an account", () => {
+        const old = new File(["a"], "a.txt");
+        const later = new File(["b"], "b.txt");
+
+        requestComposerAttach({ accountId: "u1", files: [old] });
+        // The session reloads during a switch: this drop may be for the account that is loading.
+        requestComposerAttach({ files: [later] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u2", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: undefined, files: [later] });
+
+        stop();
+    });
+
+    it("hands a drop made before the session was known to whichever account takes it", () => {
+        const file = new File(["a"], "a.txt");
+
+        requestComposerAttach({ files: [file] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u1", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: undefined, files: [file] });
+
+        stop();
+    });
+});
+
+describe(hasPendingComposerAttach, () => {
+    beforeEach(() => {
+        drainAttach();
+    });
+
+    it("counts only files waiting for this account, or for an account not known yet", () => {
+        requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
+
+        expect(hasPendingComposerAttach("u1")).toBe(true);
+        expect(hasPendingComposerAttach(undefined)).toBe(true);
+        expect(hasPendingComposerAttach("u2")).toBe(false);
+    });
+
+    it("counts a drop made while the session loaded for any account", () => {
+        requestComposerAttach({ files: [new File(["a"], "a.txt")] });
+
+        expect(hasPendingComposerAttach("u2")).toBe(true);
+    });
+});
+
+describe(withdrawComposerAttach, () => {
+    beforeEach(() => {
+        drainAttach();
+    });
+
+    it("takes back only the files of a drop whose chat did not open", () => {
+        const kept = new File(["a"], "a.txt");
+        const withdrawn = new File(["b"], "b.txt");
+
+        requestComposerAttach({ accountId: "u1", files: [kept] });
+        requestComposerAttach({ accountId: "u1", files: [withdrawn] });
+        withdrawComposerAttach([withdrawn]);
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u1", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: "u1", files: [kept] });
+
+        stop();
+    });
+
+    it("leaves nothing pending once every file is taken back", () => {
+        const file = new File(["a"], "a.txt");
+
+        requestComposerAttach({ accountId: "u1", files: [file] });
+
+        expect(hasPendingComposerAttach("u1")).toBe(true);
+
+        withdrawComposerAttach([file]);
+
+        expect(hasPendingComposerAttach("u1")).toBe(false);
     });
 });
