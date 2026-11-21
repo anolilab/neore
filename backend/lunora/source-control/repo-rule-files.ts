@@ -23,8 +23,8 @@
  * and a link's only when the SHA given is that of a file a link may lead to, so it reads only files the listing could
  * offer (a link is not tied to its own target: one the listing refused may be read as another of those files).
  *
- * Both run under {@link HOST_FETCHES_PER_IMPORT} host requests, a 401's repeat included ({@link fetchBudget}): past it
- * a link is refused (`budget`) and a file is `not_read`, never a failed request.
+ * Both run under {@link HOST_FETCHES_PER_IMPORT} host requests, redirect hops and a 401's repeat included
+ * ({@link fetchBudget}): past it a link is refused (`budget`) and a file is `not_read`, never a failed request.
  */
 import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES_BYTES, RULE_FILE_FRONT_MATTER } from "../projects/rule-file-limits";
 import type { HostRequest } from "./origin-fetch";
@@ -57,12 +57,15 @@ export const MAX_LINK_HOPS = 4;
 export const MAX_LINKS_FOLLOWED = 16;
 
 /**
- * Host requests one import action makes, at most, both tries of a 401 together. A Worker request may make 50
- * subrequests on the Free plan, and the action's own make up to 14 more (the session check's five lookups, the rate
- * limit, the repository, and the grant with a token refresh and its store, then again for a 401's forced refresh), so
- * this keeps it under the cap with room to spare. A listing spends at most 6 on the commit and its trees and {@link MAX_LINKS_FOLLOWED} on
- * links, so a repeat always has its trees; a read 6 and one per file picked (at most 20), so one without a 401 reads
- * them all.
+ * Host requests one import action makes, at most, every redirect hop and both tries of a 401 together: each is a Worker
+ * subrequest. A Worker request may make 50 subrequests on the Free plan, and the action's own make up to 14 more (the
+ * session check's five lookups, the rate limit, the repository, and the grant with a token refresh and its store, then
+ * again for a 401's forced refresh): 28 + 14 = 42, under the cap with 8 to spare. A listing spends at most 6 on the
+ * commit and its trees and {@link MAX_LINKS_FOLLOWED} on links, so without a redirect a repeat always has its trees; a
+ * read 6 and one per file picked (at most 20), so one without a 401 or a redirect reads them all. A redirect (a renamed
+ * repository answers each request with one, at most two hops) spends from the same count, so it still works while
+ * requests are left; past them a link is `budget` and a file `not_read`, and a listing whose own walk is cut short
+ * fails as the host's error.
  */
 export const HOST_FETCHES_PER_IMPORT = 28;
 
@@ -75,20 +78,31 @@ export class FetchBudgetSpent extends Error {
 }
 
 /**
- * At most `limit` host requests through every requester it wraps: the tries of one action share it, so a 401's repeat
- * spends what is left. One past it throws {@link FetchBudgetSpent} without being sent.
+ * At most `limit` host requests through every requester it wraps, each redirect hop one more: the tries of one action
+ * share it, so a 401's repeat spends what is left. A request or hop past it throws {@link FetchBudgetSpent} without
+ * being sent.
  */
 export const fetchBudget = (limit = HOST_FETCHES_PER_IMPORT): ((request: HostRequest) => HostRequest) => {
     let left = limit;
 
-    return (request) => async (path, options) => {
+    const spend = (): void => {
         if (left <= 0) {
             throw new FetchBudgetSpent();
         }
 
         left -= 1;
+    };
 
-        return request(path, options);
+    return (request) => async (path, options) => {
+        spend();
+
+        return request(path, {
+            ...options,
+            beforeRedirect: () => {
+                spend();
+                options?.beforeRedirect?.();
+            },
+        });
     };
 };
 

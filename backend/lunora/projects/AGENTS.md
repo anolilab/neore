@@ -86,8 +86,9 @@
   is reported as `truncated`, and a rules folder whose cut tree shows no Markdown is still the one listed); the read takes that commit's SHA, never a branch, lists it again (found under this repository,
   `/git/commits/{sha}`) without following links and reads only what that listing offers, by the blob SHA the listing
   gave (a link's only when that SHA is a file it may lead to), never through the contents API (it follows symlinks).
-  Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included (`fetchBudget`, under the
-  Workers 50-subrequest cap with its own lookups): past it a link is `budget`, a file `not_read`, never a failure. A symlink is followed only to another path of the same listing (a root file or the
+  Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, every redirect hop (`beforeRedirect`) and a 401's
+  repeat included (`fetchBudget`, under the Workers 50-subrequest cap with its own lookups): past it a link is `budget`,
+  a file `not_read`, a listing whose walk is cut `host_error`, never a thrown error. A symlink is followed only to another path of the same listing (a root file or the
   listed folder's), inside the repository (`resolveLinkTarget`); any other is listed `refused` with why (`LinkRefusal`) and its target never read; a listing holds at most `MAX_LISTED_FOLDER_FILES` of the folder's files, by path, and counts the rest (`omitted`). They read only `isImportablePath`
   paths (root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, Markdown right in one `RULE_FOLDERS` folder), within
   `REPO_RULE_FILE_MAX_BYTES` and `MAX_RULE_FILE_LENGTH` characters each (counted without front matter,

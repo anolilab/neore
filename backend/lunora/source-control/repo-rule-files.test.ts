@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { HostApiError } from "./origin-fetch";
+import { createBoundRequester, HostApiError } from "./origin-fetch";
 import type { HostRequest } from "./origin-fetch";
 import { MAX_RULE_FILE_LENGTH } from "../projects/rule-file-limits";
 import {
     fetchBudget,
+    FetchBudgetSpent,
     HOST_FETCHES_PER_IMPORT,
     isImportablePath,
     listRepoRuleFiles,
@@ -603,6 +604,62 @@ describe(fetchBudget, () => {
 
         expect(new Set(after.map((read) => read.status))).toStrictEqual(new Set(["not_read"]));
         expect(host.count()).toBe(HOST_FETCHES_PER_IMPORT);
+    });
+
+    /**
+     * The host as a renamed repository answers it, through the real requester: every request first a same-origin 301 to
+     * `/moved…`, then `routes`' answer there. `sent` counts what reaches the host, hops included.
+     */
+    const movedHost = (routes: Record<string, unknown>) => {
+        let sent = 0;
+        const request = createBoundRequester({
+            origin: "https://api.github.com",
+            token: "tkn",
+            via: async (input) => {
+                sent += 1;
+
+                const { pathname } = new URL(String(input));
+
+                if (!pathname.startsWith("/moved/")) {
+                    return new Response(null, { headers: { location: `/moved${pathname}` }, status: 301 });
+                }
+
+                const path = decodeURIComponent(pathname.slice("/moved".length));
+
+                return path in routes ? Response.json(routes[path]) : new Response(null, { status: 404 });
+            },
+        });
+
+        return { request, sent: () => sent };
+    };
+
+    it("spends one more for each redirect hop, and sends neither a request nor a hop past it", async () => {
+        const host = movedHost({ "/a": {} });
+        const budgeted = fetchBudget(3)(host.request);
+
+        await expect(budgeted("/a")).resolves.toBeInstanceOf(Response);
+        expect(host.sent()).toBe(2);
+
+        // One left: the request goes, its hop does not.
+        await expect(budgeted("/a")).rejects.toBeInstanceOf(FetchBudgetSpent);
+        await expect(budgeted("/a")).rejects.toBeInstanceOf(FetchBudgetSpent);
+        expect(host.sent()).toBe(3);
+    });
+
+    it("reads a redirected repository's files while requests are left, the rest not read rather than failed", async () => {
+        const { links, routes } = widest(20);
+        const picked = links.map((path) => {
+            return { path, sha: sha("AGENTS.md") };
+        });
+        const host = movedHost(routes);
+
+        const reads = await readRepoRuleFiles(fetchBudget()(host.request), ADDRESS, COMMIT, picked);
+        // The walk and each file cost two: the request and its hop.
+        const fits = (HOST_FETCHES_PER_IMPORT - 2 * WALK) / 2;
+
+        expect(host.sent()).toBe(HOST_FETCHES_PER_IMPORT);
+        expect(reads.filter((read) => read.status === "ok").map((read) => read.path)).toStrictEqual(links.slice(0, fits));
+        expect(reads.filter((read) => read.status === "not_read").map((read) => read.path)).toStrictEqual(links.slice(fits));
     });
 
     it("lists 20 links after a 401 at the listing's last request, refusing the links it has no requests left for", async () => {

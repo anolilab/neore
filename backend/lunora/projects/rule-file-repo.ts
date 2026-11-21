@@ -14,7 +14,14 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "../source-control/develop-driver";
 import { readFromHost } from "../source-control/read-host";
-import { COMMIT_SHA, fetchBudget, isImportablePath, listRepoRuleFiles as listFiles, readRepoRuleFiles as readFiles } from "../source-control/repo-rule-files";
+import {
+    COMMIT_SHA,
+    fetchBudget,
+    FetchBudgetSpent,
+    isImportablePath,
+    listRepoRuleFiles as listFiles,
+    readRepoRuleFiles as readFiles,
+} from "../source-control/repo-rule-files";
 import type { RepoAddress } from "../source-control/repo-rule-files";
 import { vFailed } from "../source-control/validators";
 import type { Id } from "../_generated/dataModel";
@@ -84,7 +91,15 @@ export const listRepoRuleFiles = authAction
         const token = await resolveGithubToken(ctx, ctx.user.userId);
         // One budget for both tries: a 401's repeat spends what the first left.
         const budgeted = fetchBudget();
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(budgeted(request), address));
+        // Links past the budget are listed `budget`; a walk the budget cuts short (redirect hops spent it) lists nothing
+        // it can stand by, so it is the host's error, never a thrown one.
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(budgeted(request), address)).catch((error: unknown) => {
+            if (error instanceof FetchBudgetSpent) {
+                return { status: "host_error" as const };
+            }
+
+            throw error;
+        });
 
         ctx.log.event("projects.rule_files.repo_list", {
             count: outcome.status === "ok" ? outcome.files.length : 0,
