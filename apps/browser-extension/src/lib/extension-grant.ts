@@ -1,3 +1,4 @@
+import { hasCookieBuildReads } from "./cookie-build-trace";
 import { APP_URL, LUNORA_URL } from "./env";
 
 /*
@@ -203,20 +204,29 @@ export const grantKey = (grant: StoredGrant): string => grant.id ?? grant.user.i
 /**
  * Run from `runtime.onInstalled`. The Chrome build used to ride the web app's
  * cookie and stored no grant, so an UPDATE that finds no grant and no migration
- * mark is an install that was signed in that way: the sign-in page then says
- * why it is back, once. A fresh install, a Firefox one (it always held a grant)
- * and every later update only write the mark.
+ * mark may be an install that was signed in that way. Only one whose read cache
+ * holds something (`hadCookieSession`, by default `hasCookieBuildReads`) was:
+ * the sign-in page then says why it is back, once. A fresh install, a Firefox
+ * one (it always held a grant), one nobody signed in to, and every later update
+ * only write the mark.
  */
-export const migrateFromCookieSession = async (input: { isFirefox: boolean; reason: string }): Promise<void> => {
+export const migrateFromCookieSession = async (input: { hadCookieSession?: () => Promise<boolean>; isFirefox: boolean; reason: string }): Promise<void> => {
     const stored = await chrome.storage.local.get([MIGRATION_KEY, STORAGE_KEY]);
 
     if (Object.hasOwn(stored, MIGRATION_KEY)) {
         return;
     }
 
-    const needsReconnect = input.reason === "update" && !input.isFirefox && !Object.hasOwn(stored, STORAGE_KEY);
+    const mayHaveSession = input.reason === "update" && !input.isFirefox && !Object.hasOwn(stored, STORAGE_KEY);
+    // A probe that fails says nothing about a sign-in: no notice, rather than one for nobody.
+    const hadSession = mayHaveSession && (await (input.hadCookieSession ?? hasCookieBuildReads)().catch(() => false));
 
-    await chrome.storage.local.set({ [MIGRATION_KEY]: 1, ...(needsReconnect && { [RECONNECT_KEY]: true }) });
+    await withGrantLock(async () => {
+        // A sign-in that finished while the cache was read needs no notice.
+        const needsReconnect = hadSession && (await readGrant()) === undefined;
+
+        await chrome.storage.local.set({ [MIGRATION_KEY]: 1, ...(needsReconnect && { [RECONNECT_KEY]: true }) });
+    });
 };
 
 export const readReconnectNeeded = async (): Promise<boolean> => {

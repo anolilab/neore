@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { keepAuthToken, MIN_REFRESH_DELAY_MS } from "./auth-token-sync";
+import { createAuthTokenSync, keepAuthToken, MIN_REFRESH_DELAY_MS } from "./auth-token-sync";
 
 /** An unsigned JWT for `sub` that expires at `exp` (seconds); only its payload is read. */
 const jwt = (exp: number, sub = "user-1"): string => `h.${btoa(JSON.stringify({ exp, sub })).replaceAll("=", "")}.s`;
 
+beforeEach(() => {
+    vi.useFakeTimers({ now: 0 });
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
 describe(keepAuthToken, () => {
-    beforeEach(() => {
-        vi.useFakeTimers({ now: 0 });
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-    });
-
     it("installs every refreshed token under the grant's user id, so a refresh keeps the offline queue", async () => {
         const setAuthToken = vi.fn();
         const first = jwt(600);
@@ -30,8 +30,9 @@ describe(keepAuthToken, () => {
         expect(getToken).toHaveBeenLastCalledWith({ force: true });
         expect(setAuthToken).toHaveBeenLastCalledWith(second, "user-1");
 
+        // The stop leaves the bearer: the next session decides (`createAuthTokenSync`).
         stop();
-        expect(setAuthToken).toHaveBeenLastCalledWith(null);
+        expect(setAuthToken).toHaveBeenLastCalledWith(second, "user-1");
     });
 
     it("asserts no subject for another account's token, so the client reads it as a switch", async () => {
@@ -66,6 +67,44 @@ describe(keepAuthToken, () => {
         stop();
         await vi.advanceTimersByTimeAsync(0);
 
+        expect(setAuthToken).not.toHaveBeenCalled();
+    });
+});
+
+describe(createAuthTokenSync, () => {
+    it("swaps a new grant's bearer in for the same user without clearing it, so the offline queue stays", async () => {
+        const setAuthToken = vi.fn();
+        const first = jwt(600);
+        const second = jwt(1200);
+        const getToken = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+        const sync = createAuthTokenSync({ setAuthToken }, getToken);
+
+        const stop = sync.start("user-1");
+
+        await vi.advanceTimersByTimeAsync(0);
+        stop();
+        sync.start("user-1");
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(setAuthToken.mock.calls).toEqual([
+            [first, "user-1"],
+            [second, "user-1"],
+        ]);
+    });
+
+    it("clears the bearer before another account's loop starts, and on sign-out", async () => {
+        const setAuthToken = vi.fn();
+        const sync = createAuthTokenSync({ setAuthToken }, async () => jwt(600, "user-2"));
+
+        sync.start("user-1")();
+        expect(setAuthToken.mock.calls).toEqual([]);
+
+        sync.start("user-2");
         expect(setAuthToken.mock.calls).toEqual([[null]]);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(setAuthToken).toHaveBeenLastCalledWith(jwt(600, "user-2"), "user-2");
+
+        sync.signOut();
+        expect(setAuthToken).toHaveBeenLastCalledWith(null);
     });
 });

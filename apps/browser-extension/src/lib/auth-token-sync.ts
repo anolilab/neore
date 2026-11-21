@@ -25,6 +25,9 @@ export const MIN_REFRESH_DELAY_MS = 30_000;
  * A refresh that gets no token (offline, or the server unreachable) keeps the
  * bearer it holds and tries again. Clearing it would read as a sign-out and drop
  * the queue. A grant that is really gone ends the session, and with it this loop.
+ *
+ * The stop leaves the bearer installed: whether it goes is the next session's
+ * call (`createAuthTokenSync`).
  */
 export const keepAuthToken = (
     client: Pick<LunoraClient, "setAuthToken">,
@@ -72,7 +75,37 @@ export const keepAuthToken = (
     return () => {
         stopped = true;
         clearTimeout(timer);
-        // Another grant's queries must not leave with this one's bearer while its own is fetched.
-        client.setAuthToken(null);
+    };
+};
+
+/**
+ * Moves `client`'s bearer from one grant to the next. Every sign-in stores a new
+ * grant, even for the account already signed in, so the loop restarts on each;
+ * only a sign-out or another account clears the bearer. Clearing it reads as a
+ * sign-out to Lunora, which drops the writes queued offline: for the same user
+ * the old bearer stays until the new grant's arrives. Another account's queries
+ * must not leave with this one's, so a switch clears it before the new loop
+ * starts.
+ */
+export const createAuthTokenSync = (
+    client: Pick<LunoraClient, "setAuthToken">,
+    getToken: (options: { force: boolean }) => Promise<string | null>,
+): { signOut: () => void; start: (userId: string) => () => void } => {
+    let lastUserId: string | undefined;
+
+    return {
+        signOut: () => {
+            lastUserId = undefined;
+            client.setAuthToken(null);
+        },
+        start: (userId) => {
+            if (lastUserId !== undefined && lastUserId !== userId) {
+                client.setAuthToken(null);
+            }
+
+            lastUserId = userId;
+
+            return keepAuthToken(client, userId, getToken);
+        },
     };
 };

@@ -41,6 +41,7 @@
         "@types/react-dom": "catalog:types",
         "@vitejs/plugin-react": "catalog:build",
         "eslint": "catalog:lint",
+        "fake-indexeddb": "catalog:test",
         "jsdom": "catalog:test",
         "tailwindcss": "catalog:style",
         "typescript": "catalog:tsc",

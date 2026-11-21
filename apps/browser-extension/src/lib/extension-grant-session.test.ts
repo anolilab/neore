@@ -318,14 +318,16 @@ describe("loadGrantSession", () => {
 });
 
 describe("migrateFromCookieSession", () => {
-    it("asks a Chrome install updated from the cookie build to connect, once", async () => {
-        await migrateFromCookieSession({ isFirefox: false, reason: "update" });
+    const signedIn = async () => true;
+
+    it("asks a Chrome install signed in with the cookie build to connect, once", async () => {
+        await migrateFromCookieSession({ hadCookieSession: signedIn, isFirefox: false, reason: "update" });
 
         await expect(readReconnectNeeded()).resolves.toBe(true);
 
         // Signed out again later: a plain sign-in page, not the notice.
         store.delete(RECONNECT_KEY);
-        await migrateFromCookieSession({ isFirefox: false, reason: "update" });
+        await migrateFromCookieSession({ hadCookieSession: signedIn, isFirefox: false, reason: "update" });
 
         await expect(readReconnectNeeded()).resolves.toBe(false);
     });
@@ -337,16 +339,45 @@ describe("migrateFromCookieSession", () => {
         });
 
         await vi.waitFor(() => expect(seen).toEqual([false]));
-        await migrateFromCookieSession({ isFirefox: false, reason: "update" });
+        await migrateFromCookieSession({ hadCookieSession: signedIn, isFirefox: false, reason: "update" });
         stop();
 
         expect(seen).toEqual([false, true]);
     });
 
     it.each([
-        ["a fresh install", { isFirefox: false, reason: "install" }, {}],
-        ["a Firefox update", { isFirefox: true, reason: "update" }, {}],
-        ["an update that already holds a grant", { isFirefox: false, reason: "update" }, { [GRANT_KEY]: { token: "grant", user: USER } }],
+        ["a fresh install", { hadCookieSession: signedIn, isFirefox: false, reason: "install" }, {}],
+        ["a Firefox update", { hadCookieSession: signedIn, isFirefox: true, reason: "update" }, {}],
+        [
+            "an update that already holds a grant",
+            { hadCookieSession: signedIn, isFirefox: false, reason: "update" },
+            { [GRANT_KEY]: { token: "grant", user: USER } },
+        ],
+        ["an update nobody signed in to", { hadCookieSession: async () => false, isFirefox: false, reason: "update" }, {}],
+        [
+            "an update that signed in while the cache was read",
+            {
+                hadCookieSession: async () => {
+                    store.set(GRANT_KEY, { token: "grant", user: USER });
+
+                    return true;
+                },
+                isFirefox: false,
+                reason: "update",
+            },
+            {},
+        ],
+        [
+            "an update whose sign-in check fails",
+            {
+                hadCookieSession: async () => {
+                    throw new Error("blocked");
+                },
+                isFirefox: false,
+                reason: "update",
+            },
+            {},
+        ],
     ])("shows no notice after %s", async (_label, input, initial) => {
         for (const [key, value] of Object.entries(initial)) {
             store.set(key, value);

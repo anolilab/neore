@@ -18,9 +18,6 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
-// Plain TypeScript, which Node runs as is (type stripping): one source for the backend and this script.
-import { carryRetiredExtensionOrigins, SHIPPED_FIREFOX_REDIRECT_URI } from "../backend/lunora/lib/extension-origins.ts";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
@@ -205,12 +202,17 @@ const main = async () => {
     const nodeVersion = process.versions.node;
     const [major] = nodeVersion.split(".").map(Number);
 
-    if (major < 22) {
-        console.error(`Node.js 22+ is required. You have ${nodeVersion}.`);
+    // The extension-origin helpers are the backend's own TypeScript, which Node
+    // runs as is only with type stripping on (by default from 22.18). Loaded
+    // after this check, so an older Node gets this message, not an import error.
+    if (major < 22 || !process.features.typescript) {
+        console.error(`Node.js 22.18+ is required (with TypeScript type stripping on). You have ${nodeVersion}.`);
         process.exit(1);
     }
 
     console.log(`Node.js ${nodeVersion}`);
+
+    const { carryRetiredExtensionOrigins, SHIPPED_FIREFOX_REDIRECT_URI } = await import("../backend/lunora/lib/extension-origins.ts");
 
     // 2. Check pnpm install
     if (!fs.existsSync(path.join(rootDir, "node_modules"))) {

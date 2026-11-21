@@ -3,11 +3,13 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 
 import { clearAccessToken, getAccessToken } from "./access-token";
-import { keepAuthToken } from "./auth-token-sync";
+import { createAuthTokenSync } from "./auth-token-sync";
 import { lunora } from "./lunora-client";
 import { useSession } from "./session";
 
-/** Keeps the Lunora client's bearer in step with the stored grant (`keepAuthToken`). */
+const authTokenSync = createAuthTokenSync(lunora, getAccessToken);
+
+/** Keeps the Lunora client's bearer in step with the stored grant (`createAuthTokenSync`). */
 export function LunoraWithAuthProvider({ children }: { children: ReactNode }) {
     const { data: session } = useSession();
     const sessionId = session?.sessionId;
@@ -16,12 +18,12 @@ export function LunoraWithAuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!sessionId || !userId) {
             clearAccessToken();
-            lunora.setAuthToken(null);
+            authTokenSync.signOut();
 
             return undefined;
         }
 
-        return keepAuthToken(lunora, userId, getAccessToken);
+        return authTokenSync.start(userId);
     }, [sessionId, userId]);
 
     return <LunoraProvider client={lunora}>{children}</LunoraProvider>;

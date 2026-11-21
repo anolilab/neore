@@ -1686,6 +1686,9 @@ importers:
       eslint:
         specifier: catalog:lint
         version: 10.14.0(jiti@2.7.0)(supports-color@10.2.2)
+      fake-indexeddb:
+        specifier: catalog:test
+        version: 6.2.8
       jsdom:
         specifier: catalog:test
         version: 31.0.0(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)
