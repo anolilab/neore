@@ -2,15 +2,21 @@
  * What the thread view reads of a goal (`useThreadGoal`): the goal text, its
  * status, the reviewer's verdict per round and the message that started it. Starting a goal rides on
  * `/chat/start`; stopping one is the thread's ordinary stop.
+ *
+ * The chat's pinned goal is stored on the thread (`getPinnedGoal`, `setPinnedGoal`, `clearPinnedGoal`). The web app
+ * sends it with each message that carries no goal of its own; the backend has no pin of its own to apply.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
-import { authQuery } from "../../lib/crpc";
+import { setThreadPinnedGoal } from "../../agent/table-writes";
+import { requireOwnedThreadIgnoringLock } from "../../agent/thread-read-access";
+import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { MAX_LENGTH } from "../../lib/validators";
 import { threadGateOutcome } from "../lib/thread-gate";
-import { vGoalStatus, vGoalStopReason, vGoalVerdict } from "./validators";
+import { GOAL_MAX_ROUNDS, GOAL_TEXT_MAX } from "./shared";
+import { vGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./validators";
 
 export const getThreadGoal = authQuery
     .input({
@@ -72,4 +78,71 @@ export const getThreadGoal = authQuery
             text: goal.text,
             verdicts: goal.verdicts,
         };
+    });
+
+/** The chat's pinned goal, or `null`. A locked chat's pin needs its proof, as its goal does. */
+export const getPinnedGoal = authQuery
+    .input({
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
+    .output(v.union(vPinnedGoal, v.null()))
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+        const { userId } = context.user;
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        if (!thread || thread.deleted || thread.userId !== userId) {
+            return null;
+        }
+
+        if (isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
+            return null;
+        }
+
+        return thread.pinnedGoal ?? null;
+    });
+
+/**
+ * Pins `text` as the chat's goal, replacing any pin. Owner only. Refused while impersonating: a goal spends the
+ * owner's budget over several rounds, and an admin acting as the owner must not start one.
+ */
+export const setPinnedGoal = authMutation
+    .input({
+        maxRounds: v.number(),
+        text: v.string().max(GOAL_TEXT_MAX),
+        threadId: v.id("threads"),
+    })
+    .use(rateLimit("chat/update"))
+    .output(v.null())
+    .mutation(async ({ args: { maxRounds, text, threadId }, ctx: context }) => {
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "A pinned goal cannot be set while impersonating");
+        }
+
+        const trimmed = text.trim();
+
+        if (trimmed.length === 0) {
+            throw new LunoraError("BAD_REQUEST", "A goal needs text");
+        }
+
+        if (!Number.isSafeInteger(maxRounds) || maxRounds < 1 || maxRounds > GOAL_MAX_ROUNDS) {
+            throw new LunoraError("BAD_REQUEST", `Review rounds must be between 1 and ${GOAL_MAX_ROUNDS}`);
+        }
+
+        await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+        await setThreadPinnedGoal(context.db, threadId, { maxRounds, text: trimmed });
+
+        return null;
+    });
+
+/** Removes the chat's pinned goal. Owner only. */
+export const clearPinnedGoal = authMutation
+    .input({ threadId: v.id("threads") })
+    .use(rateLimit("chat/update"))
+    .output(v.null())
+    .mutation(async ({ args: { threadId }, ctx: context }) => {
+        await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+        await setThreadPinnedGoal(context.db, threadId, undefined);
+
+        return null;
     });

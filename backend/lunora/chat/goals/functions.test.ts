@@ -5,7 +5,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../../schema";
-import { getThreadGoal } from "./functions";
+import { clearPinnedGoal, getPinnedGoal, getThreadGoal, setPinnedGoal } from "./functions";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -84,5 +84,36 @@ describe("getThreadGoal", () => {
         await harness.run(async (ctx: any) => await ctx.db.delete("threads", threadId));
 
         expect(await as(OWNER).query(getThreadGoal as never, { threadId } as never)).toBeNull();
+    });
+});
+
+describe("pinned goal", () => {
+    it("pins the trimmed text and rounds, and replaces an earlier pin", async () => {
+        await as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 3, text: "  Ship the report  ", threadId } as never);
+        await as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 10, text: "Ship the report", threadId } as never);
+
+        expect(await as(OWNER).query(getPinnedGoal as never, { threadId } as never)).toEqual({ maxRounds: 10, text: "Ship the report" });
+    });
+
+    it("clears in one action", async () => {
+        await as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 5, text: "Ship it", threadId } as never);
+        await as(OWNER).mutation(clearPinnedGoal as never, { threadId } as never);
+
+        expect(await as(OWNER).query(getPinnedGoal as never, { threadId } as never)).toBeNull();
+    });
+
+    it("refuses a pin from anyone but the owner, and shows it to no one else", async () => {
+        await as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 5, text: "Ship it", threadId } as never);
+
+        await expect(as("stranger").mutation(setPinnedGoal as never, { maxRounds: 5, text: "Steal", threadId } as never)).rejects.toThrow();
+        await expect(as("stranger").mutation(clearPinnedGoal as never, { threadId } as never)).rejects.toThrow();
+        expect(await as("stranger").query(getPinnedGoal as never, { threadId } as never)).toBeNull();
+    });
+
+    it("refuses blank text and rounds outside the allowed range", async () => {
+        await expect(as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 5, text: " ".repeat(3), threadId } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 0, text: "Ship it", threadId } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 1.5, text: "Ship it", threadId } as never)).rejects.toThrow();
+        expect(await as(OWNER).query(getPinnedGoal as never, { threadId } as never)).toBeNull();
     });
 });

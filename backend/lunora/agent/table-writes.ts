@@ -121,6 +121,18 @@ export const patchThread = async (db: Database, threadId: Id<"threads">, fields:
 };
 
 /**
+ * Sets the thread's pinned goal, or removes it with `undefined` (`patchRow` removes a column set to `undefined`; a patch
+ * would leave it unchanged). The caller checks the thread is its owner's.
+ */
+export const setThreadPinnedGoal = async (db: Database, threadId: Id<"threads">, pinnedGoal: Doc<"threads">["pinnedGoal"]): Promise<void> => {
+    const row = await db.get("threads", threadId);
+
+    if (row) {
+        await patchRow(db, "threads", row, { pinnedGoal });
+    }
+};
+
+/**
  * Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). With `kind`,
  * only a pause of that kind is cleared: another kind belongs to someone else's turn on the thread.
  */

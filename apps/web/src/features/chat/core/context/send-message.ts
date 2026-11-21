@@ -1,7 +1,7 @@
 import { stripHiddenText } from "@neore/ai/utils";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { withUnlockProofBody } from "@neore/client-runtime";
+import { currentUnlockProof, withUnlockProofBody } from "@neore/client-runtime";
 import type { QueryClient } from "@tanstack/react-query";
 import type { HistoryState, useNavigate } from "@tanstack/react-router";
 import type { Dispatch, RefObject, SetStateAction } from "react";
@@ -462,8 +462,15 @@ const runSendMessageBody = async (
             threadId: threadId || undefined, // undefined triggers thread creation
         };
 
-        // "Run until done": this message is a goal (text turns only).
-        const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text) : undefined;
+        // "Run until done": this message is a goal (text turns only). A goal armed for it wins; otherwise the chat's pinned goal
+        // applies. The pin is read from the cache the composer keeps live, and read once when that cache is empty.
+        const pinnedGoal =
+            currentMode === "text" && guestMessageId === undefined && threadId && text.trim() && !useGoalComposer.getState().enabled
+                ? await queryClient.ensureQueryData(
+                      crpc.chat.goals.functions.getPinnedGoal.queryOptions({ threadId: threadId as Id<"threads">, unlockProof: currentUnlockProof(threadId) }),
+                  )
+                : null;
+        const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text, pinnedGoal) : undefined;
 
         if (goal) {
             requestBody.goal = goal;

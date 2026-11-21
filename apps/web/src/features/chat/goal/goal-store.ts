@@ -22,10 +22,27 @@ export const useGoalComposer = create<GoalComposerState>()((set) => {
     };
 });
 
-/** The `goal` field of a `/v1/chat` body for `text`, or `undefined` when the composer is not set to a goal. */
-export const goalForMessage = (text: string): { maxRounds: number; text: string } | undefined => {
+/** The goal a chat pins (`chat/goals/functions.ts#setPinnedGoal`): the text and review rounds every message in the chat runs with. */
+export interface PinnedGoal {
+    maxRounds: number;
+    text: string;
+}
+
+/**
+ * The `goal` field of a `/v1/chat` body for `text`, or `undefined` when the message carries none. A goal armed for this
+ * message wins over the chat's pin; without one, the pin applies. Blank text carries no goal.
+ */
+export const goalForMessage = (text: string, pinned?: PinnedGoal | null): { maxRounds: number; text: string } | undefined => {
     const { enabled, maxRounds } = useGoalComposer.getState();
     const trimmed = text.trim();
 
-    return enabled && trimmed ? { maxRounds, text: trimmed } : undefined;
+    if (!trimmed) {
+        return undefined;
+    }
+
+    if (enabled) {
+        return { maxRounds, text: trimmed };
+    }
+
+    return pinned ? { maxRounds: pinned.maxRounds, text: pinned.text } : undefined;
 };

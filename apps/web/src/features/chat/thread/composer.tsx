@@ -797,7 +797,7 @@ const Composer: FC<ComposerProps> = ({
                                 )}
                             </AnimatePresence>
                             {/* Run until done - a goal needs an account and a text message */}
-                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} />}
+                            {composerMode === "text" && !isAnonymous && <ComposerGoal disabled={isSSEStreaming} threadId={validThreadId} />}
                             {/* MCP server selector - only for text mode */}
                             <AnimatePresence initial={animateEntrance} mode="popLayout">
                                 {composerMode === "text" && (

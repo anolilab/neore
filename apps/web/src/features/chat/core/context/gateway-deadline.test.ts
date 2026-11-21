@@ -72,7 +72,20 @@ describe("gateway deadline in chat actions", () => {
         const env = {
             ...base(),
             authGate: { isReady: () => true, set: vi.fn(), wait: vi.fn() },
-            crpc: {},
+            // The send reads the chat's pinned goal from the cache once (`ensureQueryData`); no pin is set here.
+            crpc: {
+                chat: {
+                    goals: {
+                        functions: {
+                            getPinnedGoal: {
+                                queryOptions: () => {
+                                    return { queryFn: async () => null, queryKey: ["pin"] };
+                                },
+                            },
+                        },
+                    },
+                },
+            },
             defaultLanguage: "en",
             getChangedSettings: () => null,
             getPendingSettingsFromStore: () => null,
@@ -81,7 +94,7 @@ describe("gateway deadline in chat actions", () => {
             model: "m",
             navigate: vi.fn(),
             newChatsTemporary: false,
-            queryClient: {},
+            queryClient: { ensureQueryData: async () => null },
             refetchSession: vi.fn(),
             setGatewayInfo: vi.fn(),
             setOptimisticMessages: vi.fn(),
