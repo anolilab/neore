@@ -53,6 +53,7 @@
  * `createExtensionGrantStore` binds it to the real better-auth instance.
  */
 import { sha256Bytes, timingSafeEqual } from "../lib/crypto";
+import { type ClientGrantKind, clientGrantKindOf } from "./lib/sign-in-standing";
 
 /** How long a code lives. It only has to survive one redirect and one POST. */
 export const CODE_TTL_MS = 60_000;
@@ -89,7 +90,10 @@ export interface ExtensionGrantUser {
 export interface ExtensionGrantStore {
     /** Atomically delete and return the code row; `null` when absent or already consumed. */
     consumeCode: (identifier: string) => Promise<null | { expiresAt: Date; value: string }>;
-    createSession: (userId: string, meta: { ipAddress?: string; userAgent?: string }) => Promise<{ expiresAt: Date; token: string }>;
+    createSession: (
+        userId: string,
+        meta: { clientGrant: ClientGrantKind; ipAddress?: string; userAgent?: string },
+    ) => Promise<{ expiresAt: Date; token: string }>;
     deleteSession: (token: string) => Promise<void>;
     extendSession: (token: string, expiresAt: Date) => Promise<void>;
     findSession: (token: string) => Promise<null | { session: { expiresAt: Date; id: string }; user: ExtensionGrantUser }>;
@@ -293,7 +297,13 @@ export const exchangeExtensionCode = async (
 
     // Re-checked: the user could have been banned in the minute since approving.
     const user = assertEligible(await store.findUser(stored.userId));
-    const session = await store.createSession(user.id, { ipAddress: input.ipAddress, userAgent: input.userAgent });
+    // The app the code was issued for, from its stored redirect URI, never the request: what a browser extension sends is
+    // not the owner's typing (`auth/lib/sign-in-standing.ts`).
+    const session = await store.createSession(user.id, {
+        clientGrant: clientGrantKindOf(stored.redirectUri),
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+    });
 
     return { expiresAt: session.expiresAt.getTime(), token: session.token, user: profileOf(user) };
 };
@@ -389,6 +399,7 @@ export const createExtensionGrantStore = (auth: unknown): ExtensionGrantStore =>
         createSession: async (userId, meta) => {
             const internal = await adapter();
             const session = await internal.createSession(userId, false, {
+                clientGrant: meta.clientGrant,
                 ...(meta.ipAddress && { ipAddress: meta.ipAddress }),
                 ...(meta.userAgent && { userAgent: meta.userAgent }),
             });

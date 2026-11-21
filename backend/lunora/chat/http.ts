@@ -10,7 +10,7 @@ import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
 import { ATTACH_WINDOW_EXPIRED_MESSAGE, attachCountWithinCap, attachWindowOpen, isAttachWindowExpired, MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
-import { requestSignIn } from "../auth/lib/request-sign-in";
+import { requestSignIn, requestSignInIsGrant } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
 import { assertPaidModel } from "./lib/enabled-model";
@@ -906,7 +906,8 @@ const runChatStartOnShard = async (
     // (`gsid`, which never becomes `sessionId`, `src/bearer-identity.ts`). It places the chat in its organization, so a
     // signed-in caller with neither cannot be placed and must not read as the personal space, whose cap is `auto`. A
     // public API key caller has neither; its run is held at `ask` by its origin (`apiKeyOrigin`).
-    const signIn = requestSignIn(await context.auth.getIdentity());
+    const identity = await context.auth.getIdentity();
+    const signIn = requestSignIn(identity);
 
     if (signIn === undefined && origin !== "outside_agent") {
         return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
@@ -920,7 +921,11 @@ const runChatStartOnShard = async (
     const placedPromise =
         signIn === undefined
             ? Promise.resolve(undefined)
-            : context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId });
+            : context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, {
+                  sessionId: signIn,
+                  userId,
+                  viaGrant: requestSignInIsGrant(identity),
+              });
     const sessionOrganizationPromise = placedPromise.then((placed) => placed?.organizationId ?? null);
 
     // A request refused before the first write never awaits these; they are only reads.
@@ -1201,10 +1206,15 @@ const runChatStartOnShard = async (
         return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
     }
 
-    // Text the owner did not type is saved marked: a draft from outside, and anything an admin acting as them sends.
+    // Text the owner did not type is saved marked: a draft from outside, anything an admin acting as them sends, and
+    // whatever a browser extension's grant sends (`auth/lib/sign-in-standing.ts`, from the session row, never the request).
     // `draftFrom` was checked by `runChatStart`: only a known source reaches here.
     const draftFrom = parseNotTypedDraft(body.draftFrom) ?? undefined;
-    const notTyped: NotTypedMarks = mergeNotTypedMarks(notTypedMarksOfDraftFrom(draftFrom), placed?.impersonating === true ? { impersonated: true } : {});
+    const notTyped: NotTypedMarks = mergeNotTypedMarks(
+        placed?.extension === true ? { draft: "extension" } : {},
+        notTypedMarksOfDraftFrom(draftFrom),
+        placed?.impersonating === true ? { impersonated: true } : {},
+    );
 
     const promptIndex = messageContent.indexOf(promptPart);
 
@@ -1281,6 +1291,10 @@ const runChatStartOnShard = async (
         const activeOrganizationId = await activeOrganizationPromise;
 
         await enqueueJob(internal.chat.execute.runStreamingAgent, {
+            // From the session read above, never the body: the saved-login verdict refuses an admin's turn by it, and a browser
+            // extension's (its prompt is marked too). A send with no sign-in session to read (an API key) records nothing,
+            // which is no answer and refuses too.
+            ...(placed !== undefined && { impersonated: placed.impersonating === true || placed.extension === true }),
             isAnonymous,
             messageId: run.messageId,
             ...(activeOrganizationId && { organizationId: activeOrganizationId }),
@@ -1803,20 +1817,28 @@ const runChatStartOnShard = async (
  * edit has answered, so the claim covers the file reads and the save.
  */
 /**
- * Whether a request's sign-in is an admin acting as `userId`, or cannot be confirmed as the user's own (no session, or one
- * gone): what it writes is then marked as not typed by the owner (`lib/not-typed-text.ts`). Only ever restricts.
+ * The not-typed marks (`lib/not-typed-text.ts`) of what a request's sign-in writes as `userId`: `impersonated` for an
+ * admin acting as them or a sign-in that cannot be confirmed as theirs (no session, or one gone), `extension` for a
+ * browser extension's grant or a grant whose app cannot be told (`auth/lib/sign-in-standing.ts`). Only ever restricts.
  */
-const signInNotOwn = async (context: HttpActionCtx, userId: string): Promise<boolean> => {
+const signInMarks = async (context: HttpActionCtx, userId: string): Promise<NotTypedMarks> => {
     // Never throws: a failed read is a sign-in that cannot be confirmed.
-    const signIn = requestSignIn(await context.auth.getIdentity().catch(() => null));
+    const identity = await context.auth.getIdentity().catch(() => null);
+    const signIn = requestSignIn(identity);
 
     if (signIn === undefined) {
-        return true;
+        return { impersonated: true };
     }
 
-    const placed = await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId }).catch(() => null);
+    const placed = await context
+        .runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId, viaGrant: requestSignInIsGrant(identity) })
+        .catch(() => null);
 
-    return placed === null || placed.impersonating === true;
+    if (placed === null || placed.impersonating === true) {
+        return { impersonated: true };
+    }
+
+    return placed.extension === true ? { draft: "extension" } : {};
 };
 
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
@@ -1903,8 +1925,8 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         );
     }
 
-    // Read alongside the rest: whether an admin acting as the owner sends the edit, which marks it as not typed.
-    const notOwnSignIn = signInNotOwn(context, userId);
+    // Read alongside the rest: whether an admin acting as the owner or a browser extension sends the edit, which marks it as not typed.
+    const signInMarksPromise = signInMarks(context, userId);
 
     try {
         // Get the message to find its thread. The thread is not known yet, so the raw row is read and the gate below decides.
@@ -1977,7 +1999,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         const notTyped = mergeNotTypedMarks(
             notTypedMarksOfMessage(message.message as Parameters<typeof notTypedMarksOfMessage>[0]),
             notTypedMarksOfDraftFrom(draftFrom),
-            (await notOwnSignIn) ? { impersonated: true } : {},
+            await signInMarksPromise,
         );
 
         // A stateless reply saves its prompt again from the plain text (`streamAsync`), an untagged copy of the guest's words

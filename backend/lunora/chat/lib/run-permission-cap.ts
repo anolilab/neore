@@ -8,7 +8,7 @@
 import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
-import { requestSignIn } from "../../auth/lib/request-sign-in";
+import { requestSignIn, requestSignInIsGrant } from "../../auth/lib/request-sign-in";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { toolsLogger } from "../../lib/logger";
@@ -84,7 +84,8 @@ export const readRequestPermissionCap = async (ctx: Pick<HttpActionCtx, "auth" |
         // The web app's session or an app grant's sign-in (`requestSignIn`), as `/chat/start` reads it. The caller is
         // already signed in (the proxy authenticates before it asks), so a missing identity or sign-in cannot mean the
         // personal space: its space cannot be told.
-        const sessionId = requestSignIn(await ctx.auth.getIdentity());
+        const identity = await ctx.auth.getIdentity();
+        const sessionId = requestSignIn(identity);
 
         if (sessionId === undefined) {
             toolsLogger.warn("[TOOLS] Request identity names no session; capping at ask.");
@@ -92,7 +93,11 @@ export const readRequestPermissionCap = async (ctx: Pick<HttpActionCtx, "auth" |
             return { cap: "ask", unresolved: "session" };
         }
 
-        const session = await ctx.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId, userId });
+        const session = await ctx.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, {
+            sessionId,
+            userId,
+            viaGrant: requestSignInIsGrant(identity),
+        });
 
         // A token whose session is gone or expired cannot be placed in a space either.
         if (!session) {

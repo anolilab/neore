@@ -41,8 +41,17 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
         /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
-        /** `removesInstructionRead`: the tools' own gates (the cap, a bot's selection, the permissions) removed it. */
-        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined, removesInstructionRead: false },
+        /**
+         * Whether the model may use tools, and the options `buildAgentTools` was last given.
+         * `removesInstructionRead`: the tools' own gates (the cap, a bot's selection, the permissions) removed it.
+         */
+        toolsState: {
+            allowTools: false,
+            /** The action ctx the tools were built with: the tools get it as their `ToolCtx`. */
+            ctx: undefined as { runTurn?: unknown } | undefined,
+            options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined,
+            removesInstructionRead: false,
+        },
     };
 });
 
@@ -83,6 +92,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: null,
                 untrustedContext: false,
                 userProviderKeys: undefined,
@@ -117,7 +127,8 @@ vi.mock("./lib/agent-tools", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-tools")>()),
         buildAgentTools: vi.fn(
-            async (_ctx: unknown, options: { instructions?: Promise<ReadonlyArray<unknown>>; untrustedContext?: Promise<boolean> | boolean }) => {
+            async (ctx: { runTurn?: unknown }, options: { instructions?: Promise<ReadonlyArray<unknown>>; untrustedContext?: Promise<boolean> | boolean }) => {
+                toolsState.ctx = ctx;
                 toolsState.options = options;
 
                 // Offered as a candidate, kept unless the gates remove it (`agent-tools.bot-selection.test.ts`).
@@ -237,6 +248,7 @@ beforeEach(async () => {
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
+    toolsState.ctx = undefined;
     toolsState.options = undefined;
     toolsState.removesInstructionRead = false;
 
@@ -271,7 +283,9 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) => {
+const run = async (
+    extra: { impersonated?: boolean; model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {},
+) => {
     const { model = "test-model", ...rest } = extra;
 
     return await harness.action(
@@ -335,6 +349,32 @@ describe("runStreamingAgent: a successful turn", () => {
     });
 });
 
+describe("runStreamingAgent: the turn its tools see", () => {
+    it.each([false, true])(
+        "hands the tools the turn as /chat/start recorded it (impersonated: %s), its prompt and its system prompt's kinds",
+        async (impersonated) => {
+            toolsState.allowTools = true;
+
+            await run({ impersonated });
+
+            expect(toolsState.ctx?.runTurn).toStrictEqual({
+                impersonated,
+                promptMessageId: ids.messageId,
+                systemContext: expect.arrayContaining(["instructions"]),
+            });
+        },
+    );
+
+    it("hands them no turn when the job does not say whether an admin sent it, which refuses a saved login", async () => {
+        toolsState.allowTools = true;
+
+        await run();
+
+        expect(toolsState.ctx).toBeDefined();
+        expect(toolsState.ctx?.runTurn).toBeUndefined();
+    });
+});
+
 describe("runStreamingAgent: a project's rule files read when needed", () => {
     const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
 
@@ -351,6 +391,7 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
             projectInstructions: instructions,
             researchDepth: "balanced",
             retrievedMemories: [],
+            systemContext: ["instructions"],
             threadSettings,
             untrustedContext: true,
             userProviderKeys: undefined,
