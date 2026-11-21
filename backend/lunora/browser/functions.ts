@@ -344,6 +344,37 @@ export const closeSession = internalMutation
         );
     });
 
+// ── Human checks (`human-check.ts`) ──────────────────────────────────────
+
+/** The row recording that the person was asked about `site` during the run `run` of the thread, if they were. */
+const humanCheckAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string): Promise<Doc<"browserHumanChecks"> | null> =>
+    await db
+        .query("browserHumanChecks")
+        .withIndex("by_threadId_run_site", (q) => q.eq("threadId", threadId).eq("run", run).eq("site", site))
+        .first();
+
+export const wasHumanCheckAsked = internalQuery
+    .input({ run: v.string(), site: v.string(), threadId: v.id("threads") })
+    .output(v.boolean())
+    .query(async ({ args: { run, site, threadId }, ctx }) => (await humanCheckAsk(ctx.db, threadId, run, site)) !== null);
+
+/**
+ * The person is asked about `site` once per run: `true` for the first ask, which records it in the same transaction,
+ * `false` when another action of the run asked already.
+ */
+export const claimHumanCheckAsk = internalMutation
+    .input({ run: v.string(), site: v.string(), threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { run, site, threadId, userId }, ctx }) => {
+        if ((await humanCheckAsk(ctx.db, threadId, run, site)) !== null) {
+            return false;
+        }
+
+        await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, run, site, threadId, userId });
+
+        return true;
+    });
+
 // ── Browser Extension Functions (Phase 2) ───────────────────────────────
 
 export const createExtensionPairing = internalMutation

@@ -4,7 +4,7 @@
  */
 import type { MutationCtx } from "../_generated/server";
 
-/** Browser sessions with their actions, and the user's browser extensions. */
+/** Browser sessions with their actions, the sites a run asked the user to clear, and the user's browser extensions. */
 export const eraseBrowserDataForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
     // Delete browser sessions and their actions
     const sessions = await ctx.db
@@ -27,7 +27,13 @@ export const eraseBrowserDataForUser = async (ctx: MutationCtx, userId: string):
         .withIndex("by_userId_status", (q) => q.eq("userId", userId))
         .collect();
 
+    const humanChecks = await ctx.db
+        .query("browserHumanChecks")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .collect();
+
     await Promise.all([
+        ...humanChecks.map((check) => ctx.db.delete("browserHumanChecks", check._id)),
         ...allActions.flat().map((a) => ctx.db.delete("browserActions", a._id)),
         ...sessions.map((s) => ctx.db.delete("browserSessions", s._id)),
         ...extensions.map((entry) => ctx.db.delete("browserExtensions", entry._id)),

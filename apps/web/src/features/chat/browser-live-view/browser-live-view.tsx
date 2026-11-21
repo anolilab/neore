@@ -17,6 +17,7 @@ import type { ChangeEvent, FC, FormEvent } from "react";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { onBrowserControlRequest } from "@/features/chat/browser-live-view/control-request";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
 /**
@@ -308,6 +309,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const [loadedAt, setLoadedAt] = useState(0);
     const mounted = useRef(false);
     const frame = useRef<HTMLIFrameElement>(null);
+    const section = useRef<HTMLElement>(null);
     const leaving = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const expanded = view.kind !== "closed";
     // Whether this tab's lease is still live, judged on the server's clock and moved onto this device's once per status
@@ -937,6 +939,34 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             .catch((error: unknown) => navigationFailed(navigation, error));
     };
 
+    const mayTakeControl = canControl && !youControl && !controlledByOther;
+    const takingControl = view.kind === "opening" && view.mode === "control";
+
+    const startControl = (): void => {
+        noticeTurn.current += 1;
+        setNotice(undefined);
+        setAddressError(undefined);
+        setAddress(openedUrl ?? currentUrl ?? "");
+        ask(false, "control");
+    };
+
+    // A "Needs you" card in the chat (`browser-human-check.tsx`) asks for control: the same as this card's own button.
+    const controlRequested = useEffectEvent((requested: string): boolean => {
+        if (requested !== threadId || !mayTakeControl) {
+            return false;
+        }
+
+        section.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+        if (!takingControl) {
+            startControl();
+        }
+
+        return true;
+    });
+
+    useEffect(() => onBrowserControlRequest(controlRequested), []);
+
     const framed =
         view.kind === "open" && !view.stale && !isForOtherBrowser(view, browserId) && !controlledByOther && (view.mode === "watch" || youControl)
             ? view
@@ -944,7 +974,11 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const inControlView = framed?.mode === "control";
 
     return (
-        <section aria-labelledby={headingId} className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
+        <section
+            aria-labelledby={headingId}
+            className="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50"
+            ref={section}
+        >
             <div className="flex flex-wrap items-center gap-2">
                 <Globe aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -974,21 +1008,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                         {t`Hand back`}
                     </Button>
                 )}
-                {canControl && !youControl && !controlledByOther && (
-                    <Button
-                        aria-controls={viewId}
-                        className={TOUCH_TARGET}
-                        disabled={view.kind === "opening" && view.mode === "control"}
-                        onClick={() => {
-                            noticeTurn.current += 1;
-                            setNotice(undefined);
-                            setAddressError(undefined);
-                            setAddress(openedUrl ?? currentUrl ?? "");
-                            ask(false, "control");
-                        }}
-                        size="sm"
-                        type="button"
-                    >
+                {mayTakeControl && (
+                    <Button aria-controls={viewId} className={TOUCH_TARGET} disabled={takingControl} onClick={startControl} size="sm" type="button">
                         {t`Take control`}
                     </Button>
                 )}

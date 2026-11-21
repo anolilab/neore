@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import BrowserLiveView from "./browser-live-view";
+import { requestBrowserControl } from "./control-request";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/react/macro", () => {
@@ -692,6 +693,29 @@ describe("BrowserLiveView", () => {
             fireEvent.change(screen.getByRole("textbox", { name: "Page address" }), { target: { value: url } });
             await userEvent.click(screen.getByRole("button", { name: "Go" }));
         };
+
+        it("takes control when the chat's Needs you card asks for this thread, and only for it", async () => {
+            controllable();
+            mountCard();
+            await screen.findByRole("button", { name: "Take control" });
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                connectBy: Date.now() + 60_000,
+                status: "ok",
+                until: Date.now() + 120_000,
+                url: CONTROL_URL,
+            });
+            Element.prototype.scrollIntoView = vi.fn();
+
+            expect(requestBrowserControl("thread-other")).toBe(false);
+            expect(backend.take).not.toHaveBeenCalled();
+
+            await act(async () => {
+                expect(requestBrowserControl(THREAD)).toBe(true);
+            });
+            expect(backend.take).toHaveBeenCalledExactlyOnceWith({ threadId: THREAD });
+            expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+        });
 
         it("opens the interactive view, and hands back under its claim to a read-only one", async () => {
             controllable();

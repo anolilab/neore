@@ -430,6 +430,22 @@ export const schema = defineSchema({
         .index("by_pairingCode", ["pairingCode"])
         .index("by_extensionId", ["extensionId"]),
 
+    /**
+     * A site whose check (a human verification, a sign-in the agent cannot pass) the person was asked to clear during
+     * one run (`run`: the run's prompt message): asked at most once per site per run (`browser/human-check.ts`).
+     */
+    browserHumanChecks: defineTable({
+        askedAt: v.number(),
+        run: v.string(),
+        /** The page's host, `""` when it had no readable URL. */
+        site: v.string(),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_threadId_run_site", ["threadId", "run", "site"])
+        .index("by_userId", ["userId"]),
+
     browserSessions: defineTable({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),

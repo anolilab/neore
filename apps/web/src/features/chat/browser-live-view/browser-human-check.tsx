@@ -1,0 +1,104 @@
+/**
+ * BrowserHumanCheck - the "Needs you" card in the chat, in place of a browser call's result when the agent's browser
+ * reached a page only a person can clear (a human verification, a sign-in it cannot pass) and the person was asked
+ * (`backend/lunora/browser/human-check.ts`). It names the site, shows what the browser sees, and takes control through
+ * the live view card above the composer, which owns the lease; the agent gets the browser back on Hand back or after
+ * the person stops using it.
+ */
+import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
+import type { ToolPart } from "@neore/chat-ui/types";
+import { toolImageSource } from "@neore/chat-ui/utils/tool-image-source";
+import { Button } from "@neore/ui/components/button";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { ShieldAlert } from "lucide-react";
+import type { FC } from "react";
+import { useId, useState } from "react";
+
+import { requestBrowserControl } from "@/features/chat/browser-live-view/control-request";
+import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
+import { useCRPC } from "@/lib/lunora/crpc";
+
+interface HumanCheckOutput {
+    humanCheck?: { site?: string };
+    screenshot?: string;
+    screenshotFormat?: string;
+    screenshotUrl?: string;
+    title?: string;
+    url?: string;
+}
+
+/** The card for the thread `threadId`; exported for stories and tests, which have no chat around it. */
+export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }> = ({ part, threadId }) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+    const headingId = useId();
+    const output = (part.output ?? {}) as HumanCheckOutput;
+    const site = output.humanCheck?.site || undefined;
+    // The same live status the live view card reads: one subscription for both.
+    const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
+    const browser = status.data;
+    const [missed, setMissed] = useState(false);
+    const screenshot = output.screenshotFormat
+        ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
+        : undefined;
+
+    let state: string | undefined;
+
+    if (browser === null || status.isError || missed) {
+        state = t`The browser has closed. Ask the agent to open the page again if it is still needed.`;
+    } else if (browser?.control?.byYou === true) {
+        state = t`You have control. Clear the check in the live view, then hand the browser back.`;
+    } else if (browser?.control !== undefined) {
+        state = t`Someone else has control of this browser.`;
+    } else if (browser?.canControl === false) {
+        state = t`Only someone who can write in this chat can take control of the browser.`;
+    }
+
+    const canAsk = browser !== undefined && browser !== null && state === undefined && threadId !== undefined;
+
+    return (
+        <section
+            aria-labelledby={headingId}
+            className="mb-4 overflow-hidden rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40"
+        >
+            <div className="flex flex-wrap items-start gap-2 px-3 py-2">
+                <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-medium text-amber-900 dark:text-amber-200" id={headingId}>{t`Needs you`}</h3>
+                    <p className="text-xs text-amber-900 dark:text-amber-200">
+                        {site === undefined
+                            ? t`The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it.`
+                            : t`The agent's browser reached a page on ${site} only a person can clear. The agent waits and will not try to get around it.`}
+                    </p>
+                    <p className="text-xs text-amber-800 dark:text-amber-300">{t`Take control, clear it, then hand the browser back.`}</p>
+                    {state !== undefined && (
+                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-300" role="status">
+                            {state}
+                        </p>
+                    )}
+                </div>
+                {canAsk && (
+                    <Button className="any-pointer-coarse:min-h-11" onClick={() => setMissed(!requestBrowserControl(threadId))} size="sm" type="button">
+                        {t`Take control`}
+                    </Button>
+                )}
+            </div>
+            {screenshot !== undefined && (
+                <img
+                    alt={site === undefined ? t`What the agent's browser sees` : t`What the agent's browser sees on ${site}`}
+                    className="ph-no-capture w-full border-t border-amber-200 dark:border-amber-800"
+                    src={screenshot}
+                />
+            )}
+        </section>
+    );
+};
+
+const BrowserHumanCheck: FC<{ part: ToolPart }> = ({ part }) => {
+    const { threadId } = useChatThreadIdentity();
+
+    return <HumanCheckCard part={part} threadId={threadId} />;
+};
+
+export default BrowserHumanCheck;

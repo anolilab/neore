@@ -256,8 +256,13 @@ const handBackNote = (returned: BrowserReturn): string => `The person had contro
 /**
  * The first action after a person drove the browser: the result says so, and names the page the browser is on now. An
  * action that would change the page (`skipped`) was not run; a screenshot of the page came back in its place.
+ * `handedBack` marks it for the human-check ladder (`browser/human-check.ts`), which tells whether a check it asked about cleared.
  */
-const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(result: T, returned: BrowserReturn, skipped?: string): T => {
+const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(
+    result: T,
+    returned: BrowserReturn,
+    skipped?: string,
+): T & { handedBack: true } => {
     const page = result.url === undefined ? "The current page is unknown." : `The browser is now on ${result.url}.`;
     const note = `${handBackNote(returned)} ${page} ${
         skipped === undefined
@@ -265,7 +270,12 @@ const handedBackResult = <T extends { error?: string; success?: boolean; url?: s
             : `Your ${skipped} action was not run: this is a screenshot of the page instead. Look at it, then decide what to do.`
     }`;
 
-    return { ...result, error: result.error === undefined ? note : `${note} ${result.error}`, ...(skipped !== undefined && { success: false }) };
+    return {
+        ...result,
+        error: result.error === undefined ? note : `${note} ${result.error}`,
+        handedBack: true,
+        ...(skipped !== undefined && { success: false }),
+    };
 };
 
 /** What the agent hears from an action whose browser another, concurrent action replaced: look again, on the kept browser. */

@@ -3163,7 +3163,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:384
+#: ../../packages/chat-ui/src/chat/message-content.tsx:386
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3644,7 +3644,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1162
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1167
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -5405,13 +5405,13 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:944
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
+#: ../../packages/chat-ui/src/chat/message-content.tsx:747
+#: src/features/chat/browser-live-view/browser-live-view.tsx:985
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1179
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:768
+#: ../../packages/chat-ui/src/chat/message-content.tsx:770
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -5419,7 +5419,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:766
+#: ../../packages/chat-ui/src/chat/message-content.tsx:768
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -5428,7 +5428,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:728
+#: ../../packages/chat-ui/src/chat/message-content.tsx:730
 msgid "Browser screenshot"
 msgstr "浏览器截图"
 
@@ -5436,7 +5436,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:678
+#: ../../packages/chat-ui/src/chat/message-content.tsx:680
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -6325,7 +6325,7 @@ msgstr "已检查：{0}"
 msgid "Checking"
 msgstr "检查中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:401
+#: ../../packages/chat-ui/src/chat/message-content.tsx:403
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -6740,7 +6740,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:670
+#: ../../packages/chat-ui/src/chat/message-content.tsx:672
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -6900,7 +6900,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 msgid "Code"
 msgstr "代码"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:131
+#: ../../packages/chat-ui/src/chat/message-content.tsx:133
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "代码块"
@@ -6913,7 +6913,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:646
+#: ../../packages/chat-ui/src/chat/message-content.tsx:648
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -6937,7 +6937,7 @@ msgstr "你的账号暂时无法使用代码模式。"
 msgid "Code navigation"
 msgstr "代码导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:602
+#: ../../packages/chat-ui/src/chat/message-content.tsx:604
 msgid "Code output"
 msgstr "代码输出"
 
@@ -8130,11 +8130,11 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:471
+#: src/features/chat/browser-live-view/browser-live-view.tsx:477
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "浏览器的控制权已交还给智能体：服务器未能及时确认你仍拥有控制权。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:472
+#: src/features/chat/browser-live-view/browser-live-view.tsx:478
 msgid "Control of the browser is back with the agent."
 msgstr "浏览器的控制权已交还给智能体。"
 
@@ -9334,7 +9334,7 @@ msgstr "正在创建机器人…"
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:325
+#: ../../packages/chat-ui/src/chat/message-content.tsx:327
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -11040,7 +11040,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:300
+#: ../../packages/chat-ui/src/chat/message-content.tsx:302
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11198,7 +11198,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:463
+#: ../../packages/chat-ui/src/chat/message-content.tsx:465
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "下载文件"
@@ -12623,7 +12623,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:261
+#: ../../packages/chat-ui/src/chat/message-content.tsx:263
 msgid "Error:"
 msgstr "错误："
 
@@ -12899,7 +12899,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:636
+#: ../../packages/chat-ui/src/chat/message-content.tsx:638
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -13243,11 +13243,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:736
+#: ../../packages/chat-ui/src/chat/message-content.tsx:738
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:671
+#: ../../packages/chat-ui/src/chat/message-content.tsx:673
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -15615,7 +15615,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:478
+#: ../../packages/chat-ui/src/chat/message-content.tsx:480
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -15623,12 +15623,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:479
+#: ../../packages/chat-ui/src/chat/message-content.tsx:481
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:322
+#: ../../packages/chat-ui/src/chat/message-content.tsx:324
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -15636,7 +15636,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:480
+#: ../../packages/chat-ui/src/chat/message-content.tsx:482
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -15794,7 +15794,7 @@ msgstr "授予他人访问此页面的权限，或发布一个只读链接。"
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1092
 msgid "Go"
 msgstr "前往"
 
@@ -16373,7 +16373,7 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
 msgid "Hand back"
 msgstr "交还"
 
@@ -16532,7 +16532,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1003
 msgid "Hide live view"
 msgstr "隐藏实时画面"
 
@@ -17032,7 +17032,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:430
+#: ../../packages/chat-ui/src/chat/message-content.tsx:432
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -17666,7 +17666,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:238
+#: ../../packages/chat-ui/src/chat/message-content.tsx:240
 msgid "Input:"
 msgstr "输入："
 
@@ -18081,7 +18081,7 @@ msgstr "它打开的会话与自己的不同，因此已移交对话"
 msgid "It was not saved. Paste it again and save."
 msgstr "未保存。请再次粘贴并保存。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:407
+#: ../../packages/chat-ui/src/chat/message-content.tsx:409
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -18239,7 +18239,7 @@ msgstr "哈萨克斯坦"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "继续接受旧密钥 24 小时"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1000
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
 msgid "Keep control"
 msgstr "保持控制"
 
@@ -19206,11 +19206,11 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1126
 msgid "Live view of the agent's browser (read-only)"
 msgstr "智能体浏览器的实时画面（只读）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1126
 msgid "Live view of the agent's browser (you have control)"
 msgstr "智能体浏览器的实时画面（由你控制）"
 
@@ -19341,7 +19341,7 @@ msgstr "正在加载编辑器…"
 msgid "Loading feedback"
 msgstr "正在加载反馈"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:344
+#: ../../packages/chat-ui/src/chat/message-content.tsx:346
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -19549,7 +19549,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:347
+#: ../../packages/chat-ui/src/chat/message-content.tsx:349
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21639,11 +21639,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:737
+#: ../../packages/chat-ui/src/chat/message-content.tsx:739
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:678
+#: ../../packages/chat-ui/src/chat/message-content.tsx:680
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -21666,6 +21666,7 @@ msgstr "需要我审查"
 msgid "Needs review"
 msgstr "待审核"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:65
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22444,7 +22445,7 @@ msgstr "还没有图片"
 msgid "No indexed files available. Files are still being processed."
 msgstr "没有已索引的文件。文件仍在处理中。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:997
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
@@ -23557,6 +23558,10 @@ msgstr "仅当每个筛选条件都与 JSON 正文匹配时才运行。请使用
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "只能对比同类型的模型。清除选择以切换类型。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:55
+msgid "Only someone who can write in this chat can take control of the browser."
+msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
+
 #. placeholder {0}: allThreadsData.lunora.length
 #: src/components/command-palette.tsx:631
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
@@ -23643,7 +23648,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:723
+#: ../../packages/chat-ui/src/chat/message-content.tsx:725
 #: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -24233,11 +24238,11 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1043
 msgid "Opening the live view…"
 msgstr "正在打开实时画面…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Opening the page. This can take up to a minute."
 msgstr "正在打开页面，最多可能需要一分钟。"
 
@@ -24557,7 +24562,7 @@ msgstr "已过时"
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:578
+#: ../../packages/chat-ui/src/chat/message-content.tsx:580
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -24617,8 +24622,8 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:246
-#: ../../packages/chat-ui/src/chat/message-content.tsx:254
+#: ../../packages/chat-ui/src/chat/message-content.tsx:248
+#: ../../packages/chat-ui/src/chat/message-content.tsx:256
 msgid "Output:"
 msgstr "输出："
 
@@ -24662,7 +24667,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:677
+#: ../../packages/chat-ui/src/chat/message-content.tsx:679
 msgid "page"
 msgstr "页面"
 
@@ -24675,7 +24680,7 @@ msgstr "第 {currentPage} 页，共 {totalPages} 页"
 msgid "Page added. It is being fetched and indexed."
 msgstr "已添加网页，正在获取并建立索引。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "页面地址"
@@ -28816,7 +28821,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:539
+#: ../../packages/chat-ui/src/chat/message-content.tsx:541
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -28824,7 +28829,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:215
+#: ../../packages/chat-ui/src/chat/message-content.tsx:217
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -29226,7 +29231,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:719
+#: ../../packages/chat-ui/src/chat/message-content.tsx:721
 msgid "Screenshot"
 msgstr "截图"
 
@@ -30979,7 +30984,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1095
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1100
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -31137,7 +31142,7 @@ msgstr "扎实的通用能力"
 msgid "Solid performance across most task types"
 msgstr "在大多数任务类型上表现扎实"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:628
+#: ../../packages/chat-ui/src/chat/message-content.tsx:630
 msgid "Some images from this run could not be saved."
 msgstr "此次运行中的部分图像无法保存。"
 
@@ -31145,8 +31150,13 @@ msgstr "此次运行中的部分图像无法保存。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:948
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
+#: src/features/chat/browser-live-view/browser-human-check.tsx:53
+#~ msgid "Someone else has control of the browser."
+#~ msgstr ""
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:53
+#: src/features/chat/browser-live-view/browser-live-view.tsx:989
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1055
 msgid "Someone else has control of this browser."
 msgstr "其他人正在控制此浏览器。"
 
@@ -31235,8 +31245,8 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1232
-#: src/features/chat/thread/message-content.tsx:146
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1237
+#: src/features/chat/thread/message-content.tsx:154
 msgid "Source {index}"
 msgstr "来源 {index}"
 
@@ -32826,19 +32836,24 @@ msgstr "台湾"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "输入一张图像，移除背景，然后应用风格迁移"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:985
+#: src/features/chat/browser-live-view/browser-human-check.tsx:85
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "Take control"
 msgstr "接管控制"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:71
+msgid "Take control, clear it, then hand the browser back."
+msgstr "接管控制，完成验证，然后把浏览器交还。"
 
 #: src/features/chat/group/group-mode.ts:75
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:340
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:672
+#: ../../packages/chat-ui/src/chat/message-content.tsx:674
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -33463,12 +33478,12 @@ msgid "That message was already sent."
 msgstr "该消息已发送。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:886
+#: src/features/chat/browser-live-view/browser-live-view.tsx:892
 msgid "That page could not be opened: {0}"
 msgstr "无法打开该页面：{0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:620
-#: src/features/chat/browser-live-view/browser-live-view.tsx:906
+#: src/features/chat/browser-live-view/browser-live-view.tsx:626
+#: src/features/chat/browser-live-view/browser-live-view.tsx:912
 msgid "That page could not be opened."
 msgstr "无法打开该页面。"
 
@@ -33573,7 +33588,7 @@ msgstr "智能体未提供该选项"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "智能体已结束，但未给出指南。请重新撰写。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1019
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1054
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "智能体正在完成一项浏览器操作，可能需要一分钟以上。请稍后再试。"
 
@@ -33585,7 +33600,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:945
+#: src/features/chat/browser-live-view/browser-live-view.tsx:986
 msgid "The agent is using a browser"
 msgstr "智能体正在使用浏览器"
 
@@ -33609,11 +33624,19 @@ msgstr "智能体未更改任何文件。"
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:880
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
 msgid "The agent's browser closed while the page loaded."
 msgstr "页面加载期间，智能体的浏览器已关闭。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:762
+#: src/features/chat/browser-live-view/browser-human-check.tsx:69
+msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
+msgstr "代理的浏览器在 {site} 上遇到了只有真人才能通过的页面。代理会等待，不会尝试绕过它。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:68
+msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
+msgstr "代理的浏览器遇到了只有真人才能通过的页面。代理会等待，不会尝试绕过它。"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:768
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
@@ -33687,9 +33710,13 @@ msgstr "已保存机器人的工具"
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:855
+#: src/features/chat/browser-live-view/browser-live-view.tsx:861
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "无法交还浏览器。两分钟内没有输入后，它会自动回到智能体手中。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:49
+msgid "The browser has closed. Ask the agent to open the page again if it is still needed."
+msgstr "浏览器已关闭。如果仍需要该页面，请让代理重新打开。"
 
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
@@ -34060,7 +34087,7 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
 msgid "The live view could not be opened."
 msgstr "无法打开实时画面。"
 
@@ -34068,7 +34095,7 @@ msgstr "无法打开实时画面。"
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1013
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1048
 msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
@@ -34199,7 +34226,7 @@ msgstr "页面智能体无法编辑此页面"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "页面现在显示的是另一个版本。请从你的版本中复制想保留的内容。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1103
 msgid "The page you opened is still loading."
 msgstr "你打开的页面仍在加载。"
 
@@ -34308,7 +34335,7 @@ msgstr "无法加载规则文件。"
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "运行将按你的选择进行：每次新建聊天、沿用之前的聊天，或沿用同一聊天但使用全新上下文。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:748
+#: ../../packages/chat-ui/src/chat/message-content.tsx:750
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
@@ -34536,7 +34563,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1158
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1163
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:803
 msgid "Thinking..."
@@ -34856,7 +34883,7 @@ msgstr "此主机被 ~/.ssh/config 中的 Match 规则使用，Neore 不会对�
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "此主机在 ~/.ssh/config 中使用了 {key}，Neore 不支持该设置。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:406
+#: ../../packages/chat-ui/src/chat/message-content.tsx:408
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -35640,7 +35667,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1062
 msgid "Too many live views were opened. Try again later."
 msgstr "打开的实时画面过多，请稍后再试。"
 
@@ -36043,8 +36070,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1159
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1067
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1194
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36250,7 +36277,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "整个界面的字体。代码块始终保持等宽。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:673
+#: ../../packages/chat-ui/src/chat/message-content.tsx:675
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -36756,11 +36783,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1093
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1098
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1093
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1098
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -38119,7 +38146,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1003
 msgid "Watch live"
 msgstr "观看实时画面"
 
@@ -38400,6 +38427,14 @@ msgstr "指南应该关注什么？"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:91
+msgid "What the agent's browser sees"
+msgstr "代理的浏览器看到的内容"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:91
+msgid "What the agent's browser sees on {site}"
+msgstr "代理的浏览器在 {site} 上看到的内容"
+
 #: src/features/prompts/components/variable-definitions.tsx:127
 msgid "What this variable represents..."
 msgstr "此变量代表什么..."
@@ -38532,7 +38567,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1181
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "无法检查智能体是否正在使用浏览器。"
 
@@ -38999,10 +39034,14 @@ msgstr "这些是你在智能体构建器中选择的集成。每一个都会先
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "运行完成、需要你审阅或失败时，你会收到通知。已完成的运行会链接到其聊天，需要审阅的运行会链接到任务看板。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:505
-#: src/features/chat/browser-live-view/browser-live-view.tsx:834
+#: src/features/chat/browser-live-view/browser-live-view.tsx:511
+#: src/features/chat/browser-live-view/browser-live-view.tsx:840
 msgid "You handed the browser back to the agent."
 msgstr "你已将浏览器交还给智能体。"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:51
+msgid "You have control. Clear the check in the live view, then hand the browser back."
+msgstr "你已接管控制。请在实时视图中完成验证，然后把浏览器交还。"
 
 #: src/features/auth/components/team/leave-team-dialog.tsx:47
 msgid "You have left the team"
@@ -39058,7 +39097,7 @@ msgstr "你今天的消息额度已用完。请稍后再试。"
 msgid "You have used today's translations. Try again later."
 msgstr "今天的翻译次数已用完。请稍后再试。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:340
 msgid "You may not take control of this browser."
 msgstr "你无法控制此浏览器。"
 
@@ -39066,9 +39105,9 @@ msgstr "你无法控制此浏览器。"
 msgid "You need to sign in to access this page."
 msgstr "你需要登录才能访问此页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:510
-#: src/features/chat/browser-live-view/browser-live-view.tsx:834
-#: src/features/chat/browser-live-view/browser-live-view.tsx:882
+#: src/features/chat/browser-live-view/browser-live-view.tsx:516
+#: src/features/chat/browser-live-view/browser-live-view.tsx:840
+#: src/features/chat/browser-live-view/browser-live-view.tsx:888
 msgid "You no longer have control of the browser."
 msgstr "你已不再控制此浏览器。"
 
@@ -39223,7 +39262,7 @@ msgstr "你的聊天和 {0}"
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1112
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "你在画面中的点击、输入和滚动都会发送到浏览器。在你交还之前，智能体会等待。"
 

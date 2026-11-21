@@ -1,12 +1,12 @@
 import z from "zod/v4";
 
-import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
+import { internal } from "../../_generated/internal";
 
 /**
  * Browser Automation Tool
  *
- * Gives the AI agent the ability to control a cloud browser via Browserbase.
+ * Gives the AI agent the ability to control a cloud browser (Cloudflare Browser Rendering).
  * Supports navigation, screenshots, clicking, typing, text extraction, scrolling,
  * and JavaScript evaluation.
  *
@@ -15,6 +15,7 @@ import type { Id } from "../../_generated/dataModel";
  */
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
+import { humanCheckLadder } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
 
@@ -23,6 +24,10 @@ export interface BrowserResult {
     content?: string;
     direction?: string;
     error?: string;
+    /** The person had driven the browser and gave it back: this result is the first look since. */
+    handedBack?: boolean;
+    /** The page needs a person (`browser/human-check.ts`): `asked` shows the "Needs you" card in the chat. */
+    humanCheck?: { site: string; status: "already_asked" | "asked" };
     result?: string;
     screenshot?: string;
     screenshotFormat?: string;
@@ -40,7 +45,7 @@ export interface BrowserResult {
  */
 const browserTool = createTool<
     {
-        action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll";
+        action: "navigate" | "screenshot" | "click" | "type" | "extract" | "scroll" | "needs_person";
         direction?: "up" | "down";
         fullPage?: boolean;
         selector?: string;
@@ -58,8 +63,10 @@ Available actions:
 - **type**: Type text into an input field. Requires \`selector\` and \`text\`.
 - **extract**: Extract text content from the page or a specific element. Optional \`selector\` to target specific element.
 - **scroll**: Scroll the page. Optional \`direction\` ("up" or "down", default "down").
+- **needs_person**: Ask the person to clear a page only they can (a sign-in you have no account for, or a check the browser did not catch). Shows them the page and lets them take control.
 
 The browser session persists across calls, so you can chain actions: navigate → click → extract.
+Never try to solve or get around a human verification, captcha or bot check, and never sign in with details you guessed. A detected check is waited out once, then the person is asked to clear it, at most once per site per task. Once they hand the browser back you are told; look at the page before you act.
 Use this tool when you need to visit websites, fill forms, scrape data, or interact with web applications.`,
     execute: async (context, input) => {
         const { action } = input;
@@ -74,19 +81,46 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             return { error: "Thread context required for browser automation", success: false };
         }
 
-        try {
-            const result = (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
-                action,
+        const threadId = context.threadId as Id<"threads">;
+        const { userId } = context;
+        const run = async (step: Omit<typeof input, "action"> & { action: Exclude<typeof input.action, "needs_person"> }): Promise<BrowserResult> =>
+            (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
+                action: step.action,
                 browserSettings: (context as { browserSettings?: unknown }).browserSettings,
-                direction: input.direction,
-                fullPage: input.fullPage,
-                selector: input.selector,
-                text: input.text,
-                threadId: context.threadId as Id<"threads">,
-                url: input.url,
-                userId: context.userId,
+                direction: step.direction,
+                fullPage: step.fullPage,
+                selector: step.selector,
+                text: step.text,
+                threadId,
+                url: step.url,
+                userId,
                 userTier: context.userTier,
             })) as BrowserResult;
+        // One ask per site per run: the run is its prompt (a continuation of the same prompt is the same run).
+        const runKey = (context as { promptMessageId?: string }).promptMessageId ?? context.messageId ?? threadId;
+
+        try {
+            const reported = action === "needs_person";
+            const first = await run(action === "needs_person" ? { action: "screenshot" } : { ...input, action });
+            // A refused or failed action (a person in control, the browser closed) is not a page to judge.
+            const result =
+                first.success === true || first.handedBack === true
+                    ? await humanCheckLadder(
+                          first,
+                          {
+                              claimAsk: async (site) =>
+                                  await context.runMutation(internal.browser.functions.claimHumanCheckAsk, { run: runKey, site, threadId, userId }),
+                              look: async () => await run({ action: "screenshot" }),
+                              sleep: async (ms) => {
+                                  await new Promise((resolve) => {
+                                      setTimeout(resolve, ms);
+                                  });
+                              },
+                              wasAsked: async (site) => await context.runQuery(internal.browser.functions.wasHumanCheckAsked, { run: runKey, site, threadId }),
+                          },
+                          reported && first.success === true,
+                      )
+                    : first;
 
             toolsLogger.debug(`[BROWSER] ${action} ${result.success ? "succeeded" : "failed"}${result.error ? `: ${result.error}` : ""}`);
 
@@ -104,7 +138,9 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
     },
     inputSchema: z
         .object({
-            action: z.enum(["navigate", "screenshot", "click", "type", "extract", "scroll"]).meta({ description: "The browser action to perform" }),
+            action: z
+                .enum(["navigate", "screenshot", "click", "type", "extract", "scroll", "needs_person"])
+                .meta({ description: "The browser action to perform" }),
             direction: z.enum(["up", "down"]).optional().meta({ description: "Scroll direction (default: down)" }),
             fullPage: z.boolean().optional().meta({ description: "Capture full page screenshot (default: false)" }),
             selector: z.string().optional().meta({ description: "CSS selector for the target element (required for click, type; optional for extract)" }),

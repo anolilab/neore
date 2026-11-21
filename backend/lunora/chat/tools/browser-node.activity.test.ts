@@ -566,7 +566,8 @@ describe("a browser a person took control of", () => {
 
         // The planned click is not run: a screenshot of the page the person left comes back in its place.
         expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "screenshot", sessionId: "s-1" } });
-        expect(result).toMatchObject({ screenshot: "png", success: false, url: "https://example.com/person" });
+        // Marked as the first look since the hand back, for the human-check ladder (`browser/human-check.ts`).
+        expect(result).toMatchObject({ handedBack: true, screenshot: "png", success: false, url: "https://example.com/person" });
         expect(result.error).toContain(reason);
         expect(result.error).toContain("The browser is now on https://example.com/person.");
         expect(result.error).toContain("Your click action was not run");
