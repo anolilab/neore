@@ -531,6 +531,11 @@ msgstr "已从 {1} 导入 {0} 个对话"
 msgid "{0} custom headers"
 msgstr "{0} 个自定义请求头"
 
+#. placeholder {0}: formatNumber(window, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:64
+msgid "{0} days"
+msgstr ""
+
 #. placeholder {0}: deleting.name
 #: src/features/local-models/components/ollama-model-manager.tsx:150
 msgid "{0} deleted"
@@ -1688,6 +1693,7 @@ msgstr "21:9（超宽屏）"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "2350 亿参数混合专家（MoE）架构"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:64
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 小时"
@@ -5406,8 +5412,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:944
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
+#: src/features/chat/browser-live-view/browser-live-view.tsx:951
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1151
 msgid "Browser"
 msgstr "浏览器"
 
@@ -5577,6 +5583,22 @@ msgstr "来自 <0>{0}</0>"
 #: src/features/pages/components/page-version-panel.tsx:140
 msgid "by a collaborator"
 msgstr "由协作者"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
+msgid "By day, newest first."
+msgstr ""
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
+msgid "By hour"
+msgstr ""
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
+msgstr ""
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:136
+msgid "By model, most prompt tokens first."
+msgstr ""
 
 #: src/features/pages/components/page-version-panel.tsx:140
 msgid "by you"
@@ -8130,11 +8152,11 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:471
+#: src/features/chat/browser-live-view/browser-live-view.tsx:475
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "浏览器的控制权已交还给智能体：服务器未能及时确认你仍拥有控制权。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:472
+#: src/features/chat/browser-live-view/browser-live-view.tsx:476
 msgid "Control of the browser is back with the agent."
 msgstr "浏览器的控制权已交还给智能体。"
 
@@ -9807,6 +9829,7 @@ msgstr "日期"
 msgid "Date and time"
 msgstr "日期和时间"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:94
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "日期"
@@ -15794,7 +15817,7 @@ msgstr "授予他人访问此页面的权限，或发布一个只读链接。"
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1064
 msgid "Go"
 msgstr "前往"
 
@@ -16373,7 +16396,7 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:974
 msgid "Hand back"
 msgstr "交还"
 
@@ -16532,7 +16555,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:969
 msgid "Hide live view"
 msgstr "隐藏实时画面"
 
@@ -16830,6 +16853,7 @@ msgstr "托管方"
 msgid "hotkey"
 msgstr "热键"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:117
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "小时"
@@ -18239,7 +18263,7 @@ msgstr "哈萨克斯坦"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "继续接受旧密钥 24 小时"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1000
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1007
 msgid "Keep control"
 msgstr "保持控制"
 
@@ -19206,11 +19230,11 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Live view of the agent's browser (read-only)"
 msgstr "智能体浏览器的实时画面（只读）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Live view of the agent's browser (you have control)"
 msgstr "智能体浏览器的实时画面（由你控制）"
 
@@ -19550,6 +19574,7 @@ msgid "Loading..."
 msgstr "正在加载..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:347
+#: src/features/admin/components/admin-provider-cache-row.tsx:69
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20871,6 +20896,7 @@ msgstr "模式 {0}，使用 {1}。创建时不会启动任何内容。"
 msgid "Mode:"
 msgstr "模式："
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:139
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -22444,7 +22470,7 @@ msgstr "还没有图片"
 msgid "No indexed files available. Files are still being processed."
 msgstr "没有已索引的文件。文件仍在处理中。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:997
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
@@ -24233,11 +24259,11 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1015
 msgid "Opening the live view…"
 msgstr "正在打开实时画面…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1070
 msgid "Opening the page. This can take up to a minute."
 msgstr "正在打开页面，最多可能需要一分钟。"
 
@@ -24675,7 +24701,7 @@ msgstr "第 {currentPage} 页，共 {totalPages} 页"
 msgid "Page added. It is being fetched and indexed."
 msgstr "已添加网页，正在获取并建立索引。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1049
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "页面地址"
@@ -26412,6 +26438,13 @@ msgstr "提示词优化成功"
 msgid "Prompt to run on all models..."
 msgstr "要在所有模型上运行的提示词..."
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:82
+#: src/features/admin/components/admin-provider-cache-row.tsx:96
+#: src/features/admin/components/admin-provider-cache-row.tsx:119
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
+msgid "Prompt tokens"
+msgstr ""
+
 #: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "提示词 token"
@@ -26477,6 +26510,7 @@ msgid "Proven reliability from previous generation"
 msgstr "上一代久经验证的可靠性"
 
 #: src/components/model-picker/model-picker.tsx:283
+#: src/features/admin/components/admin-provider-cache-row.tsx:140
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -26497,6 +26531,10 @@ msgstr "已添加提供商，其模型现已出现在模型选择器中"
 #: src/routes/admin/gateway/index.tsx:326
 msgid "Provider Health"
 msgstr "提供商健康状况"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:44
+msgid "Provider prompt cache"
+msgstr ""
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:323
 msgid "Provider removed"
@@ -28052,6 +28090,10 @@ msgstr "正在请求..."
 msgid "Requesting…"
 msgstr "正在请求…"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:86
+#: src/features/admin/components/admin-provider-cache-row.tsx:95
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
+#: src/features/admin/components/admin-provider-cache-row.tsx:141
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30069,6 +30111,13 @@ msgstr "塞尔维亚语（塞尔维亚）"
 msgid "Serif"
 msgstr "衬线"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:78
+#: src/features/admin/components/admin-provider-cache-row.tsx:97
+#: src/features/admin/components/admin-provider-cache-row.tsx:120
+#: src/features/admin/components/admin-provider-cache-row.tsx:143
+msgid "Served from cache"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:459
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "服务器已添加。请在桌面应用中选择要共享其中哪些文件夹。"
@@ -31145,8 +31194,8 @@ msgstr "此次运行中的部分图像无法保存。"
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:948
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
+#: src/features/chat/browser-live-view/browser-live-view.tsx:955
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
 msgid "Someone else has control of this browser."
 msgstr "其他人正在控制此浏览器。"
 
@@ -32826,7 +32875,7 @@ msgstr "台湾"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "输入一张图像，移除背景，然后应用风格迁移"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:985
+#: src/features/chat/browser-live-view/browser-live-view.tsx:992
 msgid "Take control"
 msgstr "接管控制"
 
@@ -33463,12 +33512,12 @@ msgid "That message was already sent."
 msgstr "该消息已发送。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:886
+#: src/features/chat/browser-live-view/browser-live-view.tsx:890
 msgid "That page could not be opened: {0}"
 msgstr "无法打开该页面：{0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:620
-#: src/features/chat/browser-live-view/browser-live-view.tsx:906
+#: src/features/chat/browser-live-view/browser-live-view.tsx:624
+#: src/features/chat/browser-live-view/browser-live-view.tsx:910
 msgid "That page could not be opened."
 msgstr "无法打开该页面。"
 
@@ -33573,7 +33622,7 @@ msgstr "智能体未提供该选项"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "智能体已结束，但未给出指南。请重新撰写。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1019
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1026
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "智能体正在完成一项浏览器操作，可能需要一分钟以上。请稍后再试。"
 
@@ -33585,7 +33634,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:945
+#: src/features/chat/browser-live-view/browser-live-view.tsx:952
 msgid "The agent is using a browser"
 msgstr "智能体正在使用浏览器"
 
@@ -33609,11 +33658,11 @@ msgstr "智能体未更改任何文件。"
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:880
+#: src/features/chat/browser-live-view/browser-live-view.tsx:884
 msgid "The agent's browser closed while the page loaded."
 msgstr "页面加载期间，智能体的浏览器已关闭。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:762
+#: src/features/chat/browser-live-view/browser-live-view.tsx:766
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
@@ -33687,7 +33736,7 @@ msgstr "已保存机器人的工具"
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:855
+#: src/features/chat/browser-live-view/browser-live-view.tsx:859
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "无法交还浏览器。两分钟内没有输入后，它会自动回到智能体手中。"
 
@@ -34060,7 +34109,7 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
 msgid "The live view could not be opened."
 msgstr "无法打开实时画面。"
 
@@ -34068,7 +34117,7 @@ msgstr "无法打开实时画面。"
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1013
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
@@ -34199,7 +34248,7 @@ msgstr "页面智能体无法编辑此页面"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "页面现在显示的是另一个版本。请从你的版本中复制想保留的内容。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1075
 msgid "The page you opened is still loading."
 msgstr "你打开的页面仍在加载。"
 
@@ -34235,6 +34284,10 @@ msgstr "提示词将作为用例输入，此回答将作为预期答案。保存
 #: src/features/settings/components/chat/native-providers-settings.tsx:719
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "这些请求由提供商直接向你计费。如果我们知道模型的价格，将以积分收取自有密钥的常规平台费用。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:73
+msgid "The provider cache readings could not be loaded."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:1054
 msgid "The queue is paused. Send next to go on with the queued messages."
@@ -34319,6 +34372,10 @@ msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:90
 msgid "The shard footprint could not be measured."
 msgstr "无法测量分片占用。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:46
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the models that cached at least once in the window; the model table lists every model. Answers from the gateway's response cache are left out. Times are UTC."
+msgstr ""
 
 #: src/features/skills/components/skill-import-dialog.tsx:151
 msgid "The skill could not be imported."
@@ -35640,7 +35697,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1034
 msgid "Too many live views were opened. Try again later."
 msgstr "打开的实时画面过多，请稍后再试。"
 
@@ -36043,8 +36100,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1159
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1166
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -38119,7 +38176,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:969
 msgid "Watch live"
 msgstr "观看实时画面"
 
@@ -38532,7 +38589,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1153
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "无法检查智能体是否正在使用浏览器。"
 
@@ -38594,6 +38651,10 @@ msgstr "宽度"
 #: src/features/chat/thread/request-secret-prompt.tsx:173
 msgid "Will be saved as your {provider} API key"
 msgstr "将保存为你的 {provider} API 密钥"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:51
+msgid "Window"
+msgstr ""
 
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "Windows"
@@ -38999,8 +39060,8 @@ msgstr "这些是你在智能体构建器中选择的集成。每一个都会先
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "运行完成、需要你审阅或失败时，你会收到通知。已完成的运行会链接到其聊天，需要审阅的运行会链接到任务看板。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:505
-#: src/features/chat/browser-live-view/browser-live-view.tsx:834
+#: src/features/chat/browser-live-view/browser-live-view.tsx:509
+#: src/features/chat/browser-live-view/browser-live-view.tsx:838
 msgid "You handed the browser back to the agent."
 msgstr "你已将浏览器交还给智能体。"
 
@@ -39066,9 +39127,9 @@ msgstr "你无法控制此浏览器。"
 msgid "You need to sign in to access this page."
 msgstr "你需要登录才能访问此页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:510
-#: src/features/chat/browser-live-view/browser-live-view.tsx:834
-#: src/features/chat/browser-live-view/browser-live-view.tsx:882
+#: src/features/chat/browser-live-view/browser-live-view.tsx:514
+#: src/features/chat/browser-live-view/browser-live-view.tsx:838
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
 msgid "You no longer have control of the browser."
 msgstr "你已不再控制此浏览器。"
 
@@ -39223,7 +39284,7 @@ msgstr "你的聊天和 {0}"
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1084
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "你在画面中的点击、输入和滚动都会发送到浏览器。在你交还之前，智能体会等待。"
 
