@@ -155,6 +155,15 @@ export const executeBrowserAction = internalAction
                     signal: callSignal,
                 });
 
+                // A sign-in with a saved login holds the browser: the renderer ran nothing, so the hold ends here.
+                if (response?.status === 409) {
+                    await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+
+                    const busy = { error: BROWSER_BUSY_SIGNING_IN, success: false };
+
+                    return returned === undefined ? busy : handedBackResult(busy, returned);
+                }
+
                 if (error || !response?.ok || !data) {
                     throw new LunoraError("INTERNAL", `Browser renderer returned ${response?.status ?? "no response"}: ${JSON.stringify(error)}`);
                 }
@@ -238,6 +247,9 @@ export const PERSON_HAS_CONTROL =
 /** The session was closed just before the action reached it: nothing was sent, and the next action starts a new browser. */
 export const BROWSER_CLOSED_BEFORE_ACTION =
     "The browser session was closed just before this action, so it was not run. Run it again if it is still needed: the next action opens a new, empty browser, so navigate to the page you need first.";
+
+/** The renderer refused the action: a sign-in with a saved login holds the browser for now. */
+export const BROWSER_BUSY_SIGNING_IN = "The browser is busy signing in with a saved login, so this action was not run. Try it again in a moment.";
 
 /** The session was closed while the action ran: a later action starts from a new, empty browser. */
 export const BROWSER_CLOSED_DURING_ACTION =

@@ -162,6 +162,10 @@ export type BrowserActionErrors = {
      */
     401: ErrorResponse;
     /**
+     * The browser session is signing in with a saved login; nothing was run, and the action can be tried again once that is done
+     */
+    409: ErrorResponse;
+    /**
      * Internal server error
      */
     500: ErrorResponse;

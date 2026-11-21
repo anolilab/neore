@@ -740,7 +740,7 @@ app.post("/login", async (c) => {
 
 /**
  * The sign-in of `/login`, the browser setup included, ended by `deadline`; the browser is closed when it must be. A close
- * that has not ended by the end of the hold, or that failed, is handed to `hold` (`false` when it fails) and the answer
+ * that has not ended by `deadline` (the margin after it is the answer's), or that failed, is handed to `hold` (`false` when it fails) and the answer
  * goes out without waiting for it, saying `sessionCloseUnconfirmed` instead of `sessionClosed`.
  */
 const logIn = async (
@@ -810,7 +810,7 @@ const logIn = async (
         .close()
         .then(() => true)
         .catch(() => false);
-    const isClosed = await settledWithin(closing, deadline + LOGIN_MARGIN_MS - Date.now());
+    const isClosed = await settledWithin(closing, deadline - Date.now());
     const reason = result.error.replace(TRAILING_STOP_RE, "");
 
     if (isClosed) {

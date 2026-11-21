@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
 
 import type { Page as WorkerPage } from "@cloudflare/playwright";
-import type { Browser, BrowserContext, Page, Route } from "playwright";
+import type { Browser, BrowserContext, Page, Request, Route } from "playwright";
 import { chromium } from "playwright";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -774,6 +774,44 @@ describe(signIn, () => {
         expect(result).toMatchObject({ error: expect.stringContaining("the password in an address"), submitted: true, success: false });
         expect(login.hits.filter((hit) => hit.url.startsWith("/home"))).toStrictEqual([]);
         expect(page.url()).not.toContain(SAVED_SECRET);
+    });
+
+    it("fails a redirect that echoes the password into the address while the form's POST is still being handed on", async () => {
+        // A handing on that sends the POST before it returns, and returns only once the answer was dealt with: Playwright's
+        // own sends it once the handler returned, but nothing of the guard may count on that.
+        await aroundRoutes({
+            fallback: async (next, options, route) => {
+                if (route.request().method() !== "POST") {
+                    return next(options);
+                }
+
+                const settled = new Promise<void>((resolve) => {
+                    const settle = (request: Request): void => {
+                        if (request === route.request()) {
+                            resolve();
+                        }
+                    };
+
+                    page.on("requestfinished", settle);
+                    page.on("requestfailed", settle);
+                });
+
+                await route.continue(options);
+                await settled;
+
+                return undefined;
+            },
+        });
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response, body) => {
+            response.writeHead(303, { location: `/home?${body}` });
+            response.end();
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("the password in an address"), submitted: true, success: false });
+        expect(login.hits.filter((hit) => hit.url.startsWith("/home"))).toStrictEqual([]);
     });
 
     it.each([

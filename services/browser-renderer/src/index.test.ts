@@ -208,6 +208,42 @@ describe("POST /login", () => {
         await expect(isFree(signedIn, "late")).resolves.toBe(true);
     });
 
+    it("answers by the deadline, leaving the margin to the answer, when the close ends only within that margin", async () => {
+        const { env, pending } = binding();
+        const context = {
+            route: async () => undefined,
+            routeWebSocket: async () =>
+                new Promise<void>(() => {
+                    // Never settles.
+                }),
+        };
+        const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
+        let wasAnswered = false;
+        // Past the deadline, within the margin.
+        const closedAt = Date.now() + 18_500;
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "slow" }).finally(() => {
+            wasAnswered = true;
+        });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({
+            close: async () =>
+                new Promise<void>((resolve) => {
+                    setTimeout(resolve, closedAt - Date.now());
+                }),
+            contexts: () => [{ pages: () => [page] }],
+            sessionId: () => "slow",
+        });
+        // The budget less the margin: the deadline.
+        await vi.advanceTimersByTimeAsync(18_000);
+
+        expect(wasAnswered).toBe(true);
+
+        const answer = await response;
+
+        await expect(answer.json()).resolves.toMatchObject({ sessionCloseUnconfirmed: true, success: false });
+    });
+
     it.each([
         [
             "does not end",

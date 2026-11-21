@@ -100,7 +100,7 @@ const base64Pattern = (secret: string): RegExp | null => {
     return runs.size === 0 ? null : new RegExp([...runs].join("|"), "g");
 };
 
-/** `text` with `secret` replaced in each spelling `characterPattern` and `base64Pattern` know, one layer deep. */
+/** `text` with `secret` replaced in each spelling `characterPattern` and `base64Pattern` know, one layer deep: `hasSecret` reads the deeper ones. */
 const replaceSecret = (text: string, secret: string): string => {
     const scrubbed = text.replaceAll(new RegExp([...secret].map((character) => characterPattern(character)).join(""), "g"), "[password]");
     const base64 = base64Pattern(secret);
@@ -110,46 +110,74 @@ const replaceSecret = (text: string, secret: string): string => {
 
 const PERCENT_RUN_RE = /(?:%[\da-f]{2})+/gi;
 
-/** How many layers of percent-encoding are looked through: a site that echoes what it was sent into a URL encodes it again. */
-const DECODE_ROUNDS = 4;
+/**
+ * How many layers of percent-encoding are taken off: past them, a text is taken to hold the password. A site that echoes
+ * what it was sent encodes it once more each time; no page of a site is read through that many.
+ */
+const MAX_DECODE_ROUNDS = 32;
 
 /**
- * `text`, and what it reads as with each layer of percent-encoding taken off. Each run of escapes is decoded alone, so
- * a stray `%` elsewhere (a "100%") does not stop the rest from being read.
+ * How many characters the layers of a text may take to read through, as times its length, at least
+ * `MIN_DECODE_BUDGET`: each layer is scanned whole, and a scan costs more the longer the password. A large page is read
+ * through as many layers as a fixed depth of four spent; one with more is taken to hold the password.
  */
-const decodings = (text: string): string[] => {
-    const found = [text];
+const DECODE_BUDGET_FACTOR = 5;
 
-    for (let round = 0; round < DECODE_ROUNDS; round++) {
-        const last = found.at(-1) ?? text;
-        const next = last.replaceAll(PERCENT_RUN_RE, (run) => {
-            try {
-                return decodeURIComponent(run);
-            } catch {
-                return run;
-            }
-        });
+const MIN_DECODE_BUDGET = 1_000_000;
 
-        if (next === last) {
-            break;
-        }
+const UTF8 = new TextDecoder();
 
-        found.push(next);
+/** A run of escapes as text, from its UTF-8 bytes; a byte that is no UTF-8 reads as U+FFFD, so it hides no other. */
+const decodeRun = (run: string): string => {
+    // Most runs are one escape: the decoder's call costs more than it does. A lone byte past ASCII is no UTF-8.
+    if (run.length === 3) {
+        const byte = Number.parseInt(run.slice(1), 16);
+
+        return byte < 0x80 ? String.fromCodePoint(byte) : "\u{FFFD}";
     }
 
-    return found;
+    const bytes = new Uint8Array(run.length / 3);
+
+    for (let index = 0; index < bytes.length; index++) {
+        bytes[index] = Number.parseInt(run.slice(index * 3 + 1, index * 3 + 3), 16);
+    }
+
+    return UTF8.decode(bytes);
 };
 
 /**
- * Whether `text` carries `secret`: in a form, URL, HTML or base64 spelling, escaped as a JSON string, or under further
- * layers of percent-encoding.
+ * Whether `text` carries `secret`: in a form, URL, HTML or base64 spelling, escaped as a JSON string, or under any
+ * number of further layers of percent-encoding, each read in turn until one changes nothing. Each run of escapes is
+ * decoded alone, so a stray `%` elsewhere (a "100%") does not stop the rest from being read. A text with more layers
+ * than `MAX_DECODE_ROUNDS` or its budget reaches is taken to carry it.
  */
-const hasSecret = (text: string, secret: string): boolean =>
-    decodings(text).some((decoded) => decoded.includes(JSON.stringify(secret).slice(1, -1)) || replaceSecret(decoded, secret) !== decoded);
+const hasSecret = (text: string, secret: string): boolean => {
+    const escaped = JSON.stringify(secret).slice(1, -1);
+    let budget = Math.max(MIN_DECODE_BUDGET, DECODE_BUDGET_FACTOR * text.length);
+    let decoded = text;
+
+    for (let round = 0; round <= MAX_DECODE_ROUNDS && budget >= decoded.length; round++) {
+        budget -= decoded.length;
+
+        if (decoded.includes(escaped) || replaceSecret(decoded, secret) !== decoded) {
+            return true;
+        }
+
+        const next = decoded.replaceAll(PERCENT_RUN_RE, (run) => decodeRun(run));
+
+        if (next === decoded) {
+            return false;
+        }
+
+        decoded = next;
+    }
+
+    return true;
+};
 
 /**
  * `text` with the password replaced in every spelling a page could echo it in: raw, URL- or form-encoded, HTML-escaped,
- * base64 or base64url. A text that still carries it in a spelling no replacement reaches (encoded twice) is withheld whole.
+ * base64 or base64url. A text that still carries it after that, at any depth of percent-encoding, is withheld whole.
  */
 export const withoutSecret = (text: string, secret: string): string => {
     const scrubbed = replaceSecret(text, secret);
@@ -423,10 +451,11 @@ const armGuard = async (
     };
 
     /**
-     * Whether an address carries what the page holds, or, once the form's POST went out, the password: a site that echoes
-     * it into a redirect's `Location` would have the browser put it in the address and send it again by GET.
+     * Whether an address carries what the page holds, or, once the form's POST is claimed, the password: a site that
+     * echoes it into a redirect's `Location` would have the browser put it in the address and send it again by GET. From
+     * the claim, not from `sent`: the answer can arrive while the POST is still being handed on.
      */
-    const isSecretAddress = (url: string): boolean => hasSecretInAddress(url, stand) || (sent !== null && hasSecretInAddress(url, password));
+    const isSecretAddress = (url: string): boolean => hasSecretInAddress(url, stand) || (isClaimed && hasSecretInAddress(url, password));
 
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();

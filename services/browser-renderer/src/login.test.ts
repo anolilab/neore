@@ -15,6 +15,8 @@ const LEFT_AROUND_RE = /^token=[\w%+/-]{0,6}\[password\][\w%+/=-]{0,9}$/;
 
 const base64 = (text: string): string => Buffer.from(text).toString("base64");
 
+const encodedTimes = (text: string, times: number): string => (times === 0 ? text : encodedTimes(encodeURIComponent(text), times - 1));
+
 describe(withoutSecret, () => {
     it.each([
         ["raw", SECRET],
@@ -42,8 +44,31 @@ describe(withoutSecret, () => {
         }
     });
 
-    it("withholds a text that carries the password encoded twice, which no replacement reaches", () => {
-        expect(withoutSecret(`/home?returnTo=${encodeURIComponent(encodeURIComponent(SECRET))} at 100%`, SECRET)).toBe("[withheld: it holds the password]");
+    it.each([2, 6, 10])("withholds a text that carries the password encoded %i times, which no replacement reaches", (depth) => {
+        expect(withoutSecret(`/home?returnTo=${encodedTimes(SECRET, depth)} at 100%`, SECRET)).toBe("[withheld: it holds the password]");
+    });
+
+    it("withholds a text whose encoded password sits in a run of escapes with a byte that is no UTF-8", () => {
+        const everyByteEscaped = [...new TextEncoder().encode(SECRET)].map((byte) => `%${byte.toString(16)}`).join("");
+
+        expect(withoutSecret(`/home?returnTo=%FF${encodedTimes(everyByteEscaped, 2)}`, SECRET)).toBe("[withheld: it holds the password]");
+    });
+
+    it.each([1, 2, 4])("withholds a password that holds an escape of its own, encoded %i more times", (depth) => {
+        const secret = "x%41y";
+
+        expect(withoutSecret(`q=${encodedTimes(secret, depth)}`, secret)).toBe(depth === 1 ? "q=[password]" : "[withheld: it holds the password]");
+    });
+
+    it("withholds a large text whose layers take longer to read through than its budget", () => {
+        expect(withoutSecret(`${"a".repeat(1_000_000)}${encodedTimes("a b", 8)}`, SECRET)).toBe("[withheld: it holds the password]");
+    });
+
+    it("withholds a text encoded more deeply than it is read through", () => {
+        // Each layer escapes the first hex digit of the one below: no escape of `%` alone, so every layer takes a round.
+        const layers = 40;
+
+        expect(withoutSecret(`${"%".repeat(layers + 1)}${"3".repeat(layers)}41`, SECRET)).toBe("[withheld: it holds the password]");
     });
 
     it("keeps text without the password", () => {

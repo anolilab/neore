@@ -49,6 +49,14 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The browser session is signing in with a saved login; nothing was run, and the action can be tried again once that is done",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {

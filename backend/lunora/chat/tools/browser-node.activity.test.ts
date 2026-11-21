@@ -22,7 +22,7 @@ import {
 import { getActiveSession, logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { applyLimit } from "../../lib/rate-limiter-mutations";
-import { BROWSER_CLOSED_BEFORE_ACTION, BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
+import { BROWSER_BUSY_SIGNING_IN, BROWSER_CLOSED_BEFORE_ACTION, BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
 
 const { registry, renderer, rendererStart } = vi.hoisted(() => {
     // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
@@ -261,6 +261,20 @@ describe("a browser action on a running browser", () => {
         renderer.mockRejectedValueOnce(new Error("renderer down"));
 
         await act();
+
+        const after = await row();
+
+        expect(after).toMatchObject({ lastActivityAt });
+        expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it("tells the agent to try again when a sign-in holds the browser, and ends the hold", async () => {
+        const lastActivityAt = NOW - 1000;
+
+        await addSession(lastActivityAt);
+        renderer.mockResolvedValueOnce({ data: undefined, error: { error: "signing in", success: false }, response: { ok: false, status: 409 } });
+
+        await expect(act()).resolves.toStrictEqual({ error: BROWSER_BUSY_SIGNING_IN, success: false });
 
         const after = await row();
 
