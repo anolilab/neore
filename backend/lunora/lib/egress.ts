@@ -79,7 +79,8 @@ export const isPublicIPv4 = (address: string): boolean => {
 
 /**
  * True for an IPv6 address in global unicast space (2000::/3), without the ranges that embed or stand for another address:
- * 6to4 (2002::/16), Teredo (2001:0::/32) and documentation (2001:db8::/32). Everything else, including mapped and
+ * 6to4 (2002::/16), Teredo (2001:0::/32), benchmarking (2001:2::/48, refused with its whole /32) and documentation
+ * (2001:db8::/32). Everything else, including mapped and
  * compatible forms, NAT64, link-local, unique-local, multicast and loopback, is refused. Text it cannot read is refused.
  */
 export const isPublicIPv6 = (address: string): boolean => {
@@ -101,7 +102,7 @@ export const isPublicIPv6 = (address: string): boolean => {
         return false;
     }
 
-    return !(first === 0x20_01 && (second === 0 || second === 0x0d_b8));
+    return !(first === 0x20_01 && [0, 0x00_02, 0x0d_b8].includes(second));
 };
 
 export const isPublicAddress = (address: string): boolean => (address.includes(":") ? isPublicIPv6(address) : isPublicIPv4(address));
@@ -130,6 +131,11 @@ export interface EgressRequest {
 
 export interface EgressResponse {
     status: number;
+}
+
+interface DnsBody {
+    Answer?: { data?: unknown; type?: unknown }[];
+    Status?: unknown;
 }
 
 interface Target {
@@ -170,13 +176,23 @@ const assertHeaders = (headers: Record<string, string>): void => {
 
 const queryAddresses = async (hostname: string, type: number, dependencies: EgressDependencies, signal: AbortSignal): Promise<string[]> => {
     const url = `${DOH_ENDPOINT}?name=${encodeURIComponent(hostname)}&type=${type === DNS_TYPE_A ? "A" : "AAAA"}`;
-    const response = await dependencies.fetch(url, { headers: { accept: "application/dns-json" }, signal });
+    let body: DnsBody;
 
-    if (!response.ok) {
+    try {
+        const response = await dependencies.fetch(url, { headers: { accept: "application/dns-json" }, signal });
+
+        if (!response.ok) {
+            throw new EgressError("dns_failed", "The host name could not be looked up.");
+        }
+
+        body = (await response.json()) as DnsBody;
+    } catch (error) {
+        if (error instanceof EgressError) {
+            throw error;
+        }
+
         throw new EgressError("dns_failed", "The host name could not be looked up.");
     }
-
-    const body = (await response.json()) as { Answer?: { data?: unknown; type?: unknown }[]; Status?: unknown };
 
     if (body.Status !== DNS_STATUS_OK && body.Status !== DNS_STATUS_NXDOMAIN) {
         throw new EgressError("dns_failed", "The host name could not be looked up.");
@@ -237,37 +253,64 @@ const writeRequest = async (socket: EgressSocket, target: Target, request: Egres
     }
 };
 
-/** The status line only. The body is never read: a receiver's answer is not ours to keep. */
+/**
+ * The final status line only. Interim 1xx heads are read past and dropped. The size limit applies to the head alone, and
+ * bytes after the head are never kept: a receiver's answer is not ours to keep.
+ */
+/** The status of the first complete head in `text`, and the text after it. Undefined while that head is incomplete. */
+const firstHead = (text: string): { rest: string; status: number } | undefined => {
+    const end = text.indexOf("\r\n\r\n");
+
+    if (end === -1) {
+        return undefined;
+    }
+
+    if (end + 4 > MAX_HEAD_BYTES) {
+        throw new EgressError("bad_response", "The response head is too large.");
+    }
+
+    const match = HTTP_STATUS_LINE.exec(text);
+
+    if (match === null) {
+        throw new EgressError("bad_response", "The server did not answer with HTTP.");
+    }
+
+    return { rest: text.slice(end + 4), status: Number(match[1]) };
+};
+
 const readStatus = async (socket: EgressSocket): Promise<number> => {
     const reader = socket.readable.getReader();
     const decoder = new TextDecoder();
-    let head = "";
+    let pending = "";
 
     try {
-        while (!head.includes("\r\n\r\n")) {
+        for (;;) {
+            const head = firstHead(pending);
+
+            if (head !== undefined) {
+                if (head.status >= 200) {
+                    return head.status;
+                }
+
+                pending = head.rest;
+                continue;
+            }
+
+            if (pending.length > MAX_HEAD_BYTES) {
+                throw new EgressError("bad_response", "The response head is too large.");
+            }
+
             const { done, value } = await reader.read();
 
             if (done) {
                 throw new EgressError("bad_response", "The server closed the connection before it answered.");
             }
 
-            head += decoder.decode(value, { stream: true });
-
-            if (head.length > MAX_HEAD_BYTES) {
-                throw new EgressError("bad_response", "The response head is too large.");
-            }
+            pending += decoder.decode(value, { stream: true });
         }
     } finally {
         await reader.cancel().catch(() => undefined);
     }
-
-    const match = HTTP_STATUS_LINE.exec(head);
-
-    if (match === null) {
-        throw new EgressError("bad_response", "The server did not answer with HTTP.");
-    }
-
-    return Number(match[1]);
 };
 
 /**
@@ -286,7 +329,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         await Promise.all(opened.map(async (socket) => await socket.close().catch(() => undefined)));
     };
 
-    const exchange = async (): Promise<EgressResponse> => {
+    const attempt = async (): Promise<EgressResponse> => {
         const [address] = await resolveChecked(target.hostname, dependencies, controller.signal);
 
         // The deadline can pass while a lookup is in flight. Cleanup has already run by then, so open nothing.
@@ -306,6 +349,19 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         return { status: await readStatus(socket) };
     };
 
+    // A socket failure from connect, TLS, write or read is not part of the caller's contract: it comes back as bad_response.
+    const exchange = async (): Promise<EgressResponse> => {
+        try {
+            return await attempt();
+        } catch (error) {
+            if (error instanceof EgressError) {
+                throw error;
+            }
+
+            throw new EgressError("bad_response", "The connection failed.");
+        }
+    };
+
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
@@ -320,6 +376,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         clearTimeout(timer);
         // Cancels a lookup still in flight when its sibling failed, so it cannot outlive this call.
         controller.abort();
-        await closeAll();
+        // Not awaited: a graceful close can wait on a write that never finishes, and the caller must still get the timeout.
+        void closeAll();
     }
 };

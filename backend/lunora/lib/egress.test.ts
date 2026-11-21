@@ -82,6 +82,7 @@ describe("isPublicIPv4", () => {
         "169.254.169.254",
         "172.16.0.1",
         "172.31.255.255",
+        "192.0.0.1",
         "192.0.0.8",
         "192.0.0.170",
         "192.0.2.1",
@@ -108,12 +109,22 @@ describe("isPublicIPv4", () => {
 });
 
 describe("isPublicIPv6", () => {
-    it.each(["::", "::1", "::ffff:8.8.8.8", "fe80::1", "fc00::1", "fd12::1", "ff02::1", "2002:c000:204::1", "2001::1", "2001:db8::1", "64:ff9b::1"])(
-        "refuses %s",
-        (address) => {
-            expect(isPublicIPv6(address)).toBe(false);
-        },
-    );
+    it.each([
+        "::",
+        "::1",
+        "::ffff:8.8.8.8",
+        "fe80::1",
+        "fc00::1",
+        "fd12::1",
+        "ff02::1",
+        "2002:c000:204::1",
+        "2001::1",
+        "2001:db8::1",
+        "64:ff9b::1",
+        "2001:2::1",
+    ])("refuses %s", (address) => {
+        expect(isPublicIPv6(address)).toBe(false);
+    });
 
     it.each(["2606:4700:4700::1111", "2a00:1450::1"])("accepts %s", (address) => {
         expect(isPublicIPv6(address)).toBe(true);
@@ -279,7 +290,57 @@ describe("postCheckedHttps", () => {
             return await new Promise<Response>(() => {});
         });
 
-        await expect(postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(fetch, connection))).rejects.toThrow("network down");
+        await expect(postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(fetch, connection))).rejects.toMatchObject({
+            code: "dns_failed",
+        });
         expect(pendingSignal?.aborted).toBe(true);
+    });
+
+    it("maps a rejected DNS request to dns_failed", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+        const fetch = vi.fn(async () => {
+            throw new TypeError("network down");
+        });
+
+        await expect(postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(fetch, connection))).rejects.toMatchObject({
+            code: "dns_failed",
+        });
+        expect(connection.connect).not.toHaveBeenCalled();
+    });
+
+    it("maps a DNS answer that is not JSON to dns_failed", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+        const fetch = vi.fn(async () => new Response("<html>", { status: 200 }));
+
+        await expect(postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(fetch, connection))).rejects.toMatchObject({
+            code: "dns_failed",
+        });
+        expect(connection.connect).not.toHaveBeenCalled();
+    });
+
+    it("returns the final status after an interim response", async () => {
+        const connection = fakeConnect("HTTP/1.1 103 Early Hints\r\nLink: </style.css>\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n");
+
+        const result = await postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection));
+
+        expect(result).toEqual({ status: 204 });
+    });
+
+    it("reads a short head even when the same chunk carries a body over the head limit", async () => {
+        const connection = fakeConnect(`HTTP/1.1 201 Created\r\n\r\n${"x".repeat(20 * 1024)}`);
+
+        const result = await postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection));
+
+        expect(result).toEqual({ status: 201 });
+    });
+
+    it("returns the timeout even when a graceful close never finishes", async () => {
+        const connection = fakeConnect("", silentStream);
+
+        connection.close.mockImplementation(() => new Promise<void>(() => {}));
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, timeoutMs: 20, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection)),
+        ).rejects.toMatchObject({ code: "timeout" });
     });
 });
