@@ -151,7 +151,7 @@ export class WsTicketUnavailableError extends LunoraError {
 export const wsTicketUnavailableResponse = (): Response =>
     Response.json({ error: { code: "SERVICE_UNAVAILABLE", message: "Try again shortly" } }, { headers: { "cache-control": "no-store" }, status: 503 });
 
-const readSession = async (database: TicketDatabase, sql: string, values: string[]): Promise<SessionLiveness> => {
+const readSession = async (database: TicketDatabase, sql: string, values: (number | string)[]): Promise<SessionLiveness> => {
     try {
         const row = await database
             .prepare(sql)
@@ -166,9 +166,9 @@ const readSession = async (database: TicketDatabase, sql: string, values: string
     }
 };
 
-/** Whether the session `id` of `userId` still exists; `"unknown"` when the read failed. */
-const lookUpSession = async (database: TicketDatabase, id: string, userId: string): Promise<SessionLiveness> =>
-    await readSession(database, `SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`, [id, userId]);
+/** Whether the session `id` of `userId` still exists and has not expired; `"unknown"` when the read failed. */
+const lookUpSession = async (database: TicketDatabase, id: string, userId: string, now = Date.now()): Promise<SessionLiveness> =>
+    await readSession(database, `SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? AND "expiresAt" > ? LIMIT 1`, [id, userId, now]);
 
 /**
  * Whether every sign-in a ticket was minted under still exists: its web session
@@ -176,8 +176,9 @@ const lookUpSession = async (database: TicketDatabase, id: string, userId: strin
  * grant revoked between mint and redeem cannot ride another live session of the
  * user. A ticket naming neither (a bearer minted before `sid` was added) needs
  * any session of the user. Reads better-auth's `session` table, which lives in
- * the same D1 database. Expiry is not re-checked — the caller was verified at
- * mint, 30s ago at most; what this catches is a session DELETED since, by
+ * the same D1 database. A session past its `expiresAt` (ms, as better-auth
+ * stores it) counts as gone, so an expired grant whose bearer is still valid
+ * gets no ticket and redeems none; beyond that this catches a session DELETED since, by
  * sign-out, a grant revoke or account deletion
  * (`gdpr_steps_deletion_steps.revokeUserSessions`). A gone session wins over a
  * failed read; with none gone, a failed read is `"unknown"`.
@@ -186,7 +187,7 @@ const hasLiveSession = async (database: TicketDatabase, identity: WsTicketIdenti
     const named = [identity.sessionId, identity.grantSessionId].filter((id): id is string => id !== undefined);
 
     if (named.length === 0) {
-        return await readSession(database, `SELECT 1 AS "live" FROM "session" WHERE "userId" = ? LIMIT 1`, [identity.userId]);
+        return await readSession(database, `SELECT 1 AS "live" FROM "session" WHERE "userId" = ? AND "expiresAt" > ? LIMIT 1`, [identity.userId, Date.now()]);
     }
 
     const live = await Promise.all(named.map(async (id) => await lookUpSession(database, id, identity.userId)));

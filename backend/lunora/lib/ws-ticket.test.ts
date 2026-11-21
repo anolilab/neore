@@ -101,7 +101,15 @@ describe("ws tickets", () => {
 
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
         // Consumed all the same: a session restored later cannot revive it.
-        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('s1', 'u1', 0)`).run();
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('s1', 'u1', ?)`).run(Date.now() + 60_000);
+        await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
+    });
+
+    it("refuses a ticket whose session expired after the mint", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        database.sqlite.prepare(`UPDATE "session" SET "expiresAt" = ? WHERE "id" = ?`).run(Date.now() - 1, "sa");
+
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
     });
 
@@ -259,6 +267,18 @@ describe(handleWsTicketRequest, () => {
         const { ticket } = (await response!.json()) as { ticket: string };
 
         await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ sessionId: "s1", userId: "u1" });
+    });
+
+    it("refuses an app grant's bearer once its grant session has expired, though the bearer is still valid", async () => {
+        const database = createDatabase();
+
+        database.sqlite.prepare(`UPDATE "session" SET "expiresAt" = ? WHERE "id" = ?`).run(Date.now() - 1, "sa");
+
+        const response = await handleWsTicketRequest(post(), database, async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        });
+
+        expect(response?.status).toBe(401);
     });
 
     it("refuses an app grant's bearer once the grant is revoked, so its sockets are cut at the next re-check", async () => {
