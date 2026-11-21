@@ -72,7 +72,18 @@ pnpm --filter browser-renderer test:browser   # the saved-login fill against a l
 From before `/login` loads the login page until the password is cleared, the tab starts no worker, shared worker or new
 window, has no WebRTC, WebTransport, `WebSocketStream`, `fetchLater`, keepalive fetch or beacon, and cannot reach a
 service worker (`src/channels.ts`). Other tabs of the session are closed when it starts. A login page that needs any of
-these fails rather than signs in.
+these fails rather than signs in. Speculation rules, whose
+prefetches and prerenders the browser sends past request interception, are taken out too: a `Speculation-Rules` header
+is dropped from the tab's documents, and each `<script type="speculationrules">` is removed as it is added, in the
+document and in every shadow root a script makes or reaches. A rule set that stays (one in a declarative shadow root no
+script touched) means nothing is typed, and a speculative load the browser starts once the password is typed counts as an
+attempt.
+
+Not closed: a `<link rel="preconnect">` (or `dns-prefetch`, where the browser does it) to a host the password is spelled
+into. The browser looks the host up and connects as the element is added, in a context of its own profile (the one
+Browser Rendering gives); request interception never sees it, and neither a `Content-Security-Policy` nor
+`X-DNS-Prefetch-Control` stops it. Chromium's `Connection-Allowlist` header does, but it also fails every redirect a
+navigation of the page meets (a sign-in's `303` included), so it is not used.
 
 `test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with
 cross-site frames in their own process, and needs

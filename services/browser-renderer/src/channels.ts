@@ -41,6 +41,46 @@ const PAGE_LOCK = `(() => {
     fix(globalThis, "open", () => null);
     const { open } = Document.prototype;
     fix(Document.prototype, "open", function (...args) { return args.length > 2 ? null : open.apply(this, args); });
+    // Every \`<script type="speculationrules">\` is taken out before the browser reads it (an observer's callback runs
+    // first), in the document and in each shadow root a script makes or reaches. What runs later uses only what is
+    // captured here, read by index: the page may have changed every prototype by then.
+    const { defineProperty, getOwnPropertyDescriptor } = Object;
+    const { observe } = MutationObserver.prototype;
+    const { querySelectorAll: inDocument } = Document.prototype;
+    const { querySelectorAll: inFragment } = DocumentFragment.prototype;
+    const { attachShadow, remove } = Element.prototype;
+    const { includes, toLowerCase } = String.prototype;
+    const { add: keep, has: isKept } = WeakSet.prototype;
+    const typeOf = getOwnPropertyDescriptor(HTMLScriptElement.prototype, "type").get;
+    const sizeOf = getOwnPropertyDescriptor(NodeList.prototype, "length").get;
+    const { item } = NodeList.prototype;
+    const root = document;
+    const roots = [root];
+    const kept = new WeakSet();
+    const sweep = () => {
+        for (let at = 0; at < roots.length; at++) {
+            const scripts = apply(roots[at] === root ? inDocument : inFragment, roots[at], ["script"]);
+            for (let index = apply(sizeOf, scripts, []) - 1; index >= 0; index--) {
+                const script = apply(item, scripts, [index]);
+                if (apply(includes, apply(toLowerCase, apply(typeOf, script, []), []), ["speculationrules"])) apply(remove, script, []);
+            }
+        }
+    };
+    const observer = new MutationObserver(sweep);
+    const watch = (shadow) => {
+        if (shadow && !apply(isKept, kept, [shadow])) {
+            apply(keep, kept, [shadow]);
+            defineProperty(roots, roots.length, { configurable: true, enumerable: true, value: shadow, writable: true });
+            apply(observe, observer, [shadow, { characterData: true, childList: true, subtree: true }]);
+        }
+        return shadow;
+    };
+    apply(observe, observer, [root, { characterData: true, childList: true, subtree: true }]);
+    fix(Element.prototype, "attachShadow", function () { return watch(apply(attachShadow, this, arguments)); });
+    for (const target of [Element.prototype, globalThis.ElementInternals?.prototype]) {
+        const { get } = target ? getOwnPropertyDescriptor(target, "shadowRoot") : {};
+        if (get) defineProperty(target, "shadowRoot", { configurable: false, enumerable: true, get() { return watch(apply(get, this, [])); } });
+    }
 })();`;
 
 /** What a target the lock stopped was, for a message. */
@@ -69,11 +109,26 @@ interface Attached {
     waitingForDebugger: boolean;
 }
 
+interface Header {
+    name: string;
+    value: string;
+}
+
+/** A document's response, paused once its headers are in. */
+interface Paused {
+    requestId: string;
+    responseErrorReason?: string;
+    responseHeaders?: Header[];
+    responseStatusCode?: number;
+}
+
+const isSpeculationRules = ({ name }: Header): boolean => name.toLowerCase() === "speculation-rules";
+
 /** Sends a command into one target, through the sessions between: fire and forget, in order. */
 type Post = (method: string, params?: Record<string, boolean | string>) => void;
 
 export interface ChannelLock {
-    /** Told of each target stopped from here on; `null` to stop telling. */
+    /** Told of each target stopped, and each speculative load the browser starts, from here on; `null` to stop telling. */
     onRefused: (listener: ((what: string) => void) | null) => void;
     /** The first target stopped since the lock was set, for an error message. */
     refused: () => string | null;
@@ -85,6 +140,12 @@ export interface ChannelLock {
      * loads: one added to a loaded document never sees the prefetches it asks for.
      */
     route: (handler: ((route: Route) => Promise<void>) | null) => void;
+
+    /**
+     * Whether the tab's document holds speculation rules the page lock could not take out (in a declarative shadow root
+     * no script reached): the browser would prefetch what they match itself.
+     */
+    speculates: () => Promise<boolean>;
 }
 
 /**
@@ -92,6 +153,9 @@ export interface ChannelLock {
  *
  * - On the tab's own target and every cross-site frame under it (attached paused, then let run): the `PAGE_LOCK` script
  *   in each new document, and the tab's requests bypass its service worker.
+ * - The tab's documents (the only ones whose speculation rules the browser acts on) arrive without a `Speculation-Rules`
+ *   header, whose rule sets no script can take out. The rule sets the tab holds are tracked (`speculates()`), and each
+ *   prefetch or prerender the browser starts for one is reported to `onRefused`: it is sent past request interception.
  * - Every worker the tab's own target starts (a script URL, `blob:` or `data:`, from any of its frames) is held before it
  *   runs a line, and stays held until the lock lifts, by when the document that started it is gone. So is anything else
  *   it starts (a prerendered page). Only a flat session holds a target, and only a non-flat one can talk to a child, so
@@ -108,6 +172,9 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
     let isRouted = false;
     let id = 0;
     const sessions: CDPSession[] = [];
+    let own: CDPSession | undefined;
+    /** The speculation rule sets of the tab's documents, by id: the loader of the document each is in. */
+    const ruleSets = new Map<string, string>();
 
     const refuse = (kind: string): void => {
         const what = KINDS.get(kind) ?? `a ${kind.replaceAll("_", " ")}`;
@@ -212,8 +279,9 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
         const tab = await page.context().newCDPSession(page);
 
         sessions.push(tab);
+        own = tab;
 
-        const { targetInfo: own } = (await tab.send("Target.getTargetInfo")) as { targetInfo: TargetInfo };
+        const { targetInfo: ownTarget } = (await tab.send("Target.getTargetInfo")) as { targetInfo: TargetInfo };
 
         tab.on("Target.attachedToTarget", ({ targetInfo, waitingForDebugger }) => {
             if (waitingForDebugger) {
@@ -224,6 +292,24 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
         await tab.send("Page.addScriptToEvaluateOnNewDocument", { runImmediately: true, source: PAGE_LOCK });
         await tab.send("Network.enable");
         await tab.send("Network.setBypassServiceWorker", { bypass: true });
+        tab.on("Fetch.requestPaused", (event) => {
+            const { requestId, responseErrorReason, responseHeaders = [], responseStatusCode } = event as Paused;
+
+            (responseErrorReason === undefined && responseStatusCode !== undefined && responseHeaders.some((header) => isSpeculationRules(header))
+                ? tab.send("Fetch.continueResponse", {
+                      requestId,
+                      responseCode: responseStatusCode,
+                      responseHeaders: responseHeaders.filter((header) => !isSpeculationRules(header)),
+                  })
+                : tab.send("Fetch.continueRequest", { requestId })
+            ).catch(() => undefined);
+        });
+        await tab.send("Fetch.enable", { patterns: [{ requestStage: "Response", resourceType: "Document" }] });
+        tab.on("Preload.ruleSetUpdated", ({ ruleSet }) => ruleSets.set(ruleSet.id, ruleSet.loaderId));
+        tab.on("Preload.ruleSetRemoved", ({ id: removed }) => ruleSets.delete(removed));
+        tab.on("Preload.prefetchStatusUpdated", () => listener?.("a speculative prefetch"));
+        tab.on("Preload.prerenderStatusUpdated", () => listener?.("a speculative prerender"));
+        await tab.send("Preload.enable");
         // Cross-site frames are the non-flat session's: one this session paused, it could not let run again.
         await tab.send("Target.setAutoAttach", {
             autoAttach: true,
@@ -241,7 +327,7 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
         top.on("Target.attachedToTarget", (event) => {
             const { sessionId, targetInfo, waitingForDebugger } = event as Attached;
 
-            if (targetInfo.browserContextId === own.browserContextId && targetInfo.targetId !== own.targetId && CLOSED_TYPES.has(targetInfo.type)) {
+            if (targetInfo.browserContextId === ownTarget.browserContextId && targetInfo.targetId !== ownTarget.targetId && CLOSED_TYPES.has(targetInfo.type)) {
                 if (waitingForDebugger) {
                     refuse(targetInfo.type);
                 }
@@ -270,6 +356,21 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
         release,
         route: (handler) => {
             decide = handler;
+        },
+        speculates: async () => {
+            if (!own) {
+                return true;
+            }
+
+            const { frameTree } = (await own.send("Page.getFrameTree")) as { frameTree: { frame: { loaderId: string } } };
+
+            for (const loader of ruleSets.values()) {
+                if (loader === frameTree.frame.loaderId) {
+                    return true;
+                }
+            }
+
+            return false;
         },
     };
 };

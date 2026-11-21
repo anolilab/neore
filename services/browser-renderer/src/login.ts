@@ -206,7 +206,7 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  * to `origin`. A 307 or
  * 308 redirect, which would carry a POST body on, is failed when it points elsewhere or its `Location` does not parse; a
  * new page (a popup) is closed; a WebSocket to another origin is closed or refused; a worker, window or service worker
- * `lock` stops counts as an attempt (the lock, set before the page loaded, refuses what interception does not see). Until the answer to the form's own navigation arrives (the
+ * `lock` stops, or a speculative load it sees, counts as an attempt (the lock, set before the page loaded, refuses what interception does not see). Until the answer to the form's own navigation arrives (the
  * document that held the password is being replaced; blocking goes on), `attempt()` names the first blocked request that
  * could have carried the password (a navigation, a body, a socket or such a redirect). `sent()` is the first request to
  * `origin` after `expectSubmit()` that sends the login: the main frame's own POST (whatever the page made of the
@@ -698,6 +698,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         if (!(await field.evaluate((input) => input.isConnected && (input as HTMLInputElement).type === "password"))) {
             return failed("The password field changed before it was typed into, so it was left empty");
+        }
+
+        // The browser sends a rule set's loads itself: one the page lock could not take out would carry what the page
+        // puts in a link.
+        if (await locked.speculates()) {
+            return failed("The login page holds speculation rules that cannot be taken out, so the password was not typed");
         }
 
         const timeout = left(pageTimeout);

