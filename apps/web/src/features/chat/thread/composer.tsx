@@ -862,7 +862,7 @@ const Composer: FC<ComposerProps> = ({
                         onSubmit={() => {}}
                         onSubmitOverride={onSubmitOverride}
                         placeholder={placeholder}
-                        suggestPrompt={composerMode === "text"}
+                        suggestPrompt={composerMode === "text" && !minimal}
                     />
                 </ComposerBase>
             </div>
