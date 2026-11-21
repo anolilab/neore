@@ -67,28 +67,37 @@ export const noteSavedPrompt = (prompt: SavedPromptAuthorship, viewerId: string 
 /** A request's `draftFrom`, spread into its body: nothing for the person's own words. */
 export const draftFromField = (origin: DraftOrigin | undefined): { draftFrom?: DraftOrigin } => (origin === undefined ? {} : { draftFrom: origin });
 
-/** The mark of the new-chat hand-off the chat index read last (`handOffLandingMessage`), until the composer applies it. */
-const landing: { draftFrom: DraftOrigin | undefined } = { draftFrom: undefined };
+/** The new-chat hand-off the chat index read last (`handOffLandingMessage`): its text and mark, kept until the next one. */
+const landing: { draftFrom: DraftOrigin | undefined; text: string | undefined } = { draftFrom: undefined, text: undefined };
 
-/** Set when the chat index reads a hand-off: its mark, or none, so an earlier one never marks the next. Taken by `prefillDraftFrom`. */
-export const holdLandingDraftFrom = (origin: DraftOrigin | undefined): void => {
+/**
+ * Set when the chat index reads a hand-off: its text and mark, or none, so an earlier one never marks the next. Read by
+ * `prefillDraftFrom` for that text only, as often as the composer applies it again (a remount writes the text again).
+ */
+export const holdLandingDraft = (text: string, origin: DraftOrigin | undefined): void => {
     landing.draftFrom = origin;
+    landing.text = text;
 };
 
 /**
- * The mark of a composer's `initialMessage` prefill, taken when the text is put in. A chat's comes from its address
- * (`/chat/$threadId?initialMessage=`), which a link wrote. The new-chat composer's is its hand-off's
- * (`handOffLandingMessage`): none for text typed on the landing or home page, `forwarded` for forwarded messages,
- * `suggestion` for an onboarding template.
+ * The mark of a composer's `initialMessage` prefill, read when the text is put in. A chat's comes from its address
+ * (`/chat/$threadId?initialMessage=`), which a link wrote. The new-chat composer's is its hand-off's when the text is the
+ * hand-off's (`handOffLandingMessage`): none for text typed on the landing or home page, `forwarded` for forwarded
+ * messages, `suggestion` for an onboarding template.
  */
-export const prefillDraftFrom = (threadId: string | undefined): DraftOrigin | undefined => {
+export const prefillDraftFrom = (threadId: string | undefined, text: string): DraftOrigin | undefined => {
     if (threadId) {
         return "promptLink";
     }
 
-    const origin = landing.draftFrom;
+    return landing.text === text ? landing.draftFrom : undefined;
+};
 
-    landing.draftFrom = undefined;
-
-    return origin;
+/**
+ * Gives the live composer's draft, just replaced by an `initialMessage` prefill, that prefill's mark (`prefillDraftFrom`).
+ * It replaces the mark the earlier draft held: a hand-off of typed text clears it, so an unsent forwarded or suggested
+ * draft never marks the person's own words, and a marked hand-off keeps its own.
+ */
+export const markPrefilledDraft = (threadId: string | undefined, text: string): void => {
+    useChatUIStore.getState().setComposerDraftFrom(prefillDraftFrom(threadId, text));
 };

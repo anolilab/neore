@@ -12,7 +12,7 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import Assistant from "@/features/chat/assistant";
 import { useLinkSearchAsWritten, usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
-import { holdLandingDraftFrom } from "@/features/chat/core/utils/draft-origin";
+import { holdLandingDraft } from "@/features/chat/core/utils/draft-origin";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
 import { LANDING_MESSAGE_KEY, takeLandingMessage } from "@/features/marketing/stores/landing-store";
@@ -116,7 +116,7 @@ const ChatPage = () => {
         }
 
         // Its mark goes to the composer with the text (`prefillDraftFrom`).
-        holdLandingDraftFrom(handOff.from);
+        holdLandingDraft(handOff.text, handOff.from);
         initialMessageReadRef.current = true;
         setInitialMessage(handOff.text);
     }, [hasInitialMessage]);

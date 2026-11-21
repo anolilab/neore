@@ -7,9 +7,10 @@ import { useChatUIStore } from "../stores/chat-ui-store";
 import {
     composerDraftFrom,
     draftFromField,
-    holdLandingDraftFrom,
+    holdLandingDraft,
     isOwnPromptContent,
     markComposerDraft,
+    markPrefilledDraft,
     noteSavedPrompt,
     prefillDraftFrom,
 } from "./draft-origin";
@@ -151,21 +152,60 @@ describe(isOwnPromptContent, () => {
 
 describe(prefillDraftFrom, () => {
     it("marks a chat's `?initialMessage=` prefill, which a link wrote, and not the new chat's hand-off of typed text", () => {
-        holdLandingDraftFrom(undefined);
+        holdLandingDraft("my words", undefined);
 
-        expect(prefillDraftFrom("thread-1")).toBe("promptLink");
-        expect(prefillDraftFrom(undefined)).toBeUndefined();
+        expect(prefillDraftFrom("thread-1", "my words")).toBe("promptLink");
+        expect(prefillDraftFrom(undefined, "my words")).toBeUndefined();
     });
 
-    it("gives the new chat's prefill its hand-off's mark once: forwarded messages, an onboarding template", () => {
-        holdLandingDraftFrom("forwarded");
+    it("gives the new chat's prefill its hand-off's mark each time it is applied, and only for that text", () => {
+        holdLandingDraft("> quoted", "forwarded");
 
-        expect(prefillDraftFrom(undefined)).toBe("forwarded");
-        expect(prefillDraftFrom(undefined)).toBeUndefined();
+        expect(prefillDraftFrom(undefined, "> quoted")).toBe("forwarded");
+        // A remounted composer applies the same prefill again.
+        expect(prefillDraftFrom(undefined, "> quoted")).toBe("forwarded");
+        expect(prefillDraftFrom(undefined, "other text")).toBeUndefined();
 
-        holdLandingDraftFrom("suggestion");
+        holdLandingDraft("a template", "suggestion");
 
-        expect(prefillDraftFrom(undefined)).toBe("suggestion");
+        expect(prefillDraftFrom(undefined, "a template")).toBe("suggestion");
+        expect(prefillDraftFrom(undefined, "> quoted")).toBeUndefined();
+    });
+});
+
+/** The chat index reading a hand-off, then the composer putting its text in (`chat/index.tsx`, `composer.tsx`). */
+const applyHandOff = (): void => {
+    const handOff = takeLandingMessage();
+
+    if (handOff) {
+        holdLandingDraft(handOff.text, handOff.from);
+        ui().setComposerText(handOff.text);
+        markPrefilledDraft(undefined, handOff.text);
+    }
+};
+
+describe(markPrefilledDraft, () => {
+    it("clears an unsent draft's mark when typed text from the home page replaces it", () => {
+        ui().setComposerText("> quoted");
+        markComposerDraft("forwarded");
+
+        handOffLandingMessage("my words");
+        applyHandOff();
+
+        expect(composerDraftFrom()).toBeUndefined();
+    });
+
+    it("marks a forwarded hand-off that replaces the person's own unsent draft, again after a remount", () => {
+        ui().setComposerText("my words");
+
+        handOffLandingMessage("> quoted", "forwarded");
+        applyHandOff();
+
+        expect(composerDraftFrom()).toBe("forwarded");
+
+        markPrefilledDraft(undefined, "> quoted");
+
+        expect(composerDraftFrom()).toBe("forwarded");
     });
 });
 

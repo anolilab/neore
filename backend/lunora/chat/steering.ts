@@ -32,7 +32,7 @@ import { internalMutation } from "../_generated/server";
 import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
 import { hasNotTypedMarks, mergeNotTypedMarks, notTypedMarksOfDraftFrom } from "../lib/not-typed-text";
-import { vNotTypedMarks } from "../lib/not-typed-text-validator";
+import { vDraftFrom, vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { queueSteer, type SteerEntry, takeQueuedSteers, withdrawQueuedSteer } from "./lib/steer-queue";
@@ -44,20 +44,7 @@ export const steerRun = authMutation
     .use(rateLimit("chat/steer"))
     .input({
         /** The steer holds a composer draft the owner did not type (`lib/not-typed-text.ts`): it is delivered marked. */
-        draftFrom: v.optional(
-            v.union(
-                v.literal("promptLink"),
-                v.literal("shellLink"),
-                v.literal("sharedPrompt"),
-                v.literal("forwarded"),
-                v.literal("assistantText"),
-                v.literal("suggestion"),
-                v.literal("improvedPrompt"),
-                v.literal("galleryPrompt"),
-                v.literal("organizationValue"),
-                v.literal("impersonated"),
-            ),
-        ),
+        draftFrom: v.optional(vDraftFrom),
         /**
          * The client's id for this steer. Sending the same id again queues nothing
          * more, so a call whose answer was lost can be reconciled instead of repeated.

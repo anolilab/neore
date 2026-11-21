@@ -52,7 +52,7 @@ import type {
 } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
-import { markComposerDraft, prefillDraftFrom } from "@/features/chat/core/utils/draft-origin";
+import { markPrefilledDraft } from "@/features/chat/core/utils/draft-origin";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
@@ -597,12 +597,8 @@ const Composer: FC<ComposerProps> = ({
                 draftOwnership.prefill = initialMessage;
                 ui.setComposerText(initialMessage);
 
-                // A link's prefill is not the person's own words.
-                const origin = prefillDraftFrom(threadId);
-
-                if (origin !== undefined) {
-                    markComposerDraft(origin);
-                }
+                // A link's prefill is not the person's own words; typed text handed off clears the earlier draft's mark.
+                markPrefilledDraft(threadId, initialMessage);
             }
 
             ui.setAppliedInitialMessageKey(key);

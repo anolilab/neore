@@ -69,8 +69,8 @@
   through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
   admin's prompt again as `draftFrom: "impersonated"`. A quoted reply (the quote chip) is refused by its
   `>` lines (`carriesQuotedLines`), not marked, so deleting the chip leaves typed text usable. A plain-text paste stays unseen. A new draft kind goes in
-  `NOT_TYPED_DRAFTS` and the three validators that list it (`not-typed-text-validator.ts`, `steerRun`, `saveLocalTurn`);
-  the `/chat/start`, steer and verdict tests walk the list (`saveLocalTurn`'s does not). Still unmarked, to mark
+  `NOT_TYPED_DRAFTS` and `vNotTypedDraft` (`not-typed-text-validator.ts`; a type check fails until both agree), which the
+  stored mark, `steerRun` and `saveLocalTurn` use; the `/chat/start`, steer and verdict tests walk the list. Still unmarked, to mark
   before the fill ships: bot instructions and personalization an impersonating admin wrote (a `systemContext` kind
   that refuses) and the variable defaults one wrote; an accepted ghost-text completion (`composer-tiptap/extensions/ghost-completion.ts`);
   Restore to input of a collaborator's message in a shared chat. The allowlist refuses a step holding a page's result or an approval's

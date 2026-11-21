@@ -280,7 +280,10 @@ export const fillsAnyOf = (
     values: Readonly<Record<string, string>>,
     names: ReadonlySet<string>,
     typed: Readonly<Record<string, string>> = {},
-): boolean => extractVariables(content).some((name) => names.has(name) && !typed[name]?.trim() && Object.hasOwn(values, name) && values[name]?.trim() !== "");
+): boolean =>
+    extractVariables(content).some(
+        (name) => names.has(name) && !(Object.hasOwn(typed, name) && typed[name]?.trim()) && Object.hasOwn(values, name) && values[name]?.trim() !== "",
+    );
 
 /**
  * List of auto-populated variable names (for documentation/UI)

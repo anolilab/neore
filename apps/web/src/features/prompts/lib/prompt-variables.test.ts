@@ -323,4 +323,10 @@ describe("an organization's values filled into a prompt", () => {
         // Typing one variable leaves the organization's other value marked.
         expect(fillsAnyOf("{{brand}} for {{team}}", { brand: "Acme", team: "" }, new Set(["brand", "team"]), { team: "Ops" })).toBe(true);
     });
+
+    it("reads only what the person typed, never a value the typed object inherits", () => {
+        const names = new Set(["constructor", "toString"]);
+
+        expect(fillsAnyOf("For {{constructor}} and {{toString}}", { constructor: "Acme", toString: "Acme" }, names, {})).toBe(true);
+    });
 });
