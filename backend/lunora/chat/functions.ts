@@ -4578,7 +4578,12 @@ export const retryFollowupCache = internalAction
             return;
         }
 
-        const charged = await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId, requestId, userId: chargedUserId });
+        // The unit is taken on the charged user's own shard, where their message quota lives (`/chat/start` charges there too).
+        const charged = await callOnShard(
+            internal.chat.daily_charge.chargeDailyUnit,
+            { kind: "Text", organizationId, requestId, userId: chargedUserId },
+            { shardKey: chargedUserId },
+        );
 
         // No unit, no suggestion: the written suggestions are cleared for this reply, as the job does for its own refused charge.
         if (!charged) {
@@ -4859,12 +4864,16 @@ export const generateFollowupSuggestionsForThread = internalAction
                 const replyChargeKey = `followup:${threadId}:${lastMessageId}`;
 
                 if (
-                    !(await context.runMutation(internal.chat.daily_charge.dailyUnitAvailable, {
-                        kind: "Text",
-                        organizationId: threadData.organizationId ?? undefined,
-                        requestId: replyChargeKey,
-                        userId: chargedUserId,
-                    }))
+                    !(await callOnShard(
+                        internal.chat.daily_charge.dailyUnitAvailable,
+                        {
+                            kind: "Text",
+                            organizationId: threadData.organizationId ?? undefined,
+                            requestId: replyChargeKey,
+                            userId: chargedUserId,
+                        },
+                        { shardKey: chargedUserId },
+                    ))
                 ) {
                     await giveBackPaidClaim();
 
@@ -4960,13 +4969,18 @@ export const generateFollowupSuggestionsForThread = internalAction
                 // not charged twice. A refused charge clears the written suggestions (below), so nothing shows without its unit.
                 paid.cached = true;
 
-                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-                    kind: "Text",
-                    organizationId: threadData.organizationId ?? undefined,
-                    requestId: replyChargeKey,
-                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
-                    userId: chargedUserId,
-                });
+                // Taken on the charged user's shard (see `retryFollowupCache`); a collaborator's unit is their own, not the owner's bucket there.
+                const charged = await callOnShard(
+                    internal.chat.daily_charge.chargeDailyUnit,
+                    {
+                        kind: "Text",
+                        organizationId: threadData.organizationId ?? undefined,
+                        requestId: replyChargeKey,
+                        // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                        userId: chargedUserId,
+                    },
+                    { shardKey: chargedUserId },
+                );
 
                 if (!charged) {
                     // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown
