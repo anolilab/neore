@@ -97,6 +97,21 @@ describe("ThreadImageGallery", () => {
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
+    it("lets go of its selection when the image it was opened at leaves the list", () => {
+        const { rerender } = render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+
+        openAt("m3:1");
+        rerender(<ThreadImageGallery images={IMAGES.slice(0, 2)} threadId="t1" />);
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(useImageGalleryStore.getState().shown).toBeNull();
+
+        // The image comes back: the gallery stays closed until someone opens it.
+        rerender(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
     it("does not open for another chat's image", () => {
         render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
         act(() => {

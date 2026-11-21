@@ -95,6 +95,14 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
     const index = galleryIndexOf(images, shown?.key ?? null);
     // Opens at a held image, or at the first for no key; never at another image for a key it does not hold.
     const isOpen = shown !== null && images.length > 0 && index >= 0;
+
+    // The image it was opened at left the list (its message changed, or another tab removed it): the selection is let go,
+    // so the dialog never opens again by itself if the image comes back. Only this chat's selection (`shown`) is read.
+    useEffect(() => {
+        if (shown !== null && !isOpen) {
+            close();
+        }
+    }, [close, isOpen, shown]);
     const current = images[index];
     const currentKey = current?.key;
 
