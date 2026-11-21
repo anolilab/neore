@@ -13,7 +13,7 @@ import { subscribePanelRequests } from "@/page-context/panel-request";
 import { languageName, quickPrompt } from "@/page-context/quick-prompts";
 
 import type { AccountPanel } from "./account-panel";
-import { panelFor, THREADS_VIEW } from "./account-panel";
+import { panelFor, subscribeWhileCurrent, THREADS_VIEW, withCreatedThread } from "./account-panel";
 
 const newChat = (seed?: ChatSeed): View => {
     return { key: crypto.randomUUID(), seed, threadId: null, type: "chat" };
@@ -65,21 +65,29 @@ export default function App() {
             return undefined;
         }
 
-        return subscribePanelRequests((request) => {
+        return subscribeWhileCurrent(subscribePanelRequests, async (request) => {
             if (request.kind === "error") {
-                setNotice(request.message);
-
-                return;
+                return () => setNotice(request.message);
             }
 
-            setNotice(undefined);
-            void seedFor(request).then((seed) => setView(newChat(seed)));
+            const seed = await seedFor(request);
+
+            return () => {
+                setNotice(undefined);
+                setView(newChat(seed));
+            };
         });
     }, [isSignedIn, setView]);
 
-    const onThreadCreated = useCallback((threadId: string) => {
-        setPanel((current) => (current.view.type === "chat" ? { ...current, view: { ...current.view, threadId } } : current));
-    }, []);
+    const chatKey = view.type === "chat" ? view.key : undefined;
+    const onThreadCreated = useCallback(
+        (threadId: string) => {
+            if (chatKey !== undefined) {
+                setPanel((current) => withCreatedThread(current, chatKey, threadId));
+            }
+        },
+        [chatKey],
+    );
 
     if (isPending) {
         return (
