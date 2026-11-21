@@ -8,6 +8,9 @@
  *
  * Only https on port 443 is allowed, with no credentials. Redirects are not followed: the status comes back as it is, and
  * the response body is not read. The socket API and the DNS fetch are injected, so the rules are tested without a network.
+ *
+ * A host on one of Cloudflare's published ranges is refused as `unsupported_target`: Workers cannot open TCP connections to
+ * those addresses, so the connect would fail anyway.
  */
 
 const DOH_ENDPOINT = "https://cloudflare-dns.com/dns-query";
@@ -28,7 +31,7 @@ const HTTP_STATUS_LINE = /^HTTP\/1\.[01] (\d{3})(?: |\r\n)/;
 /** The default deadline for the whole exchange: lookup, connect, request and status line. */
 export const EGRESS_TIMEOUT_MS = 10_000;
 
-export type EgressErrorCode = "bad_header" | "bad_response" | "bad_url" | "blocked_address" | "dns_failed" | "timeout";
+export type EgressErrorCode = "bad_header" | "bad_response" | "bad_url" | "blocked_address" | "dns_failed" | "timeout" | "unsupported_target";
 
 export class EgressError extends Error {
     readonly code: EgressErrorCode;
@@ -110,6 +113,124 @@ export const isPublicIPv6 = (address: string): boolean => {
 };
 
 export const isPublicAddress = (address: string): boolean => (address.includes(":") ? isPublicIPv6(address) : isPublicIPv4(address));
+
+/**
+ * Cloudflare's published ranges, from https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6, fetched
+ * 2026-11-21. Workers cannot open TCP connections to these. Refresh the list when Cloudflare changes it.
+ */
+/* eslint-disable sonarjs/no-hardcoded-ip -- a published range list: data to match against, not addresses this code connects to */
+const CLOUDFLARE_CIDRS = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+    "2400:cb00::/32",
+    "2606:4700::/32",
+    "2803:f800::/32",
+    "2405:b500::/32",
+    "2405:8100::/32",
+    "2a06:98c0::/29",
+    "2c0f:f248::/32",
+];
+/* eslint-enable sonarjs/no-hardcoded-ip */
+
+const IPV6_GROUP = /^[\da-f]{1,4}$/;
+
+const ipv4ToBigInt = (address: string): bigint | undefined => {
+    const octets = address.split(".");
+
+    if (octets.length !== 4 || octets.some((octet) => !DECIMAL_OCTET.test(octet) || Number(octet) > 255)) {
+        return undefined;
+    }
+
+    let value = 0n;
+
+    for (const octet of octets) {
+        value = (value << 8n) | BigInt(Number(octet));
+    }
+
+    return value;
+};
+
+/** The 128-bit value of an IPv6 address, with `::` expanded. Undefined for text that is not an IPv6 address. */
+const ipv6ToBigInt = (address: string): bigint | undefined => {
+    const halves = address.toLowerCase().split("::");
+
+    if (halves.length > 2) {
+        return undefined;
+    }
+
+    const head = halves[0] === "" ? [] : (halves[0] as string).split(":");
+    const tail = halves.length === 2 && halves[1] !== "" ? (halves[1] as string).split(":") : [];
+    const explicit = head.length + tail.length;
+
+    if (halves.length === 1 ? explicit !== 8 : explicit > 7) {
+        return undefined;
+    }
+
+    const groups = [...head];
+
+    for (let index = explicit; index < 8; index += 1) {
+        groups.push("0");
+    }
+
+    groups.push(...tail);
+
+    let value = 0n;
+
+    for (const group of groups) {
+        if (!IPV6_GROUP.test(group)) {
+            return undefined;
+        }
+
+        value = (value << 16n) | BigInt(Number.parseInt(group, 16));
+    }
+
+    return value;
+};
+
+interface CidrRange {
+    family: 4 | 6;
+    network: bigint;
+    shift: bigint;
+}
+
+const parseCidr = (cidr: string): CidrRange => {
+    const [text = "", prefix = ""] = cidr.split("/", 2);
+    const family = text.includes(":") ? 6 : 4;
+    const network = family === 6 ? ipv6ToBigInt(text) : ipv4ToBigInt(text);
+
+    if (network === undefined) {
+        throw new Error(`Invalid Cloudflare range: ${cidr}`);
+    }
+
+    return { family, network, shift: BigInt((family === 6 ? 128 : 32) - Number(prefix)) };
+};
+
+const CLOUDFLARE_RANGES = CLOUDFLARE_CIDRS.map((cidr) => parseCidr(cidr));
+
+/** True for an address inside one of Cloudflare's published ranges. Text it cannot read is not one of them. */
+export const isCloudflareAddress = (address: string): boolean => {
+    const family = address.includes(":") ? 6 : 4;
+    const value = family === 6 ? ipv6ToBigInt(address) : ipv4ToBigInt(address);
+
+    if (value === undefined) {
+        return false;
+    }
+
+    return CLOUDFLARE_RANGES.some((range) => range.family === family && value >> range.shift === range.network >> range.shift);
+};
 
 /** The socket a connection runs on. The shape of `connect()` from `cloudflare:sockets`, which the caller passes in. */
 export interface EgressSocket {
@@ -215,6 +336,10 @@ const resolveChecked = async (hostname: string, dependencies: EgressDependencies
             throw new EgressError("blocked_address", "The URL points at a private or reserved address.");
         }
 
+        if (isCloudflareAddress(hostname)) {
+            throw new EgressError("unsupported_target", "The URL points at Cloudflare, which Workers cannot connect to.");
+        }
+
         return [hostname];
     }
 
@@ -230,6 +355,10 @@ const resolveChecked = async (hostname: string, dependencies: EgressDependencies
 
     if (addresses.some((address) => !isPublicAddress(address))) {
         throw new EgressError("blocked_address", "The host name resolves to a private or reserved address.");
+    }
+
+    if (addresses.some((address) => isCloudflareAddress(address))) {
+        throw new EgressError("unsupported_target", "The host name is served through Cloudflare, which Workers cannot connect to.");
     }
 
     return addresses;

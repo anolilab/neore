@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { EgressConnect, EgressDependencies, EgressSocket } from "./egress";
-import { EgressError, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
+import { EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
 
 const textStream = (text: string) =>
     new ReadableStream<Uint8Array>({
@@ -133,6 +133,16 @@ describe("isPublicIPv6", () => {
     });
 });
 
+describe("isCloudflareAddress", () => {
+    it.each(["104.16.0.1", "172.64.0.1", "173.245.48.1", "2606:4700:4700::1111", "2606:4700::1"])("flags %s", (address) => {
+        expect(isCloudflareAddress(address)).toBe(true);
+    });
+
+    it.each(["93.184.216.34", "8.8.8.8", "104.15.255.255", "2a00:1450::1"])("does not flag %s", (address) => {
+        expect(isCloudflareAddress(address)).toBe(false);
+    });
+});
+
 describe("postCheckedHttps", () => {
     it("connects to the checked address and keeps the host name for the certificate", async () => {
         const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
@@ -185,6 +195,35 @@ describe("postCheckedHttps", () => {
 
         await expect(postCheckedHttps({ body: "", headers: {}, url: "https://10.0.0.1/hook" }, dependencies(fetch, connection))).rejects.toMatchObject({
             code: "blocked_address",
+        });
+        expect(fetch).not.toHaveBeenCalled();
+        expect(connection.connect).not.toHaveBeenCalled();
+    });
+
+    it("refuses a host that has one Cloudflare answer, before connecting", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34", "104.16.0.1"] }), connection)),
+        ).rejects.toMatchObject({ code: "unsupported_target" });
+        expect(connection.connect).not.toHaveBeenCalled();
+    });
+
+    it("refuses a host with an IPv6 answer inside a Cloudflare range", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+
+        await expect(
+            postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"], AAAA: ["2606:4700::1"] }), connection)),
+        ).rejects.toMatchObject({ code: "unsupported_target" });
+        expect(connection.connect).not.toHaveBeenCalled();
+    });
+
+    it("refuses a Cloudflare IP literal without a lookup", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+        const fetch = dnsFetch({ A: ["8.8.8.8"] });
+
+        await expect(postCheckedHttps({ body: "", headers: {}, url: "https://104.16.0.1/hook" }, dependencies(fetch, connection))).rejects.toMatchObject({
+            code: "unsupported_target",
         });
         expect(fetch).not.toHaveBeenCalled();
         expect(connection.connect).not.toHaveBeenCalled();
