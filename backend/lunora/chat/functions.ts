@@ -4,7 +4,7 @@ import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
-import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow } from "../agent/followup-suggestions";
+import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -200,15 +200,9 @@ const generateFollowupSuggestionsInternal = async (
     });
 
     // The call is cut off before the dispatch claim lapses, so a lock that waited for it cannot commit while the request is still live (`agent/thread-lock.ts`).
-    // An explicit timer, not `AbortSignal.timeout`: the deadline must fire, whatever the runtime does with that signal, and is cleared once the call ends.
-    const controller = new AbortController();
-    const deadline = setTimeout(() => controller.abort(), timeoutMs);
-
-    let result: Awaited<ReturnType<typeof generateText>>;
-
-    try {
-        result = await generateText({
-            abortSignal: controller.signal,
+    const result = await withDeadline(timeoutMs, (abortSignal) =>
+        generateText({
+            abortSignal,
             model: wrappedModel,
             output: Output.object({
                 schema: z
@@ -218,10 +212,8 @@ const generateFollowupSuggestionsInternal = async (
                     .strict(),
             }),
             prompt,
-        });
-    } finally {
-        clearTimeout(deadline);
-    }
+        }),
+    );
 
     // Handle case where model doesn't generate valid output
     if (!result.output) {

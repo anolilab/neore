@@ -64,6 +64,21 @@ export const followupModelRows = <Row extends { _id: string }>(turnRows: Readonl
 };
 
 /**
+ * Runs `call` with a signal that aborts after `timeoutMs`. An explicit timer, not `AbortSignal.timeout`: the deadline must fire
+ * whatever the runtime does with that signal, and it is cleared as soon as the call settles.
+ */
+export const withDeadline = async <T>(timeoutMs: number, call: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await call(controller.signal);
+    } finally {
+        clearTimeout(deadline);
+    }
+};
+
+/**
  * Whether a reply gets a suggestion for this user: the setting is on (absent = on) and the user is not a guest.
  * Read before any model is picked, so a user who switched the setting off costs no call.
  */
