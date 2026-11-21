@@ -994,10 +994,13 @@ export const runStreamingAgent = internalAction
                     return;
                 }
 
-                void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
-                    threadId,
-                    userId,
-                });
+                // A reply paused on an approval is not finished: its suggestions wait for the reply that finishes after it.
+                if (!finished.paused) {
+                    void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
+                        threadId,
+                        userId,
+                    });
+                }
 
                 await setThreadStatus(ctx, threadId, "active", { awaitingInput: finished.awaitingInput, replied: !finished.paused });
 
@@ -1253,6 +1256,11 @@ export const continueAfterToolApproval = internalAction
                 await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
                 // The stop ended the reply for good, so what it kept through its pause goes with it.
                 await discardRunSecrets(ctx, { streamId, threadId });
+            }
+
+            // A reply that finishes after an approval gets its suggestions, as any finished reply does. A sub-agent's child thread does not.
+            if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped) {
+                void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId });
             }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
