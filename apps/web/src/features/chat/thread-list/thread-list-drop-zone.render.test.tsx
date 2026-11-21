@@ -2,6 +2,7 @@
 
 /** Files dropped on the thread list are queued for the new-chat composer, which opens unless it is already open. */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createPortal } from "react-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigate = vi.hoisted(() => vi.fn());
@@ -156,6 +157,18 @@ describe("ThreadListDropZone", () => {
         await waitFor(() => {
             expect(screen.getByRole("status").textContent).toBe(DROP_HINT);
         });
+    });
+
+    it("ignores files dropped on a dialog the list opens in a portal", async () => {
+        render(<ThreadListDropZone>{createPortal(<div role="dialog">Project form</div>, document.body)}</ThreadListDropZone>);
+        fireEvent.drop(screen.getByRole("dialog"), filesTransfer([new File(["a"], "rules.md", { type: "text/markdown" })]));
+        // react-dropzone reads the drop asynchronously: give it that turn before asserting that nothing happened.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+        });
+
+        expect(requestComposerAttach).not.toHaveBeenCalled();
+        expect(navigate).not.toHaveBeenCalled();
     });
 
     it("keeps the list itself in place", () => {

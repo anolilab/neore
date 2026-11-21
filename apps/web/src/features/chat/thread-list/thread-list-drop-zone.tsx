@@ -13,7 +13,7 @@ import { useLingui } from "@lingui/react/macro";
 import cn from "@neore/ui/utils/cn";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { FilePlusIcon } from "lucide-react";
-import type { FC, ReactNode } from "react";
+import type { DragEvent, FC, ReactNode } from "react";
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 
@@ -78,8 +78,26 @@ const ThreadListDropZone: FC<{ children: ReactNode }> = ({ children }) => {
 
     const { getRootProps, isDragActive } = useDropzone({ multiple: true, noClick: true, noKeyboard: true, onDrop });
 
+    // React drag events bubble through portals: a file dropped on a dialog the list opens (a project form, which imports
+    // its own files) must not reach the zone. `currentTarget` is the zone's own element; stopped here, react-dropzone's
+    // own handlers skip the event.
+    const onlyOverTheList = (event: DragEvent<HTMLElement>) => {
+        if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) {
+            event.stopPropagation();
+        }
+    };
+
     return (
-        <div {...getRootProps({ className: "relative flex min-h-0 flex-1 flex-col" })} data-testid="thread-list-drop-zone">
+        <div
+            {...getRootProps({
+                className: "relative flex min-h-0 flex-1 flex-col",
+                onDragEnter: onlyOverTheList,
+                onDragLeave: onlyOverTheList,
+                onDragOver: onlyOverTheList,
+                onDrop: onlyOverTheList,
+            })}
+            data-testid="thread-list-drop-zone"
+        >
             {children}
             <div
                 aria-hidden={!isDragActive}
