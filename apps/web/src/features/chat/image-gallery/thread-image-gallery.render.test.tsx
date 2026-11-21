@@ -48,10 +48,10 @@ const openAt = (key: string | null) => {
 };
 
 describe(galleryIndexOf, () => {
-    it("finds the image by key, else starts at the first", () => {
+    it("finds the image by key, starts at the first for no key, and holds nothing for an unknown key", () => {
         expect(galleryIndexOf(IMAGES, "m3:1")).toBe(2);
         expect(galleryIndexOf(IMAGES, null)).toBe(0);
-        expect(galleryIndexOf(IMAGES, "gone")).toBe(0);
+        expect(galleryIndexOf(IMAGES, "gone")).toBe(-1);
     });
 });
 
@@ -88,6 +88,13 @@ describe("ThreadImageGallery", () => {
         expect(preview().getAttribute("alt")).toBe("Chart");
         expect(screen.getByText("Image 2 of 3")).toBeTruthy();
         expect(screen.getByRole("button", { name: "Image 2: Chart" }).getAttribute("aria-current")).toBe("true");
+    });
+
+    it("does not open at another image for a key it does not hold (a reply still streaming)", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt("tool:streaming-call");
+
+        expect(screen.queryByRole("dialog")).toBeNull();
     });
 
     it("does not open for another chat's image", () => {

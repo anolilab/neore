@@ -21,11 +21,8 @@ import { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
 import { useImageGalleryStore } from "./image-gallery-store";
 
 /** The index the gallery shows for `key`: that image, or the first when the key is absent or no longer loaded. */
-export const galleryIndexOf = (images: ReadonlyArray<ThreadImage>, key: string | null): number => {
-    const index = key === null ? -1 : images.findIndex((image) => image.key === key);
-
-    return Math.max(index, 0);
-};
+export const galleryIndexOf = (images: ReadonlyArray<ThreadImage>, key: string | null): number =>
+    key === null ? 0 : images.findIndex((image) => image.key === key);
 
 /** The index a key moves the gallery to, or `null` for a key it does not handle. Stops at either end. */
 export const galleryStep = (key: string, index: number, count: number): number | null => {
@@ -64,8 +61,6 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
     // Set by a key pressed in the zoomable preview: the next image replaces it, so the focus moves to that one.
     const refocusPreviewRef = useRef(false);
 
-    const isOpen = shown !== null && images.length > 0;
-
     /** An image's name: its own (a page title, a file name), else its kind, in the viewer's language. */
     const labelOf = (image: ThreadImage): string => {
         if (image.alt) {
@@ -98,6 +93,8 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
         return opener?.isConnected ? opener : true;
     };
     const index = galleryIndexOf(images, shown?.key ?? null);
+    // Opens at a held image, or at the first for no key; never at another image for a key it does not hold.
+    const isOpen = shown !== null && images.length > 0 && index >= 0;
     const current = images[index];
     const currentKey = current?.key;
 
