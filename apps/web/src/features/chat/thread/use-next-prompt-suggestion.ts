@@ -26,7 +26,8 @@ const useNextPromptSuggestion = (): string | null => {
     // A locked chat without its proof is a stub: its cache is not read, so the query is not sent and is not refused.
     const lockedWithoutProof = Boolean(thread?.lockedAt) && !unlockProof;
 
-    const enabled = userSettings?.enableFollowupSuggestions !== false;
+    // Off until the settings have loaded: an unresolved query is `undefined`, and a loaded setting without an explicit `false` is on.
+    const enabled = userSettings !== undefined && userSettings?.enableFollowupSuggestions !== false;
     const validThreadId = getValidThreadId(threadId);
 
     // The newest non-divider row, and only when it is a reply to something the person wrote: the rule the backend's generator keeps.
