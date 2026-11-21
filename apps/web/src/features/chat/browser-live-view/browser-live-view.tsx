@@ -33,9 +33,9 @@ const CONTROL_WARNING_MS = 30_000;
 const RENEW_EVERY_MS = 30_000;
 
 /**
- * How long past the lease's end, as the card last heard it (or past a page load's answer, if later), a renewal or status
- * read still out may take to answer before the card ends control anyway. A page load still out has no such limit: the
- * server holds the lease while it loads.
+ * How long past the lease's end, as the card last heard it (or past a page load's answer, if later), a renewal still out
+ * may take to answer before a status read decides, and how long a status read may take before control ends unconfirmed.
+ * A page load still out has no such limit: the server holds the lease while it loads.
  */
 const DECIDE_GRACE_MS = 15_000;
 
@@ -196,7 +196,7 @@ const settle = async <T,>(request: Promise<T>): Promise<Settled<T>> => {
     }
 };
 
-type StatusRead = { canControl: boolean; control?: { byYou: boolean; until: number }; now: number } | null;
+type StatusRead = { canControl: boolean; control?: { byClaim?: boolean; byYou: boolean; until: number }; now: number } | null;
 
 /** A person's lease as the status names it, on the server's clock; `byYou`: the caller holds it (from any of their tabs). */
 type Control = { byYou: boolean; until: number };
@@ -208,9 +208,9 @@ type CardProps = {
     currentUrl: string | undefined;
 
     /**
-     * Until when (on this device's clock) the lease this tab holds keeps the browser alive, `Infinity` while the card
-     * still waits on an answer that decides it, or `undefined` once it holds none: the status's `idleUntil` moves only
-     * with a push, so the card must not be dropped (and its lease handed back) at an older end.
+     * Until when (on this device's clock) the lease this tab holds keeps the browser alive: `Infinity` while it holds
+     * one (the card decides its end), `undefined` once it holds none. The status's `idleUntil` moves only with a push,
+     * so the card must not be dropped (and its lease handed back) at an older end.
      */
     onHold: (until: number | undefined) => void;
     /** The status's clock: the server's time at the answer, and how far the server's clock is ahead of this device's. */
@@ -236,12 +236,15 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const openLiveView = useAction(api.browser.live_view.openLiveView);
     const takeControl = useAction(api.browser.live_view.takeControl);
     const navigateInControl = useAction(api.browser.live_view.navigateInControl);
-    // A one-off read, not the live one: a live key's refetch answers from the subscription's last push.
-    const statusRead = crpc.browser.live_view.getThreadBrowser.queryOptions({ threadId }, { live: false });
-    const readStatus = async (): Promise<StatusRead> =>
-        typeof statusRead.queryFn === "function"
+    // A one-off read, not the live one: a live key's refetch answers from the subscription's last push. It names this
+    // tab's claim: the status says whose lease it is per person, and another of the person's tabs may hold it.
+    const readStatus = async (held: string): Promise<StatusRead> => {
+        const statusRead = crpc.browser.live_view.getThreadBrowser.queryOptions({ claim: held, threadId }, { live: false });
+
+        return typeof statusRead.queryFn === "function"
             ? await statusRead.queryFn({ queryKey: statusRead.queryKey })
             : await Promise.reject(new Error("No status read."));
+    };
     const keepControl = useMutation(crpc.browser.live_view.keepControl.mutationOptions());
     // A hand back that does not arrive leaves the agent waiting: it is sent again, with backoff, before the card gives up.
     // Only a request the server gave no verdict on is sent again.
@@ -283,8 +286,16 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     /** `keepControl` requests still out: each may have moved the lease on, so its end waits for their answers. */
     const [renewalsOut, setRenewalsOutState] = useState(0);
     const renewalsOutRef = useRef(0);
-    /** A status read is checking, at the lease's end as the card heard it, whether the server still holds it. */
-    const [checking, setChecking] = useState(false);
+    /** Every `keepControl` sent: a status read older than one that went out after it does not decide the lease. */
+    const renewalsSent = useRef(0);
+
+    /**
+     * A status read is checking, at the lease's end as the card heard it, whether the server still holds it: by when (on
+     * this device's clock) it must answer. `checks` names the read; an answer to an older one changes nothing.
+     */
+    const [checkBy, setCheckBy] = useState<number | undefined>(undefined);
+    const checks = useRef(0);
+    const checking = checkBy !== undefined;
     /** When the last page load answered: the renewal it sends gets its own grace, though the lease's end passed during it. */
     const [loadedAt, setLoadedAt] = useState(0);
     const mounted = useRef(false);
@@ -292,18 +303,18 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const leaving = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const expanded = view.kind !== "closed";
     // Whether this tab's lease is still live, judged on the server's clock and moved onto this device's once per status
-    // answer (`statusClock.skew`). Only a status read that can have seen the lease speaks for it: an older one may name
-    // another person's lease, or this person's last one with its earlier end. Such a read that says the lease is not the
-    // caller's ends it. Otherwise it lasts until the latest end anything has told the card of: the one `takeControl`
-    // answered (so a status push that never comes does not hold the view open past the server's lease), a `keepControl`
-    // answer, or a read that saw the lease. That end passing does not end control by itself: a renewal or a page load
-    // still out may have moved the lease on, so the card waits for it, and then reads the status once before it ends it.
+    // answer (`statusClock.skew`). Only a status that can have seen the lease speaks for it: an older one may name
+    // another person's lease, or this person's last one with its earlier end. Such a status that says the lease is not
+    // the caller's ends it. The live status names the person, not the tab, so its end never moves this tab's: the lease
+    // lasts until the latest end told for this tab's claim, by `takeControl`, a `keepControl` answer, or a status read
+    // that named the claim. That end passing does not end control by itself: a renewal or a page load still out may have
+    // moved the lease on, so the card waits for it, and then reads the status once before it ends it.
     const seen = lease !== undefined && statusClock.now >= lease.writtenBy;
     const refused = seen && (!canControl || control?.byYou !== true);
-    const statusUntil = seen && control?.byYou === true ? control.until : 0;
-    const leaseUntil = lease === undefined ? undefined : Math.max(lease.until - statusClock.skew, statusUntil - statusClock.skew, lease.confirmedUntil ?? 0);
+    const leaseUntil = lease === undefined ? undefined : Math.max(lease.until - statusClock.skew, lease.confirmedUntil ?? 0);
     const leaseEnded = usePassed(leaseUntil);
     const graceOver = usePassed(leaseUntil === undefined ? undefined : Math.max(leaseUntil, loadedAt) + DECIDE_GRACE_MS);
+    const checkTimedOut = usePassed(checkBy);
     const youControl = lease !== undefined && !refused;
     // Another person's lease ends on the server's clock too; while this tab's claim is unseen, the status may be older.
     const otherEnded = usePassed(control?.byYou === false ? control.until - statusClock.skew : undefined);
@@ -321,6 +332,12 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         setReturningState(next);
     };
 
+    /** An answer that moved or reopened the lease's end: a status read still out speaks for an older one. */
+    const dropCheck = (): void => {
+        checks.current += 1;
+        setCheckBy(undefined);
+    };
+
     const setClaim = (next: Held | undefined): void => {
         // A page still loading under a lease that ended answers into nothing.
         if (next === undefined) {
@@ -328,6 +345,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             setNavigating(false);
         }
 
+        // A status read still out speaks for the claim it was asked for only.
+        dropCheck();
         claimRef.current = next?.claim;
         setLeaseState(next);
         setReturning(undefined);
@@ -420,8 +439,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         ask(false);
     };
 
-    // The lease ended on the server (idle, or the person may no longer write) while this tab still held its claim.
-    const endLease = (): void => {
+    // The lease ended on the server (idle, or the person may no longer write) while this tab still held its claim, or
+    // the card could not learn in time that it did not (`unconfirmed`).
+    const endLease = (unconfirmed = false): void => {
         const holding = claimRef.current;
 
         if (holding === undefined || isForOtherBrowser(view, browserId)) {
@@ -436,7 +456,11 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         }
 
         giveBack();
-        endControl(t`Control of the browser is back with the agent.`);
+        endControl(
+            unconfirmed
+                ? t`Control of the browser is back with the agent: the server did not confirm in time that you still have it.`
+                : t`Control of the browser is back with the agent.`,
+        );
     };
 
     const setRenewalsOut = (change: number): void => {
@@ -456,20 +480,26 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             return;
         }
 
-        if (claimRef.current !== held || returningRef.current === held) {
+        if (claimRef.current !== held) {
             return;
         }
 
         const result = outcome.value;
 
-        // Another of the person's tabs took control since, or control ended.
+        // Another of the person's tabs took control since, or control ended; while a hand back is out, that is its answer.
         if (result === null) {
+            if (returningRef.current === held) {
+                return;
+            }
+
             endControl(t`You no longer have control of the browser.`);
 
             return;
         }
 
-        // The lease runs on from here, whether or not the status push of this write arrives.
+        // The lease runs on from here, whether or not the status push of this write arrives; a status read still out
+        // checks an end this answer replaced.
+        dropCheck();
         setLeaseState((current: Held | undefined) => (current?.claim === held ? { ...current, until: Math.max(current.until, result.until) } : current));
     };
 
@@ -482,23 +512,35 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         }
 
         lastRenewal.current = Date.now();
+        renewalsSent.current += 1;
         setRenewalsOut(1);
         // Each request's own answer: `mutate`'s callbacks would fire for the newest request only, and an older one that
         // moved the lease on would go unheard.
         void settle(keepControl.mutateAsync({ claim: held, threadId })).then((outcome: Settled<{ until: number } | null>) => renewed(held, outcome));
     };
 
-    const confirmed = (holding: string, outcome: Settled<StatusRead>): void => {
-        setChecking(false);
-
-        if (claimRef.current !== holding || returningRef.current === holding) {
+    const confirmed = (check: number, sent: number, holding: string, outcome: Settled<StatusRead>): void => {
+        if (checks.current !== check) {
             return;
         }
 
-        const read = outcome.ok ? outcome.value : null;
+        setCheckBy(undefined);
+
+        // A renewal sent since the read began may have moved the lease past what the read saw: its answer decides.
+        if (claimRef.current !== holding || returningRef.current === holding || renewalsSent.current !== sent) {
+            return;
+        }
+
+        if (!outcome.ok) {
+            endLease(true);
+
+            return;
+        }
+
+        const read = outcome.value;
         const named = read?.control;
 
-        if (read?.canControl !== true || named?.byYou !== true || named.until <= read.now) {
+        if (read?.canControl !== true || named?.byClaim !== true || named.until <= read.now) {
             endLease();
 
             return;
@@ -511,13 +553,18 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     };
 
     /**
-     * The lease's end as the card heard it passed, and no answer still out can move it: one status read (not the live
-     * one, which answers from its last push) says whether the server still holds it. Only a read that names the
-     * caller's lease running on keeps it.
+     * The lease's end as the card heard it passed, and no answer still out can move it, or a renewal still out is past
+     * its grace: one status read (not the live one, which answers from its last push) says whether the server still holds
+     * it. Only a read that names this tab's claim running on keeps it; one that fails, or does not answer in
+     * {@link DECIDE_GRACE_MS}, ends it.
      */
     const confirmLease = (holding: string): void => {
-        setChecking(true);
-        void settle(readStatus()).then((outcome: Settled<StatusRead>) => confirmed(holding, outcome));
+        checks.current += 1;
+        const check = checks.current;
+        const sent = renewalsSent.current;
+
+        setCheckBy(Date.now() + DECIDE_GRACE_MS);
+        void settle(readStatus(holding)).then((outcome: Settled<StatusRead>) => confirmed(check, sent, holding, outcome));
     };
 
     const controlEnded = useEffectEvent((): void => {
@@ -532,13 +579,20 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             return;
         }
 
-        if (graceOver || returningRef.current === holding) {
+        if (returningRef.current === holding) {
             endLease();
 
             return;
         }
 
-        if (renewalsOutRef.current === 0 && !checking) {
+        if (checkTimedOut) {
+            endLease(true);
+
+            return;
+        }
+
+        // A renewal still out past the grace may have moved the lease on, and only its answer is slow: the server says.
+        if (!checking && (graceOver || renewalsOutRef.current === 0)) {
             confirmLease(holding);
         }
     });
@@ -582,14 +636,11 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         if (youControl && leaseEnded) {
             leaseExpired();
         }
-    }, [youControl, leaseEnded, graceOver, navigating, renewalsOut, checking]);
+    }, [youControl, leaseEnded, graceOver, navigating, renewalsOut, checking, checkTimedOut]);
 
-    // Until the lease is decided, the card (and its lease) stays, though the status's `idleUntil` passed.
-    let holdUntil: number | undefined;
-
-    if (youControl) {
-        holdUntil = leaseEnded ? Infinity : leaseUntil;
-    }
+    // While this tab holds a lease, the card (and its lease) stays, though the status's `idleUntil` passed: the card
+    // decides when its lease ends, and a removal at the same moment would hand back a lease a renewal still out moved on.
+    const holdUntil = youControl ? Infinity : undefined;
 
     useEffect(() => {
         onHold(holdUntil);
@@ -783,6 +834,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         setNavigating(false);
         setLoadedAt(Date.now());
+        // The load held the lease on the server: its answer, and the renewal it sends, decide afresh.
+        dropCheck();
 
         if (result.status === "ok") {
             // The load counts as input: renewing now learns the lease's new end, whether or not the status read says it.
@@ -811,6 +864,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         setNavigating(false);
         setLoadedAt(Date.now());
+        // The load held the lease on the server: its answer, and the renewal it sends, decide afresh.
+        dropCheck();
 
         if (failureReasonOf(error) === "forbidden") {
             controlForbidden();

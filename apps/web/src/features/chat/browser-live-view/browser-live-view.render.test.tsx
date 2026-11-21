@@ -23,7 +23,8 @@ const { backend } = vi.hoisted(() => {
                 accessUntil?: number;
                 browserId: string;
                 canControl?: boolean;
-                control?: { byYou: boolean; until: number };
+                /** `claim`: the lease's claim, `claim-1` when left out; a read that names a claim is told whether it matches. */
+                control?: { byYou: boolean; claim?: string; until: number };
                 currentUrl?: string;
                 idleUntil: number;
                 /** The server's clock at the answer; this device's when left out. */
@@ -38,6 +39,8 @@ const { backend } = vi.hoisted(() => {
             navigate: vi.fn(),
             /** When set, the status read fails with it. */
             statusError: undefined as Error | undefined,
+            /** When set, a one-off status read waits: each pushes here how to fail it, and none answers otherwise. */
+            heldReads: undefined as ((error: Error) => void)[] | undefined,
             open: vi.fn(),
             take: vi.fn(),
             /** How often the status was read; `oneOffReads`: of those, the reads that were not the live query's. */
@@ -81,7 +84,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                             },
                         },
                         getThreadBrowser: {
-                            queryOptions: (args: unknown, options?: { live?: boolean }) => {
+                            queryOptions: (args: { claim?: string }, options?: { live?: boolean }) => {
                                 return {
                                     queryFn: async () => {
                                         backend.statusReads += 1;
@@ -90,11 +93,32 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             backend.oneOffReads += 1;
                                         }
 
+                                        const held = backend.heldReads;
+
+                                        if (options?.live === false && held !== undefined) {
+                                            return await new Promise((_resolve, reject) => {
+                                                held.push(reject);
+                                            });
+                                        }
+
                                         if (backend.statusError !== undefined) {
                                             throw backend.statusError;
                                         }
 
-                                        return backend.browser && { now: Date.now(), ...backend.browser };
+                                        if (backend.browser === null) {
+                                            return null;
+                                        }
+
+                                        const { control, ...browser } = backend.browser;
+                                        const { claim = "claim-1", ...named } = control ?? { byYou: false, until: 0 };
+
+                                        return {
+                                            now: Date.now(),
+                                            ...browser,
+                                            ...(control !== undefined && {
+                                                control: { ...named, ...(args.claim !== undefined && { byClaim: named.byYou && claim === args.claim }) },
+                                            }),
+                                        };
                                     },
                                     queryKey: ["browser", args],
                                 };
@@ -148,6 +172,7 @@ afterEach(async () => {
     setVisibility("visible");
     backend.browser = null;
     backend.statusError = undefined;
+    backend.heldReads = undefined;
     backend.statusReads = 0;
     backend.oneOffReads = 0;
     backend.impersonating = false;
@@ -1267,8 +1292,8 @@ describe("BrowserLiveView", () => {
             });
             fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
 
-            // A read made before that write arrives late: it names the person's old lease, ending in 10 s.
-            await push(queryClient, { ...backend.browser!, control: { byYou: true, until: Date.now() + 10_000 }, now: Date.now() });
+            // A read made before that write arrives late: the person's old lease is gone in it, which would end this one.
+            await push(queryClient, { ...backend.browser!, control: undefined, now: Date.now() });
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(15_000);
             });
@@ -1295,9 +1320,11 @@ describe("BrowserLiveView", () => {
         it("keeps control past the old end while a renewal is out, and takes the end it answers", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
+            // The browser's idle end is the lease's: the card stays past it while it decides.
+            backend.browser = { ...backend.browser!, idleUntil: Date.now() + 40_000 };
             const queryClient = mountCard();
 
-            await takeControl(queryClient, Date.now() + 40_000);
+            await takeControl(queryClient, backend.browser.idleUntil);
             const answers = heldRenewal();
 
             await act(async () => {
@@ -1345,6 +1372,196 @@ describe("BrowserLiveView", () => {
                 answers[0]?.({ until: Date.now() + 120_000 });
             });
             expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+        });
+
+        it("keeps control when a renewal answers past its grace, as the status read then says the server moved the lease on", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const start = Date.now();
+
+            await takeControl(queryClient, start + 40_000);
+            const answers = heldRenewal();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            // The renewal reached the server; its answer is slow, and the push that says so was lost.
+            backend.browser = { ...backend.browser!, control: { byYou: true, until: start + 131_000 } };
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(45_000);
+            });
+
+            expect(backend.oneOffReads).toBe(1);
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+
+            await act(async () => {
+                answers[0]?.({ until: start + 131_000 });
+            });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("ends control, saying why, when neither a renewal past its grace nor the status read after it answers", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            const answers = heldRenewal();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            backend.heldReads = [];
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(50_000);
+            });
+            // The status read after the grace is out: control holds until it has had as long again.
+            expect(backend.oneOffReads).toBe(1);
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(20_000);
+            });
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByText("Control of the browser is back with the agent: the server did not confirm in time that you still have it.")).toBeTruthy();
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+
+            await act(async () => {
+                answers[0]?.({ until: Date.now() + 120_000 });
+            });
+        });
+
+        it("lets a renewal sent while the status read is out decide, though the read then fails", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            backend.heldReads = [];
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(45_000);
+            });
+            expect(backend.heldReads).toHaveLength(1);
+
+            const answers = heldRenewal();
+
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            await act(async () => {
+                backend.heldReads?.[0]?.(new Error("offline"));
+            });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            await act(async () => {
+                answers[0]?.({ until: Date.now() + 120_000 });
+            });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(30_000);
+            });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("lets a page load that answers after a status read ran out of time decide", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const start = Date.now();
+
+            await takeControl(queryClient, start + 40_000);
+            // A renewal that moves nothing, so the one the address sends next is held back by the throttle.
+            backend.keep.mockResolvedValueOnce({ until: start + 40_000 });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(25_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            backend.heldReads = [];
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(20_000);
+            });
+            expect(backend.heldReads).toHaveLength(1);
+
+            const loads: ((value: unknown) => void)[] = [];
+
+            backend.navigate.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        loads.push(resolve);
+                    }),
+            );
+            await typeAddress();
+            expect(backend.keep).toHaveBeenCalledTimes(1);
+            // The read runs out of time while the page loads; the load then answers.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(20_000);
+            });
+            await act(async () => {
+                loads[0]?.({ status: "ok" });
+            });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(1000);
+            });
+
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("ends control at its own end though another of the person's tabs holds the lease longer", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            // The person took control in another tab: the status names their lease, under that tab's claim.
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claim: "claim-2", until: Date.now() + 100_000 } });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(45_000);
+            });
+
+            expect(backend.oneOffReads).toBe(1);
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.getByText("Control of the browser is back with the agent.")).toBeTruthy();
+        });
+
+        it("takes a renewal's end that answers while a hand back is out", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 40_000);
+            const answers = heldRenewal();
+
+            const handedBack: ((value: boolean) => void)[] = [];
+
+            backend.handBack.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        handedBack.push(resolve);
+                    }),
+            );
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+            await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+            await act(async () => {
+                answers[0]?.({ until: Date.now() + 120_000 });
+            });
+            // The old end passes with the hand back still out: the lease runs on, and so does the view.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(35_000);
+            });
+
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.queryByTitle(READ_ONLY_VIEW)).toBeNull();
+
+            await act(async () => {
+                handedBack[0]?.(true);
+            });
         });
 
         it("takes the end an earlier renewal answered, though a later one failed first", async () => {

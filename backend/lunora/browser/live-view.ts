@@ -166,7 +166,8 @@ const readerBrowser = async (
  * by the clock, so the client stops showing the status then and asks again, and every answer after it is `null`.
  */
 export const getThreadBrowser = authQuery
-    .input({ threadId: v.id("threads") })
+    /** `claim`: a view's own claim. The answer then says whether the lease is that view's, not only the caller's. */
+    .input({ claim: v.optional(v.string()), threadId: v.id("threads") })
     .output(
         v.union(
             v.null(),
@@ -174,8 +175,11 @@ export const getThreadBrowser = authQuery
                 accessUntil: v.optional(v.number()),
                 browserId: v.string(),
                 canControl: v.boolean(),
-                /** A person drives the browser until `until`; `byYou`: the caller. */
-                control: v.optional(v.object({ byYou: v.boolean(), until: v.number() })),
+                /**
+                 * A person drives the browser until `until`; `byYou`: the caller (from any of their tabs). `byClaim`, only
+                 * with a `claim` asked for: the lease is the one that claim names, and not handed back.
+                 */
+                control: v.optional(v.object({ byClaim: v.optional(v.boolean()), byYou: v.boolean(), until: v.number() })),
                 currentUrl: v.optional(v.string()),
                 idleUntil: v.number(),
                 /**
@@ -186,18 +190,27 @@ export const getThreadBrowser = authQuery
             }),
         ),
     )
-    .query(async ({ args: { threadId }, ctx }) => {
+    .query(async ({ args: { claim, threadId }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now);
 
         if (browser.kind !== "watchable") {
             return null;
         }
 
+        const { control } = browser;
+        const lease = browser.session.control;
+
         return {
             ...(browser.accessUntil !== undefined && { accessUntil: browser.accessUntil }),
             browserId: browser.browserId,
             canControl: browser.canControl,
-            ...(browser.control !== undefined && { control: { byYou: browser.control.byCaller, until: browser.control.until } }),
+            ...(control !== undefined && {
+                control: {
+                    ...(claim !== undefined && { byClaim: control.byCaller && lease?.ended === undefined && claimNames(lease, claim) }),
+                    byYou: control.byCaller,
+                    until: control.until,
+                },
+            }),
             currentUrl: browser.currentUrl,
             idleUntil: browser.idleUntil,
             now: ctx.now,

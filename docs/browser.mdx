@@ -94,6 +94,8 @@ apply). While you have control:
 - A page you open from the address field can take up to about a minute to load. Opening a page gives you a fresh
   two minutes of control.
 - An admin acting as you cannot take control of the browser.
+- Besides the two settings the live view needs, the deployment needs `STORAGE_SIGNING_SECRET` set on the backend.
+  Without it **Watch live** still works, but **Take control** says the view is not available.
 
 Control goes back to the AI when you choose **Hand back**, when you close the view or leave the chat, or after two
 minutes without input the card can see. Thirty seconds before that, the card asks whether you are still there;
@@ -101,7 +103,9 @@ minutes without input the card can see. Thirty seconds before that, the card ask
 may not get out before the page closes; control then goes back after the two minutes. Typing inside the view does
 not count as input the card sees, so during a long entry choose **Keep control** when asked. If you take control in a
 second tab, control moves to it, but the first tab's view stays open until that tab next renews control (on your
-next input there, or **Keep control**); close it yourself if you leave it open. While **Hand back** is on its way you keep
+next input there, or **Keep control**) or its own two minutes run out; close it yourself if you leave it open. When
+the time runs out and the card cannot reach the server to check that you still have control, control goes back to the
+AI, and the card says so. While **Hand back** is on its way you keep
 control; if it does not go through (for example while you are offline), the card says so, you still have control,
 and you can choose **Hand back** again, or control goes back to the AI on its own after two minutes without input.
 If the browser is replaced, control ends and the card offers **Take control** again for the new browser. If the

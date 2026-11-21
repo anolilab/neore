@@ -552,6 +552,20 @@ describe("taking control of the browser", () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    it("says, to a view that names its claim, whether the person's lease is that view's", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+
+        const first = await take(OWNER);
+        // The same person in a second tab: the lease goes on under that tab's claim.
+        const second = await take(OWNER);
+        const statusOf = async (claim: string): Promise<unknown> => await as(OWNER).query(getThreadBrowser as never, { claim, threadId } as never);
+
+        await expect(statusOf(second.claim)).resolves.toMatchObject({ control: { byClaim: true, byYou: true } });
+        await expect(statusOf(first.claim)).resolves.toMatchObject({ control: { byClaim: false, byYou: true } });
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("control.byClaim");
+    });
+
     it("lets a writer take control, but only one person at a time", async () => {
         await addSession();
 
