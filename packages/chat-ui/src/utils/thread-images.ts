@@ -4,8 +4,8 @@ import { toolImageSource } from "./tool-image-source";
  * The images of a thread, in reading order, for the image gallery: screenshots the browser tool took, images a code
  * run produced, and image files in messages (what a person attached and the agent then viewed, and generated images).
  *
- * A tool output the page left out (`outputRef`, fetched on expand) has no image yet, so it is skipped; so is an image
- * the NSFW check is still looking at or blocked.
+ * A tool output the page left out (`outputRef`) is skipped: fetched on expand, it shows as text (`TrimmedToolOutput`),
+ * not as an image. So is an image the NSFW check is still looking at or blocked.
  */
 
 export interface ThreadImage {
@@ -89,6 +89,24 @@ const imagesOfPart = (messageId: string, part: PartLike, partIndex: number): Thr
     return [];
 };
 
-/** Every image of `messages`, in order. Pure; pinned by `thread-images.test.ts`. */
-export const collectThreadImages = (messages: ReadonlyArray<{ id: string; parts: ReadonlyArray<unknown> }>): ThreadImage[] =>
-    messages.flatMap((message) => message.parts.flatMap((part, partIndex) => imagesOfPart(message.id, part as PartLike, partIndex)));
+interface MessageLike {
+    id: string;
+    parts: ReadonlyArray<unknown>;
+}
+
+// By message object: a streamed batch replaces only the streaming message (the web app shares unchanged ones), so only it is scanned again.
+const imagesByMessage = new WeakMap<MessageLike, ThreadImage[]>();
+
+const imagesOfMessage = (message: MessageLike): ThreadImage[] => {
+    let images = imagesByMessage.get(message);
+
+    if (!images) {
+        images = message.parts.flatMap((part, partIndex) => imagesOfPart(message.id, part as PartLike, partIndex));
+        imagesByMessage.set(message, images);
+    }
+
+    return images;
+};
+
+/** Every image of `messages`, in order. Pinned by `thread-images.test.ts`. */
+export const collectThreadImages = (messages: ReadonlyArray<MessageLike>): ThreadImage[] => messages.flatMap((message) => imagesOfMessage(message));

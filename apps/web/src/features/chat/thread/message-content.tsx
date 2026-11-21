@@ -7,7 +7,6 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
-import { ImageOpenContext } from "@neore/chat-ui/chat/image-open-context";
 import MessageContentUI from "@neore/chat-ui/chat/message-content";
 import { ToolOutputLoaderProvider } from "@neore/chat-ui/chat/tool-output-loader";
 import type { ChatMessage, SandboxOutputs, ToolOutputRef, ToolPart } from "@neore/chat-ui/types";
@@ -19,9 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { FC } from "react";
 import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
-import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
 import useMCPToolMeta from "@/features/chat/core/hooks/use-mcp-tool-meta";
-import { useImageGalleryStore } from "@/features/chat/image-gallery/image-gallery-store";
 import LinkPreviewSlot from "@/features/chat/link-preview/link-preview-slot";
 import ToolAutoApproval from "@/features/chat/thread/tool-auto-approval";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
@@ -167,10 +164,6 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
         },
         [crpc, queryClient],
     );
-    const { threadId } = useChatThreadIdentity();
-    const openAt = useImageGalleryStore((state) => state.openAt);
-    // A tool's image opens this chat's gallery at it (`image-gallery/`); a chat without an id yet has no gallery.
-    const openImage = useMemo(() => (threadId ? (key: string) => openAt(threadId, key) : null), [openAt, threadId]);
     const components = useMemo(() => {
         return {
             DeviceToolCall,
@@ -190,15 +183,13 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
     return (
         <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
             <ToolOutputLoaderProvider value={loadToolOutput}>
-                <ImageOpenContext value={openImage}>
-                    <MessageContentUI
-                        citationLabel={citationLabel}
-                        className={className}
-                        components={components}
-                        isStreaming={isStreaming}
-                        message={message as unknown as ChatMessage}
-                    />
-                </ImageOpenContext>
+                <MessageContentUI
+                    citationLabel={citationLabel}
+                    className={className}
+                    components={components}
+                    isStreaming={isStreaming}
+                    message={message as unknown as ChatMessage}
+                />
                 <LinkPreviewSlot isStreaming={isStreaming} message={message} />
             </ToolOutputLoaderProvider>
         </FetchableOriginsProvider>

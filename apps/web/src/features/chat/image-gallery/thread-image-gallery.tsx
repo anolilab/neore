@@ -14,6 +14,7 @@ import { ZoomableImage } from "@neore/ui/components/zoomable-image";
 import cn from "@neore/ui/utils/cn";
 import { ChevronLeftIcon, ChevronRightIcon, LocateFixedIcon } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
+import { useEffect, useRef } from "react";
 
 import { scrollToMessage } from "@/features/chat/core/utils/scroll-to-message";
 
@@ -56,10 +57,33 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
     const shown = useImageGalleryStore((state) => (state.shown?.threadId === threadId ? state.shown : null));
     const openAt = useImageGalleryStore((state) => state.openAt);
     const close = useImageGalleryStore((state) => state.close);
+    const previewRef = useRef<HTMLDivElement>(null);
+    // Set by a key pressed in the zoomable preview: the next image replaces it, so the focus moves to that one.
+    const refocusPreviewRef = useRef(false);
 
     const isOpen = shown !== null && images.length > 0;
     const index = galleryIndexOf(images, shown?.key ?? null);
     const current = images[index];
+    const currentKey = current?.key;
+
+    useEffect(() => {
+        if (!refocusPreviewRef.current) {
+            return;
+        }
+
+        refocusPreviewRef.current = false;
+        (previewRef.current?.firstElementChild as HTMLElement | null)?.focus();
+    }, [currentKey]);
+
+    // A gallery that goes away (its pane closed, the chat left) forgets its image, so it does not open again on return.
+    useEffect(
+        () => () => {
+            if (useImageGalleryStore.getState().shown?.threadId === threadId) {
+                useImageGalleryStore.getState().close();
+            }
+        },
+        [threadId],
+    );
 
     const show = (next: number) => {
         const image = images[next];
@@ -79,6 +103,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
 
         if (next !== null) {
             event.preventDefault();
+            refocusPreviewRef.current = next !== index && previewRef.current?.firstElementChild?.contains(event.target as Node) === true;
             show(next);
         }
     };
@@ -109,7 +134,7 @@ const ThreadImageGallery: FC<{ images: ReadonlyArray<ThreadImage>; threadId: str
                         <p aria-live="polite" className="text-muted-foreground text-xs">
                             {t`Image ${index + 1} of ${images.length}`}
                         </p>
-                        <div className="relative flex h-[60vh] min-h-0 items-center justify-center">
+                        <div className="relative flex h-[60vh] min-h-0 items-center justify-center" ref={previewRef}>
                             <ZoomableImage alt={current.alt} className="h-full w-full" key={current.key} src={current.src} />
                             <Button
                                 aria-label={t`Previous image`}

@@ -67,4 +67,14 @@ describe(collectThreadImages, () => {
             ]),
         ).toEqual([]);
     });
+
+    it("scans a message again only when it is a new object, as a streamed batch makes only of the streaming one", () => {
+        const done = { id: "m1", parts: [{ image: "https://api.test/files/owl?sig=1", type: "image" }] };
+        const [first] = collectThreadImages([done]);
+        const streaming = { id: "m2", parts: [{ image: "https://api.test/files/cat?sig=1", type: "image" }] };
+        const [again, next] = collectThreadImages([done, streaming]);
+
+        expect(again).toBe(first);
+        expect(next?.key).toBe("m2:0");
+    });
 });

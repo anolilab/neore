@@ -20,6 +20,12 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+vi.mock("@neore/ui/components/zoomable-image", () => {
+    return {
+        ZoomableImage: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
+    };
+});
+
 const OPEN_SCREENSHOT = { name: "Open Pricing in the image gallery" };
 
 const reply = {
@@ -37,22 +43,41 @@ const reply = {
     status: "success",
 } as unknown as ChatMessage;
 
-describe("a browser screenshot in a reply", () => {
-    it("opens the gallery at that screenshot", () => {
-        const open = vi.fn();
+vi.mock("@/features/chat/core/context/chat-context-hooks", () => {
+    return {
+        useChatMessages: () => {
+            return { messages: [reply] };
+        },
+        useChatThreadIdentity: () => {
+            return { threadId: "t1" };
+        },
+    };
+});
 
+const { default: ChatImageGallery } = await import("./chat-image-gallery");
+const { useImageGalleryStore } = await import("./image-gallery-store");
+
+describe("a browser screenshot in a reply", () => {
+    it("opens its own chat's gallery at it, from under the chat with no header mounted (a split pane without focus)", () => {
         render(
-            <ImageOpenContext value={open}>
+            <ChatImageGallery>
                 <MessageContentUI message={reply} />
-            </ImageOpenContext>,
+            </ChatImageGallery>,
         );
         fireEvent.click(screen.getByRole("button", OPEN_SCREENSHOT));
 
-        expect(open).toHaveBeenCalledWith("tool:call-1");
+        expect(useImageGalleryStore.getState().shown).toEqual({ key: "tool:call-1", threadId: "t1" });
+        expect(screen.getByText("Image 1 of 1")).toBeTruthy();
     });
 
-    it("is a plain image where the app shows no gallery", () => {
-        render(<MessageContentUI message={reply} />);
+    it("is a plain image where the app shows no gallery, as in a comparison column", () => {
+        render(
+            <ChatImageGallery>
+                <ImageOpenContext value={null}>
+                    <MessageContentUI message={reply} />
+                </ImageOpenContext>
+            </ChatImageGallery>,
+        );
 
         expect(screen.queryByRole("button", OPEN_SCREENSHOT)).toBeNull();
         expect(screen.getByRole("img", { name: "Pricing" })).toBeTruthy();

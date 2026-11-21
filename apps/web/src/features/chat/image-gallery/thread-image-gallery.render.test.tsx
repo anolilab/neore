@@ -2,7 +2,7 @@
 
 /** The chat's image gallery: opens at the chosen image, steps with the arrow keys and thumbnails, and jumps to the message. */
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scrollToMessage = vi.hoisted(() => vi.fn());
 
@@ -19,7 +19,8 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@neore/ui/components/zoomable-image", () => {
     return {
-        ZoomableImage: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
+        // Focusable, as the real one's root is.
+        ZoomableImage: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} tabIndex={-1} />,
     };
 });
 
@@ -35,20 +36,6 @@ const IMAGES = [
     { alt: "Chart", key: "tool:call-2:0", messageId: "m2", src: "https://api.test/two" },
     { alt: "Logo", key: "m3:1", messageId: "m3", src: "https://api.test/three" },
 ];
-
-class ResizeObserverStub {
-    disconnect() {
-        return this;
-    }
-
-    observe() {
-        return this;
-    }
-
-    unobserve() {
-        return this;
-    }
-}
 
 const PREVIEW_NAME = /^(Pricing page|Chart|Logo)$/u;
 
@@ -84,16 +71,8 @@ describe(galleryStep, () => {
 
 describe("ThreadImageGallery", () => {
     beforeEach(() => {
-        vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-        vi.stubGlobal("matchMedia", (query: string) => {
-            return { addEventListener: () => {}, matches: false, media: query, removeEventListener: () => {} };
-        });
         scrollToMessage.mockReset();
         useImageGalleryStore.setState({ shown: null });
-    });
-
-    afterEach(() => {
-        vi.unstubAllGlobals();
     });
 
     it("stays closed until an image is opened", () => {
@@ -137,6 +116,35 @@ describe("ThreadImageGallery", () => {
 
         fireEvent.keyDown(dialog, { key: "Home" });
         expect(preview().getAttribute("alt")).toBe("Pricing page");
+    });
+
+    it("keeps the focus on the preview while the arrow keys replace it", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt(null);
+
+        const first = preview();
+
+        act(() => {
+            first.focus();
+        });
+        fireEvent.keyDown(first, { key: "ArrowRight" });
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this test asserts
+        expect(document.activeElement).toBe(screen.getByRole("img", { name: "Chart" }));
+    });
+
+    it("forgets its image when it goes away, so the chat's gallery does not open again on return", () => {
+        const { unmount } = render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+
+        openAt("m3:1");
+        unmount();
+        expect(useImageGalleryStore.getState().shown).toBeNull();
+
+        act(() => {
+            useImageGalleryStore.getState().openAt("t2", "x");
+        });
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />).unmount();
+        expect(useImageGalleryStore.getState().shown?.threadId).toBe("t2");
     });
 
     it("leaves a key a zoomed image already used alone", () => {

@@ -32,6 +32,7 @@ import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import ChatImageGallery from "@/features/chat/image-gallery/chat-image-gallery";
 import useStoredDrafts, { keepsStoredDraft } from "@/features/chat/split/use-stored-drafts";
 import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
 import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
@@ -415,7 +416,9 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
 
 const Thread: FC<ThreadProps> = (props) => (
     <AtBottomProvider>
-        <ThreadContent {...props} />
+        <ChatImageGallery>
+            <ThreadContent {...props} />
+        </ChatImageGallery>
     </AtBottomProvider>
 );
 
