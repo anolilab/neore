@@ -408,7 +408,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     });
 
     // The view closes too: a page restored from the back/forward cache must not wait on a view whose lease is gone. A
-    // control request still out is no longer wanted: the lease it answers goes back at once.
+    // control request still out is no longer wanted: the lease it answers goes back at once. The hand back is a normal
+    // mutation (the Lunora client has no keepalive send, and there is no HTTP route for it), so a page that unloads may
+    // cut it off: the lease then ends on its idle timeout.
     const pageLeft = useEffectEvent((): void => {
         wantedControl.current = undefined;
         giveBack("left");
