@@ -4,7 +4,7 @@
  * budget, and an unfinished shard resumes from its carried state.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { decodeCensusCursor, encodeCensusCursor, measureShardPage } from "./cleanup";
@@ -32,6 +32,11 @@ import {
     willRetry,
     withRootShard,
 } from "./shard-footprint-logic";
+
+// The census cursor is sealed with a key derived from ENCRYPTION_KEY, which `encryption.ts` reads at load.
+vi.hoisted(() => {
+    process.env["ENCRYPTION_KEY"] = btoa(String.fromCodePoint(...crypto.getRandomValues(new Uint8Array(32))));
+});
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -436,27 +441,43 @@ describe("census scheduling", () => {
         expect(entries[0]?.succeeded).toBe(true);
     });
 
-    it("round-trips the census cursor through its opaque encoding and rejects anything else", () => {
+    it("round-trips the census cursor sealed, so the browser cannot read or alter it, and rejects anything else", async () => {
         const cursor: CensusCursor = {
             census: "census-cursor",
             censusDone: false,
-            pending: [{ shardKey: "user-1", state: { ...startFootprint(), largest: [{ rows: 2, threadId: "thread-1" }], threads: 3 } }],
+            pending: [
+                {
+                    shardKey: "user-1",
+                    state: { ...startFootprint(), currentRows: 4, currentThreadId: "thread-current", largest: [{ rows: 2, threadId: "thread-1" }], threads: 3 },
+                },
+            ],
             startedAt: NOW,
         };
+        const encoded = await encodeCensusCursor(cursor);
 
-        // The largest list's ids are dropped on the way out; the counts and the census clock survive.
-        const encoded = encodeCensusCursor(cursor);
+        // Neither the shard key nor any thread id can be read from the string, in plain or base64 form.
+        for (const name of ["user-1", "thread-current", "thread-1"]) {
+            expect(encoded).not.toContain(name);
+            expect(atob(encoded.slice("v1:".length))).not.toContain(name);
+        }
 
-        expect(decodeCensusCursor(encoded)).toMatchObject({
+        const decoded = await decodeCensusCursor(encoded);
+
+        // The largest list's ids are dropped on the way out; the thread the scan is in, the counts and the clock survive.
+        expect(decoded).toMatchObject({
             census: "census-cursor",
-            pending: [{ shardKey: "user-1", state: { threads: 3 } }],
+            pending: [{ shardKey: "user-1", state: { currentRows: 4, currentThreadId: "thread-current", threads: 3 } }],
             startedAt: NOW,
         });
-        expect(decodeCensusCursor(encoded)?.pending[0]?.state.largest).toEqual([]);
-        expect(decodeCensusCursor("not a cursor!")).toBeUndefined();
-        expect(decodeCensusCursor(btoa(JSON.stringify({ census: 1 })))).toBeUndefined();
-        // A cursor written before the census carried its clock is not one; the page starts over.
-        expect(decodeCensusCursor(btoa(JSON.stringify({ census: null, censusDone: false, pending: [] })))).toBeUndefined();
+        expect(decoded?.pending[0]?.state.largest).toEqual([]);
+
+        // A changed byte fails the seal.
+        const last = encoded.at(-2) === "A" ? "B" : "A";
+
+        expect(await decodeCensusCursor(`${encoded.slice(0, -2)}${last}${encoded.slice(-1)}`)).toBeUndefined();
+        expect(await decodeCensusCursor("not a cursor!")).toBeUndefined();
+        // The unsealed form the cursor had before is not a cursor.
+        expect(await decodeCensusCursor(btoa(JSON.stringify(cursor)))).toBeUndefined();
     });
 
     it("seeds the root shard into the first call only, so anonymous conversations are measured once", () => {

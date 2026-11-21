@@ -15,6 +15,7 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { adminAction, adminMutation, adminQuery, rateLimit } from "../lib/crpc";
 import { withoutUndefined } from "../lib/patch";
 import { callOnShard } from "../lib/cross-shard";
+import { decryptKey, encryptKey } from "../lib/encryption";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
 import { MAX_LENGTH } from "../lib/validators";
@@ -343,8 +344,8 @@ export const writeCleanupLog = internalMutation
 // Measures how much conversation data each user shard stores. `measureShardPage` runs on the
 // shard it measures and reads one page per call (threads, then message rows); a caller continues
 // until `done`. `getShardFootprint` drives a page of the shard census and returns totals only: no
-// thread ids or shard keys are in its fields. Its cursor is opaque to the page but not secret: it holds
-// shard keys and the scan's index positions. Counts are approximate under concurrent writes.
+// thread ids or shard keys are in its fields. Its cursor holds shard keys and the scan's index positions,
+// which name threads, so it is sealed before it reaches the browser. Counts are approximate under concurrent writes.
 // Beside the totals it reports counts by thread group and age band (the readings the retention
 // plan's decisions need) and the sizes of the largest threads and shards, as bare numbers.
 
@@ -466,33 +467,32 @@ const censusCursorValidator = v.object({
     startedAt: v.number(),
 });
 
-/** The opaque string an admin call returns and takes back. Callers never read it. */
-export const encodeCensusCursor = (cursor: CensusCursor): string => {
+/**
+ * The opaque string an admin call returns and takes back, sealed (AES-GCM, its own key purpose): the shard keys and
+ * index positions in it name users and threads, and the browser that holds it can neither read nor alter it.
+ */
+export const encodeCensusCursor = async (cursor: CensusCursor): Promise<string> => {
     const forBrowser = {
         ...cursor,
         pending: cursor.pending.map((entry) => {
             return { ...entry, state: forCursor(entry.state) };
         }),
     };
-    const bytes = new TextEncoder().encode(JSON.stringify(forBrowser));
-    let binary = "";
 
-    for (const byte of bytes) {
-        binary += String.fromCodePoint(byte);
-    }
-
-    return btoa(binary);
+    return await encryptKey(JSON.stringify(forBrowser), "census-cursor");
 };
 
-/** The census cursor an encoded string holds, or `undefined` when the string is not one this module wrote. */
-export const decodeCensusCursor = (encoded: string): CensusCursor | undefined => {
+/** The census cursor a sealed string holds, or `undefined` when the string is not one this module sealed. */
+export const decodeCensusCursor = async (encoded: string): Promise<CensusCursor | undefined> => {
+    // Only the current format: an unversioned string would be opened with the legacy master key.
+    if (!encoded.startsWith("v1:")) {
+        return undefined;
+    }
+
     let json: unknown;
 
     try {
-        const binary = atob(encoded);
-        const text = new TextDecoder().decode(Uint8Array.from(binary, (character) => character.codePointAt(0) ?? 0));
-
-        json = JSON.parse(text);
+        json = JSON.parse(await decryptKey(encoded, "census-cursor"));
     } catch {
         return undefined;
     }
@@ -557,7 +557,7 @@ export const getShardFootprint = adminAction
         }),
     )
     .action(async ({ args, ctx }) => {
-        const carried: CensusCursor | undefined = args.cursor === undefined ? startCensus(Date.now()) : decodeCensusCursor(args.cursor);
+        const carried: CensusCursor | undefined = args.cursor === undefined ? startCensus(Date.now()) : await decodeCensusCursor(args.cursor);
 
         if (carried === undefined) {
             throw new LunoraError("INVALID_INPUT", "The footprint cursor is not valid. Start the measurement again without a cursor.");
@@ -639,7 +639,7 @@ export const getShardFootprint = adminAction
 
         totals.pendingShards = stillPending.length;
         totals.isDone = cursor.censusDone && stillPending.length === 0;
-        totals.continueCursor = totals.isDone ? null : encodeCensusCursor({ ...cursor, pending: stillPending });
+        totals.continueCursor = totals.isDone ? null : await encodeCensusCursor({ ...cursor, pending: stillPending });
 
         ctx.log.event("admin.shard_footprint_measured", {
             abandonedShards: totals.abandonedShards,

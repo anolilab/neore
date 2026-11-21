@@ -131,10 +131,9 @@ export const startFootprint = (): FootprintState => {
 };
 
 /**
- * A scan state as an admin call's cursor carries it. The cursor is opaque to the page but not secret: the message
- * page's own position already holds the id of the thread the scan is in, so that thread, its class and its running
- * count stay, and a thread split across admin calls is counted whole. The largest list's ids, which nothing else in
- * the cursor holds, are dropped; its row counts are kept in `carriedLargestRows`.
+ * A scan state as an admin call's cursor carries it (sealed, see `encodeCensusCursor`). The thread the scan is in, its
+ * class and its running count stay, so a thread split across admin calls is counted whole. The largest list is reduced
+ * to its row counts (`carriedLargestRows`): only the numbers are ever reported, so its ids need not travel.
  */
 export const forCursor = (state: FootprintState): FootprintState => {
     return { ...state, carriedLargestRows: largestRowsOf(state), largest: [] };

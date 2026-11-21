@@ -6,9 +6,10 @@ import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { formatNumber } from "@neore/ui/utils/locale-format";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useShardFootprint } from "../hooks/use-admin";
+import { SHARD_FOOTPRINT_QUERY_KEY, useShardFootprint } from "../hooks/use-admin";
 import type { FootprintTotals } from "../lib/shard-footprint";
 import { COMPACT_AFTER_DAYS, readingsOf, sumTotals } from "../lib/shard-footprint";
 
@@ -67,6 +68,7 @@ const FailedPageActions = ({
  */
 const AdminShardFootprintRow = () => {
     const { i18n, t } = useLingui();
+    const queryClient = useQueryClient();
     // Pages measured before the current one. The current page is `page.data`.
     const [measured, setMeasured] = useState<FootprintTotals[]>([]);
     const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -92,8 +94,10 @@ const AdminShardFootprintRow = () => {
         page.refetch();
     };
 
-    // Drops the measured pages and the cursor, so the first page is measured again.
+    // Drops the measured pages, the cursor and every cached page of this census, so the first page is measured afresh
+    // and no page of the old census is shown or continued from.
     const startOver = () => {
+        queryClient.removeQueries({ queryKey: SHARD_FOOTPRINT_QUERY_KEY });
         setMeasured([]);
         setCursor(undefined);
     };
