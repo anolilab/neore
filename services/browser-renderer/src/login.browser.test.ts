@@ -272,6 +272,17 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([{ body: JSON.stringify({ pw: SAVED_SECRET, user: "ann" }), method: "POST", url: "/session" }]);
     });
 
+    it("signs in through a script that writes a blank frame's document first", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); const frame = document.createElement("iframe"); document.body.append(frame); frame.contentDocument.open(); frame.contentDocument.write("<p>widget</p>"); frame.contentDocument.close(); await fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value, user: document.forms[0].user.value }), method: "POST" }); });`,
+        );
+        fixture.onSession = (_request, response) => response.end("{}");
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+    });
+
     it("waits for a slow server's answer before it reports where the form landed", async () => {
         fixture.page = loginForm();
         fixture.onSession = (_request, response) => {
@@ -707,6 +718,16 @@ describe(signIn, () => {
             "a page of its own markup it opens in the tab, with speculation rules in a declarative shadow root",
             () => {
                 return { page: onSubmit(`location.href = URL.createObjectURL(new Blob([${closedRules(evil.origin)}], { type: "text/html" }));`) };
+            },
+        ],
+        [
+            "speculation rules in a shadow root a removed frame's realm attached",
+            () => {
+                return {
+                    page: onSubmit(
+                        `const frame = document.createElement("iframe"); document.body.append(frame); const host = document.createElement("div"); document.body.append(host); const shadow = frame.contentWindow.Element.prototype.attachShadow.call(host, { mode: "closed" }); frame.remove(); shadow.append(${speculationRules(evil.origin)});`,
+                    ),
+                };
             },
         ],
         [

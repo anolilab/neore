@@ -46,7 +46,9 @@ const PAGE_LOCK = `(() => {
     // A parsed document written to again is parsed again, into declarative shadow roots no script reaches (below).
     const { open, write, writeln } = Document.prototype;
     const stateOf = Object.getOwnPropertyDescriptor(Document.prototype, "readyState").get;
-    const parsing = (target, name) => apply(stateOf, target, []) === "loading" || refuse(name)();
+    const viewOf = Object.getOwnPropertyDescriptor(Document.prototype, "defaultView").get;
+    // The top document only: rules in a frame do nothing, and a script writes a new frame's blank document often.
+    const parsing = (target, name) => apply(viewOf, target, []) !== top || apply(stateOf, target, []) === "loading" || refuse(name)();
     fix(Document.prototype, "open", function (...args) { return args.length > 2 ? null : parsing(this, "document.open") && apply(open, this, args); });
     fix(Document.prototype, "write", function () { return parsing(this, "document.write") && apply(write, this, arguments); });
     fix(Document.prototype, "writeln", function () { return parsing(this, "document.writeln") && apply(writeln, this, arguments); });
@@ -94,10 +96,17 @@ const PAGE_LOCK = `(() => {
         return shadow;
     };
     apply(observe, observer, [root, watching]);
-    fix(Element.prototype, "attachShadow", function () { return watch(apply(attachShadow, this, arguments)); });
+    // A shadow root of an element another window's document holds is that window's lock's to watch: this realm's
+    // observer would stop with it (a removed frame) and leave the root to no one.
+    const ownerOf = getOwnPropertyDescriptor(Node.prototype, "ownerDocument").get;
+    const isElsewhere = (node) => {
+        const view = apply(viewOf, apply(ownerOf, node, []), []);
+        return view !== null && view !== window;
+    };
+    fix(Element.prototype, "attachShadow", function () { return isElsewhere(this) ? refuse("A shadow root for another window")() : watch(apply(attachShadow, this, arguments)); });
     for (const target of [Element.prototype, globalThis.ElementInternals?.prototype]) {
         const { get } = target ? getOwnPropertyDescriptor(target, "shadowRoot") : {};
-        if (get) defineProperty(target, "shadowRoot", { configurable: false, enumerable: true, get() { return watch(apply(get, this, [])); } });
+        if (get) defineProperty(target, "shadowRoot", { configurable: false, enumerable: true, get() { const shadow = apply(get, this, []); return shadow && isElsewhere(shadow) ? null : watch(shadow); } });
     }
 })();`;
 
