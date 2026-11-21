@@ -1,6 +1,6 @@
 /**
  * A page only a person can clear (a human-verification challenge, a bot-check interstitial, a sign-in wall the agent
- * reports): the agent waits once for it to clear on its own, then asks the person once per site per run, and after
+ * reports): the agent waits once for it to clear on its own, then asks the person once per site per reply, and after
  * they hand the browser back it is told whether the page is clear. Detection reads only what the renderer returns
  * (title, URL, extracted text): deterministic, no model call. Pure, so each step is tested without the provider.
  */
@@ -91,6 +91,8 @@ export const humanCheckMessages = {
     clearedAfterHandBack: (site: string): string => `The check on ${siteName(site)} no longer shows: the page looks clear. Look at it before you act.`,
     clearedOnItsOwn: (site: string): string =>
         `${siteName(site)} showed a check page, which cleared on its own after a short wait. This is the page now: look at it before you act.`,
+    unknownAfterHandBack: (site: string): string =>
+        `Whether the check on ${siteName(site)} cleared is unknown: the page's text could not be read after the hand back. Look at the page before you act, and do not try to solve or get around a check that still shows.`,
 };
 
 const siteName = (site: string): string => (site === "" ? "The page" : site);
@@ -101,6 +103,8 @@ export interface LadderResult extends PageSignals {
     /** The person had driven the browser and gave it back; this is the first look at the page since. */
     handedBack?: boolean;
     humanCheck?: { site: string; status: "already_asked" | "asked" };
+    screenshot?: string;
+    screenshotFormat?: string;
     success?: boolean;
 }
 
@@ -109,7 +113,8 @@ export interface LadderDependencies<R extends LadderResult> {
     claimAsk: (site: string) => Promise<boolean>;
     /** A fresh look at the page through the usual action path: the whole page's text for a check found in it. */
     look: (kind: "extract" | "screenshot") => Promise<R>;
-    sleep: (ms: number) => Promise<void>;
+    /** Waits `ms` between two actions (no browser hold is kept meanwhile): `false` when the run was stopped during it. */
+    sleep: (ms: number) => Promise<boolean>;
     /** Whether the person was asked about `site` in this run (`run`), or in any run of the thread (`thread`). */
     wasAsked: (site: string, scope: "run" | "thread") => Promise<boolean>;
 }
@@ -119,6 +124,44 @@ export interface LadderOptions {
     readContent?: boolean;
     reported?: boolean;
 }
+
+/**
+ * Waits `ms`, or less when `signal` aborts (the person pressed Stop): `true` when the whole wait passed. The timer is
+ * cleared on abort, so a stopped run keeps no invocation alive for it.
+ */
+export const waitUnlessStopped = async (ms: number, signal?: AbortSignal): Promise<boolean> => {
+    if (signal?.aborted === true) {
+        return false;
+    }
+
+    return await new Promise<boolean>((resolve) => {
+        const onAbort = (): void => {
+            clearTimeout(timer);
+            resolve(false);
+        };
+        const timer = setTimeout(() => {
+            signal?.removeEventListener("abort", onAbort);
+            resolve(true);
+        }, ms);
+
+        signal?.addEventListener("abort", onAbort, { once: true });
+    });
+};
+
+/** The signals a look must carry, besides showing no check, for a check found by each marker to count as gone. */
+const CLEAR_EVIDENCE: Record<HumanCheckMarker, ReadonlyArray<keyof PageSignals>> = {
+    content: ["content", "title", "url"],
+    title: ["title", "url"],
+    url: ["url"],
+};
+
+/**
+ * Positive evidence that a check is gone: a successful look that carries every signal the check was found by (the
+ * whole page's text for a check found in it) and shows no check in any of them. A failed look, or one missing a
+ * signal, proves nothing.
+ */
+const showsClear = (page: LadderResult, marker: HumanCheckMarker): boolean =>
+    page.success === true && CLEAR_EVIDENCE[marker].every((signal) => page[signal] !== undefined) && detectHumanCheck(page, marker === "content") === undefined;
 
 const withNote = <R extends LadderResult>(result: R, note: string): R => {
     return { ...result, error: result.error === undefined ? note : `${result.error} ${note}` };
@@ -136,31 +179,34 @@ export const humanCheckLadder = async <R extends LadderResult>(
     const marker = reported ? undefined : detectHumanCheck(result, readContent);
 
     if (!reported && marker === undefined) {
-        return result.handedBack === true ? await clearedNoteIfAsked(result, dependencies) : result;
+        return result.handedBack === true ? await afterHandBack(result, dependencies, readContent) : result;
     }
 
     let site = humanCheckSite(result.url);
 
-    // One ask per site per run: a second block is not waited out nor asked about again.
+    // One ask per site per reply: a second block is not waited out nor asked about again.
     if (await dependencies.wasAsked(site, "run")) {
         return { ...withNote(result, humanCheckMessages.alreadyAsked(site)), humanCheck: { site, status: "already_asked" }, success: false };
     }
 
     let page = result;
 
-    if (!reported) {
-        await dependencies.sleep(HUMAN_CHECK_WAIT_MS);
+    if (marker !== undefined) {
+        // Stopped during the wait: the run is ending, so nothing more is looked at or asked.
+        if (!(await dependencies.sleep(HUMAN_CHECK_WAIT_MS))) {
+            return result;
+        }
+
         // A check found only in the text is looked for in the text again: a screenshot carries none.
-        const kind = marker === "content" ? "extract" : "screenshot";
+        page = await dependencies.look(marker === "content" ? "extract" : "screenshot");
 
-        page = await dependencies.look(kind);
-
-        // The look was refused or failed (a person took control meanwhile, the browser closed): that is what the agent hears.
+        // The look was refused or failed (a person took control meanwhile, the browser closed): that is what the agent
+        // hears, never a clear page.
         if (page.success !== true && page.handedBack !== true) {
             return page;
         }
 
-        if (page.success === true && detectHumanCheck(page, kind === "extract") === undefined) {
+        if (showsClear(page, marker)) {
             return withNote(page, humanCheckMessages.clearedOnItsOwn(site));
         }
 
@@ -169,6 +215,16 @@ export const humanCheckLadder = async <R extends LadderResult>(
 
     const first = await dependencies.claimAsk(site);
 
+    // The card shows the person the page: a check re-read from the text has no image yet, so one screenshot is taken.
+    // A failed one leaves the card to say it has none.
+    if (first && page.screenshot === undefined) {
+        const shot = await dependencies.look("screenshot");
+
+        if (shot.success === true && shot.screenshot !== undefined) {
+            page = { ...page, screenshot: shot.screenshot, screenshotFormat: shot.screenshotFormat };
+        }
+    }
+
     return {
         ...withNote(page, first ? humanCheckMessages.asked(site) : humanCheckMessages.alreadyAsked(site)),
         humanCheck: { site, status: first ? "asked" : "already_asked" },
@@ -176,9 +232,27 @@ export const humanCheckLadder = async <R extends LadderResult>(
     };
 };
 
-/** The person was asked about this site in the thread (this run, or the one before the follow-up that resumed it). */
-const clearedNoteIfAsked = async <R extends LadderResult>(result: R, dependencies: LadderDependencies<R>): Promise<R> => {
+/**
+ * The first look after a hand back, on a site the person was asked about in the thread (this reply, or the one before
+ * the follow-up that resumed it). A screenshot, or a failed action, shows no page text, so the whole page's text is read:
+ * the page is clear only when that read shows no check, still blocked when it shows one, and unknown when it failed.
+ */
+const afterHandBack = async <R extends LadderResult>(result: R, dependencies: LadderDependencies<R>, readContent: boolean): Promise<R> => {
     const site = humanCheckSite(result.url);
 
-    return (await dependencies.wasAsked(site, "thread")) ? withNote(result, humanCheckMessages.clearedAfterHandBack(site)) : result;
+    if (!(await dependencies.wasAsked(site, "thread"))) {
+        return result;
+    }
+
+    const page = readContent && result.success === true ? result : await dependencies.look("extract");
+
+    if (showsClear(page, "content")) {
+        return withNote(result, humanCheckMessages.clearedAfterHandBack(site));
+    }
+
+    if (page.success === true && detectHumanCheck(page, true) !== undefined) {
+        return { ...withNote(result, humanCheckMessages.alreadyAsked(site)), humanCheck: { site, status: "already_asked" }, success: false };
+    }
+
+    return withNote(result, humanCheckMessages.unknownAfterHandBack(site));
 };

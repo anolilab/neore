@@ -7,16 +7,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { claimHumanCheckAsk, wasHumanCheckAsked } from "./functions";
-import { detectHumanCheck, HUMAN_CHECK_WAIT_MS, humanCheckLadder, humanCheckSite, type LadderDependencies, type LadderResult } from "./human-check";
+import {
+    detectHumanCheck,
+    HUMAN_CHECK_WAIT_MS,
+    humanCheckLadder,
+    humanCheckSite,
+    type LadderDependencies,
+    type LadderResult,
+    waitUnlessStopped,
+} from "./human-check";
 
 /** What the agent hears at each step, as far as these tests read it. */
 const CLEARED_NOTE = /cleared on its own.*look at it before you act/su;
 const ASKED_NOTE = /asked in the chat.*Do not try to solve or get around it/su;
 const ALREADY_ASKED_NOTE = /already asked.*move on, or reach what you need another way/su;
 const CLEAR_AFTER_HAND_BACK_NOTE = /handed it back;.*no longer shows: the page looks clear\. Look at it before you act\./su;
+const UNKNOWN_AFTER_HAND_BACK_NOTE = /cleared is unknown.*Look at the page before you act/su;
 
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
 const CLEAR_PAGE: LadderResult = { success: true, title: "Item 42 – Shop", url: "https://shop.example.com/item" };
+/** The whole page's text read back, with no check in it: the only look that proves a check is gone after a hand back. */
+const CLEAR_EXTRACT: LadderResult = { ...CLEAR_PAGE, content: "Item 42. Add to cart." };
+const TEXT_CHECK: LadderResult = { content: "Verifying you are human.", success: true, title: "shop.example.com", url: "https://shop.example.com/" };
 
 /**
  * Dependencies over in-memory sets of sites asked about in this run (`asked`) and in the thread's earlier runs
@@ -34,7 +46,7 @@ const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earli
             return true;
         }),
         look: vi.fn(async (_kind: "extract" | "screenshot") => looks.shift() ?? CLEAR_PAGE),
-        sleep: vi.fn(async () => undefined),
+        sleep: vi.fn(async (_ms: number) => true),
         wasAsked: vi.fn(async (site: string, scope: "run" | "thread") => asked.has(site) || (scope === "thread" && earlier.has(site))),
     } satisfies LadderDependencies<LadderResult>;
 
@@ -106,13 +118,46 @@ describe("humanCheckLadder", () => {
         expect(result.error).toMatch(CLEARED_NOTE);
     });
 
-    it("step 1: a check found in the page's text is looked for in the text again", async () => {
-        const blocked: LadderResult = { content: "Verifying you are human.", success: true, title: "shop.example.com", url: "https://shop.example.com/" };
-        const { dependencies } = dependenciesFor([blocked]);
-        const result = await humanCheckLadder(blocked, dependencies, { readContent: true });
+    it("step 1: a check found in the page's text is looked for in the text again, then shot once for the card", async () => {
+        const { dependencies } = dependenciesFor([TEXT_CHECK, { ...CLEAR_PAGE, screenshot: "jpeg", screenshotFormat: "jpeg" }]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
 
-        expect(dependencies.look).toHaveBeenCalledExactlyOnceWith("extract");
+        expect(dependencies.look.mock.calls).toStrictEqual([["extract"], ["screenshot"]]);
+        expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "asked" }, screenshot: "jpeg", screenshotFormat: "jpeg" });
+    });
+
+    it("step 1: a failed screenshot for the card still asks, with no image", async () => {
+        const { dependencies } = dependenciesFor([TEXT_CHECK, { error: "Browser closed", success: false }]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
         expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
+        expect(result.screenshot).toBeUndefined();
+    });
+
+    it("step 1: a text check is not clear on a look that read no text", async () => {
+        const { dependencies } = dependenciesFor([CLEAR_PAGE]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+        expect(result.humanCheck?.status).toBe("asked");
+        expect(result.error).not.toMatch(CLEARED_NOTE);
+    });
+
+    it("step 1: a title check is not clear on a look with no title", async () => {
+        const { dependencies } = dependenciesFor([{ screenshot: "jpeg", success: true }]);
+        const result = await humanCheckLadder(CHECK_PAGE, dependencies);
+
+        expect(result.humanCheck?.status).toBe("asked");
+        expect(result.error).not.toMatch(CLEARED_NOTE);
+    });
+
+    it("step 1: Stop during the wait ends it there: nothing more is looked at or asked", async () => {
+        const { dependencies } = dependenciesFor([]);
+
+        dependencies.sleep.mockResolvedValueOnce(false);
+
+        await expect(humanCheckLadder(CHECK_PAGE, dependencies)).resolves.toBe(CHECK_PAGE);
+        expect(dependencies.look).not.toHaveBeenCalled();
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
     it("step 2: still blocked after the wait, the person is asked, and told not to solve it", async () => {
@@ -167,15 +212,48 @@ describe("humanCheckLadder", () => {
         expect(result.humanCheck).toEqual({ site: "portal.example.com", status: "asked" });
     });
 
-    it("step 3: after the hand back, a clear page tells the agent it is clear and to look first, also in the next run", async () => {
-        const { dependencies } = dependenciesFor([], new Set(), new Set(["shop.example.com"]));
+    it("step 3: after the hand back, a page whose text shows no check is clear, also in the next run", async () => {
+        const { dependencies } = dependenciesFor([CLEAR_EXTRACT], new Set(), new Set(["shop.example.com"]));
         const result = await humanCheckLadder(
             { ...CLEAR_PAGE, error: "The person had control of the browser and handed it back;", handedBack: true },
             dependencies,
         );
 
+        // A screenshot carries no text: the page's text is read before anything is called clear.
+        expect(dependencies.look).toHaveBeenCalledExactlyOnceWith("extract");
         expect(result.humanCheck).toBeUndefined();
         expect(result.error).toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+    });
+
+    it("step 3: a whole-page extract handed back is its own evidence, with no second look", async () => {
+        const { dependencies } = dependenciesFor([], new Set(["shop.example.com"]));
+        const result = await humanCheckLadder(
+            { ...CLEAR_EXTRACT, error: "The person had control of the browser and handed it back;", handedBack: true },
+            dependencies,
+            { readContent: true },
+        );
+
+        expect(dependencies.look).not.toHaveBeenCalled();
+        expect(result.error).toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+    });
+
+    it("step 3: a check still in the page's text after the hand back is not called clear, nor asked again", async () => {
+        const { dependencies } = dependenciesFor([TEXT_CHECK], new Set(["shop.example.com"]));
+        const result = await humanCheckLadder({ ...CLEAR_PAGE, handedBack: true }, dependencies);
+
+        expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "already_asked" }, success: false });
+        expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
+    });
+
+    it("step 3: a failed action or a failed read after the hand back leaves it unknown, never clear", async () => {
+        const failed = { error: "Browser closed", success: false };
+        const { dependencies } = dependenciesFor([failed], new Set(["shop.example.com"]));
+        const result = await humanCheckLadder({ error: "Timed out", handedBack: true, success: false, url: CLEAR_PAGE.url }, dependencies);
+
+        expect(result.error).toMatch(UNKNOWN_AFTER_HAND_BACK_NOTE);
+        expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+        expect(result.success).toBe(false);
     });
 
     it("step 3: a page still blocked after the hand back is not asked about again", async () => {
@@ -191,6 +269,43 @@ describe("humanCheckLadder", () => {
         const handed = { ...CLEAR_PAGE, handedBack: true };
 
         await expect(humanCheckLadder(handed, dependencies)).resolves.toBe(handed);
+    });
+});
+
+describe("waitUnlessStopped", () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("waits the whole time when nobody stops the run", async () => {
+        const waited = waitUnlessStopped(HUMAN_CHECK_WAIT_MS, new AbortController().signal);
+
+        await vi.advanceTimersByTimeAsync(HUMAN_CHECK_WAIT_MS);
+
+        await expect(waited).resolves.toBe(true);
+    });
+
+    it("ends at once when Stop is pressed during the wait, and leaves no timer behind", async () => {
+        const stop = new AbortController();
+        const waited = waitUnlessStopped(HUMAN_CHECK_WAIT_MS, stop.signal);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        stop.abort();
+
+        await expect(waited).resolves.toBe(false);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("does not wait at all for a run already stopped", async () => {
+        const stop = new AbortController();
+
+        stop.abort();
+
+        await expect(waitUnlessStopped(HUMAN_CHECK_WAIT_MS, stop.signal)).resolves.toBe(false);
     });
 });
 

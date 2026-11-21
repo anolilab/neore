@@ -3163,7 +3163,7 @@ msgstr "KI-Videogenerierung"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "KI-gestützte Bug-Triage mit vollständigem Aufzeichnungskontext"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:386
+#: ../../packages/chat-ui/src/chat/message-content.tsx:387
 msgid "AI-generated"
 msgstr "KI-generiert"
 
@@ -3644,7 +3644,7 @@ msgstr "Ein Fehler ist aufgetreten"
 msgid "An error occurred during One Tap sign in"
 msgstr "Bei der One-Tap-Anmeldung ist ein Fehler aufgetreten"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1167
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1170
 msgid "An error occurred while generating the response."
 msgstr "Beim Generieren der Antwort ist ein Fehler aufgetreten."
 
@@ -5405,13 +5405,13 @@ msgstr "Frühere Versionen deines Workflows durchsuchen und wiederherstellen."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Von der Community geteilte Workflows durchsuchen, forken und remixen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:747
-#: src/features/chat/browser-live-view/browser-live-view.tsx:985
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1179
+#: ../../packages/chat-ui/src/chat/message-content.tsx:748
+#: src/features/chat/browser-live-view/browser-live-view.tsx:986
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1173
 msgid "Browser"
 msgstr "Browser"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:770
+#: ../../packages/chat-ui/src/chat/message-content.tsx:771
 msgid "Browser action failed"
 msgstr "Browser-Aktion fehlgeschlagen"
 
@@ -5419,7 +5419,7 @@ msgstr "Browser-Aktion fehlgeschlagen"
 msgid "Browser Automation"
 msgstr "Browser-Automatisierung"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:768
+#: ../../packages/chat-ui/src/chat/message-content.tsx:769
 msgid "Browser error"
 msgstr "Browser-Fehler"
 
@@ -5428,7 +5428,7 @@ msgid "Browser notes"
 msgstr "Browser-Hinweise"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:730
+#: ../../packages/chat-ui/src/chat/message-content.tsx:731
 msgid "Browser screenshot"
 msgstr "Browser-Screenshot"
 
@@ -5436,7 +5436,7 @@ msgstr "Browser-Screenshot"
 msgid "Browser Session"
 msgstr "Browser-Sitzung"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:680
+#: ../../packages/chat-ui/src/chat/message-content.tsx:681
 msgid "Browser working..."
 msgstr "Browser arbeitet..."
 
@@ -6325,7 +6325,7 @@ msgstr "Geprüft: {0}"
 msgid "Checking"
 msgstr "Wird geprüft"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:403
+#: ../../packages/chat-ui/src/chat/message-content.tsx:404
 msgid "Checking image safety..."
 msgstr "Bildsicherheit wird geprüft..."
 
@@ -6740,7 +6740,7 @@ msgstr "Zum Bearbeiten klicken"
 msgid "Click to edit..."
 msgstr "Zum Bearbeiten klicken..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:672
+#: ../../packages/chat-ui/src/chat/message-content.tsx:673
 msgid "Clicking element..."
 msgstr "Element wird angeklickt..."
 
@@ -6900,7 +6900,7 @@ msgstr "Cloudflare-Workers-AI-Modelle laufen dort, wo Cloudflare gerade Kapazit�
 msgid "Code"
 msgstr "Code"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:133
+#: ../../packages/chat-ui/src/chat/message-content.tsx:134
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "Codeblock"
@@ -6913,7 +6913,7 @@ msgstr "Codeausführung"
 msgid "Code execution and sandbox files"
 msgstr "Codeausführung und Sandbox-Dateien"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:648
+#: ../../packages/chat-ui/src/chat/message-content.tsx:649
 msgid "Code execution failed"
 msgstr "Codeausführung fehlgeschlagen"
 
@@ -6937,7 +6937,7 @@ msgstr "Der Code-Modus ist für dein Konto noch nicht verfügbar."
 msgid "Code navigation"
 msgstr "Code-Navigation"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:604
+#: ../../packages/chat-ui/src/chat/message-content.tsx:605
 msgid "Code output"
 msgstr "Code-Ausgabe"
 
@@ -9334,7 +9334,7 @@ msgstr "Bot wird erstellt…"
 msgid "Creating branch..."
 msgstr "Branch wird erstellt..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:327
+#: ../../packages/chat-ui/src/chat/message-content.tsx:328
 msgid "Creating slides..."
 msgstr "Folien werden erstellt..."
 
@@ -11040,7 +11040,7 @@ msgid "Do you want to add more rows?"
 msgstr "Möchtest du weitere Zeilen hinzufügen?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:302
+#: ../../packages/chat-ui/src/chat/message-content.tsx:303
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:114
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11198,7 +11198,7 @@ msgstr "Dokument herunterladen"
 msgid "Download Export"
 msgstr "Export herunterladen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:465
+#: ../../packages/chat-ui/src/chat/message-content.tsx:466
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:87
 msgid "Download file"
 msgstr "Datei herunterladen"
@@ -12623,7 +12623,7 @@ msgstr "Fehlerquote"
 msgid "Error trace:"
 msgstr "Fehler-Trace:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:263
+#: ../../packages/chat-ui/src/chat/message-content.tsx:264
 msgid "Error:"
 msgstr "Fehler:"
 
@@ -12899,7 +12899,7 @@ msgstr "Tools werden ausgeführt..."
 msgid "Execution"
 msgstr "Ausführung"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:638
+#: ../../packages/chat-ui/src/chat/message-content.tsx:639
 msgid "Execution failed"
 msgstr "Ausführung fehlgeschlagen"
 
@@ -13243,11 +13243,11 @@ msgstr "Seite extrahieren"
 msgid "Extract subject"
 msgstr "Motiv extrahieren"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:738
+#: ../../packages/chat-ui/src/chat/message-content.tsx:739
 msgid "Extracted"
 msgstr "Extrahiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:673
+#: ../../packages/chat-ui/src/chat/message-content.tsx:674
 msgid "Extracting content..."
 msgstr "Inhalt wird extrahiert..."
 
@@ -15615,7 +15615,7 @@ msgstr "Generiertes Video"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Generierte Videos werden hier angezeigt. Beginne damit, unten im Composer zu beschreiben, was du erstellen möchtest."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:480
+#: ../../packages/chat-ui/src/chat/message-content.tsx:481
 msgid "Generating audio..."
 msgstr "Audio wird generiert..."
 
@@ -15623,12 +15623,12 @@ msgstr "Audio wird generiert..."
 msgid "Generating draft…"
 msgstr "Entwurf wird erstellt…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:481
+#: ../../packages/chat-ui/src/chat/message-content.tsx:482
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "Bild wird generiert..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:324
+#: ../../packages/chat-ui/src/chat/message-content.tsx:325
 msgid "Generating presentation..."
 msgstr "Präsentation wird generiert..."
 
@@ -15636,7 +15636,7 @@ msgstr "Präsentation wird generiert..."
 msgid "Generating response"
 msgstr "Antwort wird generiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:482
+#: ../../packages/chat-ui/src/chat/message-content.tsx:483
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "Video wird generiert..."
@@ -15794,7 +15794,7 @@ msgstr "Gib anderen Zugriff auf diese Seite oder veröffentliche einen schreibge
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "Globale Analystenberichte, Marktanalysen und Investmentdaten"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1092
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1086
 msgid "Go"
 msgstr "Öffnen"
 
@@ -16373,7 +16373,7 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "Hand (verschieben)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1008
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1009
 msgid "Hand back"
 msgstr "Zurückgeben"
 
@@ -16532,7 +16532,7 @@ msgstr "Spalte ausblenden"
 msgid "Hide follow-up suggestions"
 msgstr "Folgevorschläge ausblenden"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1003
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
 msgid "Hide live view"
 msgstr "Live-Ansicht ausblenden"
 
@@ -17032,7 +17032,7 @@ msgid "illustration"
 msgstr "Illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:432
+#: ../../packages/chat-ui/src/chat/message-content.tsx:433
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -17666,7 +17666,7 @@ msgstr "Eingabevorlage"
 msgid "Input tokens"
 msgstr "Eingabe-Tokens"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:240
+#: ../../packages/chat-ui/src/chat/message-content.tsx:241
 msgid "Input:"
 msgstr "Eingabe:"
 
@@ -18081,7 +18081,7 @@ msgstr "Es wurde eine andere als die eigene Sitzung geöffnet, daher wurde die U
 msgid "It was not saved. Paste it again and save."
 msgstr "Es wurde nicht gespeichert. Füge es erneut ein und speichere."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:409
+#: ../../packages/chat-ui/src/chat/message-content.tsx:410
 msgid "It will be visible once approved by a moderator"
 msgstr "Es wird sichtbar, sobald ein Moderator es freigegeben hat"
 
@@ -18239,7 +18239,7 @@ msgstr "Kasachstan"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "Das alte Secret noch 24 Stunden weiter akzeptieren"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1029
 msgid "Keep control"
 msgstr "Steuerung behalten"
 
@@ -19206,11 +19206,11 @@ msgstr "Live-Vorschau – wird gerendert, sobald die Komponente fertig gestreamt
 msgid "Live preview — updating as the artifact streams"
 msgstr "Live-Vorschau – wird aktualisiert, während das Artefakt gestreamt wird"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1126
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1120
 msgid "Live view of the agent's browser (read-only)"
 msgstr "Live-Ansicht des Browsers des Agenten (nur ansehen)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1126
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1120
 msgid "Live view of the agent's browser (you have control)"
 msgstr "Live-Ansicht des Browsers des Agenten (du steuerst ihn)"
 
@@ -19341,7 +19341,7 @@ msgstr "Editor wird geladen…"
 msgid "Loading feedback"
 msgstr "Feedback wird geladen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:346
+#: ../../packages/chat-ui/src/chat/message-content.tsx:347
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
 msgid "Loading file…"
 msgstr "Datei wird geladen…"
@@ -19549,7 +19549,7 @@ msgstr "Deine Server, Connectoren und Computer werden geladen…"
 msgid "Loading..."
 msgstr "Wird geladen..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:349
+#: ../../packages/chat-ui/src/chat/message-content.tsx:350
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21639,11 +21639,11 @@ msgstr "Threads navigieren"
 msgid "navigate within each column"
 msgstr "innerhalb jeder Spalte navigieren"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:739
+#: ../../packages/chat-ui/src/chat/message-content.tsx:740
 msgid "Navigated"
 msgstr "Navigiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:680
+#: ../../packages/chat-ui/src/chat/message-content.tsx:681
 msgid "Navigating to {target}..."
 msgstr "Navigiere zu {target}..."
 
@@ -21666,7 +21666,7 @@ msgstr "Braucht mein Review"
 msgid "Needs review"
 msgstr "Prüfung nötig"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:65
+#: src/features/chat/browser-live-view/browser-human-check.tsx:74
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22445,7 +22445,7 @@ msgstr "Noch keine Bilder"
 msgid "No indexed files available. Files are still being processed."
 msgstr "Keine indexierten Dateien verfügbar. Die Dateien werden noch verarbeitet."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1026
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "Eine Weile keine Eingabe: In weniger als einer Minute geht die Steuerung an den Agenten zurück."
 
@@ -22585,6 +22585,10 @@ msgstr "Noch kein Computer gekoppelt."
 #: src/features/auth/components/organization/user-invitations-card.tsx:169
 msgid "No pending invitations"
 msgstr "Keine ausstehenden Einladungen"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:113
+msgid "No picture of the page could be taken. Take control to see it in the live view."
+msgstr "Von der Seite konnte kein Bild aufgenommen werden. Übernimm die Steuerung, um sie in der Live-Ansicht zu sehen."
 
 #: src/features/chat/pins/pins-sidebar-tab.tsx:77
 msgid "No pins yet"
@@ -23558,7 +23562,7 @@ msgstr "Nur ausführen, wenn jeder Filter zum JSON-Body passt. Verwende Punktpfa
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Nur Modelle desselben Typs können verglichen werden. Leere die Auswahl, um den Typ zu wechseln."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:55
+#: src/features/chat/browser-live-view/browser-human-check.tsx:61
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Nur wer in diesem Chat schreiben darf, kann die Steuerung des Browsers übernehmen."
 
@@ -23648,7 +23652,7 @@ msgstr "Hoppla! Etwas ist schiefgelaufen"
 msgid "Opacity"
 msgstr "Deckkraft"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:725
+#: ../../packages/chat-ui/src/chat/message-content.tsx:726
 #: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -24238,11 +24242,11 @@ msgstr "Pull Request wird geöffnet…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Wenn du den Assistenten ohne Unterhaltung öffnest, gelangst du zu deiner letzten Unterhaltung statt zu einem leeren Chat."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1043
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1037
 msgid "Opening the live view…"
 msgstr "Live-Ansicht wird geöffnet…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1092
 msgid "Opening the page. This can take up to a minute."
 msgstr "Die Seite wird geöffnet. Das kann bis zu einer Minute dauern."
 
@@ -24562,7 +24566,7 @@ msgstr "Veraltet"
 msgid "Outpaint"
 msgstr "Outpainting"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:580
+#: ../../packages/chat-ui/src/chat/message-content.tsx:581
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -24622,8 +24626,8 @@ msgstr "Ausgabetyp"
 msgid "Output-format focused"
 msgstr "Fokus auf Ausgabeformat"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:248
-#: ../../packages/chat-ui/src/chat/message-content.tsx:256
+#: ../../packages/chat-ui/src/chat/message-content.tsx:249
+#: ../../packages/chat-ui/src/chat/message-content.tsx:257
 msgid "Output:"
 msgstr "Ausgabe:"
 
@@ -24667,7 +24671,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "Pacific Time (USA & Kanada)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:679
+#: ../../packages/chat-ui/src/chat/message-content.tsx:680
 msgid "page"
 msgstr "Seite"
 
@@ -24680,7 +24684,7 @@ msgstr "Seite {currentPage} von {totalPages}"
 msgid "Page added. It is being fetched and indexed."
 msgstr "Seite hinzugefügt. Sie wird abgerufen und indexiert."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1071
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "Seitenadresse"
@@ -28821,7 +28825,7 @@ msgstr "Führe deinen Workflow aus, um hier den Ausführungsverlauf zu sehen."
 msgid "Running"
 msgstr "Läuft"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:541
+#: ../../packages/chat-ui/src/chat/message-content.tsx:542
 msgid "Running code..."
 msgstr "Code wird ausgeführt..."
 
@@ -28829,7 +28833,7 @@ msgstr "Code wird ausgeführt..."
 msgid "Running on {device}…"
 msgstr "{device}: läuft…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:217
+#: ../../packages/chat-ui/src/chat/message-content.tsx:218
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -29231,7 +29235,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:721
+#: ../../packages/chat-ui/src/chat/message-content.tsx:722
 msgid "Screenshot"
 msgstr "Screenshot"
 
@@ -30984,7 +30988,7 @@ msgstr "Folie {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Folientitel"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1100
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1103
 msgid "Slide updated"
 msgstr "Folie aktualisiert"
 
@@ -31142,7 +31146,7 @@ msgstr "Solide Allzweck-Fähigkeiten"
 msgid "Solid performance across most task types"
 msgstr "Solide Leistung bei den meisten Aufgabentypen"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:630
+#: ../../packages/chat-ui/src/chat/message-content.tsx:631
 msgid "Some images from this run could not be saved."
 msgstr "Einige Bilder aus diesem Lauf konnten nicht gespeichert werden."
 
@@ -31154,9 +31158,9 @@ msgstr "Für einige Schritte gab es keine Preisdaten; die Summe ist ein Mindestw
 #~ msgid "Someone else has control of the browser."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:53
-#: src/features/chat/browser-live-view/browser-live-view.tsx:989
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1055
+#: src/features/chat/browser-live-view/browser-human-check.tsx:59
+#: src/features/chat/browser-live-view/browser-live-view.tsx:990
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1049
 msgid "Someone else has control of this browser."
 msgstr "Jemand anderes steuert gerade diesen Browser."
 
@@ -31245,7 +31249,7 @@ msgstr "Soundeffekte aktiviert"
 msgid "Source"
 msgstr "Quelle"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1237
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1240
 #: src/features/chat/thread/message-content.tsx:154
 msgid "Source {index}"
 msgstr "Quelle {index}"
@@ -32836,12 +32840,12 @@ msgstr "Taiwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Ein Eingabebild nehmen, den Hintergrund entfernen und dann eine Stilübertragung anwenden"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:85
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
+#: src/features/chat/browser-live-view/browser-human-check.tsx:107
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1014
 msgid "Take control"
 msgstr "Steuerung übernehmen"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:71
+#: src/features/chat/browser-live-view/browser-human-check.tsx:80
 msgid "Take control, clear it, then hand the browser back."
 msgstr "Übernimm die Steuerung, erledige die Prüfung und gib den Browser dann zurück."
 
@@ -32853,7 +32857,7 @@ msgstr "Abwechselnd"
 msgid "Taking control is not available while impersonating."
 msgstr "Während du als dieses Konto handelst, kannst du die Steuerung nicht übernehmen."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:674
+#: ../../packages/chat-ui/src/chat/message-content.tsx:675
 msgid "Taking screenshot..."
 msgstr "Screenshot wird erstellt..."
 
@@ -33588,7 +33592,7 @@ msgstr "der Agent bietet diese Auswahl nicht an"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "Der Agent wurde beendet, ohne einen Leitfaden zu liefern. Schreibe ihn erneut."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1054
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1048
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "Der Agent beendet gerade eine Browser-Aktion. Das kann über eine Minute dauern. Versuche es gleich noch einmal."
 
@@ -33600,7 +33604,7 @@ msgstr "Der Agent öffnet noch seine Sitzung. Versuche es gleich noch einmal."
 msgid "The agent is still working on the last message."
 msgstr "Der Agent arbeitet noch an der letzten Nachricht."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:986
+#: src/features/chat/browser-live-view/browser-live-view.tsx:987
 msgid "The agent is using a browser"
 msgstr "Der Agent nutzt einen Browser"
 
@@ -33628,11 +33632,11 @@ msgstr "Der Agent auf deinem Computer liest die Änderung…"
 msgid "The agent's browser closed while the page loaded."
 msgstr "Der Browser des Agenten wurde geschlossen, während die Seite lud."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:69
+#: src/features/chat/browser-live-view/browser-human-check.tsx:78
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "Der Browser des Agenten ist auf {site} auf eine Seite gestoßen, die nur ein Mensch freigeben kann. Der Agent wartet und versucht nicht, sie zu umgehen."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:68
+#: src/features/chat/browser-live-view/browser-human-check.tsx:77
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "Der Browser des Agenten ist auf eine Seite gestoßen, die nur ein Mensch freigeben kann. Der Agent wartet und versucht nicht, sie zu umgehen."
 
@@ -33714,7 +33718,7 @@ msgstr "Der Browser kann dieses Video nicht lesen, um ein Bild aufzunehmen"
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "Der Browser konnte nicht zurückgegeben werden. Der Agent erhält ihn nach zwei Minuten ohne Eingabe von selbst zurück."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:49
+#: src/features/chat/browser-live-view/browser-human-check.tsx:55
 msgid "The browser has closed. Ask the agent to open the page again if it is still needed."
 msgstr "Der Browser wurde geschlossen. Bitte den Agenten, die Seite erneut zu öffnen, falls sie noch gebraucht wird."
 
@@ -34087,7 +34091,7 @@ msgstr "Der Link ist vielleicht falsch, oder der Eigentümer hat die Unterhaltun
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Der Link ist vielleicht falsch, oder der Eigentümer hat die Seite zurückgezogen oder gelöscht."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
 msgid "The live view could not be opened."
 msgstr "Die Live-Ansicht konnte nicht geöffnet werden."
 
@@ -34095,7 +34099,7 @@ msgstr "Die Live-Ansicht konnte nicht geöffnet werden."
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1048
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
 msgid "The live view is not available right now."
 msgstr "Die Live-Ansicht ist gerade nicht verfügbar."
 
@@ -34226,7 +34230,7 @@ msgstr "Der Seiten-Agent konnte diese Seite nicht bearbeiten"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "Die Seite zeigt jetzt die andere Version. Kopiere alles, was du aus deiner behalten möchtest."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1103
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1097
 msgid "The page you opened is still loading."
 msgstr "Die Seite, die du geöffnet hast, lädt noch."
 
@@ -34335,7 +34339,7 @@ msgstr "Die Regeldateien konnten nicht geladen werden."
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "Der Lauf landet dort, wo du gewählt hast: jedes Mal in einem neuen Chat, im selben Chat wie zuvor oder im selben Chat mit frischem Kontext."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:751
 msgid "The screenshot could not be saved."
 msgstr "Der Screenshot konnte nicht gespeichert werden."
 
@@ -34563,7 +34567,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Vision-Language-Modell mit Denkmodus"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1163
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1166
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:803
 msgid "Thinking..."
@@ -34883,7 +34887,7 @@ msgstr "Dieser Host wird von einer Match-Regel in ~/.ssh/config verwendet, die N
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "Dieser Host verwendet {key} in ~/.ssh/config, was Neore nicht unterstützt."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:408
+#: ../../packages/chat-ui/src/chat/message-content.tsx:409
 msgid "This image has been flagged for review"
 msgstr "Dieses Bild wurde zur Prüfung markiert"
 
@@ -35667,7 +35671,7 @@ msgstr "Zu viele Versuche. Warte ein paar Sekunden und versuche es dann erneut."
 msgid "too many files"
 msgstr "zu viele Dateien"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1062
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
 msgid "Too many live views were opened. Try again later."
 msgstr "Es wurden zu viele Live-Ansichten geöffnet. Versuche es später noch einmal."
 
@@ -36070,8 +36074,9 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1067
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1194
+#: src/features/chat/browser-live-view/browser-human-check.tsx:97
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1188
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -36277,7 +36282,7 @@ msgstr "Nachricht eingeben..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "Schriftart für die gesamte Oberfläche. Codeblöcke bleiben immer monospace."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:675
+#: ../../packages/chat-ui/src/chat/message-content.tsx:676
 msgid "Typing text..."
 msgstr "Text wird eingegeben..."
 
@@ -36783,11 +36788,11 @@ msgstr "Aktualisierte OpenAI-Spitzenleistung"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Aktualisierte Reasoning-Fähigkeiten gegenüber dem ursprünglichen R1"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1098
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1101
 msgid "Updated slide"
 msgstr "Folie aktualisiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1098
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1101
 msgid "Updated slide {slideNumber}"
 msgstr "Folie {slideNumber} aktualisiert"
 
@@ -38146,7 +38151,7 @@ msgstr "Möchtest du hier weitermachen?"
 msgid "Watch"
 msgstr "Beobachten"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1003
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
 msgid "Watch live"
 msgstr "Live ansehen"
 
@@ -38427,11 +38432,11 @@ msgstr "Worauf soll der Leitfaden achten?"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Was der Agent in den letzten 30 Tagen von deinen Geräten verlangt hat."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:91
+#: src/features/chat/browser-live-view/browser-human-check.tsx:117
 msgid "What the agent's browser sees"
 msgstr "Was der Browser des Agenten sieht"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:91
+#: src/features/chat/browser-live-view/browser-human-check.tsx:117
 msgid "What the agent's browser sees on {site}"
 msgstr "Was der Browser des Agenten auf {site} sieht"
 
@@ -38567,9 +38572,13 @@ msgstr "Wo Gedanken<0/><1>zu Taten werden.</1>"
 msgid "Where you stay in control"
 msgstr "Wo du die Kontrolle behältst"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1181
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1175
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Ob der Agent einen Browser nutzt, konnte nicht geprüft werden."
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:53
+msgid "Whether the browser is still open could not be checked."
+msgstr "Ob der Browser noch geöffnet ist, konnte nicht geprüft werden."
 
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
@@ -39039,7 +39048,7 @@ msgstr "Du erhältst eine Benachrichtigung, wenn ein Lauf endet, deine Prüfung 
 msgid "You handed the browser back to the agent."
 msgstr "Du hast den Browser an den Agenten zurückgegeben."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:51
+#: src/features/chat/browser-live-view/browser-human-check.tsx:57
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "Du hast die Steuerung. Erledige die Prüfung in der Live-Ansicht und gib den Browser dann zurück."
 
@@ -39262,7 +39271,7 @@ msgstr "Deine Chats und {0}"
 msgid "Your chats and the bots you chose"
 msgstr "Deine Chats und die gewählten Bots"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1112
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1106
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "Deine Klicks, Eingaben und dein Scrollen in der Ansicht gehen an den Browser. Der Agent wartet, bis du ihn zurückgibst."
 

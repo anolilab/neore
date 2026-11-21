@@ -5,7 +5,7 @@ import { expect, userEvent } from "storybook/test";
 
 import { STORY_NOW } from "@/storybook/clock";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunora, lunoraAnswered, lunoraHandlers } from "@/storybook/lunora";
+import { lunora, lunoraAnswered, lunoraError, lunoraHandlers } from "@/storybook/lunora";
 
 import { HumanCheckCard } from "./browser-human-check";
 
@@ -97,5 +97,37 @@ export const ReadOnly: Story = {
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), browser({ canControl: false })) } } },
     play: async ({ canvas }) => {
         await expect(await canvas.findByRole("status")).toHaveTextContent("Only someone who can write in this chat");
+    },
+};
+
+/** The browser's status could not be read: the card does not call it closed, and can ask again. */
+export const StatusUnreadable: Story = {
+    parameters: {
+        msw: {
+            handlers: { lunora: lunoraHandlers(...userFixtures(), lunoraError(api.browser.live_view.getThreadBrowser, "INTERNAL", "Status read failed", 500)) },
+        },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("status")).toHaveTextContent("could not be checked");
+        await expect(canvas.getByRole("button", { name: "Try again" })).toBeVisible();
+    },
+};
+
+/** A check found in the page's text, with no picture: the card says so in words. */
+export const NoPicture: Story = {
+    args: {
+        part: {
+            ...PART,
+            output: {
+                content: "Verifying you are human.",
+                humanCheck: { site: "shop.example.com", status: "asked" },
+                success: false,
+                url: "https://shop.example.com/",
+            },
+        } as unknown as ToolPart,
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText(/No picture of the page could be taken/u)).toBeVisible();
+        await expect(await canvas.findByRole("button", { name: "Take control" })).toBeVisible();
     },
 };

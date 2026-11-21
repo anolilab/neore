@@ -17,7 +17,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 const { backend } = vi.hoisted(() => {
-    return { backend: { browser: null as Record<string, unknown> | null } };
+    return { backend: { browser: null as Record<string, unknown> | null, fail: false } };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -28,7 +28,16 @@ vi.mock("@/lib/lunora/crpc", () => {
                     live_view: {
                         getThreadBrowser: {
                             queryOptions: (args: unknown) => {
-                                return { queryFn: async () => backend.browser, queryKey: ["getThreadBrowser", args] };
+                                return {
+                                    queryFn: async () => {
+                                        if (backend.fail) {
+                                            throw new Error("status unavailable");
+                                        }
+
+                                        return backend.browser;
+                                    },
+                                    queryKey: ["getThreadBrowser", args],
+                                };
                             },
                         },
                     },
@@ -37,6 +46,9 @@ vi.mock("@/lib/lunora/crpc", () => {
         },
     };
 });
+
+/** The card's words when no picture of the page came with the ask. */
+const NO_PICTURE = /No picture of the page could be taken/u;
 
 /** The card's wording when it names the site. */
 const SITE_NAMED = /a page on shop\.example\.com only a person can clear/u;
@@ -58,15 +70,16 @@ const running = (overrides: Record<string, unknown> = {}) => {
     return { browserId: "b-1", canControl: true, idleUntil: Date.now() + 60_000, now: Date.now(), ...overrides };
 };
 
-const show = () =>
+const show = (part: ToolPart = PART) =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-            <HumanCheckCard part={PART} threadId="thread-1" />
+            <HumanCheckCard part={part} threadId="thread-1" />
         </QueryClientProvider>,
     );
 
 afterEach(() => {
     backend.browser = null;
+    backend.fail = false;
 });
 
 describe("the Needs you card", () => {
@@ -115,5 +128,34 @@ describe("the Needs you card", () => {
             expect(screen.getByRole("status").textContent).toContain(text);
         });
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+    });
+
+    it("does not call a browser closed when its status could not be read, and asks again on Try again", async () => {
+        backend.browser = running();
+        backend.fail = true;
+        show();
+
+        await waitFor(() => {
+            expect(screen.getByRole("status").textContent).toContain("could not be checked");
+        });
+        expect(screen.getByRole("status").textContent).not.toContain("closed");
+
+        backend.fail = false;
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByRole("button", { name: "Take control" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    });
+
+    it("says so in text when no picture of the page came with the ask", async () => {
+        backend.browser = running();
+        show({
+            ...PART,
+            output: { humanCheck: { site: "shop.example.com", status: "asked" }, success: false, url: "https://shop.example.com/item" },
+        } as unknown as ToolPart);
+
+        expect(screen.getByText(NO_PICTURE)).toBeTruthy();
+        expect(screen.queryByRole("img")).toBeNull();
+        expect(await screen.findByRole("button", { name: "Take control" })).toBeTruthy();
     });
 });

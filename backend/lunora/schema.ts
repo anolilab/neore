@@ -432,7 +432,8 @@ export const schema = defineSchema({
 
     /**
      * A site whose check (a human verification, a sign-in the agent cannot pass) the person was asked to clear during
-     * one run (`run`: the run's prompt message): asked at most once per site per run (`browser/human-check.ts`).
+     * one reply (`run`: the reply key, `ToolCtx.replyKey`, the reply's first stream; the prompt, then the thread, for a
+     * run that sets none): asked at most once per site per reply (`browser/human-check.ts`).
      */
     browserHumanChecks: defineTable({
         askedAt: v.number(),

@@ -15,7 +15,7 @@ import { internal } from "../../_generated/internal";
  */
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
-import { humanCheckLadder } from "../../browser/human-check";
+import { humanCheckLadder, waitUnlessStopped } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
 
@@ -68,7 +68,7 @@ Available actions:
 The browser session persists across calls, so you can chain actions: navigate → click → extract.
 Never try to solve or get around a human verification, captcha or bot check, and never sign in with details you guessed. A detected check is waited out once, then the person is asked to clear it, at most once per site per task. Once they hand the browser back you are told; look at the page before you act.
 Use this tool when you need to visit websites, fill forms, scrape data, or interact with web applications.`,
-    execute: async (context, input) => {
+    execute: async (context, input, options) => {
         const { action } = input;
 
         toolsLogger.debug(`[BROWSER] ${action}${input.url ? ` → ${input.url}` : ""}${input.selector ? ` → ${input.selector}` : ""}`);
@@ -96,8 +96,8 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 userId,
                 userTier: context.userTier,
             })) as BrowserResult;
-        // One ask per site per run: the run is its reply, the same through a pause, a resume and an approval's continuation
-        // (a headless run sets none: its prompt, else the thread).
+        // One ask per site per reply (`replyKey`: its first stream, the same through a pause, a resume and an approval's
+        // continuation; a group turn's and a headless run's own key). A run that sets none falls back to its prompt, then the thread.
         const runKey = context.replyKey ?? (context as { promptMessageId?: string }).promptMessageId ?? threadId;
 
         try {
@@ -112,11 +112,8 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                               claimAsk: async (site) =>
                                   await context.runMutation(internal.browser.functions.claimHumanCheckAsk, { run: runKey, site, threadId, userId }),
                               look: async (kind) => await run({ action: kind }),
-                              sleep: async (ms) => {
-                                  await new Promise((resolve) => {
-                                      setTimeout(resolve, ms);
-                                  });
-                              },
+                              // Between two actions, so no browser hold is kept and a person can take control; Stop ends it.
+                              sleep: async (ms) => await waitUnlessStopped(ms, options.abortSignal),
                               wasAsked: async (site, scope) =>
                                   await context.runQuery(internal.browser.functions.wasHumanCheckAsked, {
                                       ...(scope === "run" && { run: runKey }),

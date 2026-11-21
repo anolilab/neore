@@ -47,7 +47,11 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
 
     let state: string | undefined;
 
-    if (browser === null || status.isError || missed) {
+    // The status could not be read: the browser may still be running, so the card says so and can ask again, never
+    // that it closed.
+    if (status.isError) {
+        state = t`Whether the browser is still open could not be checked.`;
+    } else if (browser === null || missed) {
         state = t`The browser has closed. Ask the agent to open the page again if it is still needed.`;
     } else if (browser?.control?.byYou === true) {
         state = t`You have control. Clear the check in the live view, then hand the browser back.`;
@@ -79,6 +83,20 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
                         {state}
                     </p>
                 </div>
+                {status.isError && (
+                    <Button
+                        className="any-pointer-coarse:min-h-11"
+                        disabled={status.isFetching}
+                        onClick={() => {
+                            status.refetch().catch(() => undefined);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                    >
+                        {t`Try again`}
+                    </Button>
+                )}
                 {canAsk && (
                     <Button
                         className="any-pointer-coarse:min-h-11"
@@ -90,7 +108,11 @@ export const HumanCheckCard: FC<{ part: ToolPart; threadId: string | undefined }
                     </Button>
                 )}
             </div>
-            {screenshot !== undefined && (
+            {screenshot === undefined ? (
+                <p className="border-t border-amber-200 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:text-amber-300">
+                    {t`No picture of the page could be taken. Take control to see it in the live view.`}
+                </p>
+            ) : (
                 <img
                     alt={site === undefined ? t`What the agent's browser sees` : t`What the agent's browser sees on ${site}`}
                     className="ph-no-capture w-full border-t border-amber-200 dark:border-amber-800"
