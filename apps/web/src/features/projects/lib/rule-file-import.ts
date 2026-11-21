@@ -1,8 +1,9 @@
 /**
  * Rule files from uploaded Markdown: an `AGENTS.md`, `CLAUDE.md` or `GEMINI.md` becomes one `always` file under its own
- * name; the files of a rule folder take their mode from their front matter (`globs` → applied when files match,
- * `description` or `alwaysApply: false` alone → read when needed, `alwaysApply: true` or none of them → always). The
- * text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
+ * name; the files of a rule folder take their mode from their front matter, read strictly: `alwaysApply: true` → always,
+ * else `globs` → applied when files match, else a `description` → read when needed. A file that says none of these is
+ * read when needed with no description, which the editor will not save until the person says when, or picks another mode.
+ * The text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
  */
 
 export interface ImportedRuleFile {
@@ -24,18 +25,105 @@ const LINE_BREAK = /\r?\n/u;
 /** A front-matter key: letters only. */
 const KEY = /^[A-Za-z]+$/u;
 
+/** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
+const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
+
+/** The brackets around an inline list. */
+const LIST_OPEN = /^\[/u;
+const LIST_CLOSE = /\]$/u;
+
 /** The front matter, an empty block included. */
 const FRONT_MATTER = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(?:\r?\n|$)/u;
 
-/** `[a, b]`, `"a", "b"` or `a, b` as its items, quotes dropped. */
-const listOf = (value: string): string[] =>
-    value
-        .replaceAll(/^\[|\]$/gu, "")
-        .split(",")
-        .map((item) => item.trim().replaceAll(/^["']|["']$/gu, ""))
-        .filter(Boolean);
+/** `value` before a ` #` comment outside quotes (YAML: a `#` that starts the value or follows a space). */
+const withoutComment = (value: string): string => {
+    let quote: string | undefined;
 
-/** The front matter's one-line `key: value` pairs (a `globs:` list on the lines after it too), and the text after it. */
+    for (let index = 0; index < value.length; index += 1) {
+        const character = value[index];
+
+        if (quote) {
+            if (character === quote) {
+                quote = undefined;
+            }
+        } else if (character === '"' || character === "'") {
+            quote = character;
+        } else if (character === "#" && (index === 0 || value[index - 1] === " " || value[index - 1] === "\t")) {
+            return value.slice(0, index).trimEnd();
+        }
+    }
+
+    return value;
+};
+
+/** One scalar with the quotes around it dropped. */
+const unquoted = (value: string): string => {
+    const trimmed = value.trim();
+    const first = trimmed[0];
+
+    return trimmed.length >= 2 && (first === '"' || first === "'") && trimmed.at(-1) === first ? trimmed.slice(1, -1) : trimmed;
+};
+
+/**
+ * `[a, b]`, `"a", "b"` or `a, b` as its items, quotes dropped. A comma inside quotes or a `{a,b}` group is part of the
+ * item, so a `*.{ts,tsx}` group stays one pattern.
+ */
+const listOf = (value: string): string[] => {
+    const inner = value.trim().replace(LIST_OPEN, "").replace(LIST_CLOSE, "");
+    const items: string[] = [];
+    let depth = 0;
+    let quote: string | undefined;
+    let start = 0;
+
+    for (let index = 0; index < inner.length; index += 1) {
+        const character = inner[index];
+
+        if (quote) {
+            quote = character === quote ? undefined : quote;
+            continue;
+        }
+
+        switch (character) {
+            case '"':
+            case "'": {
+                quote = character;
+                break;
+            }
+            case ",": {
+                if (depth === 0) {
+                    items.push(inner.slice(start, index));
+                    start = index + 1;
+                }
+
+                break;
+            }
+            case "{": {
+                depth += 1;
+                break;
+            }
+            case "}": {
+                depth = Math.max(0, depth - 1);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    items.push(inner.slice(start));
+
+    return items.map((item) => unquoted(item)).filter(Boolean);
+};
+
+/** Whether `line` is indented, so it continues the key above it rather than starting one. */
+const isIndented = (line: string): boolean => line.startsWith(" ") || line.startsWith("\t");
+
+/**
+ * The front matter's top-level `key: value` pairs and the text after it. A value may be quoted, carry a ` #` comment,
+ * continue on indented lines, or be a block (`>`, `|`): each is read as one line, its lines joined by a space. A `globs:`
+ * list may also be given as `- item` lines after it.
+ */
 const splitFrontMatter = (text: string): { body: string; fields: Map<string, string[]> } => {
     const match = FRONT_MATTER.exec(text);
     const fields = new Map<string, string[]>();
@@ -44,16 +132,30 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
         return { body: text, fields };
     }
 
+    const lines = (match[1] ?? "").split(LINE_BREAK);
     let key: string | undefined;
 
-    const lines = (match[1] ?? "").split(LINE_BREAK);
-
-    for (const line of lines) {
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index]!;
         const trimmed = line.trim();
 
+        if (trimmed === "" || trimmed.startsWith("#")) {
+            continue;
+        }
+
         // A `- item` line under the key before it.
-        if (trimmed.startsWith("-") && key) {
-            fields.get(key)!.push(...listOf(trimmed.slice(1)));
+        if (trimmed.startsWith("- ") || trimmed === "-") {
+            const item = withoutComment(trimmed.slice(1));
+
+            if (key) {
+                fields.get(key)!.push(...listOf(item));
+            }
+
+            continue;
+        }
+
+        // An indented line that is no list item belongs to a value read below; anything else nested is not ours.
+        if (isIndented(line)) {
             continue;
         }
 
@@ -62,14 +164,36 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
 
         key = KEY.test(name) ? name.toLowerCase() : undefined;
 
-        if (key) {
-            const value = line.slice(colon + 1).trim();
-
-            // A block value (`>-`, `|`) spans the lines after it, which this does not read: taken as none.
-            const single = value.startsWith(">") || value.startsWith("|") ? "" : value.replaceAll(/^["']|["']$/gu, "");
-
-            fields.set(key, key === "globs" ? listOf(value) : [single]);
+        if (!key) {
+            continue;
         }
+
+        const head = withoutComment(line.slice(colon + 1).trim());
+        const isBlock = BLOCK_HEADER.test(head);
+        const parts = isBlock ? [] : [head];
+
+        // The value's own lines: indented (or blank, inside a block), never a list item.
+        while (index + 1 < lines.length) {
+            const next = lines[index + 1]!;
+            const nextTrimmed = next.trim();
+
+            const isItem = nextTrimmed.startsWith("- ") || nextTrimmed === "-";
+            // A block takes blank lines and anything indented; a plain value stops at a blank, a list item or a comment.
+            const continues = isBlock
+                ? nextTrimmed === "" || isIndented(next)
+                : nextTrimmed !== "" && isIndented(next) && !isItem && !nextTrimmed.startsWith("#");
+
+            if (!continues) {
+                break;
+            }
+
+            parts.push(isBlock ? nextTrimmed : withoutComment(nextTrimmed));
+            index += 1;
+        }
+
+        const value = parts.filter(Boolean).join(" ");
+
+        fields.set(key, key === "globs" ? listOf(value) : [isBlock ? value : unquoted(value)]);
     }
 
     return { body: text.slice(match[0].length), fields };
@@ -96,19 +220,23 @@ export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile 
     const title = name.replace(MARKDOWN_FILE, "");
     const globs = fields.get("globs") ?? [];
     const description = fields.get("description")?.[0] ?? "";
+    // Only YAML's own booleans: any other value says nothing.
     const alwaysApply = fields.get("alwaysapply")?.[0]?.toLowerCase();
 
-    if (alwaysApply !== "true" && globs.length > 0) {
+    if (alwaysApply === "true") {
+        return { content: body, description: "", mode: "always", patterns: "", title };
+    }
+
+    if (globs.length > 0) {
         return { content: body, description: "", mode: "glob", patterns: globs.join("\n"), title };
     }
 
-    // One that never applies by itself (`alwaysApply: false`, nothing else) is read when needed; the editor asks when.
-    if ((alwaysApply !== "true" && description) || alwaysApply === "false") {
-        return { content: body, description, mode: "auto", patterns: "", title };
-    }
-
-    return { content: body, description: "", mode: "always", patterns: "", title };
+    // Read when needed; with no description it waits for the person to say when (`needsMode`).
+    return { content: body, description, mode: "auto", patterns: "", title };
 };
+
+/** Whether an imported file said nothing of when it applies: a draft the person must finish before it saves. */
+export const needsMode = (file: Pick<ImportedRuleFile, "description" | "mode">): boolean => file.mode === "auto" && file.description.trim() === "";
 
 /**
  * The rule files of the uploaded `files`, in name order, at most `room` of them: those past it are counted in `skipped`,

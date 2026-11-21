@@ -258,3 +258,17 @@ export const widenNotTypedSteerDrafts = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * The stored config gained an optional `projectId` (`chat/lib/tool-run-config.ts`): the project whose `auto` rule files a
+ * paused run listed. Nothing to fill: a row without it offered no `instruction_read`, or reads no project's files. A no-op,
+ * so `lunora prepare` records the added optional key in the baseline. (The rule files' own new `description` and `auto`
+ * mode need none: `projectRuleFiles` is `.global()`, which a shard's data migration cannot read, and every stored file
+ * still fits the wider shape.)
+ */
+export const addApprovalProjectId = defineMigration({
+    id: "add-approval-project-id",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

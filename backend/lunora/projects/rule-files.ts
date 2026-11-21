@@ -235,7 +235,7 @@ const RULE_FILE_SEPARATOR = "\n\n";
 export const INSTRUCTION_READ_TOOL = "instruction_read";
 
 /** Heads the list of `auto` files in a run's prompt ({@link renderInstructionList}). */
-const INSTRUCTION_LIST_HEADER = `Instruction files you can read with the ${INSTRUCTION_READ_TOOL} tool (by name or id) when one applies to the task:`;
+const INSTRUCTION_LIST_HEADER = `Instruction files you can read with the ${INSTRUCTION_READ_TOOL} tool (by id, or by name when no other file has it) when one applies to the task:`;
 
 const WHITESPACE_RUN = /\s+/gu;
 

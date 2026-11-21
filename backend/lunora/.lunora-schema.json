@@ -5,6 +5,7 @@
     "add-agent-commands-persistent-chunks",
     "add-approval-bot-lookup",
     "add-approval-chain-source",
+    "add-approval-project-id",
     "add-approval-tool-origins",
     "add-group-pause-file-ids",
     "add-headless-approved",
@@ -29527,6 +29528,13 @@
               "unique": false
             },
             "organizationId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "projectId": {
               "kind": "string",
               "nullable": false,
               "optional": true,

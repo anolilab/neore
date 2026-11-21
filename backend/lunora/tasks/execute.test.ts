@@ -225,7 +225,7 @@ describe("runTaskRound destination", () => {
 
         await runRound();
 
-        expect(state.runs[0]).toMatchObject({ projectInstructions: instructions });
+        expect(state.runs[0]).toMatchObject({ projectInstructions: { instructions, projectId: "project-a" } });
     });
 
     it("files nothing and gives no instructions when the owner lost the project since the claim", async () => {

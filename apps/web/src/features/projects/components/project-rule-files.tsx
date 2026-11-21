@@ -32,7 +32,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { importRuleFiles } from "../lib/rule-file-import";
+import { importRuleFiles, needsMode } from "../lib/rule-file-import";
 
 /** The id and name the backend gives a project's older single context (`LEGACY_CONTEXT_RULE_ID`). */
 const LEGACY_CONTEXT_ID = "context";
@@ -460,6 +460,17 @@ const ProjectRuleFiles: FC<{
     const folderInput = useRef<HTMLInputElement>(null);
     // What the last import added, said beside its buttons.
     const [importNote, setImportNote] = useState("");
+    // One import at a time: its buttons wait while the picked files are read.
+    const [importing, setImporting] = useState(false);
+    // The list, its revision and the draft as last rendered: an import applies onto them once its files are read, never
+    // onto the ones it started with (a save, an edit or a read may have landed meanwhile).
+    const latest = useRef({ draft, revision: data?.revision ?? "", savedFiles });
+    // Bumped by Discard: an import still reading then adds nothing.
+    const importGeneration = useRef(0);
+
+    useEffect(() => {
+        latest.current = { draft, revision: data?.revision ?? "", savedFiles };
+    });
 
     const change = (next: RuleFileDraft[]) => {
         if (draft === null) {
@@ -483,33 +494,60 @@ const ProjectRuleFiles: FC<{
             return;
         }
 
-        const { imported, skipped } = await importRuleFiles(picked, Math.max(0, MAX_RULE_FILES - files.length));
+        const generation = importGeneration.current;
+        const read = await importRuleFiles(picked, Math.max(0, MAX_RULE_FILES - files.length));
 
-        if (imported.length > 0) {
-            if (draft === null) {
-                setBaseRevision(data?.revision ?? "");
+        if (generation !== importGeneration.current) {
+            return;
+        }
+
+        // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
+        // room left now is taken.
+        const now = latest.current;
+        const base = now.draft ?? now.savedFiles;
+        const added = read.imported.slice(0, Math.max(0, MAX_RULE_FILES - base.length));
+        const skipped = read.skipped + read.imported.length - added.length;
+
+        if (added.length > 0) {
+            if (now.draft === null) {
+                setBaseRevision(now.revision);
             }
 
-            // Onto the list as it is now: edits typed, or a list read, while the files were read stay.
-            setDraft((current) => {
-                const base = current ?? savedFiles;
-                const added = imported.slice(0, Math.max(0, MAX_RULE_FILES - base.length)).map((file) => {
+            setDraft([
+                ...base,
+                ...added.map((file) => {
                     return { ...file, id: crypto.randomUUID() };
-                });
-
-                return [...base, ...added];
-            });
+                }),
+            ]);
             setStatus("");
         }
 
-        const added =
-            imported.length > 0
-                ? t`${plural(imported.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`
-                : t`No Markdown files were found to import.`;
+        const toSet = added.filter((file) => needsMode(file)).length;
+        const noneFound = read.imported.length === 0 ? [t`No Markdown files were found to import.`] : [];
+        const addedNote =
+            added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
+        const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
         const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
 
-        setImportNote(skipped > 0 ? `${added} ${left}` : added);
+        setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : [])].join(" "));
+    };
+
+    /** Reads the picked files, one import at a time. */
+    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+        if (importing) {
+            const input = event.currentTarget;
+
+            input.value = "";
+
+            return;
+        }
+
+        setImporting(true);
+        importPicked(event)
+            .catch(() => setImportNote(t`The files could not be read.`))
+            .then(() => setImporting(false))
+            .catch(() => undefined);
     };
 
     /** How a refusal reads, for `file` when it names one; the editor's own check and the backend's word it alike. */
@@ -764,7 +802,7 @@ const ProjectRuleFiles: FC<{
                             {t`Add rule file`}
                         </Button>
                         <Button
-                            disabled={files.length >= MAX_RULE_FILES}
+                            disabled={importing || files.length >= MAX_RULE_FILES}
                             onClick={() => fileInput.current?.click()}
                             size="sm"
                             title={t`An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files`}
@@ -775,7 +813,7 @@ const ProjectRuleFiles: FC<{
                             {t`Import files`}
                         </Button>
                         <Button
-                            disabled={files.length >= MAX_RULE_FILES}
+                            disabled={importing || files.length >= MAX_RULE_FILES}
                             onClick={() => folderInput.current?.click()}
                             size="sm"
                             type="button"
@@ -790,9 +828,7 @@ const ProjectRuleFiles: FC<{
                             className="hidden"
                             data-testid="rule-file-import"
                             multiple
-                            onChange={(event) => {
-                                importPicked(event).catch(() => setImportNote(t`The files could not be read.`));
-                            }}
+                            onChange={onImport}
                             ref={fileInput}
                             tabIndex={-1}
                             type="file"
@@ -803,9 +839,7 @@ const ProjectRuleFiles: FC<{
                             className="hidden"
                             data-testid="rule-folder-import"
                             multiple
-                            onChange={(event) => {
-                                importPicked(event).catch(() => setImportNote(t`The files could not be read.`));
-                            }}
+                            onChange={onImport}
                             ref={folderInput}
                             tabIndex={-1}
                             type="file"
@@ -832,6 +866,8 @@ const ProjectRuleFiles: FC<{
                                     onClick={() => {
                                         // Read again: after a refused save the cached list is the one another save replaced.
                                         refetch().catch(() => undefined);
+                                        // An import still reading is discarded with the rest.
+                                        importGeneration.current += 1;
                                         setDraft(null);
                                         setImportNote("");
                                         setBlocked(false);

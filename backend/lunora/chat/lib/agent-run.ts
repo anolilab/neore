@@ -604,15 +604,16 @@ export const loadRunContext = async (
 
 export type RunContext = Awaited<ReturnType<typeof loadRunContext>>;
 
-/** The `auto` rule files of the project `threadId` is filed in, for `userId` (`getProjectContextForRun`); none outside one. */
-const readProjectInstructions = async (ctx: ActionCtx, threadId: string, userId: string): Promise<RunInstruction[]> => {
-    const settings = await ctx.runQuery(internal.chat.functions.getThreadSettings, { threadId });
-
-    if (!settings?.projectId) {
+/**
+ * The `auto` rule files of `projectId`, the project a paused run listed them from, for `userId` (`getProjectContextForRun`,
+ * with its access check): none when the run recorded no project, or the user can no longer reach it.
+ */
+const readProjectInstructions = async (ctx: ActionCtx, projectId: string | undefined, userId: string): Promise<RunInstruction[]> => {
+    if (!projectId) {
         return [];
     }
 
-    const project = await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: settings.projectId as Id<"projects">, userId });
+    const project = await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: projectId as Id<"projects">, userId });
 
     return project?.instructions ?? [];
 };
@@ -1398,11 +1399,12 @@ export const resumeApprovedRun = async (
         ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
     ]);
 
-    // A paused run that offered `instruction_read` offers it again, over its project's `auto` files read anew (its saved
-    // prompt still lists them): a file removed meanwhile, or all of them, is answered as not found, never an unknown tool.
+    // A paused run that offered `instruction_read` offers it again, over the `auto` files of the project it listed them from
+    // (`config.projectId`), read anew: never the project the thread was moved to meanwhile. A file removed since, or a
+    // project no longer reachable, is answered as not found, never an unknown tool.
     if (config.toolNames.includes(INSTRUCTION_READ_TOOL)) {
         toolResult.tools[INSTRUCTION_READ_TOOL] = instructionReadTool(
-            await readProjectInstructions(ctx, threadId, userId),
+            await readProjectInstructions(ctx, config.projectId, userId),
         ) as (typeof toolResult.tools)[string];
     }
 

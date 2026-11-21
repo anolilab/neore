@@ -89,11 +89,11 @@ msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {max
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。この種類のファイルは最大 {maxMegabytes} MB までです。"
 
-#: src/features/projects/components/project-rule-files.tsx:540
+#: src/features/projects/components/project-rule-files.tsx:578
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "「{name}」のファイルパターンが {limit} 個を超えています。いくつか削除するか、別のファイルに移してください。"
 
-#: src/features/projects/components/project-rule-files.tsx:523
+#: src/features/projects/components/project-rule-files.tsx:561
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "「{name}」は {limit} 文字を超えています。短くするか、複数のファイルに分けてください。"
 
@@ -349,8 +349,8 @@ msgstr "{0, plural, other {# 件の必須または不明なチェックが失敗
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 件の必須または不明なチェックがまだ実行中です}}"
 
-#. placeholder {0}: imported.length
-#: src/features/projects/components/project-rule-files.tsx:507
+#. placeholder {0}: added.length
+#: src/features/projects/components/project-rule-files.tsx:528
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
 msgstr "{0, plural, other {# 件のルールファイルをインポートしました。}} 確認してから保存してください。"
 
@@ -434,7 +434,7 @@ msgstr "{0, plural, other {さらに # 件の動画を表示}}"
 #. placeholder {0}: unsupportedParams.length
 #. placeholder {1}: unsupportedParams.join(", ")
 #: src/routes/(chat)/chat/$threadId.tsx:86
-#: src/routes/(chat)/chat/index.tsx:200
+#: src/routes/(chat)/chat/index.tsx:202
 msgid "{0, plural, one {Unsupported query parameter} other {Unsupported query parameters}}: {1}"
 msgstr "{0, plural, other {未対応のクエリパラメーター}}：{1}"
 
@@ -669,7 +669,7 @@ msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} / {MAX_PARALLEL} 個を選択中"
 
 #. placeholder {0}: referenceImageIds.length
-#: src/features/chat/thread/media-gallery-view.tsx:362
+#: src/features/chat/thread/media-gallery-view.tsx:370
 msgid "{0} of {MAX_REFERENCE_IMAGES} references selected"
 msgstr "{0} / {MAX_REFERENCE_IMAGES} 枚の参照画像を選択中"
 
@@ -1190,11 +1190,11 @@ msgstr "{metricLabel} > 1 時間あたり {threshold}"
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 1 か月あたり {threshold}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:337
+#: src/features/chat/thread/media-gallery-view.tsx:345
 msgid "{mins}m"
 msgstr "{mins} 分"
 
-#: src/features/chat/thread/media-gallery-view.tsx:337
+#: src/features/chat/thread/media-gallery-view.tsx:345
 msgid "{mins}m {secs}s"
 msgstr "{mins} 分 {secs} 秒"
 
@@ -1409,7 +1409,7 @@ msgstr "{rowsNeeded, plural, other {クリップボードの内容をすべて�
 msgid "{secondLabel} ×{secondCount}"
 msgstr "{secondLabel} ×{secondCount}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:331
+#: src/features/chat/thread/media-gallery-view.tsx:339
 msgid "{seconds}s"
 msgstr "{seconds} 秒"
 
@@ -1433,7 +1433,7 @@ msgstr "{server} · {until} まで"
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, other {#個のファイルをインポートできず、除外されました}}"
 
-#: src/features/projects/components/project-rule-files.tsx:510
+#: src/features/projects/components/project-rule-files.tsx:531
 msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
 msgstr "{skipped, plural, other {# 件のファイルは追加されませんでした。}} 1 つのプロジェクトに入るルールファイルは最大 {limit} 件です。"
 
@@ -1495,6 +1495,10 @@ msgstr "{toolId} の API キーを削除しました"
 msgid "{toolId} API key saved"
 msgstr "{toolId} の API キーを保存しました"
 
+#: src/features/projects/components/project-rule-files.tsx:529
+msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
+msgstr "{toSet, plural, other {# 件のファイルは適用するタイミングを指定していません}}。説明を追加するか、別のモードを選んでください。"
+
 #: ../../packages/chat-ui/src/chat/tool-group.tsx:30
 msgid "{total, plural, one {Used # tool · {tail}} other {Used # tools · {tail}}}"
 msgstr "{total, plural, other {# 個のツールを使用 · {tail}}}"
@@ -1524,7 +1528,7 @@ msgid "#1 on OpenRouter by token usage"
 msgstr "トークン使用量で OpenRouter 第 1 位"
 
 #. placeholder {0}: promptGroups.favorites.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:880
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:894
 msgid "+ {0, plural, one {# favorite} other {# favorites}}"
 msgstr "+ {0, plural, other {お気に入り # 件}}"
 
@@ -1874,7 +1878,7 @@ msgstr "あなたと一緒に考えるドキュメントエディター。"
 msgid "A few questions first"
 msgstr "まずはいくつか質問させてください"
 
-#: src/features/projects/components/project-rule-files.tsx:536
+#: src/features/projects/components/project-rule-files.tsx:574
 msgid "A file applied when files match needs at least one pattern."
 msgstr "「ファイルが一致したとき」に適用するファイルには、パターンが 1 つ以上必要です。"
 
@@ -1882,7 +1886,7 @@ msgstr "「ファイルが一致したとき」に適用するファイルには
 msgid "A file only its owner can read (no keychain available)"
 msgstr "所有者だけが読めるファイル（キーチェーンは利用できません）"
 
-#: src/features/projects/components/project-rule-files.tsx:530
+#: src/features/projects/components/project-rule-files.tsx:568
 msgid "A file read when needed needs a line saying when to read it."
 msgstr "必要なときに読むファイルには、いつ読むかを示す 1 行が必要です。"
 
@@ -1999,7 +2003,7 @@ msgstr "引用符の外のプレースホルダーまたは @メンションは�
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "1 つのプロジェクトに登録できるリポジトリは最大 {MAX_REPOSITORIES} 件です。"
 
-#: src/features/projects/components/project-rule-files.tsx:556
+#: src/features/projects/components/project-rule-files.tsx:594
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "1 つのプロジェクトに入れられるルールファイルは最大 {limit} 個です。先に 1 つ削除してください。"
 
@@ -2037,7 +2041,7 @@ msgstr "メモリを使った返信には「使用されたメモリ」の一覧
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "ルーティングまたはメンションされたターンの発言者は最大 3 人です。並列ターンは最大 4 件の回答と統合を行い、ディベートは最大 3 ラウンドまで進みます。"
 
-#: src/features/projects/components/project-rule-files.tsx:546
+#: src/features/projects/components/project-rule-files.tsx:584
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "ルールファイルの名前は最大 {limit} 文字です。"
 
@@ -2442,7 +2446,7 @@ msgstr "モデル ID を 1 つ以上追加してください"
 msgid "Add attachment"
 msgstr "添付ファイルを追加"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:63
+#: src/features/canvas/components/canvas-toolbar.tsx:64
 msgid "Add background"
 msgstr "背景を追加"
 
@@ -2467,7 +2471,7 @@ msgstr "円を追加"
 msgid "Add comment"
 msgstr "コメントを追加"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:40
+#: src/features/canvas/components/canvas-toolbar.tsx:41
 msgid "Add comments"
 msgstr "コメントを追加"
 
@@ -2480,7 +2484,7 @@ msgstr "差分の行にコメントを追加してから、送信してくださ
 msgid "Add Endpoint"
 msgstr "エンドポイントを追加"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:42
+#: src/features/canvas/components/canvas-toolbar.tsx:43
 msgid "Add error handling"
 msgstr "エラー処理を追加"
 
@@ -2522,7 +2526,7 @@ msgstr "メンバーを追加"
 msgid "Add Model"
 msgstr "モデルを追加"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:57
+#: src/features/canvas/components/canvas-toolbar.tsx:58
 msgid "Add more rows"
 msgstr "行を追加"
 
@@ -2563,7 +2567,7 @@ msgstr "プロジェクトを追加"
 msgid "Add project on {0}"
 msgstr "{0} 上にプロジェクトを追加"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:499
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:513
 msgid "Add prompt"
 msgstr "プロンプトを追加"
 
@@ -2601,7 +2605,7 @@ msgstr "一貫性を保つために参照画像を追加"
 msgid "Add row"
 msgstr "行を追加"
 
-#: src/features/projects/components/project-rule-files.tsx:764
+#: src/features/projects/components/project-rule-files.tsx:802
 msgid "Add rule file"
 msgstr "ルールファイルを追加"
 
@@ -2626,7 +2630,7 @@ msgstr "並べ替えを追加して行を整理します。"
 msgid "Add sub-page"
 msgstr "サブページを追加"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:48
+#: src/features/canvas/components/canvas-toolbar.tsx:49
 msgid "Add summary row"
 msgstr "集計行を追加"
 
@@ -2646,7 +2650,7 @@ msgstr "テキストを追加"
 msgid "Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once."
 msgstr "これをリポジトリの Webhook として追加してください（コンテンツタイプは JSON）。個別のイベントを選び、Pull requests と Pull request reviews にチェックを入れてください。チェックしないと、新しいレビューリクエストは次のポーリングまで最大 30 分待つことになります。シークレットは一度だけ表示されます。"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:64
+#: src/features/canvas/components/canvas-toolbar.tsx:65
 msgid "Add title text"
 msgstr "タイトルテキストを追加"
 
@@ -2657,7 +2661,7 @@ msgstr "お気に入りに追加"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:848
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:862
 msgid "Add to Favorites"
 msgstr "お気に入りに追加"
 
@@ -3410,7 +3414,7 @@ msgid "All Organization"
 msgstr "組織全体"
 
 #: src/features/prompts/components/prompt-list.tsx:463
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:753
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:767
 msgid "All Prompts"
 msgstr "すべてのプロンプト"
 
@@ -3608,7 +3612,7 @@ msgstr "エージェント（スキル）"
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "エージェントがタスクを自律的に処理し、その後検証役が結果を成功基準と照らし合わせます。"
 
-#: src/features/projects/components/project-rule-files.tsx:770
+#: src/features/projects/components/project-rule-files.tsx:808
 msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
 msgstr "AGENTS.md、CLAUDE.md、GEMINI.md ファイル、またはその他の Markdown ファイル"
 
@@ -3721,7 +3725,7 @@ msgid "anime"
 msgstr "アニメ"
 
 #: src/features/chat/thread/composer-image-settings.tsx:55
-#: src/features/chat/thread/media-gallery-view.tsx:67
+#: src/features/chat/thread/media-gallery-view.tsx:68
 msgid "Anime"
 msgstr "アニメ"
 
@@ -3963,7 +3967,7 @@ msgid "Applies"
 msgstr "適用"
 
 #: src/features/canvas/canvas-panel.tsx:119
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:330
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
@@ -4342,8 +4346,8 @@ msgstr "別のアシスタントに覚えていることの一覧を出しても
 msgid "Aspect ratio"
 msgstr "アスペクト比"
 
-#: src/features/chat/thread/media-gallery-view.tsx:448
-#: src/features/chat/thread/media-gallery-view.tsx:533
+#: src/features/chat/thread/media-gallery-view.tsx:456
+#: src/features/chat/thread/media-gallery-view.tsx:541
 #: src/features/workflow/components/nodes/video-node.tsx:178
 msgid "Aspect Ratio"
 msgstr "アスペクト比"
@@ -4526,8 +4530,8 @@ msgstr "自動"
 #: src/features/chat/thread/composer-model-selector.tsx:122
 #: src/features/chat/thread/composer-permission-mode.tsx:41
 #: src/features/chat/thread/composer-video-settings.tsx:24
-#: src/features/chat/thread/media-gallery-view.tsx:64
-#: src/features/chat/thread/media-gallery-view.tsx:501
+#: src/features/chat/thread/media-gallery-view.tsx:65
+#: src/features/chat/thread/media-gallery-view.tsx:509
 #: src/features/settings/components/chat/bots-settings.tsx:131
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
@@ -5276,11 +5280,11 @@ msgstr "下"
 msgid "Box Blur"
 msgstr "ボックスぼかし"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:71
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
 msgid "Brainstorm creative marketing strategies for a new product"
 msgstr "新製品のクリエイティブなマーケティング戦略をブレインストーミングする"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:78
 msgid "Brainstorm ways to improve team productivity"
 msgstr "チームの生産性を向上させる方法をブレインストーミングする"
 
@@ -5769,7 +5773,7 @@ msgstr "カナダ"
 #: src/features/chat/thread/composer-draw-dialog.tsx:384
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
-#: src/features/chat/thread/generation-model-menu.tsx:162
+#: src/features/chat/thread/generation-model-menu.tsx:163
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:227
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
@@ -5884,7 +5888,7 @@ msgstr "候補となる事実は、種類（アイデンティティ、好み、
 msgid "Cannot be exported: {0}"
 msgstr "エクスポートできません: {0}"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:173
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:185
 #: src/features/prompts/hooks/use-prompt-loader.tsx:65
 msgid "Cannot use prompt: {errorMessages}"
 msgstr "プロンプトを使用できません：{errorMessages}"
@@ -6039,7 +6043,7 @@ msgstr "変更"
 msgid "Change (points)"
 msgstr "変化（ポイント）"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:66
+#: src/features/canvas/components/canvas-toolbar.tsx:67
 msgid "Change colors"
 msgstr "色を変更"
 
@@ -6056,7 +6060,7 @@ msgstr "パスコードを変更"
 msgid "Change Password"
 msgstr "パスワードを変更"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:36
+#: src/features/canvas/components/canvas-toolbar.tsx:37
 msgid "Change tone"
 msgstr "トーンを変更"
 
@@ -6483,14 +6487,14 @@ msgid "cinematic"
 msgstr "シネマティック"
 
 #: src/features/chat/thread/composer-image-settings.tsx:38
-#: src/features/chat/thread/media-gallery-view.tsx:54
-#: src/features/chat/thread/media-gallery-view.tsx:70
+#: src/features/chat/thread/media-gallery-view.tsx:55
+#: src/features/chat/thread/media-gallery-view.tsx:71
 msgid "Cinematic"
 msgstr "シネマティック"
 
 #: src/features/chat/thread/composer-image-settings.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:32
-#: src/features/chat/thread/media-gallery-view.tsx:55
+#: src/features/chat/thread/media-gallery-view.tsx:56
 msgid "Cinematic (ultra-wide)"
 msgstr "シネマティック（ウルトラワイド）"
 
@@ -6580,7 +6584,7 @@ msgstr "Claude Code やその他の MCP クライアントは、このキーで�
 msgid "Claude Opus, Sonnet, Haiku — latest model family"
 msgstr "Claude Opus、Sonnet、Haiku — 最新のモデルファミリー"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:53
+#: src/features/canvas/components/canvas-toolbar.tsx:54
 msgid "Clean data"
 msgstr "データのクリーンアップ"
 
@@ -6609,7 +6613,7 @@ msgstr "クリーンアップに失敗しました"
 #: ../../packages/ui/src/components/data-grid/data-grid-context-menu.tsx:233
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:252
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:96
-#: src/features/chat/thread/media-gallery-view.tsx:372
+#: src/features/chat/thread/media-gallery-view.tsx:380
 #: src/features/prompts/components/prompt-list.tsx:614
 #: src/features/settings/components/chat/api-keys-settings.tsx:401
 #: src/features/settings/components/chat/models-settings.tsx:477
@@ -6651,7 +6655,7 @@ msgstr "モデルをクリア"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:537
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:551
 #: src/features/vault/components/empty-states.tsx:21
 msgid "Clear search"
 msgstr "検索をクリア"
@@ -7372,7 +7376,7 @@ msgstr "複数の画像モデルの出力を並べて比較"
 msgid "Compare outputs from multiple models side-by-side"
 msgstr "複数のモデルの出力を並べて比較"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:84
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:87
 msgid "Compare the pros and cons of renewable energy sources"
 msgstr "再生可能エネルギー源のメリットとデメリットを比較する"
 
@@ -8222,7 +8226,7 @@ msgstr "永続化する"
 msgid "Convert to save your data"
 msgstr "データを保存するには変換してください"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:43
+#: src/features/canvas/components/canvas-toolbar.tsx:44
 msgid "Convert to TypeScript"
 msgstr "TypeScript に変換"
 
@@ -8250,7 +8254,7 @@ msgstr "最後のコードブロックをコピーしました"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:47
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:58
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:138
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:150
 msgid "Copied to clipboard"
 msgstr "クリップボードにコピーしました"
 
@@ -8275,8 +8279,8 @@ msgid "Copy"
 msgstr "コピー"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:661
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:800
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:675
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:814
 msgid "Copy {0} to clipboard"
 msgstr "{0} をクリップボードにコピー"
 
@@ -8389,8 +8393,8 @@ msgstr "このシークレットは今すぐコピーして、Webhook の送信�
 #: src/components/copy-button.tsx:45
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:52
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:677
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:816
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:691
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:830
 msgid "Copy to clipboard"
 msgstr "クリップボードにコピー"
 
@@ -9027,7 +9031,7 @@ msgid "Covers the majority of everyday video use cases"
 msgstr "日常的な動画用途の大部分をカバー"
 
 #: src/features/knowledge/components/collection-dialog.tsx:100
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:583
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:597
 #: src/features/prompts/components/variable-insertion.tsx:69
 msgid "Create"
 msgstr "作成"
@@ -9101,7 +9105,7 @@ msgstr "組織内のメンバーを整理する新しいチームを作成しま
 msgid "Create a permanent account to save your data and access it from any device."
 msgstr "永続的なアカウントを作成して、データを保存し、どのデバイスからでもアクセスできるようにしましょう。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:104
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
 msgid "Create a script for a 5-minute educational video about photosynthesis"
 msgstr "光合成についての 5 分間の教育動画の台本を作成する"
 
@@ -9129,7 +9133,7 @@ msgstr "メッセージを翻訳するにはアカウントを作成してくだ
 msgid "Create an Azure Bot resource in the Azure portal and note its Microsoft App ID, a client secret (App password) and, for single-tenant bots, the Tenant ID."
 msgstr "Azure ポータルで Azure Bot リソースを作成し、Microsoft App ID、クライアントシークレット（アプリパスワード）、シングルテナントのボットの場合は Tenant ID を控えてください。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:116
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "サステナブルな暮らしに関するブログ記事の構成案を作成する"
 
@@ -9595,7 +9599,7 @@ msgstr "カスタマイズ"
 msgid "Customize"
 msgstr "カスタマイズ"
 
-#: src/features/chat/thread/media-gallery-view.tsx:429
+#: src/features/chat/thread/media-gallery-view.tsx:437
 msgid "Customize and regenerate"
 msgstr "カスタマイズして再生成"
 
@@ -10085,8 +10089,8 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #: src/features/pages/components/pages-sidebar.tsx:281
 #: src/features/prompts/components/prompt-item.tsx:228
 #: src/features/prompts/components/prompt-list-view.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:721
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:860
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:735
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:874
 #: src/features/settings/components/chat/bots-settings.tsx:508
 #: src/features/settings/components/chat/bots-settings.tsx:562
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
@@ -10269,7 +10273,7 @@ msgstr "プロジェクトを削除"
 
 #: src/features/prompts/components/prompt-item.tsx:308
 #: src/features/prompts/components/prompt-list-view.tsx:316
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:942
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:956
 msgid "Delete Prompt"
 msgstr "プロンプトを削除"
 
@@ -10547,7 +10551,7 @@ msgstr "画像をどのように変換するかを説明してください..."
 msgid "Describe the image to generate..."
 msgstr "生成する画像を説明してください..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:438
+#: src/features/chat/thread/media-gallery-view.tsx:446
 msgid "Describe the image you want to create..."
 msgstr "作成したい画像を説明してください..."
 
@@ -10572,7 +10576,7 @@ msgstr "タスク、期待する結果、繰り返しのタイミング（毎日
 msgid "Describe the video to generate..."
 msgstr "生成する動画を説明してください..."
 
-#: src/features/chat/thread/media-gallery-view.tsx:438
+#: src/features/chat/thread/media-gallery-view.tsx:446
 msgid "Describe the video you want to create..."
 msgstr "作成したい動画を説明してください..."
 
@@ -10806,7 +10810,7 @@ msgstr "このホストでは差分を利用できません。"
 msgid "Digital"
 msgstr "デジタル"
 
-#: src/features/chat/thread/media-gallery-view.tsx:69
+#: src/features/chat/thread/media-gallery-view.tsx:70
 msgid "Digital Art"
 msgstr "デジタルアート"
 
@@ -10865,7 +10869,7 @@ msgid "Discard"
 msgstr "破棄"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:845
+#: src/features/projects/components/project-rule-files.tsx:881
 msgid "Discard changes"
 msgstr "変更を破棄"
 
@@ -11251,7 +11255,7 @@ msgstr "ダウンロードは GitHub のリリースページに移動します�
 msgid "Draft"
 msgstr "下書き"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:121
 msgid "Draft a cover letter for a software engineering position"
 msgstr "ソフトウェアエンジニア職のカバーレターを作成する"
 
@@ -11362,7 +11366,7 @@ msgstr "選択項目を複製（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:117
 #: src/features/chat/header/temporary-chat-dropdown.tsx:300
-#: src/features/chat/thread/media-gallery-view.tsx:559
+#: src/features/chat/thread/media-gallery-view.tsx:567
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
 msgstr "長さ"
@@ -11449,7 +11453,7 @@ msgstr "例：資産計画"
 msgid "e.g., Make it more concise, add technical details, improve clarity, add examples..."
 msgstr "例：もっと簡潔に、技術的な詳細を追加、わかりやすく、例を追加..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:241
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:244
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "例：もっと簡潔に、技術的な詳細を追加、わかりやすく..."
 
@@ -11457,7 +11461,7 @@ msgstr "例：もっと簡潔に、技術的な詳細を追加、わかりやす
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "例：もっと簡潔に、Markdown 出力を必須に、安全ルールを追加..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:304
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:307
 msgid "e.g., Make it stricter about JSON output, add a code example..."
 msgstr "例：JSON 出力をより厳密に、コード例を追加..."
 
@@ -11494,7 +11498,7 @@ msgstr "接続ごとに独自の Webhook アドレスが割り当てられ、ア
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Discord の各チャンネルごとに、Neore Chat に別々のスレッドが作成されます。AI はチャンネル内で自動的に応答します。"
 
-#: src/features/projects/components/project-rule-files.tsx:534
+#: src/features/projects/components/project-rule-files.tsx:572
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "「{name}」の各ファイルパターンは 1 行で最大 {limit} 文字にしてください。"
 
@@ -11584,8 +11588,8 @@ msgstr "エッジに沿った生成"
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
 #: src/features/prompts/components/prompt-list-view.tsx:218
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:700
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:839
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:714
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:853
 #: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
@@ -13081,7 +13085,7 @@ msgstr "まもなく期限切れ"
 msgid "Explain a concept in simple terms..."
 msgstr "概念をわかりやすく説明して..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:83
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
 msgid "Explain the causes and effects of climate change"
 msgstr "気候変動の原因と影響を説明する"
 
@@ -13122,7 +13126,7 @@ msgstr "バンドルをエクスポート"
 msgid "Export cancelled"
 msgstr "エクスポートをキャンセルしました"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:294
+#: src/features/chat/signed-out/signed-out-chat.tsx:295
 msgid "Export chat"
 msgstr "チャットをエクスポート"
 
@@ -13263,11 +13267,11 @@ msgstr "Facebook と Instagram の広告キャンペーン管理と分析"
 msgid "Facebook Post"
 msgstr "Facebook 投稿"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:58
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:61
 msgid "Fact Check"
 msgstr "ファクトチェック"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:66
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "ファクトチェック：砂糖は子どもの多動を引き起こしますか？"
 
@@ -13372,7 +13376,7 @@ msgstr "接続できませんでした"
 msgid "Failed to connect {name}"
 msgstr "{name} に接続できませんでした"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:141
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:153
 msgid "Failed to copy"
 msgstr "コピーできませんでした"
 
@@ -13470,7 +13474,7 @@ msgid "Failed to delete project"
 msgstr "プロジェクトを削除できませんでした"
 
 #: src/features/prompts/components/prompt-list.tsx:243
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:306
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:320
 msgid "Failed to delete prompt"
 msgstr "プロンプトを削除できませんでした"
 
@@ -13815,7 +13819,7 @@ msgid "Failed to save preset"
 msgstr "プリセットを保存できませんでした"
 
 #: src/features/prompts/components/prompt-list.tsx:227
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:466
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:480
 msgid "Failed to save prompt"
 msgstr "プロンプトを保存できませんでした"
 
@@ -13948,7 +13952,7 @@ msgstr "エンドポイントを更新できませんでした"
 msgid "Failed to update favorite"
 msgstr "お気に入りを更新できませんでした"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:318
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:332
 msgid "Failed to update favorite status"
 msgstr "お気に入りの状態を更新できませんでした"
 
@@ -14412,7 +14416,7 @@ msgstr "お気に入りのページ"
 
 #: src/features/pages/components/pages-sidebar.tsx:194
 #: src/features/prompts/components/prompt-list.tsx:439
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:614
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:628
 msgid "Favorites"
 msgstr "お気に入り"
 
@@ -14732,11 +14736,11 @@ msgstr "スレッド内を検索"
 msgid "Find in Thread"
 msgstr "スレッド内を検索"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:93
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
 msgid "Find the best restaurants near me for Italian cuisine"
 msgstr "近くのおすすめイタリアンレストランを探す"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:96
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:99
 msgid "Find tutorials on how to learn Python programming"
 msgstr "Python プログラミングを学ぶためのチュートリアルを探す"
 
@@ -14799,7 +14803,7 @@ msgstr "魚眼、極端な歪み"
 msgid "Fit view"
 msgstr "全体を表示"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:32
+#: src/features/canvas/components/canvas-toolbar.tsx:33
 msgid "Fix grammar"
 msgstr "文法を修正"
 
@@ -15081,9 +15085,9 @@ msgstr "無料"
 
 #: src/features/prompts/components/prompt-list.tsx:159
 #: src/features/prompts/components/prompt-list.tsx:225
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:464
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:509
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:572
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:478
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:523
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:586
 msgid "Free accounts are limited to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "無料アカウントのプロンプトは 3 個までです。Pro にアップグレードすると無制限に使えます。"
 
@@ -15093,7 +15097,7 @@ msgid "Free accounts are limited to 5 skills. Upgrade to Pro for unlimited skill
 msgstr "無料アカウントのスキルは 5 個までです。Pro にアップグレードすると無制限に使えます。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:42
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:558
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:572
 msgid "Free accounts can create up to 3 prompts. Upgrade to Pro for unlimited prompts."
 msgstr "無料アカウントで作成できるプロンプトは 3 個までです。Pro にアップグレードすると無制限に作成できます。"
 
@@ -15476,7 +15480,7 @@ msgstr "Alibaba の最新世代 Wan モデルによる汎用の動画生成"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:264
 #: src/features/chat/sidebar/thread-sidebar.tsx:145
-#: src/features/chat/thread/generation-model-menu.tsx:166
+#: src/features/chat/thread/generation-model-menu.tsx:167
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:153
@@ -15487,7 +15491,7 @@ msgstr "生成"
 msgid "Generate 4 images with different models and compare them side by side"
 msgstr "異なるモデルで 4 枚の画像を生成し、並べて比較する"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:111
 msgid "Generate a storyboard for a short documentary"
 msgstr "短編ドキュメンタリーの絵コンテを作成する"
 
@@ -15523,7 +15527,7 @@ msgstr "音声を生成"
 msgid "Generate from a description"
 msgstr "説明から生成"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:119
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:122
 msgid "Generate ideas for a creative writing story"
 msgstr "創作ストーリーのアイデアを出す"
 
@@ -15531,7 +15535,7 @@ msgstr "創作ストーリーのアイデアを出す"
 msgid "Generate image"
 msgstr "画像を生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:612
+#: src/features/chat/thread/media-gallery-view.tsx:620
 #: src/features/workflow/templates/index.ts:106
 msgid "Generate Image"
 msgstr "画像を生成"
@@ -15549,7 +15553,7 @@ msgstr "FLUX や Stable Diffusion で画像を生成し、Runway や Luma で動
 msgid "Generate random seed"
 msgstr "ランダムなシードを生成"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:72
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:75
 msgid "Generate unique business ideas for 2025"
 msgstr "2025 年向けのユニークなビジネスアイデアを考える"
 
@@ -15557,7 +15561,7 @@ msgstr "2025 年向けのユニークなビジネスアイデアを考える"
 msgid "Generate video"
 msgstr "動画を生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:612
+#: src/features/chat/thread/media-gallery-view.tsx:620
 #: src/features/workflow/templates/index.ts:424
 msgid "Generate Video"
 msgstr "動画を生成"
@@ -15579,7 +15583,7 @@ msgstr "<0>{0}</0> で生成"
 msgid "Generate Workflow with AI"
 msgstr "AI でワークフローを生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:231
+#: src/features/chat/thread/media-gallery-view.tsx:232
 msgid "Generated image"
 msgstr "生成された画像"
 
@@ -15587,15 +15591,15 @@ msgstr "生成された画像"
 msgid "Generated Image"
 msgstr "生成された画像"
 
-#: src/features/chat/thread/media-gallery-view.tsx:345
+#: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "Generated images will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した画像はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:243
+#: src/features/chat/thread/media-gallery-view.tsx:244
 msgid "Generated video"
 msgstr "生成された動画"
 
-#: src/features/chat/thread/media-gallery-view.tsx:346
+#: src/features/chat/thread/media-gallery-view.tsx:354
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成した動画はここに表示されます。まずは下の入力欄で作りたいものを説明してください。"
 
@@ -15608,7 +15612,7 @@ msgid "Generating draft…"
 msgstr "下書きを生成しています…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:479
-#: src/features/chat/thread/media-gallery-view.tsx:395
+#: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "画像を生成しています..."
 
@@ -15621,7 +15625,7 @@ msgid "Generating response"
 msgstr "応答を生成中"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:480
-#: src/features/chat/thread/media-gallery-view.tsx:395
+#: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "動画を生成しています..."
 
@@ -15632,7 +15636,7 @@ msgstr "動画を生成しています..."
 msgid "Generating..."
 msgstr "生成しています..."
 
-#: src/features/chat/thread/generation-model-menu.tsx:166
+#: src/features/chat/thread/generation-model-menu.tsx:167
 msgid "Generating…"
 msgstr "生成中…"
 
@@ -15766,7 +15770,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab シークレットトークン（X-Gitlab-Token）"
 
-#: src/features/projects/components/project-rule-files.tsx:542
+#: src/features/projects/components/project-rule-files.tsx:580
 msgid "Give every rule file a name."
 msgstr "すべてのルールファイルに名前を付けてください。"
 
@@ -16463,7 +16467,7 @@ msgstr "ヘルプ"
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "新しいチームに自己紹介するビジネスメールを書くのを手伝って。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:115
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:118
 msgid "Help me write a professional email to my manager"
 msgstr "上司宛てのビジネスメールを書くのを手伝って"
 
@@ -16503,8 +16507,8 @@ msgstr "添付コンテンツを非表示"
 msgid "Hide column"
 msgstr "列を非表示"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:250
-#: src/features/chat/thread/composer-followup-suggestions.tsx:266
+#: src/features/chat/thread/composer-followup-suggestions.tsx:253
+#: src/features/chat/thread/composer-followup-suggestions.tsx:269
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
 
@@ -16967,7 +16971,7 @@ msgid "Ideal for simple classification and extraction"
 msgstr "シンプルな分類や抽出に最適"
 
 #: src/features/admin/components/feedback-admin-page.tsx:169
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:69
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:72
 msgid "Ideas"
 msgstr "アイデア"
 
@@ -17083,7 +17087,7 @@ msgid "Image generation"
 msgstr "画像生成"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:177
-#: src/features/chat/thread/media-gallery-view.tsx:342
+#: src/features/chat/thread/media-gallery-view.tsx:350
 #: src/features/marketing/components/landing-page.tsx:287
 #: src/features/marketing/components/model-detail-page.tsx:87
 #: src/features/workflow/components/gallery/publish-dialog.tsx:28
@@ -17273,7 +17277,7 @@ msgstr "ChatGPT、Google Gemini、Claude、Neore のデータエクスポート�
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: src/features/projects/components/project-rule-files.tsx:775
+#: src/features/projects/components/project-rule-files.tsx:813
 msgid "Import files"
 msgstr "ファイルをインポート"
 
@@ -17289,7 +17293,7 @@ msgstr "Notion のエクスポートをインポート（.zip）"
 msgid "Import one kind of export at a time."
 msgstr "一度にインポートできるのは 1 種類のエクスポートだけです。"
 
-#: src/features/projects/components/project-rule-files.tsx:785
+#: src/features/projects/components/project-rule-files.tsx:823
 msgid "Import rule folder"
 msgstr "ルールフォルダーをインポート"
 
@@ -17356,11 +17360,11 @@ msgstr "{0} からインポートしています..."
 msgid "Imprint"
 msgstr "運営者情報"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:340
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:343
 msgid "Improve"
 msgstr "改善"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:65
+#: src/features/canvas/components/canvas-toolbar.tsx:66
 msgid "Improve layout"
 msgstr "レイアウトを改善"
 
@@ -17401,7 +17405,7 @@ msgstr "Kling 2.x より動きのダイナミクスが向上"
 msgid "Improved multimodal reasoning"
 msgstr "マルチモーダル推論の向上"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:258
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:261
 msgid "Improved Prompt"
 msgstr "改善されたプロンプト"
 
@@ -17429,7 +17433,7 @@ msgstr "プロンプトを改善しています..."
 msgid "Improving your prompt..."
 msgstr "プロンプトを改善しています..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:337
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:340
 msgid "Improving..."
 msgstr "改善しています..."
 
@@ -17735,7 +17739,7 @@ msgstr "指示"
 msgid "Instructions"
 msgstr "指示"
 
-#: src/features/projects/components/project-rule-files.tsx:703
+#: src/features/projects/components/project-rule-files.tsx:741
 msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
 msgstr "このプロジェクトのチャットに追加される指示です。常に、チャットの添付ファイルが **/*.sql などのパターンに一致するときのみ、またはチャットが必要なときに読むかを選べます。"
 
@@ -17847,7 +17851,7 @@ msgstr "パスワードが無効です"
 msgid "Invalid password. Please try again."
 msgstr "パスワードが無効です。もう一度お試しください。"
 
-#: src/routes/(chat)/chat/index.tsx:163
+#: src/routes/(chat)/chat/index.tsx:165
 msgid "Invalid thread ID"
 msgstr "無効なスレッド ID です"
 
@@ -17996,7 +18000,7 @@ msgstr "{0} は無料で使えますか？"
 msgid "Is it compatible with the OpenAI SDK?"
 msgstr "OpenAI SDK と互換性はありますか？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:60
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:63
 msgid "Is it true that drinking 8 glasses of water daily is necessary?"
 msgstr "1 日にコップ 8 杯の水を飲む必要があるというのは本当ですか？"
 
@@ -18004,7 +18008,7 @@ msgstr "1 日にコップ 8 杯の水を飲む必要があるというのは本�
 msgid "Is my data private?"
 msgstr "データはプライベートに保たれますか？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:67
 msgid "Is the claim about 5G causing health issues supported by science?"
 msgstr "5G が健康被害を引き起こすという主張は科学的に裏付けられていますか？"
 
@@ -18440,14 +18444,14 @@ msgid "Landscape (2x wide)"
 msgstr "横長 (2 倍幅)"
 
 #: src/features/chat/thread/composer-image-settings.tsx:36
-#: src/features/chat/thread/media-gallery-view.tsx:52
+#: src/features/chat/thread/media-gallery-view.tsx:53
 msgid "Landscape (photo)"
 msgstr "横長 (写真)"
 
 #: src/features/chat/thread/composer-image-settings.tsx:37
 #: src/features/chat/thread/composer-video-settings.tsx:29
-#: src/features/chat/thread/media-gallery-view.tsx:53
-#: src/features/chat/thread/media-gallery-view.tsx:78
+#: src/features/chat/thread/media-gallery-view.tsx:54
+#: src/features/chat/thread/media-gallery-view.tsx:79
 msgid "Landscape (standard)"
 msgstr "横長 (標準)"
 
@@ -18456,7 +18460,7 @@ msgid "Landscape (ultra-wide)"
 msgstr "横長 (ウルトラワイド)"
 
 #: src/features/chat/thread/composer-video-settings.tsx:30
-#: src/features/chat/thread/media-gallery-view.tsx:75
+#: src/features/chat/thread/media-gallery-view.tsx:76
 msgid "Landscape (wide)"
 msgstr "横長 (ワイド)"
 
@@ -19607,7 +19611,7 @@ msgid "Log out"
 msgstr "サインアウト"
 
 #: src/features/auth/components/auth/login-modal.tsx:46
-#: src/features/chat/signed-out/signed-out-chat.tsx:284
+#: src/features/chat/signed-out/signed-out-chat.tsx:285
 #: src/features/layout/components/app-sidebar.tsx:61
 #: src/features/layout/components/app-sidebar.tsx:74
 #: src/features/marketing/components/gateway-navbar.tsx:90
@@ -19876,11 +19880,11 @@ msgstr "管理者にする"
 msgid "Make default"
 msgstr "デフォルトにする"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:30
+#: src/features/canvas/components/canvas-toolbar.tsx:31
 msgid "Make longer"
 msgstr "長くする"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:29
+#: src/features/canvas/components/canvas-toolbar.tsx:30
 msgid "Make shorter"
 msgstr "短くする"
 
@@ -21102,8 +21106,8 @@ msgstr "その他のアクション"
 
 #. placeholder {0}: prompt.name
 #: src/features/prompts/components/prompt-list-view.tsx:192
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:683
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:822
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:697
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:836
 msgid "More actions for {0}"
 msgstr "{0} のその他のアクション"
 
@@ -21557,7 +21561,7 @@ msgid "Native text-to-video at frontier quality"
 msgstr "フロンティア品質のネイティブなテキストから動画生成"
 
 #: src/features/chat/thread/composer-image-settings.tsx:54
-#: src/features/chat/thread/media-gallery-view.tsx:66
+#: src/features/chat/thread/media-gallery-view.tsx:67
 msgid "Natural"
 msgstr "ナチュラル"
 
@@ -21677,7 +21681,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Neore エージェント"
 
-#: src/features/chat/thread/composer.tsx:699
+#: src/features/chat/thread/composer.tsx:695
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -21857,7 +21861,7 @@ msgstr "新しいチャット"
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:46
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:113
 #: src/features/chat/header/chat-header.tsx:49
-#: src/features/chat/signed-out/signed-out-chat.tsx:305
+#: src/features/chat/signed-out/signed-out-chat.tsx:306
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:285
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:159
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:161
@@ -22067,7 +22071,7 @@ msgid "Next output mode"
 msgstr "次の出力モード"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:144
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:895
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:909
 msgid "Next page"
 msgstr "次のページ"
 
@@ -22404,7 +22408,7 @@ msgid "No icon found"
 msgstr "アイコンが見つかりません"
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
-#: src/features/chat/thread/media-gallery-view.tsx:343
+#: src/features/chat/thread/media-gallery-view.tsx:351
 msgid "No images yet"
 msgstr "画像はまだありません"
 
@@ -22432,7 +22436,7 @@ msgstr "言語が見つかりません"
 msgid "No lens selected"
 msgstr "レンズが選択されていません"
 
-#: src/features/projects/components/project-rule-files.tsx:508
+#: src/features/projects/components/project-rule-files.tsx:526
 msgid "No Markdown files were found to import."
 msgstr "インポートできる Markdown ファイルが見つかりませんでした。"
 
@@ -22590,7 +22594,7 @@ msgstr "利用可能なプロジェクトがありません。先にプロジェ
 msgid "No prompt"
 msgstr "プロンプトなし"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:589
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "「{searchQuery}」に一致するプロンプトは見つかりませんでした"
 
@@ -22599,8 +22603,8 @@ msgid "No prompts found matching your search."
 msgstr "検索に一致するプロンプトは見つかりませんでした。"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:28
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:553
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:589
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:567
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:603
 msgid "No prompts yet"
 msgstr "プロンプトはまだありません"
 
@@ -22778,7 +22782,7 @@ msgstr "このグループにスレッドはありません"
 msgid "No threads were active in that date range."
 msgstr "その期間にアクティブだったスレッドはありません。"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:273
+#: src/features/chat/signed-out/signed-out-chat.tsx:274
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:904
 msgid "No threads yet"
 msgstr "スレッドはまだありません"
@@ -22837,7 +22841,7 @@ msgstr "変数が見つかりません"
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "バージョンはまだありません。編集するとバージョンが保存されます。"
 
-#: src/features/chat/thread/media-gallery-view.tsx:343
+#: src/features/chat/thread/media-gallery-view.tsx:351
 msgid "No videos yet"
 msgstr "動画はまだありません"
 
@@ -24230,7 +24234,7 @@ msgstr "最適化が拒否されました"
 msgid "Optimization style"
 msgstr "最適化のスタイル"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:41
+#: src/features/canvas/components/canvas-toolbar.tsx:42
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
 #: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
@@ -25188,7 +25192,7 @@ msgstr "WhatsApp > API Setup にある Phone number ID"
 msgid "Photo"
 msgstr "写真"
 
-#: src/features/chat/thread/media-gallery-view.tsx:68
+#: src/features/chat/thread/media-gallery-view.tsx:69
 msgid "Photographic"
 msgstr "写真風"
 
@@ -25438,10 +25442,10 @@ msgid "Please log in to configure variables"
 msgstr "変数を設定するにはサインインしてください"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:35
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:503
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:554
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:566
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:590
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:517
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:568
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:580
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:604
 msgid "Please log in to create prompts"
 msgstr "プロンプトを作成するにはサインインしてください"
 
@@ -25536,21 +25540,21 @@ msgid "Portrait (mobile)"
 msgstr "縦長 (モバイル)"
 
 #: src/features/chat/thread/composer-image-settings.tsx:31
-#: src/features/chat/thread/media-gallery-view.tsx:50
+#: src/features/chat/thread/media-gallery-view.tsx:51
 msgid "Portrait (photo)"
 msgstr "縦長 (写真)"
 
 #: src/features/chat/thread/composer-image-settings.tsx:30
 #: src/features/chat/thread/composer-video-settings.tsx:27
-#: src/features/chat/thread/media-gallery-view.tsx:49
-#: src/features/chat/thread/media-gallery-view.tsx:79
+#: src/features/chat/thread/media-gallery-view.tsx:50
+#: src/features/chat/thread/media-gallery-view.tsx:80
 msgid "Portrait (standard)"
 msgstr "縦長 (標準)"
 
 #: src/features/chat/thread/composer-image-settings.tsx:32
 #: src/features/chat/thread/composer-video-settings.tsx:26
-#: src/features/chat/thread/media-gallery-view.tsx:51
-#: src/features/chat/thread/media-gallery-view.tsx:76
+#: src/features/chat/thread/media-gallery-view.tsx:52
+#: src/features/chat/thread/media-gallery-view.tsx:77
 msgid "Portrait (tall)"
 msgstr "縦長 (トール)"
 
@@ -25932,7 +25936,7 @@ msgid "Previous output mode"
 msgstr "前の出力モード"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:130
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:886
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:900
 msgid "Previous page"
 msgstr "前のページ"
 
@@ -26148,8 +26152,8 @@ msgstr "プロフェッショナル"
 msgid "Professional"
 msgstr "プロフェッショナル"
 
-#: src/features/chat/thread/media-gallery-view.tsx:519
-#: src/features/chat/thread/media-gallery-view.tsx:598
+#: src/features/chat/thread/media-gallery-view.tsx:527
+#: src/features/chat/thread/media-gallery-view.tsx:606
 msgid "Professional Camera Controls"
 msgstr "プロ向けカメラコントロール"
 
@@ -26285,19 +26289,19 @@ msgid "prompt"
 msgstr "プロンプト"
 
 #: ../../packages/ui/src/components/image-gallery.tsx:400
-#: src/features/chat/thread/media-gallery-view.tsx:433
+#: src/features/chat/thread/media-gallery-view.tsx:441
 #: src/features/settings/components/chat/trigger-settings.tsx:1017
 #: src/features/workflow/templates/index.ts:96
 #: src/features/workflow/templates/index.ts:230
 msgid "Prompt"
 msgstr "プロンプト"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:224
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:241
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:236
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:254
 msgid "Prompt added to input"
 msgstr "プロンプトを入力欄に追加しました"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:261
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:275
 msgid "Prompt added with placeholders"
 msgstr "プレースホルダー付きでプロンプトを追加しました"
 
@@ -26318,7 +26322,7 @@ msgstr "プロンプトをコピーしました"
 msgid "Prompt copied to clipboard"
 msgstr "プロンプトをクリップボードにコピーしました"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:456
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:470
 msgid "Prompt created"
 msgstr "プロンプトを作成しました"
 
@@ -26327,7 +26331,7 @@ msgid "Prompt created successfully"
 msgstr "プロンプトを作成しました"
 
 #: src/features/prompts/components/prompt-list.tsx:240
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:302
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:316
 msgid "Prompt deleted"
 msgstr "プロンプトを削除しました"
 
@@ -26335,7 +26339,7 @@ msgstr "プロンプトを削除しました"
 msgid "Prompt format"
 msgstr "プロンプトの形式"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:355
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:358
 msgid "Prompt improved"
 msgstr "プロンプトを改善しました"
 
@@ -26359,7 +26363,7 @@ msgstr "プロンプトのリンクをコピーしました"
 msgid "Prompt link copied. It names no model, so it opens on the reader's model."
 msgstr "プロンプトのリンクをコピーしました。モデルは指定されていないため、開いた人のモデルで開きます。"
 
-#: src/features/prompts/hooks/use-prompt-loader.tsx:108
+#: src/features/prompts/hooks/use-prompt-loader.tsx:114
 msgid "Prompt loaded"
 msgstr "プロンプトを読み込みました"
 
@@ -26375,7 +26379,7 @@ msgstr "すべてのモデルで実行するプロンプト..."
 msgid "Prompt Tokens"
 msgstr "プロンプトトークン"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:443
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:457
 msgid "Prompt updated"
 msgstr "プロンプトを更新しました"
 
@@ -26395,7 +26399,7 @@ msgstr "プロンプト変数"
 #: src/features/chat/sidebar/thread-sidebar.tsx:339
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:491
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:505
 msgid "Prompts"
 msgstr "プロンプト"
 
@@ -26607,7 +26611,7 @@ msgid "Put several agents with their own roles in one thread. A review panel can
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
-#: src/features/chat/thread/media-gallery-view.tsx:473
+#: src/features/chat/thread/media-gallery-view.tsx:481
 msgid "Quality"
 msgstr "品質"
 
@@ -27314,7 +27318,7 @@ msgstr "参照"
 msgid "References"
 msgstr "参照"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:314
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:317
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
@@ -27325,7 +27329,7 @@ msgstr "改善"
 msgid "Refine Edge Detection"
 msgstr "エッジ検出を精緻化"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:294
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:297
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "フィードバックで改善（任意）"
@@ -27684,7 +27688,7 @@ msgstr "お気に入りから削除"
 
 #: src/features/prompts/components/prompt-item.tsx:218
 #: src/features/prompts/components/prompt-list-view.tsx:222
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:709
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:723
 msgid "Remove from Favorites"
 msgstr "お気に入りから削除"
 
@@ -28050,7 +28054,7 @@ msgstr "リサーチ"
 
 #: src/features/chat/tags/thread-categories.ts:17
 #: src/features/chat/tags/thread-category-filter.tsx:19
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:80
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:83
 #: src/features/skills/components/skill-form-dialog.tsx:123
 msgid "Research"
 msgstr "リサーチ"
@@ -28350,7 +28354,7 @@ msgid "Retrying…"
 msgstr "再試行しています…"
 
 #. placeholder {0}: retryCount + 1
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:216
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:219
 msgid "Retrying... (Attempt {0})"
 msgstr "再試行しています...（{0} 回目）"
 
@@ -28662,11 +28666,11 @@ msgstr "ルーブリック"
 msgid "Rule file {0}"
 msgstr "ルールファイル {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:701
+#: src/features/projects/components/project-rule-files.tsx:739
 msgid "Rule files"
 msgstr "ルールファイル"
 
-#: src/features/projects/components/project-rule-files.tsx:683
+#: src/features/projects/components/project-rule-files.tsx:721
 msgid "Rule files saved."
 msgstr "ルールファイルを保存しました。"
 
@@ -28999,7 +29003,7 @@ msgstr "画像を保存"
 msgid "Save login"
 msgstr "ログインを保存"
 
-#: src/features/projects/components/project-rule-files.tsx:859
+#: src/features/projects/components/project-rule-files.tsx:895
 msgid "Save or discard your rule file changes first."
 msgstr "先にルールファイルの変更を保存または破棄してください。"
 
@@ -29011,7 +29015,7 @@ msgstr "プリセットを保存"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "再利用可能なシステムプロンプトを保存し、特定のモデルに紐付けます。「最適化」ボタンで、プロンプトオプティマイザーを使って各プリセットを改善できます。"
 
-#: src/features/projects/components/project-rule-files.tsx:827
+#: src/features/projects/components/project-rule-files.tsx:861
 msgid "Save rule files"
 msgstr "ルールファイルを保存"
 
@@ -29089,7 +29093,7 @@ msgstr "ツールを保存中…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:827
+#: src/features/projects/components/project-rule-files.tsx:861
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29223,7 +29227,7 @@ msgid "search"
 msgstr "検索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:91
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:94
 msgid "Search"
 msgstr "検索"
 
@@ -29278,7 +29282,7 @@ msgstr "ファイルとチャットを検索..."
 msgid "Search for an icon..."
 msgstr "アイコンを検索..."
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:95
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:98
 msgid "Search for the latest news about space exploration"
 msgstr "宇宙探査に関する最新ニュースを検索する"
 
@@ -29356,12 +29360,12 @@ msgstr "変数を検索または作成..."
 msgid "Search pages"
 msgstr "ページを検索"
 
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:529
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:543
 msgid "Search prompts"
 msgstr "プロンプトを検索"
 
 #: src/features/prompts/components/prompt-list.tsx:511
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:532
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:546
 msgid "Search prompts..."
 msgstr "プロンプトを検索..."
 
@@ -29410,7 +29414,7 @@ msgstr "曲、アーティスト、アルバムを検索"
 msgid "Search Stack Overflow for programming help"
 msgstr "Stack Overflow でプログラミングのヘルプを検索"
 
-#: src/features/chat/thread/composer-search-suggestions.tsx:72
+#: src/features/chat/thread/composer-search-suggestions.tsx:75
 msgid "Search suggestions"
 msgstr "検索候補"
 
@@ -29769,7 +29773,7 @@ msgstr "自分のメッセージを選択"
 msgid "Selected {requestNoun}"
 msgstr "選択した{requestNoun}"
 
-#: src/features/chat/thread/media-gallery-view.tsx:357
+#: src/features/chat/thread/media-gallery-view.tsx:365
 msgid "Selected reference"
 msgstr "選択した参照"
 
@@ -30365,8 +30369,8 @@ msgstr "すべてのタスクを表示"
 msgid "Show attached content"
 msgstr "添付コンテンツを表示"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:250
-#: src/features/chat/thread/composer-followup-suggestions.tsx:266
+#: src/features/chat/thread/composer-followup-suggestions.tsx:253
+#: src/features/chat/thread/composer-followup-suggestions.tsx:269
 msgid "Show follow-up suggestions"
 msgstr "フォローアップの提案を表示"
 
@@ -30484,7 +30488,7 @@ msgstr "{0} 人のユーザーを表示中。さらにユーザーがいます�
 #. placeholder {0}: Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, promptGroups.all.length)
 #. placeholder {1}: Math.min(currentPage * ITEMS_PER_PAGE, promptGroups.all.length)
 #. placeholder {2}: promptGroups.all.length
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:877
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:891
 msgid "Showing {0}-{1} of {2} prompts"
 msgstr "{2} 件中 {0}〜{1} 件のプロンプトを表示中"
 
@@ -30572,7 +30576,7 @@ msgstr "ガイドを書くには、アカウントにサインインしてくだ
 msgid "Sign in to fork this workflow"
 msgstr "このワークフローをフォークするにはサインインしてください"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:274
+#: src/features/chat/signed-out/signed-out-chat.tsx:275
 msgid "Sign in to see your chats."
 msgstr "サインインするとチャットが表示されます。"
 
@@ -30716,7 +30720,7 @@ msgstr "シンプルな中央配置カード"
 msgid "Simple, transparent <0>pricing</0>."
 msgstr "シンプルで明確な<0>料金体系</0>。"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:35
+#: src/features/canvas/components/canvas-toolbar.tsx:36
 msgid "Simplify"
 msgstr "簡潔にする"
 
@@ -31140,7 +31144,7 @@ msgstr "昇順で並べ替え"
 msgid "Sort by"
 msgstr "並べ替えの基準"
 
-#: src/features/canvas/components/canvas-toolbar.tsx:51
+#: src/features/canvas/components/canvas-toolbar.tsx:52
 msgid "Sort data"
 msgstr "データを並べ替え"
 
@@ -31432,8 +31436,8 @@ msgstr "sql"
 #: src/features/canvas/components/design-preset-selector.tsx:89
 #: src/features/chat/thread/composer-image-settings.tsx:29
 #: src/features/chat/thread/composer-video-settings.tsx:25
-#: src/features/chat/thread/media-gallery-view.tsx:48
-#: src/features/chat/thread/media-gallery-view.tsx:77
+#: src/features/chat/thread/media-gallery-view.tsx:49
+#: src/features/chat/thread/media-gallery-view.tsx:78
 msgid "Square"
 msgstr "正方形"
 
@@ -31500,7 +31504,7 @@ msgid "Stable, consistent frame output"
 msgstr "安定して一貫したフレーム出力"
 
 #: src/features/appearance/components/appearance-controls.tsx:119
-#: src/features/chat/thread/media-gallery-view.tsx:59
+#: src/features/chat/thread/media-gallery-view.tsx:60
 #: src/features/marketing/components/model-detail-page.tsx:36
 msgid "Standard"
 msgstr "標準"
@@ -32304,7 +32308,7 @@ msgid "style"
 msgstr "スタイル"
 
 #: src/features/chat/thread/composer-image-settings.tsx:205
-#: src/features/chat/thread/media-gallery-view.tsx:494
+#: src/features/chat/thread/media-gallery-view.tsx:502
 #: src/features/workflow/components/nodes/character-ref-node.tsx:26
 msgid "Style"
 msgstr "スタイル"
@@ -32347,7 +32351,7 @@ msgid "Style-consistent video generation guided by reference images to maintain 
 msgstr "参照画像に基づいて視覚的な一貫性を保つ、スタイルの統一された動画生成"
 
 #. placeholder {0}: styleLabels.user[style].label
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:231
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:234
 msgid "Style: {0}"
 msgstr "スタイル：{0}"
 
@@ -32423,11 +32427,11 @@ msgstr "成功基準は {CRITERIA_MAX} 文字以内で入力してください"
 msgid "Successfully imported {imported} conversations from {0}"
 msgstr "{0} から {imported} 件の会話をインポートしました"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:73
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:76
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "プラスチックごみを減らす革新的な解決策を提案する"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:105
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "テック系 YouTube チャンネルの動画アイデアを提案する"
 
@@ -32489,7 +32493,7 @@ msgstr "毎朝メールの受信トレイを要約して"
 msgid "Summarize my inbox and highlight urgent items. Use {PAYLOAD_TOKEN} for webhook data."
 msgstr "受信トレイを要約して、緊急の項目を強調してください。Webhook データには {PAYLOAD_TOKEN} を使用します。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:86
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:89
 msgid "Summarize the history of the internet"
 msgstr "インターネットの歴史を要約する"
 
@@ -33070,7 +33074,7 @@ msgid "Temporary chat"
 msgstr "一時チャット"
 
 #: src/features/chat/header/temporary-chat-dropdown.tsx:293
-#: src/features/chat/signed-out/signed-out-chat.tsx:299
+#: src/features/chat/signed-out/signed-out-chat.tsx:300
 msgid "Temporary Chat"
 msgstr "一時チャット"
 
@@ -33728,7 +33732,7 @@ msgstr "データセット、そのケース、およびすべての実行が削
 msgid "The description is cut short."
 msgstr "説明が途中で切れています。"
 
-#: src/features/projects/components/project-rule-files.tsx:528
+#: src/features/projects/components/project-rule-files.tsx:566
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "\"{name}\" の説明は 1 行で最大 {limit} 文字にしてください。"
 
@@ -33807,8 +33811,7 @@ msgstr "ファイルは添付されたままで、メッセージと一緒に送
 msgid "The file was not imported:"
 msgstr "ファイルはインポートされませんでした："
 
-#: src/features/projects/components/project-rule-files.tsx:794
-#: src/features/projects/components/project-rule-files.tsx:807
+#: src/features/projects/components/project-rule-files.tsx:548
 msgid "The files could not be read."
 msgstr "ファイルを読み込めませんでした。"
 
@@ -33949,7 +33952,7 @@ msgstr "アイコンを読み込めませんでした。"
 msgid "The imported file appears to be empty."
 msgstr "インポートしたファイルは空のようです。"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:287
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:290
 msgid "The improved prompt will appear here..."
 msgstr "改善されたプロンプトがここに表示されます..."
 
@@ -34217,7 +34220,7 @@ msgstr "再試行に予想より時間がかかっています"
 msgid "The right model, every time."
 msgstr "いつでも、最適なモデルを。"
 
-#: src/features/projects/components/project-rule-files.tsx:708
+#: src/features/projects/components/project-rule-files.tsx:746
 msgid "The rule files could not be loaded."
 msgstr "ルールファイルを読み込めませんでした。"
 
@@ -35091,7 +35094,7 @@ msgstr "このスレッドには、保持できる上限までプルリクエス
 msgid "This thread changed since, so this was not applied."
 msgstr "その後スレッドが変更されたため、これは適用されませんでした。"
 
-#: src/routes/(chat)/chat/index.tsx:168
+#: src/routes/(chat)/chat/index.tsx:170
 msgid "This thread has been deleted"
 msgstr "このスレッドは削除されました"
 
@@ -35146,7 +35149,7 @@ msgstr "プロジェクトと関連するすべてのスレッドが完全に削
 #. placeholder {0}: promptToDelete?.name
 #: src/features/prompts/components/prompt-item.tsx:300
 #: src/features/prompts/components/prompt-list-view.tsx:300
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:932
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:946
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
 msgstr "プロンプト「{0}」が完全に削除されます。この操作は元に戻せません。"
 
@@ -35231,7 +35234,7 @@ msgstr "スレッドを公開しました"
 msgid "Thread management"
 msgstr "スレッド管理"
 
-#: src/routes/(chat)/chat/index.tsx:173
+#: src/routes/(chat)/chat/index.tsx:175
 msgid "Thread not found or you don't have access to it"
 msgstr "スレッドが見つからないか、アクセス権がありません"
 
@@ -35411,7 +35414,7 @@ msgstr "今日"
 msgid "Today, {label}"
 msgstr "今日、{label}"
 
-#: src/features/projects/components/project-rule-files.tsx:551
+#: src/features/projects/components/project-rule-files.tsx:589
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "これらのルールファイルの合計が {limit} MB を超えています。いくつか短くするか削除してください。"
 
@@ -36157,7 +36160,7 @@ msgstr "入力して検索"
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
-#: src/features/chat/signed-out/signed-out-chat.tsx:249
+#: src/features/chat/signed-out/signed-out-chat.tsx:250
 #: src/features/chat/thread/composer-input.tsx:1959
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
 msgid "Type your message..."
@@ -37008,7 +37011,7 @@ msgstr "MCP クライアントから使用する"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "小文字、数字、単一のハイフンのみ使用できます"
 
-#: src/features/chat/thread/media-gallery-view.tsx:623
+#: src/features/chat/thread/media-gallery-view.tsx:631
 msgid "Use Original Prompt"
 msgstr "元のプロンプトを使用"
 
@@ -37361,7 +37364,7 @@ msgstr "確認"
 msgid "Verify Code"
 msgstr "コードを確認"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:61
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:64
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "次の主張を検証して：「万里の長城は宇宙から見える」"
 
@@ -37549,7 +37552,7 @@ msgstr "動画生成"
 msgid "Video generation"
 msgstr "動画生成"
 
-#: src/features/chat/thread/media-gallery-view.tsx:342
+#: src/features/chat/thread/media-gallery-view.tsx:350
 #: src/features/marketing/components/model-detail-page.tsx:95
 msgid "Video Generation"
 msgstr "動画生成"
@@ -37592,7 +37595,7 @@ msgstr "動画から動画"
 msgid "video understanding"
 msgstr "動画認識"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:102
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:105
 msgid "Videos"
 msgstr "動画"
 
@@ -37883,7 +37886,7 @@ msgid "Vitesse"
 msgstr "Vitesse"
 
 #: src/features/chat/thread/composer-image-settings.tsx:53
-#: src/features/chat/thread/media-gallery-view.tsx:65
+#: src/features/chat/thread/media-gallery-view.tsx:66
 msgid "Vivid"
 msgstr "ビビッド"
 
@@ -38224,27 +38227,27 @@ msgstr "ウェールズ語"
 msgid "Welsh (UK)"
 msgstr "ウェールズ語（英国）"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:74
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:77
 msgid "What are some creative date night ideas?"
 msgstr "クリエイティブなデートのアイデアを教えて"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:107
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:110
 msgid "What are the best practices for video editing?"
 msgstr "動画編集のベストプラクティスは？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:100
 msgid "What are the current trends in web development?"
 msgstr "Web 開発の最新トレンドは？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:88
 msgid "What are the key findings from recent AI research papers?"
 msgstr "最近の AI 研究論文の主な発見は？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:82
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:85
 msgid "What are the latest developments in quantum computing?"
 msgstr "量子コンピューティングの最新の動向は？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:94
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:97
 msgid "What are the top-rated productivity apps in 2025?"
 msgstr "2025 年に評価の高い生産性アプリは？"
 
@@ -38347,7 +38350,7 @@ msgstr "ユーザーがアプリから送信した内容（新しい順）"
 msgid "what we store"
 msgstr "保存する内容"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:228
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:231
 msgid "What would you like to improve? (optional)"
 msgstr "何を改善したいですか？（任意）"
 
@@ -38364,7 +38367,7 @@ msgstr "新機能"
 msgid "What's the latency overhead?"
 msgstr "レイテンシのオーバーヘッドはどれくらいですか？"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:62
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:65
 msgid "What's the scientific evidence for the health benefits of meditation?"
 msgstr "瞑想の健康効果に関する科学的根拠は？"
 
@@ -38628,7 +38631,7 @@ msgstr "世界知識"
 msgid "Write"
 msgstr "書き込み"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:117
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:120
 msgid "Write a compelling product description for an e-commerce site"
 msgstr "EC サイト向けの魅力的な商品説明を書く"
 
@@ -38636,7 +38639,7 @@ msgstr "EC サイト向けの魅力的な商品説明を書く"
 msgid "Write a summary, or add a comment, before you submit this review."
 msgstr "このレビューを送信する前に、要約を書くかコメントを追加してください。"
 
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:106
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:109
 msgid "Write a video description for a product launch"
 msgstr "製品発表用の動画の説明文を書く"
 
@@ -38674,7 +38677,7 @@ msgstr "入力するか、「/」でコマンドを表示…"
 
 #: src/features/chat/tags/thread-categories.ts:18
 #: src/features/chat/tags/thread-category-filter.tsx:18
-#: src/features/chat/thread/thread-welcome-suggestions.tsx:113
+#: src/features/chat/thread/thread-welcome-suggestions.tsx:116
 msgid "Writing"
 msgstr "ライティング"
 
@@ -39006,7 +39009,7 @@ msgstr "すべて確認済みです。"
 msgid "You're all set!"
 msgstr "準備が整いました！"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:205
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:208
 msgid "You're offline. Please check your connection."
 msgstr "オフラインです。接続を確認してください。"
 
@@ -39023,7 +39026,7 @@ msgid "You've been invited to join an organization"
 msgstr "組織への招待が届いています"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:43
-#: src/features/prompts/components/prompts-sidebar-tab.tsx:559
+#: src/features/prompts/components/prompts-sidebar-tab.tsx:573
 msgid "You've reached the free account limit of 3 prompts. Upgrade to Pro to create more."
 msgstr "無料アカウントのプロンプト上限（3 個）に達しました。さらに作成するには Pro にアップグレードしてください。"
 

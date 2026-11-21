@@ -154,10 +154,11 @@ export interface HeadlessRunOptions {
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
     personalization: "full" | "none";
     /**
-     * The `auto` rule files of the project the run is for (`runProjectFor`): with tools, the run lists them after `system`
-     * and may read them with `instruction_read` (`withInstructionRead`); without, neither.
+     * The `auto` rule files of the project the run is for (`runProjectFor`), and that project: with tools, the run lists them
+     * after `system` and may read them with `instruction_read` (`withInstructionRead`); without, neither. A pause records the
+     * project, so its continuation reads that project's files.
      */
-    projectInstructions?: ReadonlyArray<RunInstruction>;
+    projectInstructions?: { instructions: ReadonlyArray<RunInstruction>; projectId: string };
     /** Omitted when continuing a thread: its latest message is the prompt. */
     prompt?: string;
     /** Reasoning effort on the chat's 0-100 scale; wins over the skill's. Unset leaves it to the skill, then the model. */
@@ -335,7 +336,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
         // Only for a model that calls tools: the list without the tool would name files nothing can read.
-        const instructions = buildsTools && modelSupportsTools(model) ? (options.projectInstructions ?? []) : [];
+        const instructions = buildsTools && modelSupportsTools(model) ? (options.projectInstructions?.instructions ?? []) : [];
         const runTools = withInstructionRead(applyToolAllowlist(toolResult.tools, toolAllowlist), instructions);
         const agent = await getAgent(model, {
             backupModelId,
@@ -500,6 +501,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 model,
                 // The continuation's cap reads it when the thread has no stored organization (`readRunPermissionCap`).
                 ...(options.organizationId && { organizationId: options.organizationId }),
+                // The project the listed `auto` files came from (`resumeApprovedRun` reads that one's again).
+                ...(instructions.length > 0 && options.projectInstructions && { projectId: options.projectInstructions.projectId }),
                 ...((options.reasoningEffort ?? skill?.config?.reasoningEffort) !== undefined && {
                     reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 }),

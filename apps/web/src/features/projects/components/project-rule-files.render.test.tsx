@@ -142,7 +142,111 @@ describe("project rule files read when needed", () => {
     });
 });
 
+/** A picked file whose text arrives only when `finish` is called: an import still reading. */
+const slowFile = (name: string, text: string): { file: File; finish: () => void } => {
+    const file = new File([text], name, { type: "text/markdown" });
+    let finish = () => {};
+    const ready = new Promise<string>((resolve) => {
+        finish = () => resolve(text);
+    });
+
+    Object.defineProperty(file, "text", { value: async () => await ready });
+
+    return { file, finish: () => finish() };
+};
+
 describe("importing rule files", () => {
+    it("applies an import that finishes after a save onto the list just saved, at its revision", async () => {
+        const user = userEvent.setup();
+
+        // The backend keeps what is saved, so the read after the save answers with it.
+        backend.save.mockImplementation(async ({ ruleFiles }: { ruleFiles: unknown[] }) => {
+            backend.listed = { ...backend.listed, files: ruleFiles, revision: "r2" };
+
+            return { files: ruleFiles, revision: "r2" };
+        });
+        renderEditor();
+        await user.type(within(await screen.findByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Instructions" }), " Always.");
+
+        const slow = slowFile("a.md", "---\ndescription: When A\n---\nA");
+
+        await user.upload(screen.getByTestId("rule-file-import"), slow.file);
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+        await screen.findByText("Rule files saved.");
+        slow.finish();
+        await screen.findByRole("listitem", { name: "a" });
+
+        expect((within(screen.getByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value).toBe(
+            "Use snake_case. Always.",
+        );
+
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save.mock.calls[1]?.[0]).toMatchObject({ revision: "r2" });
+        expect(backend.save.mock.calls[1]?.[0].ruleFiles.map((file: { title: string }) => file.title)).toStrictEqual(["Project context", "SQL", "a"]);
+    });
+
+    it("adds nothing from an import still reading when the changes are discarded", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Add rule file" }));
+
+        const slow = slowFile("a.md", "A");
+
+        await user.upload(screen.getByTestId("rule-file-import"), slow.file);
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+        slow.finish();
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import files" }).hasAttribute("disabled")).toBe(false));
+
+        expect(screen.queryByRole("listitem", { name: "a" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Discard changes" })).toBeNull();
+    });
+
+    it("counts only the files it added when the last place was taken while it read, and takes one import at a time", async () => {
+        const user = userEvent.setup();
+
+        backend.listed.files = Array.from({ length: 19 }, (_, index) => {
+            return { content: "x", id: `f${index}`, mode: "always", title: `F${index}` };
+        });
+        renderEditor();
+        await screen.findByRole("listitem", { name: "F0" });
+
+        const slow = slowFile("a.md", "A");
+
+        await user.upload(screen.getByTestId("rule-file-import"), slow.file);
+
+        expect(screen.getByRole("button", { name: "Import files" }).hasAttribute("disabled")).toBe(true);
+
+        await user.click(screen.getByRole("button", { name: "Add rule file" }));
+        slow.finish();
+
+        await screen.findByText("1 file was left out. A project holds at most 20 rule files.");
+        expect(screen.queryByRole("listitem", { name: "a" })).toBeNull();
+    });
+
+    it("says which imported files need a description or another mode before they save", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await screen.findByRole("listitem", { name: "SQL" });
+        await user.upload(screen.getByTestId("rule-folder-import"), [
+            pickedFile("plain.md", "No front matter.", "rules/plain.md"),
+            pickedFile("manual.md", "---\nalwaysApply: false # on request\n---\nOnly when asked.", "rules/manual.md"),
+        ]);
+
+        const manual = await screen.findByRole("listitem", { name: "manual" });
+
+        expect(within(manual).getByRole("radio", { name: "When needed" }).getAttribute("aria-checked")).toBe("true");
+        expect(
+            screen.getByText("2 rule files imported. Review, then save. 2 files say nothing about when they apply: set a description or another mode."),
+        ).toBeDefined();
+
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+    });
+
     it("adds an uploaded AGENTS.md as one always file, an unsaved draft until saved", async () => {
         const user = userEvent.setup();
         const onDirtyChange = vi.fn();
@@ -198,7 +302,7 @@ describe("importing rule files", () => {
         });
         renderEditor();
         await screen.findByRole("listitem", { name: "F0" });
-        await user.upload(screen.getByTestId("rule-file-import"), [pickedFile("a.md", "A"), pickedFile("b.md", "B")]);
+        await user.upload(screen.getByTestId("rule-file-import"), [pickedFile("a.md", "---\nalwaysApply: true\n---\nA"), pickedFile("b.md", "B")]);
 
         await screen.findByRole("listitem", { name: "a" });
         expect(screen.queryByRole("listitem", { name: "b" })).toBeNull();

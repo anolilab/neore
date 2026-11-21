@@ -967,7 +967,6 @@ describe("the rule-file table's readers", () => {
             .map((file) => relative(LUNORA_DIR, file))
             .toSorted((left, right) => left.localeCompare(right));
 
-        // `migrations.ts` only names the table for the schema gate: its migration changes no row (`addRuleFileDescription`).
-        expect(touching).toStrictEqual(["migrations.ts", "projects/gdpr.ts", "projects/rule-file-rows.ts"]);
+        expect(touching).toStrictEqual(["projects/gdpr.ts", "projects/rule-file-rows.ts"]);
     });
 });

@@ -98,9 +98,17 @@ afterEach(() => {
 });
 
 /** A paused run, as `finishRun` leaves it: the request on the assistant's turn and its snapshot. */
-const pause = async (origin: "outside_agent" | undefined, { projectId, toolNames }: { projectId?: string; toolNames?: string[] } = {}) =>
+const pause = async (
+    origin: "outside_agent" | undefined,
+    { projectId, threadProjectId = projectId, toolNames }: { projectId?: string; threadProjectId?: string; toolNames?: string[] } = {},
+) =>
     await harness.run(async (ctx: any) => {
-        const threadId = await ctx.db.insert("threads", { status: "running", title: "Chat", userId: OWNER, ...(projectId && { projectId }) });
+        const threadId = await ctx.db.insert("threads", {
+            status: "running",
+            title: "Chat",
+            userId: OWNER,
+            ...(threadProjectId && { projectId: threadProjectId }),
+        });
         const insert = async (order: number, message: Record<string, unknown>) =>
             await ctx.db.insert("messages", { message, order, status: "success", stepOrder: 0, text: "", threadId, tool: false, userId: OWNER });
 
@@ -124,7 +132,7 @@ const pause = async (origin: "outside_agent" | undefined, { projectId, toolNames
 
         await ctx.runMutation(recordPendingToolApprovals, {
             approvalIds: ["ap1"],
-            config: { ...baseConfig, ...(origin && { dispatchOrigin: origin }), ...(toolNames && { toolNames }) },
+            config: { ...baseConfig, ...(origin && { dispatchOrigin: origin }), ...(toolNames && { toolNames }), ...(projectId && { projectId }) },
             threadId: String(threadId),
             userId: OWNER,
         });
@@ -185,12 +193,12 @@ describe("the continuation of a run started with an API key", () => {
 
 describe("the continuation of a run that offered its project's rule files", () => {
     /** A project of the owner's with one file read when needed. */
-    const projectWithAutoFile = async () =>
+    const projectWithAutoFile = async (content = "Run the script.") =>
         (await harness.run(async (ctx: any) => {
             const projectId = await ctx.db.insert("projects", { createdAt: 0, title: "p", userId: OWNER });
 
             await ctx.db.insert("projectRuleFiles", {
-                files: [{ content: "Run the script.", description: "How to deploy", id: "d", mode: "auto", title: "Deploy" }],
+                files: [{ content, description: "How to deploy", id: "d", mode: "auto", title: "Deploy" }],
                 projectId,
                 updatedAt: 0,
                 userId: OWNER,
@@ -215,6 +223,32 @@ describe("the continuation of a run that offered its project's rule files", () =
         await approve(await pause(undefined, { projectId, toolNames: [...baseConfig.toolNames, "instruction_read"] }));
 
         expect(Object.keys(rebuilt.results[0]!.tools)).toContain("instruction_read");
+    });
+
+    it("reads the project the paused run listed the files from, not the one the thread was moved to meanwhile", async () => {
+        const listed = await projectWithAutoFile("Listed project's steps.");
+        const movedTo = await projectWithAutoFile("Other project's steps.");
+
+        await approve(await pause(undefined, { projectId: listed, threadProjectId: movedTo, toolNames: [...baseConfig.toolNames, "instruction_read"] }));
+
+        const read = { ...rebuilt.results[0]!.tools.instruction_read, ctx: { userId: OWNER } } as unknown as {
+            execute: (input: unknown, options: unknown) => Promise<unknown>;
+        };
+        const output = await read.execute({ file: "Deploy" }, { messages: [], toolCallId: "call-read" });
+
+        expect(output).toMatchObject({ found: true, text: "Listed project's steps." });
+    });
+
+    it("finds nothing for a paused run that recorded no project, even in a thread filed in one", async () => {
+        const threadProjectId = await projectWithAutoFile();
+
+        await approve(await pause(undefined, { threadProjectId, toolNames: [...baseConfig.toolNames, "instruction_read"] }));
+
+        const read = { ...rebuilt.results[0]!.tools.instruction_read, ctx: { userId: OWNER } } as unknown as {
+            execute: (input: unknown, options: unknown) => Promise<unknown>;
+        };
+
+        await expect(read.execute({ file: "Deploy" }, { messages: [], toolCallId: "call-read" })).resolves.toMatchObject({ found: false });
     });
 
     it("control: a paused run that did not offer it does not get it", async () => {

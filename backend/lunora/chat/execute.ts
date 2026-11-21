@@ -878,6 +878,8 @@ export const runStreamingAgent = internalAction
                             memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                             model,
                             promptMessageId: messageId,
+                            // The project the listed `auto` files came from: the continuation reads that one's, not the thread's then.
+                            ...(instructions.length > 0 && appThread?.projectId && { projectId: appThread.projectId }),
                             reasoningEffort: threadReasoningEffort,
                             // The reply is named by its first stream; every continuation inherits it.
                             replyKey: streamId,

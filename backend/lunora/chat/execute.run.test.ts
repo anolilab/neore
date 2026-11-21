@@ -65,8 +65,12 @@ vi.mock("../usage/schedule", async (importOriginal) => {
 });
 
 vi.mock("./lib/agent-run", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./lib/agent-run")>();
+
     return {
-        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        ...actual,
+        // Passed through; watched for the snapshot a pause would record.
+        finishRun: vi.fn(actual.finishRun),
         loadRunContext: vi.fn(async () => {
             return {
                 botId: undefined,
@@ -145,7 +149,7 @@ vi.mock("./lib/get-agent", () => {
 const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runGroupTurn } = await import("./group/run");
 const { runStreamingAgent } = await import("./execute");
-const { loadRunContext } = await import("./lib/agent-run");
+const { finishRun, loadRunContext } = await import("./lib/agent-run");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -326,7 +330,7 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
     const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
 
     /** The run's context with the project's `auto` files, as `loadRunContext` reads them. */
-    const withInstructions = () => {
+    const withInstructions = (threadSettings: { projectId: string } | null = null) => {
         vi.mocked(loadRunContext).mockResolvedValueOnce({
             botId: undefined,
             contextParts: ["PROJECT CONTEXT:\nBe brief."],
@@ -336,7 +340,7 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
             projectInstructions: instructions,
             researchDepth: "balanced",
             retrievedMemories: [],
-            threadSettings: null,
+            threadSettings,
             untrustedContext: true,
             userProviderKeys: undefined,
         } as never);
@@ -362,6 +366,15 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
         expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nInstruction files you can read with the instruction_read tool");
         expect(system).toContain("- Deploy (id: d): How to deploy");
         expect(system).not.toContain("Run the script.");
+    });
+
+    it("names the project they came from in the snapshot a pause records, so its continuation reads that one's", async () => {
+        toolsState.allowTools = true;
+        withInstructions({ projectId: "project-a" });
+
+        await run();
+
+        expect(vi.mocked(finishRun).mock.calls.at(-1)?.[1].snapshot).toMatchObject({ projectId: "project-a" });
     });
 
     it("neither lists nor offers them to a model that takes no tools", async () => {

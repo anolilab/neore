@@ -276,7 +276,7 @@ describe("runHeadlessAgent project instructions", () => {
             organizationId: null,
             origin: "trigger",
             personalization: "none",
-            projectInstructions: instructions,
+            projectInstructions: { instructions, projectId: "project-a" },
             prompt: "Do the task",
             system: "PROJECT CONTEXT:\nBe brief.",
             thread: { title: "t" },
@@ -1023,6 +1023,27 @@ describe("runHeadlessAgent pauseForApproval", () => {
         const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
 
         expect(recorded!.config.organizationId).toBe("org-a");
+    });
+
+    it("saves the project its auto files came from, so the continuation reads that project's, not the thread's", async () => {
+        const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+        const snapshotOf = async (extra: Partial<Parameters<typeof runHeadlessAgent>[1]>) => {
+            seen.saved = [approvalRequest];
+
+            const ctx = fakeCtx();
+
+            await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID }, ...extra });
+
+            const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+            return recorded!.config;
+        };
+
+        await expect(snapshotOf({ projectInstructions: { instructions, projectId: "project-a" } })).resolves.toMatchObject({
+            projectId: "project-a",
+            toolNames: expect.arrayContaining(["instruction_read"]),
+        });
+        await expect(snapshotOf({})).resolves.not.toHaveProperty("projectId");
     });
 
     it("labels the saved MCP calls with their real server before recording the request, as an interactive pause does", async () => {

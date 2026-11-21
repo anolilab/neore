@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { importRuleFiles, toImportedRuleFile } from "./rule-file-import";
+import { importRuleFiles, needsMode, toImportedRuleFile } from "./rule-file-import";
 
 describe("toImportedRuleFile", () => {
     it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "repo/claude.md"])("imports %s whole as one always file under its own name", (path) => {
@@ -32,19 +32,59 @@ describe("toImportedRuleFile", () => {
             mode: "auto",
         });
         expect(toImportedRuleFile("rules/base.md", "---\ndescription: Base\nalwaysApply: true\n---\nAll.")).toMatchObject({ content: "All.", mode: "always" });
-        expect(toImportedRuleFile("rules/plain.md", "No front matter.")).toMatchObject({ content: "No front matter.", mode: "always", title: "plain" });
     });
 
-    it("reads front matter after a byte-order mark, an empty block, and leaves a block value's description to the editor", () => {
+    it("applies a file to every chat only when its front matter says so, and leaves one that says nothing for the person to set", () => {
+        const plain = toImportedRuleFile("rules/plain.md", "No front matter.");
+
+        expect(plain).toMatchObject({ content: "No front matter.", description: "", mode: "auto", title: "plain" });
+        expect(needsMode(plain!)).toBe(true);
+        expect(toImportedRuleFile("rules/empty.md", "---\n---\nBody.")).toMatchObject({ content: "Body.", description: "", mode: "auto" });
+        expect(toImportedRuleFile("rules/odd.md", "---\nalwaysApply: sometimes\n---\nBody.")).toMatchObject({ mode: "auto" });
+        // A comment after the value is not part of it.
+        expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false # on request\n---\nBody.")).toMatchObject({ description: "", mode: "auto" });
+        expect(toImportedRuleFile("rules/all.md", "---\nalwaysApply: true # every chat\n---\nBody.")).toMatchObject({ mode: "always" });
+        expect(toImportedRuleFile("rules/both.md", "---\nalwaysApply: true\nglobs: *.ts\n---\nBody.")).toMatchObject({ mode: "always" });
+        expect(needsMode({ description: "How to deploy", mode: "auto" })).toBe(false);
+    });
+
+    it("reads quoted values, comments, and values that continue on the next lines", () => {
+        expect(toImportedRuleFile("rules/q.md", '---\ndescription: "Tags # not a comment" # but this is\n---\nB')).toMatchObject({
+            description: "Tags # not a comment",
+            mode: "auto",
+        });
+        expect(toImportedRuleFile("rules/folded.md", "---\ndescription: >-\n  Long text\n  over lines\nalwaysApply: false\n---\nBody.")).toMatchObject({
+            description: "Long text over lines",
+            mode: "auto",
+        });
+        expect(toImportedRuleFile("rules/literal.md", "---\ndescription: |\n  First\n\n  Second\n---\nBody.")).toMatchObject({
+            description: "First Second",
+            mode: "auto",
+        });
+        expect(toImportedRuleFile("rules/plain-cont.md", "---\ndescription: When the task\n  touches billing\n# note\n---\nBody.")).toMatchObject({
+            description: "When the task touches billing",
+            mode: "auto",
+        });
+    });
+
+    it("keeps a brace group's commas inside its pattern", () => {
+        expect(toImportedRuleFile("rules/ts.mdc", "---\nglobs: **/*.{ts,tsx}, docs/**\n---\nT")).toMatchObject({
+            mode: "glob",
+            patterns: "**/*.{ts,tsx}\ndocs/**",
+        });
+        expect(toImportedRuleFile("rules/js.mdc", '---\nglobs: ["src/**/*.{js,jsx}", "b/*.md"] # web\n---\nT')).toMatchObject({
+            patterns: "src/**/*.{js,jsx}\nb/*.md",
+        });
+        expect(toImportedRuleFile("rules/list.mdc", '---\nglobs:\n  - "**/*.{ts,tsx}" # code\n  - a/*.md\n---\nT')).toMatchObject({
+            patterns: "**/*.{ts,tsx}\na/*.md",
+        });
+    });
+
+    it("reads front matter after a byte-order mark", () => {
         expect(toImportedRuleFile("rules/bom.md", "\u{FEFF}---\nglobs: *.ts\n---\nTyped.")).toMatchObject({
             content: "Typed.",
             mode: "glob",
             patterns: "*.ts",
-        });
-        expect(toImportedRuleFile("rules/empty.md", "---\n---\nBody.")).toMatchObject({ content: "Body.", mode: "always" });
-        expect(toImportedRuleFile("rules/folded.md", "---\ndescription: >-\n  Long text\nalwaysApply: false\n---\nBody.")).toMatchObject({
-            description: "",
-            mode: "auto",
         });
     });
 
@@ -63,8 +103,8 @@ describe("importRuleFiles", () => {
 
         await expect(importRuleFiles(files, 2)).resolves.toStrictEqual({
             imported: [
-                { content: "A", description: "", mode: "always", patterns: "", title: "a" },
-                { content: "B", description: "", mode: "always", patterns: "", title: "b" },
+                { content: "A", description: "", mode: "auto", patterns: "", title: "a" },
+                { content: "B", description: "", mode: "auto", patterns: "", title: "b" },
             ],
             skipped: 1,
         });
