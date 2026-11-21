@@ -4827,6 +4827,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return false;
                 }
 
+                // An edit or regenerate that switched the branch since the job began supersedes this reply: its leaf moved, so the reply
+                // the composer shows is another one. The leaf is read now, not the one captured when the job started.
+                const currentThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+                if (currentThread?.activeLeafMessageId !== threadData.activeLeafMessageId) {
+                    return false;
+                }
+
                 // A branched thread's newest reply is on its active path: a row on another branch, stored later, does not supersede it.
                 const listing = threadData.activeLeafMessageId
                     ? undefined
