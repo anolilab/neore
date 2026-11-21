@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import type { JSX } from "react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -52,8 +52,14 @@ const NativeBridge = (): JSX.Element | null => {
     const router = useRouter();
     const { authClient } = useAuth();
     const { data: session } = authClient.useSession();
-    // The account a dock drop is for; undefined while the session loads, when the composer that opens takes it.
+    // The account a dock drop is for; undefined while the session loads, when the composer that opens takes it. Read from
+    // a ref when files arrive, so a session that resolves never re-subscribes the listener mid-drain and loses the drop.
     const sessionUserId = session?.user?.id;
+    const sessionUserIdRef = useRef(sessionUserId);
+
+    useEffect(() => {
+        sessionUserIdRef.current = sessionUserId;
+    }, [sessionUserId]);
     const afterFirstPaint = useAfterFirstPaint();
     const [hasDeviceTools, setHasDeviceTools] = useState(false);
 
@@ -98,11 +104,11 @@ const NativeBridge = (): JSX.Element | null => {
         () =>
             onNativeFiles((files) => {
                 void (async () => {
-                    await requestAttach(files, sessionUserId);
+                    await requestAttach(files, sessionUserIdRef.current);
                     await openNewChat();
                 })();
             }),
-        [openNewChat, sessionUserId],
+        [openNewChat],
     );
 
     useEffect(
