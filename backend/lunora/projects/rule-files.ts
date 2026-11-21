@@ -1,6 +1,7 @@
 /**
  * A project's rule files (stored in `projectRuleFiles`, `rule-file-rows.ts`): the owner's instructions for the project's runs, each with a mode. An
- * `always` file reaches every run; a `glob` file only a run whose files match one of its patterns. A project written
+ * `always` file reaches every run; a `glob` file only a run whose files match one of its patterns; an `auto` file is
+ * listed by name and description, and the model reads it when it needs it (`instruction_read`). A project written
  * before rule files keeps its `context` text, which reads as the first `always` file ({@link projectRuleFiles}) until
  * the rule files are first saved, which moves it into the list. The text is the owner's: never logged.
  */
@@ -10,7 +11,9 @@ import {
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
     MAX_RULE_FILES_BYTES,
+    isRuleDescriptionValid,
     isRuleGlobValid,
+    MAX_RULE_DESCRIPTION_LENGTH,
     MAX_RULE_GLOB_LENGTH,
     MAX_RULE_GLOBS,
     MAX_RULE_ID_LENGTH,
@@ -20,13 +23,23 @@ import {
     ruleFilesStoredBytes,
 } from "./rule-file-limits";
 
-export type RuleFileMode = "always" | "glob";
+export type RuleFileMode = "always" | "auto" | "glob";
 
 export interface RuleFile {
     content: string;
+    /** An `auto` file's one-line description, listed in the run's prompt; only on `auto` files. */
+    description?: string;
     globs?: string[];
     id: string;
     mode: RuleFileMode;
+    title: string;
+}
+
+/** An `auto` rule file a run lists and may read (`instruction_read`), its text carried from the run's one read. */
+export interface RunInstruction {
+    content: string;
+    description: string;
+    id: string;
     title: string;
 }
 
@@ -218,20 +231,46 @@ export const matchesGlob = (glob: string, path: string, shared?: MatchBudget): b
 /** What joins two files' text for a run ({@link renderRuleFiles}); counted in the run's budget. */
 const RULE_FILE_SEPARATOR = "\n\n";
 
+/** The name of the tool a run reads an `auto` file with (`chat/tools/instruction-read.ts`). */
+export const INSTRUCTION_READ_TOOL = "instruction_read";
+
+/** Heads the list of `auto` files in a run's prompt ({@link renderInstructionList}). */
+const INSTRUCTION_LIST_HEADER = `Instruction files you can read with the ${INSTRUCTION_READ_TOOL} tool (by name or id) when one applies to the task:`;
+
+/** One `auto` file's line in that list. */
+const instructionLine = (file: Pick<RuleFile, "description" | "id" | "title">): string => `- ${file.title} (id: ${file.id}): ${file.description ?? ""}`;
+
+/**
+ * The list of a run's `auto` files for its prompt, `null` for none: each by name, id and description, after the
+ * {@link INSTRUCTION_LIST_HEADER}. Its length is what {@link selectRuleFiles} counts for them.
+ */
+export const renderInstructionList = (files: ReadonlyArray<Pick<RuleFile, "description" | "id" | "title">>): string | null =>
+    files.length > 0 ? [INSTRUCTION_LIST_HEADER, ...files.map((file) => instructionLine(file))].join("\n") : null;
+
 /**
  * The files a run takes, in the project's order: every `always` file, and each `glob` file one of whose patterns matches
- * one of `paths`. Rendered ({@link renderRuleFiles}), their text stays within {@link MAX_RULE_TEXT_PER_RUN}, the
- * separators and the cut file's marker included: the file that reaches it is cut there (marked) and the ones after it
- * are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule files, and not counted: one
+ * one of `paths`, in `files`; every `auto` file in `instructions`, the ones the run lists and may read. Rendered
+ * ({@link renderRuleFiles}, {@link renderInstructionList} after it), the text and the list stay within
+ * {@link MAX_RULE_TEXT_PER_RUN}, the separators and the cut file's marker included: an `auto` file costs its line in the
+ * list (the list's header with the first), never its text. The file that reaches the budget is cut there (marked), an
+ * `auto` one left out whole, and the ones after it are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule files, and not counted: one
  * kept beside the files (`keepContext`) would otherwise leave them nothing. `matchingCut` says the matching budget ran
  * out, so some pattern was not tried.
  */
-export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: RuleFile[]; matchingCut: boolean; omitted: number; truncated: boolean } => {
+export const selectRuleFiles = (
+    files: RuleFile[],
+    paths: string[],
+): { files: RuleFile[]; instructions: RuleFile[]; matchingCut: boolean; omitted: number; truncated: boolean } => {
     const budget: MatchBudget = { steps: GLOB_MATCH_STEPS_PER_RUN };
     const applicable = files.filter(
-        (file) => file.mode === "always" || (file.globs ?? []).some((glob) => paths.some((path) => matchesGlob(glob, path, budget))),
+        (file) =>
+            file.mode === "always" ||
+            // An empty `auto` file would list a name with nothing to read.
+            (file.mode === "auto" && file.content.trim().length > 0) ||
+            (file.globs ?? []).some((glob) => paths.some((path) => matchesGlob(glob, path, budget))),
     );
     const selected: RuleFile[] = [];
+    const instructions: RuleFile[] = [];
     let left = MAX_RULE_TEXT_PER_RUN;
     let truncated = false;
     // Whether text is already rendered, so the next file's text comes after a separator.
@@ -248,6 +287,20 @@ export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: Ru
         }
 
         const separator = started ? RULE_FILE_SEPARATOR.length : 0;
+
+        if (file.mode === "auto") {
+            // The list is one block: its header and the separator before it come with its first line.
+            const cost = (instructions.length === 0 ? separator + INSTRUCTION_LIST_HEADER.length : 0) + 1 + instructionLine(file).length;
+
+            if (cost > left) {
+                break;
+            }
+
+            instructions.push(file);
+            left -= cost;
+            started = true;
+            continue;
+        }
 
         if (separator + file.content.length <= left) {
             selected.push(file);
@@ -266,7 +319,7 @@ export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: Ru
         break;
     }
 
-    return { files: selected, matchingCut: budget.steps <= 0, omitted: applicable.length - selected.length, truncated };
+    return { files: selected, instructions, matchingCut: budget.steps <= 0, omitted: applicable.length - selected.length - instructions.length, truncated };
 };
 
 /** FNV-1a over `text`, with its length; not a security measure. */
@@ -285,7 +338,19 @@ const fingerprint = (text: string): string => {
  * (`setProjectRuleFiles`): {@link fingerprint} over the JSON.
  */
 export const ruleFilesRevision = (files: RuleFile[]): string =>
-    fingerprint(JSON.stringify(files.map((file) => [file.id, file.title, file.mode, file.globs ?? [], file.content])));
+    // A description only when present, so a list saved before `auto` files keeps the revision it had.
+    fingerprint(
+        JSON.stringify(
+            files.map((file) => [
+                file.id,
+                file.title,
+                file.mode,
+                file.globs ?? [],
+                file.content,
+                ...(file.description === undefined ? [] : [file.description]),
+            ]),
+        ),
+    );
 
 /**
  * The fingerprint a save that carries a legacy `context` into the list stores beside it (`carriedContext`), so a
@@ -316,8 +381,9 @@ const assertGlob = (glob: string, fileId: string): void => {
 };
 
 /**
- * The list as it is saved: trimmed titles and patterns, no patterns on an `always` file. Refuses a list past the
- * caps, a repeated id, an empty title, or a `glob` file without a pattern. `alongside` counts the files the project
+ * The list as it is saved: trimmed titles, patterns and descriptions, patterns only on a `glob` file and a description
+ * only on an `auto` one. Refuses a list past the caps, a repeated id, an empty title, a `glob` file without a pattern,
+ * or an `auto` file without a one-line description. `alongside` counts the files the project
  * keeps outside the list (a kept legacy `context`), so the project still holds at most {@link MAX_RULE_FILES}.
  */
 export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): RuleFile[] => {
@@ -350,6 +416,20 @@ export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): R
 
         if (file.mode === "always") {
             return { content: file.content, id: file.id, mode: file.mode, title };
+        }
+
+        if (file.mode === "auto") {
+            const description = (file.description ?? "").trim();
+
+            if (!isRuleDescriptionValid(description)) {
+                throw refuse(
+                    `A rule file read when needed needs a description of 1 to ${MAX_RULE_DESCRIPTION_LENGTH} characters on one line`,
+                    description ? RULE_FILE_REFUSALS.DESCRIPTION_INVALID : RULE_FILE_REFUSALS.DESCRIPTION_MISSING,
+                    file.id,
+                );
+            }
+
+            return { content: file.content, description, id: file.id, mode: file.mode, title };
         }
 
         const globs = (file.globs ?? []).map((glob) => glob.trim());

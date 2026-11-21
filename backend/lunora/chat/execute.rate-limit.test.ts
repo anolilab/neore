@@ -83,6 +83,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 threadSettings: null,

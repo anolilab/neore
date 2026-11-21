@@ -20,6 +20,8 @@ export const MAX_RULE_ID_LENGTH = 64;
 export const MAX_RULE_GLOBS = 10;
 /** Characters of one pattern, trimmed. */
 export const MAX_RULE_GLOB_LENGTH = 200;
+/** Characters of an `auto` file's one-line description, trimmed: listed in every run's prompt, so kept short. */
+export const MAX_RULE_DESCRIPTION_LENGTH = 300;
 
 /**
  * The `data.code` of a save refused at one of the limits above, beside the `fileId` it names when it names a file. The
@@ -28,6 +30,8 @@ export const MAX_RULE_GLOB_LENGTH = 200;
  */
 export const RULE_FILE_REFUSALS = {
     CONTENT_TOO_LONG: "RULE_FILE_CONTENT_TOO_LONG",
+    DESCRIPTION_INVALID: "RULE_FILE_DESCRIPTION_INVALID",
+    DESCRIPTION_MISSING: "RULE_FILE_DESCRIPTION_MISSING",
     PATTERN_INVALID: "RULE_FILE_PATTERN_INVALID",
     PATTERNS_MISSING: "RULE_FILE_PATTERNS_MISSING",
     PATTERNS_TOO_MANY: "RULE_FILE_PATTERNS_TOO_MANY",
@@ -43,6 +47,13 @@ const LINE_BREAK_OR_NUL = /[\0\n\r]/u;
 
 /** Whether `glob`, trimmed, is a pattern a save takes: 1 to {@link MAX_RULE_GLOB_LENGTH} characters, no line break or NUL. */
 export const isRuleGlobValid = (glob: string): boolean => glob.trim().length > 0 && glob.length <= MAX_RULE_GLOB_LENGTH && !LINE_BREAK_OR_NUL.test(glob);
+
+/** Whether `description`, trimmed, is one an `auto` file takes: 1 to {@link MAX_RULE_DESCRIPTION_LENGTH} characters on one line. */
+export const isRuleDescriptionValid = (description: string): boolean => {
+    const trimmed = description.trim();
+
+    return trimmed.length > 0 && trimmed.length <= MAX_RULE_DESCRIPTION_LENGTH && !LINE_BREAK_OR_NUL.test(trimmed);
+};
 
 /** The UTF-8 bytes `files` take stored, as JSON: the measure of {@link MAX_RULE_FILES_BYTES}. */
 export const ruleFilesStoredBytes = (files: ReadonlyArray<unknown>): number => new TextEncoder().encode(JSON.stringify(files)).byteLength;

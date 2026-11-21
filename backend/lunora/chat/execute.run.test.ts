@@ -33,8 +33,8 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
         autoState: { plans: [] as unknown[], requests: 0 },
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
-        /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
-        modelState: { builtAgents: 0, model: undefined as unknown },
+        /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating, `tools` names the last one's tools. */
+        modelState: { builtAgents: 0, model: undefined as unknown, tools: [] as string[] },
         /** Whether the agent-module preference read reports a failure. */
         prefsState: { readFailed: false },
         registry: new Map<string, unknown>(),
@@ -74,6 +74,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 threadSettings: null,
@@ -123,8 +124,9 @@ vi.mock("./group/run", async (importOriginal) => {
 
 vi.mock("./lib/get-agent", () => {
     return {
-        default: async (model: string, options: { maxSteps?: number }) => {
+        default: async (model: string, options: { maxSteps?: number; tools?: Record<string, unknown> }) => {
             modelState.builtAgents += 1;
+            modelState.tools = Object.keys(options.tools ?? {});
 
             // Imported at call time: the agent client and `agent/messages` import each other.
             const { Agent } = await import("../agent/client");
@@ -143,6 +145,7 @@ vi.mock("./lib/get-agent", () => {
 const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runGroupTurn } = await import("./group/run");
 const { runStreamingAgent } = await import("./execute");
+const { loadRunContext } = await import("./lib/agent-run");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -316,6 +319,60 @@ describe("runStreamingAgent: a successful turn", () => {
         expect(usageArgs).toMatchObject({ date: expect.stringMatching(ISO_DATE), replyKey: expect.any(String), tokens: 8, userId: OWNER });
         // A plain turn has no invoked skill, so the usage page files it under the assistant.
         expect(usageArgs).not.toHaveProperty("skillName");
+    });
+});
+
+describe("runStreamingAgent: a project's rule files read when needed", () => {
+    const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+
+    /** The run's context with the project's `auto` files, as `loadRunContext` reads them. */
+    const withInstructions = () => {
+        vi.mocked(loadRunContext).mockResolvedValueOnce({
+            botId: undefined,
+            contextParts: ["PROJECT CONTEXT:\nBe brief."],
+            knowledgeSources: [],
+            memoryEnabled: false,
+            prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+            projectInstructions: instructions,
+            researchDepth: "balanced",
+            retrievedMemories: [],
+            threadSettings: null,
+            untrustedContext: true,
+            userProviderKeys: undefined,
+        } as never);
+    };
+
+    /** The tools the run's agent was built with, and the system prompt the model was called with. */
+    const firstCall = () => {
+        const [call] = (modelState.model as MockLanguageModelV3).doStreamCalls;
+        const system = call?.prompt.find((message) => message.role === "system");
+
+        return { system: typeof system?.content === "string" ? system.content : "", tools: modelState.tools };
+    };
+
+    it("lists them after the project's context and offers instruction_read over them", async () => {
+        toolsState.allowTools = true;
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).toContain("instruction_read");
+        expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nInstruction files you can read with the instruction_read tool");
+        expect(system).toContain("- Deploy (id: d): How to deploy");
+        expect(system).not.toContain("Run the script.");
+    });
+
+    it("neither lists nor offers them to a model that takes no tools", async () => {
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).not.toContain("instruction_read");
+        expect(system).not.toContain("instruction_read");
     });
 });
 

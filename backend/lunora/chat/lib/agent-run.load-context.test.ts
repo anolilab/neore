@@ -22,7 +22,9 @@ const deferred = <T>() => {
     return { promise, resolve: (value: T) => settle.resolve?.(value) };
 };
 
-const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{ projectId?: string } | null>) => {
+const NOTES = { instructions: [] as { content: string; description: string; id: string; title: string }[], text: "Project notes" as string | null };
+
+const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{ projectId?: string } | null>, project = NOTES) => {
     const runQuery = vi.fn(async (reference: unknown) => {
         switch (reference) {
             case internal.auth.functions.getDecryptedProviderKeysQuery: {
@@ -39,7 +41,7 @@ const makeCtx = (prefs: Promise<{ memoryEnabled: boolean }>, settings: Promise<{
                 return { kind: "miss" };
             }
             case internal.projects.functions.getProjectContextForRun: {
-                return "Project notes";
+                return project;
             }
             default: {
                 throw new Error("unexpected query");
@@ -153,6 +155,17 @@ describe(loadRunContext, () => {
 
         const result = await loadRunContext(ctx, { ...args, promptText: undefined });
 
+        expect(result.untrustedContext).toBe(true);
+    });
+
+    it("hands back a project's auto files apart from its context, as untrusted context too", async () => {
+        const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+        const { ctx } = makeCtx(Promise.resolve({ memoryEnabled: false }), Promise.resolve({ projectId: "p1" }), { instructions, text: null });
+
+        const result = await loadRunContext(ctx, { ...args, promptText: undefined });
+
+        expect(result.projectInstructions).toStrictEqual(instructions);
+        expect(result.contextParts.join("\n")).not.toContain("Deploy");
         expect(result.untrustedContext).toBe(true);
     });
 

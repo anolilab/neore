@@ -77,6 +77,8 @@ import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
 import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
+import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
+import { withInstructionRead } from "../tools/instruction-read";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -551,8 +553,8 @@ export const loadRunContext = async (
         contextParts.push(knowledgeContext.context);
     }
 
-    if (project) {
-        contextParts.push(`PROJECT CONTEXT:\n${project}`);
+    if (project?.text) {
+        contextParts.push(`PROJECT CONTEXT:\n${project.text}`);
     }
 
     if (bot) {
@@ -580,6 +582,11 @@ export const loadRunContext = async (
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
+        /**
+         * The project's `auto` rule files, from the same read: a run that offers `instruction_read` over them
+         * (`withInstructionRead`) lists them after `contextParts` (`renderInstructionList`); one that does not leaves them out.
+         */
+        projectInstructions: project?.instructions ?? [],
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
@@ -588,7 +595,7 @@ export const loadRunContext = async (
         untrustedContext: injectsUntrustedContext({
             knowledge: knowledgeContext?.context,
             memory: memoryContext?.context,
-            project: project ?? undefined,
+            project: [project?.text, renderInstructionList(project?.instructions ?? [])].filter(Boolean).join("\n\n") || undefined,
             threadPrompt: threadSettings?.customSystemPrompt,
         }),
         userProviderKeys,
@@ -596,6 +603,19 @@ export const loadRunContext = async (
 };
 
 export type RunContext = Awaited<ReturnType<typeof loadRunContext>>;
+
+/** The `auto` rule files of the project `threadId` is filed in, for `userId` (`getProjectContextForRun`); none outside one. */
+const readProjectInstructions = async (ctx: ActionCtx, threadId: string, userId: string): Promise<RunInstruction[]> => {
+    const settings = await ctx.runQuery(internal.chat.functions.getThreadSettings, { threadId });
+
+    if (!settings?.projectId) {
+        return [];
+    }
+
+    const project = await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: settings.projectId as Id<"projects">, userId });
+
+    return project?.instructions ?? [];
+};
 
 /** A saved tool result, cut down for memory extraction. */
 const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summary: string; toolName: string }[] => {
@@ -1377,6 +1397,12 @@ export const resumeApprovedRun = async (
         loadUserProviderKeys(ctx, userId),
         ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
     ]);
+
+    // A paused run that offered `instruction_read` offers it again, over its project's `auto` files read anew (its saved
+    // prompt still lists them); a file removed meanwhile is no longer read.
+    if (config.toolNames.includes(INSTRUCTION_READ_TOOL)) {
+        toolResult.tools = withInstructionRead(toolResult.tools, await readProjectInstructions(ctx, threadId, userId));
+    }
 
     // Set once the continuation has a result: a run that fails after it still leaves the record of its auto-approved calls.
     let started: { savedMessages?: SavedToolCallStamp["savedMessages"] } | undefined;

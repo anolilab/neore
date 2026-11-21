@@ -3,7 +3,7 @@
 ## INVARIANTS
 
 - **Rule files** (`projectRuleFiles` table, `rule-files.ts`, `rule-file-rows.ts`) — the owner's instructions for a
-  project's runs, at most `MAX_RULE_FILES`, each `always` or `glob`. One `.global()` row per project holds the whole
+  project's runs, at most `MAX_RULE_FILES`, each `always`, `glob` or `auto`. One `.global()` row per project holds the whole
   list, OFF the `projects` row: a metered `.global()` read is charged the whole row whatever it `select`s, so on the
   project row every list, pin, read and export would pay for up to 1 MB. Only the editor (`listProjectRuleFiles`), a
   run's setup (`getProjectContextForRun`, `tasks/internal.ts#runProjectFor`), a save and the export read it, always
@@ -42,6 +42,14 @@
   `MAX_RULE_TEXT_PER_RUN`, separators and the cut marker counted, is cut (marked) and later files left out, except a
   legacy `context`, which is never cut, as before, and not counted, so files kept beside it still reach runs. Only
   counts are logged, never file text.
+- An `auto` file has a one-line `description` (`MAX_RULE_DESCRIPTION_LENGTH`). `selectRuleFiles` returns them apart
+  (`instructions`), each costing its line of `renderInstructionList` (the header with the first) against
+  `MAX_RULE_TEXT_PER_RUN`, never its text; an empty one is not listed. Their text travels with the run's one read
+  (`getProjectContextForRun`, `runProjectFor`), and the model reads one with `instruction_read`
+  (`chat/tools/instruction-read.ts`), built per run over those files: no database read, never another project's. Only a
+  run that offers the tool lists them (`withInstructionRead` + `renderInstructionList` together): a chat run with
+  tools, its approval continuation (read anew when its snapshot named the tool), and a task run (`projectInstructions`
+  on `runHeadlessAgent`). Edit (`streamAsync`) and group runs take the text only. Triggers have no project.
 - Glob matching is `matchesGlob`, never a `RegExp` built from a pattern: one constant-cost step per (pattern, path)
   position, spent from a per-run budget (`GLOB_MATCH_STEPS_PER_RUN`); past it nothing more matches.
 - Size: `normalizeRuleFiles` caps the list at `MAX_RULE_FILES_BYTES` of stored JSON, which keeps the rule-file row

@@ -111,6 +111,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                     personalization: undefined,
                     timezone: "Europe/Berlin",
                 },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 threadSettings: modelState.threadStateless ? { statelessMode: true } : null,

@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES, MAX_RULE_GLOB_LENGTH, MAX_RULE_GLOBS, MAX_RULE_TITLE_LENGTH, RULE_FILE_REFUSALS } from "./rule-file-limits";
+import {
+    MAX_RULE_DESCRIPTION_LENGTH,
+    MAX_RULE_FILE_LENGTH,
+    MAX_RULE_FILES,
+    MAX_RULE_GLOB_LENGTH,
+    MAX_RULE_GLOBS,
+    MAX_RULE_TITLE_LENGTH,
+    RULE_FILE_REFUSALS,
+} from "./rule-file-limits";
 import {
     MAX_RULE_TEXT_PER_RUN,
     matchesGlob,
     normalizeRuleFiles,
     projectRuleFiles,
+    renderInstructionList,
     renderRuleFiles,
     type RuleFile,
     ruleFilesRevision,
@@ -14,6 +23,10 @@ import {
 
 const always = (id: string, content: string): RuleFile => {
     return { content, id, mode: "always", title: id };
+};
+
+const auto = (id: string, content: string, description = `When ${id} applies`): RuleFile => {
+    return { content, description, id, mode: "auto", title: id };
 };
 
 const sql: RuleFile = { content: "Use snake_case columns.", globs: ["**/*.sql"], id: "sql", mode: "glob", title: "SQL" };
@@ -140,6 +153,31 @@ describe("selectRuleFiles", () => {
     });
 });
 
+describe("selectRuleFiles with auto files", () => {
+    it("lists an auto file by name and description, never its text, and leaves an empty one out", () => {
+        const result = selectRuleFiles([always("a", "Always."), auto("deploy", "Deploy steps."), auto("blank", " ")], []);
+
+        expect(renderRuleFiles(result.files)).toBe("Always.");
+        expect(result.instructions.map((file) => file.id)).toStrictEqual(["deploy"]);
+        expect(result.omitted).toBe(0);
+        expect(renderInstructionList(result.instructions)).toContain("- deploy (id: deploy): When deploy applies");
+        expect(renderInstructionList(result.instructions)).not.toContain("Deploy steps.");
+    });
+
+    it("counts the list, header and separator included, against the run's budget", () => {
+        const text = always("a", "x".repeat(MAX_RULE_TEXT_PER_RUN - 2 - renderInstructionList([auto("one", "1")])!.length));
+        const fits = selectRuleFiles([text, auto("one", "1"), auto("two", "2")], []);
+
+        expect(fits.instructions.map((file) => file.id)).toStrictEqual(["one"]);
+        expect(fits.omitted).toBe(1);
+        expect(`${renderRuleFiles(fits.files)}\n\n${renderInstructionList(fits.instructions)}`).toHaveLength(MAX_RULE_TEXT_PER_RUN);
+    });
+
+    it("gives no list for a project without auto files", () => {
+        expect(renderInstructionList(selectRuleFiles([always("a", "A"), sql], []).instructions)).toBeNull();
+    });
+});
+
 describe("ruleFilesRevision", () => {
     it("changes with any edit or a new order, and not otherwise", () => {
         const files = [always("a", "A"), sql];
@@ -147,6 +185,7 @@ describe("ruleFilesRevision", () => {
         expect(ruleFilesRevision(files)).toBe(ruleFilesRevision([always("a", "A"), { ...sql }]));
         expect(ruleFilesRevision(files)).not.toBe(ruleFilesRevision([sql, always("a", "A")]));
         expect(ruleFilesRevision(files)).not.toBe(ruleFilesRevision([always("a", "A!"), sql]));
+        expect(ruleFilesRevision([auto("d", "D")])).not.toBe(ruleFilesRevision([auto("d", "D", "Other")]));
     });
 });
 
@@ -163,7 +202,16 @@ describe("normalizeRuleFiles", () => {
         ]);
     });
 
+    it("trims an auto file's description and keeps no patterns on it", () => {
+        expect(normalizeRuleFiles([{ ...auto("d", "D", "  Deploys  "), globs: ["*.md"] }])).toEqual([
+            { content: "D", description: "Deploys", id: "d", mode: "auto", title: "d" },
+        ]);
+    });
+
     it.each([
+        ["an auto file without a description", [auto("d", "D", "  ")], RULE_FILE_REFUSALS.DESCRIPTION_MISSING, "d"],
+        ["an auto description on two lines", [auto("d", "D", "One\ntwo")], RULE_FILE_REFUSALS.DESCRIPTION_INVALID, "d"],
+        ["an auto description past its length", [auto("d", "D", "d".repeat(MAX_RULE_DESCRIPTION_LENGTH + 1))], RULE_FILE_REFUSALS.DESCRIPTION_INVALID, "d"],
         ["too many files", Array.from({ length: MAX_RULE_FILES + 1 }, (_, index) => always(`f${index}`, "x")), RULE_FILE_REFUSALS.TOO_MANY, undefined],
         ["an empty title", [{ ...always("a", "x"), title: " " }], RULE_FILE_REFUSALS.TITLE_MISSING, "a"],
         ["a title past its length", [{ ...always("a", "x"), title: "t".repeat(MAX_RULE_TITLE_LENGTH + 1) }], RULE_FILE_REFUSALS.TITLE_TOO_LONG, "a"],

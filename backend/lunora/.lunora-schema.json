@@ -9,6 +9,7 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-rule-file-description",
     "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
@@ -21695,6 +21696,12 @@
                 "optional": false,
                 "unique": false
               },
+              "description": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
               "globs": {
                 "kind": "array",
                 "nullable": false,
@@ -21725,6 +21732,13 @@
                     "optional": false,
                     "unique": false,
                     "literal": "\"always\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"auto\""
                   },
                   {
                     "kind": "literal",

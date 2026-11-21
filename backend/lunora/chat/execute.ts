@@ -81,6 +81,8 @@ import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
 import { vAskUserAnswers } from "./tools/ask-user-validators";
+import { withInstructionRead } from "./tools/instruction-read";
+import { INSTRUCTION_READ_TOOL, renderInstructionList } from "../projects/rule-files";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
@@ -539,7 +541,16 @@ export const runStreamingAgent = internalAction
 
                 mcpClients = toolResult.mcpClients;
 
-                const tools = toolRuns.wrap(toolResult.tools, new Set(toolResult.repeatable));
+                // The project's `auto` rule files: listed, and read with `instruction_read`, only by a run that calls tools.
+                const instructions = allowTools ? runContext.projectInstructions : [];
+                // Read-only, so a resume may call it again (`repeatable-tools.ts`).
+                const repeatable = new Set(toolResult.repeatable);
+
+                if (instructions.length > 0) {
+                    repeatable.add(INSTRUCTION_READ_TOOL);
+                }
+
+                const tools = toolRuns.wrap(withInstructionRead(toolResult.tools, instructions), repeatable);
                 const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
 
                 setResearchDepth(ctx, effectiveResearchDepth);
@@ -614,7 +625,8 @@ export const runStreamingAgent = internalAction
 
                 // Memory, knowledge base, project context and the thread's own
                 // instructions — then a note about attached documents.
-                const additionalParts = [...contextParts];
+                const instructionList = renderInstructionList(instructions);
+                const additionalParts = [...contextParts, ...(instructionList ? [instructionList] : [])];
 
                 if (fileIds && fileIds.length > 0) {
                     additionalParts.push(

@@ -267,6 +267,40 @@ describe("runHeadlessAgent hidden characters", () => {
     });
 });
 
+describe("runHeadlessAgent project instructions", () => {
+    const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+    const run = (tools: "headless" | "none") =>
+        runHeadlessAgent(fakeCtx(), {
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "trigger",
+            personalization: "none",
+            projectInstructions: instructions,
+            prompt: "Do the task",
+            system: "PROJECT CONTEXT:\nBe brief.",
+            thread: { title: "t" },
+            tools,
+            userId: "owner",
+        });
+
+    it("lists the project's auto files after its context and offers instruction_read over them", async () => {
+        await run("headless");
+
+        expect(seen.tools.at(-1)).toContain("instruction_read");
+        expect(seen.system.at(-1)).toContain("PROJECT CONTEXT:\nBe brief.\n\nInstruction files you can read with the instruction_read tool");
+        expect(seen.system.at(-1)).toContain("- Deploy (id: d): How to deploy");
+        expect(seen.system.at(-1)).not.toContain("Run the script.");
+    });
+
+    it("neither lists nor offers them to a run without tools", async () => {
+        await run("none");
+
+        expect(seen.tools.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).not.toContain("instruction_read");
+    });
+});
+
 describe("runHeadlessAgent backup model", () => {
     const BACKUP = MODEL_REGISTRY.find((m) => m.enabled !== false && m.provider !== "external" && (m.mode ?? "text") === "text" && !requiresPaidPlan(m))!.id;
 

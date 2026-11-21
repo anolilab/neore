@@ -69,6 +69,8 @@ import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
 import { scheduleReplyUsage } from "../../usage/schedule";
+import { renderInstructionList, type RunInstruction } from "../../projects/rule-files";
+import { withInstructionRead } from "../tools/instruction-read";
 
 /** No tools, so no permission keys or fingerprints: typed, so the union with the built tools' maps stays a plain record. */
 const NO_PERMISSION_KEYS: Record<string, string> = {};
@@ -151,6 +153,11 @@ export interface HeadlessRunOptions {
     pauseForApproval?: { subAgentRunId: Id<"subAgentRuns"> };
     /** Whether the user's personalization reaches the prompt — `"none"` when someone else reads the reply. */
     personalization: "full" | "none";
+    /**
+     * The `auto` rule files of the project the run is for (`runProjectFor`): with tools, the run lists them after `system`
+     * and may read them with `instruction_read` (`withInstructionRead`); without, neither.
+     */
+    projectInstructions?: ReadonlyArray<RunInstruction>;
     /** Omitted when continuing a thread: its latest message is the prompt. */
     prompt?: string;
     /** Reasoning effort on the chat's 0-100 scale; wins over the skill's. Unset leaves it to the skill, then the model. */
@@ -327,7 +334,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
         const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, modelFilterRules);
         // The tools the call carries: after the allowlist, so a run it strips bare is sized for a backup that cannot call tools.
-        const runTools = applyToolAllowlist(toolResult.tools, toolAllowlist);
+        const instructions = buildsTools ? (options.projectInstructions ?? []) : [];
+        const runTools = withInstructionRead(applyToolAllowlist(toolResult.tools, toolAllowlist), instructions);
         const agent = await getAgent(model, {
             backupModelId,
             customProvider,
@@ -346,7 +354,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         });
 
         const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
-        const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
+        const extraParts = [options.system, renderInstructionList(instructions), memoryContext].filter((part): part is string => !!part);
         // Without extra parts the agent falls back to its own instructions.
         const system = extraParts.length > 0 ? [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") : undefined;
         const shouldAutoContinue = options.maxSteps === undefined;

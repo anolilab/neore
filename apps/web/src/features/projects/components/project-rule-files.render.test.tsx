@@ -25,6 +25,12 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+vi.mock("@lingui/core/macro", () => {
+    return {
+        plural: (count: number, forms: { one: string; other: string }) => (count === 1 ? forms.one : forms.other).split("#").join(String(count)),
+    };
+});
+
 const backend = vi.hoisted(() => {
     return {
         listed: { canEdit: true, files: [] as unknown[], revision: "r1" } as { canEdit: boolean; files: unknown[]; legacyContextId?: string; revision: string },
@@ -92,6 +98,112 @@ beforeEach(() => {
 
 afterEach(() => {
     onlineManager.setOnline(true);
+});
+
+/** A picked file as the browser hands it, with its path inside a picked folder when it has one. */
+const pickedFile = (name: string, text: string, folderPath?: string): File => {
+    const file = new File([text], name, { type: "text/markdown" });
+
+    if (folderPath) {
+        Object.defineProperty(file, "webkitRelativePath", { value: folderPath });
+    }
+
+    return file;
+};
+
+describe("project rule files read when needed", () => {
+    it("asks when to read a file read when needed, refuses it without, and saves its description", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Add rule file" }));
+
+        const added = screen.getByRole("listitem", { name: "Rule file 3" });
+
+        await user.type(within(added).getByRole("textbox", { name: "Name" }), "Deploy");
+        await user.click(within(added).getByRole("radio", { name: "When needed" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert").textContent).toBe("A file read when needed needs a line saying when to read it.");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(within(added).getByRole("textbox", { name: "When to read it" }));
+
+        await user.type(within(added).getByRole("textbox", { name: "When to read it" }), " How to deploy ");
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save.mock.calls[0]?.[0].ruleFiles[2]).toEqual({
+            content: "",
+            description: "How to deploy",
+            id: expect.any(String),
+            mode: "auto",
+            title: "Deploy",
+        });
+    });
+});
+
+describe("importing rule files", () => {
+    it("adds an uploaded AGENTS.md as one always file, an unsaved draft until saved", async () => {
+        const user = userEvent.setup();
+        const onDirtyChange = vi.fn();
+
+        renderEditor(onDirtyChange);
+        await screen.findByRole("listitem", { name: "SQL" });
+        await user.upload(screen.getByTestId("rule-file-import"), pickedFile("AGENTS.md", "# Agents\n\nRun the tests."));
+
+        const imported = await screen.findByRole("listitem", { name: "AGENTS.md" });
+
+        expect(within(imported).getByRole("radio", { name: "Always" }).getAttribute("aria-checked")).toBe("true");
+        expect((within(imported).getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value).toBe("# Agents\n\nRun the tests.");
+        expect(screen.getByText("1 rule file imported. Review, then save.")).toBeDefined();
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save.mock.calls[0]?.[0].ruleFiles).toHaveLength(3);
+        expect(backend.save.mock.calls[0]?.[0].ruleFiles[2]).toEqual({
+            content: "# Agents\n\nRun the tests.",
+            id: expect.any(String),
+            mode: "always",
+            title: "AGENTS.md",
+        });
+    });
+
+    it("imports a rule folder's Markdown files by their front matter, and leaves the rest out", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await screen.findByRole("listitem", { name: "SQL" });
+        await user.upload(screen.getByTestId("rule-folder-import"), [
+            pickedFile("deploy.md", "---\ndescription: How to deploy\n---\nRun the script.", "rules/deploy.md"),
+            pickedFile("tests.md", "---\nglobs: src/**/*.test.ts\n---\nUse vitest.", "rules/tests.md"),
+            pickedFile("logo.png", "png", "rules/logo.png"),
+        ]);
+
+        const deploy = await screen.findByRole("listitem", { name: "deploy" });
+        const tests = screen.getByRole("listitem", { name: "tests" });
+
+        expect((within(deploy).getByRole("textbox", { name: "When to read it" }) as HTMLInputElement).value).toBe("How to deploy");
+        expect((within(deploy).getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value).toBe("Run the script.");
+        expect((within(tests).getByRole("textbox", { name: "File patterns, one per line" }) as HTMLTextAreaElement).value).toBe("src/**/*.test.ts");
+        expect(screen.getByText("2 rule files imported. Review, then save.")).toBeDefined();
+    });
+
+    it("imports no more files than the project has room for, and says how many it left out", async () => {
+        const user = userEvent.setup();
+
+        backend.listed.files = Array.from({ length: 19 }, (_, index) => {
+            return { content: "x", id: `f${index}`, mode: "always", title: `F${index}` };
+        });
+        renderEditor();
+        await screen.findByRole("listitem", { name: "F0" });
+        await user.upload(screen.getByTestId("rule-file-import"), [pickedFile("a.md", "A"), pickedFile("b.md", "B")]);
+
+        await screen.findByRole("listitem", { name: "a" });
+        expect(screen.queryByRole("listitem", { name: "b" })).toBeNull();
+        expect(screen.getByText("1 rule file imported. Review, then save. 1 file was left out. A project holds at most 20 rule files.")).toBeDefined();
+    });
 });
 
 describe("project rule files", () => {

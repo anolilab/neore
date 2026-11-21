@@ -68,7 +68,9 @@ beforeAll(async () => {
     registerModule(registry, "auth_functions", await import("../auth/functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "bots_functions", await import("../bots/functions"));
+    registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
+    registerModule(registry, "projects_functions", await import("../projects/functions"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
     registerModule(registry, "chat_tool_permissions", await import("./tool-permissions"));
@@ -96,9 +98,9 @@ afterEach(() => {
 });
 
 /** A paused run, as `finishRun` leaves it: the request on the assistant's turn and its snapshot. */
-const pause = async (origin: "outside_agent" | undefined) =>
+const pause = async (origin: "outside_agent" | undefined, { projectId, toolNames }: { projectId?: string; toolNames?: string[] } = {}) =>
     await harness.run(async (ctx: any) => {
-        const threadId = await ctx.db.insert("threads", { status: "running", title: "Chat", userId: OWNER });
+        const threadId = await ctx.db.insert("threads", { status: "running", title: "Chat", userId: OWNER, ...(projectId && { projectId }) });
         const insert = async (order: number, message: Record<string, unknown>) =>
             await ctx.db.insert("messages", { message, order, status: "success", stepOrder: 0, text: "", threadId, tool: false, userId: OWNER });
 
@@ -122,7 +124,7 @@ const pause = async (origin: "outside_agent" | undefined) =>
 
         await ctx.runMutation(recordPendingToolApprovals, {
             approvalIds: ["ap1"],
-            config: { ...baseConfig, ...(origin && { dispatchOrigin: origin }) },
+            config: { ...baseConfig, ...(origin && { dispatchOrigin: origin }), ...(toolNames && { toolNames }) },
             threadId: String(threadId),
             userId: OWNER,
         });
@@ -178,5 +180,38 @@ describe("the continuation of a run started with an API key", () => {
 
         expect(Object.keys(tools)).toContain("device_laptop__shell_run");
         expect(Object.entries(tools).filter(([, tool]) => tool.needsApproval !== true).length).toBeGreaterThan(1);
+    });
+});
+
+describe("the continuation of a run that offered its project's rule files", () => {
+    /** A project of the owner's with one file read when needed. */
+    const projectWithAutoFile = async () =>
+        (await harness.run(async (ctx: any) => {
+            const projectId = await ctx.db.insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+
+            await ctx.db.insert("projectRuleFiles", {
+                files: [{ content: "Run the script.", description: "How to deploy", id: "d", mode: "auto", title: "Deploy" }],
+                projectId,
+                updatedAt: 0,
+                userId: OWNER,
+            });
+
+            return String(projectId);
+        })) as string;
+
+    it("offers instruction_read again, over the project's files read anew", async () => {
+        const projectId = await projectWithAutoFile();
+
+        await approve(await pause(undefined, { projectId, toolNames: [...baseConfig.toolNames, "instruction_read"] }));
+
+        expect(Object.keys(rebuilt.results[0]!.tools)).toContain("instruction_read");
+    });
+
+    it("control: a paused run that did not offer it does not get it", async () => {
+        const projectId = await projectWithAutoFile();
+
+        await approve(await pause(undefined, { projectId }));
+
+        expect(Object.keys(rebuilt.results[0]!.tools)).not.toContain("instruction_read");
     });
 });

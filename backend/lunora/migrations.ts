@@ -245,3 +245,14 @@ export const addApprovalBotLookup = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A rule file gained an optional `description` and the `auto` mode (`projects/rule-files.ts`). Nothing to fill: every
+ * stored file is `always` or `glob` without one, which the new shape still takes. A no-op for the same reason as
+ * {@link addApprovalChainSource}.
+ */
+export const addRuleFileDescription = defineMigration({
+    id: "add-rule-file-description",
+    table: "projectRuleFiles",
+    up: () => undefined,
+});

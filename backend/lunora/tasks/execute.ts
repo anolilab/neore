@@ -185,6 +185,8 @@ const runAgent = async (
         skill,
         // The project's own instructions, framed as a chat in the project gets them (`chat/lib/agent-run.ts`).
         ...(project?.context && { system: `PROJECT CONTEXT:\n${project.context}` }),
+        // Its `auto` rule files, listed after it and read with `instruction_read`, as in a chat in the project.
+        ...(project?.instructions && { projectInstructions: project.instructions }),
         thread,
         tools: "headless",
         ...(skill && claim.skillId && { usageSkill: { id: claim.skillId, name: `/${skill.slug}` } }),

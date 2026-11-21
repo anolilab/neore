@@ -153,8 +153,18 @@ const ruleRow = async (projectId: string) =>
 const chatFile = async (filename: string) =>
     await insert("chatFiles", { filename, hash: filename, lastTouchedAt: 0, mediaType: "text/plain", refcount: 1, storageId: filename });
 
-const contextFor = async (projectId: string, fileIds?: string[]) =>
-    await harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: OWNER, ...(fileIds && { fileIds }) }));
+/** What a chat run's setup reads (`getProjectContextForRun`). */
+const runFor = async (projectId: string, fileIds?: string[]) =>
+    (await harness.run(
+        async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: OWNER, ...(fileIds && { fileIds }) }),
+    )) as { instructions: { content: string; description: string; id: string; title: string }[]; text: string | null } | null;
+
+/** The rule text a chat run takes. */
+const contextFor = async (projectId: string, fileIds?: string[]) => {
+    const run = await runFor(projectId, fileIds);
+
+    return run?.text ?? null;
+};
 
 describe("a project's rule files in a run", () => {
     it("adds a **/*.sql file only for a run whose files include SQL", async () => {
@@ -227,7 +237,7 @@ describe("a project's rule files in a run", () => {
             return await (getProjectContextForRun as any).handler({ ...ctx, db }, { fileIds: [md, ...notes, sql, md], projectId, userId: OWNER });
         });
 
-        expect(result).toBe("Docs.\n\nUse snake_case columns.");
+        expect(result).toMatchObject({ text: "Docs.\n\nUse snake_case columns." });
         // Ten files, the repeated one read once: a read per RUN_FILE_NAMES_PER_READ of them, not one each.
         expect(reads).toHaveBeenCalledTimes(Math.ceil((notes.length + 2) / RUN_FILE_NAMES_PER_READ));
     });
@@ -246,7 +256,7 @@ describe("a project's rule files in a run", () => {
             return await (getProjectContextForRun as any).handler({ ...ctx, db }, { fileIds: [sql], projectId, userId: OWNER });
         });
 
-        expect(result).toBe("Use snake_case columns.");
+        expect(result).toMatchObject({ text: "Use snake_case columns." });
     });
 
     it("gives a task's run its project's always files, read on the primary as a chat's are", async () => {
@@ -331,6 +341,67 @@ describe("changing a project's rule files", () => {
     };
     const row = async (projectId: string) =>
         (await harness.run(async (ctx: any) => await ctx.db.projects.findFirst({ where: { _id: projectId } }))) as Record<string, unknown>;
+
+    it("saves an auto file, whose run lists it and carries its text from the one read, and only its own project's", async () => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+        const other = await project({
+            createdAt: 0,
+            ruleFiles: [{ content: "Other.", description: "Elsewhere", id: "o", mode: "auto", title: "Other" }],
+            title: "q",
+            userId: OWNER,
+        });
+        const deploy = { content: "Run the script.", description: "  How to deploy  ", id: "d", mode: "auto", title: "Deploy" };
+
+        await expect(save(OWNER, projectId, [deploy, { content: "Be brief.", id: "a", mode: "always", title: "A" }])).resolves.toMatchObject({
+            files: [{ ...deploy, description: "How to deploy" }, { id: "a" }],
+        });
+        await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ description: "How to deploy", id: "d", mode: "auto" }, { id: "a" }] });
+
+        vi.mocked(readProjectRuleFiles).mockClear();
+
+        await expect(runFor(projectId)).resolves.toStrictEqual({
+            instructions: [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }],
+            text: "Be brief.",
+        });
+        // One read of the rules for the run's setup, the text of the auto file included.
+        expect(readProjectRuleFiles).toHaveBeenCalledTimes(1);
+        const otherRun = await runFor(other);
+
+        expect(otherRun?.instructions.map((file) => file.id)).toStrictEqual(["o"]);
+    });
+
+    it("gives a task's run its project's auto files too", async () => {
+        const projectId = await project({
+            createdAt: 0,
+            ruleFiles: [{ content: "Run the script.", description: "How to deploy", id: "d", mode: "auto", title: "Deploy" }],
+            title: "p",
+            userId: OWNER,
+        });
+        const taskId = await insert("tasks", {
+            attemptCount: 0,
+            dependsOn: [],
+            instructions: "Do it.",
+            maxRepairRounds: 0,
+            projectId,
+            recurring: false,
+            title: "t",
+            updatedAt: 0,
+            userId: OWNER,
+        });
+
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(runProjectFor as never, { taskId }))).resolves.toStrictEqual({
+            instructions: [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }],
+            projectId,
+        });
+    });
+
+    it("refuses an auto file without a description, naming it", async () => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+
+        await expect(save(OWNER, projectId, [{ content: "x", id: "d", mode: "auto", title: "Deploy" }])).rejects.toMatchObject({
+            data: { code: "RULE_FILE_DESCRIPTION_MISSING", fileId: "d" },
+        });
+    });
 
     it("moves the legacy context into the list on the first save, in the order saved", async () => {
         const projectId = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
@@ -477,9 +548,11 @@ describe("changing a project's rule files", () => {
         expect(readProjectRuleFiles).not.toHaveBeenCalled();
 
         await expect(list(owner, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }] });
-        await expect(harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: owner }))).resolves.toBe(
-            "Old notes",
-        );
+        await expect(
+            harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: owner })),
+        ).resolves.toMatchObject({
+            text: "Old notes",
+        });
         expect(readProjectRuleFiles).toHaveBeenCalledTimes(2);
     });
 
@@ -894,6 +967,7 @@ describe("the rule-file table's readers", () => {
             .map((file) => relative(LUNORA_DIR, file))
             .toSorted((left, right) => left.localeCompare(right));
 
-        expect(touching).toStrictEqual(["projects/gdpr.ts", "projects/rule-file-rows.ts"]);
+        // `migrations.ts` only names the table for the schema gate: its migration changes no row (`addRuleFileDescription`).
+        expect(touching).toStrictEqual(["migrations.ts", "projects/gdpr.ts", "projects/rule-file-rows.ts"]);
     });
 });
