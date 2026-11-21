@@ -4809,6 +4809,13 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
+                // A reply the model gave no suggestion for is not paid for: there is nothing to show, so the claim is given back.
+                if (output.suggestions.length === 0) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
                 // The Text unit is taken only now, once the model has produced suggestions: a run that makes no call pays nothing. A refused
                 // charge gives the claim back, and the output is dropped. The charge is keyed per reply, so a retry is not charged twice.
                 const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
