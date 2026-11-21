@@ -69,10 +69,10 @@ describe(isPinShapeValid, () => {
     it.each([
         [{}, true],
         [{ kind: "message" as const }, true],
-        [{ kind: "image" as const, partIndex: 0 }, true],
+        [{ imageIndex: 0, kind: "image" as const }, true],
         [{ kind: "image" as const }, false],
-        [{ partIndex: 2 }, false],
-        [{ kind: "message" as const, partIndex: 2 }, false],
+        [{ imageIndex: 2 }, false],
+        [{ imageIndex: 2, kind: "message" as const }, false],
     ])("%o is %s", (shape, expected) => {
         expect(isPinShapeValid(shape)).toBe(expected);
     });
@@ -83,10 +83,10 @@ describe("image pins", () => {
         await as(OWNER).mutation(
             createPin as never,
             {
+                imageIndex: 2,
                 kind: "image",
                 messageId: "m-1",
                 messageRole: "assistant",
-                partIndex: 2,
                 selectedText: "A fox logo, flat colours",
                 threadId,
             } as never,
@@ -94,7 +94,7 @@ describe("image pins", () => {
 
         const [pin] = await pinsOf();
 
-        expect(pin).toMatchObject({ kind: "image", messageId: "m-1", partIndex: 2, selectedText: "A fox logo, flat colours" });
+        expect(pin).toMatchObject({ imageIndex: 2, kind: "image", messageId: "m-1", selectedText: "A fox logo, flat colours" });
     });
 
     it("stores a message pin as before, with no kind and no part index", async () => {
@@ -104,7 +104,7 @@ describe("image pins", () => {
 
         expect(pin).toMatchObject({ messageId: "m-2" });
         expect(pin).not.toHaveProperty("kind");
-        expect(pin).not.toHaveProperty("partIndex");
+        expect(pin).not.toHaveProperty("imageIndex");
     });
 
     it("stores no kind for an explicit message pin either", async () => {
@@ -123,16 +123,16 @@ describe("image pins", () => {
     });
 
     it("refuses a message pin that names a part", async () => {
-        await expect(as(OWNER).mutation(createPin as never, { messageId: "m-1", messageRole: "assistant", partIndex: 1, threadId } as never)).rejects.toThrow(
+        await expect(as(OWNER).mutation(createPin as never, { imageIndex: 1, messageId: "m-1", messageRole: "assistant", threadId } as never)).rejects.toThrow(
             SHAPE_ERROR,
         );
         expect(await pinsOf()).toHaveLength(0);
     });
 
     it("refuses a part index that is negative or not whole", async () => {
-        for (const partIndex of [-1, 1.5]) {
+        for (const imageIndex of [-1, 1.5]) {
             await expect(
-                as(OWNER).mutation(createPin as never, { kind: "image", messageId: "m-1", messageRole: "assistant", partIndex, threadId } as never),
+                as(OWNER).mutation(createPin as never, { imageIndex, kind: "image", messageId: "m-1", messageRole: "assistant", threadId } as never),
             ).rejects.toThrow();
         }
 

@@ -34,6 +34,7 @@ import { createCitationMarker, safeHttpUrl } from "../utils/citation-marker";
 import cn from "../utils/cn";
 import { resolveDeviceToolName } from "../utils/device-tool-name";
 import { isHostRunText } from "../utils/host-run-text";
+import { imageOrdinals } from "../utils/image-ordinals";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
@@ -78,11 +79,11 @@ const AUDIO_GENERATING_MARKER = "__AUDIO_GENERATING__";
 
 /** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
 export interface ImagePlace {
+    /** The image's place among the message's images (`utils/image-ordinals.ts`), which a reply edit leaves as it is. */
+    imageIndex?: number;
     messageId?: string;
     /** The role of the message the image is in (`"user"`, `"assistant"`). */
     messageRole?: string;
-    /** The image's index in `message.parts`. */
-    partIndex?: number;
 }
 
 /** What the `Image` renderer is given: the image, and where it sits (absent when a caller renders one on its own). */
@@ -371,10 +372,10 @@ FileLoadingFallback.displayName = "FileLoadingFallback";
 const FilePartView: FC<ImagePlace & { generationPrompt?: string; Image: FC<ImageRendererProps>; part: FilePart }> = ({
     generationPrompt,
     Image,
+    imageIndex,
     messageId,
     messageRole,
     part,
-    partIndex,
 }) => {
     const { filename, mediaType, nsfwStatus } = part;
     const fileUrl = part.url || part.data;
@@ -383,10 +384,10 @@ const FilePartView: FC<ImagePlace & { generationPrompt?: string; Image: FC<Image
     if (type === "image") {
         return (
             <Image
+                imageIndex={imageIndex}
                 messageId={messageId}
                 messageRole={messageRole}
                 part={{ filename, image: fileUrl ?? "", nsfwStatus, prompt: generationPrompt, type: "image" }}
-                partIndex={partIndex}
             />
         );
     }
@@ -897,6 +898,9 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
     let openGroup: { end: number; group: ToolGroupSegment; mark: number } | undefined;
 
+    // Each image's place among the message's images, so an `Image` override can name it (an image pin).
+    const ordinals = imageOrdinals(message.parts);
+
     for (let i = 0; i < message.parts.length; i += 1) {
         const part = message.parts[i] as MessagePart;
         const key = `${message.id}-part-${i}`;
@@ -915,11 +919,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                     <FilePartView
                         generationPrompt={generationPrompt}
                         Image={Image}
+                        imageIndex={ordinals.get(i)}
                         key={key}
                         messageId={message.id}
                         messageRole={message.role}
                         part={filePart}
-                        partIndex={i}
                     />,
                 );
 
@@ -936,11 +940,11 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
                 renderedParts.push(
                     <Image
+                        imageIndex={ordinals.get(i)}
                         key={key}
                         messageId={message.id}
                         messageRole={message.role}
                         part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart}
-                        partIndex={i}
                     />,
                 );
 

@@ -42,35 +42,54 @@ const reply = {
 };
 
 describe(findPinnedImage, () => {
-    it("finds a file image and an image part by message and part index", () => {
-        expect(findPinnedImage([reply], "m1", 1)).toEqual({ filename: "fox.png", url: "https://files.example/fox.png" });
-        expect(findPinnedImage([reply], "m1", 2)).toEqual({ filename: undefined, url: "https://files.example/owl.png" });
+    it("finds a file image and an image part by message and image index", () => {
+        expect(findPinnedImage([reply], "m1", 0)).toEqual({ filename: "fox.png", url: "https://files.example/fox.png" });
+        expect(findPinnedImage([reply], "m1", 1)).toEqual({ filename: undefined, url: "https://files.example/owl.png" });
     });
 
     it("finds a stored file image whose link is in `data`", () => {
-        expect(findPinnedImage([reply], "m1", 5)).toEqual({ filename: "stored.png", url: "https://files.example/stored.png" });
+        expect(findPinnedImage([reply], "m1", 3)).toEqual({ filename: "stored.png", url: "https://files.example/stored.png" });
     });
 
-    it("finds nothing for text, a non-image file, a blocked image, a missing part or an unloaded message", () => {
-        expect(findPinnedImage([reply], "m1", 0)).toBeNull();
-        expect(findPinnedImage([reply], "m1", 3)).toBeNull();
-        expect(findPinnedImage([reply], "m1", 4)).toBeNull();
+    it("finds nothing for a blocked image, a missing image or an unloaded message", () => {
+        expect(findPinnedImage([reply], "m1", 2)).toBeNull();
         expect(findPinnedImage([reply], "m1", 9)).toBeNull();
-        expect(findPinnedImage([reply], "m2", 1)).toBeNull();
+        expect(findPinnedImage([reply], "m2", 0)).toBeNull();
+    });
+
+    it("keeps finding the pinned image after an edit removes the text before it", () => {
+        const before = {
+            id: "m5",
+            parts: [
+                { text: "First take:", type: "text" },
+                { image: "https://files.example/a.png", type: "image" },
+                { text: "done", type: "text" },
+            ],
+        };
+        const edited = {
+            id: "m5",
+            parts: [
+                { image: "https://files.example/a.png", type: "image" },
+                { text: "Edited.", type: "text" },
+            ],
+        };
+
+        expect(findPinnedImage([before], "m5", 0)?.url).toBe("https://files.example/a.png");
+        expect(findPinnedImage([edited], "m5", 0)?.url).toBe("https://files.example/a.png");
     });
 });
 
 describe("PinnedImagePreview", () => {
     it("shows the pinned image, named by the pin's caption", () => {
         loaded.messages = [reply];
-        render(<PinnedImagePreview alt="A fox logo" messageId="m1" partIndex={1} />);
+        render(<PinnedImagePreview alt="A fox logo" imageIndex={0} messageId="m1" />);
 
         expect(screen.getByRole("img", { name: "A fox logo" }).getAttribute("src")).toBe("https://files.example/fox.png");
     });
 
     it("says an image is pinned while its message is not loaded", () => {
         loaded.messages = [];
-        render(<PinnedImagePreview messageId="m1" partIndex={1} />);
+        render(<PinnedImagePreview imageIndex={0} messageId="m1" />);
 
         expect(screen.queryByRole("img")).toBeNull();
         expect(screen.getByText("Image pinned")).toBeTruthy();

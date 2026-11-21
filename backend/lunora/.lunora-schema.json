@@ -28779,6 +28779,12 @@
           "optional": false,
           "unique": false
         },
+        "imageIndex": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "kind": {
           "kind": "union",
           "nullable": false,
@@ -28831,12 +28837,6 @@
         },
         "note": {
           "kind": "string",
-          "nullable": false,
-          "optional": true,
-          "unique": false
-        },
-        "partIndex": {
-          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false

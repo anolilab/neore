@@ -89,15 +89,15 @@ const generated = { image: "https://files.example/fox.png", prompt: "A fox logo"
 
 describe(canPinImage, () => {
     it("pins a shown image of a reply whose place is known", () => {
-        expect(canPinImage({ messageId: "m1", part: generated, partIndex: 0, messageRole: "assistant" })).toBe(true);
+        expect(canPinImage({ messageId: "m1", part: generated, imageIndex: 0, messageRole: "assistant" })).toBe(true);
     });
 
     it.each([
-        ["a person's upload", { messageId: "m1", part: generated, partIndex: 0, messageRole: "user" }],
+        ["a person's upload", { messageId: "m1", part: generated, imageIndex: 0, messageRole: "user" }],
         ["an image with no known place", { part: generated, messageRole: "assistant" }],
-        ["an image still being checked", { messageId: "m1", part: { ...generated, nsfwStatus: "checking" }, partIndex: 0, messageRole: "assistant" }],
-        ["a blocked image", { messageId: "m1", part: { ...generated, nsfwStatus: "blocked" }, partIndex: 0, messageRole: "assistant" }],
-        ["an image with no source", { messageId: "m1", part: { ...generated, image: "" }, partIndex: 0, messageRole: "assistant" }],
+        ["an image still being checked", { messageId: "m1", part: { ...generated, nsfwStatus: "checking" }, imageIndex: 0, messageRole: "assistant" }],
+        ["a blocked image", { messageId: "m1", part: { ...generated, nsfwStatus: "blocked" }, imageIndex: 0, messageRole: "assistant" }],
+        ["an image with no source", { messageId: "m1", part: { ...generated, image: "" }, imageIndex: 0, messageRole: "assistant" }],
     ])("does not pin %s", (_label, props) => {
         expect(canPinImage(props)).toBe(false);
     });
@@ -118,7 +118,7 @@ describe("PinnableImage", () => {
     });
 
     it("pins the image with its message, part index and prompt", () => {
-        render(<PinnableImage messageId="m1" messageRole="assistant" part={generated} partIndex={3} />);
+        render(<PinnableImage imageIndex={3} messageId="m1" messageRole="assistant" part={generated} />);
         fireEvent.click(screen.getByRole("button", PIN_BUTTON));
 
         expect(mutate).toHaveBeenCalledTimes(1);
@@ -126,14 +126,23 @@ describe("PinnableImage", () => {
             kind: "image",
             messageId: "m1",
             messageRole: "assistant",
-            partIndex: 3,
+            imageIndex: 3,
             selectedText: "A fox logo",
             threadId: "k17abc",
         });
     });
 
+    it("shows the pin button where nothing can hover, at a full touch target", () => {
+        render(<PinnableImage imageIndex={0} messageId="m1" messageRole="assistant" part={generated} />);
+
+        const { className } = screen.getByRole("button", PIN_BUTTON);
+
+        expect(className).toContain("[@media(hover:none)]:opacity-100");
+        expect(className).toContain("pointer-coarse:size-11");
+    });
+
     it("opens the pins tab once the pin is saved", () => {
-        render(<PinnableImage messageId="m1" messageRole="assistant" part={generated} partIndex={3} />);
+        render(<PinnableImage imageIndex={3} messageId="m1" messageRole="assistant" part={generated} />);
         fireEvent.click(screen.getByRole("button", PIN_BUTTON));
         (mutate.mock.calls[0]?.[1] as { onSuccess: () => void }).onSuccess();
 
@@ -141,7 +150,7 @@ describe("PinnableImage", () => {
     });
 
     it("shows a person's own upload without a pin button", () => {
-        render(<PinnableImage messageId="m1" messageRole="user" part={generated} partIndex={0} />);
+        render(<PinnableImage imageIndex={0} messageId="m1" messageRole="user" part={generated} />);
 
         expect(screen.queryByRole("button", PIN_BUTTON)).toBeNull();
         expect(screen.getByRole("img", { name: "generated" }).getAttribute("src")).toBe(generated.image);

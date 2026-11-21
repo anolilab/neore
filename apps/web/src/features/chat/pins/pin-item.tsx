@@ -57,12 +57,12 @@ interface PinItemProps {
     pin: {
         _id: string;
         createdAt: number;
-        /** `"image"` pins one image of the message, at `partIndex`; absent pins the whole message. */
+        imageIndex?: number;
+        /** `"image"` pins one image of the message, at `imageIndex`; absent pins the whole message. */
         kind?: "image" | "message";
         messageId: string;
         messageRole: string;
         note?: string;
-        partIndex?: number;
         selectedText?: string;
     };
 }
@@ -167,8 +167,8 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
         <>
             <div className="group/pin relative flex overflow-hidden rounded-md border">
                 <div className="flex w-full flex-col px-3 pt-2.5 pb-2">
-                    {pin.kind === "image" && pin.partIndex !== undefined && (
-                        <PinnedImagePreview alt={pin.selectedText} messageId={pin.messageId} partIndex={pin.partIndex} />
+                    {pin.kind === "image" && pin.imageIndex !== undefined && (
+                        <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} messageId={pin.messageId} />
                     )}
 
                     {pin.kind !== "image" && !pin.selectedText && (

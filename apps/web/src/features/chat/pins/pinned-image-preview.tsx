@@ -6,6 +6,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { imageOrdinals } from "@neore/chat-ui/utils/image-ordinals";
 import { ImageIcon } from "lucide-react";
 import type { FC } from "react";
 
@@ -21,13 +22,18 @@ interface PartLike {
     url?: string;
 }
 
-/** The shown image at `partIndex` of message `messageId`, or `null` when it is not loaded, not an image, or not shown. */
+/**
+ * The `imageIndex`-th image of message `messageId` (counted as chat-ui renders them, `imageOrdinals`), or `null` when it
+ * is not loaded, there is no such image, or it is not shown.
+ */
 export const findPinnedImage = (
     messages: ReadonlyArray<{ id: string; parts: ReadonlyArray<unknown> }>,
     messageId: string,
-    partIndex: number,
+    imageIndex: number,
 ): { filename?: string; url: string } | null => {
-    const part = messages.find((message) => message.id === messageId)?.parts[partIndex] as PartLike | undefined;
+    const parts = messages.find((message) => message.id === messageId)?.parts ?? [];
+    const partIndex = [...imageOrdinals(parts)].find(([, ordinal]) => ordinal === imageIndex)?.[0];
+    const part = partIndex === undefined ? undefined : (parts[partIndex] as PartLike | undefined);
 
     if (!part || part.nsfwStatus === "blocked" || part.nsfwStatus === "checking") {
         return null;
@@ -40,17 +46,17 @@ export const findPinnedImage = (
     // As chat-ui's `FilePartView` reads it: a stored file's signed link can be in `data` rather than `url`.
     const fileUrl = part.url || part.data;
 
-    if (part.type === "file" && part.mediaType?.startsWith("image/") === true && fileUrl) {
+    if (part.type === "file" && fileUrl) {
         return { filename: part.filename, url: fileUrl };
     }
 
     return null;
 };
 
-const PinnedImagePreview: FC<{ alt?: string; messageId: string; partIndex: number }> = ({ alt, messageId, partIndex }) => {
+const PinnedImagePreview: FC<{ alt?: string; imageIndex: number; messageId: string }> = ({ alt, messageId, imageIndex }) => {
     const { t } = useLingui();
     const { messages } = useChatMessages();
-    const image = findPinnedImage(messages, messageId, partIndex);
+    const image = findPinnedImage(messages, messageId, imageIndex);
 
     if (!image) {
         return (

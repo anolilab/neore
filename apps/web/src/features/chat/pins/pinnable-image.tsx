@@ -27,15 +27,15 @@ import { showError } from "@/lib/toast";
 export const imagePinText = (part: ImageRendererProps["part"]): string | undefined => part.prompt?.trim() || part.filename?.trim() || undefined;
 
 /** Whether this image gets a pin button: a shown image of a reply whose place in the message is known. */
-export const canPinImage = ({ messageId, messageRole, part, partIndex }: ImageRendererProps): boolean =>
+export const canPinImage = ({ messageId, messageRole, part, imageIndex }: ImageRendererProps): boolean =>
     messageRole === "assistant" &&
     messageId !== undefined &&
-    partIndex !== undefined &&
+    imageIndex !== undefined &&
     part.image.length > 0 &&
     part.nsfwStatus !== "blocked" &&
     part.nsfwStatus !== "checking";
 
-const PinImageButton: FC<{ messageId: string; part: ImageRendererProps["part"]; partIndex: number }> = ({ messageId, part, partIndex }) => {
+const PinImageButton: FC<{ imageIndex: number; messageId: string; part: ImageRendererProps["part"] }> = ({ messageId, part, imageIndex }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { threadId } = useChatThreadIdentity();
@@ -51,7 +51,7 @@ const PinImageButton: FC<{ messageId: string; part: ImageRendererProps["part"]; 
                 kind: "image",
                 messageId,
                 messageRole: "assistant",
-                partIndex,
+                imageIndex,
                 selectedText: imagePinText(part),
                 threadId: threadId as Id<"threads">,
             },
@@ -68,7 +68,8 @@ const PinImageButton: FC<{ messageId: string; part: ImageRendererProps["part"]; 
     return (
         <Button
             aria-label={t`Pin image`}
-            className="bg-background/80 absolute top-2 right-2 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+            // Shown on hover or focus, always where nothing can hover (a touch screen), and a full touch target there.
+            className="bg-background/80 absolute top-2 right-2 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:size-11 [@media(hover:none)]:opacity-100"
             disabled={isPending}
             onClick={handlePin}
             size="icon-sm"
@@ -81,16 +82,16 @@ const PinImageButton: FC<{ messageId: string; part: ImageRendererProps["part"]; 
 };
 
 const PinnableImage: FC<ImageRendererProps> = memo((props) => {
-    const { messageId, part, partIndex } = props;
+    const { messageId, part, imageIndex } = props;
 
-    if (!canPinImage(props) || messageId === undefined || partIndex === undefined) {
+    if (!canPinImage(props) || messageId === undefined || imageIndex === undefined) {
         return <DefaultImage {...props} />;
     }
 
     return (
         <div className="group relative w-fit max-w-full">
             <DefaultImage {...props} />
-            <PinImageButton messageId={messageId} part={part} partIndex={partIndex} />
+            <PinImageButton imageIndex={imageIndex} messageId={messageId} part={part} />
         </div>
     );
 });

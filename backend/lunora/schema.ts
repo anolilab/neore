@@ -3360,13 +3360,13 @@ export const schema = defineSchema({
 
     threadPins: defineTable({
         createdAt: v.number(),
+        // An image pin's place among the message's images (`kind: "image"`, `imageOrdinals` in chat-ui); a message pin has none.
+        imageIndex: v.optional(v.number()),
         // What is pinned: the whole message (absent, as every pin before images), or one image of it.
         kind: v.optional(v.union(v.literal("message"), v.literal("image"))),
         messageId: v.string(),
         messageRole: v.union(v.literal("user"), v.literal("assistant")),
         note: v.optional(v.string()),
-        // An image pin's place among the message's parts (`kind: "image"`); a message pin has none.
-        partIndex: v.optional(v.number()),
         selectedText: v.optional(v.string()),
         threadId: v.id("threads"),
         updatedAt: v.number(),
