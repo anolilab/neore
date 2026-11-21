@@ -616,12 +616,10 @@ impl DeviceState {
         }
 
         let tainted = !call.tainted_by.is_empty();
-        let planned = plan(
-            &call.tool,
-            &call.input,
-            &settings,
-            &self.mcp_tools.lock().unwrap(),
-        );
+        // A copy, so the lock is not held while an instruction-file plan touches the home folder: a hung mount there
+        // would otherwise stall `replanned_since`, which takes this lock under `save_lock`, and every settings update.
+        let mcp_tools = self.mcp_tools.lock().unwrap().clone();
+        let planned = plan(&call.tool, &call.input, &settings, &mcp_tools);
         let mut detail = String::new();
 
         let outcome = match planned {
