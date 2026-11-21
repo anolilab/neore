@@ -4765,6 +4765,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
+                // A call that cannot finish inside the claim's remaining life is not started, so nothing is charged for it.
+                if (modelBudgetMs(dispatchedAt) < MIN_MODEL_BUDGET_MS) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The claim has too little life left to start a call: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
                 // One Text unit per reply, on whoever the background model bills, keyed per reply so a retry is not charged again.
                 // The thread's organization is passed, so a member is charged the organization's plan as on the chat routes.
                 const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
