@@ -17,7 +17,7 @@ import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid
 import { authQuery } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { readableProject } from "../projects/functions";
-import type { SubAgentRoleConfig, SubAgentRoleName, SubAgentRoles } from "./roles";
+import type { SubAgentRoleConfig, SubAgentRoles } from "./roles";
 import { activeRoles, buildRoleCatalog, isRoleModelAllowed, mergeSubAgentRoles } from "./roles";
 import { vSubAgentRoles } from "./validators";
 
@@ -131,14 +131,16 @@ export const getRoleCatalogForRun = internalQuery
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { projectId, userId }, ctx }) => {
         const roles = await effectiveRoles(ctx, userId, projectId);
-        const refused = await Promise.all(
-            activeRoles(roles).map(async (name) => {
-                const model = roles[name]?.model;
+        const refused = new Set<string | undefined>(
+            await Promise.all(
+                activeRoles(roles).map(async (name) => {
+                    const model = roles[name]?.model;
 
-                return model && (await roleModelRefusal(ctx, userId, model)) ? name : undefined;
-            }),
+                    return model && (await roleModelRefusal(ctx, userId, model)) ? name : undefined;
+                }),
+            ),
         );
-        const runnable = Object.fromEntries(Object.entries(roles).filter(([name]) => !refused.includes(name as SubAgentRoleName))) as SubAgentRoles;
+        const runnable = Object.fromEntries(Object.entries(roles).filter(([name]) => !refused.has(name))) as SubAgentRoles;
 
         return buildRoleCatalog(runnable) ?? null;
     });
