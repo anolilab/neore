@@ -37,7 +37,8 @@ const ItemActions = ({ fileName, fileType: _fileType, id }: Properties) => {
         try {
             const { url } = await getDownloadUrl({ attachmentId: id as Id<"files"> });
 
-            await saveFromUrl(url, fileName);
+            // The click's activation went on asking for the link, so the save waits for the file rather than give way to a tab.
+            await saveFromUrl(url, fileName, undefined, { headersDeadlineMs: null });
         } catch (error) {
             console.error("Download error:", error);
             showError(t`Failed to download file. Please try again.`);

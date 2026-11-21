@@ -14,7 +14,7 @@ import type { MouseEvent } from "react";
  */
 
 /** A name that already ends in an extension. */
-const HAS_EXTENSION = /\.[a-z0-9]{1,8}$/iu;
+const HAS_EXTENSION = /\.[a-z0-9]{1,16}$/iu;
 
 /** The extension a saved file gets from its type when its name has none. */
 const EXTENSION_BY_TYPE: Record<string, string> = {
@@ -109,9 +109,19 @@ export const HEADERS_DEADLINE_MS = 1000;
 /** URLs being saved right now: a second click on one does not start a second transfer. */
 const savesInFlight = new Set<string>();
 
-const fetchBlob = async (url: string): Promise<Blob | undefined> => {
+/** How `saveFromUrl` waits for the file. */
+export interface SaveOptions {
+    /**
+     * How long the response headers may take before the save gives way to the new tab; `null` waits for them. Default
+     * {@link HEADERS_DEADLINE_MS}, for a save started by the click itself. A caller that awaits something first (the
+     * vault asks for the link) has spent the click's activation already, so it waits instead.
+     */
+    headersDeadlineMs?: number | null;
+}
+
+const fetchBlob = async (url: string, headersDeadlineMs: number | null): Promise<Blob | undefined> => {
     const controller = new AbortController();
-    const deadline = setTimeout(() => controller.abort(), HEADERS_DEADLINE_MS);
+    const deadline = headersDeadlineMs === null ? undefined : setTimeout(() => controller.abort(), headersDeadlineMs);
 
     try {
         const response = await fetch(url, { referrerPolicy: "no-referrer", signal: controller.signal });
@@ -136,7 +146,7 @@ const fetchBlob = async (url: string): Promise<Blob | undefined> => {
  * Saves the file at `url` as `filename` (see the module comment for why it is fetched first). A URL of another scheme
  * than http(s), blob or data is left alone, and so is a second save of a URL still being fetched.
  */
-export const saveFromUrl = async (url: string, filename?: string, fallbackName?: string): Promise<void> => {
+export const saveFromUrl = async (url: string, filename?: string, fallbackName?: string, options: SaveOptions = {}): Promise<void> => {
     if (!isFetchable(url) || savesInFlight.has(url)) {
         return;
     }
@@ -144,7 +154,7 @@ export const saveFromUrl = async (url: string, filename?: string, fallbackName?:
     savesInFlight.add(url);
 
     try {
-        const blob = await fetchBlob(url);
+        const blob = await fetchBlob(url, options.headersDeadlineMs === undefined ? HEADERS_DEADLINE_MS : options.headersDeadlineMs);
 
         if (!blob) {
             clickAnchor(url, saveName(filename, undefined, fallbackName), true);

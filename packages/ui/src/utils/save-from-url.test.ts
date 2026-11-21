@@ -38,6 +38,7 @@ describe(saveName, () => {
         ["chart", "image/png", "chart.png"],
         ["Report", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Report.docx"],
         ["Budget", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Budget.xlsx"],
+        ["manifest.webmanifest", "application/json", "manifest.webmanifest"],
         [undefined, "image/jpeg; charset=binary", "download.jpg"],
         ["  ", undefined, "download"],
         ["notes", "application/x-unknown", "notes"],
@@ -183,6 +184,30 @@ describe(saveFromUrl, () => {
 
             expect(signal?.aborted).toBe(false);
             expect(clickedLinks()).toEqual([{ download: "big.mp4", href: "blob:https://app.test/1", target: "" }]);
+        });
+
+        it("waits for slow headers when the caller asks for no deadline, and saves the blob", async () => {
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(async (_url: string, init: RequestInit) => {
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, HEADERS_DEADLINE_MS * 5);
+                    });
+
+                    if (init.signal?.aborted) {
+                        throw new DOMException("aborted", "AbortError");
+                    }
+
+                    return { blob: async () => new Blob(["%PDF"], { type: "application/pdf" }), body: null, ok: true, status: 200 };
+                }),
+            );
+
+            const saving = saveFromUrl("https://api.test/vault", "contract.pdf", undefined, { headersDeadlineMs: null });
+
+            await vi.advanceTimersByTimeAsync(HEADERS_DEADLINE_MS * 5);
+            await saving;
+
+            expect(clickedLinks()).toEqual([{ download: "contract.pdf", href: "blob:https://app.test/1", target: "" }]);
         });
     });
 });
