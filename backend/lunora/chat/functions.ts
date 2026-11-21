@@ -2882,6 +2882,14 @@ export const deleteThreads = authMutation
                     return null;
                 }
 
+                // A suggestion for this chat is being sent to a model: the chat is left out of this batch, as a single delete waits for it
+                // (`deleteThread`). The rest of the batch is deleted and the count says so.
+                if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+                    chatLogger.debug(`[deleteThreads] Left out, a suggestion is being generated: ${threadId}`);
+
+                    return null;
+                }
+
                 try {
                     // Run all operations in parallel for this thread
                     await Promise.all([
