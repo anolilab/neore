@@ -446,6 +446,11 @@ export const schema = defineSchema({
                 ended: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
                 /** A page the person asked for loads until then: the lease lasts at least as long. */
                 navigatingUntil: v.optional(v.number()),
+                /**
+                 * A renewal's mint is still running: the claim it replaces, which the view holding it keeps using until the
+                 * renewal settles (then it goes) or fails (then it is `claim` again).
+                 */
+                renewing: v.optional(v.string()),
                 since: v.number(),
                 until: v.number(),
             }),

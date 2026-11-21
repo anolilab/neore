@@ -14,7 +14,6 @@ import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
 import { NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
-import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { isServiceBound, serviceFetch } from "../../lib/services";
 import { validateDomain } from "./utilities";
 
@@ -93,7 +92,13 @@ export const executeBrowserAction = internalAction
                     return { error: PERSON_HAS_CONTROL, success: false };
                 }
 
-                held = use.held ? { sessionId, until, ...(use.reaped === true && { reaped: true }) } : undefined;
+                // The session closed between the read above and the hold: its browser is not the thread's any more, so
+                // nothing is sent to it. The next action opens a fresh one.
+                if (!use.held) {
+                    return { error: BROWSER_CLOSED_BEFORE_ACTION, success: false };
+                }
+
+                held = { sessionId, until, ...(use.reaped === true && { reaped: true }) };
                 returned = use.returned;
                 // The ended lease this action looks at the page for: once a look came back, the next actions act again.
                 const { inspecting } = use;
@@ -105,9 +110,7 @@ export const executeBrowserAction = internalAction
                 });
 
                 if (!rlResult.ok) {
-                    if (held !== undefined) {
-                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
-                    }
+                    await ctx.runMutation(internal.browser.functions.endSessionUse, held);
 
                     if (returned === undefined) {
                         return { error: "Browser automation rate limit exceeded.", success: false };
@@ -127,7 +130,7 @@ export const executeBrowserAction = internalAction
 
                 const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
                 // A call that starts late is cut off before its hold ends, never after it; one too late for any of it is not sent.
-                const budget = held === undefined ? FETCH_TIMEOUT_LONG_MS : rendererCallBudget(held.until, Date.now());
+                const budget = rendererCallBudget(held.until, Date.now());
 
                 if (budget === 0) {
                     throw new Error("The action started too late and was not sent. Try it again.");
@@ -169,8 +172,8 @@ export const executeBrowserAction = internalAction
                     currentUrl: result.url,
                     durationMs,
                     errorMessage: result.error,
-                    heldReaped: held?.reaped,
-                    heldUntil: held?.until,
+                    heldReaped: held.reaped,
+                    heldUntil: held.until,
                     ...(inspecting !== undefined && result.success === true && { inspected: inspecting }),
                     providerSessionId: returnedSessionId,
                     sessionId,
@@ -231,6 +234,10 @@ type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 /** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
 export const PERSON_HAS_CONTROL =
     "The person watching this chat has taken control of the browser and is using it now, so this action was not run. Do not use the browser until they hand it back: tell them what you are waiting for, or ask them, and try again later.";
+
+/** The session was closed just before the action reached it: nothing was sent, and the next action starts a new browser. */
+export const BROWSER_CLOSED_BEFORE_ACTION =
+    "The browser session was closed just before this action, so it was not run. Run it again if it is still needed: the next action opens a new, empty browser, so navigate to the page you need first.";
 
 /** The session was closed while the action ran: a later action starts from a new, empty browser. */
 export const BROWSER_CLOSED_DURING_ACTION =

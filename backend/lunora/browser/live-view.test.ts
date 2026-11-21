@@ -611,6 +611,8 @@ describe("taking control of the browser", () => {
 
         expect(newer).not.toBe(older);
         await expect(heldClaim()).resolves.toBe(newer);
+        // The renewal settled: the claim it replaced is no longer the lease's.
+        await expect(control()).resolves.not.toHaveProperty("renewing");
         await expect(keep(OWNER, older)).resolves.toBeNull();
         await expect(as(OWNER).action(navigateInControl as never, { claim: older, threadId, url: "https://example.com/next" } as never)).resolves.toEqual({
             error: "You do not have control of the browser.",
@@ -652,18 +654,71 @@ describe("taking control of the browser", () => {
         await expect(take(WRITER)).resolves.toMatchObject({ status: "ok" });
     });
 
-    it("keeps the lease for the view that holds it when a renewal by its holder fails to mint", async () => {
+    it("keeps the lease for the view that holds it while a renewal by its holder mints, and when that mint fails", async () => {
         await addSession();
         const { claim } = await take(OWNER);
+        const duringMint: unknown[] = [];
 
-        fetchMock.mockResolvedValue(answer(500, {}));
+        fetchMock.mockImplementation(async () => {
+            // The open view is still at work while the renewal is minted: it is never told to close.
+            duringMint.push(await keep(OWNER, claim));
+
+            return answer(500, {});
+        });
 
         await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        expect(duringMint).toEqual([{ until: NOW + CONTROL_IDLE_MS }]);
+        await expect(control()).resolves.not.toHaveProperty("renewing");
         await expect(control()).resolves.toMatchObject({ by: OWNER, claim, until: NOW + CONTROL_IDLE_MS });
         // The view that got no URL never held a claim: the one still open renews and hands back as before.
         await expect(keep(OWNER, claim)).resolves.toEqual({ until: NOW + CONTROL_IDLE_MS });
         await giveBack(OWNER, "handed_back", claim);
         await expect(control()).resolves.toMatchObject({ claim, ended: "handed_back" });
+    });
+
+    it("keeps a newer view's lease when the older view closes while it is minted, and ends it if that mint fails", async () => {
+        await addSession();
+        const { claim: older } = await take(OWNER);
+
+        fetchMock.mockImplementationOnce(async () => {
+            await giveBack(OWNER, "left", older);
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        const { claim: newer } = await take(OWNER);
+
+        await expect(control()).resolves.toMatchObject({ by: OWNER, claim: newer });
+        await expect(control()).resolves.not.toHaveProperty("ended");
+        await expect(keep(OWNER, older)).resolves.toBeNull();
+
+        // The view that held the lease closed and the renewal got no view: no one holds it.
+        fetchMock.mockImplementationOnce(async () => {
+            await giveBack(OWNER, "left", newer);
+
+            return answer(500, {});
+        });
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "left", until: NOW });
+    });
+
+    it("keeps the open view's claim through a renewal made while another renewal is minted", async () => {
+        await addSession();
+        const { claim } = await take(OWNER);
+
+        fetchMock.mockImplementationOnce(async () => {
+            fetchMock.mockResolvedValueOnce(answer(500, {}));
+            await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+            await expect(keep(OWNER, claim)).resolves.toEqual({ until: NOW + CONTROL_IDLE_MS });
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        // The first renewal's claim was replaced while it minted: it gets no URL, and the open view goes on.
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toMatchObject({ claim });
+        await expect(keep(OWNER, claim)).resolves.toEqual({ until: NOW + CONTROL_IDLE_MS });
     });
 
     it("stops renewing a writer whose grant was lowered to read", async () => {

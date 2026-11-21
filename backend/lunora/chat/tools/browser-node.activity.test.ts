@@ -4,9 +4,11 @@
  * always the current browser's.
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../../test/registered-api";
+import { internalQuery } from "../../_generated/server";
 import schema from "../../schema";
 import {
     BROWSER_IDLE_REAP_MS,
@@ -17,10 +19,10 @@ import {
     rendererCallHold,
     watchableSessionId,
 } from "../../browser/live-view-logic";
-import { logAction } from "../../browser/functions";
+import { getActiveSession, logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { applyLimit } from "../../lib/rate-limiter-mutations";
-import { BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
+import { BROWSER_CLOSED_BEFORE_ACTION, BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
 
 const { registry, renderer, rendererStart } = vi.hoisted(() => {
     // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
@@ -667,6 +669,29 @@ describe("a browser a person took control of", () => {
 });
 
 describe("a browser session closed while an action ran", () => {
+    it("sends nothing to a browser that closed between the action's read of the session and its hold", async () => {
+        await addSession(NOW - 1000);
+        const seen = await harness.run(async (ctx: any) => await ctx.db.get("browserSessions", sessionId));
+
+        // The action's read of the session still sees it active; it closed before the hold is taken.
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { status: "terminated" }));
+        registry.set(
+            "browser_functions:getActiveSession",
+            internalQuery.input({ threadId: v.id("threads") }).query(async () => seen),
+        );
+
+        try {
+            await expect(act("click")).resolves.toEqual({ error: BROWSER_CLOSED_BEFORE_ACTION, success: false });
+        } finally {
+            registry.set("browser_functions:getActiveSession", getActiveSession);
+        }
+
+        expect(renderer).not.toHaveBeenCalled();
+        // Not run, so not counted against the agent's browser actions.
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("rateLimits").collect())).resolves.toEqual([]);
+        await expect(row()).resolves.toMatchObject({ status: "terminated" });
+    });
+
     it("still tells the agent of a hand back when the action's result is discarded", async () => {
         await addSession(NOW - 1000);
         await harness.run(
