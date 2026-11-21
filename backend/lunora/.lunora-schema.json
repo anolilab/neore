@@ -13,6 +13,7 @@
     "backfill-approval-organization",
     "drop-agent-option-fields",
     "session-options-to-session-state",
+    "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
   ],
   "tables": {
@@ -4123,6 +4124,13 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "instructionsByImpersonator": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "true"
         },
         "model": {
           "kind": "string",
@@ -20636,6 +20644,13 @@
                         "nullable": false,
                         "optional": false,
                         "unique": false,
+                        "literal": "\"collaborator\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
                         "literal": "\"forwarded\""
                       },
                       {
@@ -28530,6 +28545,18 @@
               }
             }
           }
+        },
+        "variablesByImpersonator": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         }
       },
       "indexes": {
@@ -31851,6 +31878,13 @@
           "optional": true,
           "unique": false
         },
+        "personalizationByImpersonator": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "true"
+        },
         "profession": {
           "kind": "string",
           "nullable": false,
@@ -32067,6 +32101,18 @@
                 "unique": false
               }
             }
+          }
+        },
+        "variablesByImpersonator": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
           }
         }
       },

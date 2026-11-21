@@ -22,6 +22,7 @@ export const savePromptInTransaction = async (
         model,
         parentId,
         threadId,
+        userId,
     }: {
         /** AI SDK user content parts, as the HTTP action built them. */
         content: Extract<ModelMessage, { role: "user" }>["content"];
@@ -32,6 +33,12 @@ export const savePromptInTransaction = async (
         model: string;
         parentId?: string;
         threadId: string;
+        /**
+         * Who sent it, when that may not be the thread's owner: a collaborator's prompt in a shared chat names them, so
+         * nothing reads it as the owner's words (`vault/site-login-turn.ts#pathRowRefusal`, Restore to input). Absent,
+         * the thread's owner.
+         */
+        userId?: string;
     },
 ): Promise<string> => {
     // Serialized as `saveMessages` does.
@@ -43,6 +50,7 @@ export const savePromptInTransaction = async (
         messages: [parse(vMessageWithMetadata, { message, ...(allFileIds.length > 0 && { fileIds: allFileIds }) }) as never],
         ...(parentId !== undefined && { promptMessageId: parentId as Id<"messages"> }),
         threadId: threadId as Id<"threads">,
+        ...(userId !== undefined && { userId }),
     });
     const saved = messages.at(-1);
 

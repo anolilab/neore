@@ -199,7 +199,7 @@ describe("the shared gate outcome", () => {
             harness.run(async (context: any) => await gateThreadActionHandler(context, { level: "write", threadId: threadId as never, unlockProof, userId }));
 
         expect(await answer(OWNER)).toEqual({ outcome: "locked" });
-        expect(await answer(OWNER, proof)).toEqual({ isWorker: false, outcome: "ok" });
+        expect(await answer(OWNER, proof)).toEqual({ isWorker: false, outcome: "ok", ownerId: OWNER });
         expect(await answer(STRANGER, proof)).toEqual({ outcome: "denied" });
     });
 
@@ -222,9 +222,28 @@ describe("the shared gate outcome", () => {
         const answer = (userId: string, unlockProof?: string) =>
             harness.run(async (context: any) => await gateThreadActionHandler(context, { level: "write", threadId: threadId as never, unlockProof, userId }));
 
-        expect(await answer(OWNER, proof)).toEqual({ botId, isWorker: false, outcome: "ok" });
+        expect(await answer(OWNER, proof)).toEqual({ botId, isWorker: false, outcome: "ok", ownerId: OWNER });
         expect(await answer(OWNER)).toEqual({ outcome: "locked" });
         expect(await answer(STRANGER, proof)).toEqual({ outcome: "denied" });
+    });
+
+    it("names the thread's owner, never the caller, to a granted collaborator", async () => {
+        const answer = await harness.run(async (context: any) => {
+            const shared = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Shared", userId: OWNER });
+
+            await context.db.insert("threadAccess", {
+                grantedAt: 1,
+                grantedBy: OWNER,
+                ownerId: OWNER,
+                permission: "write",
+                threadId: shared,
+                userId: STRANGER,
+            });
+
+            return await gateThreadActionHandler(context, { level: "write", threadId: shared, userId: STRANGER });
+        });
+
+        expect(answer).toMatchObject({ outcome: "ok", ownerId: OWNER });
     });
 
     it("throws THREAD_LOCKED for a locked outcome and NOT_FOUND for a denial with no message", () => {

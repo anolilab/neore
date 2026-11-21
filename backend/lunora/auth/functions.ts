@@ -38,6 +38,7 @@ import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
+import { changesPersonalization } from "./lib/personalization";
 import { isValidShortcut } from "./lib/shortcut";
 
 /** Any context an auth helper may be called from. */
@@ -292,6 +293,11 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
 
     // The generic settings write is the other way into a locked key: it takes the same refusal as `preference-writes.ts`.
     await assertSettingsWritable(context.db, user?.activeOrganization?.id ?? null, toStore);
+
+    // Words an admin acting as the user put into their system prompt mark the row for good (`auth/lib/personalization.ts`).
+    if (tableName === "userSettings" && user?.impersonatedBy && changesPersonalization(settings as Record<string, unknown> | null, toStore)) {
+        toStore.personalizationByImpersonator = true;
+    }
 
     if (settings) {
         await context.db.patch(tableName, settings._id, withoutUndefined(toStore));
@@ -1033,7 +1039,7 @@ export const initializeUserSettings = authMutation
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .unique();
 
-        const updates: { location?: string; timezone?: string } = {};
+        const updates: { location?: string; personalizationByImpersonator?: true; timezone?: string } = {};
 
         if (existingSettings) {
             // If settings exist, update timezone and location if not set
@@ -1043,6 +1049,11 @@ export const initializeUserSettings = authMutation
 
             if (location && !existingSettings.location) {
                 updates.location = location;
+
+                // The location reaches the system prompt: an admin acting as the user marks it (`auth/lib/personalization.ts`).
+                if (context.user.impersonatedBy) {
+                    updates.personalizationByImpersonator = true;
+                }
             }
 
             if (Object.keys(updates).length > 0) {
@@ -1054,6 +1065,7 @@ export const initializeUserSettings = authMutation
                 timezone,
                 userId,
                 ...(location && { location }),
+                ...(location && context.user.impersonatedBy && { personalizationByImpersonator: true as const }),
             });
         }
 
@@ -1075,6 +1087,7 @@ export const getUserPreferencesQuery = internalQuery
             location: v.optional(v.string()),
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
+            personalizationByImpersonator: v.boolean(),
             profession: v.optional(v.string()),
             resumeInterruptedRuns: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
@@ -1099,6 +1112,7 @@ export const getUserPreferencesQuery = internalQuery
                 location: userSettings?.location ?? undefined,
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
+                personalizationByImpersonator: userSettings?.personalizationByImpersonator === true,
                 profession: userSettings?.profession ?? undefined,
                 resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
@@ -1115,6 +1129,8 @@ export const getUserPreferencesQuery = internalQuery
                 location: undefined,
                 memoryEnabled: false,
                 nickname: undefined,
+                // A failed read carries no personalization, so nothing an admin wrote reaches the prompt.
+                personalizationByImpersonator: false,
                 profession: undefined,
                 // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
                 resumeInterruptedRuns: false,
