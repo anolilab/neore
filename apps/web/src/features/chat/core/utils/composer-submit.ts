@@ -84,12 +84,9 @@ export const withdrawComposerAttach = (files: ReadonlyArray<File>): void => {
 };
 
 /**
- * Hands dropped files to the new-thread composer of `accountId`. A request for another account (one made before an
- * account switch) is taken and dropped, never uploaded under this account.
+ * Hands dropped files to the new-thread composer of `accountId`. A request for another account is not taken at all: it
+ * stays for that account's composer (during a switch, the old one may still be listening), is never uploaded under
+ * this one, and the next drop for another account replaces it.
  */
 export const onComposerAttachRequest = (accountId: string, handler: (request: ComposerAttachRequest) => void): (() => void) =>
-    composerAttachChannel.consume((request: ComposerAttachRequest) => {
-        if (request.accountId === undefined || request.accountId === accountId) {
-            handler(request);
-        }
-    });
+    composerAttachChannel.consume(handler, (request: ComposerAttachRequest) => request.accountId === undefined || request.accountId === accountId);

@@ -44,10 +44,10 @@ describe(requestComposerSubmit, () => {
 
 /** Takes whatever request is still pending, so each case starts from an empty channel. */
 const drainAttach = () => {
-    const stop = onComposerAttachRequest("drain", () => {});
-
-    // Any pending request is taken: one for another account is dropped, an untagged one goes to the no-op handler.
-    stop();
+    // A composer takes only its own account's request (or an untagged one): one for each account the cases use.
+    for (const accountId of ["u1", "u2"]) {
+        onComposerAttachRequest(accountId, () => {})();
+    }
 };
 
 describe(requestComposerAttach, () => {
@@ -85,7 +85,7 @@ describe(requestComposerAttach, () => {
         stop();
     });
 
-    it("drops files meant for another account instead of uploading them", () => {
+    it("never hands files meant for another account to this account's composer", () => {
         requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
 
         const handler = vi.fn();
@@ -95,6 +95,24 @@ describe(requestComposerAttach, () => {
         expect(hasPendingComposerAttach("u2")).toBe(false);
 
         stop();
+    });
+
+    it("leaves a new account's files for its composer while the old account's composer still listens", () => {
+        const oldComposer = vi.fn();
+        const stopOld = onComposerAttachRequest("u1", oldComposer);
+        const file = new File(["a"], "a.txt");
+
+        requestComposerAttach({ accountId: "u2", files: [file] });
+
+        expect(oldComposer).not.toHaveBeenCalled();
+
+        const newComposer = vi.fn();
+        const stopNew = onComposerAttachRequest("u2", newComposer);
+
+        expect(newComposer).toHaveBeenCalledExactlyOnceWith({ accountId: "u2", files: [file] });
+
+        stopOld();
+        stopNew();
     });
 
     it("joins a drop made while the session loaded with the next drop, under that drop's account", () => {
