@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { withoutSecret, withPassword } from "./login";
+import { standIn, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -37,6 +37,10 @@ describe(withoutSecret, () => {
         }
     });
 
+    it("withholds a text that carries the password encoded twice, which no replacement reaches", () => {
+        expect(withoutSecret(`/home?returnTo=${encodeURIComponent(encodeURIComponent(SECRET))} at 100%`, SECRET)).toBe("[withheld: it holds the password]");
+    });
+
     it("keeps text without the password", () => {
         expect(withoutSecret("https://example.com/home?p=other", SECRET)).toBe("https://example.com/home?p=other");
     });
@@ -67,5 +71,25 @@ describe(withPassword, () => {
         ["the body is plain text", "text/plain", `pw=${STAND}`],
     ])("sends nothing when %s", (_why, type, body) => {
         expect(withPassword(Buffer.from(body), type, FIELD, SECRET)).toBeNull();
+    });
+});
+
+describe(standIn, () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("draws a byte past the alphabet again rather than wrap it onto a letter, which would favour the first ones", () => {
+        let draws = 0;
+
+        vi.spyOn(crypto, "getRandomValues").mockImplementation(<T extends ArrayBufferView | null>(array: T): T => {
+            // 254 is past the 62 letters and digits; then 0, the first of them.
+            (array as Uint8Array).fill(draws === 0 ? 254 : 0);
+            draws += 1;
+
+            return array;
+        });
+
+        expect(standIn(4, "secret")).toBe("AAAA");
     });
 });

@@ -72,7 +72,8 @@ pnpm --filter browser-renderer test:browser   # the saved-login fill against a l
 From before `/login` loads the login page until the password is cleared, the tab starts no worker, shared worker or new
 window, has no WebRTC, WebTransport, `WebSocketStream`, `fetchLater`, keepalive fetch or beacon, and cannot reach a
 service worker (`src/channels.ts`). Other tabs of the session are closed when it starts. A login page that needs any of
-these fails rather than signs in. Speculation rules, whose
+these fails rather than signs in; a sign-in that stops before anything is typed leaves the tab on `about:blank`, so the
+session goes on from a page loaded without the lock. Speculation rules, whose
 prefetches and prerenders the browser sends past request interception, are taken out too: a `Speculation-Rules` header
 is dropped from the tab's documents, and each `<script type="speculationrules">` is removed as it is added, in the
 document and in every shadow root a script makes or reaches, including one whose type a script changes after it is in.
@@ -87,7 +88,9 @@ main frame's POST to the form's action address, only as the password field's val
 nowhere else in the body. That action and field are the ones of the page as the site sent it, loaded first with
 scripts off: a form a script points elsewhere or builds itself is not typed into, since it could send the password to an
 address of the site that keeps and shows it. A POST elsewhere, or one where the page moved or copied the stand-in, is
-not sent. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before
+not sent. Neither is a redirect of the answer whose address carries the password in its query or fragment, in any
+spelling (encoded twice included): that counts as an attempt. A password short enough to be part of an ordinary
+query (`1234` in `?tab=12345`) can fail a sign-in that way after the site took it; the result says it was sent. Scripts are off for the document that answers the POST and for the cleanup's reload, which is checked before
 the lock lifts and only then loaded with its scripts. So no page
 script can read the password, by the field's value or any other way (other realms, events, `FormData`, selection), and a
 `<link rel="preconnect">` or a `javascript:` page can only carry the stand-in. A site that signs in from a script (a
@@ -96,7 +99,8 @@ and nothing is sent. So is a form sent as `text/plain`, or in a charset other th
 
 Not covered: the stand-in's length tells the page the length of a password longer than 64 characters. A site whose
 server shows the password in another spelling than those `isClean` knows, or only to a later request, has its scripts
-read it. `/login` holds its session alone against other calls of the same isolate (a `409` for an `/action`
+read it. A `/login` whose browser is not ready in time, or whose page cannot be set up, closes only a browser it launched: a
+session it reconnected to is left to its keepAlive, as `/action` leaves it. `/login` holds its session alone against other calls of the same isolate (a `409` for an `/action`
 on it); a call from another isolate is not excluded.
 
 `test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with

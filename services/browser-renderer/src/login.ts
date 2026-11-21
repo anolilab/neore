@@ -98,12 +98,61 @@ const base64Pattern = (secret: string): RegExp | null => {
     return runs.size === 0 ? null : new RegExp([...runs].join("|"), "g");
 };
 
-/** `text` with the password replaced in every spelling a page could echo it in: raw, URL- or form-encoded, HTML-escaped, base64 or base64url. */
-export const withoutSecret = (text: string, secret: string): string => {
+/** `text` with `secret` replaced in each spelling `characterPattern` and `base64Pattern` know, one layer deep. */
+const replaceSecret = (text: string, secret: string): string => {
     const scrubbed = text.replaceAll(new RegExp([...secret].map((character) => characterPattern(character)).join(""), "g"), "[password]");
     const base64 = base64Pattern(secret);
 
     return base64 ? scrubbed.replaceAll(base64, "[password]") : scrubbed;
+};
+
+const PERCENT_RUN_RE = /(?:%[\da-f]{2})+/gi;
+
+/** How many layers of percent-encoding are looked through: a site that echoes what it was sent into a URL encodes it again. */
+const DECODE_ROUNDS = 4;
+
+/**
+ * `text`, and what it reads as with each layer of percent-encoding taken off. Each run of escapes is decoded alone, so
+ * a stray `%` elsewhere (a "100%") does not stop the rest from being read.
+ */
+const decodings = (text: string): string[] => {
+    const found = [text];
+
+    for (let round = 0; round < DECODE_ROUNDS; round++) {
+        const last = found.at(-1) ?? text;
+        const next = last.replaceAll(PERCENT_RUN_RE, (run) => {
+            try {
+                return decodeURIComponent(run);
+            } catch {
+                return run;
+            }
+        });
+
+        if (next === last) {
+            break;
+        }
+
+        found.push(next);
+    }
+
+    return found;
+};
+
+/**
+ * Whether `text` carries `secret`: in a form, URL, HTML or base64 spelling, escaped as a JSON string, or under further
+ * layers of percent-encoding.
+ */
+const hasSecret = (text: string, secret: string): boolean =>
+    decodings(text).some((decoded) => decoded.includes(JSON.stringify(secret).slice(1, -1)) || replaceSecret(decoded, secret) !== decoded);
+
+/**
+ * `text` with the password replaced in every spelling a page could echo it in: raw, URL- or form-encoded, HTML-escaped,
+ * base64 or base64url. A text that still carries it in a spelling no replacement reaches (encoded twice) is withheld whole.
+ */
+export const withoutSecret = (text: string, secret: string): string => {
+    const scrubbed = replaceSecret(text, secret);
+
+    return hasSecret(scrubbed, secret) ? "[withheld: it holds the password]" : scrubbed;
 };
 
 // ─── Stand-in ───────────────────────────────────────────────────────────────────
@@ -113,12 +162,30 @@ const STAND_IN_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 /** The shortest stand-in: no other text of a request matches it by chance, and it hides the length of most passwords. */
 const STAND_IN_LENGTH = 64;
 
-/** What the page is given in place of the password: `length` random letters and digits, never the password itself. */
+/** The low six bits of a random byte: a uniform pick from 64, of which the alphabet's 62 are kept. */
+const SIX_BITS = 0b11_1111;
+
+/**
+ * What the page is given in place of the password: `length` random letters and digits, each as likely as any other
+ * (a byte's low six bits, drawn again when they fall past the alphabet), never the password itself.
+ */
 export const standIn = (length: number, password: string): string => {
     let value = password;
 
     while (value === password) {
-        value = [...crypto.getRandomValues(new Uint8Array(length))].map((byte) => STAND_IN_CHARACTERS[byte % STAND_IN_CHARACTERS.length]).join("");
+        value = "";
+
+        while (value.length < length) {
+            const bytes = crypto.getRandomValues(new Uint8Array(length));
+
+            for (const byte of bytes) {
+                const character = STAND_IN_CHARACTERS[byte & SIX_BITS];
+
+                if (character !== undefined && value.length < length) {
+                    value += character;
+                }
+            }
+        }
     }
 
     return value;
@@ -196,21 +263,18 @@ const isRedirectElsewhere = (
     origin: string,
 ): boolean => hasBody && target !== undefined && status !== undefined && REDIRECT_KEEPING_BODY.has(status) && target !== origin;
 
-/** Whether `text` carries `secret`: in a form, URL, HTML or base64 spelling, or escaped as a JSON string. */
-const hasSecret = (text: string, secret: string): boolean => text.includes(JSON.stringify(secret).slice(1, -1)) || withoutSecret(text, secret) !== text;
-
 /**
- * Whether an address carries `secret` in its query or fragment, where a form sent by GET or a script puts it. Not the
- * path: a short password could be a word of the site's own paths.
+ * Whether an address carries `secret` in its query, fragment or user info, where a form sent by GET, a script or a
+ * server's redirect puts it. Not the path: a short password could be a word of the site's own paths.
  */
 const hasSecretInAddress = (url: string, secret: string): boolean => {
     if (!URL.canParse(url)) {
         return hasSecret(url, secret);
     }
 
-    const { hash, search } = new URL(url);
+    const address = new URL(url);
 
-    return hasSecret(search + hash, secret);
+    return [address.username, address.password, address.search + address.hash].some((part) => hasSecret(part, secret));
 };
 
 /** Where a `Location` header points, against the address it answers; `null` (another site) when it does not parse. */
@@ -338,13 +402,19 @@ const armGuard = async (
                   .catch(() => false)
             : false;
 
+    /**
+     * Whether an address carries what the page holds, or, once the form's POST went out, the password: a site that echoes
+     * it into a redirect's `Location` would have the browser put it in the address and send it again by GET.
+     */
+    const isSecretAddress = (url: string): boolean => hasSecretInAddress(url, stand) || (sent !== null && hasSecretInAddress(url, password));
+
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();
         const body = request.postDataBuffer();
         const isOwn = frameOf(request)?.page() === page && originOf(request.url()) === origin;
         const isAdmitted = body === null && request.url() === admitted && request.isNavigationRequest() && frameOf(request) === page.mainFrame();
 
-        if (hasSecretInAddress(request.url(), stand)) {
+        if (isSecretAddress(request.url())) {
             attempt ??= "the password in an address";
         } else if (isExpecting && !sent && isOwn && request.isNavigationRequest() && request.method() === "POST" && frameOf(request) === page.mainFrame()) {
             const filled =
@@ -472,7 +542,10 @@ const armGuard = async (
             const location = event.responseHeaders?.find((header) => header.name.toLowerCase() === "location")?.value;
             const target = location === undefined ? undefined : redirectOrigin(location, event.request.url);
 
-            if (isRedirectElsewhere({ hasBody: event.request.hasPostData === true, status: event.responseStatusCode, target }, origin)) {
+            if (location !== undefined && isSecretAddress(URL.canParse(location, event.request.url) ? new URL(location, event.request.url).href : location)) {
+                attempt ??= "the password in an address";
+                session.send("Fetch.failRequest", { errorReason: "BlockedByClient", requestId: event.requestId }).catch(() => undefined);
+            } else if (isRedirectElsewhere({ hasBody: event.request.hasPostData === true, status: event.responseStatusCode, target }, origin)) {
                 if (isCounting) {
                     attempt ??= `a redirect to ${target ?? "another site"}`;
                 }
@@ -561,8 +634,8 @@ const LINE_BREAK_RE = /[\n\r]/;
 class OutOfTimeError extends Error {}
 
 /**
- * Where the form `input` belongs to would send it (its default button's `formaction`/`formmethod`/`formtarget`/
- * `formenctype`, else the form's own), and, with `submit`, sends it with `requestSubmit`, which runs the page's own submit
+ * Where the form `input` belongs to would send it (the `formaction`/`formmethod`/`formtarget`/`formenctype` of its first
+ * enabled submit button, else the form's own), and, with `submit`, sends it with `requestSubmit` from that button, which runs the page's own submit
  * handlers. Those handlers can still change where it goes; the request guard is what keeps it on `origin`. No method is
  * GET, which would put the password in the address: such a form is sent by POST. A form for another window is refused:
  * it would post from a page the guard does not watch. So is a `text/plain` form, and one in another charset than UTF-8
@@ -578,7 +651,12 @@ const checkForm = (
         return "no-form";
     }
 
-    const button = form.querySelector<HTMLButtonElement | HTMLInputElement>('button:not([type]), button[type="submit" i], input[type="submit" i]');
+    // The first enabled submit button whose form this is, wherever it sits (a `form` attribute): an image input is one,
+    // and a button of no known type is a submit button. A disabled one cannot send the form.
+    const button =
+        [...document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input")].find(
+            (control) => control.form === form && ["image", "submit"].includes(control.type) && !control.matches(":disabled"),
+        ) ?? null;
     const named = button?.getAttribute("formmethod") ?? form.getAttribute("method");
     const action = new URL(button?.getAttribute("formaction") ?? form.getAttribute("action") ?? "", document.baseURI);
     const target = (
@@ -1010,7 +1088,27 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     // The guard is armed right before the password is typed: without it, the password never reached the page.
     if (!guard) {
-        await within(lock?.release() ?? Promise.resolve(), 1000, undefined);
+        if (lock) {
+            await within(lock.release(), 1000, undefined);
+
+            // The document loaded under the lock keeps its locked APIs: the session goes on from a blank page, or none.
+            const isBlank = await within(
+                page
+                    .goto("about:blank", { timeout: 1000 })
+                    .then(() => true)
+                    .catch(() => false),
+                1000,
+                false,
+            );
+
+            if (!isBlank) {
+                await within(
+                    page.close().catch(() => undefined),
+                    1000,
+                    undefined,
+                );
+            }
+        }
 
         return result;
     }

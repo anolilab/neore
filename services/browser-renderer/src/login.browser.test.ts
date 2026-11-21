@@ -194,6 +194,10 @@ describe(signIn, () => {
     const passwordLeft = async (): Promise<boolean> =>
         page.evaluate((secret) => [...document.querySelectorAll("input")].some((input) => input.value === secret), SAVED_SECRET);
 
+    /** Whether a sign-in that typed nothing left the tab on a blank page, with the lock lifted from it. */
+    const leftBlank = async (): Promise<boolean> =>
+        page.url() === "about:blank" && (await page.evaluate(() => typeof RTCPeerConnection === "function" && typeof Worker === "function"));
+
     const sessionPosts = (): Hit[] => login.hits.filter((hit) => hit.url === "/session");
 
     it("sends the form by POST to the login's origin and reports where it landed", async () => {
@@ -398,7 +402,7 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("in this window"), submitted: false, success: false });
-        expect(await page.inputValue("[name=user]")).toBe("");
+        expect(await leftBlank()).toBe(true);
     });
 
     it("signs in when the page it lands on embeds another site", async () => {
@@ -429,7 +433,7 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("in this window"), submitted: false, success: false });
-        expect(await page.inputValue("[name=user]")).toBe("");
+        expect(await leftBlank()).toBe(true);
     });
 
     it("blocks a form a submit handler sends to another window", async () => {
@@ -460,6 +464,15 @@ describe(signIn, () => {
         expect(evil.hits).toStrictEqual([]);
     });
 
+    it("sends the form from its first enabled submit button, an image one, with that button's address", async () => {
+        fixture.page = `<form method="post" action="/elsewhere">${FIELDS}<button disabled formaction="/disabled">Go</button><input type="image" alt="Go" formaction="/session"></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}&x=0&y=0`, method: "POST", url: "/session" }]);
+    });
+
     it("clears the password when the page throws after it was typed", async () => {
         fixture.page = loginForm(`HTMLFormElement.prototype.requestSubmit = () => { throw new Error("broken"); };`);
 
@@ -485,7 +498,7 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ submitted: false, success: false });
-        expect(await page.inputValue("[name=user]")).toBe("");
+        expect(await leftBlank()).toBe(true);
     });
 
     it("reports a sign-in whose answer fails to load as sent, not signed in", async () => {
@@ -542,16 +555,23 @@ describe(signIn, () => {
         expect(page.isClosed()).toBe(true);
     });
 
-    it("scrubs the password from the URL and title it reads back", async () => {
+    it.each([
+        ["as the form sent it", (body: string) => `/home?${body}`],
+        ["in another spelling", () => `/home?echo=${encodeURIComponent(SAVED_SECRET).toLowerCase()}`],
+        ["encoded twice", () => `/home?returnTo=${[...SAVED_SECRET].map((character) => `%25${character.codePointAt(0)?.toString(16)}`).join("")}`],
+        ["as its user info", () => `${login.origin.replace("//", () => `//ann:${SAVED_SECRET}@`)}/home`],
+    ])("fails a redirect of the sign-in that echoes the password into the address %s", async (_how, location) => {
         fixture.page = loginForm();
-        fixture.onSession = (_request, response) => {
-            response.writeHead(303, { location: `/home?echo=${encodeURIComponent(SAVED_SECRET).toLowerCase()}` });
+        fixture.onSession = (_request, response, body) => {
+            response.writeHead(303, { location: location(body) });
             response.end();
         };
 
         const result = await run();
 
-        expect(result).toMatchObject({ success: true, url: `${login.origin}/home?echo=[password]` });
+        expect(result).toMatchObject({ error: expect.stringContaining("the password in an address"), submitted: true, success: false });
+        expect(login.hits.filter((hit) => hit.url.startsWith("/home"))).toStrictEqual([]);
+        expect(page.url()).not.toContain(SAVED_SECRET);
     });
 
     it.each([
@@ -603,7 +623,7 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("A script changed where"), submitted: false, success: false });
-        expect(await page.inputValue("[name=user]")).toBe("");
+        expect(await leftBlank()).toBe(true);
     });
 
     it("types nothing into a login form a script builds", async () => {
@@ -612,6 +632,7 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("built by a script"), submitted: false, success: false });
+        expect(await leftBlank()).toBe(true);
     });
 
     it("does not count a beacon of the whole form as the sign-in", async () => {

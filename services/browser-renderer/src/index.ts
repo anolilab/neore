@@ -286,10 +286,13 @@ const guardPage = async (page: import("@cloudflare/playwright").Page) => {
  * multi-step workflows (navigate → click → screenshot) can reuse the same page; an expired or invalid session falls back
  * to a new launch. The session id is the caller's to persist.
  */
-const openBrowser = async (env: Env, sessionId: string | undefined): Promise<{ browser: import("@cloudflare/playwright").Browser; sessionId: string }> => {
+const openBrowser = async (
+    env: Env,
+    sessionId: string | undefined,
+): Promise<{ browser: import("@cloudflare/playwright").Browser; isLaunched: boolean; sessionId: string }> => {
     if (sessionId) {
         try {
-            return { browser: await env.BROWSER.connect(sessionId), sessionId };
+            return { browser: await env.BROWSER.connect(sessionId), isLaunched: false, sessionId };
         } catch {
             // Session expired or invalid — fall back to new launch
         }
@@ -297,7 +300,7 @@ const openBrowser = async (env: Env, sessionId: string | undefined): Promise<{ b
 
     const browser = await env.BROWSER.launch({ keepAlive: KEEP_ALIVE_MS });
 
-    return { browser, sessionId: browser.sessionId() };
+    return { browser, isLaunched: true, sessionId: browser.sessionId() };
 };
 
 /** The session's page (a reconnected session keeps its page), guarded and with the default timeout. */
@@ -586,40 +589,57 @@ const settledWithin = async <T>(promise: Promise<T>, ms: number): Promise<T | nu
 };
 
 /**
- * The session's browser and page for a sign-in, or `null` when they are not ready by `deadline`: a browser that is ready
- * later is closed, since nothing will use it.
+ * The session's browser and page for a sign-in, or `null` when they are not ready by `deadline`. A browser this call
+ * launched is closed when it is late or its page cannot be set up, since nothing will use it; one reconnected to the
+ * caller's session is left to its keepAlive, as `/action` leaves it: closing it would end the caller's session.
+ * `sessionClosed`, also on the error it throws: the session the caller named is gone (its reconnect failed and a new
+ * browser was launched instead).
  */
 const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: number) => {
     let isLate = false;
-    let opened: { browser: Browser; sessionId: string } | undefined;
-    const close = (browser: Browser): void => {
-        browser.close().catch(() => undefined);
+    let opened: { browser: Browser; isLaunched: boolean; sessionId: string } | undefined;
+    const close = ({ browser, isLaunched }: { browser: Browser; isLaunched: boolean }): void => {
+        if (isLaunched) {
+            browser.close().catch(() => undefined);
+        }
     };
     const opening = openBrowser(env, sessionId).then((result) => {
         opened = result;
 
         if (isLate) {
-            close(result.browser);
+            close(result);
         }
 
         return result;
     });
+    const isSessionClosed = (): boolean => Boolean(sessionId && opened?.isLaunched);
     const ready = await settledWithin(
         opening.then(async (result) => {
-            return { ...result, page: await pageOf(result.browser) };
+            try {
+                return { ...result, page: await pageOf(result.browser) };
+            } catch (error) {
+                // A late one was closed as it opened.
+                if (!isLate) {
+                    close(result);
+                }
+
+                throw error;
+            }
         }),
         deadline - Date.now(),
-    );
+    ).catch((error: unknown) => {
+        throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), { sessionClosed: isSessionClosed() });
+    });
 
     if (!ready) {
         isLate = true;
 
         if (opened) {
-            close(opened.browser);
+            close(opened);
         }
     }
 
-    return { opened, ready };
+    return { isSessionClosed: isSessionClosed(), opened, ready };
 };
 
 app.post("/login", async (c) => {
@@ -693,13 +713,25 @@ const logIn = async (
     try {
         setup = await setUpWithin(env, sessionId, deadline);
     } catch (error) {
-        return { body: { error: `Failed to launch browser: ${scrub(error)}`, success: false }, status: 500 } as const;
+        const isSessionClosed = (error as { sessionClosed?: boolean }).sessionClosed === true;
+
+        return {
+            body: { error: `Failed to launch browser: ${scrub(error)}`, success: false, ...(isSessionClosed && { sessionClosed: true }) },
+            status: 500,
+        } as const;
     }
 
-    const { opened, ready } = setup;
+    const { isSessionClosed, opened, ready } = setup;
 
     if (!ready) {
-        return { body: { error: "The browser did not start in time, so nothing was typed. Try it again.", success: false }, status: 504 } as const;
+        return {
+            body: {
+                error: "The browser did not start in time, so nothing was typed. Try it again.",
+                success: false,
+                ...(isSessionClosed && { sessionClosed: true }),
+            },
+            status: 504,
+        } as const;
     }
 
     const { browser, page } = ready;
