@@ -7,7 +7,7 @@ import type { BrowserContext, CDPSession, Page, Request, Response, Route, WebSoc
 import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
 import type { FormTarget } from "./served-form";
-import { MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
+import { AMBIGUOUS, MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
 
 /** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
 export const originOf = (url: string): string | null => {
@@ -383,6 +383,7 @@ const armGuard = async (
     let isScripted = false;
     let attempt: string | null = null;
     let admitted: string | null = null;
+    let answerStatus = 0;
 
     /** A service worker's request has no frame: it is not the page's. */
     const frameOf = (request: Request) => {
@@ -480,6 +481,7 @@ const armGuard = async (
 
         if (request) {
             isCounting = false;
+            answerStatus = status;
         }
     };
 
@@ -589,6 +591,8 @@ const armGuard = async (
         },
         /** Whether the final answer to the form's own navigation arrived. */
         answered: () => !isCounting,
+        /** The HTTP status of that answer, 0 before it arrived. */
+        answerStatus: () => answerStatus,
         attempt: () => attempt,
         /** Whether the form's own POST went without the stand-in: the page changed the field, so it was not sent. */
         changed: () => isChanged,
@@ -1000,6 +1004,27 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     let guard: Guard | undefined;
     let lock: ChannelLock | undefined;
+    let isLocking = false;
+    let isStalled = false;
+
+    /** A step of the lock's setup, ended by the hold: one that does not settle in time has the tab closed with the session. */
+    const settle = async <T>(step: Promise<T>): Promise<T> => {
+        const settled = await within(
+            step.then((value) => {
+                return { value };
+            }),
+            left(pageTimeout),
+            null,
+        );
+
+        if (!settled) {
+            isStalled = true;
+
+            throw new Error("The browser could not be locked for the sign-in in time, so nothing was typed and the browser session was closed");
+        }
+
+        return settled.value;
+    };
 
     const failed = (error: string): Extract<SignInResult, { success: false }> => {
         const refused = guard ? null : lock?.refused();
@@ -1052,7 +1077,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             const served = html ? servedForms(html.text, html.url) : [];
             const target = servedTarget(served, form);
 
-            if (html === null || served[0] === null) {
+            if (html === null || served[0] === null || served.includes(AMBIGUOUS)) {
                 return "The agent's browser cannot check where the login form sends the password (the page as the site sent it could not be read, or its first password field is in no form it can read), so nothing was typed";
             }
 
@@ -1094,9 +1119,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         // Before the page loads: each socket it opens is then one the guard can close, and no worker, window or WebRTC
         // connection of it runs past the lock.
-        await gateSockets(page.context());
+        await settle(gateSockets(page.context()));
 
-        const locked = await lockChannels(page);
+        // Its script is in the tab's document from the first command: one that fails part way leaves it there.
+        isLocking = true;
+
+        const locked = await settle(lockChannels(page));
 
         lock = locked;
 
@@ -1197,6 +1225,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return failed(`The page tried to send ${blocked} while the password was in it, so it was stopped`);
         }
 
+        if (guard.submitted() && guard.answerStatus() >= 400) {
+            return failed(`The site answered the sign-in with an error (HTTP ${guard.answerStatus()}); the form was sent`);
+        }
+
         if (guard.submitted()) {
             return { passwordFieldRemains: false, submitted: true, success: true, title: "", url: "" };
         }
@@ -1224,8 +1256,19 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     // The guard is armed right before the password is typed: without it, the password never reached the page.
     if (!guard) {
-        if (lock) {
-            await within(lock.release(), 1000, undefined);
+        // A setup that may still finish would lock or route the session's later pages.
+        if (isStalled && !result.success) {
+            await within(
+                page.close().catch(() => undefined),
+                1000,
+                undefined,
+            );
+
+            return { ...result, sessionClosed: true };
+        }
+
+        if (isLocking) {
+            await within(lock?.release() ?? Promise.resolve(), 1000, undefined);
 
             // The document loaded under the lock keeps its locked APIs: the session goes on from a blank page, or none.
             const isBlank = await within(

@@ -17,6 +17,9 @@ const SAVED_SECRET = "s3cret-pw";
 
 type FallbackOptions = Parameters<Route["fallback"]>[0];
 
+/** The outcome of a sign-in that typed the stand-in and sent the form, or ran the page's submit handler that held it back. */
+const REACHED_SEND = /^(?:The login form was not sent: the page held it back|The page tried to send .+|The password could not be cleared .+)?$/u;
+
 /** A command answer that never comes. */
 const NEVER = new Promise<never>(() => {
     // Never settles.
@@ -1009,6 +1012,7 @@ describe(signIn, () => {
             () => {
                 return {
                     page: `<div><template shadowrootmode="closed"><script type="speculationrules">${EVERY_LINK}</script></template></div>${onSubmit(linkTo(evil.origin))}`,
+                    refusal: "speculation rules that cannot be taken out",
                 };
             },
         ],
@@ -1057,10 +1061,14 @@ describe(signIn, () => {
             },
         ],
     ])("gives %s no way out with the password", async (_what, make) => {
-        Object.assign(fixture, make());
+        const { refusal, ...fields }: Partial<typeof fixture> & { refusal?: string } = make();
 
-        await run();
+        Object.assign(fixture, fields);
 
+        const result = await run();
+
+        // Each case gets as far as the stand-in typed and the form sent, unless it names the refusal that stops it first.
+        expect(result.success ? "" : result.error).toMatch(refusal ?? REACHED_SEND);
         expect(evil.hits).toStrictEqual([]);
     });
 
@@ -1094,8 +1102,9 @@ describe(signIn, () => {
     ])("refuses WebRTC from %s while the password is in it", async (_where, send) => {
         fixture.page = onSubmit(send());
 
-        await run();
+        const result = await run();
 
+        expect(result.success ? "" : result.error).toMatch(REACHED_SEND);
         expect(datagrams).toStrictEqual([]);
     });
 
@@ -1263,6 +1272,53 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ submitted: true, success: true });
         expect(sessionPosts().map((hit) => new URLSearchParams(hit.body).get("user"))).toStrictEqual(["ann"]);
+    });
+
+    it("reports an error the site answers the sign-in with as sent, not signed in", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            response.statusCode = 503;
+            html(response, "<h1>Down for maintenance</h1>");
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("HTTP 503"), submitted: true, success: false });
+    });
+
+    it("leaves the tab on a blank page when the lock fails part way, after its script reached the tab's document", async () => {
+        const { newCDPSession } = context;
+
+        await page.goto(`${login.origin}/home`);
+        context.newCDPSession = async (...args) => {
+            const session = await newCDPSession.apply(context, args);
+            const { send } = session;
+
+            session.send = (async (method: string, params?: Parameters<typeof send>[1]) =>
+                method === "Preload.enable"
+                    ? Promise.reject(new Error("Preload is off"))
+                    : send.call(session, method as never, params as never)) as typeof send;
+
+            return session;
+        };
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: false, success: false });
+        expect(page.url()).toBe("about:blank");
+        await expect(page.evaluate(() => Boolean(new RTCPeerConnection()))).resolves.toBe(true);
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("closes the session when the lock's setup does not settle in time", async () => {
+        context.routeWebSocket = async () => NEVER;
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("could not be locked"), sessionClosed: true, submitted: false, success: false });
+        expect(page.isClosed()).toBe(true);
     });
 
     it("stops waiting on a submit handler that does not return", async () => {

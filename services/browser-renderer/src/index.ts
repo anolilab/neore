@@ -696,28 +696,65 @@ app.post("/login", async (c) => {
 
     const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - LOGIN_MARGIN_MS;
 
+    let closing: Promise<void> | undefined;
+
     try {
-        const { body: answer, status } = await logIn(c.env, { deadline, origin, password, sessionId, url, username });
+        const { body: answer, status } = await logIn(c.env, {
+            deadline,
+            hold: (pending) => {
+                closing = pending;
+            },
+            origin,
+            password,
+            sessionId,
+            url,
+            username,
+        });
 
         return c.json(answer, status);
     } finally {
-        if (sessionId) {
+        if (closing) {
+            // A close still under way: the session stays held until it ends, so nothing else uses it meanwhile.
+            const held = closing.finally(() => {
+                if (sessionId) {
+                    signingIn.delete(sessionId);
+                }
+            });
+
+            try {
+                c.executionCtx.waitUntil(held);
+            } catch {
+                // No execution context (a test's request): the close goes on regardless.
+            }
+        } else if (sessionId) {
             signingIn.delete(sessionId);
         }
     }
 });
 
-/** The sign-in of `/login`, the browser setup included, ended by `deadline`; the browser is closed when it must be. */
+/**
+ * The sign-in of `/login`, the browser setup included, ended by `deadline`; the browser is closed when it must be. A close
+ * that has not ended by the end of the hold is handed to `hold` and the answer goes out without waiting for it.
+ */
 const logIn = async (
     env: Env,
     {
         deadline,
+        hold,
         origin,
         password,
         sessionId,
         url,
         username,
-    }: { deadline: number; origin: string; password: string; sessionId: string | undefined; url: string; username: string },
+    }: {
+        deadline: number;
+        hold: (closing: Promise<void>) => void;
+        origin: string;
+        password: string;
+        sessionId: string | undefined;
+        url: string;
+        username: string;
+    },
 ) => {
     const scrub = (error: unknown): string => withoutSecret(error instanceof Error ? error.message : String(error), password);
     let setup: Awaited<ReturnType<typeof setUpWithin>>;
@@ -764,7 +801,15 @@ const logIn = async (
         return { body: { error: scrub(error), sessionId: opened?.sessionId, success: false }, status: 500 } as const;
     } finally {
         if (shouldCloseSession) {
-            await browser.close().catch(() => {});
+            const closing = browser.close().catch(() => undefined);
+            const isClosed = await settledWithin(
+                closing.then(() => true),
+                deadline + LOGIN_MARGIN_MS - Date.now(),
+            );
+
+            if (!isClosed) {
+                hold(closing);
+            }
         }
     }
 };

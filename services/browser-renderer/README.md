@@ -101,7 +101,7 @@ body, a service worker's answer, not `text/html`, over 2 MB, or bytes the browse
 not for Shift_JIS or an undeclared charset with non-ASCII bytes), when a redirect of the load passed through another
 site, or when the site's first password field is in no form parse5 sees (a form inside a table, which the browser's
 parser ties to its fields without holding them). A page with password forms to more than one place (a sign-up form
-beside the login form), a form whose submit buttons go to different places, a login form only in a declarative shadow root,
+beside the login form), a form (any of the page's) whose submit buttons go to different places, a login form only in a declarative shadow root,
 and a `url` that differs from the tab's address only by its fragment are refused too. The capture has been run
 against Playwright's Chromium only, not yet on Browser Rendering; there, a body it does not hand back refuses every
 sign-in rather than allow one. Not covered: a script can still change the other fields of the body (a hidden field, or the username), as the site's own scripts do, or send a form of its own with the stand-in in the password field's name to the same action; a site where such a field alone picks what the password signs into would take the password for the
@@ -121,9 +121,9 @@ and nothing is sent. So is a form sent as `text/plain`, or in a charset other th
 
 Not covered: the stand-in's length tells the page the length of a password longer than 64 characters. A site whose
 server shows the password in another spelling than those `isClean` knows, or only to a later request, has its scripts
-read it. A `/login` whose browser is not ready in time, or whose page cannot be set up, closes only a browser it launched: a
+read it. A lock that cannot be set up whole leaves the tab on `about:blank`, and one that does not settle in time closes the session. An answer to the sign-in with an HTTP error status is reported as sent, not signed in. A `/login` whose browser is not ready in time, or whose page cannot be set up, closes only a browser it launched: a
 session it reconnected to is left to its keepAlive, as `/action` leaves it. `/login` holds its session alone against other calls of the same isolate (a `409` for an `/action`
-on it); a call from another isolate is not excluded.
+on it); a call from another isolate is not excluded. A session it must close stays held until the close ends, while the answer goes out within the hold.
 
 `test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with
 cross-site frames in their own process, and needs

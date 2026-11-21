@@ -30,6 +30,9 @@ export interface FormTarget {
     target: string;
 }
 
+/** A password field whose form's submit buttons send it to different places: no page with one is filled. */
+export const AMBIGUOUS = "ambiguous";
+
 const ENCTYPES = new Set(["application/x-www-form-urlencoded", "multipart/form-data", "text/plain"]);
 
 /** An `enctype` or `formenctype` value as the DOM reads it: an unknown one is URL-encoded. */
@@ -86,13 +89,13 @@ const isSameDestination = (one: Omit<FormTarget, "name">, other: Omit<FormTarget
     one.action === other.action && one.charset === other.charset && one.enctype === other.enctype && one.method === other.method && one.target === other.target;
 
 /**
- * Where each password field of `html` would be sent, in document order (`null` for one in no form), read the way
+ * Where each password field of `html` would be sent, in document order (`null` for one in no form, `AMBIGUOUS` for one
+ * whose form's enabled submit buttons would send it to different places), read the way
  * `checkForm` reads the live page: the form owner by the `form` attribute or the nearest form around it, the first enabled
  * submit button of that form, and the addresses against the first `<base href>` or `url`. A form the parser ties to a field
- * it does not hold (a form in a table) is not seen, so that field is in no form here; nor is a form whose enabled submit
- * buttons would send it to different places.
+ * it does not hold (a form in a table) is not seen, so that field is in no form here.
  */
-export const servedForms = (html: string, url: string): (FormTarget | null)[] => {
+export const servedForms = (html: string, url: string): (FormTarget | typeof AMBIGUOUS | null)[] => {
     const elements = inOrder(parse(html));
     const html5 = elements.filter(({ element }) => element.namespaceURI === HTML_NAMESPACE);
     const baseHref = html5.find(({ element }) => isHtml(element, "base") && attribute(element, "href") !== null);
@@ -123,17 +126,19 @@ export const servedForms = (html: string, url: string): (FormTarget | null)[] =>
 
     const typeOf = (element: Element): string => attribute(element, "type")?.toLowerCase() ?? "";
 
-    const submittersOf = (form: Element): Element[] =>
-        html5
-            .filter(
-                (entry) =>
-                    (isHtml(entry.element, "button")
-                        ? !["button", "reset"].includes(typeOf(entry.element))
-                        : isHtml(entry.element, "input") && ["image", "submit"].includes(typeOf(entry.element))) &&
-                    ownerOf(entry) === form &&
-                    !isDisabled(entry.element, entry.ancestors),
-            )
-            .map(({ element }) => element);
+    // The enabled submit buttons of each form, in document order: read once, not once for each password field.
+    const submitters = new Map<Element, Element[]>();
+
+    for (const entry of html5) {
+        const isSubmit = isHtml(entry.element, "button")
+            ? !["button", "reset"].includes(typeOf(entry.element))
+            : isHtml(entry.element, "input") && ["image", "submit"].includes(typeOf(entry.element));
+        const form = isSubmit && !isDisabled(entry.element, entry.ancestors) ? ownerOf(entry) : null;
+
+        if (form) {
+            submitters.set(form, [...(submitters.get(form) ?? []), entry.element]);
+        }
+    }
 
     /** Where `form` goes when `button` (the first enabled submit button, or none) sends it. */
     const destinationOf = (form: Element, button: Element | undefined): Omit<FormTarget, "name"> => {
@@ -152,6 +157,26 @@ export const servedForms = (html: string, url: string): (FormTarget | null)[] =>
         };
     };
 
+    const destinations = new Map<Element, Omit<FormTarget, "name"> | typeof AMBIGUOUS>();
+
+    /** Where `form` goes, once for each form: `AMBIGUOUS` when its submit buttons send it to different places. */
+    const destinationOfForm = (form: Element): Omit<FormTarget, "name"> | typeof AMBIGUOUS => {
+        const known = destinations.get(form);
+
+        if (known) {
+            return known;
+        }
+
+        const [button, ...others] = submitters.get(form) ?? [];
+        const destination = destinationOf(form, button);
+        // Which button is first is the page's to change (a button rendered above the form's own, by its `form` attribute).
+        const found = others.every((other) => isSameDestination(destinationOf(form, other), destination)) ? destination : AMBIGUOUS;
+
+        destinations.set(form, found);
+
+        return found;
+    };
+
     return html5
         .filter(({ element }) => isHtml(element, "input") && typeOf(element) === "password")
         .map((entry) => {
@@ -161,12 +186,9 @@ export const servedForms = (html: string, url: string): (FormTarget | null)[] =>
                 return null;
             }
 
-            const [button, ...others] = submittersOf(form);
-            const destination = { ...destinationOf(form, button), name: attribute(entry.element, "name") ?? "" };
+            const destination = destinationOfForm(form);
 
-            // A form whose submit buttons send it to different places: which one is first is the page's to change (a
-            // button rendered above the form's own, by its `form` attribute).
-            return others.every((other) => isSameDestination(destinationOf(form, other), destination)) ? destination : null;
+            return destination === AMBIGUOUS ? AMBIGUOUS : { ...destination, name: attribute(entry.element, "name") ?? "" };
         });
 };
 
@@ -175,18 +197,26 @@ export const servedForms = (html: string, url: string): (FormTarget | null)[] =>
  * of that form. `null` unless the live form, `live`, is that very destination, the site sent a password field of that
  * name to it, and every password field the site sent in a form goes there too (content the site renders above its login
  * form, or a sign-up form beside it, could otherwise be the one filled); also when that first field is in no form parse5
- * sees (one the parser ties to a form in a table), which cannot be checked. The live values are read in the page, whose
+ * sees (one the parser ties to a form in a table), which cannot be checked, and when any password form the site sent is
+ * `AMBIGUOUS`. The live values are read in the page, whose
  * scripts could fake them: what is sent is held to the served destination and name by the request guard, so a faked
  * report only has the form not sent.
  */
-export const servedTarget = (served: (FormTarget | null)[], live: FormTarget): FormTarget | null => {
+export const servedTarget = (served: (FormTarget | typeof AMBIGUOUS | null)[], live: FormTarget): FormTarget | null => {
     const [first] = served;
+    const targets = served.filter((target): target is FormTarget => target !== null && target !== AMBIGUOUS);
 
-    if (!first || !isSameDestination(first, live) || served.some((target) => target !== null && !isSameDestination(target, first))) {
+    if (
+        !first ||
+        first === AMBIGUOUS ||
+        served.includes(AMBIGUOUS) ||
+        !isSameDestination(first, live) ||
+        targets.some((target) => !isSameDestination(target, first))
+    ) {
         return null;
     }
 
-    return served.some((target) => target?.name === live.name) ? { ...first, name: live.name } : null;
+    return targets.some((target) => target.name === live.name) ? { ...first, name: live.name } : null;
 };
 
 /** The most served HTML read, in bytes: a login page is far smaller, and a larger one is not checked. */

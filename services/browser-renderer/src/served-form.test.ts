@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FormTarget } from "./served-form";
-import { servedForms, servedTarget } from "./served-form";
+import { AMBIGUOUS, servedForms, servedTarget } from "./served-form";
 
 const URL_OF_PAGE = "https://id.example/login?x=1";
 
@@ -81,10 +81,13 @@ describe(servedTarget, () => {
         expect(servedTarget(two, { ...LIVE, action: "https://id.example/session" })).toBeNull();
     });
 
-    it("takes no destination for a form whose submit buttons send it to different places", () => {
+    it("refuses a page with a form whose submit buttons send it to different places, wherever that form is", () => {
         const html = `<button form="f" formaction="/comments">x</button><form id="f" action="/session">${FIELDS}<button>Go</button></form>`;
+        const later = servedForms(`<form action="/session">${FIELDS}</form>${html.replace(">x<", ">y<")}`, URL_OF_PAGE);
 
-        expect(servedForms(html, URL_OF_PAGE)).toStrictEqual([null]);
+        expect(servedForms(html, URL_OF_PAGE)).toStrictEqual([AMBIGUOUS]);
+        expect(later).toStrictEqual([{ ...LIVE, action: "https://id.example/session" }, AMBIGUOUS]);
+        expect(servedTarget(later, { ...LIVE, action: "https://id.example/session" })).toBeNull();
     });
 
     it("accepts another password field of that same form, and refuses a page whose first one is in no form", () => {

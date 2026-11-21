@@ -151,6 +151,40 @@ describe("POST /login", () => {
         await expect(response.json()).resolves.toMatchObject({ sessionClosed: true, success: false });
     });
 
+    it("answers within its budget when closing a session it must close does not end, and keeps that session held", async () => {
+        const { env, pending } = binding();
+        // A page whose sign-in cannot be locked in time (its sockets are never gated), so the session must be closed.
+        const context = {
+            route: async () => undefined,
+            routeWebSocket: async () =>
+                new Promise<void>(() => {
+                    // Never settles.
+                }),
+        };
+        const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
+        const close = vi.fn(
+            async () =>
+                new Promise<void>(() => {
+                    // Never settles.
+                }),
+        );
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "held" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close, contexts: () => [{ pages: () => [page] }], sessionId: () => "held" });
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        const answer = await response;
+
+        expect(answer.status).toBe(200);
+        await expect(answer.json()).resolves.toMatchObject({ sessionClosed: true, success: false });
+        expect(close).toHaveBeenCalledOnce();
+
+        const action = await post(env, "/action", { action: "extract", sessionId: "held" });
+
+        expect(action.status).toBe(409);
+    });
+
     it("holds its session alone: an action on it is refused, and a sign-in waits for no running action", async () => {
         const { env } = binding();
         const signingIn = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "one" });
