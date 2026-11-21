@@ -16,20 +16,19 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 
-import type { ImportedRuleFile } from "../lib/rule-file-import";
-import { importRuleTexts } from "../lib/rule-file-import";
+import type { ImportedRuleTexts } from "../lib/rule-file-import";
+import { importRuleTexts, isWholeInstructionFile } from "../lib/rule-file-import";
 
 /**
- * What a repository import read: the files as the upload import turns them into drafts, those it could not read, those
- * it had no requests left for (`notRead`), which another import reads, and picks left out as the same file as one
- * before them (`duplicates`: a link such as `CLAUDE.md → AGENTS.md`, whose text would apply twice).
+ * What a repository import read: the files as the upload import turns them into drafts (`skipped`: the paths past the
+ * room), the paths it could not read, how many it had no requests left for (`notRead`), which another import reads, and
+ * picks left out as the same file as one before them (`duplicates`: a link such as `CLAUDE.md → AGENTS.md`, whose text
+ * would apply twice).
  */
-export interface RepoImportResult {
+export interface RepoImportResult extends ImportedRuleTexts {
     duplicates: number;
-    imported: ImportedRuleFile[];
     notRead: number;
-    skipped: number;
-    unreadable: number;
+    unreadable: string[];
 }
 
 /** Why a symlink is not followed (`LinkRefusal` in `source-control/repo-rule-files.ts`): listed, never read. */
@@ -65,7 +64,13 @@ const repoName = (url: string): string => url.replace(HOST_PREFIX, "").replace(G
  */
 const mayBeTooLong = (file: FoundFile): boolean => isPickable(file) && file.size > MAX_RULE_FILE_LENGTH;
 
-/** For each pickable file whose blob an earlier one by path has (a link to it), that earlier file's path. */
+/**
+ * What makes two picks one draft: the same blob read the same way. A root instruction file is imported whole, a rules
+ * folder's file by its front matter, so the same bytes at both make two different drafts.
+ */
+const draftKey = (path: string, sha: string): string => `${isWholeInstructionFile(path) ? "whole" : "rule"}:${sha}`;
+
+/** For each pickable file whose draft an earlier one by path makes (a link to it), that earlier file's path. */
 const sameFileAs = (files: ReadonlyArray<FoundFile>): Map<string, string> => {
     const first = new Map<string, string>();
     const same = new Map<string, string>();
@@ -77,10 +82,11 @@ const sameFileAs = (files: ReadonlyArray<FoundFile>): Map<string, string> => {
             continue;
         }
 
-        const earlier = first.get(file.sha);
+        const key = draftKey(file.path, file.sha);
+        const earlier = first.get(key);
 
         if (earlier === undefined) {
-            first.set(file.sha, file.path);
+            first.set(key, file.path);
         } else {
             same.set(file.path, earlier);
         }
@@ -232,8 +238,8 @@ const RepoRuleFileImport: FC<{
         const readArgs = { commit, projectId: projectId as Id<"projects">, repoId: listing.repoId as Id<"projectRepositories"> };
         // Each with the blob its listing found, so the read need not follow links again.
         const shas = new Map(listing.files.map((file) => [file.path, file.sha]));
-        // In the order the import takes them, one pick of each blob (the first by path; a link to it is the same text):
-        // the first a project can hold are read, the rest counted as left out.
+        // In the order the import takes them, one pick of each draft (the first by path; a link to it is the same text,
+        // read the same way): the first a project can hold are read, the rest left out.
         const taken = new Set<string>();
         const all = [...picked]
             .toSorted((left, right) => left.localeCompare(right))
@@ -244,9 +250,10 @@ const RepoRuleFileImport: FC<{
                     return true;
                 }
 
-                const repeat = taken.has(sha);
+                const key = draftKey(path, sha);
+                const repeat = taken.has(key);
 
-                taken.add(sha);
+                taken.add(key);
 
                 return !repeat;
             });
@@ -282,13 +289,18 @@ const RepoRuleFileImport: FC<{
             const notRead = outcome.files.flatMap((file) => (file.status === "not_read" ? [file.path] : []));
             const read = await importRuleTexts(texts, MAX_RULE_FILES);
 
-            // What this read answered, and any pick of a blob it answered: importing again adds nothing twice.
-            const answered = new Set(outcome.files.flatMap((file) => (file.status === "not_read" ? [] : [file.path])));
-            const answeredShas = new Set([...answered].flatMap((path) => shas.get(path) ?? []));
-            const left = [...latestPicks.current].filter((path) => {
+            // What this read answered, and any pick of a draft it answered: importing again adds nothing twice.
+            const keyOf = (path: string): string | undefined => {
                 const sha = shas.get(path);
 
-                return !answered.has(path) && (sha === undefined || !answeredShas.has(sha));
+                return sha === undefined ? undefined : draftKey(path, sha);
+            };
+            const answered = new Set(outcome.files.flatMap((file) => (file.status === "not_read" ? [] : [file.path])));
+            const answeredKeys = new Set([...answered].flatMap((path) => keyOf(path) ?? []));
+            const left = [...latestPicks.current].filter((path) => {
+                const key = keyOf(path);
+
+                return !answered.has(path) && (key === undefined || !answeredKeys.has(key));
             });
 
             if (pickChanges.current !== changesAtRead && left.length > 0) {
@@ -305,8 +317,8 @@ const RepoRuleFileImport: FC<{
                 ...read,
                 duplicates,
                 notRead: notRead.length,
-                skipped: read.skipped + all.length - paths.length,
-                unreadable: outcome.files.length - texts.length - notRead.length,
+                skipped: [...read.skipped, ...all.slice(MAX_RULE_FILES)],
+                unreadable: outcome.files.flatMap((file) => (file.status === "ok" || file.status === "not_read" ? [] : [file.path])),
             };
         });
     };

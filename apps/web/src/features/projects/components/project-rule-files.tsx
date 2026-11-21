@@ -41,6 +41,9 @@ import RepoRuleFileImport from "./repo-rule-file-import";
 const LEGACY_CONTEXT_ID = "context";
 const LEGACY_CONTEXT_TITLE = "Project context";
 
+/** How many files an import note names of those it left out; the rest are counted. */
+const NAMED_LEFT_OUT = 5;
+
 /** The backend's code for a refused call: its own `data.code` when it names one, else the standard `code`. */
 const errorCode = (error: unknown): unknown => {
     const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
@@ -498,8 +501,8 @@ const ProjectRuleFiles: FC<{
         const now = latest.current;
         const base = now.draft ?? now.savedFiles;
         const added: RuleFileDraft[] = [];
-        let { skipped } = read;
-        let tooLarge = 0;
+        const skipped = [...read.skipped];
+        const tooLarge: string[] = [];
         let bytes = ruleFilesStoredBytes(
             toSaved(
                 base.filter((file) => file.id !== now.keptLegacyId),
@@ -512,7 +515,7 @@ const ProjectRuleFiles: FC<{
         let shortened = 0;
         let renamed = 0;
 
-        for (const file of read.imported) {
+        for (const { path, ...file } of read.imported) {
             // A name opening the id form, which a save refuses (a file named `id:setup.md`), is renamed and said.
             const unreserved = unreservedTitle(file.title);
             const title = fitTitle(unreserved, titles, MAX_RULE_TITLE_LENGTH);
@@ -521,9 +524,9 @@ const ProjectRuleFiles: FC<{
             const cost = ruleFilesStoredBytes(toSaved([draftFile], legacyTitle)) - (bytes > 2 ? 1 : 2);
 
             if (base.length + added.length >= MAX_RULE_FILES) {
-                skipped += 1;
+                skipped.push(path);
             } else if (file.content.length > MAX_RULE_FILE_LENGTH || bytes + cost > MAX_RULE_FILES_BYTES) {
-                tooLarge += 1;
+                tooLarge.push(path);
             } else {
                 added.push(draftFile);
                 titles.add(title);
@@ -544,19 +547,34 @@ const ProjectRuleFiles: FC<{
         }
 
         const toSet = added.filter((file) => needsMode(file)).length;
-        const noneFound = read.imported.length === 0 && read.unreadable === 0 && read.notRead === 0 ? [t`No Markdown files were found to import.`] : [];
+        const noneFound = read.imported.length === 0 && read.unreadable.length === 0 && read.notRead === 0 ? [t`No Markdown files were found to import.`] : [];
         const addedNote =
             added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
         const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
-        const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
-        const unreadable = t`${plural(read.unreadable, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large.`;
+        // The files left out by name, so the person knows which to shorten or add by hand: the first few, then how many more.
+        const named = (paths: ReadonlyArray<string>): string => {
+            const more = paths.length - NAMED_LEFT_OUT;
+            const shown = paths.toSorted((left, right) => left.localeCompare(right)).slice(0, NAMED_LEFT_OUT);
+
+            return new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(
+                more > 0 ? [...shown, plural(more, { one: "# more", other: "# more" })] : shown,
+            );
+        };
+        const skippedCount = skipped.length;
+        const skippedNames = named(skipped);
+        const left = t`${plural(skippedCount, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files. Left out: ${skippedNames}.`;
+        const unreadableCount = read.unreadable.length;
+        const unreadableNames = named(read.unreadable);
+        const unreadable = t`${plural(unreadableCount, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large. Not read: ${unreadableNames}.`;
         const { duplicates } = read;
         const duplicatesNote = t`${plural(duplicates, { one: "# file was left out as the same file as another picked", other: "# files were left out as the same file as another picked" })}: the same text would apply twice.`;
         const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;
         const length = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
         const size = formatNumber(MAX_RULE_FILES_BYTES / 1_000_000, i18n.locale);
-        const tooLargeNote = t`${plural(tooLarge, { one: "# file was left out as too large", other: "# files were left out as too large" })}: a rule file holds at most ${length} characters, and all of a project's together at most ${size} MB.`;
+        const tooLargeCount = tooLarge.length;
+        const tooLargeNames = named(tooLarge);
+        const tooLargeNote = t`${plural(tooLargeCount, { one: "# file was left out as too large", other: "# files were left out as too large" })}: a rule file holds at most ${length} characters, and all of a project's together at most ${size} MB. Too large: ${tooLargeNames}.`;
 
         const titleLimit = formatNumber(MAX_RULE_TITLE_LENGTH, i18n.locale);
         const shortenedNote = t`${plural(shortened, { one: "# name was", other: "# names were" })} shortened to ${titleLimit} characters.`;
@@ -568,10 +586,10 @@ const ProjectRuleFiles: FC<{
                 ...(shortened > 0 ? [shortenedNote] : []),
                 ...(renamed > 0 ? [renamedNote] : []),
                 ...(toSet > 0 ? [setNote] : []),
-                ...(skipped > 0 ? [left] : []),
-                ...(tooLarge > 0 ? [tooLargeNote] : []),
+                ...(skipped.length > 0 ? [left] : []),
+                ...(tooLarge.length > 0 ? [tooLargeNote] : []),
                 ...(duplicates > 0 ? [duplicatesNote] : []),
-                ...(read.unreadable > 0 ? [unreadable] : []),
+                ...(read.unreadable.length > 0 ? [unreadable] : []),
                 ...(read.notRead > 0 ? [notRead] : []),
             ].join(" "),
         );
@@ -608,7 +626,7 @@ const ProjectRuleFiles: FC<{
 
         if (picked.length > 0) {
             runImport(async () => {
-                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, unreadable: 0 };
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, unreadable: [] };
             });
         }
     };

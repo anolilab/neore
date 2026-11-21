@@ -318,6 +318,12 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
 export const isRootInstructionFile = (name: string): boolean => ROOT_INSTRUCTION_FILES.has(name.toLowerCase());
 
 /**
+ * Whether the file at `path` (from the top of what was imported) is a root instruction file, imported whole as `always`:
+ * the same text elsewhere is read by its front matter, so it makes another rule file.
+ */
+export const isWholeInstructionFile = (path: string): boolean => !path.replaceAll("\\", "/").includes("/") && isRootInstructionFile(path);
+
+/**
  * One imported file as a rule file, or `null` for one that is not Markdown. `path` is its path from the top of what was
  * imported: only a root instruction file there is `always` whole; in a folder it is read like any rule file.
  */
@@ -327,7 +333,7 @@ export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile 
     // A byte-order mark would hide the front matter.
     const text = raw.startsWith("\u{FEFF}") ? raw.slice(1) : raw;
 
-    if (slash === -1 && isRootInstructionFile(name)) {
+    if (isWholeInstructionFile(path)) {
         return { content: text, description: "", mode: "always", patterns: "", title: name };
     }
 
@@ -401,18 +407,24 @@ export const unreservedTitle = (title: string): string => (isRuleTitleReserved(t
 /** Whether an imported file said nothing of when it applies: a draft the person must finish before it saves. */
 export const needsMode = (file: Pick<ImportedRuleFile, "description" | "mode">): boolean => file.mode === "auto" && file.description.trim() === "";
 
+/** What an import read: each rule file with the path it came from, and the paths past the room (`skipped`). */
+export interface ImportedRuleTexts {
+    imported: (ImportedRuleFile & { path: string })[];
+    skipped: string[];
+}
+
 /**
  * The rule files of `entries` (a path, and its text read on demand), in path order, at most `room` of them (those past it
- * counted in `skipped`), files that are not Markdown left out: the upload ({@link importRuleFiles}) and the repository
- * import share it.
+ * in `skipped`), files that are not Markdown left out: the upload ({@link importRuleFiles}) and the repository import
+ * share it.
  */
 export const importRuleTexts = async (
     entries: ReadonlyArray<{ path: string; text: () => Promise<string> | string }>,
     room: number,
-): Promise<{ imported: ImportedRuleFile[]; skipped: number }> => {
+): Promise<ImportedRuleTexts> => {
     const sorted = entries.toSorted((left, right) => left.path.localeCompare(right.path));
-    const imported: ImportedRuleFile[] = [];
-    let skipped = 0;
+    const imported: ImportedRuleTexts["imported"] = [];
+    const skipped: string[] = [];
 
     for (const entry of sorted) {
         // A name alone decides whether it is taken, before its text is read.
@@ -421,14 +433,14 @@ export const importRuleTexts = async (
         }
 
         if (imported.length >= room) {
-            skipped += 1;
+            skipped.push(entry.path);
             continue;
         }
 
         const ruleFile = toImportedRuleFile(entry.path, await entry.text());
 
         if (ruleFile) {
-            imported.push(ruleFile);
+            imported.push({ ...ruleFile, path: entry.path });
         }
     }
 
@@ -443,10 +455,10 @@ const pathInPick = (file: File): string => {
 };
 
 /**
- * The rule files of the uploaded `files`, in path order, at most `room` of them: those past it are counted in `skipped`,
- * files that are not Markdown are left out.
+ * The rule files of the uploaded `files`, in path order, at most `room` of them: those past it are in `skipped`, files
+ * that are not Markdown are left out.
  */
-export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<{ imported: ImportedRuleFile[]; skipped: number }> =>
+export const importRuleFiles = async (files: ReadonlyArray<File>, room: number): Promise<ImportedRuleTexts> =>
     importRuleTexts(
         files.map((file) => {
             return { path: pathInPick(file), text: () => file.text() };
