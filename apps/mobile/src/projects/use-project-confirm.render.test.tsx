@@ -250,4 +250,39 @@ describe("useProjectConfirm", () => {
 
         expect(container.textContent).toBe("none");
     });
+
+    it("does not show an old refusal again on a later reconnect whose read is unreachable", async () => {
+        harness.query.mockRejectedValueOnce(new Error("FORBIDDEN"));
+        await render();
+        await flush();
+        expect(container.textContent).toBe("FORBIDDEN");
+
+        // A live answer confirms the connection, then a new reconnect starts checking again.
+        offline = connection({ isChecking: false });
+        await render();
+        await flush();
+
+        harness.query.mockRejectedValue(new TypeError("Network request failed"));
+        offline = connection({ refreshTick: 1 });
+        await render();
+        await flush();
+
+        expect(container.textContent).toBe("none");
+    });
+
+    it("does not mark a project gone from a read that started before newer live rows arrived", async () => {
+        const pending = Promise.withResolvers<unknown>();
+
+        harness.query.mockReturnValueOnce(pending.promise);
+        await render();
+        await flush();
+
+        // The subscription publishes a newer answer while the read is still out.
+        liveRows = [{ id: "p1", title: "newer" }];
+        await render();
+        pending.resolve(null);
+        await flush();
+
+        expect(container.textContent).toBe("none");
+    });
 });

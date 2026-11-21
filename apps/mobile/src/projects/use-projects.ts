@@ -65,30 +65,33 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
     const { hasToken, status, tokenSerial, user } = useAuth();
     const { isChecking, isOffline, refreshTick, reportRead } = useOffline();
     const scope = status === "signed-in" && hasToken && user ? `${user.id}:confirm:${projectId}` : undefined;
-    const [shown, setShown] = useState<{ rows: unknown; scope: string; view: ConfirmView } | undefined>();
+    const [shown, setShown] = useState<{ epoch: string; rows: unknown; scope: string; view: ConfirmView } | undefined>();
     // The read decides from the state at the tick it runs on; the tick's own render is the one that holds it.
     const connection = useRef({ isChecking, isOffline, liveRows });
+    // One reconnect (a refresh tick) or one minted token. A refusal describes only the epoch it was read in.
+    const epoch = `${refreshTick}:${tokenSerial}`;
 
     useEffect(() => {
         connection.current = { isChecking, isOffline, liveRows };
     });
 
     useEffect(() => {
-        const { isChecking: checking, isOffline: offline } = connection.current;
+        const { isChecking: checking, isOffline: offline, liveRows: startRows } = connection.current;
 
         if (scope === undefined || !checking || offline) {
             return undefined;
         }
 
+        // The rows are those on screen when the read starts: rows that arrive while it runs are newer than its answer.
         return confirmOnTick({
             client: getClient(),
             projectId,
             reportRead,
             show: (view) => {
-                setShown(view === undefined ? undefined : { rows: connection.current.liveRows, scope, view });
+                setShown(view === undefined ? undefined : { epoch, rows: startRows, scope, view });
             },
         });
-    }, [projectId, refreshTick, reportRead, scope, tokenSerial]);
+    }, [epoch, projectId, reportRead, scope]);
 
     if (shown === undefined || shown.scope !== scope) {
         return NOT_CONFIRMED;
@@ -98,6 +101,6 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
         return { gone: shown.rows === liveRows, refusal: undefined };
     }
 
-    // Once the connection is confirmed, by a read or by a live answer, an old refusal no longer describes it.
-    return { gone: false, refusal: isChecking ? shown.view.message : undefined };
+    // A refusal stops describing the connection once it is confirmed, or once a later reconnect or token starts a new epoch.
+    return { gone: false, refusal: isChecking && shown.epoch === epoch ? shown.view.message : undefined };
 };
