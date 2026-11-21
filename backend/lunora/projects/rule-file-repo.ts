@@ -115,8 +115,8 @@ export const listRepoRuleFiles = authAction
 
 /**
  * The text of the picked files at the commit their listing read (`commit`), at most a project's worth, taken only from
- * what that commit's listing holds (listed again, under this repository, links not followed: each by the blob SHA its
- * listing gave); a file that is gone, too large, not listed or a refused link says so instead, and one past the
+ * what that commit's listing holds (listed again, under this repository: each by the blob SHA its listing gave, a link's
+ * only when followed again it ends there); a file that is gone, too large, not listed or a refused link says so instead, and one past the
  * action's `HOST_FETCHES_PER_IMPORT` host requests (a 401's repeat included) is `not_read`.
  */
 export const readRepoRuleFiles = authAction

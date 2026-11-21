@@ -84,8 +84,8 @@
   token, for whoever may save the rule files (`repoForRuleFileImport`) and a repository the project lists. A listing pins one commit and walks git
   trees by SHA (never `ref:path`, never recursive; a cut tree is reported as `truncated`, and a rules folder whose cut tree shows no Markdown is still
   the one listed); the read takes that commit's SHA, never a branch, lists it again (found under this repository, `/git/commits/{sha}`) and reads only
-  what that listing offers, by the blob SHA it gave (a link's, unfollowed, when that SHA is a file listed by its own path; else only the one past the
-  cap it leads to, followed again), never through the contents API. Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, every redirect
+  what that listing offers, by the blob SHA it gave (a link's only when, followed again, it ends there: never as another listed file's SHA, so a
+  refused link stays refused; each hop a host request), never through the contents API. Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, every redirect
   hop (`beforeRedirect`, charged after its origin is checked) and a 401's repeat included (`fetchBudget`, under the Workers 50-subrequest cap with its
   own lookups): past it a link is `budget`, a file `not_read`, a listing whose walk is cut `host_error`, never a thrown error. A symlink is followed
   only to another path of the same listing (a root file or the listed folder's), inside the repository (`resolveLinkTarget`); any other is listed

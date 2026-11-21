@@ -19,9 +19,9 @@
  *
  * A listing holds every root instruction file and at most `MAX_LISTED_FOLDER_FILES` of the rules folder's, the first by
  * path; it counts the rest (`omitted`), and gives each file it would read the blob SHA it reads (a link's final
- * target's). A read lists the same way: it takes a file's own blob when that is the SHA given, and a link's when the
- * SHA given is that of a file the listing offers by its own path (unfollowed: the link may be read as any of those), or
- * that of the file the link, followed again, leads to (one past the cap), so it reads only what the listing offered.
+ * target's). A read lists the same way: it takes a file's own blob when that is the SHA given, and a link's only when
+ * the link, followed again at that commit, ends at exactly the SHA given, so a link the listing refused is refused
+ * there too, whatever SHA comes with it, and a link reads only the file it leads to.
  *
  * Both run under {@link HOST_FETCHES_PER_IMPORT} host requests, redirect hops and a 401's repeat included
  * ({@link fetchBudget}): past it a link is refused (`budget`) and a file is `not_read`, never a failed request.
@@ -62,8 +62,10 @@ export const MAX_LINKS_FOLLOWED = 16;
  * session check's five lookups, the rate limit, the repository, and the grant with a token refresh and its store, then
  * again for a 401's forced refresh): 28 + 14 = 42, under the cap with 8 to spare. A listing spends at most 6 on the
  * commit and its trees and {@link MAX_LINKS_FOLLOWED} on links, so without a redirect a repeat always has its trees; a
- * read 6 and one per file picked (at most 20), so one without a 401 or a redirect reads them all, unless it follows a
- * link again to a file past the listing's cap (a hop each, from the same count). A redirect (a renamed
+ * read 6, one per blob it downloads (at most 20 picked) and one per hop of each link picked, followed again (a chain
+ * costs its length; at most {@link MAX_LINKS_FOLLOWED} hops in all, as the listing offered only links within them, and
+ * a 401's repeat follows them again). So one without a 401 or a redirect reads 20 files, or fewer files and one-hop
+ * links to them (the root links to `AGENTS.md`: 6 + 1 + one per link); past 28 the last picks are `not_read`. A redirect (a renamed
  * repository answers each request with one, at most two hops) spends from the same count, so it still works while
  * requests are left; past them a link is `budget` and a file `not_read`, and a listing whose own walk is cut short
  * fails as the host's error.
@@ -417,8 +419,7 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
      * The root instruction files and the first {@link MAX_LISTED_FOLDER_FILES} Markdown files, by path, of the first
      * rules folder holding any, or whose cut tree may (not its subfolders), links not yet followed; `omitted` counts the folder's files past
      * the cap. `offers` accepts the paths a link may lead to: a root file, or a file of that folder (one past the cap
-     * included, as it is there), whose files, links left out, are `targets` by blob SHA; `offered` holds those the
-     * listing offers by their own path.
+     * included, as it is there), whose files, links left out, are `targets` by blob SHA.
      */
     const scan = async () => {
         const rootFiles = importableIn("", root);
@@ -449,7 +450,7 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
             (!target.includes("/") || (chosen !== undefined && target.startsWith(`${chosen}/`) && !target.slice(chosen.length + 1).includes("/")));
         const byShaOf = (files: { blob: Blob }[]) => new Map(files.filter(({ blob }) => !blob.link).map(({ blob }) => [blob.sha, blob]));
 
-        return { candidates, offered: byShaOf(candidates), offers, omitted, targets: byShaOf([...rootFiles, ...folderFiles]) };
+        return { candidates, offers, omitted, targets: byShaOf([...rootFiles, ...folderFiles]) };
     };
 
     /** The files {@link scan} finds, links followed only to a path `offers` accepts. */
@@ -532,11 +533,11 @@ export const repoReadLedger = (): RepoReadLedger => {
 
 /**
  * The text of each of `picks` (paths already checked by {@link isImportablePath}) at `commit` (the listing's), in order,
- * as that commit's listing holds them: a file's own blob when its SHA is the one given; a link's when the SHA given is
- * that of a file the listing offers by its own path (unread: any of those may be read), or else that of a file the link
- * leads to there (a rules folder's past the listing's cap: followed again, so only the link the listing offered it
- * under reads it). One it does not list (gone, another rules folder, or a commit this repository does not hold), or
- * whose SHA is another, is `missing`; a link with no such SHA `refused`. One past its own byte limit, or what the read
+ * as that commit's listing holds them: a file's own blob when its SHA is the one given; a link's only when following
+ * it again there ends at exactly the SHA given (never because that SHA is another listed file's: a link the listing
+ * refused, broken or leading outside it, would read that file under the link's path). One it does not list (gone,
+ * another rules folder, or a commit this repository does not hold), or whose SHA is another, is `missing`; a link
+ * leading elsewhere, or refused, is `refused`. One past its own byte limit, or what the read
  * has left to download or return, is `too_large`; a later one may still fit. A blob's bytes are charged before it is
  * downloaded, so one then longer than a rule file may be ({@link fitsRuleFile}, `too_large`) still spends them. Once
  * `request` throws {@link FetchBudgetSpent}, every file it would still read is `not_read`. The tries of one action pass
@@ -577,26 +578,29 @@ export const readRepoRuleFiles = async (
     const reads: RepoRuleFileRead[] = [];
     let left = REPO_RULE_FILES_READ_BYTES;
     let spent = false;
+    // Each link followed once, however often picked: a read's hops then stay within the listing's.
+    const followedLinks = new Map<string, Followed>();
 
-    /** The blob a link at `path` reads for `sha`, `budget` when following it is past the host requests left. */
+    /**
+     * The blob a link at `path` reads for `sha`: the file it leads to when that is `sha`, followed again (never the SHA
+     * alone); `budget` when following it is past the host requests left.
+     */
     const linkBlob = async (path: string, link: Blob, sha: string | undefined): Promise<Blob | "budget" | undefined> => {
-        if (sha === undefined) {
+        // No file the link could lead to: nothing to follow.
+        if (sha === undefined || !scanned.targets.has(sha)) {
             return undefined;
         }
 
-        if (scanned.offered.has(sha)) {
-            return scanned.offered.get(sha);
-        }
+        let followed = followedLinks.get(path);
 
-        if (!scanned.targets.has(sha)) {
-            return undefined;
-        }
+        if (!followed) {
+            if (spent) {
+                return "budget";
+            }
 
-        if (spent) {
-            return "budget";
+            followed = await at.follow(path, link, scanned.offers);
+            followedLinks.set(path, followed);
         }
-
-        const followed = await at.follow(path, link, scanned.offers);
 
         if ("refused" in followed) {
             return followed.spent ? "budget" : undefined;

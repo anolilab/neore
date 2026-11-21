@@ -352,13 +352,10 @@ describe(listRepoRuleFiles, () => {
                 { path: "CLAUDE.md", sha: sha(omitted) },
                 // Another link: it leads elsewhere, so the file past the cap is not offered under it.
                 { path: "GEMINI.md", sha: sha(omitted) },
-                // A file the listing offers by its own path, under any link.
-                { path: "GEMINI.md", sha: sha(folderFiles[0]!) },
             ]),
         ).resolves.toStrictEqual([
             { path: "CLAUDE.md", status: "ok", text: "past the cap" },
             { path: "GEMINI.md", status: "refused" },
-            { path: "GEMINI.md", status: "ok", text: "rule" },
         ]);
     });
 
@@ -487,9 +484,16 @@ describe(readRepoRuleFiles, () => {
         ]);
     });
 
-    it("reads a link as the listed file its SHA names, never reading the link, and refuses one whose SHA is no listed file's", async () => {
+    it("reads a link only as the file it leads to, followed once, and refuses a broken or outside one whatever listed SHA it names", async () => {
         const host = fakeHost(
-            repoAt({ ".env": "SECRET=1", "AGENTS.md": "# Rules", "CLAUDE.md": { link: "AGENTS.md" }, "GEMINI.md": { link: ".env" }, "rules/a.md": "rule" }),
+            repoAt({
+                ".env": "SECRET=1",
+                "AGENTS.md": "# Rules",
+                "CLAUDE.md": { link: "AGENTS.md" },
+                "GEMINI.md": { link: ".env" },
+                "rules/a.md": "rule",
+                "rules/gone.md": { link: "missing.md" },
+            }),
         );
 
         await expect(
@@ -497,8 +501,12 @@ describe(readRepoRuleFiles, () => {
                 { path: "GEMINI.md" },
                 // A SHA the listing never gave: the file a link leads outside to.
                 { path: "GEMINI.md", sha: sha(".env") },
+                // A listed file's SHA under a link the listing refused, leading outside or nowhere.
+                { path: "GEMINI.md", sha: sha("AGENTS.md") },
+                { path: "rules/gone.md", sha: sha("rules/a.md") },
                 { path: "CLAUDE.md", sha: sha("AGENTS.md") },
-                // A link may lead to a rules folder's file too.
+                { path: "CLAUDE.md", sha: sha("AGENTS.md") },
+                // A listed file the link does not lead to.
                 { path: "CLAUDE.md", sha: sha("rules/a.md") },
                 // A file's own blob only, never another's.
                 { path: "AGENTS.md", sha: sha("rules/a.md") },
@@ -506,16 +514,23 @@ describe(readRepoRuleFiles, () => {
         ).resolves.toStrictEqual([
             { path: "GEMINI.md", status: "refused" },
             { path: "GEMINI.md", status: "refused" },
+            { path: "GEMINI.md", status: "refused" },
+            { path: "rules/gone.md", status: "refused" },
             { path: "CLAUDE.md", status: "ok", text: "# Rules" },
-            { path: "CLAUDE.md", status: "ok", text: "rule" },
+            { path: "CLAUDE.md", status: "ok", text: "# Rules" },
+            { path: "CLAUDE.md", status: "refused" },
             { path: "AGENTS.md", status: "missing" },
         ]);
 
         const blobs = host.calls.map((call) => call.path).filter((path) => path.includes("/git/blobs/"));
 
-        expect(blobs).not.toContain(`${REPO}/git/blobs/${sha(".env")}`);
-        // No link's own blob: the read follows none.
-        expect(blobs).toStrictEqual([`${REPO}/git/blobs/${sha("AGENTS.md")}`, `${REPO}/git/blobs/${sha("rules/a.md")}`]);
+        // Each link's own blob once, its target once, and never what a refused link leads to.
+        expect(blobs).toStrictEqual([
+            `${REPO}/git/blobs/${sha("GEMINI.md")}`,
+            `${REPO}/git/blobs/${sha("rules/gone.md")}`,
+            `${REPO}/git/blobs/${sha("CLAUDE.md")}`,
+            `${REPO}/git/blobs/${sha("AGENTS.md")}`,
+        ]);
     });
 
     it("stops spending at the read budget, still taking a later file that fits", async () => {
