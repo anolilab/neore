@@ -52,6 +52,9 @@ const connection = (overrides: Partial<OfflineValue> = {}): OfflineValue => {
 
 const coded = (message: string, code: string): Error => Object.assign(new Error(message), { code });
 
+/** How many microtask turns a read takes to reach the screen; generous, and it waits on no clock. */
+const MICROTASK_TURNS = 50;
+
 describe("useProjectConfirm", () => {
     let container: HTMLDivElement;
     let root: Root;
@@ -76,11 +79,13 @@ describe("useProjectConfirm", () => {
         });
     };
 
+    // Drains the microtasks the read chain takes (the query, the race, the screen's update): no wall-clock wait.
     const flush = async () => {
         await act(async () => {
-            await new Promise((resolve) => {
-                setTimeout(resolve, 0);
-            });
+            for (let turn = 0; turn < MICROTASK_TURNS; turn += 1) {
+                // eslint-disable-next-line no-await-in-loop -- each turn lets one more step of the read chain settle
+                await Promise.resolve();
+            }
         });
     };
 
@@ -284,5 +289,25 @@ describe("useProjectConfirm", () => {
         await flush();
 
         expect(container.textContent).toBe("none");
+    });
+
+    it("keeps a missing project gone when a later read is refused", async () => {
+        harness.query.mockResolvedValueOnce(null);
+        await render();
+        await flush();
+        expect(container.textContent).toBe("gone");
+
+        // A later reconnect's read is refused, then a live answer confirms the connection.
+        harness.query.mockRejectedValueOnce(new Error("FORBIDDEN"));
+        offline = connection({ refreshTick: 1 });
+        await render();
+        await flush();
+        expect(container.textContent).toBe("FORBIDDEN");
+
+        offline = connection({ isChecking: false, refreshTick: 1 });
+        await render();
+        await flush();
+
+        expect(container.textContent).toBe("gone");
     });
 });

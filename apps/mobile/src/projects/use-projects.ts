@@ -4,7 +4,6 @@ import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
 import { useOffline } from "@/offline/offline-context";
 
-import type { ConfirmView } from "./confirm-project";
 import { confirmOnTick } from "./confirm-project";
 import type { Live, Scoped } from "./live-follow";
 import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
@@ -53,7 +52,11 @@ export interface ProjectConfirmState {
     refusal: string | undefined;
 }
 
-const NOT_CONFIRMED: ProjectConfirmState = { gone: false, refusal: undefined };
+/** What the last reads showed: a missing project, kept against the live rows it was read with, and the latest refusal. */
+interface ConfirmShown {
+    gone?: { rows: unknown; scope: string };
+    refusal?: { epoch: string; message: string; scope: string };
+}
 
 /**
  * Write controls wait while a reconnect is unconfirmed. A reconnect that only resumes the project's subscription never
@@ -65,7 +68,7 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
     const { hasToken, status, tokenSerial, user } = useAuth();
     const { isChecking, isOffline, refreshTick, reportRead } = useOffline();
     const scope = status === "signed-in" && hasToken && user ? `${user.id}:confirm:${projectId}` : undefined;
-    const [shown, setShown] = useState<{ epoch: string; rows: unknown; scope: string; view: ConfirmView } | undefined>();
+    const [shown, setShown] = useState<ConfirmShown>({});
     // The read decides from the state at the tick it runs on; the tick's own render is the one that holds it.
     const connection = useRef({ isChecking, isOffline, liveRows });
     // One reconnect (a refresh tick) or one minted token. A refusal describes only the epoch it was read in.
@@ -88,19 +91,26 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
             projectId,
             reportRead,
             show: (view) => {
-                setShown(view === undefined ? undefined : { epoch, rows: startRows, scope, view });
+                setShown((current) => {
+                    if (view === undefined) {
+                        return {};
+                    }
+
+                    // A refusal leaves a "gone" result alone: it is evidence about the rows, not about the connection.
+                    if (view.kind === "refused") {
+                        return { ...current, refusal: { epoch, message: view.message, scope } };
+                    }
+
+                    return { gone: { rows: startRows, scope }, refusal: undefined };
+                });
             },
         });
     }, [epoch, projectId, reportRead, scope]);
 
-    if (shown === undefined || shown.scope !== scope) {
-        return NOT_CONFIRMED;
-    }
-
-    if (shown.view.kind === "gone") {
-        return { gone: shown.rows === liveRows, refusal: undefined };
-    }
-
+    // "Gone" holds for the live rows it was read against: newer live rows supersede it, a refusal does not.
+    const isGone = shown.gone !== undefined && shown.gone.scope === scope && shown.gone.rows === liveRows;
     // A refusal stops describing the connection once it is confirmed, or once a later reconnect or token starts a new epoch.
-    return { gone: false, refusal: isChecking && shown.epoch === epoch ? shown.view.message : undefined };
+    const isRefusalCurrent = shown.refusal !== undefined && shown.refusal.scope === scope && isChecking && shown.refusal.epoch === epoch;
+
+    return { gone: isGone, refusal: isRefusalCurrent ? shown.refusal?.message : undefined };
 };

@@ -90,19 +90,25 @@ describe("confirmProject", () => {
 });
 
 describe("confirmOnTick", () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("reports a found project to the connection and clears the screen", async () => {
         const reportRead = vi.fn();
         const show = vi.fn();
-
         const client = clientWith((async () => {
             return { _id: "p1" };
         }) as never);
 
         confirmOnTick({ client, projectId: "p1", reportRead, show });
+        await vi.advanceTimersByTimeAsync(0);
 
-        await vi.waitFor(() => {
-            expect(reportRead).toHaveBeenCalledWith("succeeded");
-        });
+        expect(reportRead).toHaveBeenCalledWith("succeeded");
         expect(show).toHaveBeenCalledWith(undefined);
     });
 
@@ -111,10 +117,9 @@ describe("confirmOnTick", () => {
         const show = vi.fn();
 
         confirmOnTick({ client: clientWith((async () => null) as never), projectId: "p1", reportRead, show });
+        await vi.advanceTimersByTimeAsync(0);
 
-        await vi.waitFor(() => {
-            expect(reportRead).toHaveBeenCalledWith("succeeded");
-        });
+        expect(reportRead).toHaveBeenCalledWith("succeeded");
         expect(show).toHaveBeenCalledWith({ kind: "gone" });
     });
 
@@ -130,10 +135,9 @@ describe("confirmOnTick", () => {
             reportRead,
             show,
         });
+        await vi.advanceTimersByTimeAsync(0);
 
-        await vi.waitFor(() => {
-            expect(show).toHaveBeenCalledWith({ kind: "refused", message: "FORBIDDEN" });
-        });
+        expect(show).toHaveBeenCalledWith({ kind: "refused", message: "FORBIDDEN" });
         expect(reportRead).not.toHaveBeenCalled();
     });
 
@@ -146,9 +150,7 @@ describe("confirmOnTick", () => {
 
         cancel();
         pending.resolve(null);
-        await new Promise((resolve) => {
-            setTimeout(resolve, 0);
-        });
+        await vi.advanceTimersByTimeAsync(0);
 
         expect(reportRead).not.toHaveBeenCalled();
         expect(show).not.toHaveBeenCalled();
