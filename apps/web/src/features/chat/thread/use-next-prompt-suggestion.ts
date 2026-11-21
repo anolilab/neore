@@ -17,12 +17,14 @@ import { pickNextPrompt } from "./next-prompt";
 
 /** The next prompt to suggest in this chat's composer, or `null`. Off with the setting, and for a chat with no reply yet. */
 const useNextPromptSuggestion = (): string | null => {
-    const { threadId } = useChatThread();
+    const { thread, threadId } = useChatThread();
     const { messages } = useChatMessages();
     const isRunning = useChatIsRunning();
     const { data: userSettings } = useUserSettings();
     const crpc = useCRPC();
     const unlockProof = useUnlockProof(threadId);
+    // A locked chat without its proof is a stub: its cache is not read, so the query is not sent and is not refused.
+    const lockedWithoutProof = Boolean(thread?.lockedAt) && !unlockProof;
 
     const enabled = userSettings?.enableFollowupSuggestions !== false;
     const validThreadId = getValidThreadId(threadId);
@@ -34,7 +36,9 @@ const useNextPromptSuggestion = (): string | null => {
 
     const { data: cached } = useQuery({
         ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions(
-            validThreadId && enabled && !isRunning && lastReplyId !== undefined ? { threadId: validThreadId as Id<"threads">, unlockProof } : skipToken,
+            validThreadId && enabled && !isRunning && lastReplyId !== undefined && !lockedWithoutProof
+                ? { threadId: validThreadId as Id<"threads">, unlockProof }
+                : skipToken,
         ),
     });
 
