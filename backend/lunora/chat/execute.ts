@@ -26,7 +26,7 @@ import { internalAction } from "../_generated/server";
 import { autoCompactBeforeReply } from "../agent/thread-compaction";
 import { streamLogger } from "../lib/logger";
 import { notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
-import { COMPLETION_MESSAGE_IDS_MAX } from "../sub-agents/logic";
+import { COMPLETION_MESSAGE_IDS_MAX, SUB_AGENT_TOOL_NAME } from "../sub-agents/logic";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
@@ -316,6 +316,7 @@ export const runStreamingAgent = internalAction
                     fileIds,
                     promptText: prompt,
                     researchDepth: streamingConfig.researchDepth,
+                    roleCatalog: true,
                     threadId,
                     threadLanguage: thread.language,
                     userId,
@@ -646,6 +647,10 @@ export const runStreamingAgent = internalAction
                 // instructions — then a note about attached documents.
                 const instructionList = renderInstructionList(instructions);
                 const additionalParts = [...contextParts, ...(instructionList ? [instructionList] : [])];
+
+                if (runContext.roleCatalog && SUB_AGENT_TOOL_NAME in tools) {
+                    additionalParts.push(runContext.roleCatalog);
+                }
 
                 if (fileIds && fileIds.length > 0) {
                     additionalParts.push(

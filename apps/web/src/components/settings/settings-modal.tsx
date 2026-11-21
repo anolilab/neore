@@ -42,6 +42,7 @@ const AppCustomizationSettings = lazy(() => import("@/features/settings/componen
 const AgentSettings = lazy(() => import("@/features/settings/components/chat/agent-settings"));
 const MCPSettings = lazy(() => import("@/features/settings/components/chat/mcp-settings"));
 const ToolPermissionsSettings = lazy(() => import("@/features/settings/components/chat/tool-permissions-settings"));
+const SubAgentRolesSettings = lazy(() => import("@/features/settings/components/chat/sub-agent-roles-settings"));
 const DefaultModelsSettings = lazy(() => import("@/features/settings/components/chat/default-models-settings"));
 const ModelsSettings = lazy(() => import("@/features/settings/components/chat/models-settings"));
 const PrivacySettings = lazy(() => import("@/features/settings/components/privacy/privacy-settings"));
@@ -103,6 +104,7 @@ const preloadTab: Record<string, () => void> = {
     "chat-mcp": () => import("@/features/settings/components/chat/mcp-settings"),
     "chat-models": () => import("@/features/settings/components/chat/models-settings"),
     "chat-tools": () => import("@/features/settings/components/chat/tool-permissions-settings"),
+    "chat-sub-agent-roles": () => import("@/features/settings/components/chat/sub-agent-roles-settings"),
     "chat-personalization": () => import("@/features/settings/components/personalization/personalization-settings"),
     "chat-system-prompts": () => import("@/features/settings/components/chat/system-prompt-preset-settings"),
     privacy: () => import("@/features/settings/components/privacy/privacy-settings"),
@@ -471,6 +473,9 @@ export const SettingsModal: FC = () => {
             }
             case "chat-personalization": {
                 return <PersonalizationSettings />;
+            }
+            case "chat-sub-agent-roles": {
+                return <SubAgentRolesSettings />;
             }
             case "chat-system-prompts": {
                 return <SystemPromptPresetSettings />;

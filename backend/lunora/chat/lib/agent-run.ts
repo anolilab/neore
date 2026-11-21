@@ -517,6 +517,8 @@ export const loadRunContext = async (
         fileIds?: string[];
         promptText?: string;
         researchDepth?: string;
+        /** Read the sub-agent role catalog: only a run that may hand work to one asks (a group turn does not). */
+        roleCatalog?: boolean;
         threadId: string;
         threadLanguage?: string;
         userId: string;
@@ -541,7 +543,7 @@ export const loadRunContext = async (
 
         return bot ? { ...bot, botId: settings.botId } : null;
     });
-    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot] = await Promise.all([
+    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot, roleCatalog] = await Promise.all([
         prefsPromise,
         threadSettingsPromise,
         loadUserProviderKeys(ctx, userId),
@@ -565,6 +567,8 @@ export const loadRunContext = async (
                 : null,
         ),
         botPromise,
+        // Alongside the project read, so it adds no wait of its own.
+        args.roleCatalog ? ctx.runQuery(internal.sub_agents.role_settings.getRoleCatalogForRun, { threadId, userId }) : null,
     ]);
 
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;
@@ -612,6 +616,8 @@ export const loadRunContext = async (
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
+        /** The sub-agent roles that have a model (`sub-agents/roles.ts`); the run adds it only while it can delegate. */
+        roleCatalog: roleCatalog ?? undefined,
         /** One kind per piece of the system prompt above, for the saved-login verdict (`system-context-kinds.ts`). */
         systemContext: systemContextKinds({
             bot,
