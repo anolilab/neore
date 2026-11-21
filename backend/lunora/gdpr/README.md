@@ -413,13 +413,13 @@ The following tables contain user personal data and are included in exports/dele
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id
-and an expiry 30 seconds after minting. It is deleted when redeemed, and an
+or an app grant's session id, and an expiry 30 seconds after minting. It is deleted when redeemed, and an
 expired one is purged by the next mint or by the Worker's one-minute cron tick
 (`src/server.ts#scheduled`), so no row outlives its minting by more than about
 90 seconds. Account deletion therefore does not visit it: within that window a
 deleted user's rows are gone on their own. Nor can a ticket minted just before
 the deletion be redeemed: `redeemWsTicket` also requires the session it was
-minted under to still exist (any session of the user, for a ticket that names
+minted under to still exist (that exact session or grant; any session of the user, for a ticket that names
 none), and `revokeUserSessions` is the workflow's first step — so from then on
 every outstanding ticket of the user authenticates nothing, even inside its 30s
 (`lib/ws-ticket.test.ts` pins this). A sign-out ends them the same way. It holds

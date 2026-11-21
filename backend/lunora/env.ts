@@ -32,9 +32,7 @@ export const CREEM_YEARLY_CHECKOUT = read("CREEM_YEARLY_CHECKOUT");
 export const CREEM_WEBHOOK_SECRET = read("CREEM_WEBHOOK_SECRET");
 /** `true` targets test-api.creem.io (test-mode keys and products). */
 export const CREEM_TEST_MODE = read("CREEM_TEST_MODE");
-/** Comma-separated `chrome-extension://<id>` origins allowed to call auth. Empty = none. */
-export const TRUSTED_EXTENSION_ORIGINS = read("TRUSTED_EXTENSION_ORIGINS");
-/** Comma-separated `identity.launchWebAuthFlow` redirect URIs the extension sign-in may deliver a code to. Empty = the shipped Firefox add-on; `none` = off. */
+/** Comma-separated `identity.launchWebAuthFlow` redirect URIs the extension sign-in may deliver a code to. Empty = the shipped Firefox add-on; `none` = off; list the Chrome build's `https://<id>.chromiumapp.org/` here. */
 export const TRUSTED_EXTENSION_REDIRECT_URIS = read("TRUSTED_EXTENSION_REDIRECT_URIS");
 export const ENCRYPTION_KEY = read("ENCRYPTION_KEY");
 
