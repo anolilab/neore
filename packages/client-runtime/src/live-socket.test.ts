@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { LiveSocketClient } from "./live-socket";
 import { wireLiveSocket } from "./live-socket";
 
-const jwt = (subject: string): string => `h.${Buffer.from(JSON.stringify({ sub: subject })).toString("base64url")}.s`;
+const jwt = (subject: string): string => `h.${btoa(JSON.stringify({ sub: subject })).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")}.s`;
 
 const fakeClient = (initial: string | null) => {
     let token = initial;

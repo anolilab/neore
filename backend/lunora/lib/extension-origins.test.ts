@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OPTIONAL_ENV_KEYS } from "./env-validation";
 import {
+    carryRetiredExtensionOrigins,
     MOBILE_REDIRECT_URI,
     NATIVE_REDIRECT_URI,
     parseTrustedExtensionRedirectUris,
@@ -78,12 +79,6 @@ describe("parseTrustedExtensionRedirectUris", () => {
         expect(declared).toBe(SHIPPED_FIREFOX_EXTENSION_ID);
     });
 
-    it("is the Firefox URI `pnpm dev:setup` lists beside a Chrome id, which replaces the default", () => {
-        const setup = readFileSync(join(import.meta.dirname, "../../../scripts/dev-setup.js"), "utf8");
-
-        expect(setup).toContain(`.chromiumapp.org/,${SHIPPED_FIREFOX_REDIRECT_URI}`);
-    });
-
     it("an explicit value replaces the default rather than adding to it", () => {
         expect(parseTrustedExtensionRedirectUris(CHROME_REDIRECT)).toEqual([CHROME_REDIRECT]);
     });
@@ -114,5 +109,36 @@ describe("parseTrustedExtensionRedirectUris", () => {
             ),
         ).toEqual([]);
         expect(console.warn).toHaveBeenCalledTimes(5);
+    });
+});
+
+describe("carryRetiredExtensionOrigins", () => {
+    const ID = "c".repeat(32);
+    const CHROME = `https://${ID}.chromiumapp.org/`;
+
+    it.each([
+        ["an unset list, keeping the Firefox default", undefined, `${SHIPPED_FIREFOX_REDIRECT_URI},${CHROME}`],
+        [
+            "a list with the app callbacks, keeping them",
+            `${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI}`,
+            `${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI},${CHROME}`,
+        ],
+    ])("adds the old Chrome origin's redirect URI to %s", (_label, redirectUris, expected) => {
+        const carried = carryRetiredExtensionOrigins(`chrome-extension://${ID}`, redirectUris);
+
+        expect(carried).toEqual({ added: [CHROME], value: expected, withheld: [] });
+        expect(parseTrustedExtensionRedirectUris(carried.value)).toEqual(expected.split(","));
+    });
+
+    it.each([
+        ["no Chrome origin", "chrome-extension://not-an-id,moz-extension://x", undefined],
+        ["an already listed URI, copied without its slash", `chrome-extension://${ID}/`, `https://${ID}.chromiumapp.org`],
+        ["nothing", undefined, undefined],
+    ])("moves nothing for %s", (_label, origins, redirectUris) => {
+        expect(carryRetiredExtensionOrigins(origins, redirectUris)).toEqual({ added: [], value: redirectUris, withheld: [] });
+    });
+
+    it("keeps a switched-off sign-in off, naming the URI it did not move", () => {
+        expect(carryRetiredExtensionOrigins(`chrome-extension://${ID}`, "none")).toEqual({ added: [], value: "none", withheld: [CHROME] });
     });
 });

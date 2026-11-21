@@ -132,9 +132,11 @@ POSTHOG_HOST=
 POSTHOG_PERSONAL_API_KEY=
 POSTHOG_PROJECT_ID=
 TURNSTILE_SECRET_KEY=
-# Browser-extension sign-in (identity.launchWebAuthFlow) redirect URIs, comma-separated.
+# App-grant sign-in redirect URIs, comma-separated: the browser extension's
+# (identity.launchWebAuthFlow), plus neore://auth/callback (desktop) and
+# neore-mobile://auth/callback (mobile) when those apps sign in.
 # Unset = the shipped Firefox add-on (anole-chat@neore.ai) only; "none" = sign-in off.
-# A value REPLACES the default. The Chrome build needs https://<extension id>.chromiumapp.org/
+# A value REPLACES the whole list: keep every entry already set. The Chrome build needs https://<extension id>.chromiumapp.org/
 # (build apps/browser-extension, load dist/ at chrome://extensions; the ID is on its card),
 # so list the Firefox URI beside it: https://c64d88ed4645bb5915bc267506fbc3dcd4a1da90.extensions.allizom.org/
 # For another gecko id: node -e "console.log('https://'+require('crypto').createHash('sha1').update('<id>').digest('hex')+'.extensions.allizom.org/')"

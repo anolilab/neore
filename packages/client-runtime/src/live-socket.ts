@@ -1,6 +1,6 @@
 import type { LunoraClient, Unsubscribe } from "@lunora/client";
-import type { WsTicketMinter } from "@neore/client-runtime";
-import { tokenSubject } from "@neore/client-runtime";
+import type { WsTicketMinter } from "./ws-ticket";
+import { tokenSubject } from "./live-queries";
 
 export type LiveSocketClient = Pick<LunoraClient, "getAuthToken" | "onAuthTokenChange" | "setWsToken">;
 

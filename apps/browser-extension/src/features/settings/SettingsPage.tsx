@@ -3,9 +3,7 @@ import { ModelPickerButton } from "@neore/chat-ui/model-picker/model-picker-butt
 import { ArrowLeftIcon, KeyboardIcon, LogOutIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-import { clearAccessToken } from "@/lib/access-token";
 import { APP_URL, LLM_GATEWAY_URL, LUNORA_URL } from "@/lib/env";
-import { lunora } from "@/lib/lunora-client";
 import { signOut as endSession, useSession } from "@/lib/session";
 import { browserLanguage, updateSettings, useSettings } from "@/lib/settings";
 import { firefoxBrowser, IS_FIREFOX } from "@/lib/target";
@@ -40,8 +38,6 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         try {
             await endSession();
         } finally {
-            clearAccessToken();
-            lunora.setAuthToken(null);
             setIsSigningOut(false);
         }
     };

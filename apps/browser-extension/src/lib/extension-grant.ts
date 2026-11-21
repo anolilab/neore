@@ -37,6 +37,11 @@ export interface GrantUser {
 }
 
 export interface StoredGrant {
+    /**
+     * Random, minted per sign-in: names this grant without being its secret.
+     * Grants stored before it existed lack it (`grantKey`).
+     */
+    id?: string;
     token: string;
     user: GrantUser;
 }
@@ -154,6 +159,21 @@ const writeGrant = async (grant: StoredGrant): Promise<void> => {
     await chrome.storage.local.set({ [STORAGE_KEY]: grant });
 };
 
+/** Changes with every sign-in, so a cache or an effect keyed on it never outlives the grant. */
+export const grantKey = (grant: StoredGrant): string => grant.id ?? grant.user.id;
+
+/**
+ * True while `token` is still the stored grant. A refresh or a revoke answers
+ * after a round trip, by which time another panel may have signed in again:
+ * whatever it writes or clears must be for the grant it started with. Storage
+ * has no compare-and-set, so this narrows the window to one local read.
+ */
+const isStoredGrant = async (token: string): Promise<boolean> => {
+    const stored = await readGrant();
+
+    return stored?.token === token;
+};
+
 /**
  * Run from `runtime.onInstalled`. The Chrome build used to ride the web app's
  * cookie and stored no grant, so an UPDATE that finds no grant and no migration
@@ -179,8 +199,11 @@ export const readReconnectNeeded = async (): Promise<boolean> => {
     return stored[RECONNECT_KEY] === true;
 };
 
-const clearGrant = async (): Promise<void> => {
-    await chrome.storage.local.remove(STORAGE_KEY);
+/** Forget the grant `token` names, and only that one. */
+const clearGrant = async (token: string): Promise<void> => {
+    if (await isStoredGrant(token)) {
+        await chrome.storage.local.remove(STORAGE_KEY);
+    }
 };
 
 /**
@@ -218,7 +241,7 @@ export const signInWithWebAuthFlow = async (): Promise<GrantUser> => {
 
     const { token, user } = (await response.json()) as StoredGrant;
 
-    await writeGrant({ token, user });
+    await writeGrant({ id: randomToken(), token, user });
     await chrome.storage.local.remove(RECONNECT_KEY);
 
     return user;
@@ -231,9 +254,7 @@ export const signInWithWebAuthFlow = async (): Promise<GrantUser> => {
  * the web app's session list — so the grant is dropped and the panel falls back
  * to the sign-in page.
  */
-export const requestGrantAccessToken = async (): Promise<string | null> => {
-    const grant = await readGrant();
-
+export const requestGrantAccessToken = async (grant: StoredGrant | undefined): Promise<string | null> => {
     if (!grant) {
         return null;
     }
@@ -243,7 +264,7 @@ export const requestGrantAccessToken = async (): Promise<string | null> => {
 
         if (response.status === 401) {
             await response.body?.cancel();
-            await clearGrant();
+            await clearGrant(grant.token);
 
             return null;
         }
@@ -258,8 +279,8 @@ export const requestGrantAccessToken = async (): Promise<string | null> => {
 
         // Keep the shown profile current without rewriting storage (and notifying
         // every listener) on each refresh.
-        if (JSON.stringify(user) !== JSON.stringify(grant.user)) {
-            await writeGrant({ token: grant.token, user });
+        if (JSON.stringify(user) !== JSON.stringify(grant.user) && (await isStoredGrant(grant.token))) {
+            await writeGrant({ ...grant, user });
         }
 
         return token;
@@ -268,19 +289,24 @@ export const requestGrantAccessToken = async (): Promise<string | null> => {
     }
 };
 
-/** Revoke the session server-side, then forget it. Forgets it even if the revoke fails. */
+/**
+ * Revoke the session server-side, then forget it. Forgets it even if the revoke
+ * fails, but not a grant a sign-in stored while the revoke was out.
+ */
 export const signOutGrant = async (): Promise<void> => {
     const grant = await readGrant();
 
-    try {
-        if (grant) {
-            const response = await postBackend("/extension/auth/revoke", { token: grant.token });
+    if (!grant) {
+        return;
+    }
 
-            await response.body?.cancel();
-        }
+    try {
+        const response = await postBackend("/extension/auth/revoke", { token: grant.token });
+
+        await response.body?.cancel();
     } catch {
         // Offline: the session expires on its own; the local copy goes regardless.
     } finally {
-        await clearGrant();
+        await clearGrant(grant.token);
     }
 };

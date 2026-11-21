@@ -65,6 +65,8 @@ export function LunoraWithAuthProvider({ children }: { children: ReactNode }) {
         return () => {
             cancelled = true;
             clearTimeout(timer);
+            // Another grant's queries must not leave with this one's bearer while its own is fetched.
+            lunora.setAuthToken(null);
         };
     }, [sessionId]);
 

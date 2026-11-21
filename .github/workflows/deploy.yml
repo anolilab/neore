@@ -558,10 +558,13 @@ jobs:
                   # The address the account-deletion email names; the web build
                   # shows the same one (VITE_DPO_EMAIL).
                   DPO_EMAIL: "${{ secrets.VITE_DPO_EMAIL }}"
-                  # Browser-extension sign-in redirect URI(s), comma-separated.
-                  # Unset = the shipped Firefox add-on's URI only. The Chrome
-                  # build needs https://<store id>.chromiumapp.org/ listed, and
-                  # a value REPLACES the default, so list the Firefox URI too
+                  # App-grant sign-in redirect URI(s), comma-separated: the
+                  # browser extension's, and the desktop (neore://auth/callback)
+                  # and mobile (neore-mobile://auth/callback) callbacks when
+                  # those apps sign in. Unset = the shipped Firefox add-on's URI
+                  # only. The Chrome build needs https://<store id>.chromiumapp.org/
+                  # listed, and a value REPLACES the whole list: add it to every
+                  # entry already set, and list the Firefox URI if it was unset
                   # (lib/extension-origins.ts). "none" turns the sign-in off.
                   TRUSTED_EXTENSION_REDIRECT_URIS: "${{ secrets.TRUSTED_EXTENSION_REDIRECT_URIS }}"
                   WOLFRAM_APP_ID: "${{ secrets.WOLFRAM_APP_ID }}"

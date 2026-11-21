@@ -42,14 +42,17 @@ Copy `.env.example` to `.env`. `VITE_*` values are baked in at build time, and
 The backend delivers sign-in codes only to listed redirect URIs
 (`TRUSTED_EXTENSION_REDIRECT_URIS`, see [Sign-in](#sign-in-without-cookies)).
 Unset, it lists the shipped Firefox add-on only. The Chrome build's URI is
-`https://<extension id>.chromiumapp.org/`, and a value replaces the default, so
-list both:
+`https://<extension id>.chromiumapp.org/`. The same list holds the desktop
+(`neore://auth/callback`) and mobile (`neore-mobile://auth/callback`) callbacks
+when those apps sign in, and a value replaces the whole list, so add the Chrome
+URI to whatever is set. Unset before, list the Firefox URI beside it:
 
 ```dotenv
 TRUSTED_EXTENSION_REDIRECT_URIS=https://<extension id>.chromiumapp.org/,https://c64d88ed4645bb5915bc267506fbc3dcd4a1da90.extensions.allizom.org/
 ```
 
-`pnpm dev:setup` asks for the unpacked id and writes that value.
+`pnpm dev:setup` asks for the unpacked id and writes that value when the list
+is unset, and moves the id of a retired `TRUSTED_EXTENSION_ORIGINS` into the list.
 
 ### A stable extension id for development
 
@@ -142,7 +145,8 @@ The backend only delivers codes to listed redirect URIs
 (`TRUSTED_EXTENSION_REDIRECT_URIS`). Unset, it lists the shipped Firefox
 add-on's (`https://<sha1 of the gecko id>.extensions.allizom.org/`). A deploy
 that ships the Chrome build lists its store id's `https://<id>.chromiumapp.org/`
-beside it; a value replaces the default. The one-liner for another gecko id is
+beside it; a value replaces the whole list, desktop and mobile callbacks
+included, so keep every entry already set. The one-liner for another gecko id is
 in `backend/.dev.vars.example`; `none` turns sign-in off. These URIs are safe to
 send a code to because a browser intercepts one only for the extension whose id
 it derives from, and each store signs one extension per id, so a code sent there

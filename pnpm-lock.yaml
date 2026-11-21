@@ -1637,6 +1637,9 @@ importers:
       '@neore/chat-ui':
         specifier: workspace:*
         version: link:../../packages/chat-ui
+      '@neore/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
       '@neore/ui':
         specifier: workspace:*
         version: link:../../packages/ui

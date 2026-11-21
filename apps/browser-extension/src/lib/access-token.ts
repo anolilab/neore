@@ -1,4 +1,5 @@
-import { requestGrantAccessToken } from "./extension-grant";
+import type { StoredGrant } from "./extension-grant";
+import { readGrant, requestGrantAccessToken } from "./extension-grant";
 
 /** Refresh this long before `exp`, so a request never leaves with a token about to lapse. */
 const REFRESH_MARGIN_MS = 60_000;
@@ -37,26 +38,68 @@ export const isTokenStale = (token: string, now = Date.now()): boolean => {
     return expiresAt !== undefined && expiresAt - REFRESH_MARGIN_MS <= now;
 };
 
-let cached: string | null = null;
-let inflight: Promise<string | null> | null = null;
+/** The stored grant, or none when storage cannot be read: a signed-out answer, never a throw. */
+const readGrantOrNone = async (): Promise<StoredGrant | undefined> => {
+    try {
+        return await readGrant();
+    } catch {
+        return undefined;
+    }
+};
+
+/** A JWT and the grant it was minted for: a token never outlives its grant. */
+let cached: { grant: string; token: string } | null = null;
+let inflight: { grant: string; promise: Promise<string | null> } | null = null;
 
 /**
  * A current bearer token for the stored grant, fetched once and reused until
  * near expiry. `null` when signed out — the normal case, never a throw.
+ *
+ * Keyed to the grant's token: after a sign-out, or another account's sign-in
+ * in any panel, the next call fetches for the grant now stored instead of
+ * handing out the previous one's JWT.
  */
 export const getAccessToken = async (options: { force?: boolean } = {}): Promise<string | null> => {
-    if (!options.force && cached && !isTokenStale(cached)) {
-        return cached;
+    const grant = await readGrantOrNone();
+
+    if (!grant) {
+        cached = null;
+
+        return null;
     }
 
-    inflight ??= requestGrantAccessToken().then((token) => {
-        cached = token;
-        inflight = null;
+    if (!options.force && cached?.grant === grant.token && !isTokenStale(cached.token)) {
+        return cached.token;
+    }
 
-        return token;
-    });
+    if (inflight?.grant !== grant.token) {
+        const key = grant.token;
+        const promise = requestGrantAccessToken(grant).then(async (token): Promise<string | null> => {
+            const current = inflight?.promise === promise;
 
-    return inflight;
+            if (current) {
+                inflight = null;
+            }
+
+            // Replaced while the request was out: neither cached nor handed to
+            // anyone waiting, who gets the grant stored now instead.
+            const stored = await readGrantOrNone();
+
+            if (stored?.token !== key) {
+                return await getAccessToken();
+            }
+
+            if (current) {
+                cached = token ? { grant: key, token } : null;
+            }
+
+            return token;
+        });
+
+        inflight = { grant: key, promise };
+    }
+
+    return await inflight.promise;
 };
 
 /** Forget the cached token (sign-out, or a 401 that says it is no longer good). */

@@ -113,3 +113,62 @@ export const parseTrustedExtensionRedirectUris = (raw: string | undefined): stri
 
     return [...new Set(uris)];
 };
+
+const RETIRED_CHROME_ORIGIN = /^chrome-extension:\/\/(?<id>[a-p]{32})\/?$/;
+
+/** The entries a `TRUSTED_EXTENSION_REDIRECT_URIS` value lists, as written; unset is the default. */
+const listedRedirectUris = (raw: string | undefined): string[] => {
+    const trimmed = raw?.trim() ?? "";
+
+    if (!trimmed) {
+        return [SHIPPED_FIREFOX_REDIRECT_URI];
+    }
+
+    if (trimmed.toLowerCase() === "none") {
+        return [];
+    }
+
+    return trimmed
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+};
+
+/**
+ * For `pnpm dev:setup` (`scripts/dev-setup.js`): moves the Chrome ids of the
+ * retired `TRUSTED_EXTENSION_ORIGINS` (`chrome-extension://<id>`) into
+ * `TRUSTED_EXTENSION_REDIRECT_URIS` as `https://<id>.chromiumapp.org/`.
+ *
+ * A value replaces the default, so an unset list starts from the shipped
+ * Firefox URI, and every entry already there (the desktop or mobile callback
+ * among them) is kept. `none` stays: sign-in was switched off on purpose, so
+ * the URIs that would have moved come back as `withheld`, for the script to
+ * name. `added` is empty when nothing moved, and `value` is then the input
+ * unchanged.
+ */
+export const carryRetiredExtensionOrigins = (
+    origins: string | undefined,
+    redirectUris: string | undefined,
+): { added: string[]; value: string | undefined; withheld: string[] } => {
+    const off = redirectUris?.trim().toLowerCase() === "none";
+    const current = listedRedirectUris(redirectUris);
+    const listed = new Set(current.map((entry) => (entry.endsWith("/") ? entry : `${entry}/`)));
+    const added: string[] = [];
+    const entries = origins?.split(",") ?? [];
+
+    for (const entry of entries) {
+        const id = RETIRED_CHROME_ORIGIN.exec(entry.trim())?.groups?.["id"];
+        const uri = id && `https://${id}.chromiumapp.org/`;
+
+        if (uri && !listed.has(uri)) {
+            listed.add(uri);
+            added.push(uri);
+        }
+    }
+
+    if (off) {
+        return { added: [], value: redirectUris, withheld: added };
+    }
+
+    return { added, value: added.length > 0 ? [...current, ...added].join(",") : redirectUris, withheld: [] };
+};

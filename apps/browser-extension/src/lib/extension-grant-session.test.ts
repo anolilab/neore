@@ -5,13 +5,15 @@ vi.stubEnv("VITE_LUNORA_URL", "https://api.example.test");
 
 const { migrateFromCookieSession, readReconnectNeeded, RECONNECT_KEY, requestGrantAccessToken, signInWithWebAuthFlow, signOutGrant } =
     await import("./extension-grant");
+const { clearAccessToken, getAccessToken } = await import("./access-token");
+const { loadGrantSession } = await import("./session");
 
 const GRANT_KEY = "neore.extensionGrant";
 const REDIRECT_URI = `https://${"a".repeat(32)}.chromiumapp.org/`;
 const USER = { email: "a@example.test", id: "u1", image: null, name: "A" };
 
 /** What these tests keep in storage: the grant, and the migration and notice marks. */
-type Stored = boolean | number | { token: string; user: typeof USER };
+type Stored = boolean | number | { id?: string; token: string; user: typeof USER };
 
 let store: Map<string, Stored>;
 let launchWebAuthFlow: ReturnType<typeof vi.fn>;
@@ -47,6 +49,7 @@ const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
     installChrome();
+    clearAccessToken();
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
 });
@@ -59,6 +62,17 @@ afterAll(() => {
     vi.unstubAllEnvs();
 });
 
+/** A response the test hands over when it chooses: the round trip a race needs. */
+const deferred = () => {
+    let settle: ((response: Response) => void) | undefined;
+    // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the project's `lib` is ES2023, which has no `withResolvers`
+    const promise = new Promise<Response>((resolve) => {
+        settle = resolve;
+    });
+
+    return { promise, resolve: (response: Response) => settle?.(response) };
+};
+
 const sentTo = (call: number) => {
     const [url, init] = fetchMock.mock.calls[call] ?? [];
 
@@ -67,32 +81,59 @@ const sentTo = (call: number) => {
 
 describe("requestGrantAccessToken", () => {
     it("is null and asks nothing while signed out", async () => {
-        await expect(requestGrantAccessToken()).resolves.toBeNull();
+        await expect(requestGrantAccessToken(undefined)).resolves.toBeNull();
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("trades the stored grant for a JWT, without cookies", async () => {
-        store.set(GRANT_KEY, { token: "grant", user: USER });
+        const grant = { token: "grant", user: USER };
+
+        store.set(GRANT_KEY, grant);
         fetchMock.mockResolvedValueOnce(Response.json({ token: "jwt", user: USER }));
 
-        await expect(requestGrantAccessToken()).resolves.toBe("jwt");
+        await expect(requestGrantAccessToken(grant)).resolves.toBe("jwt");
         expect(sentTo(0)).toEqual({ body: { token: "grant" }, credentials: "omit", url: "https://api.example.test/extension/auth/token" });
     });
 
     it("drops a revoked or expired grant on 401, so the panel shows the sign-in page", async () => {
-        store.set(GRANT_KEY, { token: "grant", user: USER });
+        const grant = { token: "grant", user: USER };
+
+        store.set(GRANT_KEY, grant);
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }));
 
-        await expect(requestGrantAccessToken()).resolves.toBeNull();
+        await expect(requestGrantAccessToken(grant)).resolves.toBeNull();
         expect(store.get(GRANT_KEY)).toBeUndefined();
     });
 
+    it.each([
+        ["a 401", () => new Response(null, { status: 401 })],
+        ["a renamed profile", () => Response.json({ token: "jwt", user: { ...USER, name: "Old" } })],
+    ])("leaves a grant signed in while the refresh was out alone on %s", async (_label, response) => {
+        const old = { token: "old-grant", user: USER };
+        const newer = { id: "g2", token: "new-grant", user: { ...USER, id: "u2" } };
+        const answer = deferred();
+
+        store.set(GRANT_KEY, old);
+        fetchMock.mockReturnValueOnce(answer.promise);
+
+        const refresh = requestGrantAccessToken(old);
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        store.set(GRANT_KEY, newer);
+        answer.resolve(response());
+        await refresh;
+
+        expect(store.get(GRANT_KEY)).toEqual(newer);
+    });
+
     it("keeps the grant through a server error or being offline", async () => {
-        store.set(GRANT_KEY, { token: "grant", user: USER });
+        const grant = { token: "grant", user: USER };
+
+        store.set(GRANT_KEY, grant);
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 503 })).mockRejectedValueOnce(new TypeError("offline"));
 
-        await expect(requestGrantAccessToken()).resolves.toBeNull();
-        await expect(requestGrantAccessToken()).resolves.toBeNull();
+        await expect(requestGrantAccessToken(grant)).resolves.toBeNull();
+        await expect(requestGrantAccessToken(grant)).resolves.toBeNull();
         expect(store.get(GRANT_KEY)).toEqual({ token: "grant", user: USER });
     });
 });
@@ -115,6 +156,100 @@ describe("signOutGrant", () => {
         await signOutGrant();
 
         expect(store.get(GRANT_KEY)).toBeUndefined();
+    });
+
+    it("keeps a grant signed in while the revoke was out", async () => {
+        const newer = { id: "g2", token: "new-grant", user: { ...USER, id: "u2" } };
+        const answer = deferred();
+
+        store.set(GRANT_KEY, { token: "old-grant", user: USER });
+        fetchMock.mockReturnValueOnce(answer.promise);
+
+        const signingOut = signOutGrant();
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        store.set(GRANT_KEY, newer);
+        answer.resolve(new Response(null, { status: 204 }));
+        await signingOut;
+
+        expect(store.get(GRANT_KEY)).toEqual(newer);
+    });
+});
+
+describe("getAccessToken", () => {
+    it("never hands out a JWT minted for a grant that is no longer stored", async () => {
+        store.set(GRANT_KEY, { id: "g1", token: "grant-1", user: USER });
+        fetchMock.mockResolvedValueOnce(Response.json({ token: "jwt-1", user: USER }));
+        await expect(getAccessToken()).resolves.toBe("jwt-1");
+
+        // Cached for the same grant.
+        await expect(getAccessToken()).resolves.toBe("jwt-1");
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        // Signed out: nothing, without asking.
+        store.delete(GRANT_KEY);
+        await expect(getAccessToken()).resolves.toBeNull();
+
+        // Another account signed in (here without the sign-out between): its own JWT.
+        const other = { ...USER, id: "u2" };
+
+        store.set(GRANT_KEY, { id: "g2", token: "grant-2", user: other });
+        fetchMock.mockResolvedValueOnce(Response.json({ token: "jwt-2", user: other }));
+        await expect(getAccessToken()).resolves.toBe("jwt-2");
+        expect(sentTo(1).body).toEqual({ token: "grant-2" });
+    });
+
+    it("does not cache a late answer for a grant replaced while it was out", async () => {
+        const answer = deferred();
+
+        store.set(GRANT_KEY, { id: "g1", token: "grant-1", user: USER });
+        fetchMock.mockReturnValueOnce(answer.promise);
+
+        const first = getAccessToken();
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        store.set(GRANT_KEY, { id: "g2", token: "grant-2", user: USER });
+        fetchMock.mockResolvedValueOnce(Response.json({ token: "jwt-2", user: USER }));
+        await expect(getAccessToken()).resolves.toBe("jwt-2");
+
+        answer.resolve(Response.json({ token: "jwt-1", user: USER }));
+
+        // Whoever waited gets the grant stored now, not the one it asked under.
+        await expect(first).resolves.toBe("jwt-2");
+        await expect(getAccessToken()).resolves.toBe("jwt-2");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("hands a caller waiting through an account switch the new account's JWT", async () => {
+        const answer = deferred();
+        const other = { ...USER, id: "u2" };
+
+        store.set(GRANT_KEY, { id: "g1", token: "grant-1", user: USER });
+        fetchMock.mockReturnValueOnce(answer.promise);
+
+        const waiting = getAccessToken();
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        store.set(GRANT_KEY, { id: "g2", token: "grant-2", user: other });
+        fetchMock.mockResolvedValueOnce(Response.json({ token: "jwt-2", user: other }));
+        answer.resolve(Response.json({ token: "jwt-1", user: USER }));
+
+        await expect(waiting).resolves.toBe("jwt-2");
+        expect(sentTo(1).body).toEqual({ token: "grant-2" });
+    });
+});
+
+describe("loadGrantSession", () => {
+    it("reads an unreadable storage as signed out, so the panel offers sign-in", async () => {
+        chrome.storage.local.get = vi.fn().mockRejectedValue(new Error("storage unavailable"));
+
+        await expect(loadGrantSession()).resolves.toBeNull();
+    });
+
+    it("keys the session to the grant, not the user", async () => {
+        store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
+
+        await expect(loadGrantSession()).resolves.toEqual({ key: "g1", user: USER });
     });
 });
 
@@ -164,7 +299,7 @@ describe("signInWithWebAuthFlow", () => {
         expect(credentials).toBe("omit");
         expect(body).toMatchObject({ code: "one-time", redirectUri: REDIRECT_URI });
         expect((body as { codeVerifier: string }).codeVerifier).toMatch(/^[\w-]{43}$/);
-        expect(store.get(GRANT_KEY)).toEqual({ token: "grant", user: USER });
+        expect(store.get(GRANT_KEY)).toEqual({ id: expect.stringMatching(/^[\w-]{43}$/), token: "grant", user: USER });
         expect(store.get(RECONNECT_KEY)).toBeUndefined();
     });
 
