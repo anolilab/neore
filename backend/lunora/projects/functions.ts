@@ -233,7 +233,7 @@ export const writableProject = async (
  * (`selectRuleFiles`, the list counted in it) and the logging apply to each the same way. Only counts are logged, never text.
  * A run that ends up showing no list (no `instruction_read`: no tools, the cap, a bot's selection, an edit or group run)
  * takes `textWithoutInstructions` instead, the text selected without the list's cost: present only when that cost left
- * something out or cut it, so it is never sent twice for nothing.
+ * something out or cut it, so it is never sent twice for nothing. The over-budget log describes the listing selection.
  */
 export const projectRunContext = (
     context: QueryCtx,
@@ -253,7 +253,8 @@ export const projectRunContext = (
     }
 
     const text = renderRuleFiles(selected.files);
-    const textWithoutInstructions = selected.instructions.length > 0 ? renderRuleFiles(selectRuleFiles(files, paths, false).files) : null;
+    // For any `auto` file, listed or not: one whose line did not fit still ended the selection there.
+    const textWithoutInstructions = files.some((file) => file.mode === "auto") ? renderRuleFiles(selectRuleFiles(files, paths, false).files) : null;
 
     return {
         instructions: selected.instructions.map((file) => {

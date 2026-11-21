@@ -47,8 +47,8 @@
   `MAX_RULE_TEXT_PER_RUN`, never its text; an empty one is not listed. Their text travels with the run's one read
   (`getProjectContextForRun`, `runProjectFor`), and the model reads one with `instruction_read`
   (`chat/tools/instruction-read.ts`), built per run over those files: no database read, never another project's. It is
-  a built-in candidate of `buildAgentTools` (`instructions`), so the cap, a skill, a bot's selection, the permissions
-  and an allowlist remove it like any tool; only a run whose tools still hold it lists them: a chat run with
+  a built-in candidate of `buildAgentTools` (`instructions`), so the cap, a skill, the permissions and an allowlist
+  remove it like any tool; a bot's `allow` list keeps it, only an `exclude` naming it or an empty `allow` removes it; only a run whose tools still hold it lists them: a chat run with
   tools, its approval continuation (read anew from the project its snapshot recorded, `config.projectId`, never the
   thread's project by then), and a task run (`projectInstructions` on `runHeadlessAgent`). Edit (`streamAsync`) and group
   runs take the text only. A run that lists none takes `textWithoutInstructions` when present, the text chosen

@@ -340,7 +340,20 @@ describe("buildAgentTools with a project's instruction files", () => {
         expect(await offers({ instructions: [] })).toBe(false);
         expect(await offers({ skillTools: { disabledTools: ["instruction_read"] } })).toBe(false);
 
+        // A bot's pick of other tools keeps the project's files; only naming it, or no tools at all, removes it.
         selection = { allow: ["webSearch"], exclude: [] };
+
+        expect(await offers()).toBe(true);
+
+        selection = { exclude: ["instruction_read"] };
+
+        expect(await offers()).toBe(false);
+
+        selection = { allow: [], exclude: [] };
+
+        expect(await offers()).toBe(false);
+
+        selection = "fail";
 
         expect(await offers()).toBe(false);
 
@@ -350,10 +363,15 @@ describe("buildAgentTools with a project's instruction files", () => {
         expect(await offers()).toBe(false);
 
         overrides = {};
+        // Under an `ask` cap a chat asks before each read, and a headless run that cannot pause has no tools.
+        cap = "ask";
+
+        expect(await offers()).toBe(true);
+        expect(await offers({ headless: true })).toBe(false);
+
         cap = "off";
 
         expect(await offers()).toBe(false);
-        expect(await offers({ headless: true })).toBe(false);
     });
 
     it("closes the servers it connected to when the files cannot be read, before it fails", async () => {

@@ -394,6 +394,16 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
 
+    // The project's instruction files are the run's context, not a capability a bot picks: an `allow` list naming other tools
+    // keeps them. An `exclude` naming `instruction_read` removes them (`bots/functions.ts` accepts the name), and so does an
+    // empty `allow` list, no tools at all, which a selection that could not be read is too.
+    const instructionRead: ToolSet =
+        Object.hasOwn(candidates, INSTRUCTION_READ_TOOL) &&
+        botToolSelection?.allow?.length !== 0 &&
+        !(botToolSelection?.exclude ?? []).includes(INSTRUCTION_READ_TOOL)
+            ? { [INSTRUCTION_READ_TOOL]: candidates[INSTRUCTION_READ_TOOL]! }
+            : {};
+
     // The bot's own pick, by built-in name or `<server key>:tool` (`bots/tool-selectors.ts`: a server's stable key, so a rename
     // keeps its selectors matching); it only removes, so every rule below still applies.
     candidates = applyBotToolSelection(candidates, botToolSelection, (name) => {
@@ -408,6 +418,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         return device && { server: deviceServerKey(device.deviceId) ?? "", tool: device.toolName };
     });
+
+    candidates = { ...candidates, ...instructionRead };
 
     // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
     // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector

@@ -501,6 +501,11 @@ export const runStreamingAgent = internalAction
                 // Built-ins + MCP tools, with the user's per-tool permissions applied
                 // (`off` removed, `ask` gated behind a tool-approval request) — and
                 // the run context started above.
+                const projectInstructions = runContextPromise.then((context) => context.projectInstructions);
+
+                // Awaited only by a run that builds tools under no `off` cap; the failure itself surfaces through `runContextPromise`.
+                projectInstructions.catch(() => undefined);
+
                 const [toolResult, runContext] = await Promise.all([
                     allowTools
                         ? buildAgentTools(ctx, {
@@ -510,10 +515,8 @@ export const runStreamingAgent = internalAction
                               // Interactive: the user's devices, if this thread may reach them.
                               deviceThreadId: threadId,
                               // Offered as a candidate like any built-in, only to a model that calls tools. A failed context read
-                              // fails the run through `runContextPromise` below, so this one offers nothing.
-                              ...(modelSupportsTools(model) && {
-                                  instructions: runContextPromise.then((context) => context.projectInstructions).catch(() => []),
-                              }),
+                              // fails the run through `runContextPromise` below, and makes `buildAgentTools` close what it connected.
+                              ...(modelSupportsTools(model) && { instructions: projectInstructions }),
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,

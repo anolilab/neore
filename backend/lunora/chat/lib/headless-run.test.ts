@@ -273,6 +273,10 @@ describe("runHeadlessAgent hidden characters", () => {
 });
 
 describe("runHeadlessAgent project instructions", () => {
+    beforeEach(() => {
+        seen.removesInstructionRead = false;
+    });
+
     const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
     const run = (tools: "headless" | "none", model = "test-model") =>
         runHeadlessAgent(fakeCtx(), {
@@ -308,7 +312,6 @@ describe("runHeadlessAgent project instructions", () => {
     it("neither lists them nor gives up their room once the tools' own gates removed instruction_read", async () => {
         seen.removesInstructionRead = true;
         await run("headless");
-        seen.removesInstructionRead = false;
 
         expect(seen.tools.at(-1)).not.toContain("instruction_read");
         expect(seen.system.at(-1)).not.toContain("instruction_read");
