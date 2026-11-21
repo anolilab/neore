@@ -39,6 +39,7 @@ import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import { deviceDiagnostics, serverDiagnostics } from "./diagnostics";
 import { createAddProjectMachines } from "./machines";
+import { isSettingsRequest, promptHeading } from "./prompt-origin";
 import { readSshConfig } from "./ssh-config";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
@@ -548,8 +549,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             apply: applyCommand,
             core: requireCore(),
             interrupted: (held) => posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
-            lapsed: (held) =>
-                posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
+            lapsed: (held) => posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
             refused: (held, reason) =>
@@ -1058,6 +1058,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 const promptSummary = ({ body }: Prompt): string => {
     switch (body.kind) {
         case "call": {
+            if (isSettingsRequest(body.tool)) {
+                return promptHeading(body.tool, body.host);
+            }
+
             return `${body.tool}${body.host === undefined ? "" : ` on ${body.host}`} — ${body.threadTitle}`;
         }
         case "hostConnect": {

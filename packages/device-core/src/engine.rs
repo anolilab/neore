@@ -25,6 +25,7 @@ use crate::actions::{
 };
 use crate::approval::{Answer, Prompt, PromptBody, Prompts, SandboxState};
 use crate::envelope::{self, Domain, NonceSet, Signed};
+use crate::global_instructions;
 use crate::install::{Bundle, Root};
 use crate::mcp::{self, McpManager, McpServerConfig};
 use crate::sandbox::{self, NetworkTier};
@@ -82,6 +83,7 @@ pub type Sink = Box<dyn Fn(Event) + Send + Sync>;
 type SharedSink = Arc<dyn Fn(Event) + Send + Sync>;
 
 /// One MCP tool the manifest offered: its server, its own name on that server, and whether it declared itself read-only.
+#[derive(Clone)]
 struct McpToolRef {
     server: String,
     tool: String,
@@ -431,11 +433,11 @@ impl DeviceState {
         self.generation.load(Ordering::SeqCst) == generation
     }
 
-    /// Whether the approval still covers the call right before it starts, under the save lock (an update in flight has
-    /// finished first; the lock is not held while the action runs). Settings untouched since planning: yes. Changed
-    /// meanwhile: the call is planned again from what is saved now and must come out as the very same action, so an
-    /// unrelated change (another folder shared) lets it run while a removed folder, a shell policy or a replaced
-    /// server does not. A call that skipped its prompt on an allow rule also needs that rule to still be there.
+    /// Whether the approval still covers the call right before it starts. Settings untouched since planning: yes.
+    /// Changed meanwhile: the call is planned again from what is saved now and must come out as the very same action,
+    /// so an unrelated change (another folder shared) lets it run while a removed folder, a shell policy or a replaced
+    /// server does not. A call that skipped its prompt on an allow rule also needs that rule to still be there. The
+    /// lock is not held while the action runs.
     fn approval_holds(
         &self,
         generation: u64,
@@ -444,22 +446,55 @@ impl DeviceState {
         rule_approved: bool,
         pairing: &Pairing,
     ) -> bool {
+        self.replanned_since(generation, pairing, |current, mcp_tools| {
+            plan(tool, input, current, mcp_tools).is_ok_and(|again| again == *action)
+                && (!rule_approved
+                    || decide(tool, tainted, action.read_only(), &current.allow_rules).0)
+        })
+        .is_some_and(|valid| self.unchanged_since(valid, pairing))
+    }
+
+    /// The generation an approval given under `generation` is still good for, or `None` when it no longer is: the
+    /// pairing is not the saved one, or `replans_same` says the settings saved since no longer plan the call to the
+    /// approved action. The settings and MCP tools are copied under the save lock, but `replans_same` runs WITHOUT it:
+    /// planning resolves paths, which a hung mount stalls, and a settings change must never wait on that. An answer
+    /// for a changed generation holds only while [`Self::unchanged_since`] it (checked by the caller under the lock).
+    fn replanned_since(
+        &self,
+        generation: u64,
+        pairing: &Pairing,
+        replans_same: impl FnOnce(&Settings, &HashMap<String, McpToolRef>) -> bool,
+    ) -> Option<u64> {
+        let (now, current, mcp_tools) = {
+            let _guard = self.save_lock.lock().unwrap();
+            let current = self.settings();
+
+            // The call was verified and approved under one pairing; another (a re-pair, even of the same device) is
+            // another secret, and nothing approved before it carries over.
+            if current.pairing.as_ref() != Some(pairing) {
+                return None;
+            }
+
+            let now = self.generation.load(Ordering::SeqCst);
+
+            if now == generation {
+                return Some(now);
+            }
+
+            (now, current, self.mcp_tools.lock().unwrap().clone())
+        };
+
+        replans_same(&current, &mcp_tools).then_some(now)
+    }
+
+    /// Whether nothing was saved since `generation` and `pairing` is still the saved one, under the save lock (an
+    /// update in flight has finished first). The pairing is compared on its own, so the check never relies on every
+    /// pairing change bumping the generation.
+    fn unchanged_since(&self, generation: u64, pairing: &Pairing) -> bool {
         let _guard = self.save_lock.lock().unwrap();
-        let current = self.settings();
 
-        // The call was verified and approved under one pairing; another (a re-pair, even of the same device) is
-        // another secret, and nothing approved before it carries over.
-        if current.pairing.as_ref() != Some(pairing) {
-            return false;
-        }
-
-        if self.generation.load(Ordering::SeqCst) == generation {
-            return true;
-        }
-
-        plan(tool, input, &current, &self.mcp_tools.lock().unwrap())
-            .is_ok_and(|again| again == *action)
-            && (!rule_approved || decide(tool, tainted, action.read_only(), &current.allow_rules).0)
+        self.settings().pairing.as_ref() == Some(pairing)
+            && self.generation.load(Ordering::SeqCst) == generation
     }
 
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
@@ -581,12 +616,21 @@ impl DeviceState {
         }
 
         let tainted = !call.tainted_by.is_empty();
-        let planned = plan(
-            &call.tool,
-            &call.input,
-            &settings,
-            &self.mcp_tools.lock().unwrap(),
-        );
+        // A copy, so the lock is not held while an instruction-file plan touches the home folder: a hung mount there
+        // would otherwise stall `replanned_since`, which takes this lock under `save_lock`, and every settings update.
+        let mcp_tools = self.mcp_tools.lock().unwrap().clone();
+        // Only a click in a project's settings starts an instruction-file call, and the prompt says the agent did not ask: one
+        // that names a chat is refused before it is shown. The backend never signs one (`createDeviceCall`).
+        let planned = if global_instructions::is_global_instructions_tool(&call.tool)
+            && call.thread_id.is_some()
+        {
+            Err(format!(
+                "{} is started only from a project's settings, never by a chat",
+                call.tool
+            ))
+        } else {
+            plan(&call.tool, &call.input, &settings, &mcp_tools)
+        };
         let mut detail = String::new();
 
         let outcome = match planned {
@@ -638,26 +682,21 @@ impl DeviceState {
                 };
 
                 // The settings can change while the prompt is open (a folder unshared, shell network off, a
-                // server replaced, a rule removed). The rule is saved only if nothing changed since the call was
-                // planned, checked under the save lock, so a replaced server never inherits it; the dispatch below
-                // checks again, so the call never starts under a policy the owner has since changed.
+                // server replaced, a rule removed). The rule is saved only if the call still plans to the approved
+                // action (replanned outside the save lock) and nothing was saved since that answer, checked under the
+                // lock, so a replaced server never inherits it; the dispatch below checks again, so the call never
+                // starts under a policy the owner has since changed.
                 if answer == Answer::Always && offer_always {
+                    let valid = self.replanned_since(generation, &pairing, |current, mcp_tools| {
+                        plan(&call.tool, &call.input, current, mcp_tools)
+                            .is_ok_and(|again| again == action)
+                    });
                     let _ = self.change_settings(|next| {
                         if next.pairing.as_ref() != Some(&pairing) {
                             return Err("the pairing changed while waiting".to_owned());
                         }
 
-                        // Under the save lock, so nothing changes meanwhile: the tool must still plan to the very
-                        // action that was approved (same server config included), or the rule is not saved.
-                        if self.generation.load(Ordering::SeqCst) != generation
-                            && !plan(
-                                &call.tool,
-                                &call.input,
-                                next,
-                                &self.mcp_tools.lock().unwrap(),
-                            )
-                            .is_ok_and(|again| again == action)
-                        {
+                        if valid != Some(self.generation.load(Ordering::SeqCst)) {
                             return Err("the settings changed while waiting".to_owned());
                         }
 
@@ -669,7 +708,10 @@ impl DeviceState {
                     });
                 }
 
+                // An absolute deadline: the waits below (the save lock) count against it, so nothing starts once
+                // the request has expired, however long they took.
                 let remaining = call.expires_at.saturating_sub(now_ms());
+                let deadline = std::time::Instant::now() + Duration::from_millis(remaining);
 
                 let still_paired = self
                     .settings()
@@ -695,11 +737,11 @@ impl DeviceState {
                         )
                     }
                     _ if remaining == 0 => {
-                        Outcome::failed(decision, "approved after the request expired")
+                        Outcome::failed(decision, EXPIRED_BEFORE_START)
                     }
                     _ => {
                         self.emit_progress(&pairing.secret, &pairing.device_id, &call.call_id, "running");
-                        run_action(self, action, Duration::from_millis(remaining), decision)
+                        run_action(self, action, deadline, decision, &pairing)
                     }
                 }
             }
@@ -1003,6 +1045,7 @@ fn drop_rules_of_changed_servers(
 /// Tools that may never skip the prompt: they change things irreversibly.
 pub fn can_always_allow(tool: &str) -> bool {
     !matches!(tool, "shell_run" | "fs_write")
+        && !global_instructions::is_global_instructions_tool(tool)
 }
 
 /// `(skip the prompt, offer "Always allow")` for one call. Only a read-only tool
@@ -1078,6 +1121,12 @@ fn plan(
         allow_unsandboxed: settings.allow_unsandboxed_shell,
         network: settings.shell_network_tier(),
     };
+
+    // Not confined to the shared folders: a fixed list under the home folder, asked for every time (`can_always_allow`).
+    if global_instructions::is_global_instructions_tool(tool) {
+        return global_instructions::plan(tool, input, actions::canonical_home(), &roots)
+            .map(Action::GlobalInstructions);
+    }
 
     if let Some(planned) = plan_builtin(tool, input, &roots, shell) {
         return planned;
@@ -1162,15 +1211,89 @@ impl Outcome {
 fn run_action(
     state: &DeviceState,
     action: Action,
-    remaining: Duration,
+    deadline: std::time::Instant,
     decision: &'static str,
+    pairing: &Pairing,
 ) -> Outcome {
+    if matches!(action, Action::GlobalInstructions(_)) {
+        return read_outside_settings_lock(
+            state,
+            decision,
+            (deadline, pairing),
+            |roots, remaining| actions::run(action, roots, remaining, Some(&state.mcp)),
+        );
+    }
+
     let roots = shareable_roots(&state.settings().roots);
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+
+    if remaining.is_zero() {
+        return Outcome::failed(decision, EXPIRED_BEFORE_START);
+    }
 
     Outcome::of(
         decision,
         actions::run(action, &roots, remaining, Some(&state.mcp)),
     )
+}
+
+/// Why an approved call never started: the request expired first (waiting for the save lock counts).
+const EXPIRED_BEFORE_START: &str = "approved after the request expired";
+
+/// Why an approved instruction-file read did not run or came back with nothing: the computer was unpaired or paired
+/// again since the call was approved.
+const PAIRING_CHANGED: &str =
+    "the computer was unpaired or paired again since the call was approved";
+
+/// Why an instruction-file read came back with nothing: the owner changed the settings while it ran.
+const SETTINGS_CHANGED_DURING_READ: &str =
+    "The settings changed while the files were read; nothing was sent. Try again.";
+
+/// Runs `read` (an instruction-file read) against the folders shared when it starts, WITHOUT holding the save lock,
+/// so a read stalled on a hung mount never blocks a settings change. Its result is kept only if no settings update was
+/// saved meanwhile (the generation, bumped under the save lock by every one): a folder shared during the read can
+/// never have been left out of its check. The call's `pairing` must still be the saved one both when the snapshot is
+/// taken and when the result is kept (an unpair or re-pair since the approval check refuses it), and the read never
+/// starts at or past `deadline`, however long the lock took. Nothing under the lock touches the disk: the folders are resolved (canonicalised,
+/// which a hung mount stalls) after it.
+fn read_outside_settings_lock(
+    state: &DeviceState,
+    decision: &'static str,
+    (deadline, pairing): (std::time::Instant, &Pairing),
+    read: impl FnOnce(&[PathBuf], Duration) -> actions::Outcome,
+) -> Outcome {
+    let (generation, saved) = {
+        let _guard = state.save_lock.lock().unwrap();
+        let current = state.settings();
+
+        if current.pairing.as_ref() != Some(pairing) {
+            return Outcome::failed(decision, PAIRING_CHANGED);
+        }
+
+        (state.generation.load(Ordering::SeqCst), current.roots)
+    };
+
+    let roots = shareable_roots(&saved);
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+
+    if remaining.is_zero() {
+        return Outcome::failed(decision, EXPIRED_BEFORE_START);
+    }
+
+    let done = read(&roots, remaining);
+    // Only `settings_update` changes the shared folders, and it bumps the generation under the lock once saved. The
+    // pairing is compared on its own, so this never relies on every pairing change bumping it.
+    let _guard = state.save_lock.lock().unwrap();
+
+    if state.settings().pairing.as_ref() != Some(pairing) {
+        return Outcome::failed(decision, PAIRING_CHANGED);
+    }
+
+    if state.generation.load(Ordering::SeqCst) != generation {
+        return Outcome::failed(decision, SETTINGS_CHANGED_DURING_READ);
+    }
+
+    Outcome::of(decision, done)
 }
 
 /// What the page relays for one progress step: the call it is about and the
@@ -1465,6 +1588,15 @@ mod tests {
     }
 
     fn paired_state(name: &str) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
+        paired_state_as(name, "dev1")
+    }
+
+    /// [`paired_state`] as `device_id`. The test keychain is one for every test in the process, so a test that
+    /// unpairs or replaces its pairing (which deletes the entry) needs an id no other test pairs as.
+    fn paired_state_as(
+        name: &str,
+        device_id: &str,
+    ) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
         crate::store::test_keychain::install();
         let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -1473,7 +1605,7 @@ mod tests {
             &Settings {
                 pairing: Some(Pairing {
                     account_label: "me".into(),
-                    device_id: "dev1".into(),
+                    device_id: device_id.into(),
                     secret: turn_secret(),
                 }),
                 ..Default::default()
@@ -1650,6 +1782,229 @@ mod tests {
         assert_eq!(decide("shell_run", false, false, &rules), (false, false));
         assert_eq!(decide("fs_write", false, false, &rules), (false, false));
         assert_eq!(decide("fs_read", false, true, &rules), (true, true));
+    }
+
+    #[test]
+    fn global_instruction_reads_always_ask_and_need_no_shared_folder() {
+        let rules = vec![
+            "instructions_list".to_owned(),
+            "instructions_read".to_owned(),
+        ];
+
+        assert_eq!(
+            decide("instructions_list", false, true, &rules),
+            (false, false)
+        );
+        assert_eq!(
+            decide("instructions_read", false, true, &rules),
+            (false, false)
+        );
+
+        // No shared folder at all: the fixed list is planned under the home folder, never from a path in the input.
+        let settings = Settings::default();
+        let planned = plan(
+            "instructions_read",
+            &json!({ "files": ["claude"], "path": "/etc" }),
+            &settings,
+            &HashMap::new(),
+        );
+
+        assert!(
+            matches!(planned, Ok(Action::GlobalInstructions(ref request)) if request.read == Some(vec!["claude"]))
+        );
+        assert!(plan(
+            "instructions_read",
+            &json!({ "files": ["/etc/passwd"] }),
+            &settings,
+            &HashMap::new()
+        )
+        .is_err());
+    }
+
+    /// A read stalled on a hung mount holds no lock a settings change waits on, and a folder shared while it ran
+    /// voids its result; one that finishes with the settings untouched keeps it.
+    #[test]
+    fn a_stalled_instruction_read_never_blocks_settings_and_loses_its_result_to_a_change() {
+        let (state, dir, _) = paired_state("stalled-read");
+        let shared = dir.join("shared");
+        stdfs::create_dir_all(&shared).unwrap();
+
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+
+        assert_eq!(
+            read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+                actions::Outcome::completed("files".to_owned())
+            })
+            .output
+            .as_deref(),
+            Some("files")
+        );
+
+        let (started_tx, started) = std::sync::mpsc::channel();
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let reader = {
+            let state = Arc::clone(&state);
+            let pairing = pairing.clone();
+
+            std::thread::spawn(move || {
+                read_outside_settings_lock(&state, "once", (deadline, &pairing), move |roots, _| {
+                    assert!(roots.is_empty());
+                    started_tx.send(()).unwrap();
+                    released.recv().unwrap();
+
+                    actions::Outcome::completed("files".to_owned())
+                })
+            })
+        };
+
+        started.recv().unwrap();
+
+        // The read is stalled: the update must finish anyway (a held lock would hang this test).
+        let update = json!({ "roots": [shared.to_string_lossy()] });
+        state
+            .settings_update(serde_json::from_value(update).unwrap())
+            .unwrap();
+        release.send(()).unwrap();
+
+        let outcome = reader.join().unwrap();
+
+        assert_eq!(outcome.status, "failed");
+        assert!(outcome.output.is_none());
+        assert_eq!(outcome.error.as_deref(), Some(SETTINGS_CHANGED_DURING_READ));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// Replanning after a settings change (which resolves paths a hung mount can stall) holds no lock a settings
+    /// change waits on, and a change saved while it ran voids its answer, so the call fails closed.
+    #[test]
+    fn a_stalled_replan_never_blocks_settings_and_loses_its_answer_to_a_change() {
+        let (state, dir, _) = paired_state("stalled-replan");
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+        let change = |state: &DeviceState| {
+            let update = json!({ "allowShellNetwork": true });
+            state
+                .settings_update(serde_json::from_value(update).unwrap())
+                .unwrap();
+        };
+        let holds = |state: &DeviceState, replans_same: &dyn Fn() -> bool| {
+            state
+                .replanned_since(planned, &pairing, |_, _| replans_same())
+                .is_some_and(|valid| state.unchanged_since(valid, &pairing))
+        };
+
+        change(&state);
+        assert!(holds(&state, &|| true));
+        assert!(!holds(&state, &|| false));
+
+        let (started_tx, started) = std::sync::mpsc::channel();
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let checker = {
+            let state = Arc::clone(&state);
+            let pairing = pairing.clone();
+
+            std::thread::spawn(move || {
+                state
+                    .replanned_since(planned, &pairing, |_, _| {
+                        started_tx.send(()).unwrap();
+                        released.recv().unwrap();
+
+                        true
+                    })
+                    .is_some_and(|valid| state.unchanged_since(valid, &pairing))
+            })
+        };
+
+        started.recv().unwrap();
+
+        // The replan is stalled: the update must finish anyway (a held lock would hang this test).
+        change(&state);
+        release.send(()).unwrap();
+
+        assert!(!checker.join().unwrap());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// The deadline is a point in time fixed before `approval_holds` waits for the save lock (`execute`), and the read
+    /// checks it again after its own wait: a deadline that passed while the lock was held never starts the read.
+    #[test]
+    fn an_instruction_read_never_starts_past_a_deadline_that_ran_out_during_the_lock_wait() {
+        let (state, dir, _) = paired_state("read-past-deadline");
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let deadline = std::time::Instant::now();
+
+        let held = state.save_lock.lock().unwrap();
+        let reader = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || {
+                read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+                    panic!("the read started after the request expired")
+                })
+            })
+        };
+        drop(held);
+
+        let outcome = reader.join().unwrap();
+
+        assert_eq!(outcome.status, "failed");
+        assert_eq!(outcome.error.as_deref(), Some(EXPIRED_BEFORE_START));
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
+    /// An unpair (or a re-pair) saved after the approval was checked refuses the read before it starts, and one saved
+    /// while it runs voids its result, though a pairing is saved without a generation bump.
+    #[test]
+    fn an_instruction_read_never_runs_for_a_pairing_that_is_gone() {
+        let (state, dir, _) = paired_state_as("read-after-unpair", "dev-read-after-unpair");
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+
+        state
+            .settings_update(serde_json::from_value(json!({ "unpair": true })).unwrap())
+            .unwrap();
+
+        let outcome = read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+            panic!("the read ran after the computer was unpaired")
+        });
+
+        assert_eq!(outcome.status, "failed");
+        assert_eq!(outcome.error.as_deref(), Some(PAIRING_CHANGED));
+
+        // Re-paired while the read runs: the generation is unchanged, the pairing is not.
+        state
+            .change_settings(|settings| {
+                settings.pairing = Some(pairing.clone());
+                Ok(())
+            })
+            .unwrap();
+        let outcome = read_outside_settings_lock(&state, "once", (deadline, &pairing), |_, _| {
+            state
+                .change_settings(|settings| {
+                    settings.pairing = Some(Pairing {
+                        device_id: "dev-read-after-unpair-2".into(),
+                        ..pairing.clone()
+                    });
+                    Ok(())
+                })
+                .unwrap();
+
+            actions::Outcome::completed("files".to_owned())
+        });
+
+        assert_eq!(outcome.status, "failed");
+        assert!(outcome.output.is_none());
+        assert_eq!(outcome.error.as_deref(), Some(PAIRING_CHANGED));
+
+        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -2076,6 +2431,87 @@ mod tests {
     fn offers_no_file_or_shell_tools_without_shared_folders() {
         assert!(builtin_tools(&[], "here").is_empty());
         assert_eq!(builtin_tools(&[std::env::temp_dir()], "here").len(), 4);
+    }
+
+    /// An instruction-file call that names a chat is refused unasked: its prompt would say the agent did not ask. The
+    /// same call from settings (no thread) is shown.
+    #[test]
+    fn an_instruction_file_call_from_a_chat_is_refused_before_it_asks() {
+        use std::sync::mpsc::channel;
+        use std::sync::Arc;
+
+        crate::store::test_keychain::install();
+
+        let dir = std::env::temp_dir().join(format!(
+            "neore-device-chat-instructions-{}",
+            std::process::id()
+        ));
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&dir).unwrap();
+
+        let secret = "0123456789abcdef".repeat(4);
+
+        store::save(
+            &dir.join("device.json"),
+            &Settings {
+                pairing: Some(Pairing {
+                    account_label: "me".into(),
+                    device_id: "dev1".into(),
+                    secret: secret.clone(),
+                }),
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+
+        let (events, received) = channel();
+        let state = Arc::new(DeviceState::new(
+            &dir,
+            Box::new(move |event| {
+                let _ = events.send(event);
+            }),
+        ));
+        let call = |nonce: &str, thread: Option<&str>| {
+            let mut payload = json!({
+                "v": 1, "kind": "call", "callId": nonce, "deviceId": "dev1", "tool": "instructions_list",
+                "input": {}, "threadTitle": "T", "taintedBy": [],
+                "issuedAt": now_ms(), "expiresAt": now_ms() + 60_000, "nonce": nonce,
+            });
+
+            if let Some(thread) = thread {
+                payload["threadId"] = json!(thread);
+            }
+
+            envelope::sign_value(&secret, Domain::Call, &payload)
+        };
+
+        let result = state.execute(&call("n1", Some("t1"))).unwrap();
+        let parsed: Value = serde_json::from_str(&result.payload).unwrap();
+
+        assert_eq!(parsed["status"], "failed");
+        assert!(parsed["error"]
+            .as_str()
+            .is_some_and(|error| error.contains("never by a chat")));
+        assert!(parsed.get("output").is_none());
+        assert!(!received
+            .try_iter()
+            .any(|event| matches!(event, Event::Prompt { .. })));
+
+        let signed = call("n2", None);
+        let worker = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || state.execute(&signed))
+        };
+        let prompt = next_prompt(&received);
+
+        state.prompt_answer(prompt.id, "deny").unwrap();
+
+        let parsed: Value = serde_json::from_str(&worker.join().unwrap().unwrap().payload).unwrap();
+
+        assert_eq!(parsed["status"], "denied");
+
+        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// The approval gate end to end: a call waits for a person, a refusal runs
