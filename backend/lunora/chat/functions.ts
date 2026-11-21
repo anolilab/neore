@@ -5059,7 +5059,10 @@ export const streamAsync = internalAction
 
         // The edit's reply gets its follow-up suggestions here, as any finished reply does: the composer offers the next prompt for it.
         // The job's own claim and charge are per reply, so a second schedule for the same reply does no second work.
-        await context.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId });
+        // A failed hand-off is logged, not thrown: the edit is saved and its job is already complete, so the job must not fail for it.
+        await context.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId }).catch((error: unknown) => {
+            streamLogger.warn(`[StreamAsync] Could not queue the follow-up suggestions of ${threadId}:`, error);
+        });
 
         context.log.event("chat.stream_async", { model, statelessMode: threadStatelessMode ?? false });
 
