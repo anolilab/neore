@@ -10,6 +10,7 @@ import { forkSlug, isValidRating, summarizeRatings } from "./marketplace-logic";
 import { vSkillConfig } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { type StoredRow, storedPage, storedRow, storedRows } from "../lib/stored-row";
 
 // ============================================================================
 // Shapes
@@ -43,7 +44,7 @@ const vSkillVariable = v.object({
 
 const clampLimit = (limit: number | undefined): number => Math.min(Math.max(Math.trunc(limit ?? 20), 1), MAX_PAGE_SIZE);
 
-const toSummary = (skill: Doc<"skills">, stats: Doc<"skillStats"> | null) => {
+const toSummary = (skill: StoredRow<Doc<"skills">>, stats: Doc<"skillStats"> | null) => {
     return {
         _id: skill._id,
         category: skill.category,
@@ -74,7 +75,7 @@ export const browseSkills = authQuery
     .query(async ({ args: input, ctx }) => {
         const limit = clampLimit(input.limit);
 
-        const { page: allPublic } = await ctx.db.skills.findMany({ limit: BROWSE_WINDOW, where: { visibility: "public" } });
+        const { page: allPublic } = storedPage(await ctx.db.skills.findMany({ limit: BROWSE_WINDOW, where: { visibility: "public" } }));
 
         // Apply category filter if provided
         const filtered = input.category ? allPublic.filter((s) => s.category === input.category) : allPublic;
@@ -122,7 +123,7 @@ export const searchMarketplaceSkills = async (ctx: QueryContext, rawQuery: strin
     const descResults = await ctx.db.skills.withSearchIndex("search_skills_description", (q) => q.search("description", query)).take(window);
 
     const seen = new Set<string>();
-    const merged = [...nameResults, ...descResults].filter((skill) => {
+    const merged = storedRows([...nameResults, ...descResults]).filter((skill) => {
         if (seen.has(skill._id as string) || !isMarketplaceSkill(skill)) {
             return false;
         }
@@ -167,7 +168,7 @@ export const getSkillDetail = authQuery
         }),
     )
     .query(async ({ args: input, ctx }) => {
-        const skill = await ctx.db.skills.findFirst({ where: { _id: input.skillId as Id<"skills"> } });
+        const skill = storedRow(await ctx.db.skills.findFirst({ where: { _id: input.skillId as Id<"skills"> } }));
 
         if (!isMarketplaceSkill(skill)) {
             throw new LunoraError("NOT_FOUND", "Skill not found in marketplace");
