@@ -264,6 +264,64 @@ describe("humanCheckLadder", () => {
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
+    it("step 1: a blank page after the wait (a fresh browser once the session died) is not clear", async () => {
+        const { dependencies } = dependenciesFor([{ content: "", success: true, title: "", url: "about:blank" }]);
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+        expect(result.error).not.toMatch(CLEARED_NOTE);
+        expect(result.humanCheck?.status).toBe("asked");
+    });
+
+    it("step 1: a person who took control during the wait and handed back a clear page is not told it cleared on its own", async () => {
+        const handed = { ...CLEAR_PAGE, error: "The person had control of the browser and handed it back;", handedBack: true };
+        const { dependencies } = dependenciesFor([handed]);
+        const result = await humanCheckLadder(CHECK_PAGE, dependencies);
+
+        expect(result).toBe(handed);
+        expect(dependencies.claimAsk).not.toHaveBeenCalled();
+    });
+
+    it("step 2: a screenshot for the card that throws still leaves the ask and its card", async () => {
+        const { dependencies } = dependenciesFor([TEXT_CHECK]);
+
+        dependencies.look.mockResolvedValueOnce(TEXT_CHECK).mockRejectedValueOnce(new Error("renderer down"));
+
+        const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+        expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
+        expect(result.screenshot).toBeUndefined();
+    });
+
+    it("step 3: a read after the hand back that throws, or lands on a blank or other page, leaves it unknown", async () => {
+        for (const look of [
+            undefined,
+            { content: "", success: true, title: "", url: "about:blank" },
+            { content: "Welcome", success: true, title: "Elsewhere", url: "https://elsewhere.example.net/" },
+        ]) {
+            const { dependencies } = dependenciesFor([], new Set(["shop.example.com"]));
+
+            if (look === undefined) {
+                dependencies.look.mockRejectedValueOnce(new Error("renderer down"));
+            } else {
+                dependencies.look.mockResolvedValueOnce(look);
+            }
+
+            const result = await humanCheckLadder({ ...CLEAR_PAGE, handedBack: true }, dependencies);
+
+            expect(result.error).toMatch(UNKNOWN_AFTER_HAND_BACK_NOTE);
+            expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+        }
+    });
+
+    it("step 3: a failed hand back with no page (the browser closed) is passed on as it is, never called clear", async () => {
+        const closed: LadderResult = { error: "The browser closed during the action.", handedBack: true, success: false };
+        const { dependencies } = dependenciesFor([], new Set([""]));
+        const result = await humanCheckLadder(closed, dependencies);
+
+        expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+        expect(result.success).toBe(false);
+    });
+
     it("step 3: a hand back on a site nobody was asked about adds nothing", async () => {
         const { dependencies } = dependenciesFor([]);
         const handed = { ...CLEAR_PAGE, handedBack: true };

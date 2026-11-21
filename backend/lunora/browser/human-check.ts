@@ -156,12 +156,26 @@ const CLEAR_EVIDENCE: Record<HumanCheckMarker, ReadonlyArray<keyof PageSignals>>
 };
 
 /**
- * Positive evidence that a check is gone: a successful look that carries every signal the check was found by (the
- * whole page's text for a check found in it) and shows no check in any of them. A failed look, or one missing a
- * signal, proves nothing.
+ * Positive evidence that the check on `site` is gone: a successful look, still on `site`, that carries every signal the
+ * check was found by (the whole page's text for a check found in it) and shows no check in any of them. A failed look,
+ * one missing a signal, or one on another page (a fresh blank browser after the session died, a site the person went
+ * on to) proves nothing.
  */
-const showsClear = (page: LadderResult, marker: HumanCheckMarker): boolean =>
-    page.success === true && CLEAR_EVIDENCE[marker].every((signal) => page[signal] !== undefined) && detectHumanCheck(page, marker === "content") === undefined;
+const showsClear = (page: LadderResult, marker: HumanCheckMarker, site: string): boolean =>
+    page.success === true &&
+    site !== "" &&
+    humanCheckSite(page.url) === site &&
+    CLEAR_EVIDENCE[marker].every((signal) => page[signal] !== undefined) &&
+    detectHumanCheck(page, marker === "content") === undefined;
+
+/** A look that threw (the action call failed) is a failed look, never an error out of the ladder after an ask is recorded. */
+const safeLook = async <R extends LadderResult>(dependencies: LadderDependencies<R>, kind: "extract" | "screenshot"): Promise<R | LadderResult> => {
+    try {
+        return await dependencies.look(kind);
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error), success: false };
+    }
+};
 
 const withNote = <R extends LadderResult>(result: R, note: string): R => {
     return { ...result, error: result.error === undefined ? note : `${result.error} ${note}` };
@@ -206,8 +220,9 @@ export const humanCheckLadder = async <R extends LadderResult>(
             return page;
         }
 
-        if (showsClear(page, marker)) {
-            return withNote(page, humanCheckMessages.clearedOnItsOwn(site));
+        if (showsClear(page, marker, site)) {
+            // A person took control during the wait and handed back a clear page: the hand-back note already says so.
+            return page.handedBack === true ? page : withNote(page, humanCheckMessages.clearedOnItsOwn(site));
         }
 
         site = humanCheckSite(page.url ?? result.url);
@@ -218,10 +233,15 @@ export const humanCheckLadder = async <R extends LadderResult>(
     // The card shows the person the page: a check re-read from the text has no image yet, so one screenshot is taken.
     // A failed one leaves the card to say it has none.
     if (first && page.screenshot === undefined) {
-        const shot = await dependencies.look("screenshot");
+        const shot = await safeLook(dependencies, "screenshot");
 
         if (shot.success === true && shot.screenshot !== undefined) {
             page = { ...page, screenshot: shot.screenshot, screenshotFormat: shot.screenshotFormat };
+        }
+
+        // The person took control and gave it back meanwhile: the agent still hears that.
+        if (shot.handedBack === true && shot.error !== undefined) {
+            page = withNote(page, shot.error);
         }
     }
 
@@ -244,9 +264,9 @@ const afterHandBack = async <R extends LadderResult>(result: R, dependencies: La
         return result;
     }
 
-    const page = readContent && result.success === true ? result : await dependencies.look("extract");
+    const page = readContent && result.success === true ? result : await safeLook(dependencies, "extract");
 
-    if (showsClear(page, "content")) {
+    if (showsClear(page, "content", site)) {
         return withNote(result, humanCheckMessages.clearedAfterHandBack(site));
     }
 
