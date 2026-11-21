@@ -8,8 +8,14 @@ export const WS_TICKET_PATH = "/_lunora/ws-ticket";
 /** How long a minted ticket may wait for its upgrade. A connect follows the mint at once. */
 export const WS_TICKET_TTL_MS = 30_000;
 
-/** Who a ticket was minted for — the identity its upgrade resolves to. */
+/**
+ * Who a ticket was minted for — the identity its upgrade resolves to. A web
+ * caller's ticket names its session (`sessionId`, the JWT's `sid` or the
+ * cookie's); an app grant's names the grant's sign-in (`grantSessionId`, from
+ * `gsid`), kept apart from `sessionId` for the reason in `src/bearer-identity.ts`.
+ */
 export interface WsTicketIdentity {
+    grantSessionId?: string;
     sessionId?: string;
     userId: string;
 }
@@ -43,23 +49,43 @@ type TicketDatabase = Pick<D1DatabaseLike, "prepare">;
  * What it cannot bound is a ticket minted just BEFORE the deletion — so a
  * redeem also requires the session behind the ticket to still exist
  * (`hasLiveSession`). Deletion revokes every session in its first step, and so
- * does a sign-out, which makes both end an unredeemed ticket at once.
+ * does a sign-out or a grant revoke, which makes each end an unredeemed ticket
+ * at once.
  */
-const CREATE_TABLE = `CREATE TABLE IF NOT EXISTS "wsTicket" ("hash" TEXT PRIMARY KEY NOT NULL, "userId" TEXT NOT NULL, "sessionId" TEXT, "expiresAt" INTEGER NOT NULL)`;
+const CREATE_TABLE = `CREATE TABLE IF NOT EXISTS "wsTicket" ("hash" TEXT PRIMARY KEY NOT NULL, "userId" TEXT NOT NULL, "sessionId" TEXT, "grantSessionId" TEXT, "expiresAt" INTEGER NOT NULL)`;
+
+/**
+ * `grantSessionId` came after the table first shipped, and `CREATE TABLE IF NOT
+ * EXISTS` leaves an existing table as it is, so the column is added here. On a
+ * table that already has it SQLite answers "duplicate column name", which is
+ * the expected answer; anything else is a real failure.
+ */
+const ADD_GRANT_SESSION_COLUMN = `ALTER TABLE "wsTicket" ADD COLUMN "grantSessionId" TEXT`;
+const DUPLICATE_COLUMN = /duplicate column/iu;
+
+const addGrantSessionColumn = async (database: TicketDatabase): Promise<void> => {
+    try {
+        await database.prepare(ADD_GRANT_SESSION_COLUMN).run();
+    } catch (error) {
+        if (!DUPLICATE_COLUMN.test(error instanceof Error ? error.message : String(error))) {
+            throw error;
+        }
+    }
+};
 
 let ensured: Promise<unknown> | undefined;
 
 const ensureTable = async (database: TicketDatabase): Promise<void> => {
     // Memoised per isolate, like `ensureGlobalTables`; a failure clears it so the
     // next request retries instead of caching a broken database.
-    ensured ??= database
-        .prepare(CREATE_TABLE)
-        .run()
-        .catch((error: unknown) => {
-            ensured = undefined;
+    ensured ??= (async () => {
+        await database.prepare(CREATE_TABLE).run();
+        await addGrantSessionColumn(database);
+    })().catch((error: unknown) => {
+        ensured = undefined;
 
-            throw error;
-        });
+        throw error;
+    });
 
     await ensured;
 };
@@ -96,32 +122,47 @@ export const issueWsTicket = async (database: TicketDatabase, identity: WsTicket
 
     await purgeExpiredWsTickets(database, now);
     await database
-        .prepare(`INSERT INTO "wsTicket" ("hash", "userId", "sessionId", "expiresAt") VALUES (?, ?, ?, ?)`)
-        .bind(await sha256(ticket), identity.userId, identity.sessionId ?? null, now + WS_TICKET_TTL_MS)
+        .prepare(`INSERT INTO "wsTicket" ("hash", "userId", "sessionId", "grantSessionId", "expiresAt") VALUES (?, ?, ?, ?, ?)`)
+        .bind(await sha256(ticket), identity.userId, identity.sessionId ?? null, identity.grantSessionId ?? null, now + WS_TICKET_TTL_MS)
         .run();
 
     return ticket;
 };
 
+/** Whether the session `id` of `userId` still exists. A failed read counts as gone. */
+const sessionExists = async (database: TicketDatabase, id: string, userId: string): Promise<boolean> => {
+    try {
+        const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`).bind(id, userId).first();
+
+        return row !== null;
+    } catch {
+        return false;
+    }
+};
+
 /**
- * Whether the session a ticket was minted under still exists: that exact
- * session when the ticket names one, else any session of the user (a bearer
- * minted before `sid` was added names none). Reads better-auth's `session`
- * table, which lives in the same D1 database. Expiry is not re-checked — the
- * caller was verified at mint, 30s ago at most; what this catches is a session
- * DELETED since, by sign-out, revocation or account deletion
+ * Whether every sign-in a ticket was minted under still exists: its web session
+ * (`sessionId`) and its app grant (`grantSessionId`), each by exact id — so a
+ * grant revoked between mint and redeem cannot ride another live session of the
+ * user. A ticket naming neither (a bearer minted before `sid` was added) needs
+ * any session of the user. Reads better-auth's `session` table, which lives in
+ * the same D1 database. Expiry is not re-checked — the caller was verified at
+ * mint, 30s ago at most; what this catches is a session DELETED since, by
+ * sign-out, a grant revoke or account deletion
  * (`gdpr_steps_deletion_steps.revokeUserSessions`). A failed read refuses the
  * ticket: the upgrade then falls through to the cookie, like a spent one.
  */
 const hasLiveSession = async (database: TicketDatabase, identity: WsTicketIdentity): Promise<boolean> => {
+    const named = [identity.sessionId, identity.grantSessionId].filter((id): id is string => id !== undefined);
+
+    if (named.length > 0) {
+        const live = await Promise.all(named.map(async (id) => await sessionExists(database, id, identity.userId)));
+
+        return live.every(Boolean);
+    }
+
     try {
-        const row =
-            identity.sessionId === undefined
-                ? await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "userId" = ? LIMIT 1`).bind(identity.userId).first()
-                : await database
-                      .prepare(`SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`)
-                      .bind(identity.sessionId, identity.userId)
-                      .first();
+        const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "userId" = ? LIMIT 1`).bind(identity.userId).first();
 
         return row !== null;
     } catch {
@@ -139,15 +180,19 @@ export const redeemWsTicket = async (database: TicketDatabase, ticket: string, n
     await ensureTable(database);
 
     const row = await database
-        .prepare(`DELETE FROM "wsTicket" WHERE "hash" = ? RETURNING "userId", "sessionId", "expiresAt"`)
+        .prepare(`DELETE FROM "wsTicket" WHERE "hash" = ? RETURNING "userId", "sessionId", "grantSessionId", "expiresAt"`)
         .bind(await sha256(ticket))
-        .first<{ expiresAt: number; sessionId: string | null; userId: string }>();
+        .first<{ expiresAt: number; grantSessionId: string | null; sessionId: string | null; userId: string }>();
 
     if (!row || row.expiresAt <= now) {
         return null;
     }
 
-    const identity: WsTicketIdentity = { userId: row.userId, ...(row.sessionId !== null && { sessionId: row.sessionId }) };
+    const identity: WsTicketIdentity = {
+        userId: row.userId,
+        ...(row.sessionId !== null && { sessionId: row.sessionId }),
+        ...(row.grantSessionId !== null && { grantSessionId: row.grantSessionId }),
+    };
 
     return (await hasLiveSession(database, identity)) ? identity : null;
 };
@@ -183,32 +228,21 @@ export const resolveWsTicketIdentity = async <Identity>(
     return isWsReauth(request) ? null : await fallback(request);
 };
 
-/** Whether the app-grant sign-in a bearer stands for (`gsid`) still exists. A failed read refuses. */
-const hasGrantSession = async (database: TicketDatabase, grantSessionId: string, userId: string): Promise<boolean> => {
-    try {
-        const row = await database.prepare(`SELECT 1 AS "live" FROM "session" WHERE "id" = ? AND "userId" = ? LIMIT 1`).bind(grantSessionId, userId).first();
-
-        return row !== null;
-    } catch {
-        return false;
-    }
-};
-
 /**
  * `POST /_lunora/ws-ticket` — answers `{ ticket }` for an authenticated caller,
  * 401 for anyone else. `undefined` for every other request, so the caller falls
  * through to the app.
  *
  * An app grant's JWT (`grantSessionId`, from `gsid`) outlives a revoke until it
- * expires, and its ticket names no session (`gsid` is never `sessionId`), so the
- * redeem would accept it while the user has any other session. The mint
- * therefore checks the grant itself: once it is revoked, no ticket is minted,
- * and the grant's open sockets are cut at their next re-authentication.
+ * expires. Its ticket names the grant (never as `sessionId`), and both ends
+ * check it: once the grant is revoked no ticket is minted, a ticket minted just
+ * before is refused at redeem, and the grant's open sockets are cut at their
+ * next re-authentication.
  */
 export const handleWsTicketRequest = async (
     request: Request,
     database: TicketDatabase,
-    resolveIdentity: (request: Request) => Promise<(WsTicketIdentity & { grantSessionId?: string }) | null>,
+    resolveIdentity: (request: Request) => Promise<WsTicketIdentity | null>,
 ): Promise<Response | undefined> => {
     if (new URL(request.url).pathname !== WS_TICKET_PATH) {
         return undefined;
@@ -222,11 +256,11 @@ export const handleWsTicketRequest = async (
 
     const identity = await resolveIdentity(request);
 
-    if (!identity || (identity.grantSessionId !== undefined && !(await hasGrantSession(database, identity.grantSessionId, identity.userId)))) {
+    if (!identity || (identity.grantSessionId !== undefined && !(await sessionExists(database, identity.grantSessionId, identity.userId)))) {
         return Response.json({ error: { code: "UNAUTHENTICATED", message: "A ticket needs a signed-in caller" } }, { headers, status: 401 });
     }
 
-    const ticket = await issueWsTicket(database, { sessionId: identity.sessionId, userId: identity.userId });
+    const ticket = await issueWsTicket(database, { grantSessionId: identity.grantSessionId, sessionId: identity.sessionId, userId: identity.userId });
 
     return Response.json({ expiresInMs: WS_TICKET_TTL_MS, ticket }, { headers });
 };

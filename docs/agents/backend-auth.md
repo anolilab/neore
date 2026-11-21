@@ -90,6 +90,13 @@ Sign-up requires an invitation, and anonymous (guest) sign-in is refused. `@luno
   socket signed in carries a fresh ticket the same way, and is redeemed too (a
   ticket-only client sends no bearer there). `requestBearer` reads the
   `Authorization` header alone, and `?token=` is only ever redeemed as a ticket.
+  A ticket stores the exact sign-in it was minted under: the web `sessionId`,
+  or an app grant's `grantSessionId` (never as `sessionId`). The redeem requires
+  that row of `session` to still exist, so a grant revoked between mint and
+  redeem cannot ride another live session of the user. The column was added
+  after the table shipped; `ensureTable` adds it to an older table. A grant's
+  socket now resolves to `{ grantSessionId, userId }`, like its bearer over
+  HTTP, so `callerSessionMarks` and push registration see the grant there too.
 - **The JWT's `iss` and `aud` are the backend's `PUBLIC_ORIGIN`, set explicitly** on the
   `jwt()` plugin in `auth.ts`. better-auth defaults both to `baseURL`, which is `SITE_URL`
   (the WEB origin in every deployed topology), and `@lunora/auth` only allows the request's

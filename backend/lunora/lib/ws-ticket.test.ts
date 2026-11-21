@@ -112,6 +112,32 @@ describe("ws tickets", () => {
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
     });
 
+    it("refuses an app grant's ticket once the grant is revoked, though the user has another live session", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('web', 'user-a', ?)`).run(Date.now() + 60_000);
+        // The revoke lands between the mint and the redeem.
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("sa");
+
+        await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
+    });
+
+    it("redeems an app grant's ticket as the grant, never as a web session", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ grantSessionId: "sa", userId: "user-a" });
+    });
+
+    it("adds the grant column to a table created before it existed", async () => {
+        database.sqlite.exec(
+            `CREATE TABLE "wsTicket" ("hash" TEXT PRIMARY KEY NOT NULL, "userId" TEXT NOT NULL, "sessionId" TEXT, "expiresAt" INTEGER NOT NULL)`,
+        );
+
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ grantSessionId: "sa", userId: "user-a" });
+    });
+
     it("refuses a ticket naming another user's session", async () => {
         const ticket = await issueWsTicket(database, { sessionId: "sb", userId: "user-a" });
 
@@ -214,6 +240,23 @@ describe(handleWsTicketRequest, () => {
         const revoked = await handleWsTicketRequest(post(), database, grantBearer);
 
         expect(revoked?.status).toBe(401);
+    });
+
+    it("refuses at redeem a grant's ticket minted just before the revoke", async () => {
+        const database = createDatabase();
+        const response = await handleWsTicketRequest(post(), database, async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        });
+        const { ticket } = (await response!.json()) as { ticket: string };
+
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("sa");
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('web', 'user-a', ?)`).run(Date.now() + 60_000);
+
+        await expect(
+            resolveWsTicketIdentity(new Request(`http://x/_lunora/ws/reauth?shard=user-a&token=${ticket}`, { method: "POST" }), database, async () => {
+                return { sessionId: "web", userId: "user-a" };
+            }),
+        ).resolves.toBeNull();
     });
 
     it("refuses an anonymous caller", async () => {
