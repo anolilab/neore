@@ -363,8 +363,8 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  * (`withPassword`), with scripts turned off for the document it loads, so nothing the site shows of it can be read
  * (`sent()`). Only the first such POST can be sent: it is claimed before anything is awaited, and any later one is
  * not. A POST elsewhere, or one whose stand-in is missing or also in another field, is not sent (`changed()`); nor is one
- * whose answer the scripts could not be turned off for (`unshielded()`), or one over `MAX_GUARDED_BODY_BYTES`
- * (`oversized()`). Any other request or socket message that carries
+ * whose answer the scripts could not be turned off for (`unshielded()`), one over `MAX_GUARDED_BODY_BYTES`
+ * (`oversized()`), or one encoded otherwise than `form.enctype` (`reencoded()`). `disarm()` turns the scripts back on. Any other request or socket message that carries
  * the stand-in (a script read the field) is dropped, a script's fetch, XHR or socket message to `origin` as
  * `scripted()`: that sign-in cannot be filled. A 307 or 308 redirect of a request with a body, which would carry it on,
  * is failed when it points elsewhere or its `Location` does not parse; a new page (a popup) is closed; a WebSocket to
@@ -384,6 +384,10 @@ const armGuard = async (
     let isCounting = true;
     let isClaimed = false;
     let sent: Request | null = null;
+    /** The claimed POST while it is handed on: its answer can arrive before the hand-on returns. */
+    let forwarding: Request | null = null;
+    let isReencoded = false;
+    let isShielded = false;
     let isChanged = false;
     let isUnshielded = false;
     let isUnsent = false;
@@ -404,13 +408,19 @@ const armGuard = async (
 
     let cdp: CDPSession | undefined;
 
-    const shield = async (): Promise<boolean> =>
-        cdp
-            ? cdp
-                  .send("Emulation.setScriptExecutionDisabled", { value: true })
-                  .then(() => true)
-                  .catch(() => false)
-            : false;
+    const shield = async (): Promise<boolean> => {
+        if (!cdp) {
+            return false;
+        }
+
+        // Set before the command: one that stalls may still take effect.
+        isShielded = true;
+
+        return cdp
+            .send("Emulation.setScriptExecutionDisabled", { value: true })
+            .then(() => true)
+            .catch(() => false);
+    };
 
     /**
      * Whether an address carries what the page holds, or, once the form's POST went out, the password: a site that echoes
@@ -439,15 +449,19 @@ const armGuard = async (
             // Claimed before anything is awaited: a second submission that arrives meanwhile is never the one sent.
             isClaimed = true;
 
+            const contentType = request.headers()["content-type"] ?? "";
             const filled =
                 body && !isLarge && withoutFragment(request.url()) === withoutFragment(form.action)
-                    ? withPassword(body, request.headers()["content-type"] ?? "", { name: form.name, stand }, password)
+                    ? withPassword(body, contentType, { name: form.name, stand }, password)
                     : null;
 
             // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later. A sign-in
             // given up while that command was on its way is not sent: its result already says so.
             if (isLarge) {
                 isOversized = true;
+            } else if ((contentType.split(";", 1)[0] ?? "").trim().toLowerCase() !== form.enctype) {
+                // Encoded otherwise than the form the site served: a submit handler changed it.
+                isReencoded = true;
             } else if (filled === null) {
                 isChanged = true;
             } else if (!(await shield())) {
@@ -457,11 +471,13 @@ const armGuard = async (
                     // It rejects only for a route already handled, when nothing is handed on. Once it resolves, the
                     // request goes on when this handler returns, and whether it reaches the site is unknown: that counts
                     // as sent, so the sign-in is never sent again.
+                    forwarding = request;
                     await route.fallback({ postData: filled });
                     sent = request;
 
                     return;
                 } catch {
+                    forwarding = null;
                     isUnsent = true;
                 }
             }
@@ -484,11 +500,13 @@ const armGuard = async (
         let request: Request | null = response.request();
         const status = response.status();
 
-        if (!sent || (status >= 300 && status < 400)) {
+        const claimed = sent ?? forwarding;
+
+        if (!claimed || (status >= 300 && status < 400)) {
             return;
         }
 
-        while (request && request !== sent) {
+        while (request && request !== claimed) {
             request = request.redirectedFrom();
         }
 
@@ -508,7 +526,11 @@ const armGuard = async (
 
     let gate: SocketGate | undefined;
 
-    const disarm = async (): Promise<void> => {
+    /**
+     * Takes the guard down. Whether the tab's scripts are confirmed back on: false when they were turned off and the
+     * command that turns them on again failed or did not answer within a second, so the page must not be used again.
+     */
+    const disarm = async (): Promise<boolean> => {
         lock.onRefused(null);
 
         if (gate) {
@@ -519,7 +541,23 @@ const armGuard = async (
         lock.route(null);
         page.context().off("page", onPage);
         page.off("response", onResponse);
-        await cdp?.detach().catch(() => undefined);
+
+        const session = cdp;
+        const isRunning =
+            !isShielded ||
+            (session !== undefined &&
+                (await within(
+                    session
+                        .send("Emulation.setScriptExecutionDisabled", { value: false })
+                        .then(() => true)
+                        .catch(() => false),
+                    1000,
+                    false,
+                )));
+
+        await session?.detach().catch(() => undefined);
+
+        return isRunning;
     };
 
     try {
@@ -619,6 +657,8 @@ const armGuard = async (
         },
         /** Whether the form's own POST was over `MAX_GUARDED_BODY_BYTES`: it was not read or sent. */
         oversized: () => isOversized,
+        /** Whether the form's own POST was encoded otherwise than the form the site served: it was not sent. */
+        reencoded: () => isReencoded,
         /** Whether a script sent what it read from the field: such a sign-in is not one the stand-in can fill. */
         scripted: () => isScripted,
         /** Turns the tab's scripts off until the guard is taken down; false when that cannot be confirmed. */
@@ -683,8 +723,9 @@ class OutOfTimeError extends Error {}
 
 /**
  * Where the form `input` belongs to would send it (the `formaction`/`formmethod`/`formtarget`/`formenctype` of its first
- * enabled submit button, else the form's own), and, with `submit`, sends it with `requestSubmit` from that button, which runs the page's own submit
- * handlers. Those handlers can still change where it goes; the request guard is what keeps it on `origin`. No method is
+ * enabled submit button, else the form's own), and, with `expected`, sends it with `requestSubmit` from that button, which runs the page's own submit
+ * handlers. A form whose encoding or `accept-charset` is not `expected` (the form the site served) before or after those
+ * handlers is not sent (`re-encoded`). Those handlers can still change where it goes; the request guard is what keeps it on `origin`. No method is
  * GET, which would put the password in the address: such a form is sent by POST. A form for another window (any target
  * but this one, `_parent` and `_top` only when it is the top window) is refused: it would post from a page the guard does
  * not watch. So is a `text/plain` form, and one in another charset than UTF-8
@@ -692,8 +733,8 @@ class OutOfTimeError extends Error {}
  */
 const checkForm = (
     input: Element,
-    { isAscii, origin, submit }: { isAscii: boolean; origin: string; submit: boolean },
-): "encoding" | "no-form" | "off-site" | FormTarget => {
+    { expected, isAscii, origin }: { expected?: { charset: string; enctype: string }; isAscii: boolean; origin: string },
+): "encoding" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
     const { form, isConnected, name, type } = input as HTMLInputElement;
 
     if (!form || !isConnected || type !== "password") {
@@ -746,17 +787,36 @@ const checkForm = (
         return "encoding";
     }
 
-    if (submit) {
+    const accepted = getAttribute.call(form, "accept-charset") ?? "";
+
+    if (expected && (encoding !== expected.enctype || accepted !== expected.charset)) {
+        return "re-encoded";
+    }
+
+    if (expected) {
+        // Read before the page's submit handlers run, which could replace it.
+        const stop = view ? (Object.getOwnPropertyDescriptor(view, "stop")?.value as (() => void) | undefined) : undefined;
+
         if (named === null) {
             setAttribute.call(form, "method", "post");
         }
 
         HTMLFormElement.prototype.requestSubmit.call(form, button ?? undefined);
+
+        // The submission reads the encoding once the page's submit handlers are done, as here: one that changed it has
+        // its navigation stopped before it starts.
+        const sentEncoding = button?.hasAttribute("formenctype") ? button.formEnctype : (enctype?.get?.call(form) as string);
+
+        if (sentEncoding !== expected.enctype || (getAttribute.call(form, "accept-charset") ?? "") !== expected.charset) {
+            stop?.call(view);
+
+            return "re-encoded";
+        }
     }
 
     return {
         action: action.href,
-        charset: getAttribute.call(form, "accept-charset") ?? "",
+        charset: accepted,
         enctype: encoding,
         method: (named ?? "post").toLowerCase(),
         name,
@@ -1023,7 +1083,9 @@ const clearPassword = async (
     // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
     if (
         !(await within(
-            release().then(() => true),
+            release()
+                .then(() => true)
+                .catch(() => false),
             CLOSE_MS,
             false,
         ))
@@ -1145,7 +1207,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return "No password field is on the page";
             }
 
-            const form = await answered(async () => field.evaluate(checkForm, { isAscii, origin, submit: false }));
+            const form = await answered(async () => field.evaluate(checkForm, { isAscii, origin }));
 
             if (form === "no-form") {
                 return "The password field is not in a form, so nothing was typed or sent";
@@ -1155,7 +1217,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return `The login form would not send the password to ${origin} by POST in this window, so nothing was typed`;
             }
 
-            if (form === "encoding") {
+            // `re-encoded` only at the send, which compares the form with the one the site served.
+            if (form === "encoding" || form === "re-encoded") {
                 return "The login form encodes what it sends in a way the agent's browser cannot put a saved password into, so nothing was typed";
             }
 
@@ -1306,13 +1369,20 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         // The page's submit handlers run inside this call: one that never returns must not hold it past the deadline.
         const form = await within<ReturnType<typeof checkForm> | "busy">(
-            field.evaluate(checkForm, { isAscii, origin, submit: true }),
+            field.evaluate(checkForm, { expected: { charset: target.charset, enctype: target.enctype }, isAscii, origin }),
             left(pageTimeout),
             "busy",
         );
 
         if (form === "busy") {
             return failed("The page did not finish sending the form in time");
+        }
+
+        if (form === "re-encoded") {
+            // Before the POST's scripts-off command answers: a navigation the page's `stop` did not end is not handed on.
+            guard.giveUp();
+
+            return failed("The login form changed how it encodes what it sends from the form the site served, so the password was not sent");
         }
 
         if (typeof form === "string") {
@@ -1329,6 +1399,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             !guard.unshielded() &&
             !guard.unsent() &&
             !guard.oversized() &&
+            !guard.reencoded() &&
             now() < waitUntil
         ) {
             await page.waitForTimeout(100);
@@ -1373,6 +1444,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             );
         }
 
+        if (guard.reencoded()) {
+            return failed("The login form changed how it encodes what it sends from the form the site served, so the password was not sent");
+        }
+
         if (guard.unsent()) {
             return failed("The browser did not send the login form, so the password was not sent");
         }
@@ -1402,7 +1477,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         if (isLocking && !result.success) {
             // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
             const isReleased = await within(
-                (lock?.release() ?? Promise.resolve()).then(() => true),
+                (lock?.release() ?? Promise.resolve()).then(() => true).catch(() => false),
                 CLOSE_MS,
                 false,
             );
@@ -1436,9 +1511,14 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     // The result is settled: a send still on its way must not go out under it.
     armed.giveUp();
-    // Both, even when one of them hangs or fails.
+    // Both, even when one of them hangs or fails. It throws when the tab's scripts are not confirmed back on: such a page
+    // is closed rather than handed on.
     const release = async (): Promise<void> => {
-        await Promise.allSettled([armed.disarm(), lock?.release()]);
+        const [scripts] = await Promise.allSettled([armed.disarm(), lock?.release()]);
+
+        if (scripts.status !== "fulfilled" || !scripts.value) {
+            throw new Error("The tab's scripts could not be turned back on");
+        }
     };
 
     // Read before the cleanup leaves the page, in the time the cleanup does not need: where the sign-in landed, and
@@ -1458,7 +1538,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             page
                 .close()
                 .catch(() => undefined)
-                .then(release),
+                .then(release)
+                .catch(() => undefined),
             CLOSE_MS,
             undefined,
         );

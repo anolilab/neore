@@ -234,8 +234,11 @@ describe(signIn, () => {
 
     const sessionPosts = (): Hit[] => login.hits.filter((hit) => hit.url === "/session");
 
-    /** Has the `call`th `Emulation.setScriptExecutionDisabled` of the tab's DevTools sessions (from 1) answered by `answer`. */
-    const scriptsOff = (answer: (call: number, send: () => Promise<unknown>) => Promise<unknown>): void => {
+    /**
+     * Has the `call`th `Emulation.setScriptExecutionDisabled` of the tab's DevTools sessions (from 1) answered by `answer`,
+     * told whether it turns them off (`isOff`).
+     */
+    const scriptsOff = (answer: (call: number, send: () => Promise<unknown>, isOff: boolean) => Promise<unknown>): void => {
         const { newCDPSession } = context;
         let calls = 0;
 
@@ -250,7 +253,11 @@ describe(signIn, () => {
 
                 calls += 1;
 
-                return answer(calls, async () => send.call(session, method as never, params as never));
+                return answer(
+                    calls,
+                    async () => send.call(session, method as never, params as never),
+                    (params as { value?: boolean } | undefined)?.value === true,
+                );
             }) as typeof send;
 
             return session;
@@ -466,6 +473,41 @@ describe(signIn, () => {
         expect(result).toMatchObject({ submitted: true, success: true });
         // The answer and the cleanup's look at it, both without scripts, then the load the session goes on with.
         expect(login.hits.filter((hit) => ["/home", "/ran"].includes(hit.url)).map((hit) => hit.url)).toStrictEqual(["/home", "/home", "/home", "/ran"]);
+    });
+
+    it("signs in when the site answers the form's POST at once, with no redirect", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            html(response, "<h1>Welcome</h1>");
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/session` });
+        expect(sessionPosts().filter((hit) => hit.method === "POST")).toHaveLength(1);
+    });
+
+    it.each([
+        ["changes its enctype", `form.enctype = "multipart/form-data";`],
+        ["changes its accept-charset", `form.acceptCharset = "ISO-8859-1";`],
+        ["sends it later with another enctype", `event.preventDefault(); setTimeout(() => { form.enctype = "multipart/form-data"; form.submit(); });`],
+    ])("does not send the form when a submit handler %s from the form the site served", async (_what, change) => {
+        fixture.page = loginForm(`const form = document.forms[0]; form.addEventListener("submit", (event) => { ${change} });`);
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("changed how it encodes"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("closes the session when the tab's scripts cannot be turned back on after the sign-in", async () => {
+        scriptsOff(async (_call, send, isOff) => (isOff ? send() : Promise.reject(new Error("Target closed"))));
+        fixture.page = loginForm();
+
+        const result = await run();
+
+        expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
+        expect(page.isClosed()).toBe(true);
     });
 
     it("sends the password in a multipart form's own POST", async () => {
@@ -1304,8 +1346,9 @@ describe(signIn, () => {
         // The send's command answers; the cleanup's never does. The clock jumps from that command, which the cleanup
         // sends only with time left: a cleanup that ran out of time first would never reach it. The jump lands before the
         // cleanup sets its wait, as the command is sent synchronously inside the shield call.
-        scriptsOff(async (call, send) => {
-            if (call === 1) {
+        scriptsOff(async (call, send, isOff) => {
+            // The send's, and the command that turns them back on as the closed page is let go.
+            if (call === 1 || !isOff) {
                 return send();
             }
 

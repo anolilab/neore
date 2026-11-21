@@ -56,6 +56,19 @@ export type BrowserLoginResponse = {
     error?: string;
 };
 
+export type BrowserLoginErrorResponse = {
+    success: false;
+    error: string;
+    /**
+     * The session named could not be reconnected and is gone; nothing was typed
+     */
+    sessionClosed?: boolean;
+    /**
+     * The browser session of this call (the one named, when it was reconnected), which holds no password: the sign-in failed before anything was typed
+     */
+    sessionId?: string;
+};
+
 export type BrowserActionRequest = {
     /**
      * The browser action to execute
@@ -184,11 +197,11 @@ export type BrowserLoginErrors = {
     /**
      * Internal server error
      */
-    500: ErrorResponse;
+    500: BrowserLoginErrorResponse;
     /**
      * The browser did not start within the budget; nothing was typed
      */
-    504: ErrorResponse;
+    504: BrowserLoginErrorResponse;
 };
 
 export type BrowserLoginError = BrowserLoginErrors[keyof BrowserLoginErrors];
