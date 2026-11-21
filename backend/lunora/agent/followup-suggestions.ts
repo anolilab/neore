@@ -34,12 +34,13 @@ export interface ReplyAnchorRow {
 /**
  * The row a reply is keyed by: the first row of the last assistant group the composer shows. The UI closes a group at
  * every user or system row of the turn (ui-messages.ts), so only rows after the last of those belong to the reply on
- * screen. A switch divider (a system row) is never the anchor, because the composer never shows it.
+ * screen. A switch divider (a system row) is never the anchor, because the composer never shows it. Only the boundaries before the
+ * newest reply's row count: a divider appended after the reply (a task run's) starts nothing and must not move the anchor.
  */
 export const replyAnchorRow = <Row extends ReplyAnchorRow>(turnRows: ReadonlyArray<Row>, newest: Row): Row => {
     const isBoundary = (row: Row) => row.message?.role === "user" || row.message?.role === "system";
     const turn = turnRows.filter((row) => row.order === newest.order);
-    const boundary = Math.max(-Infinity, ...turn.filter((row) => isBoundary(row)).map((row) => row.stepOrder));
+    const boundary = Math.max(-Infinity, ...turn.filter((row) => isBoundary(row) && row.stepOrder < newest.stepOrder).map((row) => row.stepOrder));
 
     let anchor = newest;
 

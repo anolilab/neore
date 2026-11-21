@@ -248,6 +248,13 @@ describe("the row a reply is keyed by", () => {
 
         expect(replyAnchorRow([...turn, older], turn[2]!)._id).toBe("text");
     });
+
+    it("a task divider appended after a multi-row reply does not move its key to the final row", () => {
+        const turn = [row("user", "user", 0, 1), row("text", "assistant", 1, 1), row("tool", "tool", 2, 1), row("final", "assistant", 3, 1)];
+        const divider = row("divider", "system", 4, 1);
+
+        expect(replyAnchorRow([...turn, divider], turn[3]!)._id).toBe("text");
+    });
 });
 
 describe("the rows the suggestion model reads", () => {
