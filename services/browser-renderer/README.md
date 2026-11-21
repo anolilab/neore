@@ -74,7 +74,8 @@ window, has no WebRTC, WebTransport, `WebSocketStream`, `fetchLater`, keepalive 
 service worker (`src/channels.ts`). Other tabs of the session are closed when it starts. A login page that needs any of
 these fails rather than signs in; a sign-in that stops before anything is typed leaves the tab on `about:blank`, so the
 session goes on from a page loaded without the lock; when the lock does not let go within a second, or the tab cannot be
-moved there, the session is closed instead. Speculation rules, whose
+moved there, the session is closed instead. While the guard holds, a request body over 1 MiB is not looked into: the
+login form's own is not sent, and another to the login's site is aborted. Speculation rules, whose
 prefetches and prerenders the browser sends past request interception, are taken out too: a `Speculation-Rules` header
 is dropped from the tab's documents, and each `<script type="speculationrules">` is removed as it is added, in the
 document and in every shadow root a script makes or reaches, including one whose type a script changes after it is in.

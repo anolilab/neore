@@ -259,6 +259,12 @@ export const withPassword = (body: Buffer, contentType: string, { name, stand }:
 
 const REDIRECT_KEEPING_BODY = new Set([307, 308]);
 
+/**
+ * The largest request body the guard looks into: a login form's POST is far smaller. One larger, the form's own or
+ * another request to `origin`, is aborted without being scanned or copied again while the guard holds.
+ */
+export const MAX_GUARDED_BODY_BYTES = 1024 * 1024;
+
 /** Whether a redirect would carry a request's body to another site: only a 307 or 308 does, and only of a request with one. */
 const isRedirectElsewhere = (
     { hasBody, status, target }: { hasBody: boolean; status: number | undefined; target: string | null | undefined },
@@ -357,7 +363,8 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  * (`withPassword`), with scripts turned off for the document it loads, so nothing the site shows of it can be read
  * (`sent()`). Only the first such POST can be sent: it is claimed before anything is awaited, and any later one is
  * not. A POST elsewhere, or one whose stand-in is missing or also in another field, is not sent (`changed()`); nor is one
- * whose answer the scripts could not be turned off for (`unshielded()`). Any other request or socket message that carries
+ * whose answer the scripts could not be turned off for (`unshielded()`), or one over `MAX_GUARDED_BODY_BYTES`
+ * (`oversized()`). Any other request or socket message that carries
  * the stand-in (a script read the field) is dropped, a script's fetch, XHR or socket message to `origin` as
  * `scripted()`: that sign-in cannot be filled. A 307 or 308 redirect of a request with a body, which would carry it on,
  * is failed when it points elsewhere or its `Location` does not parse; a new page (a popup) is closed; a WebSocket to
@@ -380,6 +387,7 @@ const armGuard = async (
     let isChanged = false;
     let isUnshielded = false;
     let isUnsent = false;
+    let isOversized = false;
     let isScripted = false;
     let attempt: string | null = null;
     let admitted: string | null = null;
@@ -412,7 +420,9 @@ const armGuard = async (
 
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();
+        // The buffer Playwright already holds, not a further copy; one over `MAX_GUARDED_BODY_BYTES` is neither scanned nor rewritten.
         const body = request.postDataBuffer();
+        const isLarge = body !== null && body.length > MAX_GUARDED_BODY_BYTES;
         const isOwn = frameOf(request)?.page() === page && originOf(request.url()) === origin;
         const isAdmitted = body === null && request.url() === admitted && request.isNavigationRequest() && frameOf(request) === page.mainFrame();
 
@@ -430,13 +440,15 @@ const armGuard = async (
             isClaimed = true;
 
             const filled =
-                body && withoutFragment(request.url()) === withoutFragment(form.action)
+                body && !isLarge && withoutFragment(request.url()) === withoutFragment(form.action)
                     ? withPassword(body, request.headers()["content-type"] ?? "", { name: form.name, stand }, password)
                     : null;
 
             // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later. A sign-in
             // given up while that command was on its way is not sent: its result already says so.
-            if (filled === null) {
+            if (isLarge) {
+                isOversized = true;
+            } else if (filled === null) {
                 isChanged = true;
             } else if (!(await shield())) {
                 isUnshielded = true;
@@ -453,8 +465,9 @@ const armGuard = async (
                     isUnsent = true;
                 }
             }
-        } else if (isOwn && body?.includes(stand)) {
-            isScripted ||= ["fetch", "xhr"].includes(request.resourceType());
+        } else if (isOwn && (isLarge || body?.includes(stand))) {
+            // A body too large to look into is aborted unread.
+            isScripted ||= !isLarge && ["fetch", "xhr"].includes(request.resourceType());
         } else if (isOwn || isAdmitted) {
             await route.fallback();
 
@@ -604,6 +617,8 @@ const armGuard = async (
         giveUp: (): void => {
             isExpecting = false;
         },
+        /** Whether the form's own POST was over `MAX_GUARDED_BODY_BYTES`: it was not read or sent. */
+        oversized: () => isOversized,
         /** Whether a script sent what it read from the field: such a sign-in is not one the stand-in can fill. */
         scripted: () => isScripted,
         /** Turns the tab's scripts off until the guard is taken down; false when that cannot be confirmed. */
@@ -685,35 +700,47 @@ const checkForm = (
         return "no-form";
     }
 
+    // Read through the prototypes: a control named `enctype`, `acceptCharset` or `requestSubmit` hides the form's own,
+    // and a form or image named `URL` or `querySelectorAll` the document's. No helper function: a bundler that keeps
+    // names wraps one in a helper the page lacks.
+    const { getAttribute, setAttribute } = Element.prototype;
+    const { acceptCharset, enctype } = Object.getOwnPropertyDescriptors(HTMLFormElement.prototype);
+    const { characterSet, defaultView, URL: address } = Object.getOwnPropertyDescriptors(Document.prototype);
+    const baseUri = Object.getOwnPropertyDescriptor(Node.prototype, "baseURI");
+
     // The first enabled submit button whose form this is, wherever it sits (a `form` attribute): an image input is one,
     // and a button of no known type is a submit button. A disabled one cannot send the form.
     const button =
-        [...document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input")].find(
+        [...(Document.prototype.querySelectorAll.call(document, "button, input") as NodeListOf<HTMLButtonElement | HTMLInputElement>)].find(
             (control) => control.form === form && ["image", "submit"].includes(control.type) && !control.matches(":disabled"),
         ) ?? null;
-    const named = button?.getAttribute("formmethod") ?? form.getAttribute("method");
-    const written = button?.getAttribute("formaction") ?? form.getAttribute("action") ?? "";
+    const named = button?.getAttribute("formmethod") ?? getAttribute.call(form, "method");
+    const written = button?.getAttribute("formaction") ?? getAttribute.call(form, "action") ?? "";
     // An empty action is the document's own address, whatever its base.
-    const action = new URL(written === "" ? document.URL : written, document.baseURI);
+    const action = new URL(written === "" ? (address?.get?.call(document) as string) : written, baseUri?.get?.call(document) as string);
 
     action.hash = "";
+    const base = Document.prototype.querySelector.call(document, "base[target]");
     const target = (
         button?.getAttribute("formtarget") ??
-        form.getAttribute("target") ??
-        document.querySelector("base[target]")?.getAttribute("target") ??
+        getAttribute.call(form, "target") ??
+        (base ? getAttribute.call(base, "target") : null) ??
         ""
     ).toLowerCase();
 
     // `_parent` and `_top` name this window when it is the top one, as the main frame's always is.
-    const sameWindow = document.defaultView?.top === document.defaultView ? ["", "_parent", "_self", "_top"] : ["", "_self"];
+    const view = defaultView?.get?.call(document) as Window | null;
+    const sameWindow = view?.top === view ? ["", "_parent", "_self", "_top"] : ["", "_self"];
 
     if ((named ?? "post").toLowerCase() !== "post" || action.origin !== origin || !sameWindow.includes(target)) {
         return "off-site";
     }
 
-    const encoding = button?.hasAttribute("formenctype") ? button.formEnctype : form.enctype;
+    const encoding = button?.hasAttribute("formenctype") ? button.formEnctype : (enctype?.get?.call(form) as string);
     // The first of `accept-charset`, else the document's own; spelled `UTF-8` or `utf8`.
-    const charset = (form.acceptCharset.trim().split(" ", 1)[0] || document.characterSet).toLowerCase().replace("-", "");
+    const charset = ((acceptCharset?.get?.call(form) as string).trim().split(" ", 1)[0] || (characterSet?.get?.call(document) as string))
+        .toLowerCase()
+        .replace("-", "");
 
     if (encoding === "text/plain" || (!isAscii && charset !== "utf8")) {
         return "encoding";
@@ -721,15 +748,15 @@ const checkForm = (
 
     if (submit) {
         if (named === null) {
-            form.setAttribute("method", "post");
+            setAttribute.call(form, "method", "post");
         }
 
-        form.requestSubmit(button ?? undefined);
+        HTMLFormElement.prototype.requestSubmit.call(form, button ?? undefined);
     }
 
     return {
         action: action.href,
-        charset: form.getAttribute("accept-charset") ?? "",
+        charset: getAttribute.call(form, "accept-charset") ?? "",
         enctype: encoding,
         method: (named ?? "post").toLowerCase(),
         name,
@@ -1294,7 +1321,16 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         const waitUntil = now() + left(SEND_WAIT_MS);
 
-        while (!guard.submitted() && !guard.attempt() && !guard.changed() && !guard.scripted() && !guard.unshielded() && !guard.unsent() && now() < waitUntil) {
+        while (
+            !guard.submitted() &&
+            !guard.attempt() &&
+            !guard.changed() &&
+            !guard.scripted() &&
+            !guard.unshielded() &&
+            !guard.unsent() &&
+            !guard.oversized() &&
+            now() < waitUntil
+        ) {
             await page.waitForTimeout(100);
         }
 
@@ -1329,6 +1365,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         if (guard.unshielded()) {
             return failed("The browser could not be locked down for the send, so nothing was sent");
+        }
+
+        if (guard.oversized()) {
+            return failed(
+                `The login form sends more than the agent's browser checks for the password (${MAX_GUARDED_BODY_BYTES / 1024 / 1024} MiB), so it was not sent`,
+            );
         }
 
         if (guard.unsent()) {

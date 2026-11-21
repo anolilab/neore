@@ -11,7 +11,7 @@ import type { Browser, BrowserContext, Page, Route } from "playwright";
 import { chromium } from "playwright";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { signIn } from "./login";
+import { MAX_GUARDED_BODY_BYTES, signIn } from "./login";
 
 const SAVED_SECRET = "s3cret-pw";
 
@@ -605,6 +605,32 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ submitted: true, success: true });
         expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}&x=0&y=0`, method: "POST", url: "/session" }]);
+    });
+
+    it("sends a form whose controls are named like the form's own properties, and gives no method one", async () => {
+        const shadows = ["acceptCharset", "enctype", "method", "requestSubmit"];
+
+        fixture.page = `<img name="URL" alt=""><img name="characterSet" alt=""><img name="defaultView" alt=""><form action="/session">${FIELDS}${shadows.map((name) => `<input type="hidden" name="${name}">`).join("")}<button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([
+            { body: `user=ann&pw=${SAVED_SECRET}&${shadows.map((name) => `${name}=`).join("&")}`, method: "POST", url: "/session" },
+        ]);
+    });
+
+    it("does not send a login form whose POST is larger than the guard reads, and aborts a large upload to the site unread", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].big.value = "x".repeat(${MAX_GUARDED_BODY_BYTES}); document.forms[0].pw.addEventListener("input", () => fetch("/upload", { body: "y".repeat(${MAX_GUARDED_BODY_BYTES + 1}), method: "POST" }).catch(() => console.log("upload refused")), { once: true });`,
+        ).replace("<button>", '<input type="hidden" name="big"><button>');
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("more than"), submitted: false, success: false });
+        expect(login.hits.filter((hit) => ["/session", "/upload"].includes(hit.url))).toStrictEqual([]);
+        expect(logged).toContain("upload refused");
+        expect(await passwordLeft()).toBe(false);
     });
 
     it("clears the password when the page throws after it was typed", async () => {
