@@ -1,4 +1,4 @@
-import type { wireLiveSocket } from "@neore/client-runtime";
+import { requestWsTicket } from "@neore/backend/request-bearer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createLunoraClient } from "./lunora-client";
@@ -7,24 +7,61 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
+/** Records each socket's upgrade URL; never opens, so the client just waits. */
+const recordSockets = (): string[] => {
+    const opened: string[] = [];
+
+    vi.stubGlobal(
+        "WebSocket",
+        class extends EventTarget {
+            public readyState = 0;
+
+            public constructor(url: string | URL) {
+                super();
+                opened.push(String(url));
+            }
+
+            public close(): void {
+                this.readyState = 3;
+            }
+
+            public send(): void {
+                // Never opened, as a real socket still connecting: sending throws.
+                if (this.readyState !== 1) {
+                    throw new DOMException("Still connecting", "InvalidStateError");
+                }
+            }
+        },
+    );
+
+    return opened;
+};
+
 describe("createLunoraClient", () => {
-    it("signs the live-query socket in with a ticket minted for the bearer, without cookies", async () => {
-        const wire = vi.fn<typeof wireLiveSocket>(() => () => undefined);
-        const client = createLunoraClient("https://api.example.test", wire);
-        const [wired, mint] = wire.mock.calls[0] ?? [];
-
-        expect(wired).toBe(client);
-
-        const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ ticket: "t1" }));
+    it("opens the live-query socket with a ticket the server's upgrade check redeems, minted without cookies", async () => {
+        const opened = recordSockets();
+        const fetchMock = vi.fn<typeof fetch>(async (input) => Response.json(String(input).endsWith("/_lunora/ws-ticket") ? { ticket: "t1" } : {}));
 
         vi.stubGlobal("fetch", fetchMock);
 
-        await expect(mint?.("jwt")).resolves.toBe("t1");
+        const client = createLunoraClient("https://api.example.test");
 
-        const [url, init] = fetchMock.mock.calls[0] ?? [];
+        client.setAuthToken("h.eyJzdWIiOiJ1MSJ9.s");
 
-        expect(String(url)).toBe("https://api.example.test/_lunora/ws-ticket");
+        const unsubscribe = client.subscribe({ __lunoraRef: "chat:list" } as never, {} as never, () => undefined);
+
+        await vi.waitFor(() => expect(opened.length).toBeGreaterThan(0));
+        unsubscribe();
+        client.close();
+
+        // What the Worker reads off the upgrade (`backend/src/server.ts#resolveCallerIdentity`).
+        const upgrade = new Request(opened[0]?.replace(/^ws/u, "http") ?? "", { headers: { Upgrade: "websocket" } });
+
+        expect(requestWsTicket(upgrade)).toBe("t1");
+
+        const [, init] = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/_lunora/ws-ticket")) ?? [];
+
         expect(init?.credentials).toBe("omit");
-        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer jwt");
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer h.eyJzdWIiOiJ1MSJ9.s");
     });
 });

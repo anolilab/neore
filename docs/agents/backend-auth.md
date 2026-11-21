@@ -84,8 +84,11 @@ Sign-up requires an invitation, and anonymous (guest) sign-in is refused. `@luno
   each (re)connect and the socket sends the returned single-use, 30s ticket
   (`lib/ws-ticket.ts`, a raw `wsTicket` D1 table redeemed with
   `DELETE … RETURNING`, created lazily per isolate, purged on every mint and
-  on the Worker's `scheduled()` tick). It rides as `?token=` only because that is the one
-  name `LunoraClient`'s `wsToken` provider appends; `requestBearer` reads the
+  on the Worker's `scheduled()` tick). It rides as `?token=`, where `LunoraClient` puts its
+  `wsTicket` (`setWsTicket`); a `wsToken` goes only in the connect frame, which
+  nothing here reads, so a ticket passed that way never arrives. The `POST /_lunora/ws/reauth` that keeps an open
+  socket signed in carries a fresh ticket the same way, and is redeemed too (a
+  ticket-only client sends no bearer there). `requestBearer` reads the
   `Authorization` header alone, and `?token=` is only ever redeemed as a ticket.
 - **The JWT's `iss` and `aud` are the backend's `PUBLIC_ORIGIN`, set explicitly** on the
   `jwt()` plugin in `auth.ts`. better-auth defaults both to `baseURL`, which is `SITE_URL`

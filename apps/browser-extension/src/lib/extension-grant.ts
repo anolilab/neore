@@ -155,24 +155,50 @@ export const readGrant = async (): Promise<StoredGrant | undefined> => {
     return stored[STORAGE_KEY] as StoredGrant | undefined;
 };
 
+/** One name for every context of this extension (panel, popup, service worker): they share the lock. */
+const GRANT_LOCK = "neore.extensionGrant";
+
+/**
+ * Runs `step` alone among every grant write in this extension. Storage has no
+ * compare-and-set, so a check and the write it guards hold this lock together:
+ * nothing (a sign-out in another panel, say) lands between them. Without the
+ * Web Locks API (never in a supported browser) the step runs unguarded.
+ */
+const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => {
+    const locks = globalThis.navigator?.locks as LockManager | undefined;
+
+    return locks ? await locks.request(GRANT_LOCK, step) : await step();
+};
+
 const writeGrant = async (grant: StoredGrant): Promise<void> => {
-    await chrome.storage.local.set({ [STORAGE_KEY]: grant });
+    await withGrantLock(async () => {
+        await chrome.storage.local.set({ [STORAGE_KEY]: grant });
+    });
+};
+
+/**
+ * Change the grant `token` names, and only while it is the stored one. A
+ * refresh or a revoke answers after a round trip, by which time another panel
+ * may have signed out or in again: what it writes or clears must be for the
+ * grant it started with. `change` returns the new grant, or `undefined` to
+ * remove it.
+ */
+const updateGrantIf = async (token: string, change: (stored: StoredGrant) => StoredGrant | undefined): Promise<void> => {
+    await withGrantLock(async () => {
+        const stored = await readGrant();
+
+        if (stored?.token !== token) {
+            return;
+        }
+
+        const next = change(stored);
+
+        await (next ? chrome.storage.local.set({ [STORAGE_KEY]: next }) : chrome.storage.local.remove(STORAGE_KEY));
+    });
 };
 
 /** Changes with every sign-in, so a cache or an effect keyed on it never outlives the grant. */
 export const grantKey = (grant: StoredGrant): string => grant.id ?? grant.user.id;
-
-/**
- * True while `token` is still the stored grant. A refresh or a revoke answers
- * after a round trip, by which time another panel may have signed in again:
- * whatever it writes or clears must be for the grant it started with. Storage
- * has no compare-and-set, so this narrows the window to one local read.
- */
-const isStoredGrant = async (token: string): Promise<boolean> => {
-    const stored = await readGrant();
-
-    return stored?.token === token;
-};
 
 /**
  * Run from `runtime.onInstalled`. The Chrome build used to ride the web app's
@@ -201,9 +227,7 @@ export const readReconnectNeeded = async (): Promise<boolean> => {
 
 /** Forget the grant `token` names, and only that one. */
 const clearGrant = async (token: string): Promise<void> => {
-    if (await isStoredGrant(token)) {
-        await chrome.storage.local.remove(STORAGE_KEY);
-    }
+    await updateGrantIf(token, () => undefined);
 };
 
 /**
@@ -279,8 +303,10 @@ export const requestGrantAccessToken = async (grant: StoredGrant | undefined): P
 
         // Keep the shown profile current without rewriting storage (and notifying
         // every listener) on each refresh.
-        if (JSON.stringify(user) !== JSON.stringify(grant.user) && (await isStoredGrant(grant.token))) {
-            await writeGrant({ ...grant, user });
+        if (JSON.stringify(user) !== JSON.stringify(grant.user)) {
+            await updateGrantIf(grant.token, (stored) => {
+                return { ...stored, user };
+            });
         }
 
         return token;

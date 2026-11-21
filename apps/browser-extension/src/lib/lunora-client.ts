@@ -14,12 +14,12 @@ const fetchWithoutCookies: typeof fetch = async (input, init) => await fetch(inp
  * A Lunora client that sends no cookie. Live queries run over a socket, which
  * cannot carry a header and (with no cookie) has no credential of its own: each
  * connect trades the bearer for a single-use ticket, as the web and mobile
- * clients do. `wire` is for tests.
+ * clients do.
  */
-export const createLunoraClient = (url: string, wire: typeof wireLiveSocket = wireLiveSocket): LunoraClient => {
+export const createLunoraClient = (url: string): LunoraClient => {
     const client = new LunoraClient({ fetch: fetchWithoutCookies, url });
 
-    wire(client, createWsTicketMinter(url, fetchWithoutCookies));
+    wireLiveSocket(client, createWsTicketMinter(url, fetchWithoutCookies));
 
     return client;
 };

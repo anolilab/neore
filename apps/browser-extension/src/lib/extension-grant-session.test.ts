@@ -45,10 +45,31 @@ const installChrome = () => {
     });
 };
 
+/** The Web Locks API, as browsers run it: one holder per name at a time, the rest queued in order. */
+const installLocks = () => {
+    const tails = new Map<string, Promise<unknown>>();
+
+    vi.stubGlobal("navigator", {
+        locks: {
+            request: async (name: string, step: () => Promise<unknown>) => {
+                const run = (tails.get(name) ?? Promise.resolve()).then(step);
+
+                tails.set(
+                    name,
+                    run.catch(() => undefined),
+                );
+
+                return await run;
+            },
+        },
+    });
+};
+
 const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
     installChrome();
+    installLocks();
     clearAccessToken();
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
@@ -173,6 +194,37 @@ describe("signOutGrant", () => {
         await signingOut;
 
         expect(store.get(GRANT_KEY)).toEqual(newer);
+    });
+});
+
+describe("a refresh against a sign-out", () => {
+    it("lets a sign-out that lands between the refresh's check and its write win", async () => {
+        const grant = { token: "grant", user: USER };
+        const { set } = chrome.storage.local;
+        const held = deferred();
+        const write = vi.fn(async (items: Record<string, Stored>) => {
+            // The refresh's write stalls after its check passed.
+            await held.promise;
+            await set(items);
+        });
+
+        store.set(GRANT_KEY, grant);
+        chrome.storage.local.set = write as unknown as typeof set;
+        fetchMock
+            .mockResolvedValueOnce(Response.json({ token: "jwt", user: { ...USER, name: "Renamed" } }))
+            .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+        const refresh = requestGrantAccessToken(grant);
+
+        await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+
+        const signingOut = signOutGrant();
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        held.resolve(new Response(null));
+        await Promise.all([refresh, signingOut]);
+
+        expect(store.get(GRANT_KEY)).toBeUndefined();
     });
 });
 

@@ -284,8 +284,8 @@ const resolveCallerIdentity = async (env: Env, request: Request): Promise<Caller
         });
     }
 
-    // The live-query socket's upgrade carries a single-use ticket
-    // instead of a bearer (`lib/ws-ticket.ts`): a browser cannot set
+    // The live-query socket's upgrade (and its re-authentication) carries a
+    // single-use ticket instead of a bearer (`lib/ws-ticket.ts`): a browser cannot set
     // headers on a `WebSocket`, and the URL is logged. A spent,
     // expired or forged ticket falls through to the cookie, like a
     // stale bearer does.

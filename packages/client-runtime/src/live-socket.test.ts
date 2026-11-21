@@ -1,3 +1,4 @@
+import { LunoraClient } from "@lunora/client";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LiveSocketClient } from "./live-socket";
@@ -8,7 +9,7 @@ const jwt = (subject: string): string => `h.${btoa(JSON.stringify({ sub: subject
 const fakeClient = (initial: string | null) => {
     let token = initial;
     const listeners: ((next: string | null) => void)[] = [];
-    const setWsToken = vi.fn();
+    const setWsTicket = vi.fn();
     const client: LiveSocketClient = {
         getAuthToken: () => token,
         onAuthTokenChange: (listener) => {
@@ -16,7 +17,7 @@ const fakeClient = (initial: string | null) => {
 
             return () => undefined;
         },
-        setWsToken,
+        setWsTicket,
     };
 
     return {
@@ -28,7 +29,7 @@ const fakeClient = (initial: string | null) => {
             }
         },
         client,
-        setWsToken,
+        setWsTicket,
     };
 };
 
@@ -39,7 +40,7 @@ describe("wireLiveSocket", () => {
 
         wireLiveSocket(fake.client, mint);
 
-        const provider = fake.setWsToken.mock.calls[0]?.[0] as () => Promise<string | undefined>;
+        const provider = fake.setWsTicket.mock.calls[0]?.[0] as () => Promise<string | undefined>;
 
         await expect(provider()).resolves.toBe("ticket-1");
         expect(mint).toHaveBeenCalledWith(jwt("u1"));
@@ -51,7 +52,7 @@ describe("wireLiveSocket", () => {
 
         wireLiveSocket(fake.client, mint);
 
-        const provider = fake.setWsToken.mock.calls[0]?.[0] as () => Promise<string | undefined>;
+        const provider = fake.setWsTicket.mock.calls[0]?.[0] as () => Promise<string | undefined>;
 
         await expect(provider()).resolves.toBeUndefined();
         expect(mint).not.toHaveBeenCalled();
@@ -61,16 +62,51 @@ describe("wireLiveSocket", () => {
         const fake = fakeClient(jwt("u1"));
 
         wireLiveSocket(fake.client, vi.fn());
-        expect(fake.setWsToken).toHaveBeenCalledTimes(1);
+        expect(fake.setWsTicket).toHaveBeenCalledTimes(1);
 
         fake.change(jwt("u1"));
-        expect(fake.setWsToken).toHaveBeenCalledTimes(1);
+        expect(fake.setWsTicket).toHaveBeenCalledTimes(1);
 
         fake.change(jwt("u2"));
-        expect(fake.setWsToken).toHaveBeenCalledTimes(2);
-        expect(fake.setWsToken.mock.calls[1]?.[0]).not.toBe(fake.setWsToken.mock.calls[0]?.[0]);
+        expect(fake.setWsTicket).toHaveBeenCalledTimes(2);
+        expect(fake.setWsTicket.mock.calls[1]?.[0]).not.toBe(fake.setWsTicket.mock.calls[0]?.[0]);
 
         fake.change(null);
-        expect(fake.setWsToken).toHaveBeenCalledTimes(3);
+        expect(fake.setWsTicket).toHaveBeenCalledTimes(3);
+    });
+
+    it("puts the ticket on the socket's upgrade URL, where the backend redeems it", async () => {
+        const opened: string[] = [];
+
+        // Records each upgrade URL; never opens, so the client just waits.
+        class RecordingSocket extends EventTarget {
+            public readyState = 0;
+
+            public constructor(url: string | URL) {
+                super();
+                opened.push(String(url));
+            }
+
+            public close(): void {}
+
+            public send(): void {}
+        }
+
+        const client = new LunoraClient({
+            fetch: async () => Response.json({}),
+            url: "https://api.example.test",
+            WebSocket: RecordingSocket as unknown as typeof WebSocket,
+        });
+
+        client.setAuthToken(jwt("u1"));
+        wireLiveSocket(client, async () => "ticket-1");
+
+        const unsubscribe = client.subscribe({ __lunoraRef: "chat:list" } as never, {} as never, () => undefined);
+
+        await vi.waitFor(() => expect(opened.length).toBeGreaterThan(0));
+        unsubscribe();
+        client.close();
+
+        expect(new URL(opened[0] ?? "").searchParams.get("token")).toBe("ticket-1");
     });
 });

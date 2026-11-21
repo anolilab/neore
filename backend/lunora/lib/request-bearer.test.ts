@@ -24,6 +24,12 @@ describe(requestWsTicket, () => {
         expect(requestWsTicket(upgrade("http://x/_lunora/ws?token=ticket"))).toBe("ticket");
     });
 
+    it("reads it on the POST that re-authenticates an open socket, and only there", () => {
+        expect(requestWsTicket(new Request("http://x/_lunora/ws/reauth?shard=u1&token=ticket", { method: "POST" }))).toBe("ticket");
+        expect(requestWsTicket(new Request("http://x/_lunora/ws/reauth?token=ticket"))).toBeUndefined();
+        expect(requestWsTicket(new Request("http://x/_lunora/claims?token=ticket", { method: "POST" }))).toBeUndefined();
+    });
+
     it("ignores it on a plain request", () => {
         expect(requestWsTicket(new Request("http://x/_lunora/ws?token=ticket"))).toBeUndefined();
         expect(requestWsTicket(new Request("http://x/_lunora/rpc?token=ticket"))).toBeUndefined();
