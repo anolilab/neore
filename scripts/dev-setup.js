@@ -500,8 +500,15 @@ const main = async () => {
     // what is there (an unset list starts from the shipped Firefox add-on, the
     // backend's default), and `none` (sign-in off on purpose) is left alone.
     const redirectUris = backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"];
+    const hasChromeRedirect = (redirectUris ?? "").split(",").some((entry) => {
+        try {
+            return new URL(entry.trim()).hostname.endsWith(".chromiumapp.org");
+        } catch {
+            return false;
+        }
+    });
 
-    if (process.stdin.isTTY && redirectUris?.trim().toLowerCase() !== "none" && !(redirectUris ?? "").includes(".chromiumapp.org")) {
+    if (process.stdin.isTTY && redirectUris?.trim().toLowerCase() !== "none" && !hasChromeRedirect) {
         const extensionId = await ask("\n  Unpacked browser extension ID (chrome://extensions, leave blank to skip)");
 
         if (/^[a-p]{32}$/.test(extensionId)) {
