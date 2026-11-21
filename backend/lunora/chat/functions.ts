@@ -2819,6 +2819,11 @@ export const deleteThread = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot delete another user's thread");
         }
 
+        // A suggestion for this chat is being sent to a model: the delete waits for it, as a lock does (`agent/thread-lock.ts`).
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
 
         const result = await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
@@ -3906,6 +3911,11 @@ export const softDeleteThread = authMutation
 
         if (!thread || thread.userId !== userId) {
             throwForbidden("Not allowed");
+        }
+
+        // A suggestion for this chat is being sent to a model: the delete waits for it, as a lock does (`agent/thread-lock.ts`).
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }
 
         await context.runMutation(internal.agent.threads.softDeleteThread, {
