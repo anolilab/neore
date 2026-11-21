@@ -78,6 +78,7 @@ const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const NOT_OFFERED = /did not offer/u;
 const NOT_FOUND = /not found/u;
+const ANOTHER_PROJECT = /another project/u;
 
 const OFFER = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore" };
 const SESSION_OPEN = { ...OFFER, kind: "session_open" };
@@ -898,6 +899,31 @@ describe("a project remembers its runner", () => {
         expect(await defaultOf(projectId)).toBeNull();
     });
 
+    it("hands a retry the thread of the project its first try was filed under, and refuses one named for another project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const otherId = await insertProject({ title: "Other", userId: ownerId });
+        const first = (await startIn(projectId, device, "tap-p5")) as { threadId: string };
+
+        expect(await startIn(projectId, device, "tap-p5")).toEqual({ started: false, threadId: first.threadId });
+        await expect(startIn(otherId, device, "tap-p5")).rejects.toThrow(ANOTHER_PROJECT);
+        expect(await rows("acpSessions")).toHaveLength(1);
+    });
+
+    it("records no default for a start the computer refuses at once, and leaves no thread behind", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { hostProtocol: MIN_DEVICE_PROTOCOL - 1 }));
+        await expect(startIn(projectId, device, "tap-p6")).rejects.toThrow(OUT_OF_DATE);
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerAgentKey).toBeUndefined();
+        expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+
     it("refuses to file a thread into another person's project, and starts nothing", async () => {
         const device = await pairedDevice(ownerId);
         const projectId = await insertProject({ userId: await insertUser() });
@@ -965,6 +991,42 @@ describe("an organization's cap on coding agents", () => {
         expect(await rows("acpSessions")).toHaveLength(0);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
         expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+    });
+
+    describe("an organization project's start from another space", () => {
+        const organizationProject = async (): Promise<string> =>
+            (await run(async (ctx) => await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Billing", userId: ownerId }))) as string;
+
+        const startIn = async (deviceId: string, projectId: string) =>
+            await as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId: "tap-org-p", deviceId, folderId: "f1", projectId } as never,
+            );
+
+        it("refuses it when the project's organization holds agents below auto, though the caller is in another space", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = await organizationProject();
+
+            await joinOrganization();
+            await capOrganization("ask");
+
+            await expect(startIn(device.deviceId, projectId)).rejects.toThrow(NOT_ALLOWED);
+            expect(await rows("acpSessions")).toHaveLength(0);
+            expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        });
+
+        it("files the thread under the project's organization, so its cap holds the chat in every space", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = await organizationProject();
+
+            await joinOrganization();
+            await capOrganization("auto");
+
+            const result = (await startIn(device.deviceId, projectId)) as { started: boolean; threadId: string };
+
+            expect(result.started).toBe(true);
+            expect(await row(result.threadId)).toMatchObject({ organizationId: "org-a", projectId, runner: "host" });
+        });
     });
 
     it("refuses a send into a chat filed under an organization that has since tightened its cap, or that its owner left", async () => {

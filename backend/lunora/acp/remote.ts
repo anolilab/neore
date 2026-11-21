@@ -111,6 +111,26 @@ export interface StartHostSessionInput {
     projectId?: Id<"projects">;
 }
 
+/**
+ * What a start whose claim was already taken answers: the session the first try made, so a lost answer is found again.
+ * A retry naming another project is not the same start, so it is refused rather than handed the first try's thread.
+ */
+const answerRetry = async (
+    ctx: MutationCtx,
+    deviceId: Id<"devices">,
+    hostSessionId: string,
+    project: Doc<"projects"> | null,
+): Promise<{ started: boolean; threadId?: string }> => {
+    const first = await ctx.db.acpSessions.findFirst({ where: { deviceId, hostSessionId } });
+    const firstThread = first ? await ctx.db.get("threads", first.threadId) : null;
+
+    if (first && firstThread?.projectId !== project?._id) {
+        throw new LunoraError("BAD_REQUEST", "That start was made for another project. Start it again from the project it was made in.");
+    }
+
+    return { started: false, ...(first && { threadId: first.threadId as string }) };
+};
+
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
 export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args: StartHostSessionInput): Promise<{ started: boolean; threadId?: string }> => {
     const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
@@ -135,14 +155,15 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
 
     if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
-        // The first try's answer may have been lost: hand back the session it made.
-        const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
-
-        return { started: false, ...(first && { threadId: first.threadId as string }) };
+        return await answerRetry(ctx, device._id, hostSessionId, project);
     }
 
+    // A project of an organization files its thread under that organization, whatever space the start came from, so the
+    // organization's cap holds the thread. Otherwise the thread is filed under the caller's organization.
+    const organizationId = project?.organizationId ?? args.organizationId;
+
     // After the claim, so a retry of a start that went through still finds its session. Throwing gives the claim back.
-    const refused = await hostOrganizationRefusal(ctx, args.organizationId, userId);
+    const refused = await hostOrganizationRefusal(ctx, organizationId, userId);
 
     if (refused) {
         throw new LunoraError("FORBIDDEN", refused);
@@ -154,7 +175,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         mode: "text",
         model: offer.agentKey,
         ...(project && { projectId: project._id }),
-        ...(args.organizationId && { organizationId: args.organizationId }),
+        ...(organizationId && { organizationId }),
         runner: "host",
         status: "active",
         tags: ["chat", "host"],
@@ -171,7 +192,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     }
 
     if (project) {
-        await rememberProjectRunner(ctx, project, userId, args.organizationId ?? null, {
+        await rememberProjectRunner(ctx, project, userId, organizationId ?? null, {
             agentKey: offer.agentKey,
             deviceId: args.deviceId as string,
             folderId: args.folderId,
