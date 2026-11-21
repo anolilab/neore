@@ -21,6 +21,7 @@ type InstructionReadOutput =
 
 /** Opens the explicit form of an id (`id:<id>`), which no name is read as; in any case. */
 const ID_FORM = "id:";
+const ANGLE_BRACKETS = /^<|>$/gu;
 
 /**
  * The files `file` names: with the `id:` form ({@link ID_FORM}) the one with that id; otherwise every one whose id is
@@ -29,7 +30,8 @@ const ID_FORM = "id:";
  */
 export const findInstruction = (instructions: ReadonlyArray<RunInstruction>, file: string): RunInstruction[] => {
     const wanted = file.trim();
-    const explicitId = wanted.toLowerCase().startsWith(ID_FORM) ? wanted.slice(ID_FORM.length).trim() : undefined;
+    // Angle brackets kept from the `id:<its id>` the list and the ambiguous answer show are not part of the id.
+    const explicitId = wanted.toLowerCase().startsWith(ID_FORM) ? wanted.slice(ID_FORM.length).trim().replaceAll(ANGLE_BRACKETS, "") : undefined;
     const byExplicitId = explicitId ? instructions.find((entry) => entry.id === explicitId) : undefined;
 
     if (byExplicitId) {

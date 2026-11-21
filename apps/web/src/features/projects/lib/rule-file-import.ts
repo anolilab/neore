@@ -207,6 +207,11 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
         fields.set(key, key === "globs" ? parts.flatMap((part) => listOf(part)) : [isBlock ? value : unquoted(value)]);
     }
 
+    // Blank lines, then a `---` rule: a block that sets nothing there is the text's own, kept whole.
+    if (fields.size === 0 && !match[0].startsWith("-")) {
+        return { body: text, fields };
+    }
+
     return { body: text.slice(match[0].length), fields };
 };
 

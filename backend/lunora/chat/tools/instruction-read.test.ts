@@ -51,5 +51,6 @@ describe("instruction_read", () => {
         await expect(tool.execute({ file: "deploy-1" }, options)).resolves.toMatchObject({ found: false, ids: ["deploy-1", "style-2"] });
         await expect(tool.execute({ file: "id:deploy-1" }, options)).resolves.toMatchObject({ found: true, text: "Run the deploy script." });
         await expect(tool.execute({ file: "ID: style-2" }, options)).resolves.toMatchObject({ found: true, text: "Not the deploy file." });
+        await expect(tool.execute({ file: "id:<style-2>" }, options)).resolves.toMatchObject({ found: true, text: "Not the deploy file." });
     });
 });

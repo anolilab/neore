@@ -130,6 +130,12 @@ describe("toImportedRuleFile", () => {
         });
     });
 
+    it("keeps a text that opens with blank lines and a rule whole when no setting follows", () => {
+        const text = "\n\n---\n\nIntro.\n\n---\n\nBody";
+
+        expect(toImportedRuleFile("rules/ruled.md", text)).toMatchObject({ content: text, mode: "auto" });
+    });
+
     it("reads a file that never applies by itself as one read when needed", () => {
         expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false\n---\nOnly on request.")).toMatchObject({ description: "", mode: "auto" });
     });
