@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import {
+    activePathIds,
     admitFollowupSuggestions,
     beginFollowupDispatch,
     cacheFollowupSuggestions,
@@ -104,15 +105,14 @@ describe("the setting", () => {
 });
 
 describe("threads that never get a suggestion", () => {
-    it("a branched thread gets no model call: its raw rows share an order, so the reply shown cannot be keyed", async () => {
+    // A branched thread is read along its active path (`activePathIds`), not its raw rows: a leaf that is not a stored message has no path.
+    it("a branched thread whose leaf is not a stored message reads no path rows, so no reply is keyed", async () => {
         const branched = await harness.run(
             async (ctx: any) =>
                 await ctx.db.insert("threads", { activeLeafMessageId: "leaf-1", createdAt: 1, status: "active", title: "B", updatedAt: 1, userId: OWNER }),
         );
 
-        await runJob(branched);
-
-        expect(getAgent).not.toHaveBeenCalled();
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(activePathIds, { leafId: "leaf-1", threadId: branched }))).resolves.toEqual([]);
     });
 
     it("a locked thread gets no model call", async () => {

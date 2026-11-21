@@ -4555,6 +4555,19 @@ const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPAT
 /** A call with less budget than this cannot finish, so it is not started. */
 const MIN_MODEL_BUDGET_MS = 10 * 1000;
 
+/** The rows on a branched thread's active path, newest first: the rows the composer shows (see `activePathIds`). */
+const readFollowupPath = async (context: Pick<ActionContext, "runQuery">, threadId: string, leafId: string) => {
+    const messageIds = await context.runQuery(internal.agent.followup_suggestions.activePathIds, { leafId, threadId });
+
+    if (messageIds.length === 0) {
+        return [];
+    }
+
+    const rows = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: messageIds as Id<"messages">[] });
+
+    return rows.filter((row): row is NonNullable<typeof row> => row !== null);
+};
+
 /**
  * The cache write's retry policy: unbounded, with backoff capped at five minutes, so a reply never loses its suggestion to a run of
  * failed writes. Each write is idempotent (a refused write returns quietly, and the unit is taken only when the write landed).
@@ -4643,12 +4656,6 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // A branched thread (a regenerate or an edit) lists only its active path, and this job reads raw rows, where replies share
-            // an `order`. It could key a reply the composer does not show, and charge for it. Until it reads the path, it gets none.
-            if (threadData.activeLeafMessageId) {
-                return;
-            }
-
             // The owner's setting decides whether the owner's thread gets a suggestion; the run's own guest status decides whether this run pays.
             const ownerUserId = threadData.userId;
 
@@ -4688,10 +4695,20 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
 
-            const messagesResult = await agent.listMessages(context, {
-                paginationOpts: { cursor: null, numItems: 10 },
-                threadId,
-            });
+            // A branched thread (a regenerate or an edit) is read along its active path: the rows the composer shows, newest first. A
+            // plain thread reads its raw rows, which are one branch. Either way the turn below is keyed on the reply the composer shows.
+            const messagesResult = (
+                threadData.activeLeafMessageId
+                    ? {
+                          continueCursor: null,
+                          isDone: true,
+                          page: await readFollowupPath(context, threadId, threadData.activeLeafMessageId),
+                      }
+                    : await agent.listMessages(context, {
+                          paginationOpts: { cursor: null, numItems: 10 },
+                          threadId,
+                      })
+            ) as Awaited<ReturnType<typeof agent.listMessages>>;
 
             // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
             const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });

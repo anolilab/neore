@@ -9,6 +9,23 @@ import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "
 import { getUser } from "../auth/lib/better-auth-queries";
 import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
+import { loadActivePathTail } from "./branch-rows";
+
+/** How many rows of a branched thread's active path the job reads: a turn longer than this is not keyed (see the job). */
+export const FOLLOWUP_PATH_LIMIT = 60;
+
+/**
+ * The ids on a branched thread's active path, newest first, capped at {@link FOLLOWUP_PATH_LIMIT}. The composer shows exactly these
+ * rows, so the job reads them rather than the raw rows, where replies on other branches share an `order`.
+ */
+export const activePathIds = internalQuery
+    .input({ leafId: v.string(), threadId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx }) => {
+        const rows = await loadActivePathTail(ctx, args.threadId as Id<"threads">, args.leafId, FOLLOWUP_PATH_LIMIT);
+
+        return rows.map((row) => row._id);
+    });
 
 /** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
 export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
