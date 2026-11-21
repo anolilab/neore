@@ -797,13 +797,13 @@ describe("a repository for a rule-file import", () => {
         await expect(
             harness
                 .withIdentity({ userId: OWNER })
-                .action(readRepoRuleFiles as never, { commit: "a".repeat(40), paths: ["src/index.ts"], projectId, repoId: onGithub } as never),
+                .action(readRepoRuleFiles as never, { commit: "a".repeat(40), files: [{ path: "src/index.ts" }], projectId, repoId: onGithub } as never),
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
         // A branch name in place of the listing's commit: the read would take whatever the branch holds now.
         await expect(
             harness
                 .withIdentity({ userId: OWNER })
-                .action(readRepoRuleFiles as never, { commit: "main", paths: ["AGENTS.md"], projectId, repoId: onGithub } as never),
+                .action(readRepoRuleFiles as never, { commit: "main", files: [{ path: "AGENTS.md" }], projectId, repoId: onGithub } as never),
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 });

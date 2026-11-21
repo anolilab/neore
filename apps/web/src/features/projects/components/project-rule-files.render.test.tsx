@@ -941,7 +941,7 @@ describe("project rule files imported from the project's repository", () => {
             commit: COMMIT,
             truncated: false,
             files: [
-                { path: "AGENTS.md", size: 20, tooLarge: false },
+                { path: "AGENTS.md", sha: "sha-agents", size: 20, tooLarge: false },
                 { path: "GEMINI.md", refused: "outside", size: 4, tooLarge: false },
                 { path: "rules/huge.md", size: 900_000, tooLarge: true },
             ],
@@ -966,7 +966,8 @@ describe("project rule files imported from the project's repository", () => {
 
         await user.click(screen.getByRole("button", { name: "Import selected" }));
 
-        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, paths: ["AGENTS.md"], projectId: "p1", repoId: "repo1" });
+        // With the blob its listing found, which the read takes.
+        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, files: [{ path: "AGENTS.md", sha: "sha-agents" }], projectId: "p1", repoId: "repo1" });
 
         const imported = await screen.findByRole("listitem", { name: "AGENTS.md" });
 
@@ -1094,9 +1095,9 @@ describe("project rule files imported from the project's repository", () => {
             }),
             status: "ok",
         });
-        backend.repoRead.mockImplementation(async ({ paths: asked }: { paths: string[] }) => {
+        backend.repoRead.mockImplementation(async ({ files: asked }: { files: { path: string }[] }) => {
             return {
-                files: asked.map((path) => {
+                files: asked.map(({ path }) => {
                     return { path, status: "ok", text: "---\nalwaysApply: true\n---\nText" };
                 }),
                 status: "ok",
@@ -1107,7 +1108,14 @@ describe("project rule files imported from the project's repository", () => {
         await user.click(screen.getByRole("button", { name: "Find files" }));
         await user.click(await screen.findByRole("button", { name: "Import selected" }));
 
-        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, paths: paths.slice(0, 20), projectId: "p1", repoId: "repo1" });
+        expect(backend.repoRead).toHaveBeenCalledWith({
+            commit: COMMIT,
+            files: paths.slice(0, 20).map((path) => {
+                return { path };
+            }),
+            projectId: "p1",
+            repoId: "repo1",
+        });
         expect(
             await screen.findByText("20 rule files imported. Review, then save. 3 files were left out. A project holds at most 20 rule files."),
         ).toBeTruthy();
@@ -1130,9 +1138,9 @@ describe("project rule files imported from the project's repository", () => {
             ],
             status: "ok",
         });
-        backend.repoRead.mockImplementation(async ({ paths: asked }: { paths: string[] }) => {
+        backend.repoRead.mockImplementation(async ({ files: asked }: { files: { path: string }[] }) => {
             return {
-                files: asked.map((path) => {
+                files: asked.map(({ path }) => {
                     return { path, status: "ok", text: `---\nalwaysApply: true\n---\n${text(path)}` };
                 }),
                 status: "ok",
@@ -1148,7 +1156,14 @@ describe("project rule files imported from the project's repository", () => {
 
         await user.click(screen.getByRole("button", { name: "Import selected" }));
 
-        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, paths, projectId: "p1", repoId: "repo1" });
+        expect(backend.repoRead).toHaveBeenCalledWith({
+            commit: COMMIT,
+            files: paths.map((path) => {
+                return { path };
+            }),
+            projectId: "p1",
+            repoId: "repo1",
+        });
         // Eleven of 90 KB fit beside the two saved files; the one past a file's length and the twelfth, past 1 MB, do not.
         expect(
             await screen.findByText(
@@ -1188,7 +1203,37 @@ describe("project rule files imported from the project's repository", () => {
         await client.invalidateQueries({ queryKey: ["listProjectRepos"] });
         await user.click(await screen.findByRole("button", { name: "Import selected" }));
 
-        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, paths: ["AGENTS.md"], projectId: "p1", repoId: "repo1" });
+        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, files: [{ path: "AGENTS.md" }], projectId: "p1", repoId: "repo1" });
+    });
+
+    it("adds what a read could take and says how many files it had no requests left for, to import again", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [
+                { path: "rules/a.md", sha: "sha-a", size: 10, tooLarge: false },
+                { path: "rules/b.md", sha: "sha-b", size: 10, tooLarge: false },
+                { path: "rules/c.md", sha: "sha-c", size: 10, tooLarge: false },
+            ],
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockResolvedValue({
+            files: [
+                { path: "rules/a.md", status: "ok", text: "---\nalwaysApply: true\n---\nText" },
+                { path: "rules/b.md", status: "not_read" },
+                { path: "rules/c.md", status: "not_read" },
+            ],
+            status: "ok",
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+
+        expect(await screen.findByText("1 rule file imported. Review, then save. 2 files were not read this time: import again to add the rest.")).toBeTruthy();
     });
 
     it("shortens a file name past what a save takes, keeping two that start alike apart, and the drafts save", async () => {

@@ -540,13 +540,14 @@ const ProjectRuleFiles: FC<{
         }
 
         const toSet = added.filter((file) => needsMode(file)).length;
-        const noneFound = read.imported.length === 0 && read.unreadable === 0 ? [t`No Markdown files were found to import.`] : [];
+        const noneFound = read.imported.length === 0 && read.unreadable === 0 && read.notRead === 0 ? [t`No Markdown files were found to import.`] : [];
         const addedNote =
             added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
         const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
         const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
         const unreadable = t`${plural(read.unreadable, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large.`;
+        const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;
         const length = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
         const size = formatNumber(MAX_RULE_FILES_BYTES / 1_000_000, i18n.locale);
         const tooLargeNote = t`${plural(tooLarge, { one: "# file was left out as too large", other: "# files were left out as too large" })}: a rule file holds at most ${length} characters, and all of a project's together at most ${size} MB.`;
@@ -562,6 +563,7 @@ const ProjectRuleFiles: FC<{
                 ...(skipped > 0 ? [left] : []),
                 ...(tooLarge > 0 ? [tooLargeNote] : []),
                 ...(read.unreadable > 0 ? [unreadable] : []),
+                ...(read.notRead > 0 ? [notRead] : []),
             ].join(" "),
         );
     };
@@ -597,7 +599,7 @@ const ProjectRuleFiles: FC<{
 
         if (picked.length > 0) {
             runImport(async () => {
-                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), unreadable: 0 };
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), notRead: 0, unreadable: 0 };
             });
         }
     };

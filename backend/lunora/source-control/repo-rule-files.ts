@@ -18,7 +18,12 @@
  * ({@link LinkRefusal}), and never read: the contents API would follow `AGENTS.md → .env` and hand over `.env`.
  *
  * A listing holds every root instruction file and at most `MAX_LISTED_FOLDER_FILES` of the rules folder's, the first by
- * path; it counts the rest (`omitted`). A read lists the same way, so a file a listing offered stays readable.
+ * path; it counts the rest (`omitted`), and gives each file it would read the blob SHA it reads (a link's final
+ * target's). A read lists the same way without following links: it takes a file's own blob when that is the SHA given,
+ * and a link's only when the SHA given is that of a file the link may lead to, so it reads nothing a link could not.
+ *
+ * Both run under {@link HOST_FETCHES_PER_IMPORT} host requests, a 401's repeat included ({@link fetchBudget}): past it
+ * a link is refused (`budget`) and a file is `not_read`, never a failed request.
  */
 import { MAX_RULE_FILE_LENGTH, MAX_RULE_FILES_BYTES, RULE_FILE_FRONT_MATTER } from "../projects/rule-file-limits";
 import type { HostRequest } from "./origin-fetch";
@@ -47,8 +52,44 @@ const SYMLINK_MODE = "120000";
 /** Links followed from one path, at most: a longer chain, or a loop, is refused. */
 export const MAX_LINK_HOPS = 4;
 
-/** Links one listing or read follows, at most, hops counted: past it a link is refused, never read unchecked. */
-export const MAX_LINKS_FOLLOWED = 20;
+/** Links one listing follows, at most, hops counted: past it a link is refused, never read unchecked. */
+export const MAX_LINKS_FOLLOWED = 16;
+
+/**
+ * Host requests one import action makes, at most, both tries of a 401 together. A Worker request may make 50
+ * subrequests on the Free plan, and the action's own make up to 14 more (the session and rate-limit checks, the
+ * repository and grant lookups, a token refresh and its store, and a 401's forced refresh), so this keeps it under the
+ * cap with room to spare. A listing spends at most 6 on the commit and its trees and {@link MAX_LINKS_FOLLOWED} on
+ * links, so a repeat always has its trees; a read 6 and one per file picked (at most 20), so one without a 401 reads
+ * them all.
+ */
+export const HOST_FETCHES_PER_IMPORT = 28;
+
+/** A host request past {@link HOST_FETCHES_PER_IMPORT}, not sent. */
+export class FetchBudgetSpent extends Error {
+    public constructor() {
+        super("The import's host requests are spent");
+        this.name = "FetchBudgetSpent";
+    }
+}
+
+/**
+ * At most `limit` host requests through every requester it wraps: the tries of one action share it, so a 401's repeat
+ * spends what is left. One past it throws {@link FetchBudgetSpent} without being sent.
+ */
+export const fetchBudget = (limit = HOST_FETCHES_PER_IMPORT): ((request: HostRequest) => HostRequest) => {
+    let left = limit;
+
+    return (request) => async (path, options) => {
+        if (left <= 0) {
+            throw new FetchBudgetSpent();
+        }
+
+        left -= 1;
+
+        return request(path, options);
+    };
+};
 
 /** A link's target path, in bytes, at most: a longer one is refused unread. */
 const MAX_LINK_TARGET_BYTES = 1024;
@@ -67,6 +108,8 @@ export interface RepoRuleFileEntry {
     path: string;
     /** Set for a symlink not followed, with why: listed, never read. */
     refused?: LinkRefusal;
+    /** The blob a read takes for it (a link's final target's); absent for a refused link. */
+    sha?: string;
     size: number;
     tooLarge: boolean;
 }
@@ -106,12 +149,6 @@ interface Blob {
     link: boolean;
     sha: string;
     size: number;
-}
-
-/** A listed path and the blob a read takes for it (a link's final target), or none for a refused link. */
-interface Found {
-    blob?: Blob;
-    entry: RepoRuleFileEntry;
 }
 
 /** Where a link led: the file a read takes, or why it is not followed. */
@@ -299,7 +336,17 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
             }
 
             linksLeft -= 1;
-            const content = await readBlob(request, address, current.sha);
+            let content: string | undefined;
+
+            try {
+                content = await readBlob(request, address, current.sha);
+            } catch (error) {
+                if (error instanceof FetchBudgetSpent) {
+                    return { refused: "budget" };
+                }
+
+                throw error;
+            }
 
             if (content === undefined) {
                 return { refused: "broken" };
@@ -338,11 +385,14 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
 
     /**
      * The root instruction files and the first {@link MAX_LISTED_FOLDER_FILES} Markdown files, by path, of the first
-     * rules folder holding any (not its subfolders), links followed only to a path of the same listing: a root file, or
-     * a file of that folder (one past the cap included, as it is there). `omitted` counts the folder's files past it.
+     * rules folder holding any (not its subfolders), links not yet followed; `omitted` counts the folder's files past
+     * the cap. `offers` accepts the paths a link may lead to: a root file, or a file of that folder (one past the cap
+     * included, as it is there), whose files, links left out, are `targets` by blob SHA.
      */
-    const list = async (): Promise<{ found: Found[]; omitted: number }> => {
-        let candidates = importableIn("", root).toSorted((left, right) => left.path.localeCompare(right.path));
+    const scan = async () => {
+        const rootFiles = importableIn("", root);
+        let candidates = rootFiles.toSorted((left, right) => left.path.localeCompare(right.path));
+        let folderFiles: { blob: Blob; path: string }[] = [];
         let chosen: string | undefined;
         let omitted = 0;
 
@@ -354,6 +404,7 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
                 const first = files.toSorted((left, right) => left.path.localeCompare(right.path)).slice(0, MAX_LISTED_FOLDER_FILES);
 
                 candidates = [...candidates, ...first];
+                folderFiles = files;
                 omitted = files.length - first.length;
                 chosen = folder;
                 break;
@@ -363,24 +414,32 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
         const offers = (target: string): boolean =>
             isImportablePath(target) &&
             (!target.includes("/") || (chosen !== undefined && target.startsWith(`${chosen}/`) && !target.slice(chosen.length + 1).includes("/")));
-        const found: Found[] = [];
+        const targets = new Map([...rootFiles, ...folderFiles].filter(({ blob }) => !blob.link).map(({ blob }) => [blob.sha, blob]));
+
+        return { candidates, offers, omitted, targets };
+    };
+
+    /** The files {@link scan} finds, links followed only to a path `offers` accepts. */
+    const list = async (): Promise<{ files: RepoRuleFileEntry[]; omitted: number }> => {
+        const { candidates, offers, omitted } = await scan();
+        const files: RepoRuleFileEntry[] = [];
 
         // Root files first, then the folder's, each by path: the links one listing follows are the same every time it
         // lists this commit, and a folder's links never spend the budget a root file's link needs.
         for (const { blob, path } of candidates) {
             const followed = await follow(path, blob, offers);
 
-            found.push(
+            files.push(
                 "blob" in followed
-                    ? { blob: followed.blob, entry: { path, size: followed.blob.size, tooLarge: followed.blob.size > REPO_RULE_FILE_MAX_BYTES } }
-                    : { entry: { path, refused: followed.refused, size: blob.size, tooLarge: false } },
+                    ? { path, sha: followed.blob.sha, size: followed.blob.size, tooLarge: followed.blob.size > REPO_RULE_FILE_MAX_BYTES }
+                    : { path, refused: followed.refused, size: blob.size, tooLarge: false },
             );
         }
 
-        return { found: found.toSorted((left, right) => left.entry.path.localeCompare(right.entry.path)), omitted };
+        return { files: files.toSorted((left, right) => left.path.localeCompare(right.path)), omitted };
     };
 
-    return { list, truncated: () => truncated };
+    return { list, scan, truncated: () => truncated };
 };
 
 /**
@@ -395,9 +454,9 @@ export const listRepoRuleFiles = async (request: HostRequest, address: RepoAddre
     }
 
     const atHead = snapshot(request, address, await readTree(request, address, head.tree));
-    const { found, omitted } = await atHead.list();
+    const { files, omitted } = await atHead.list();
 
-    return { commit: head.commit, files: found.map((file) => file.entry), ...(omitted > 0 && { omitted }), truncated: atHead.truncated() };
+    return { commit: head.commit, files, ...(omitted > 0 && { omitted }), truncated: atHead.truncated() };
 };
 
 /**
@@ -411,56 +470,96 @@ const fitsRuleFile = (path: string, text: string): boolean => {
     return text.length - frontMatter <= MAX_RULE_FILE_LENGTH;
 };
 
-export type RepoRuleFileRead = { path: string; status: "missing" | "refused" | "too_large" } | { path: string; status: "ok"; text: string };
+export type RepoRuleFileRead = { path: string; status: "missing" | "not_read" | "refused" | "too_large" } | { path: string; status: "ok"; text: string };
+
+/** A file picked to read: its path, and the blob SHA its listing gave (none for a refused link). */
+export interface RepoRuleFilePick {
+    path: string;
+    sha?: string;
+}
 
 /**
- * The text of each of `paths` (already checked by {@link isImportablePath}) at `commit` (the listing's), in order, as
- * that commit's listing holds them: one it does not list (gone, another rules folder, or a commit this repository does
- * not hold) is `missing`, a refused link `refused`. One past its own limits (bytes, then characters as the import counts
- * them, {@link fitsRuleFile}) or past what the read has left is `too_large` and spends nothing; a later one may still fit.
+ * The text of each of `picks` (paths already checked by {@link isImportablePath}) at `commit` (the listing's), in order,
+ * as that commit's listing holds them, links not followed: a file's own blob when its SHA is the one given, a link's
+ * target when the SHA given is that of a file it may lead to (a root instruction file, or one of the rules folder
+ * listed). One it does not list (gone, another rules folder, or a commit this repository does not hold), or whose SHA
+ * is another, is `missing`; a link with no such SHA `refused`. One past its own limits (bytes, then characters as the
+ * import counts them, {@link fitsRuleFile}) or past what the read has left is `too_large` and spends nothing; a later
+ * one may still fit. Once `request` throws {@link FetchBudgetSpent}, every file it would still read is `not_read`.
  */
 export const readRepoRuleFiles = async (
     request: HostRequest,
     address: RepoAddress,
     commit: string,
-    paths: ReadonlyArray<string>,
+    picks: ReadonlyArray<RepoRuleFilePick>,
 ): Promise<RepoRuleFileRead[]> => {
-    const rootSha = await commitTree(request, address, commit);
+    let scanned: Awaited<ReturnType<ReturnType<typeof snapshot>["scan"]>>;
 
-    if (rootSha === undefined) {
-        return paths.map((path) => {
-            return { path, status: "missing" };
-        });
+    try {
+        const rootSha = await commitTree(request, address, commit);
+
+        if (rootSha === undefined) {
+            return picks.map(({ path }) => {
+                return { path, status: "missing" };
+            });
+        }
+
+        scanned = await snapshot(request, address, await readTree(request, address, rootSha)).scan();
+    } catch (error) {
+        if (error instanceof FetchBudgetSpent) {
+            return picks.map(({ path }) => {
+                return { path, status: "not_read" };
+            });
+        }
+
+        throw error;
     }
 
-    const atCommit = snapshot(request, address, await readTree(request, address, rootSha));
-    const { found: offered } = await atCommit.list();
-    const listed = new Map(offered.map((file) => [file.entry.path, file]));
+    const listed = new Map(scanned.candidates.map((candidate) => [candidate.path, candidate.blob]));
     const reads: RepoRuleFileRead[] = [];
     let left = REPO_RULE_FILES_READ_BYTES;
+    let spent = false;
 
-    for (const path of paths) {
-        const found = listed.get(path);
+    for (const { path, sha } of picks) {
+        const own = listed.get(path);
 
-        if (!found) {
+        if (!own || (!own.link && own.sha !== sha)) {
             reads.push({ path, status: "missing" });
             continue;
         }
 
-        if (!found.blob) {
+        const target = own.link && sha !== undefined ? scanned.targets.get(sha) : undefined;
+        const blob = own.link ? target : own;
+
+        if (!blob) {
             reads.push({ path, status: "refused" });
             continue;
         }
 
-        const { size } = found.blob;
-
-        if (size > REPO_RULE_FILE_MAX_BYTES || size > left) {
+        if (blob.size > REPO_RULE_FILE_MAX_BYTES || blob.size > left) {
             reads.push({ path, status: "too_large" });
             continue;
         }
 
+        if (spent) {
+            reads.push({ path, status: "not_read" });
+            continue;
+        }
+
+        let text: string | undefined;
+
         // One at a time, so the read stops spending at its budget.
-        const text = await readBlob(request, address, found.blob.sha);
+        try {
+            text = await readBlob(request, address, blob.sha);
+        } catch (error) {
+            if (!(error instanceof FetchBudgetSpent)) {
+                throw error;
+            }
+
+            spent = true;
+            reads.push({ path, status: "not_read" });
+            continue;
+        }
 
         if (text === undefined) {
             reads.push({ path, status: "missing" });
@@ -472,7 +571,7 @@ export const readRepoRuleFiles = async (
             continue;
         }
 
-        left -= size;
+        left -= blob.size;
         reads.push({ path, status: "ok", text });
     }
 

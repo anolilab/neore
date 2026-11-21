@@ -19,9 +19,13 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import type { ImportedRuleFile } from "../lib/rule-file-import";
 import { importRuleTexts } from "../lib/rule-file-import";
 
-/** What a repository import read: the files as the upload import turns them into drafts, and those it could not read. */
+/**
+ * What a repository import read: the files as the upload import turns them into drafts, those it could not read, and
+ * those it had no requests left for (`notRead`), which another import reads.
+ */
 export interface RepoImportResult {
     imported: ImportedRuleFile[];
+    notRead: number;
     skipped: number;
     unreadable: number;
 }
@@ -29,8 +33,8 @@ export interface RepoImportResult {
 /** Why a symlink is not followed (`LinkRefusal` in `source-control/repo-rule-files.ts`): listed, never read. */
 type LinkRefusal = "broken" | "budget" | "outside" | "too_deep" | "too_long";
 
-/** `refused`: a symlink not followed, with why. */
-type FoundFile = { path: string; refused?: LinkRefusal; size: number; tooLarge: boolean };
+/** `refused`: a symlink not followed, with why; `sha`: the blob the read takes for it, which it sends back. */
+type FoundFile = { path: string; refused?: LinkRefusal; sha?: string; size: number; tooLarge: boolean };
 
 /** Whether a found file can be picked at all. */
 const isPickable = (file: FoundFile): boolean => !file.tooLarge && file.refused === undefined;
@@ -184,13 +188,20 @@ const RepoRuleFileImport: FC<{
         // In the order the import takes them: the first a project can hold are read, the rest counted as left out.
         const all = [...picked].toSorted((left, right) => left.localeCompare(right));
         const paths = all.slice(0, MAX_RULE_FILES);
+        // Each with the blob its listing found, so the read need not follow links again.
+        const shas = new Map(listing.files.map((file) => [file.path, file.sha]));
+        const files = paths.map((path) => {
+            const sha = shas.get(path);
+
+            return sha === undefined ? { path } : { path, sha };
+        });
 
         request.current += 1;
         const asked = request.current;
 
         runImport(async () => {
             // A read that failed is said in the panel, as a refusal is.
-            const outcome = await readFiles({ ...readArgs, paths }).catch(() => undefined);
+            const outcome = await readFiles({ ...readArgs, files }).catch(() => undefined);
 
             // Cancelled or closed meanwhile: nothing is added, nothing said.
             if (asked !== request.current) {
@@ -205,11 +216,12 @@ const RepoRuleFileImport: FC<{
             }
 
             const texts = outcome.files.flatMap((file) => (file.status === "ok" ? [{ path: file.path, text: () => file.text }] : []));
+            const notRead = outcome.files.filter((file) => file.status === "not_read").length;
             const read = await importRuleTexts(texts, MAX_RULE_FILES);
 
             toggle(false);
 
-            return { ...read, skipped: read.skipped + all.length - paths.length, unreadable: outcome.files.length - texts.length };
+            return { ...read, notRead, skipped: read.skipped + all.length - paths.length, unreadable: outcome.files.length - texts.length - notRead };
         });
     };
 

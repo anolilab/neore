@@ -14,7 +14,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "../source-control/develop-driver";
 import { readFromHost } from "../source-control/read-host";
-import { COMMIT_SHA, isImportablePath, listRepoRuleFiles as listFiles, readRepoRuleFiles as readFiles } from "../source-control/repo-rule-files";
+import { COMMIT_SHA, fetchBudget, isImportablePath, listRepoRuleFiles as listFiles, readRepoRuleFiles as readFiles } from "../source-control/repo-rule-files";
 import type { RepoAddress } from "../source-control/repo-rule-files";
 import { vFailed } from "../source-control/validators";
 import type { Id } from "../_generated/dataModel";
@@ -44,8 +44,9 @@ const addressFor = async (
 };
 
 /**
- * The instruction files the repository holds at one commit, by path and size (a link not followed with why), whether
- * a tree was cut, and how many of the rules folder's files are past the listing's cap; none read yet.
+ * The instruction files the repository holds at one commit, by path, size and the blob a read takes (a link not
+ * followed with why), whether a tree was cut, and how many of the rules folder's files are past the listing's cap; none
+ * read yet. At most `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included.
  */
 export const listRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
@@ -60,6 +61,7 @@ export const listRepoRuleFiles = authAction
                         refused: v.optional(
                             v.union(v.literal("broken"), v.literal("budget"), v.literal("outside"), v.literal("too_deep"), v.literal("too_long")),
                         ),
+                        sha: v.optional(v.string()),
                         size: v.number(),
                         tooLarge: v.boolean(),
                     }),
@@ -80,7 +82,9 @@ export const listRepoRuleFiles = authAction
         }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
-        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(request, address));
+        // One budget for both tries: a 401's repeat spends what the first left.
+        const budgeted = fetchBudget();
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(budgeted(request), address));
 
         ctx.log.event("projects.rule_files.repo_list", {
             count: outcome.status === "ok" ? outcome.files.length : 0,
@@ -94,18 +98,26 @@ export const listRepoRuleFiles = authAction
 
 /**
  * The text of the picked files at the commit their listing read (`commit`), at most a project's worth, taken only from
- * what that commit's listing holds (listed again, under this repository); a file that is gone, too large, not listed or
- * a refused link says so instead.
+ * what that commit's listing holds (listed again, under this repository, links not followed: each by the blob SHA its
+ * listing gave); a file that is gone, too large, not listed or a refused link says so instead, and one past the
+ * action's `HOST_FETCHES_PER_IMPORT` host requests (a 401's repeat included) is `not_read`.
  */
 export const readRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
-    .input({ ...vRepoArgs, commit: v.string().max(64), paths: v.array(v.string().max(MAX_LENGTH.long)).max(MAX_RULE_FILES) })
+    .input({
+        ...vRepoArgs,
+        commit: v.string().max(64),
+        files: v.array(v.object({ path: v.string().max(MAX_LENGTH.long), sha: v.optional(v.string().max(64)) })).max(MAX_RULE_FILES),
+    })
     .output(
         v.union(
             v.object({
                 files: v.array(
                     v.union(
-                        v.object({ path: v.string(), status: v.union(v.literal("missing"), v.literal("refused"), v.literal("too_large")) }),
+                        v.object({
+                            path: v.string(),
+                            status: v.union(v.literal("missing"), v.literal("not_read"), v.literal("refused"), v.literal("too_large")),
+                        }),
                         v.object({ path: v.string(), status: v.literal("ok"), text: v.string() }),
                     ),
                 ),
@@ -117,7 +129,7 @@ export const readRepoRuleFiles = authAction
     )
     .action(async ({ args, ctx }) => {
         // Only paths a listing can offer: the import reads instruction files, never anything else in the repository.
-        if (args.paths.some((path) => !isImportablePath(path))) {
+        if (args.files.some(({ path }) => !isImportablePath(path))) {
             throw new LunoraError("BAD_REQUEST", "Only a repository's instruction files can be imported");
         }
 
@@ -133,13 +145,18 @@ export const readRepoRuleFiles = authAction
         }
 
         const token = await resolveGithubToken(ctx, ctx.user.userId);
+        // Each path once.
+        const picks = [...new Map(args.files.map((file) => [file.path, file])).values()];
+        // One budget for both tries: a 401's repeat spends what the first left.
+        const budgeted = fetchBudget();
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
-            return { files: await readFiles(request, address, args.commit, [...new Set(args.paths)]) };
+            return { files: await readFiles(budgeted(request), address, args.commit, picks) };
         });
 
         ctx.log.event("projects.rule_files.repo_read", {
+            notRead: outcome.status === "ok" ? outcome.files.filter((file) => file.status === "not_read").length : 0,
             read: outcome.status === "ok" ? outcome.files.filter((file) => file.status === "ok").length : 0,
-            requested: args.paths.length,
+            requested: args.files.length,
             status: outcome.status,
         });
 
