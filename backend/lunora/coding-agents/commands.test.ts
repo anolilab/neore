@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import {
+    AGENT_KEY_PATH,
     agentEnv,
     buildAgentCommand,
     buildAgentPrompt,
@@ -10,11 +11,17 @@ import {
     buildPollCommand,
     buildPullRequestScript,
     buildRunScript,
+    CODEX_LAST_MESSAGE_PATH,
     CODING_AGENTS,
     GIT_AUTH_PATH,
+    KEY_WANTED_PATH,
     parsePullRequestStatus,
     parseRunStatus,
     PROMPT_PATH,
+    REPO_SETUP_FILE,
+    SETUP_LOG_PATH,
+    SETUP_TIMEOUT_S,
+    SETUP_USER,
     buildCloneCommand,
     buildCommitCommand,
     buildDiffCommand,
@@ -52,6 +59,8 @@ const EXACT_VERSION = /^\d+\.\d+\.\d+$/u;
 const SUBSHELL_EXPORT = /\( if \[ -s \S+ \]; then export GIT_CONFIG_COUNT=1/u;
 const FAKE_GITHUB_TOKEN = fakeKey("github");
 const NUL_ERROR = /NUL/u;
+const CASE_END = / ;;$/u;
+const FINISH_CALL = /finish \S+/gu;
 const BRANCH_ERROR = /branch/u;
 const PR_BRANCH = /^neore\/agent-[a-z0-9]{1,12}$/u;
 
@@ -118,10 +127,11 @@ describe("buildAgentCommand", () => {
     });
 
     it("never puts the prompt or a secret in the command line", () => {
-        expect(agentEnv("claude_code", fakeKey("anthropic"))["ANTHROPIC_API_KEY"]).toBe(fakeKey("anthropic"));
-        expect(agentEnv("codex", fakeKey("openai"))["CODEX_API_KEY"]).toBe(fakeKey("openai"));
+        // The script's environment carries no key either: the key is a file the poller writes after repository setup.
+        expect(agentEnv("claude_code")).not.toHaveProperty("ANTHROPIC_API_KEY");
+        expect(agentEnv("codex")).not.toHaveProperty("CODEX_API_KEY");
 
-        // The builders never receive a key, so none can appear; the env is the only channel.
+        // The builders never receive a key, so none can appear.
         for (const agent of ["claude_code", "codex"] as const) {
             expect(buildAgentCommand(agent)).not.toContain("not-real");
             expect(buildRunScript({ agent, repo: parseRepoUrl("a/b"), timeoutSeconds: 600 })).not.toContain("not-real");
@@ -129,8 +139,8 @@ describe("buildAgentCommand", () => {
     });
 
     it("names neore as Claude Code's entrypoint, and only for Claude Code", () => {
-        expect(agentEnv("claude_code", fakeKey("anthropic"))["CLAUDE_CODE_ENTRYPOINT"]).toBe("neore");
-        expect(agentEnv("codex", fakeKey("openai"))).not.toHaveProperty("CLAUDE_CODE_ENTRYPOINT");
+        expect(agentEnv("claude_code")["CLAUDE_CODE_ENTRYPOINT"]).toBe("neore");
+        expect(agentEnv("codex")).not.toHaveProperty("CLAUDE_CODE_ENTRYPOINT");
         expect(buildAgentCommand("claude_code")).not.toContain("CLAUDE_CODE_ENTRYPOINT");
     });
 
@@ -155,36 +165,117 @@ describe("buildRunScript", () => {
         expect(() => execFileSync("/bin/bash", ["-n"], { input: script })).not.toThrow();
     });
 
-    it("clones, installs, then runs the agent under a timeout and records the outcome", () => {
+    const setupLine = script.split("\n").find((line) => line.includes(`sudo -n -u ${SETUP_USER}`)) ?? "";
+
+    it("clones, installs, runs the repository's setup, then runs the agent under what is left of the budget", () => {
         const clone = script.indexOf("git' 'clone'");
         const install = script.indexOf("npm ls -g");
-        const agent = script.indexOf("timeout 1080 claude --bare");
+        const setup = script.indexOf(setupLine);
+        const keyWanted = script.indexOf(`touch ${KEY_WANTED_PATH}`);
+        const agent = script.indexOf('timeout "$agent_s" claude --bare');
 
         expect(clone).toBeGreaterThan(0);
         expect(install).toBeGreaterThan(clone);
-        expect(agent).toBeGreaterThan(install);
+        expect(setupLine).not.toBe("");
+        expect(setup).toBeGreaterThan(install);
+        expect(keyWanted).toBeGreaterThan(setup);
+        expect(agent).toBeGreaterThan(keyWanted);
+        expect(script).toContain("agent_s=$((1080 - SECONDS))");
         expect(script).toContain('finish "agent:$?"');
     });
 
-    it("hands the GitHub credential to git only, and deletes it before the agent starts", () => {
+    it("hands the GitHub credential to git only, and deletes it before setup and the agent", () => {
         const firstDelete = script.indexOf(`rm -f ${GIT_AUTH_PATH}`);
 
         expect(firstDelete).toBeGreaterThan(0);
-        expect(firstDelete).toBeLessThan(script.indexOf("timeout 1080 claude"));
+        expect(firstDelete).toBeLessThan(script.indexOf(setupLine));
         // Exported inside the clone's subshell, never at the top level.
         expect(script).toMatch(SUBSHELL_EXPORT);
+    });
+
+    it("runs setup as its own user, in an empty environment with the neore hints, under its own timeout and log", () => {
+        expect(setupLine).toContain(`timeout -k 10 ${String(SETUP_TIMEOUT_S)} sudo -n -u ${SETUP_USER} -- env -i `);
+        expect(setupLine).toContain("NEORE=1 NEORE_SETUP=fresh");
+        expect(setupLine).toContain(`> ${SETUP_LOG_PATH} 2>&1 < /dev/null`);
+        expect(setupLine).toContain(`exec ./${REPO_SETUP_FILE}; else exec bash ./${REPO_SETUP_FILE}`);
+        // No key, no credential, no inherited variable: `env -i` and nothing of the agent's.
+        expect(setupLine).not.toContain("API_KEY");
+        expect(setupLine).not.toContain("extraheader");
+        expect(setupLine).not.toContain(AGENT_KEY_PATH);
+        // `.git` stays the sandbox user's, so setup cannot plant hooks the agent's git would run.
+        expect(script).toContain(`sudo -n chown -R "$(id -u):$(id -g)" /home/user/repo/.git`);
+    });
+
+    it("kills what setup left running, takes the repository back and checks .git before the key is requested", () => {
+        const keyWanted = script.indexOf(`touch ${KEY_WANTED_PATH}`);
+        const afterSetup = script.slice(script.indexOf(setupLine), keyWanted);
+
+        expect(afterSetup).toContain(`sudo -n pkill -KILL -u ${SETUP_USER}`);
+        expect(afterSetup).toContain(`sudo -n pgrep -u ${SETUP_USER} >/dev/null && finish setup-failed:repo-setup`);
+        expect(afterSetup).toContain(`timeout 180 sudo -n chown -R "$(id -u):$(id -g)" /home/user/repo || finish setup-failed:repo-setup`);
+        // Owning the working tree is enough to swap `.git` for one whose config runs a command.
+        expect(script.indexOf("git_id=$(stat -c %i:%u .git)")).toBeLessThan(script.indexOf(setupLine));
+        expect(afterSetup).toContain('[ "$(stat -c %i:%u .git 2>/dev/null)" = "$git_id" ] || finish setup-failed:repo-setup');
+        // A file the agent writes later exists before setup, so setup cannot own it.
+        expect(script.indexOf(`: > ${CODEX_LAST_MESSAGE_PATH}`)).toBeLessThan(script.indexOf(setupLine));
+    });
+
+    it("lets a failed or timed-out setup through to the agent, with a note, and skips setup without sudo", () => {
+        const afterSetup = script.slice(script.indexOf(setupLine), script.indexOf(`touch ${KEY_WANTED_PATH}`));
+
+        // The only way setup ends the run: the repository could not be taken back safely.
+        expect(afterSetup.match(FINISH_CALL)).toEqual(["finish setup-failed:repo-setup", "finish setup-failed:repo-setup", "finish setup-failed:repo-setup"]);
+        expect(afterSetup).toContain("124 | 137)");
+        expect(afterSetup).toContain(`>> ${PROMPT_PATH}`);
+        expect(afterSetup).toContain("the agent starts anyway");
+        expect(script).toContain("repository setup skipped");
+    });
+
+    it("gives the key to the agent's command alone, and deletes its file first", () => {
+        const read = script.indexOf(`agent_key=$(cat ${AGENT_KEY_PATH}); rm -f ${AGENT_KEY_PATH}`);
+
+        expect(read).toBeGreaterThan(script.indexOf(`touch ${KEY_WANTED_PATH}`));
+        expect(script).toContain('ANTHROPIC_API_KEY="$agent_key" timeout "$agent_s" claude --bare');
+        expect(script).not.toContain("export ANTHROPIC_API_KEY");
+        expect(script).toContain("finish setup-failed:agent-key");
+    });
+
+    it("leaves repository setup out when asked, keeping the key hand-off", () => {
+        const skipped = buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), skipRepoSetup: true, timeoutSeconds: 1080 });
+
+        expect(skipped).not.toContain(`sudo -n -u ${SETUP_USER}`);
+        expect(skipped).not.toContain("setup-failed:repo-setup");
+        expect(skipped).toContain(`repository setup (${REPO_SETUP_FILE}) skipped for this run`);
+        expect(skipped).toContain(`touch ${KEY_WANTED_PATH}`);
+        expect(buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), skipRepoSetup: false, timeoutSeconds: 1080 })).toBe(
+            buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), timeoutSeconds: 1080 }),
+        );
+    });
+
+    it.skipIf(NO_BASH)("writes the setup notes to the prompt with real newlines", () => {
+        const noteLine = script.split("\n").find((line) => line.includes("printf") && line.includes(PROMPT_PATH)) ?? "";
+        const output = execFileSync("/bin/bash", ["-c", `setup_exit=0; ${noteLine.trim().replace(`>> ${PROMPT_PATH}`, "").replace(CASE_END, "")}`], {
+            encoding: "utf8",
+        });
+
+        expect(output).toBe(
+            `\n\nThe repository's setup script (${REPO_SETUP_FILE}) ran before you started (exit code 0); its output is in ${SETUP_LOG_PATH}.\n`,
+        );
     });
 
     it("parses the status the script writes", () => {
         expect(parseRunStatus("agent:0\n")).toEqual({ exitCode: 0, kind: "agent" });
         expect(parseRunStatus("agent:124")).toEqual({ exitCode: 124, kind: "agent" });
         expect(parseRunStatus("setup-failed:clone")).toEqual({ kind: "setup-failed", step: "clone" });
+        expect(parseRunStatus("setup-failed:repo-setup")).toEqual({ kind: "setup-failed", step: "repo-setup" });
+        expect(parseRunStatus("setup-failed:agent-key")).toEqual({ kind: "setup-failed", step: "agent-key" });
         expect(parseRunStatus("")).toBeUndefined();
     });
 
     it("only polls from a valid offset", () => {
         expect(() => buildPollCommand(-1)).toThrow();
         expect(buildPollCommand(10)).toContain("tail -c +11");
+        expect(buildPollCommand(0)).toContain(`[ -e ${KEY_WANTED_PATH} ] && [ ! -e ${AGENT_KEY_PATH} ]`);
     });
 });
 
