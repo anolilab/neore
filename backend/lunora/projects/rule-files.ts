@@ -261,18 +261,20 @@ export const renderInstructionList = (files: ReadonlyArray<Pick<RuleFile, "descr
  * list (the list's header with the first), never its text. The file that reaches the budget is cut there (marked), an
  * `auto` one left out whole, and the ones after it are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule files, and not counted: one
  * kept beside the files (`keepContext`) would otherwise leave them nothing. `matchingCut` says the matching budget ran
- * out, so some pattern was not tried.
+ * out, so some pattern was not tried. `listsInstructions: false` is for a run that shows no list: its `auto` files are
+ * neither taken nor counted, so they leave the other files all of the budget.
  */
 export const selectRuleFiles = (
     files: RuleFile[],
     paths: string[],
+    listsInstructions = true,
 ): { files: RuleFile[]; instructions: RuleFile[]; matchingCut: boolean; omitted: number; truncated: boolean } => {
     const budget: MatchBudget = { steps: GLOB_MATCH_STEPS_PER_RUN };
     const applicable = files.filter(
         (file) =>
             file.mode === "always" ||
             // An empty `auto` file would list a name with nothing to read.
-            (file.mode === "auto" && file.content.trim().length > 0) ||
+            (file.mode === "auto" && listsInstructions && file.content.trim().length > 0) ||
             (file.globs ?? []).some((glob) => paths.some((path) => matchesGlob(glob, path, budget))),
     );
     const selected: RuleFile[] = [];

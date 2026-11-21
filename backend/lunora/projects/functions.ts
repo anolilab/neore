@@ -231,13 +231,16 @@ export const writableProject = async (
  * (`instructions`, empty for none), which a caller that offers `instruction_read` lists after the text
  * (`renderInstructionList`). What every run path uses, chat, edit, group and task runs alike, so the per-run cap
  * (`selectRuleFiles`, the list counted in it) and the logging apply to each the same way. Only counts are logged, never text.
+ * A run that ends up showing no list (no `instruction_read`: no tools, the cap, a bot's selection, an edit or group run)
+ * takes `textWithoutInstructions` instead, the text selected without the list's cost: present only when that cost left
+ * something out or cut it, so it is never sent twice for nothing.
  */
 export const projectRunContext = (
     context: QueryCtx,
     projectId: Id<"projects">,
     files: RuleFile[],
     paths: string[],
-): { instructions: RunInstruction[]; text: string | null } => {
+): { instructions: RunInstruction[]; text: string | null; textWithoutInstructions?: string } => {
     const selected = selectRuleFiles(files, paths);
 
     if (selected.omitted > 0 || selected.truncated || selected.matchingCut) {
@@ -249,11 +252,15 @@ export const projectRunContext = (
         });
     }
 
+    const text = renderRuleFiles(selected.files);
+    const textWithoutInstructions = selected.instructions.length > 0 ? renderRuleFiles(selectRuleFiles(files, paths, false).files) : null;
+
     return {
         instructions: selected.instructions.map((file) => {
             return { content: file.content, description: file.description ?? "", id: file.id, title: file.title };
         }),
-        text: renderRuleFiles(selected.files),
+        text,
+        ...(textWithoutInstructions !== null && textWithoutInstructions !== text && { textWithoutInstructions }),
     };
 };
 
@@ -325,6 +332,7 @@ export const getProjectContextForRun = internalQuery
             v.object({
                 instructions: v.array(v.object({ content: v.string(), description: v.string(), id: v.string(), title: v.string() })),
                 text: v.union(v.string(), v.null()),
+                textWithoutInstructions: v.optional(v.string()),
             }),
         ),
     )

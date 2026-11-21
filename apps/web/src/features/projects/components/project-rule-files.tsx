@@ -26,7 +26,7 @@ import { Textarea } from "@neore/ui/components/textarea";
 import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, FileUp, FolderUp, Plus, Trash2 } from "lucide-react";
-import type { ChangeEvent, FC } from "react";
+import type { ChangeEvent, FC, KeyboardEvent } from "react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
@@ -214,6 +214,15 @@ const RuleFileFields: FC<{
     const id = useId();
     const name = file.title.trim() || t`Rule file ${index + 1}`;
     const invalidProps = (field: RuleFileField) => (invalid === field ? { "aria-describedby": errorId, "aria-invalid": true } : {});
+    // Inside the project's form: Enter in a one-line field saves the rule files, the editor's own action, never the project.
+    const saveOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+            return;
+        }
+
+        event.preventDefault();
+        onSave();
+    };
 
     // By id, not a ref: `Textarea` would hand a ref past its field control's own (`packages/ui` `Textarea`).
     useEffect(() => {
@@ -252,15 +261,7 @@ const RuleFileFields: FC<{
                         autoComplete="off"
                         id={`${id}-title`}
                         onChange={(event) => onChange({ ...file, title: event.target.value })}
-                        onKeyDown={(event) => {
-                            // Inside the project's form: Enter saves the rule files, the editor's own action, never the project.
-                            if (event.key !== "Enter" || event.nativeEvent.isComposing) {
-                                return;
-                            }
-
-                            event.preventDefault();
-                            onSave();
-                        }}
+                        onKeyDown={saveOnEnter}
                         value={file.title}
                         {...invalidProps("title")}
                     />
@@ -306,6 +307,7 @@ const RuleFileFields: FC<{
                         id={`${id}-description`}
                         maxLength={MAX_RULE_DESCRIPTION_LENGTH}
                         onChange={(event) => onChange({ ...file, description: event.target.value })}
+                        onKeyDown={saveOnEnter}
                         placeholder={t`For example: how we write database migrations`}
                         value={file.description}
                         {...invalidProps("description")}
@@ -496,7 +498,8 @@ const ProjectRuleFiles: FC<{
         }
 
         const generation = importGeneration.current;
-        const read = await importRuleFiles(picked, Math.max(0, MAX_RULE_FILES - files.length));
+        // Up to the project's limit, not the room left now: a draft removed while the files are read frees room the import takes.
+        const read = await importRuleFiles(picked, MAX_RULE_FILES);
 
         if (generation !== importGeneration.current) {
             return;

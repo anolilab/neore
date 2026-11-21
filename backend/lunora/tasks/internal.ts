@@ -605,6 +605,8 @@ export const runProjectFor = internalQuery
                 context: v.optional(v.string()),
                 // The project's `auto` rule files, from the same read: listed, and read with `instruction_read`.
                 instructions: v.optional(v.array(v.object({ content: v.string(), description: v.string(), id: v.string(), title: v.string() }))),
+                // The text a run that lists no `auto` file takes instead, when the list's cost cut it (`projectRunContext`).
+                contextWithoutInstructions: v.optional(v.string()),
                 projectId: v.id("projects"),
             }),
         ),
@@ -619,9 +621,19 @@ export const runProjectFor = internalQuery
 
         // A task's run attaches no files: its project's `always` rule files, a legacy `context` first, as a chat gets them;
         // read on the primary, as a chat's are (`getProjectContextForRun`).
-        const { instructions, text } = projectRunContext(ctx, project._id, await readProjectRuleFiles(ctx, project, { primary: true }), []);
+        const { instructions, text, textWithoutInstructions } = projectRunContext(
+            ctx,
+            project._id,
+            await readProjectRuleFiles(ctx, project, { primary: true }),
+            [],
+        );
 
-        return { projectId: project._id, ...(text && { context: text }), ...(instructions.length > 0 && { instructions }) };
+        return {
+            projectId: project._id,
+            ...(text && { context: text }),
+            ...(instructions.length > 0 && { instructions }),
+            ...(textWithoutInstructions !== undefined && { contextWithoutInstructions: textWithoutInstructions }),
+        };
     });
 
 /**

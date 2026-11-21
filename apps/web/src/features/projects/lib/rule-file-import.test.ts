@@ -45,6 +45,15 @@ describe("toImportedRuleFile", () => {
         expect(toImportedRuleFile("rules/manual.md", "---\nalwaysApply: false # on request\n---\nBody.")).toMatchObject({ description: "", mode: "auto" });
         expect(toImportedRuleFile("rules/all.md", "---\nalwaysApply: true # every chat\n---\nBody.")).toMatchObject({ mode: "always" });
         expect(toImportedRuleFile("rules/both.md", "---\nalwaysApply: true\nglobs: *.ts\n---\nBody.")).toMatchObject({ mode: "always" });
+        // Quoted or not, in any case, `true` and `false` mean what they say; nothing else applies a file to every chat.
+        expect(toImportedRuleFile("rules/q.md", '---\nalwaysApply: "True"\n---\nBody.')).toMatchObject({ mode: "always" });
+        expect(toImportedRuleFile("rules/q.md", "---\nalwaysApply: 'true'\n---\nBody.")).toMatchObject({ mode: "always" });
+        expect(toImportedRuleFile("rules/q.md", '---\ndescription: On deploys\nalwaysApply: "false"\n---\nBody.')).toMatchObject({
+            description: "On deploys",
+            mode: "auto",
+        });
+        expect(toImportedRuleFile("rules/q.md", "---\nalwaysApply: FALSE\n---\nBody.")).toMatchObject({ mode: "auto" });
+        expect(toImportedRuleFile("rules/q.md", '---\nalwaysApply: "yes"\n---\nBody.')).toMatchObject({ mode: "auto" });
         expect(needsMode({ description: "How to deploy", mode: "auto" })).toBe(false);
     });
 
@@ -53,6 +62,11 @@ describe("toImportedRuleFile", () => {
             description: "Tags # not a comment",
             mode: "auto",
         });
+        // Escaped quotes stay inside the value, read as the quote they stand for.
+        expect(toImportedRuleFile("rules/q.md", '---\ndescription: "Use \\"quoted\\" # headings" # note\n---\nB')).toMatchObject({
+            description: 'Use "quoted" # headings',
+        });
+        expect(toImportedRuleFile("rules/q.md", "---\ndescription: 'It''s # one' # note\n---\nB")).toMatchObject({ description: "It's # one" });
         expect(toImportedRuleFile("rules/folded.md", "---\ndescription: >-\n  Long text\n  over lines\nalwaysApply: false\n---\nBody.")).toMatchObject({
             description: "Long text over lines",
             mode: "auto",
@@ -65,6 +79,11 @@ describe("toImportedRuleFile", () => {
             description: "When the task touches billing",
             mode: "auto",
         });
+    });
+
+    it("takes brackets as a list only around the whole value, so a pattern keeps its character class", () => {
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: src/[ab]\n---\nT")).toMatchObject({ patterns: "src/[ab]" });
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: [src/[ab]/*.ts, docs/**]\n---\nT")).toMatchObject({ patterns: "src/[ab]/*.ts\ndocs/**" });
     });
 
     it("keeps a brace group's commas inside its pattern", () => {

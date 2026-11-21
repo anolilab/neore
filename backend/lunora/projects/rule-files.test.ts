@@ -173,6 +173,17 @@ describe("selectRuleFiles with auto files", () => {
         expect(`${renderRuleFiles(fits.files)}\n\n${renderInstructionList(fits.instructions)}`).toHaveLength(MAX_RULE_TEXT_PER_RUN);
     });
 
+    it("leaves a run that shows no list the whole budget for its always and matching files", () => {
+        const first = always("a", "x".repeat(MAX_RULE_TEXT_PER_RUN - 200));
+        const files = [auto("one", "1", "d".repeat(150)), first, always("b", "y".repeat(150)), { ...sql, content: "z".repeat(40) }];
+        const listed = selectRuleFiles(files, ["db/schema.sql"]);
+        const unlisted = selectRuleFiles(files, ["db/schema.sql"], false);
+
+        expect(listed.truncated).toBe(true);
+        expect(unlisted).toMatchObject({ instructions: [], omitted: 0, truncated: false });
+        expect(unlisted.files.map((file) => file.id)).toStrictEqual(["a", "b", sql.id]);
+    });
+
     it("gives no list for a project without auto files", () => {
         expect(renderInstructionList(selectRuleFiles([always("a", "A"), sql], []).instructions)).toBeNull();
     });

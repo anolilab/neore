@@ -80,6 +80,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },

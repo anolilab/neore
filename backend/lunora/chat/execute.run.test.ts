@@ -41,7 +41,8 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
         /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
-        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined },
+        /** `removesInstructionRead`: the tools' own gates (the cap, a bot's selection, the permissions) removed it. */
+        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined, removesInstructionRead: false },
     };
 });
 
@@ -75,6 +76,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
@@ -114,11 +116,17 @@ vi.mock("./lib/auto-model", async (importOriginal) => {
 vi.mock("./lib/agent-tools", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-tools")>()),
-        buildAgentTools: vi.fn(async (_ctx: unknown, options: { untrustedContext?: Promise<boolean> | boolean }) => {
-            toolsState.options = options;
+        buildAgentTools: vi.fn(
+            async (_ctx: unknown, options: { instructions?: Promise<ReadonlyArray<unknown>>; untrustedContext?: Promise<boolean> | boolean }) => {
+                toolsState.options = options;
 
-            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
-        }),
+                // Offered as a candidate, kept unless the gates remove it (`agent-tools.bot-selection.test.ts`).
+                const listed = (await options.instructions) ?? [];
+                const tools = listed.length > 0 && !toolsState.removesInstructionRead ? { instruction_read: { description: "read", inputSchema: {} } } : {};
+
+                return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools };
+            },
+        ),
     };
 });
 
@@ -230,6 +238,7 @@ beforeEach(async () => {
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
     toolsState.options = undefined;
+    toolsState.removesInstructionRead = false;
 
     harness = lunoraTest(schema as never);
 
@@ -334,6 +343,8 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
         vi.mocked(loadRunContext).mockResolvedValueOnce({
             botId: undefined,
             contextParts: ["PROJECT CONTEXT:\nBe brief."],
+            // Chosen without the list's cost: a later file the list left no room for.
+            contextPartsWithoutInstructions: ["PROJECT CONTEXT:\nBe brief.\n\nAlso this."],
             knowledgeSources: [],
             memoryEnabled: false,
             prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
@@ -375,6 +386,20 @@ describe("runStreamingAgent: a project's rule files read when needed", () => {
         await run();
 
         expect(vi.mocked(finishRun).mock.calls.at(-1)?.[1].snapshot).toMatchObject({ projectId: "project-a" });
+    });
+
+    it("neither lists them nor gives up their room once the tools' own gates removed instruction_read", async () => {
+        toolsState.allowTools = true;
+        toolsState.removesInstructionRead = true;
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).not.toContain("instruction_read");
+        expect(system).not.toContain("instruction_read");
+        expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nAlso this.");
     });
 
     it("neither lists nor offers them to a model that takes no tools", async () => {

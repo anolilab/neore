@@ -22,6 +22,8 @@ const seen = vi.hoisted(() => {
         botModeFails: false,
         botModeReads: [] as unknown[],
         buildOptions: [] as unknown[],
+        /** The tools' own gates removed `instruction_read`. */
+        removesInstructionRead: false,
         callOptions: [] as unknown[],
         created: [] as unknown[],
         failAt: undefined as "generate" | "keys" | "round" | "thread" | undefined,
@@ -116,8 +118,11 @@ vi.mock("./agent-tools", async () => {
     const webSearch = createTool({ description: "Search the web", execute: async () => "results", inputSchema: z.object({}) });
 
     return {
-        buildAgentTools: async (_ctx: unknown, options: unknown) => {
+        buildAgentTools: async (_ctx: unknown, options: { instructions?: ReadonlyArray<unknown> }) => {
             seen.buildOptions.push(options);
+
+            // Offered as a candidate; the gates that remove it are `agent-tools.bot-selection.test.ts`'s.
+            const instructionRead = (options.instructions?.length ?? 0) > 0 && !seen.removesInstructionRead ? { instruction_read: {} } : {};
 
             return {
                 mcpClients: [],
@@ -129,7 +134,7 @@ vi.mock("./agent-tools", async () => {
                 permissionKeys: { browser: "builtin:browser", mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
                 // The notes search is set to `ask`, a tool kept for a run that may pause.
                 requiresApproval: ["mcp_notes_search"],
-                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: { needsApproval: true }, webSearch },
+                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: { needsApproval: true }, webSearch, ...instructionRead },
             };
         },
     };
@@ -276,7 +281,7 @@ describe("runHeadlessAgent project instructions", () => {
             organizationId: null,
             origin: "trigger",
             personalization: "none",
-            projectInstructions: { instructions, projectId: "project-a" },
+            projectInstructions: { instructions, projectId: "project-a", systemWithoutInstructions: "PROJECT CONTEXT:\nBe brief.\n\nAlso this." },
             prompt: "Do the task",
             system: "PROJECT CONTEXT:\nBe brief.",
             thread: { title: "t" },
@@ -298,6 +303,16 @@ describe("runHeadlessAgent project instructions", () => {
 
         expect(seen.tools.at(-1)).not.toContain("instruction_read");
         expect(seen.system.at(-1)).not.toContain("instruction_read");
+    });
+
+    it("neither lists them nor gives up their room once the tools' own gates removed instruction_read", async () => {
+        seen.removesInstructionRead = true;
+        await run("headless");
+        seen.removesInstructionRead = false;
+
+        expect(seen.tools.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).toContain("PROJECT CONTEXT:\nBe brief.\n\nAlso this.");
     });
 
     it("neither lists nor offers them to a model that cannot call tools", async () => {
@@ -1039,7 +1054,10 @@ describe("runHeadlessAgent pauseForApproval", () => {
             return recorded!.config;
         };
 
-        await expect(snapshotOf({ projectInstructions: { instructions, projectId: "project-a" } })).resolves.toMatchObject({
+        // An allowlist removes it like any other tool, so this one names it.
+        await expect(
+            snapshotOf({ projectInstructions: { instructions, projectId: "project-a" }, toolAllowlist: ["instruction_read", "mcp_notes_search", "webSearch"] }),
+        ).resolves.toMatchObject({
             projectId: "project-a",
             toolNames: expect.arrayContaining(["instruction_read"]),
         });

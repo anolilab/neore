@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { INSTRUCTION_READ_TOOL } from "../../projects/rule-files";
-import { findInstruction, instructionReadTool, withInstructionRead } from "./instruction-read";
+import { findInstruction, instructionReadTool } from "./instruction-read";
 
 const deploy = { content: "Run the deploy script.", description: "How to deploy", id: "deploy-1", title: "Deploy" };
 const style = { content: "Use tabs.", description: "Code style", id: "style", title: "Style guide" };
@@ -39,11 +38,5 @@ describe("instruction_read", () => {
 
         await expect(tool.execute({ file: "deploy" }, options)).resolves.toMatchObject({ found: false, ids: ["deploy-1", "deploy-2"] });
         await expect(tool.execute({ file: "deploy-2" }, options)).resolves.toMatchObject({ found: true, text: "Staging only." });
-    });
-
-    it("is offered only to a run that lists at least one file", () => {
-        expect(withInstructionRead({}, [])).toStrictEqual({});
-        expect(withInstructionRead({}, undefined)).toStrictEqual({});
-        expect(Object.keys(withInstructionRead({}, [deploy]))).toStrictEqual([INSTRUCTION_READ_TOOL]);
     });
 });

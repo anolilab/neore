@@ -4845,7 +4845,7 @@ export const streamAsync = internalAction
                 userId,
             });
 
-            projectContext = project?.text ?? undefined;
+            projectContext = project?.textWithoutInstructions ?? project?.text ?? undefined;
         }
 
         // Get model definition

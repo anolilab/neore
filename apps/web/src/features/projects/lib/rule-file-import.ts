@@ -28,9 +28,7 @@ const KEY = /^[A-Za-z]+$/u;
 /** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
 const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
 
-/** The brackets around an inline list, and a quote around an item. */
-const LIST_OPEN = /^\[/u;
-const LIST_CLOSE = /\]$/u;
+/** A quote around an item. */
 const QUOTE_START = /^["']/u;
 const QUOTE_END = /["']$/u;
 
@@ -52,7 +50,13 @@ const withoutComment = (value: string): string => {
     for (let index = 0; index < value.length; index += 1) {
         const character = value[index]!;
 
-        if (quote) {
+        if (quote === '"' && character === "\\") {
+            // An escape inside a double-quoted scalar: the next character is text, a quote included.
+            index += 1;
+        } else if (quote === "'" && character === "'" && value[index + 1] === "'") {
+            // `''` is a single quote inside a single-quoted scalar.
+            index += 1;
+        } else if (quote) {
             quote = character === quote ? undefined : quote;
         } else if ((character === '"' || character === "'") && QUOTE_OPENS_AFTER.has(previous)) {
             quote = character;
@@ -68,12 +72,26 @@ const withoutComment = (value: string): string => {
     return value;
 };
 
-/** One scalar with the quotes around it dropped. */
+/** A double-quoted scalar's escape: `\"` and `\\` give the character, a line break or tab a space (a value is one line). */
+const DOUBLE_QUOTED_ESCAPE = /\\(.)/gu;
+const DOUBLED_SINGLE_QUOTE = /''/gu;
+
+const unescaped = (character: string): string => (character === "n" || character === "t" || character === "r" ? " " : character);
+
+/** One scalar with the quotes around it dropped, and its escapes read: `\"` in a double-quoted one, `''` in a single-quoted one. */
 const unquoted = (value: string): string => {
     const trimmed = value.trim();
     const first = trimmed[0];
 
-    return trimmed.length >= 2 && (first === '"' || first === "'") && trimmed.at(-1) === first ? trimmed.slice(1, -1) : trimmed;
+    if (trimmed.length < 2 || (first !== '"' && first !== "'") || trimmed.at(-1) !== first) {
+        return trimmed;
+    }
+
+    const inner = trimmed.slice(1, -1);
+
+    return first === '"'
+        ? inner.replaceAll(DOUBLE_QUOTED_ESCAPE, (_match, character: string) => unescaped(character))
+        : inner.replaceAll(DOUBLED_SINGLE_QUOTE, "'");
 };
 
 /**
@@ -81,7 +99,9 @@ const unquoted = (value: string): string => {
  * a `*.{ts,tsx}` group stays one pattern and a quoted list of several patterns still gives each.
  */
 const listOf = (value: string): string[] => {
-    const inner = value.trim().replace(LIST_OPEN, "").replace(LIST_CLOSE, "");
+    const trimmed = value.trim();
+    // Brackets only around the whole value make it a list: `src/[ab]` is one pattern, its class kept.
+    const inner = trimmed.startsWith("[") && trimmed.endsWith("]") ? trimmed.slice(1, -1) : trimmed;
     const items: string[] = [];
     let depth = 0;
     let start = 0;
@@ -210,8 +230,8 @@ export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile 
     const title = name.replace(MARKDOWN_FILE, "");
     const globs = fields.get("globs") ?? [];
     const description = fields.get("description")?.[0] ?? "";
-    // Only YAML's own booleans: any other value says nothing.
-    const alwaysApply = fields.get("alwaysapply")?.[0]?.toLowerCase();
+    // Only `true` or `false`, quoted or not, in any case: any other value says nothing, so the file is not applied to every chat.
+    const alwaysApply = fields.get("alwaysapply")?.[0]?.trim().toLowerCase();
 
     if (alwaysApply === "true") {
         return { content: body, description: "", mode: "always", patterns: "", title };

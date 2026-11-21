@@ -103,6 +103,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: modelState.memory,
                 prefs: {

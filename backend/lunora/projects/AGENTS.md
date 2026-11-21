@@ -46,11 +46,13 @@
   (`instructions`), each costing its line of `renderInstructionList` (the header with the first) against
   `MAX_RULE_TEXT_PER_RUN`, never its text; an empty one is not listed. Their text travels with the run's one read
   (`getProjectContextForRun`, `runProjectFor`), and the model reads one with `instruction_read`
-  (`chat/tools/instruction-read.ts`), built per run over those files: no database read, never another project's. Only a
-  run that offers the tool lists them (`withInstructionRead` + `renderInstructionList` together): a chat run with
+  (`chat/tools/instruction-read.ts`), built per run over those files: no database read, never another project's. It is
+  a built-in candidate of `buildAgentTools` (`instructions`), so the cap, a skill, a bot's selection, the permissions
+  and an allowlist remove it like any tool; only a run whose tools still hold it lists them: a chat run with
   tools, its approval continuation (read anew from the project its snapshot recorded, `config.projectId`, never the
   thread's project by then), and a task run (`projectInstructions` on `runHeadlessAgent`). Edit (`streamAsync`) and group
-  runs take the text only. Triggers have no project. Names may repeat, ids do not: a name that more than one file has
+  runs take the text only. A run that lists none takes `textWithoutInstructions` when present, the text chosen
+  without the list's cost (`selectRuleFiles(…, false)`). Triggers have no project. Names may repeat, ids do not: a name that more than one file has
   is answered with their ids, never a guess.
 - Never a `defineMigration` on `projectRuleFiles`: a shard's data migration has no `.global()` store (`adminWriter` in
   `_generated/shard.ts`), so it fails there. Keep a new field optional, so every stored row still fits.

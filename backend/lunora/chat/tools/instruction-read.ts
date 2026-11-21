@@ -3,15 +3,15 @@
  * (`projects/rule-files.ts#renderInstructionList`). Built per run over the files that run's one rule-file read listed
  * (`getProjectContextForRun`, `runProjectFor`), so it reaches the run's own project and nothing else, and reads no
  * database. The call is saved with the reply like any tool call, so each read shows in the run's details. Offered only
- * when the run lists at least one file ({@link withInstructionRead}).
+ * when the run lists at least one file, as a built-in candidate of `buildAgentTools`, so the cap, a bot's selection, a skill
+ * and the user's permissions remove it like any other tool.
  */
-import type { ToolSet } from "ai";
 import z from "zod/v4";
 
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
-import { INSTRUCTION_READ_TOOL, oneLine, type RunInstruction } from "../../projects/rule-files";
+import { oneLine, type RunInstruction } from "../../projects/rule-files";
 import toonEncodeOutput from "./toon-encode";
 
 type InstructionReadOutput =
@@ -68,11 +68,3 @@ export const instructionReadTool = (instructions: ReadonlyArray<RunInstruction>)
         title: "Project instructions",
         toModelOutput: (_context, { output }) => toonEncodeOutput(output),
     });
-
-/**
- * `tools` with {@link instructionReadTool} over `instructions`, unchanged when there are none: a run without `auto`
- * files has no such tool. The tool is the run's own context, like the rule text in its prompt, not a capability, so it
- * is added after the permission layer and a bot's selection, which never list it.
- */
-export const withInstructionRead = (tools: ToolSet, instructions: ReadonlyArray<RunInstruction> | undefined): ToolSet =>
-    instructions && instructions.length > 0 ? { ...tools, [INSTRUCTION_READ_TOOL]: instructionReadTool(instructions) } : tools;

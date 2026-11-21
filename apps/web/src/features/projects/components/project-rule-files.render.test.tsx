@@ -225,6 +225,25 @@ describe("importing rule files", () => {
         expect(screen.queryByRole("listitem", { name: "a" })).toBeNull();
     });
 
+    it("takes a place freed while it read", async () => {
+        const user = userEvent.setup();
+
+        backend.listed.files = Array.from({ length: 20 }, (_, index) => {
+            return { content: "x", id: `f${index}`, mode: "always", title: `F${index}` };
+        });
+        renderEditor();
+        await screen.findByRole("listitem", { name: "F0" });
+
+        const slow = slowFile("a.md", "A");
+
+        await user.upload(screen.getByTestId("rule-file-import"), slow.file);
+        await user.click(screen.getByRole("button", { name: "Delete F0" }));
+        slow.finish();
+
+        await screen.findByRole("listitem", { name: "a" });
+        expect(screen.queryByText(/left out/u)).toBeNull();
+    });
+
     it("says which imported files need a description or another mode before they save", async () => {
         const user = userEvent.setup();
 
@@ -381,7 +400,7 @@ describe("project rule files", () => {
         expect(document.activeElement).toBe(screen.getByRole("button", { name: "Add rule file" }));
     });
 
-    it("saves the rule files on Enter in a file's name, never submitting the project form around it", async () => {
+    it("saves the rule files on Enter in a file's name or when to read it, never submitting the project form around it", async () => {
         const user = userEvent.setup();
         const submitProject = vi.fn((event: FormEvent) => event.preventDefault());
 
@@ -406,6 +425,17 @@ describe("project rule files", () => {
 
         await waitFor(() => expect(backend.save).toHaveBeenCalledOnce());
         expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ ruleFiles: [expect.anything(), expect.objectContaining({ title: "SQL rules" })] });
+
+        // The saved list is read again; this backend answers with the one it was given.
+        const sql = within(await screen.findByRole("listitem", { name: "SQL" }));
+
+        await user.click(sql.getByRole("radio", { name: "When needed" }));
+        await user.type(sql.getByRole("textbox", { name: "When to read it" }), "On schema changes{Enter}");
+
+        await waitFor(() => expect(backend.save).toHaveBeenCalledTimes(2));
+        expect(backend.save.mock.calls[1]?.[0]).toMatchObject({
+            ruleFiles: [expect.anything(), expect.objectContaining({ description: "On schema changes", mode: "auto" })],
+        });
         expect(submitProject).not.toHaveBeenCalled();
     });
 
