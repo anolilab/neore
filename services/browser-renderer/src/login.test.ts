@@ -6,7 +6,7 @@ const SECRET = "p@ss wörd{1}&<x>";
 
 const PERCENT_ESCAPE_RE = /%[0-9A-F]{2}/g;
 
-const LEFT_AROUND_RE = /^token=[\w+/-]{0,4}\[password\][\w+/=-]{0,4}$/;
+const LEFT_AROUND_RE = /^token=[\w%+/-]{0,6}\[password\][\w%+/=-]{0,9}$/;
 
 const base64 = (text: string): string => Buffer.from(text).toString("base64");
 
@@ -29,6 +29,7 @@ describe(withoutSecret, () => {
     it.each([
         ["base64", (text: string) => base64(text)],
         ["base64url", (text: string) => base64(text).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")],
+        ["URL-encoded base64", (text: string) => encodeURIComponent(base64(text))],
     ])("hides a %s password at every byte alignment", (_name, encode) => {
         for (const prefix of ["", "a", "ab"]) {
             // What is left either side is the prefix's and the suffix's own characters, at most a few.
