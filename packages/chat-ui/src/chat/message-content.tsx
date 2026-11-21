@@ -22,7 +22,7 @@ import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-block
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
 import useStreamdownPlugins, { streamdownRehypePlugins } from "@neore/ui/hooks/use-streamdown-plugins";
 import { MarkdownBlockCacheContext } from "@neore/ui/utils/markdown-block-cache";
-import { saveOnClick } from "@neore/ui/utils/save-from-url";
+import { safeImageDownloadUrl, saveOnClick } from "@neore/ui/utils/save-from-url";
 import { AlertCircle, ChevronDown, ChevronRight, Download, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
 import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -425,6 +425,9 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
         return <NsfwBlockedPlaceholder nsfwStatus={part.nsfwStatus} />;
     }
 
+    // Only a link to a value safe to open on its own: a modified click skips the save helper's check.
+    const downloadUrl = safeImageDownloadUrl(part.image);
+
     return (
         <div className="group/image relative mb-4 w-fit max-w-full">
             <img
@@ -435,18 +438,20 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
                 src={part.image}
             />
             {/* Top left, so an override's own button (a pin) can take the top right. Always shown where nothing can hover. */}
-            <a
-                aria-label={part.filename ? t`Download ${part.filename}` : t`Download image`}
-                className="bg-background/80 hover:bg-background absolute top-2 left-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within/image:opacity-100 group-hover/image:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-                download={part.filename ?? ""}
-                href={part.image}
-                onClick={saveOnClick(part.image, part.filename, "image")}
-                rel="noopener noreferrer"
-                target="_blank"
-                title={t`Download image`}
-            >
-                <Download aria-hidden="true" className="size-4" />
-            </a>
+            {downloadUrl && (
+                <a
+                    aria-label={part.filename ? t`Download ${part.filename}` : t`Download image`}
+                    className="bg-background/80 hover:bg-background absolute top-2 left-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within/image:opacity-100 group-hover/image:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    download={part.filename ?? ""}
+                    href={downloadUrl}
+                    onClick={saveOnClick(downloadUrl, part.filename, "image")}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    title={t`Download image`}
+                >
+                    <Download aria-hidden="true" className="size-4" />
+                </a>
+            )}
             {part.prompt && (
                 <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs italic" title={part.prompt}>
                     {part.prompt}

@@ -83,6 +83,22 @@ const isFetchable = (url: string): boolean => {
     }
 };
 
+/** A `data:` URL of a raster image: no SVG, which can carry script when opened on its own. */
+const DATA_RASTER_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/iu;
+
+/**
+ * `url` when a link may point at it as an image download (http(s), `blob:`, or a `data:` raster image), else
+ * `undefined`. A link's own navigation (a click with a modifier, "open in new tab") skips `saveOnClick`, so a link to
+ * a value a message could carry (`javascript:`, an HTML or SVG `data:` URL) must not be rendered at all.
+ */
+export const safeImageDownloadUrl = (url: string): string | undefined => {
+    if (url.startsWith("data:")) {
+        return DATA_RASTER_IMAGE.test(url) ? url : undefined;
+    }
+
+    return isFetchable(url) ? url : undefined;
+};
+
 /**
  * How long the response headers may take. The fallback opens a tab, which a browser allows only while the click's user
  * activation lasts (about a second in Safari, five in Chrome and Firefox), so a fetch that has not answered by then

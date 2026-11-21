@@ -7,7 +7,7 @@
 import type { MouseEvent } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HEADERS_DEADLINE_MS, saveFromUrl, saveName, saveOnClick } from "./save-from-url";
+import { HEADERS_DEADLINE_MS, safeImageDownloadUrl, saveFromUrl, saveName, saveOnClick } from "./save-from-url";
 
 // One spy for the whole file, cleared before each test: every click's `this` is the anchor the helper made.
 const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
@@ -48,6 +48,22 @@ describe(saveName, () => {
     it("uses the fallback name when there is no file name", () => {
         expect(saveName(undefined, "image/webp", "image")).toBe("image.webp");
     });
+});
+
+describe(safeImageDownloadUrl, () => {
+    it.each(["https://api.test/agent-files/a?sig=1", "blob:https://app.test/1", "data:image/png;base64,iVBORw0KGgo=", "data:image/jpeg;base64,/9j/"])(
+        "links %s",
+        (url) => {
+            expect(safeImageDownloadUrl(url)).toBe(url);
+        },
+    );
+
+    it.each([["javascript", ":alert(document.domain)"].join(""), "data:text/html,<b>x</b>", "data:image/svg+xml,<svg onload=alert(1)>", "file:///etc/passwd"])(
+        "links nothing for %s",
+        (url) => {
+            expect(safeImageDownloadUrl(url)).toBeUndefined();
+        },
+    );
 });
 
 describe(saveFromUrl, () => {

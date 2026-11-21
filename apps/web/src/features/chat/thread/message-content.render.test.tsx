@@ -151,6 +151,19 @@ describe("saving a message's files", () => {
         expect(link.className).toContain("[@media(hover:none)]:opacity-100");
     });
 
+    it("links no download for an image value a link must not open", () => {
+        const unsafe = {
+            id: "m4",
+            parts: [{ image: ["javascript", ":alert(document.domain)"].join(""), type: "image" }],
+            role: "assistant",
+            status: "success",
+        } as unknown as ChatMessage;
+
+        render(<MessageContentUI message={unsafe} />);
+
+        expect(screen.queryByRole("link", { name: "Download image" })).toBeNull();
+    });
+
     it("saves the image under its own name, not the storage URL's", async () => {
         const saved = recordSaves();
 
