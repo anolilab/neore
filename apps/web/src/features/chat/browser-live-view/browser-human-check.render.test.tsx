@@ -55,7 +55,7 @@ const SITE_NAMED = /a page on shop\.example\.com only a person can clear/u;
 
 const PART = {
     output: {
-        humanCheck: { site: "shop.example.com", status: "asked" },
+        humanCheck: { browserId: "b-1", site: "shop.example.com", status: "asked" },
         screenshot: "aGVsbG8=",
         screenshotFormat: "jpeg",
         success: false,
@@ -67,7 +67,7 @@ const PART = {
 } as unknown as ToolPart;
 
 const running = (overrides: Record<string, unknown> = {}) => {
-    return { browserId: "b-1", canControl: true, idleUntil: Date.now() + 60_000, now: Date.now(), ...overrides };
+    return { browserId: "b-1", canControl: true, currentUrl: "https://shop.example.com/item", idleUntil: Date.now() + 60_000, now: Date.now(), ...overrides };
 };
 
 const show = (part: ToolPart = PART, liveViewHere = true) =>
@@ -136,6 +136,9 @@ describe("the Needs you card", () => {
         [running({ control: { byYou: true, until: Date.now() + 60_000 } }), "You have control."],
         [running({ control: { byYou: false, until: Date.now() + 60_000 } }), "Someone else has control of this browser."],
         [running({ canControl: false }), "Only someone who can write in this chat"],
+        // An old card: a later reply's browser, or the asked browser moved on to another site, is not handed over from it.
+        [running({ browserId: "b-2" }), "This check was for an earlier browser"],
+        [running({ currentUrl: "https://other.example.org/" }), "The browser has since moved on from shop.example.com"],
     ])("offers no button when %j", async (browser, text) => {
         backend.browser = browser;
         show();
@@ -175,6 +178,28 @@ describe("the Needs you card", () => {
         }
     });
 
+    it("offers no Take control once a lapsed lease leaves the browser on another site", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+
+        try {
+            backend.browser = running({ control: { byYou: true, until: Date.now() + 10_000 }, currentUrl: "https://other.example.org/" });
+            show();
+
+            await waitFor(() => {
+                expect(screen.getByRole("status").textContent).toContain("You have control.");
+            });
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(11_000);
+            });
+
+            expect(screen.getByRole("status").textContent).toContain("The browser has since moved on from shop.example.com");
+            expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("does not call a browser closed when its status could not be read, and asks again on Try again", async () => {
         backend.browser = running();
         backend.fail = true;
@@ -196,7 +221,7 @@ describe("the Needs you card", () => {
         backend.browser = running();
         show({
             ...PART,
-            output: { humanCheck: { site: "shop.example.com", status: "asked" }, success: false, url: "https://shop.example.com/item" },
+            output: { humanCheck: { browserId: "b-1", site: "shop.example.com", status: "asked" }, success: false, url: "https://shop.example.com/item" },
         } as unknown as ToolPart);
 
         expect(screen.getByText(NO_PICTURE)).toBeTruthy();

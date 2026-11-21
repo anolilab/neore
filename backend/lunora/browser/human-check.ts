@@ -165,7 +165,7 @@ export interface LadderResult extends PageSignals {
     error?: string;
     /** The person had driven the browser and gave it back; this is the first look at the page since. */
     handedBack?: boolean;
-    humanCheck?: { site: string; status: "already_asked" | "asked" };
+    humanCheck?: { browserId?: string; site: string; status: "already_asked" | "asked" };
     screenshot?: string;
     screenshotFormat?: string;
     success?: boolean;
@@ -196,8 +196,8 @@ export interface LadderDependencies<R extends LadderResult> {
 
 /**
  * `reported`: the agent itself said a person is needed (a sign-in wall). `readContent`: see {@link detectHumanCheck}.
- * `navigated`: an interactive action (click, type, scroll) left the page on another URL; its result carries no title
- * or text, so one whole-page text read looks for a check there before the page counts as having none.
+ * `navigated`: a navigate, or an interactive action (click, type, scroll) that left the page on another URL; its result
+ * carries no text, so one whole-page text read looks for a check there before the page counts as having none.
  */
 export interface LadderOptions {
     navigated?: boolean;
@@ -442,7 +442,8 @@ const afterWait = async <R extends LadderResult>(
     if (first && page.screenshot === undefined) {
         const shot = await safeLook(dependencies, "screenshot");
 
-        if (shot.success === true && shot.screenshot !== undefined) {
+        // Only a picture of the site asked about: a person who took control meanwhile may have left another page.
+        if (shot.success === true && shot.screenshot !== undefined && shot.handedBack !== true && humanCheckSite(shot.url) === site) {
             page = { ...page, screenshot: shot.screenshot, screenshotFormat: shot.screenshotFormat };
         }
 

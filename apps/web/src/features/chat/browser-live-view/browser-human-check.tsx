@@ -20,8 +20,22 @@ import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/stat
 import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+/** The host of `url`, lower case, as the backend names a check's site; `undefined` when it has none. */
+const hostOf = (url: string | undefined): string | undefined => {
+    if (url === undefined) {
+        return undefined;
+    }
+
+    try {
+        return new URL(url).hostname.toLowerCase();
+    } catch {
+        return undefined;
+    }
+};
+
 interface HumanCheckOutput {
-    humanCheck?: { site?: string };
+    /** `browserId`: the browser the ask was about (`getThreadBrowser`'s name for it). */
+    humanCheck?: { browserId?: string; site?: string };
     screenshot?: string;
     screenshotFormat?: string;
     screenshotUrl?: string;
@@ -50,6 +64,10 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     // The browser no live view card answered for: once it changes, the button comes back.
     const [missedBrowser, setMissedBrowser] = useState<string | undefined>(undefined);
     const missed = browser !== undefined && browser !== null && missedBrowser === browser.browserId;
+    // The thread's browser now is not the one asked about (a later reply opened another), or it moved on to another site
+    // while nobody has control: taking it over from this card would hand the agent's current work to the person.
+    const earlierBrowser = browser !== undefined && browser !== null && output.humanCheck?.browserId !== browser.browserId;
+    const movedOn = browser !== undefined && browser !== null && site !== undefined && control === undefined && hostOf(browser.currentUrl) !== site;
     const screenshot = output.screenshotFormat
         ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
         : undefined;
@@ -65,6 +83,10 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
         // be paid browser time while nobody looks): a late reader is told so, and a retry in a new reply (a steer keeps the
         // reply's one ask per site) opens a new browser.
         state = t`The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows.`;
+    } else if (earlierBrowser) {
+        state = t`This check was for an earlier browser, which the agent no longer uses.`;
+    } else if (movedOn) {
+        state = t`The browser has since moved on from ${site}, so this check is no longer open.`;
     } else if (missed) {
         // No live view card answered: the browser went idle (its card is gone) though the status still lists it.
         state = t`The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed.`;

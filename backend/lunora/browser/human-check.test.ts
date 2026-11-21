@@ -181,6 +181,18 @@ describe("humanCheckLadder", () => {
         expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "asked" }, screenshot: "jpeg", screenshotFormat: "jpeg" });
     });
 
+    it("step 2: a screenshot for the card of another site (a person took control and handed back elsewhere) is not shown", async () => {
+        const elsewhere = { screenshot: "other", screenshotFormat: "jpeg", success: true, url: "https://other.example.org/" };
+
+        for (const shot of [elsewhere, { ...elsewhere, handedBack: true, url: TEXT_CHECK.url }]) {
+            const { dependencies } = dependenciesFor([TEXT_CHECK, shot]);
+            const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });
+
+            expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
+            expect(result.screenshot).toBeUndefined();
+        }
+    });
+
     it("step 1: a failed screenshot for the card still asks, with no image", async () => {
         const { dependencies } = dependenciesFor([TEXT_CHECK, { error: "Browser closed", success: false }]);
         const result = await humanCheckLadder(TEXT_CHECK, dependencies, { readContent: true });

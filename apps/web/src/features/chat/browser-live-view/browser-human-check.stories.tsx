@@ -15,7 +15,7 @@ const STAND_IN_SCREENSHOT = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0l
 const PART = {
     input: { action: "navigate", url: "https://shop.example.com/item" },
     output: {
-        humanCheck: { site: "shop.example.com", status: "asked" },
+        humanCheck: { browserId: "browser-1", site: "shop.example.com", status: "asked" },
         screenshot: STAND_IN_SCREENSHOT,
         screenshotFormat: "png",
         success: false,
@@ -93,6 +93,17 @@ export const YouHaveControl: Story = {
     },
 };
 
+/** An old card: a later reply's browser runs in the thread now, so this card offers no Take control of it. */
+export const EarlierBrowser: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), browser({ browserId: "browser-2", currentUrl: "https://other.example.org/" })) } },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("status")).toHaveTextContent("This check was for an earlier browser");
+        await expect(canvas.queryByRole("button", { name: "Take control" })).toBeNull();
+    },
+};
+
 /** The browser closed since the ask (a minute after its last action): no button, and a retry opens a new one. */
 export const Closed: Story = {
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), lunora(api.browser.live_view.getThreadBrowser, null)) } } },
@@ -131,7 +142,7 @@ export const NoPicture: Story = {
             ...PART,
             output: {
                 content: "Verifying you are human.",
-                humanCheck: { site: "shop.example.com", status: "asked" },
+                humanCheck: { browserId: "browser-1", site: "shop.example.com", status: "asked" },
                 success: false,
                 url: "https://shop.example.com/",
             },

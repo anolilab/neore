@@ -26,9 +26,12 @@ export interface BrowserResult {
     error?: string;
     /** The person had driven the browser and gave it back: this result is the first look since. */
     handedBack?: boolean;
-    /** The page needs a person (`browser/human-check.ts`): `asked` shows the "Needs you" card in the chat. */
-    humanCheck?: { site: string; status: "already_asked" | "asked" };
-    /** An interactive action left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
+    /**
+     * The page needs a person (`browser/human-check.ts`): `asked` shows the "Needs you" card in the chat, which offers
+     * Take control only while the thread's browser is still `browserId` (the one asked about) and on `site`.
+     */
+    humanCheck?: { browserId?: string; site: string; status: "already_asked" | "asked" };
+    /** A navigate, or an interactive action that left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
     navigated?: boolean;
     result?: string;
     screenshot?: string;
@@ -41,6 +44,22 @@ export interface BrowserResult {
     typedText?: string;
     url?: string;
 }
+
+/**
+ * The card is for the browser an ask was about (`getThreadBrowser`'s name for it): a later reply's browser is not
+ * handed over from it. A failed read leaves no name, so the card offers no Take control.
+ */
+const stampAskedBrowser = async (context: ToolContext, threadId: Id<"threads">, result: BrowserResult): Promise<void> => {
+    if (result.humanCheck?.status !== "asked") {
+        return;
+    }
+
+    const browserId = await context.runQuery(internal.browser.live_view.getThreadBrowserId, { threadId }).catch(() => null);
+
+    if (browserId !== null) {
+        result.humanCheck = { ...result.humanCheck, browserId };
+    }
+};
 
 /**
  * Browser Automation Tool
@@ -140,7 +159,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                           },
                           // Only a whole page's text is read for a check: a selected element's is always short.
                           {
-                              // A click, a typed entry or a scroll that moved the page on carries no title or text: one read looks for a check.
+                              // A navigate carries no text, nor does a click, a typed entry or a scroll that moved the page on: one read looks for a check.
                               navigated: first.navigated === true,
                               readContent: action === "extract" && input.selector === undefined,
                               reported: reported && first.success === true,
@@ -149,6 +168,8 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     : first;
 
             delete result.navigated;
+
+            await stampAskedBrowser(context, threadId, result);
 
             toolsLogger.debug(`[BROWSER] ${action} ${result.success ? "succeeded" : "failed"}${result.error ? `: ${result.error}` : ""}`);
 

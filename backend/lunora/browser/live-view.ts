@@ -218,6 +218,20 @@ export const getThreadBrowser = authQuery
     });
 
 /**
+ * The opaque name ({@link browserIdOf}) of the thread's running browser, or `null`: what a "Needs you" card records, so
+ * it offers Take control only of the browser it asked about (`chat/tools/browser.ts`).
+ */
+export const getThreadBrowserId = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.union(v.null(), v.string()))
+    .query(async ({ args: { threadId }, ctx }) => {
+        const session = await activeThreadSession(systemDb(ctx), threadId);
+        const providerSessionId = watchableSessionId(session, ctx.now);
+
+        return session === null || providerSessionId === undefined ? null : await browserIdOf(session._id, providerSessionId);
+    });
+
+/**
  * {@link readerBrowser} for the action, which reaches the database only through `runQuery`; the grant from the primary.
  * `at`: the action's clock after a provider call. The lease is judged at the later of it and `ctx.now`, so one that
  * lapsed while the provider minted is over even where a nested call still reads the time its action started at.

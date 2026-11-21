@@ -12,7 +12,7 @@ import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
-import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
+import { controlHolder, getThreadBrowser, getThreadBrowserId, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
 import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
@@ -446,6 +446,8 @@ describe("an agent action", () => {
 
         expect(after.browserId).not.toBe(before.browserId);
         expect([before.browserId, after.browserId].join(" ")).not.toMatch(PROVIDER_SESSION_ID);
+        // A "Needs you" card records the same name, so it offers Take control of that browser and no later one.
+        await expect(harness.action(async (ctx: any) => await ctx.runQuery(getThreadBrowserId, { threadId }))).resolves.toBe(after.browserId);
     });
 
     it("does not bring back the old browser when an older action finishes after a newer one replaced it", async () => {

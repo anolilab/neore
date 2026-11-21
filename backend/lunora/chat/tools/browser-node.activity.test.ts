@@ -601,6 +601,9 @@ describe("a browser a person took control of", () => {
         renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/next" }));
         // The click moved the page on, so the human-check ladder reads it once (`browser/human-check.ts`).
         await expect(act("click")).resolves.toEqual({ navigated: true, sessionId: "s-1", success: true, url: "https://example.com/next" });
+        // So does a navigate, whose result has a title but no text: a check only its text shows is read for too.
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, title: "example.com", url: "https://example.com/" }));
+        await expect(act("navigate")).resolves.toMatchObject({ navigated: true, success: true });
     });
 
     it("tells of a hand back on a rate-limited action, and again on the next action", async () => {

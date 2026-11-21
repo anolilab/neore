@@ -204,14 +204,16 @@ export const executeBrowserAction = internalAction
                 }
 
                 if (returned === undefined) {
-                    // A click, a typed entry or a scroll that left the page on another URL: the human-check ladder reads
-                    // that page's text once (`browser/human-check.ts`), as these results carry none.
+                    // A navigate, or a click, a typed entry or a scroll that left the page on another URL: the human-check
+                    // ladder reads that page's text once (`browser/human-check.ts`), as these results carry none. A navigate's
+                    // title and URL can look ordinary on a check that only its text shows.
                     const navigated =
-                        INTERACTIVE_ACTIONS.has(action) &&
                         result.success === true &&
-                        result.url !== undefined &&
-                        sessionDocument.currentUrl !== undefined &&
-                        withoutHash(result.url) !== withoutHash(sessionDocument.currentUrl);
+                        ((action === "navigate" && result.content === undefined) ||
+                            (INTERACTIVE_ACTIONS.has(action) &&
+                                result.url !== undefined &&
+                                sessionDocument.currentUrl !== undefined &&
+                                withoutHash(result.url) !== withoutHash(sessionDocument.currentUrl)));
 
                     return navigated ? { ...result, navigated: true } : result;
                 }
