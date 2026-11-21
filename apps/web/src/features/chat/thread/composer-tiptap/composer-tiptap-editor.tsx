@@ -727,6 +727,7 @@ const ComposerTiptapEditor = ({
 
             editor.off("transaction", onTransaction);
             clearTimeout(clearAnnouncement);
+            clearTimeout(restoreAnnouncement);
             setGhostAnnouncement("");
         };
 
