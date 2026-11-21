@@ -9,8 +9,10 @@
  */
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
+import { LunoraError } from "lunorash/server";
 import { callOnShard } from "../lib/cross-shard";
 import { chatLogger } from "../lib/logger";
+import { MAX_STORED_READ_BYTES, readStoredObject, type StorageReader } from "../lib/storage-read";
 import { threadShardFor } from "../lib/thread-shard";
 
 /** An attach claim taken on a referenced chat's owner shard, released by {@link releaseReferenceClaims}. */
@@ -23,6 +25,8 @@ export interface ReferenceClaim {
 /**
  * Whether every reference is still the caller's own row under its URL, and every chat it sits in is still held by the caller.
  * Each claim is pushed to `claims` as it is taken, so the caller releases them even when the check throws part-way.
+ * Returns `null` when a reference is no longer held; otherwise the stored object of each reference, paired by position (`""` for a
+ * document, whose content is inline).
  */
 export const referencesStillHeld = async (
     context: Parameters<typeof threadShardFor>[0],
@@ -34,7 +38,7 @@ export const referencesStillHeld = async (
         requestId,
         userId,
     }: { claims: ReferenceClaim[]; referenceIds: string[]; referenceImages: string[]; requestedAt: number; requestId: string; userId: string },
-): Promise<boolean> => {
+): Promise<string[] | null> => {
     const rows = await callOnShard(
         internal.chat.reference_gate.gateReferenceRowsOnCallerShard,
         { referenceIds, referenceImages, userId },
@@ -42,7 +46,7 @@ export const referencesStillHeld = async (
     );
 
     if (rows.refused) {
-        return false;
+        return null;
     }
 
     for (const chatId of rows.chatIds) {
@@ -58,7 +62,7 @@ export const referencesStillHeld = async (
         }
 
         if (!held) {
-            return false;
+            return null;
         }
     }
 
@@ -72,12 +76,50 @@ export const referencesStillHeld = async (
         );
 
         if (!held) {
-            return false;
+            return null;
         }
     }
 
-    return true;
+    return rows.storageKeys;
 };
+
+const BASE64_CHUNK = 0x80_00;
+
+const toBase64 = (bytes: ArrayBuffer): string => {
+    const view = new Uint8Array(bytes);
+    let binary = "";
+
+    for (let offset = 0; offset < view.length; offset += BASE64_CHUNK) {
+        binary += String.fromCodePoint(...view.subarray(offset, offset + BASE64_CHUNK));
+    }
+
+    return btoa(binary);
+};
+
+/**
+ * The reference images as the provider should receive them, read after the holds are renewed. A file's bytes are read from storage
+ * and sent inline as a data URI, so the provider never fetches a signed URL: a grant revoked after the recheck cannot reach it
+ * through a URL it fetches later. A document's content is already inline and passes through. A stored object that is not an image is
+ * refused, and so is one that is missing, so a failed read fails the job rather than sending the reference URL.
+ */
+export const referenceBytesForProvider = async (storage: StorageReader | undefined, referenceImages: string[], storageKeys: string[]): Promise<string[]> =>
+    await Promise.all(
+        referenceImages.map(async (url, index) => {
+            const key = storageKeys[index];
+
+            if (!key) {
+                return url;
+            }
+
+            const { bytes, contentType } = await readStoredObject(storage, key, { maxBytes: MAX_STORED_READ_BYTES });
+
+            if (!contentType?.startsWith("image/")) {
+                throw new LunoraError("BAD_REQUEST", "A reference is not an image");
+            }
+
+            return `data:${contentType};base64,${toBase64(bytes)}`;
+        }),
+    );
 
 /**
  * Releases the claims {@link referencesStillHeld} took, once the provider has its references. A release that fails is logged, not

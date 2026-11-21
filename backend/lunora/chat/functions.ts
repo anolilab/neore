@@ -110,7 +110,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
 import { savePromptInTransaction } from "./lib/save-prompt";
-import { type ReferenceClaim, referencesStillHeld, releaseReferenceClaims } from "./reference-recheck";
+import { type ReferenceClaim, referenceBytesForProvider, referencesStillHeld, releaseReferenceClaims } from "./reference-recheck";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -5165,22 +5165,28 @@ export const generateImage = internalAction
                 // Checked again here, after the queue delivered the job: a lock or grant change since the request must not reach the
                 // provider. Only a job that carries reference ids is checked: `/chat/media` sends them with its references and refuses
                 // references without them, while the image tool and the workflows pass their own URLs, which are not picker rows.
-                if (referenceIds !== undefined) {
-                    const held =
-                        referenceImages !== undefined &&
-                        referenceCheckedAt !== undefined &&
-                        (await referencesStillHeld(context, {
-                            claims: referenceClaims,
-                            referenceIds,
-                            referenceImages,
-                            requestedAt: referenceCheckedAt,
-                            requestId: referenceRequestId,
-                            userId,
-                        }));
+                // What the provider receives: the URLs as sent, or for a checked job the bytes of each file, read after the holds are renewed
+                // (`referenceBytesForProvider`), so no signed URL reaches the provider.
+                let providerReferences = referenceImages;
 
-                    if (!held) {
+                if (referenceIds !== undefined) {
+                    const storageKeys =
+                        referenceImages !== undefined && referenceCheckedAt !== undefined
+                            ? await referencesStillHeld(context, {
+                                  claims: referenceClaims,
+                                  referenceIds,
+                                  referenceImages,
+                                  requestedAt: referenceCheckedAt,
+                                  requestId: referenceRequestId,
+                                  userId,
+                              })
+                            : null;
+
+                    if (storageKeys === null || referenceImages === undefined) {
                         throw new LunoraError("NOT_FOUND", "File not found");
                     }
+
+                    providerReferences = await referenceBytesForProvider(context.storage, referenceImages, storageKeys);
                 }
 
                 let images: { mimeType?: string; uint8Array: Uint8Array }[] = [];
@@ -5192,7 +5198,7 @@ export const generateImage = internalAction
                 // that take refs as inline image content parts, not as provider-
                 // level `image_url`/`image_urls`, so spreading FAL fields there is
                 // a no-op at best and a foot-gun at worst.
-                const referenceImageInput = buildFalReferenceImageInput(modelDefinition, referenceImages);
+                const referenceImageInput = buildFalReferenceImageInput(modelDefinition, providerReferences);
 
                 if (provider === "openrouter") {
                     const baseProviderOptions = {};

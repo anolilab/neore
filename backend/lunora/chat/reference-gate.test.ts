@@ -57,7 +57,9 @@ const insertThread = async (userId: string, locked: boolean) =>
     });
 
 const insertFile = async (userId: string, chatId: string, url: string) =>
-    await run(async (ctx) => (await ctx.db.insert("files", { chatId, name: "image.png", size: 1, type: "image/png", url, userId })) as string);
+    await run(
+        async (ctx) => (await ctx.db.insert("files", { chatId, key: `ref/${url}`, name: "image.png", size: 1, type: "image/png", url, userId })) as string,
+    );
 
 const insertDocument = async (userId: string, threadId: string, content: string) =>
     await run(async (ctx) => (await ctx.db.insert("documents", { content, kind: "image", threadId, title: "Image", userId, version: 1 })) as string);
@@ -170,6 +172,19 @@ describe("a media request's references: the rows on the caller's shard", () => {
         });
 
         await expect(refusedFor(OWNER, repeated, ownerOpenId)).resolves.toBe(true);
+    });
+
+    it("returns each file's stored key, paired with its id, from the caller's rows", async () => {
+        const rows = await run(
+            async (ctx) =>
+                await ctx.runQuery(gateReferenceRowsOnCallerShard as never, {
+                    referenceIds: [`file:${openFileId}`],
+                    referenceImages: [OPEN_URL],
+                    userId: OWNER,
+                }),
+        );
+
+        expect(rows).toMatchObject({ refused: false, storageKeys: [`ref/${OPEN_URL}`] });
     });
 });
 

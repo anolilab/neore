@@ -21,15 +21,18 @@ import { lockedAfterCreation, threadGateOutcome } from "./lib/thread-gate";
 
 const REFERENCE_ID = /^(file|doc):([\w-]+)$/u;
 
-/** Whether one reference is the caller's own row under its own URL, and the chat that row sits in (if any). */
+/**
+ * Whether one reference is the caller's own row under its own URL. `chatId` is the chat the row sits in (if any); `storageKey` is the
+ * stored object of a file, `""` for a document, whose content is already inline.
+ */
 const rowChecked = async (
     ctx: Pick<QueryCtx, "db">,
     { referenceId, referenceUrl, userId }: { referenceId: string; referenceUrl: string; userId: string },
-): Promise<{ chatId: string | undefined; refused: boolean }> => {
+): Promise<{ chatId: string | undefined; refused: boolean; storageKey: string }> => {
     const match = REFERENCE_ID.exec(referenceId);
 
     if (!match) {
-        return { chatId: undefined, refused: true };
+        return { chatId: undefined, refused: true, storageKey: "" };
     }
 
     const [, kind = "", rowId = ""] = match;
@@ -38,52 +41,59 @@ const rowChecked = async (
         const fileId = ctx.db.normalizeId("files", rowId);
         const file = fileId === null ? null : await ctx.db.get("files", fileId);
 
-        if (!file || file.userId !== userId || file.url !== referenceUrl) {
-            return { chatId: undefined, refused: true };
+        // A file without its stored object cannot be copied for the provider, so it is refused rather than sent by URL.
+        if (!file || file.userId !== userId || file.url !== referenceUrl || file.key === undefined) {
+            return { chatId: undefined, refused: true, storageKey: "" };
         }
 
-        return { chatId: file.chatId, refused: false };
+        return { chatId: file.chatId, refused: false, storageKey: file.key };
     }
 
     const documentId = ctx.db.normalizeId("documents", rowId);
     const document = documentId === null ? null : await ctx.db.get("documents", documentId);
 
     if (!document || document.userId !== userId || document.content !== referenceUrl) {
-        return { chatId: undefined, refused: true };
+        return { chatId: undefined, refused: true, storageKey: "" };
     }
 
-    return { chatId: document.threadId, refused: false };
+    return { chatId: document.threadId, refused: false, storageKey: "" };
 };
 
-/** Step 1: every id is the caller's own row under its own URL. Ids and URLs are paired by position; the caller checks the counts. */
+/**
+ * Step 1: every id is the caller's own row under its own URL. Ids and URLs are paired by position; the caller checks the counts.
+ * `storageKeys` pairs with the ids too: each file's stored object, `""` for a document.
+ */
 export const gateReferenceRowsOnCallerShard = internalQuery
     .input({
         referenceIds: v.array(v.string().max(MAX_LENGTH.id)),
         referenceImages: v.array(v.string()),
         userId: v.string(),
     })
-    .output(v.object({ chatIds: v.array(v.string()), refused: v.boolean() }))
+    .output(v.object({ chatIds: v.array(v.string()), refused: v.boolean(), storageKeys: v.array(v.string()) }))
     .query(async ({ args, ctx }) => {
         // Refused before any read: the list is caller-controlled and the reads below run once per entry.
         if (args.referenceIds.length > REFERENCE_MEDIA_CAPS.images || args.referenceImages.length > REFERENCE_MEDIA_CAPS.images) {
-            return { chatIds: [], refused: true };
+            return { chatIds: [], refused: true, storageKeys: [] };
         }
 
         const chatIds: string[] = [];
+        const storageKeys: string[] = [];
 
         for (const [index, referenceId] of args.referenceIds.entries()) {
             const row = await rowChecked(ctx, { referenceId, referenceUrl: args.referenceImages[index] ?? "", userId: args.userId });
 
             if (row.refused) {
-                return { chatIds: [], refused: true };
+                return { chatIds: [], refused: true, storageKeys: [] };
             }
 
             if (row.chatId !== undefined) {
                 chatIds.push(row.chatId);
             }
+
+            storageKeys.push(row.storageKey);
         }
 
-        return { chatIds: [...new Set(chatIds)], refused: false };
+        return { chatIds: [...new Set(chatIds)], refused: false, storageKeys };
     });
 
 /**
