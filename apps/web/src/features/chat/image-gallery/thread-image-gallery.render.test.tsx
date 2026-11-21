@@ -1,0 +1,176 @@
+// @vitest-environment jsdom
+
+/** The chat's image gallery: opens at the chosen image, steps with the arrow keys and thumbnails, and jumps to the message. */
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const scrollToMessage = vi.hoisted(() => vi.fn());
+
+vi.mock("@lingui/react/macro", () => {
+    const t = (strings: TemplateStringsArray | string, ...values: unknown[]) =>
+        typeof strings === "string" ? strings : String.raw({ raw: strings }, ...values);
+
+    return {
+        useLingui: () => {
+            return { t };
+        },
+    };
+});
+
+vi.mock("@neore/ui/components/zoomable-image", () => {
+    return {
+        ZoomableImage: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
+    };
+});
+
+vi.mock("@/features/chat/core/utils/scroll-to-message", () => {
+    return { scrollToMessage };
+});
+
+const { useImageGalleryStore } = await import("./image-gallery-store");
+const { default: ThreadImageGallery, galleryIndexOf, galleryStep } = await import("./thread-image-gallery");
+
+const IMAGES = [
+    { alt: "Pricing page", key: "tool:call-1", messageId: "m1", src: "https://api.test/one" },
+    { alt: "Chart", key: "tool:call-2:0", messageId: "m2", src: "https://api.test/two" },
+    { alt: "Logo", key: "m3:1", messageId: "m3", src: "https://api.test/three" },
+];
+
+class ResizeObserverStub {
+    disconnect() {
+        return this;
+    }
+
+    observe() {
+        return this;
+    }
+
+    unobserve() {
+        return this;
+    }
+}
+
+const PREVIEW_NAME = /^(Pricing page|Chart|Logo)$/u;
+
+const preview = () => screen.getByRole("img", { name: PREVIEW_NAME });
+
+const openAt = (key: string | null) => {
+    act(() => {
+        useImageGalleryStore.getState().openAt("t1", key);
+    });
+};
+
+describe(galleryIndexOf, () => {
+    it("finds the image by key, else starts at the first", () => {
+        expect(galleryIndexOf(IMAGES, "m3:1")).toBe(2);
+        expect(galleryIndexOf(IMAGES, null)).toBe(0);
+        expect(galleryIndexOf(IMAGES, "gone")).toBe(0);
+    });
+});
+
+describe(galleryStep, () => {
+    it.each([
+        ["ArrowRight", 0, 1],
+        ["ArrowRight", 2, 2],
+        ["ArrowLeft", 1, 0],
+        ["ArrowLeft", 0, 0],
+        ["Home", 2, 0],
+        ["End", 0, 2],
+        ["Enter", 1, null],
+    ])("%s from %i goes to %s", (key, from, expected) => {
+        expect(galleryStep(key, from, 3)).toBe(expected);
+    });
+});
+
+describe("ThreadImageGallery", () => {
+    beforeEach(() => {
+        vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+        vi.stubGlobal("matchMedia", (query: string) => {
+            return { addEventListener: () => {}, matches: false, media: query, removeEventListener: () => {} };
+        });
+        scrollToMessage.mockReset();
+        useImageGalleryStore.setState({ shown: null });
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("stays closed until an image is opened", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("opens at the chosen image", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt("tool:call-2:0");
+
+        expect(preview().getAttribute("alt")).toBe("Chart");
+        expect(screen.getByText("Image 2 of 3")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Image 2: Chart" }).getAttribute("aria-current")).toBe("true");
+    });
+
+    it("does not open for another chat's image", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        act(() => {
+            useImageGalleryStore.getState().openAt("t2", "m3:1");
+        });
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("steps through the images with the arrow keys and stops at the ends", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt(null);
+
+        const dialog = screen.getByRole("dialog");
+
+        fireEvent.keyDown(dialog, { key: "ArrowRight" });
+        expect(preview().getAttribute("alt")).toBe("Chart");
+
+        fireEvent.keyDown(dialog, { key: "End" });
+        expect(preview().getAttribute("alt")).toBe("Logo");
+
+        fireEvent.keyDown(dialog, { key: "ArrowRight" });
+        expect(preview().getAttribute("alt")).toBe("Logo");
+
+        fireEvent.keyDown(dialog, { key: "Home" });
+        expect(preview().getAttribute("alt")).toBe("Pricing page");
+    });
+
+    it("leaves a key a zoomed image already used alone", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt(null);
+
+        const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "ArrowRight" });
+
+        event.preventDefault();
+        act(() => {
+            screen.getByRole("dialog").dispatchEvent(event);
+        });
+
+        expect(preview().getAttribute("alt")).toBe("Pricing page");
+    });
+
+    it("shows the image whose thumbnail is chosen, and the buttons step too", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt(null);
+
+        fireEvent.click(screen.getByRole("button", { name: "Image 3: Logo" }));
+        expect(preview().getAttribute("alt")).toBe("Logo");
+        expect((screen.getByRole("button", { name: "Next image" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Previous image" }));
+        expect(preview().getAttribute("alt")).toBe("Chart");
+    });
+
+    it("closes and scrolls to the image's message", () => {
+        render(<ThreadImageGallery images={IMAGES} threadId="t1" />);
+        openAt("m3:1");
+        fireEvent.click(screen.getByRole("button", { name: "Go to message" }));
+
+        expect(scrollToMessage).toHaveBeenCalledWith("m3", { threadId: "t1" });
+        expect(useImageGalleryStore.getState().shown).toBeNull();
+    });
+});

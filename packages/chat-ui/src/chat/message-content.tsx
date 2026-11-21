@@ -37,7 +37,9 @@ import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
+import { browserImageKey, codeImageKey } from "../utils/thread-images";
 import { toolImageSource } from "../utils/tool-image-source";
+import { GalleryImage } from "./gallery-image";
 import PageContextChip from "./page-context-chip";
 import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
@@ -599,7 +601,12 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
 
                             return source === undefined ? null : (
                                 <div className="flex justify-center border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <img alt={t`Code output`} className="max-w-full rounded" src={source} />
+                                    <GalleryImage
+                                        alt={t`Code output`}
+                                        className="max-w-full rounded"
+                                        imageKey={codeImageKey(part.toolCallId, index)}
+                                        src={source}
+                                    />
                                 </div>
                             );
                         }
@@ -725,7 +732,13 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
                 </div>
                 {/* Screenshot */}
-                <img alt={output.title || t`Browser screenshot`} className="w-full" src={screenshotSource} />
+                <GalleryImage
+                    alt={output.title || t`Browser screenshot`}
+                    buttonClassName="block w-full"
+                    className="w-full"
+                    imageKey={browserImageKey(part.toolCallId)}
+                    src={screenshotSource}
+                />
             </div>
         );
     }
