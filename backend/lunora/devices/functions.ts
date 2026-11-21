@@ -34,6 +34,7 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
+import { isGlobalInstructionsTool } from "./global-instructions";
 import { scheduleClearDeviceProjects } from "./internal";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
@@ -694,7 +695,10 @@ export const releaseDeviceCall = authMutation
         return null;
     });
 
-/** The audit list: the caller's recent device calls, newest first, optionally for one device. */
+/**
+ * The audit list: the caller's recent device calls, newest first, optionally for one device. An impersonating admin
+ * sees no output of a call that read the person's local instruction files (`global-instructions.ts`).
+ */
 export const listDeviceCalls = authQuery
     .input({
         deviceId: v.optional(v.id("devices")),
@@ -708,7 +712,11 @@ export const listDeviceCalls = authQuery
             where: { userId: ctx.user.userId, ...(args.deviceId !== undefined && { deviceId: args.deviceId }) },
         });
 
+        const { impersonatedBy } = ctx.user;
+
         return page.map((call) => {
+            const output = impersonatedBy && isGlobalInstructionsTool(call.toolName) ? undefined : call.output;
+
             return {
                 _id: call._id as string,
                 createdAt: call.createdAt,
@@ -724,7 +732,7 @@ export const listDeviceCalls = authQuery
                 ...(call.decision !== undefined && { decision: call.decision }),
                 ...(call.error !== undefined && { error: call.error }),
                 ...(call.exitCode !== undefined && { exitCode: call.exitCode }),
-                ...(call.output !== undefined && { output: call.output.slice(0, OUTPUT_PREVIEW_CHARS) }),
+                ...(output !== undefined && { output: output.slice(0, OUTPUT_PREVIEW_CHARS) }),
                 ...(call.truncated !== undefined && { truncated: call.truncated }),
             };
         });

@@ -1173,17 +1173,58 @@ fn run_action(
     remaining: Duration,
     decision: &'static str,
 ) -> Outcome {
-    // The instruction files are checked against the folders shared now and read before an update can share another:
-    // under the save lock, which nothing in that read waits on (its opens never block, the files are small; a home
-    // folder on a hung network mount would stall settings updates until it answers).
-    let _saving =
-        matches!(action, Action::GlobalInstructions(_)).then(|| state.save_lock.lock().unwrap());
+    if matches!(action, Action::GlobalInstructions(_)) {
+        return read_outside_settings_lock(state, decision, remaining, |roots| {
+            actions::run(action, roots, remaining, Some(&state.mcp))
+        });
+    }
+
     let roots = shareable_roots(&state.settings().roots);
 
     Outcome::of(
         decision,
         actions::run(action, &roots, remaining, Some(&state.mcp)),
     )
+}
+
+/// Why an instruction-file read came back with nothing: the owner changed the settings while it ran.
+const SETTINGS_CHANGED_DURING_READ: &str =
+    "The settings changed while the files were read; nothing was sent. Try again.";
+
+/// Runs `read` (an instruction-file read) against the folders shared when it starts, WITHOUT holding the save lock,
+/// so a read stalled on a hung mount never blocks a settings change. Its result is kept only if no settings update was
+/// saved meanwhile (the generation, bumped under the save lock by every one): a folder shared during the read can
+/// never have been left out of its check. Nor does it start once `remaining` ran out waiting for that lock. Nothing
+/// under the lock touches the disk: the folders are resolved (canonicalised, which a hung mount stalls) after it.
+fn read_outside_settings_lock(
+    state: &DeviceState,
+    decision: &'static str,
+    remaining: Duration,
+    read: impl FnOnce(&[PathBuf]) -> actions::Outcome,
+) -> Outcome {
+    let started = std::time::Instant::now();
+    let (generation, saved) = {
+        let _guard = state.save_lock.lock().unwrap();
+
+        (
+            state.generation.load(Ordering::SeqCst),
+            state.settings().roots,
+        )
+    };
+
+    if started.elapsed() >= remaining {
+        return Outcome::failed(decision, "approved after the request expired");
+    }
+
+    let done = read(&shareable_roots(&saved));
+    // Only `settings_update` changes the shared folders, and it bumps the generation under the lock once saved.
+    let _guard = state.save_lock.lock().unwrap();
+
+    if state.generation.load(Ordering::SeqCst) != generation {
+        return Outcome::failed(decision, SETTINGS_CHANGED_DURING_READ);
+    }
+
+    Outcome::of(decision, done)
 }
 
 /// What the page relays for one progress step: the call it is about and the
@@ -1700,6 +1741,61 @@ mod tests {
             &HashMap::new()
         )
         .is_err());
+    }
+
+    /// A read stalled on a hung mount holds no lock a settings change waits on, and a folder shared while it ran
+    /// voids its result; one that finishes with the settings untouched keeps it.
+    #[test]
+    fn a_stalled_instruction_read_never_blocks_settings_and_loses_its_result_to_a_change() {
+        let dir =
+            std::env::temp_dir().join(format!("neore-device-stalled-read-{}", std::process::id()));
+        let shared = dir.join("shared");
+        let _ = stdfs::remove_dir_all(&dir);
+        stdfs::create_dir_all(&shared).unwrap();
+
+        let state = Arc::new(DeviceState::new(&dir, Box::new(|_| {})));
+
+        assert_eq!(
+            read_outside_settings_lock(&state, "once", Duration::from_secs(60), |_| {
+                actions::Outcome::completed("files".to_owned())
+            })
+            .output
+            .as_deref(),
+            Some("files")
+        );
+
+        let (started_tx, started) = std::sync::mpsc::channel();
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let reader = {
+            let state = Arc::clone(&state);
+
+            std::thread::spawn(move || {
+                read_outside_settings_lock(&state, "once", Duration::from_secs(60), move |roots| {
+                    assert!(roots.is_empty());
+                    started_tx.send(()).unwrap();
+                    released.recv().unwrap();
+
+                    actions::Outcome::completed("files".to_owned())
+                })
+            })
+        };
+
+        started.recv().unwrap();
+
+        // The read is stalled: the update must finish anyway (a held lock would hang this test).
+        let update = json!({ "roots": [shared.to_string_lossy()] });
+        state
+            .settings_update(serde_json::from_value(update).unwrap())
+            .unwrap();
+        release.send(()).unwrap();
+
+        let outcome = reader.join().unwrap();
+
+        assert_eq!(outcome.status, "failed");
+        assert!(outcome.output.is_none());
+        assert_eq!(outcome.error.as_deref(), Some(SETTINGS_CHANGED_DURING_READ));
+
+        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]

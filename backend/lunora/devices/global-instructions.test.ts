@@ -5,10 +5,16 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sessionFrom } = vi.hoisted(() => {
+const { impersonation, sessionFrom } = vi.hoisted(() => {
+    // Set while a test acts as an admin impersonating the signed-in user.
+    const state = { by: null as string | null };
+
     return {
+        impersonation: state,
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                : null,
     };
 });
 
@@ -33,6 +39,7 @@ const { signDevicePayload, verifyDevicePayload } = await import("./lib/signing")
 const { DEVICE_ONLINE_WINDOW_MS } = await import("./lib/constants");
 
 const NOT_FOUND_ERROR = /not found/u;
+const IMPERSONATING_ERROR = /impersonating/u;
 
 let harness: ReturnType<typeof lunoraTest>;
 let ownerId: string;
@@ -75,6 +82,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    impersonation.by = null;
     harness.close();
 });
 
@@ -181,6 +189,17 @@ describe("getGlobalInstructionsCall", () => {
 
         expect(logged).toMatchObject({ _id: callId, decision: "once", status: "completed", toolName: "instructions_read" });
         expect(logged).not.toHaveProperty("threadId");
+        expect(logged?.output).toContain("be brief");
+
+        // An admin signed in as the owner reads neither the files nor the log's preview of them.
+        impersonation.by = "an-admin";
+
+        await expect(read(ownerId, callId)).rejects.toThrow(IMPERSONATING_ERROR);
+
+        const seen = ((await as(ownerId).query(functions.listDeviceCalls as never, {} as never)) as Record<string, unknown>[])[0];
+
+        expect(seen).toMatchObject({ _id: callId, status: "completed", toolName: "instructions_read" });
+        expect(seen).not.toHaveProperty("output");
     });
 
     it("reports a result it cannot read as failed, not as one that found no files", async () => {

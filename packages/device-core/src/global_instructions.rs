@@ -113,13 +113,24 @@ enum Resolved {
 
 /// A planned request: `read` is `None` for the list, else the ids picked, in [`FILES`] order. `resolved` is where
 /// each of its files led when it was planned, which the prompt shows and the run must find again.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Request {
     pub home: PathBuf,
     pub read: Option<Vec<&'static str>>,
     resolved: Vec<(&'static GlobalFile, Resolved)>,
     roots: Vec<PathBuf>,
 }
+
+/// The same approval: the same files, leading to the same places. The shared folders it was planned under are left
+/// out, so sharing an unrelated folder while the prompt is open does not void it; one that covers a place on the way
+/// changes `resolved`, and [`Request::run`] checks the planned and current folders again.
+impl PartialEq for Request {
+    fn eq(&self, other: &Self) -> bool {
+        self.home == other.home && self.read == other.read && self.resolved == other.resolved
+    }
+}
+
+impl Eq for Request {}
 
 impl PartialEq for GlobalFile {
     fn eq(&self, other: &Self) -> bool {
@@ -341,6 +352,7 @@ const MAX_LINKS: usize = 8;
 
 const SHARED: &str = "it is in a folder shared with the assistant";
 const OUTSIDE_HOME: &str = "it links outside the home folder";
+const UNREADABLE: &str = "it could not be looked up (no permission or a read error)";
 
 /// Follows `path` one name at a time, as the system would, so that every place on the way is seen: each name is
 /// joined to its folder's real path and refused when that place is in a shared folder (the agent could re-point a
@@ -391,7 +403,15 @@ fn walk(
                 }
 
                 match fs::symlink_metadata(&here) {
-                    Err(_) => return Ok(None),
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+                        ) =>
+                    {
+                        return Ok(None)
+                    }
+                    Err(_) => return Err(UNREADABLE),
                     Ok(metadata) if metadata.file_type().is_symlink() => {
                         links += 1;
 
@@ -908,7 +928,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn refuses_a_chain_through_a_link_in_a_shared_folder() {
-        use std::os::unix::fs::symlink;
+        use std::os::unix::fs::{symlink, PermissionsExt};
 
         let (dir, home) = home("shared-middle");
 
@@ -918,9 +938,12 @@ mod tests {
         symlink(home.join("notes/private.md"), home.join("work/claude.md")).unwrap();
         symlink(home.join("work/claude.md"), home.join(".claude/CLAUDE.md")).unwrap();
         // A link outside home on the way back in: no longer a place the home-folder rule covers.
+        // Its folder is writable by anyone, so it is no system link even when the suite runs as root.
         fs::create_dir_all(home.join(".codex")).unwrap();
-        symlink(home.join("notes/private.md"), dir.join("hop.md")).unwrap();
-        symlink(dir.join("hop.md"), home.join(".codex/AGENTS.md")).unwrap();
+        fs::create_dir_all(dir.join("hops")).unwrap();
+        fs::set_permissions(dir.join("hops"), fs::Permissions::from_mode(0o777)).unwrap();
+        symlink(home.join("notes/private.md"), dir.join("hops/hop.md")).unwrap();
+        symlink(dir.join("hops/hop.md"), home.join(".codex/AGENTS.md")).unwrap();
 
         let got: Vec<Value> = serde_json::from_str(
             &plan(
@@ -1173,6 +1196,21 @@ mod tests {
             &[],
         )
         .unwrap();
+        let replanned = |roots: &[PathBuf]| {
+            plan(
+                READ_TOOL,
+                &json!({ "files": ["claude"] }),
+                Some(home.clone()),
+                roots,
+            )
+            .unwrap()
+        };
+
+        // Planned again for the approval check: an unrelated folder shared keeps it, the one on the way does not.
+        fs::create_dir_all(home.join("elsewhere")).unwrap();
+        assert_eq!(replanned(&[home.join("elsewhere")]), request);
+        assert_ne!(replanned(&[home.join("work")]), request);
+
         let got: Vec<Value> = serde_json::from_str(&request.run(&[home.join("work")])).unwrap();
 
         assert_eq!(
@@ -1180,6 +1218,31 @@ mod tests {
             json!("it is in a folder shared with the assistant")
         );
         assert!(got[0].get("text").is_none());
+    }
+
+    /// A folder the person cannot search is a refusal they can act on, not a file that is not there.
+    #[cfg(unix)]
+    #[test]
+    fn a_lookup_without_permission_is_refused_not_missing() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // SAFETY: geteuid has no preconditions. Root searches any folder, so there is nothing to refuse.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+
+        let (_dir, home) = home("unsearchable");
+
+        put(&home, ".claude/CLAUDE.md", "private");
+        fs::set_permissions(home.join(".claude"), fs::Permissions::from_mode(0o600)).unwrap();
+
+        let got = read(&home, &["claude", "codex"]);
+
+        fs::set_permissions(home.join(".claude"), fs::Permissions::from_mode(0o700)).unwrap();
+
+        assert_eq!(got[0]["status"], json!("refused"));
+        assert_eq!(got[0]["reason"], json!(UNREADABLE));
+        assert_eq!(got[1]["status"], json!("missing"));
     }
 
     #[cfg(unix)]

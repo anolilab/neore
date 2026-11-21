@@ -28,6 +28,9 @@ export const GLOBAL_INSTRUCTION_FILE_IDS = ["claude", "codex", "gemini", "windsu
 export const GLOBAL_INSTRUCTIONS_LIST_TOOL = "instructions_list";
 export const GLOBAL_INSTRUCTIONS_READ_TOOL = "instructions_read";
 
+/** Whether a device call is one of the two that carry the person's local instruction files. */
+export const isGlobalInstructionsTool = (toolName: string): boolean => toolName === GLOBAL_INSTRUCTIONS_LIST_TOOL || toolName === GLOBAL_INSTRUCTIONS_READ_TOOL;
+
 /** The `data.code` of a refusal the editor words itself. */
 export const GLOBAL_INSTRUCTIONS_REFUSALS = { BUSY: "DEVICE_BUSY", OFFLINE: "DEVICE_OFFLINE", OUTDATED: "DEVICE_OUTDATED" } as const;
 
@@ -187,7 +190,10 @@ export const startGlobalInstructionsCall = authMutation
         return { callId: callId as string };
     });
 
-/** Where one such call is and, once the device answered, its files. The caller's own calls of these two tools only. */
+/**
+ * Where one such call is and, once the device answered, its files. The caller's own calls of these two tools only,
+ * and never to an impersonating admin: the files are the person's own, as starting a call is.
+ */
 export const getGlobalInstructionsCall = authQuery
     .input({ callId: v.id("deviceCalls") })
     .output(
@@ -202,9 +208,13 @@ export const getGlobalInstructionsCall = authQuery
         ),
     )
     .query(async ({ args, ctx }) => {
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "A device cannot be used while impersonating");
+        }
+
         const call = await ctx.db.deviceCalls.findFirst({ where: { _id: args.callId as Id<"deviceCalls">, userId: ctx.user.userId } });
 
-        if (!call || (call.toolName !== GLOBAL_INSTRUCTIONS_LIST_TOOL && call.toolName !== GLOBAL_INSTRUCTIONS_READ_TOOL)) {
+        if (!call || !isGlobalInstructionsTool(call.toolName)) {
             return null;
         }
 
@@ -214,6 +224,8 @@ export const getGlobalInstructionsCall = authQuery
         if (files === undefined && call.status === "completed") {
             return { error: "The computer's answer could not be read", status: "failed" as const };
         }
+
+        ctx.log.event("devices.get_global_instructions_call", { files: files?.length ?? 0, status: call.status });
 
         return {
             status: call.status,
