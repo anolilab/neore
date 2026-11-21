@@ -150,6 +150,7 @@ export const humanCheckMessages = {
     lookBudgetSpent: "The page could not be looked at again during this browser action. Look at it yourself before you act.",
     navigationUnchecked:
         "The action worked and the page moved on, but the new page could not be read to see whether it shows a check that needs a person. Look at it before you act.",
+    recheckFailed: (reason: string): string => `The page could not be looked at again after the wait: ${reason}`,
     stillShowsAfterHandBack: (site: string): string =>
         `${siteName(site)} still shows a check after the person handed the browser back. They were already asked to clear it, so they are not asked again. Do not try to solve or get around it: tell them it still shows, or reach what you need another way.`,
     unknownAfterHandBack: (site: string): string =>
@@ -162,6 +163,11 @@ const siteName = (site: string): string => (site === "" ? "The page" : site);
 
 /** The fields of a browser result the ladder reads and writes. */
 export interface LadderResult extends PageSignals {
+    /**
+     * The browser this result's page is on (`browserIdOf`), as the action that ran on it named it: an ask is stamped
+     * with the one that showed the check, never a browser that replaced it later. None: the card offers no Take control.
+     */
+    browserId?: string;
     error?: string;
     /** The person had driven the browser and gave it back; this is the first look at the page since. */
     handedBack?: boolean;
@@ -397,8 +403,17 @@ const afterWait = async <R extends LadderResult>(
             return result;
         }
 
-        // A check found only in the text is looked for in the text again: a screenshot carries none.
-        page = await dependencies.look(marker === "content" ? "extract" : "screenshot");
+        // A check found only in the text is looked for in the text again: a screenshot carries none. A look that threw
+        // (the action call itself failed) shows nothing either way: the check still stands, so the person is asked.
+        try {
+            page = await dependencies.look(marker === "content" ? "extract" : "screenshot");
+        } catch (error) {
+            return await ask(withNote(result, humanCheckMessages.recheckFailed(error instanceof Error ? error.message : String(error))), dependencies, {
+                marker,
+                reported,
+                site,
+            });
+        }
 
         // The look was refused or failed (a person took control meanwhile, the browser closed, also after a hand back):
         // that is what the agent hears, never a clear page, and nobody is asked to take control of a browser that is gone.
@@ -435,6 +450,16 @@ const afterWait = async <R extends LadderResult>(
         }
     }
 
+    return await ask(page, dependencies, { marker, reported, site });
+};
+
+/** Records the ask about `site`, shown on `shown` (the last look that showed the check, and its browser), and builds its card. */
+const ask = async <R extends LadderResult>(
+    shown: R,
+    dependencies: LadderDependencies<R>,
+    { marker, reported, site }: { marker: HumanCheckMarker | undefined; reported: boolean; site: string },
+): Promise<R> => {
+    let page = shown;
     const first = await dependencies.claimAsk(site, askKindOf(reported, marker));
 
     // The card shows the person the page: a check re-read from the text has no image yet, so one screenshot is taken.
@@ -442,8 +467,15 @@ const afterWait = async <R extends LadderResult>(
     if (first && page.screenshot === undefined) {
         const shot = await safeLook(dependencies, "screenshot");
 
-        // Only a picture of the site asked about: a person who took control meanwhile may have left another page.
-        if (shot.success === true && shot.screenshot !== undefined && shot.handedBack !== true && humanCheckSite(shot.url) === site) {
+        // Only a picture of the site asked about, on the browser asked about: a person who took control meanwhile may
+        // have left another page, and a browser that replaced it is not the one the card is for.
+        if (
+            shot.success === true &&
+            shot.screenshot !== undefined &&
+            shot.handedBack !== true &&
+            humanCheckSite(shot.url) === site &&
+            shot.browserId === shown.browserId
+        ) {
             page = { ...page, screenshot: shot.screenshot, screenshotFormat: shot.screenshotFormat };
         }
 
@@ -455,7 +487,7 @@ const afterWait = async <R extends LadderResult>(
 
     return {
         ...withNote(page, first ? humanCheckMessages.asked(site) : humanCheckMessages.alreadyAsked(site)),
-        humanCheck: { site, status: first ? "asked" : "already_asked" },
+        humanCheck: first ? { ...(shown.browserId !== undefined && { browserId: shown.browserId }), site, status: "asked" } : { site, status: "already_asked" },
         success: false,
     };
 };

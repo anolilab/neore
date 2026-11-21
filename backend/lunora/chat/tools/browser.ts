@@ -20,6 +20,8 @@ import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
 
 export interface BrowserResult {
+    /** The browser the page is on (`browser-node.ts`); for the ladder's ask only, never the model. */
+    browserId?: string;
     clickedSelector?: string;
     content?: string;
     direction?: string;
@@ -28,7 +30,8 @@ export interface BrowserResult {
     handedBack?: boolean;
     /**
      * The page needs a person (`browser/human-check.ts`): `asked` shows the "Needs you" card in the chat, which offers
-     * Take control only while the thread's browser is still `browserId` (the one asked about) and on `site`.
+     * Take control only while the thread's browser is still `browserId` (the one that showed the check, named by the
+     * action that ran on it) and on `site`.
      */
     humanCheck?: { browserId?: string; site: string; status: "already_asked" | "asked" };
     /** A navigate, or an interactive action that left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
@@ -44,22 +47,6 @@ export interface BrowserResult {
     typedText?: string;
     url?: string;
 }
-
-/**
- * The card is for the browser an ask was about (`getThreadBrowser`'s name for it): a later reply's browser is not
- * handed over from it. A failed read leaves no name, so the card offers no Take control.
- */
-const stampAskedBrowser = async (context: ToolContext, threadId: Id<"threads">, result: BrowserResult): Promise<void> => {
-    if (result.humanCheck?.status !== "asked") {
-        return;
-    }
-
-    const browserId = await context.runQuery(internal.browser.live_view.getThreadBrowserId, { threadId }).catch(() => null);
-
-    if (browserId !== null) {
-        result.humanCheck = { ...result.humanCheck, browserId };
-    }
-};
 
 /**
  * Browser Automation Tool
@@ -168,8 +155,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     : first;
 
             delete result.navigated;
-
-            await stampAskedBrowser(context, threadId, result);
+            delete result.browserId;
 
             toolsLogger.debug(`[BROWSER] ${action} ${result.success ? "succeeded" : "failed"}${result.error ? `: ${result.error}` : ""}`);
 

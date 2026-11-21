@@ -9,6 +9,7 @@ import schema from "../schema";
 import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { claimHumanCheckAsk, wasHumanCheckAsked } from "./functions";
 import { BATCH } from "../gdpr/batch";
+import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { eraseBrowserDataForUser } from "./gdpr";
 import {
     budgetedLook,
@@ -40,6 +41,8 @@ const UNKNOWN_LONG_PAGE_NOTE = /cleared is unknown: the page now has too much te
 const READ_FAILED_REASON = /Navigation timeout$/u;
 /** Why the ladder's own look failed, at the end of the note. */
 const LOOK_FAILED_REASON = /Renderer down$/u;
+/** A look after the wait that threw: why it was not re-read, then the ask. */
+const RECHECK_FAILED_THEN_ASKED_NOTE = /could not be looked at again after the wait: Renderer down.*asked in the chat/su;
 const HAND_BACK_THEN_CLEARED_NOTE = /^The person had control; .*cleared on its own/su;
 const SKIPPED_ACTION_NOTE = /Your click action was not run/gu;
 const NAVIGATION_UNCHECKED_NOTE = /the new page could not be read to see whether it shows a check.*Look at it before you act/su;
@@ -525,6 +528,43 @@ describe("humanCheckLadder", () => {
         expect(result.screenshot).toBeUndefined();
     });
 
+    it("step 1: a look after the wait that throws still asks: the check stands, and the agent hears why it was not re-read", async () => {
+        const { asked, dependencies } = dependenciesFor([]);
+
+        dependencies.look.mockRejectedValueOnce(new Error("Renderer down"));
+
+        const result = await humanCheckLadder({ ...CHECK_PAGE, screenshot: "jpeg" }, dependencies);
+
+        expect(asked).toEqual(new Set(["shop.example.com"]));
+        expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "asked" }, screenshot: "jpeg", success: false });
+        expect(result.error).toMatch(RECHECK_FAILED_THEN_ASKED_NOTE);
+    });
+
+    it("step 2: the card names the browser that showed the check, not one that replaced it before the card's screenshot", async () => {
+        const { dependencies } = dependenciesFor([
+            { ...TEXT_CHECK, browserId: "b-1" },
+            { ...CLEAR_PAGE, browserId: "b-2", screenshot: "replacement", screenshotFormat: "jpeg" },
+        ]);
+        const result = await humanCheckLadder({ ...TEXT_CHECK, browserId: "b-1" }, dependencies, { readContent: true });
+
+        expect(result.humanCheck).toEqual({ browserId: "b-1", site: "shop.example.com", status: "asked" });
+        expect(result.screenshot).toBeUndefined();
+    });
+
+    it("step 2: a check still showing on a browser that replaced the first during the wait is asked about on that browser", async () => {
+        const { dependencies } = dependenciesFor([{ ...CHECK_PAGE, browserId: "b-2", screenshot: "jpeg" }]);
+        const result = await humanCheckLadder({ ...CHECK_PAGE, browserId: "b-1" }, dependencies);
+
+        expect(result.humanCheck).toEqual({ browserId: "b-2", site: "shop.example.com", status: "asked" });
+    });
+
+    it("step 2: a check still showing on a browser with no name names no browser, so the card offers no Take control", async () => {
+        const { dependencies } = dependenciesFor([{ ...CHECK_PAGE, screenshot: "jpeg" }]);
+        const result = await humanCheckLadder({ ...CHECK_PAGE, browserId: "b-1" }, dependencies);
+
+        expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "asked" });
+    });
+
     it("step 3: a read after the hand back that throws, or lands on a blank or other page, leaves it unknown", async () => {
         for (const look of [
             undefined,
@@ -822,6 +862,22 @@ describe("the ask record", () => {
         await harness.run(async (ctx: any) => await eraseBrowserDataForUser(ctx, "u-1"));
 
         await expect(rows()).resolves.toHaveLength(0);
+    });
+
+    it("records an ask on a thread with no owner under the shard it lives on", async () => {
+        const ownerless = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Anonymous" }))) as string;
+
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId: ownerless })),
+        ).resolves.toBe(true);
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runQuery(wasHumanCheckAsked, { run: "r1", site: "a.example", threadId: ownerless })),
+        ).resolves.toBe("detected");
+
+        const rows = (await harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect())) as { userId: string }[];
+
+        // Outside a shard (the harness) the code serves the root shard.
+        expect(rows.map((row) => row.userId)).toStrictEqual([ROOT_SHARD_KEY]);
     });
 
     const insertAsks = async (count: number, userId = "u-1") =>

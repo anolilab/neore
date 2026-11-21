@@ -13,7 +13,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
-import { NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
+import { browserIdOf, NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
 import { isServiceBound, serviceFetch } from "../../lib/services";
 import { validateDomain } from "./utilities";
 
@@ -203,6 +203,10 @@ export const executeBrowserAction = internalAction
                     return returned === undefined ? discarded : handedBackResult(discarded, returned);
                 }
 
+                // The browser this page is on, by the name a "Needs you" card keeps (`browserIdOf`): a check it shows is
+                // asked about on this browser, never on one that replaced it later. No reusable browser, no name.
+                const seen = returnedSessionId === NO_PROVIDER_SESSION ? result : { ...result, browserId: await browserIdOf(sessionId, returnedSessionId) };
+
                 if (returned === undefined) {
                     // A navigate, or a click, a typed entry or a scroll that left the page on another URL: the human-check
                     // ladder reads that page's text once (`browser/human-check.ts`), as these results carry none. A navigate's
@@ -215,10 +219,10 @@ export const executeBrowserAction = internalAction
                                 sessionDocument.currentUrl !== undefined &&
                                 withoutHash(result.url) !== withoutHash(sessionDocument.currentUrl)));
 
-                    return navigated ? { ...result, navigated: true } : result;
+                    return navigated ? { ...seen, navigated: true } : seen;
                 }
 
-                return handedBackResult(result, returned, looksFirst ? action : undefined);
+                return handedBackResult(seen, returned, looksFirst ? action : undefined);
             } catch (error) {
                 // Whether the browser survived is unknown: the row falls back to its last confirmed activity. A call cut off
                 // at its deadline may still be acting in the renderer: its hold runs out on its own, so no person takes

@@ -11,6 +11,7 @@ import { internalMutation, internalQuery, type QueryCtx } from "../_generated/se
 import { isUniqueViolation } from "../lib/error-helpers";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import { controlStateOf, watchableSessionId } from "./live-view-logic";
 // ── Utility ─────────────────────────────────────────────────────────────
 
@@ -386,7 +387,8 @@ export const wasHumanCheckAsked = internalQuery
  * The person is asked about `site` once per run: `true` for the first ask, which records it, `false` when another
  * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
  * insert that loses answers `false`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
- * collaborator's id there would outlive their account and escape the owner's erasure). A thread that is gone asks nobody.
+ * collaborator's id there would outlive their account and escape the owner's erasure); a thread with no owner names
+ * the shard it lives on. A thread that is gone asks nobody.
  * A report on a site the run already asked about (a sign-in wall after a check) marks that ask `reported`: what the
  * person handed back then shows no marker either way.
  */
@@ -423,7 +425,9 @@ export const claimHumanCheckAsk = internalMutation
                 run,
                 site,
                 threadId,
-                userId: thread.userId,
+                // An ownerless thread (an anonymous one) lives on the shard serving it: the row names that shard's key, and
+                // goes with the thread when it is deleted.
+                userId: thread.userId ?? currentShard() ?? ROOT_SHARD_KEY,
             });
         } catch (error) {
             if (isUniqueViolation(error)) {
