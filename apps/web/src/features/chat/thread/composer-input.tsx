@@ -114,8 +114,6 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
     return new File([await response.blob()], fileName, { type: fileType });
 };
 
-/** The account key of a guest whose session has loaded, so a sign-in during a waiting send reads as an account change. */
-
 /** Messages already toasted (no second announcement), and those a retry cannot fix (too large, unsupported, content mismatch). */
 const toastedMessages = new Set<string>();
 const permanentMessages = new Set<string>();

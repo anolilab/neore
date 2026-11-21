@@ -123,12 +123,8 @@ describe("NativeBridge dock drops", () => {
         expect(inbox.fileListeners).toHaveLength(1);
         expect(inbox.unsubscribed).toBe(0);
 
-        // The shell starts handing a drop over under u1; the account switches before it answers.
+        // The shell hands a drop over under u1, the account still signed in when it is queued.
         const startedFor = inbox.accountsAtStart[0]?.();
-
-        session.data = { user: { id: "u2" } };
-        rerender(<NativeBridge />);
-
         const file = new File(["a"], "a.txt");
 
         inbox.fileListeners[0]?.([file], startedFor);
@@ -136,7 +132,21 @@ describe("NativeBridge dock drops", () => {
         await waitFor(() => {
             expect(requestComposerAttach).toHaveBeenCalledWith({ accountId: "u1", files: [file] });
         });
-        expect(inbox.accountsAtStart[0]?.()).toBe("u2");
+    });
+
+    it("does not queue a dock drop whose account changed while the composer code loaded, and says so", async () => {
+        requestComposerAttach.mockClear();
+        toastError.mockClear();
+        session.data = { user: { id: "u2" } };
+        session.isPending = false;
+        render(<NativeBridge />);
+        // Taken from the shell under u1; by the time it is queued, u2 is signed in.
+        inbox.fileListeners.at(-1)?.([new File(["a"], "a.txt")], "u1");
+
+        await waitFor(() => {
+            expect(toastError).toHaveBeenCalledTimes(1);
+        });
+        expect(requestComposerAttach).not.toHaveBeenCalled();
     });
 
     it("tells the person when a dock drop replaced an earlier drop for another account", async () => {

@@ -28,9 +28,18 @@ const requestSend = async (text: string): Promise<void> => {
 };
 
 /** Lazy, like `requestSend`: the new-thread composer takes the files and attaches them (`composer-submit.ts`). */
-/** Returns the number of files of an earlier drop this one replaced (another account's), which were not attached. */
-const requestAttach = async (files: File[], accountId: string | undefined): Promise<number> => {
+
+/**
+ * Queues a dock drop for the new-chat composer. Returns the number of files of an earlier drop it replaced (another
+ * account's), or `"switched"` when the account changed while the composer code loaded: the switch has let go of drops
+ * for the account before already, so these are not queued either.
+ */
+const requestAttach = async (files: File[], accountId: string | undefined, currentAccount: () => string | undefined): Promise<number | "switched"> => {
     const { requestComposerAttach } = await import("@/features/chat/core/utils/composer-submit");
+
+    if (accountId !== undefined && currentAccount() !== accountId) {
+        return "switched";
+    }
 
     return requestComposerAttach({ accountId, files });
 };
@@ -123,7 +132,15 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeFiles(
                 (files, accountId) => {
                     void (async () => {
-                        if ((await requestAttach(files, accountId)) > 0) {
+                        const queued = await requestAttach(files, accountId, () => sessionUserIdRef.current);
+
+                        if (queued === "switched") {
+                            toast.error(discardedMessageRef.current);
+
+                            return;
+                        }
+
+                        if (queued > 0) {
                             toast.error(replacedMessageRef.current);
                         }
 
