@@ -25,9 +25,8 @@ const LINE_BREAK = /\r?\n/u;
 /** A front-matter key: letters only. */
 const KEY = /^[A-Za-z]+$/u;
 
-/** A quote at an item's start or end that no quote across it matches. */
+/** A quote at an item's start that no quote across it matches. */
 const QUOTE_START = /^["']/u;
-const QUOTE_END = /["']$/u;
 
 /** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
 const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
@@ -156,12 +155,35 @@ const splitItems = (text: string): string[] => {
 };
 
 /**
+ * `item` without its quotes, and the quote left open after it: the one closing `open`, what an item before it left
+ * open (inside which no other quote counts); else both when it is one quoted scalar, or the quote it opens and leaves
+ * open. A quote ending an item nothing
+ * opened stays: in `src/it's'` or `a"` it is part of the path.
+ */
+const openOrClosed = (item: string, open: string | undefined): [text: string, open: string | undefined] => {
+    // Inside an open quote every other quote is text: `'a,` then `"b, c'` is `a`, `"b`, `c`.
+    if (open) {
+        return item.endsWith(open) ? [item.slice(0, -1), undefined] : [item, open];
+    }
+
+    if (item !== unquoted(item)) {
+        return [unquoted(item), open];
+    }
+
+    const opening = QUOTE_START.exec(item)?.[0];
+
+    return opening ? [item.slice(1), opening] : [item, open];
+};
+
+/**
  * `[a, b]`, `"a", "b"`, `"a, b"` or `a, b` as its items, quotes dropped. Split at each comma outside a quoted item and
  * outside a `{a,b}` group, so `["src/a,b.ts"]` and `*.{ts,tsx}` each stay one pattern. One quoted string that is the
  * whole value outside brackets is a list of its own (`"a/**, b/*.md"`), as such files write it; a `- item` line
- * (`isItem`) is one item already.
+ * (`isItem`) is one item already. `open` is a quote an item on a line before opened and left open, returned with the
+ * items as it is after them: only that quote, at an item's end, closes it (`"a/**,` then `b/*.md"`); any other quote at
+ * an end is text.
  */
-const listOf = (value: string, { isItem = false } = {}): string[] => {
+const listOf = (value: string, { isItem = false, open }: { isItem?: boolean; open?: string } = {}): { items: string[]; open: string | undefined } => {
     const trimmed = value.trim();
     // Brackets only around the whole value make it a list: `src/[ab]` is one pattern, its class kept.
     const isBracketed = trimmed.startsWith("[") && trimmed.endsWith("]");
@@ -169,13 +191,40 @@ const listOf = (value: string, { isItem = false } = {}): string[] => {
     const [only] = items;
 
     if (!isItem && !isBracketed && items.length === 1 && only && only !== unquoted(only)) {
-        return splitItems(unquoted(only))
-            .map((item) => item.trim())
-            .filter(Boolean);
+        return {
+            items: splitItems(unquoted(only))
+                .map((item) => item.trim())
+                .filter(Boolean),
+            open,
+        };
     }
 
-    // A quote left open or closed on another line (`"a/**,` then `b/*.md"`) is dropped from its item's end.
-    return items.map((item) => (item === unquoted(item) ? item.replace(QUOTE_START, "").replace(QUOTE_END, "") : unquoted(item)).trim()).filter(Boolean);
+    const texts: string[] = [];
+    let left = open;
+
+    for (const item of items) {
+        const [text, after] = openOrClosed(item, left);
+
+        texts.push(text.trim());
+        left = after;
+    }
+
+    return { items: texts.filter(Boolean), open: left };
+};
+
+/** The patterns of a `globs:` value's lines, a quote left open on one closed on a later one. */
+const globsOf = (parts: string[]): string[] => {
+    const patterns: string[] = [];
+    let open: string | undefined;
+
+    for (const part of parts) {
+        const list = listOf(part, { open });
+
+        patterns.push(...list.items);
+        open = list.open;
+    }
+
+    return patterns;
 };
 
 /** Whether `line` is indented, so it continues the key above it rather than starting one. */
@@ -210,7 +259,7 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
             const item = withoutComment(trimmed.slice(1));
 
             if (key) {
-                fields.get(key)!.push(...listOf(item, { isItem: true }));
+                fields.get(key)!.push(...listOf(item, { isItem: true }).items);
             }
 
             continue;
@@ -256,7 +305,7 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
         const value = parts.filter(Boolean).join(" ");
 
         // Patterns are read line by line: a block or continued `globs:` value gives one or more on each line.
-        fields.set(key, key === "globs" ? parts.flatMap((part) => listOf(part)) : [isBlock ? value : unquoted(value)]);
+        fields.set(key, key === "globs" ? globsOf(parts) : [isBlock ? value : unquoted(value)]);
     }
 
     // Blank lines, then a `---` rule: a block that sets nothing there is the text's own, kept whole.

@@ -55,7 +55,9 @@
   without the list's cost (`selectRuleFiles(…, false)`); a line that does not fit is skipped, never ends the selection,
   so one that lists none is that text already. Triggers have no project. Names may repeat, and may be another file's id: a name or bare id
   that fits more than one file is answered with their ids, never a guess; `id:<id>` names one file or none, never a
-  name, and a save refuses a name opening it (`isRuleTitleReserved`).
+  name, and a save refuses a name opening it (`isRuleTitleReserved`) unless the file has it saved already: one saved
+  before the check keeps it, the rest of the list still saves, and it is read by its id only (listed as
+  `id:<its id>`, `listedName`).
 - Never a `defineMigration` on `projectRuleFiles`: a shard's data migration has no `.global()` store (`adminWriter` in
   `_generated/shard.ts`), so it fails there. Keep a new field optional, so every stored row still fits.
 - Glob matching is `matchesGlob`, never a `RegExp` built from a pattern: one constant-cost step per (pattern, path)

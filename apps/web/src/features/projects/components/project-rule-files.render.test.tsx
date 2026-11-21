@@ -510,7 +510,6 @@ describe("project rule files", () => {
 
     it.each([
         ["a name past its length", { title: "t".repeat(201) }, "Name", "may be at most 200 characters"],
-        ["a name opening the id form", { title: "Id: sql" }, "Name", 'may not start with "id:"'],
         [
             "more patterns than a file holds",
             { globs: Array.from({ length: 11 }, (_, index) => `${index}.sql`) },
@@ -538,6 +537,34 @@ describe("project rule files", () => {
         expect(input.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
         // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
         expect(document.activeElement).toBe(input);
+    });
+
+    it("refuses a file renamed to open the id form before saving, on its name", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+
+        const name = within(await screen.findByRole("listitem", { name: "SQL" })).getByRole("textbox", { name: "Name" });
+
+        await user.clear(name);
+        await user.type(name, "Id: sql");
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert").textContent).toContain('may not start with "id:"');
+        expect(name.getAttribute("aria-invalid")).toBe("true");
+    });
+
+    it("saves a file already saved under a name opening the id form while another file is edited", async () => {
+        const user = userEvent.setup();
+
+        backend.listed = { ...backend.listed, files: [backend.listed.files[0], { ...(backend.listed.files[1] as Record<string, unknown>), title: "Id: sql" }] };
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move Project context down" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ ruleFiles: [{ id: "sql", title: "Id: sql" }, { id: "context" }] });
     });
 
     it("refuses a list larger than it may be stored before saving, measured as stored, naming the whole list", async () => {

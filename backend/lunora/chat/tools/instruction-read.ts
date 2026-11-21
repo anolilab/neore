@@ -12,7 +12,7 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
 import { RULE_ID_FORM } from "../../projects/rule-file-limits";
-import { oneLine, type RunInstruction } from "../../projects/rule-files";
+import { listedName, oneLine, type RunInstruction } from "../../projects/rule-files";
 import toonEncodeOutput from "./toon-encode";
 
 type InstructionReadOutput =
@@ -34,7 +34,8 @@ export const findInstruction = (instructions: ReadonlyArray<RunInstruction>, fil
         // Angle brackets kept from the `id:<its id>` the list and the ambiguous answer show are not part of the id.
         const explicitId = wanted.slice(RULE_ID_FORM.length).trim().replaceAll(ANGLE_BRACKETS, "");
 
-        // Never a name: a save refuses one opening the id form, and an id that matches nothing is not found.
+        // Never a name: a save refuses a new one opening the id form, one saved before is read by its id, and an id
+        // that matches nothing is not found.
         return instructions.filter((entry) => entry.id === explicitId);
     }
 
@@ -57,7 +58,7 @@ export const instructionReadTool = (instructions: ReadonlyArray<RunInstruction>)
             toolsLogger.info("[instruction_read]", { fileId: matches.length === 1 ? found!.id : null, matches: matches.length });
 
             if (!found) {
-                return { found: false, names: instructions.map((entry) => oneLine(entry.title)) };
+                return { found: false, names: instructions.map((entry) => listedName(entry)) };
             }
 
             // Never a guess between files `file` could mean: the model asks again in the id form, which no name is read as.

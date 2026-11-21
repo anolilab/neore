@@ -57,13 +57,19 @@ export const isRuleDescriptionValid = (description: string): boolean => {
 };
 
 /**
- * Opens the explicit form of a rule file's id (`id:<id>`) that `instruction_read` reads, in any case. No name starts
- * with it ({@link isRuleTitleReserved}), so a name never reads as that form.
+ * Opens the explicit form of a rule file's id (`id:<id>`) that `instruction_read` reads, in any case, and only ever as
+ * an id: a save refuses a new name opening it ({@link isRuleTitleReserved}), and a file saved under one before that
+ * check is read by its id alone.
  */
 export const RULE_ID_FORM = "id:";
 
-/** Whether `title`, trimmed, starts with {@link RULE_ID_FORM} in any case: a name a save refuses. */
-export const isRuleTitleReserved = (title: string): boolean => title.trim().toLowerCase().startsWith(RULE_ID_FORM);
+/**
+ * Whether a save refuses `title`: it starts, trimmed, with {@link RULE_ID_FORM} in any case, and is not `storedTitle`,
+ * the name the file already has saved. A file saved under such a name before the check keeps it, so the rest of the
+ * list still saves.
+ */
+export const isRuleTitleReserved = (title: string, storedTitle?: string): boolean =>
+    title.trim().toLowerCase().startsWith(RULE_ID_FORM) && title.trim() !== storedTitle?.trim();
 
 /** The UTF-8 bytes `files` take stored, as JSON: the measure of {@link MAX_RULE_FILES_BYTES}. */
 export const ruleFilesStoredBytes = (files: ReadonlyArray<unknown>): number => new TextEncoder().encode(JSON.stringify(files)).byteLength;

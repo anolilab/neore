@@ -114,6 +114,16 @@ describe("toImportedRuleFile", () => {
         expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: "a/**, b/*.md\n---\nT')).toMatchObject({ patterns: "a/**\nb/*.md" });
     });
 
+    it("keeps a quote ending a pattern that no quote opened", () => {
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: src/it's'\n---\nT")).toMatchObject({ patterns: "src/it's'" });
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: a\", vendor/'\n---\nT")).toMatchObject({ patterns: "a\"\nvendor/'" });
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: |\n  a/**\n  b/*.md"\n---\nT')).toMatchObject({ patterns: 'a/**\nb/*.md"' });
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs:\n  - a"\n---\nT')).toMatchObject({ patterns: 'a"' });
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: \"a/**,\n  b/*.md'\n---\nT")).toMatchObject({ patterns: "a/**\nb/*.md'" });
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: 'a,\n  \"b,\n  c'\n---\nT")).toMatchObject({ patterns: 'a\n"b\nc' });
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: "a,\n  b, \'c\n  d"\n---\nT')).toMatchObject({ patterns: "a\nb\n'c\nd" });
+    });
+
     it("splits a quoted list of patterns, reads a block of them line by line, and takes an apostrophe as text", () => {
         expect(toImportedRuleFile("rules/q.mdc", '---\nglobs: "**/*.ts, **/*.tsx"\n---\nT')).toMatchObject({ patterns: "**/*.ts\n**/*.tsx" });
         expect(toImportedRuleFile("rules/b.mdc", "---\nglobs: |\n  a/**\n  b/*.{md,mdx}\n---\nT")).toMatchObject({ patterns: "a/**\nb/*.{md,mdx}" });

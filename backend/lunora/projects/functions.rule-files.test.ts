@@ -435,6 +435,18 @@ describe("changing a project's rule files", () => {
         });
     });
 
+    it("saves an edit to another file beside one saved under a name opening the id form, and refuses a new such name", async () => {
+        const named = { content: "Old", id: "old", mode: "always", title: "id:legacy" };
+        const projectId = await project({ createdAt: 0, ruleFiles: [named, sqlRules], title: "p", userId: OWNER });
+
+        await save(OWNER, projectId, [named, { ...sqlRules, content: "Use snake_case. Always." }]);
+
+        await expect(savedFiles(projectId)).resolves.toEqual([named, { ...sqlRules, content: "Use snake_case. Always." }]);
+        await expect(save(OWNER, projectId, [named, { ...sqlRules, title: "ID:sql" }])).rejects.toMatchObject({
+            data: { code: "RULE_FILE_TITLE_RESERVED", fileId: sqlRules.id },
+        });
+    });
+
     it("moves the legacy context into the list on the first save, in the order saved", async () => {
         const projectId = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
         const { files } = (await list(OWNER, projectId))!;

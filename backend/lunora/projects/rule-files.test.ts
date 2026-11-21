@@ -161,6 +161,7 @@ describe("selectRuleFiles with auto files", () => {
         expect(result.instructions.map((file) => file.id)).toStrictEqual(["deploy"]);
         expect(result.omitted).toBe(0);
         expect(renderInstructionList(result.instructions)).toContain("- deploy (id: deploy): When deploy applies");
+        expect(renderInstructionList([{ ...auto("old", "x"), title: "ID:deploy" }])).toContain("- id:old (id: old): When old applies");
         expect(renderInstructionList(result.instructions)).not.toContain("Deploy steps.");
     });
 
@@ -258,5 +259,24 @@ describe("normalizeRuleFiles", () => {
 
     it("refuses a repeated id", () => {
         expect(() => normalizeRuleFiles([always("a", "x"), always("a", "y")])).toThrow();
+    });
+
+    it("keeps a name opening the id form that the file already has saved, while another file is edited", () => {
+        const stored = [{ ...always("a", "x"), title: "id:deploy" }, always("b", "y")];
+
+        expect(normalizeRuleFiles([{ ...always("a", "x"), title: " id:deploy " }, always("b", "changed")], { stored })).toEqual([
+            { content: "x", id: "a", mode: "always", title: "id:deploy" },
+            { content: "changed", id: "b", mode: "always", title: "b" },
+        ]);
+    });
+
+    it.each([
+        ["renamed into it", [{ ...always("a", "x"), title: "Deploy" }], [{ ...always("a", "x"), title: "id:deploy" }]],
+        ["renamed within it", [{ ...always("a", "x"), title: "id:deploy" }], [{ ...always("a", "x"), title: "ID:deploy" }]],
+        ["given another file's saved one", [{ ...always("a", "x"), title: "id:deploy" }], [always("a", "x"), { ...always("b", "y"), title: "id:deploy" }]],
+    ])("refuses a name opening the id form %s", (_, stored, files) => {
+        expect(() => normalizeRuleFiles(files, { stored })).toThrow(
+            expect.objectContaining({ data: { code: RULE_FILE_REFUSALS.TITLE_RESERVED, fileId: files.at(-1)!.id } }),
+        );
     });
 });

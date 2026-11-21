@@ -490,9 +490,9 @@ export const setProjectRuleFiles = authMutation
         const normalized = kept
             ? normalizeRuleFiles(
                   ruleFiles.filter((file) => file.id !== kept),
-                  { alongside: 1 },
+                  { alongside: 1, stored: current },
               )
-            : normalizeRuleFiles(ruleFiles);
+            : normalizeRuleFiles(ruleFiles, { stored: current });
         // The `context` text this save carries into the list, marked carried in the same write, so one the clear below
         // fails to remove is not read a second time.
         const carried = kept ? undefined : project.context;

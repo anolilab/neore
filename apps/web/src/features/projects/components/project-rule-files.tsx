@@ -624,7 +624,8 @@ const ProjectRuleFiles: FC<{
             return RULE_FILE_REFUSALS.TITLE_TOO_LONG;
         }
 
-        if (isRuleTitleReserved(title)) {
+        // A name the file already has saved keeps saving, as the backend keeps it.
+        if (isRuleTitleReserved(title, savedFiles.find((stored) => stored.id === file.id)?.title)) {
             return RULE_FILE_REFUSALS.TITLE_RESERVED;
         }
 

@@ -55,11 +55,30 @@ describe("instruction_read", () => {
     });
 
     it("answers an id form that names no file as not found, never by a name", () => {
-        // Saves refuse such a name now, but one stored before still must not be read for an id.
+        // A save refuses a new such name, but one saved before keeps it and must not be read for an id.
         const named = { ...style, id: "style-2", title: "id:abc" };
 
         expect(findInstruction([deploy, named], "id:abc")).toStrictEqual([]);
         expect(findInstruction([deploy, named], "id:Deploy")).toStrictEqual([]);
         expect(findInstruction([deploy, named], "id:")).toStrictEqual([]);
+    });
+
+    it("reads a file saved under a name opening the id form by its id only", () => {
+        const named = { ...style, id: "style-2", title: "id:abc" };
+
+        expect(findInstruction([deploy, named], "style-2")).toStrictEqual([named]);
+        expect(findInstruction([deploy, named], "id:style-2")).toStrictEqual([named]);
+    });
+
+    it("names a file saved under a name opening the id form by its own id form when it has no file asked for", async () => {
+        const named = { ...style, id: "style-2", title: "id:abc" };
+        const tool = { ...instructionReadTool([deploy, named]), ctx: { userId: "u1" } } as unknown as {
+            execute: (input: { file: string }, options: unknown) => Promise<unknown>;
+        };
+
+        await expect(tool.execute({ file: "secrets" }, { messages: [], toolCallId: "call-1" })).resolves.toStrictEqual({
+            found: false,
+            names: ["Deploy", "id:style-2"],
+        });
     });
 });

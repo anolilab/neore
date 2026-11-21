@@ -244,8 +244,14 @@ const WHITESPACE_RUN = /\s+/gu;
 export const oneLine = (text: string): string => text.replaceAll(WHITESPACE_RUN, " ").trim();
 
 /** One `auto` file's line in that list. */
+/**
+ * The name a run shows for `file`, on one line: a name opening the id form (one saved before a save refused such names)
+ * shows as the file's own `id:<id>`, since `instruction_read` reads that form as an id only, never as a name.
+ */
+export const listedName = (file: Pick<RuleFile, "id" | "title">): string => (isRuleTitleReserved(file.title) ? `id:${file.id}` : oneLine(file.title));
+
 const instructionLine = (file: Pick<RuleFile, "description" | "id" | "title">): string =>
-    `- ${oneLine(file.title)} (id: ${file.id}): ${oneLine(file.description ?? "")}`;
+    `- ${listedName(file)} (id: ${file.id}): ${oneLine(file.description ?? "")}`;
 
 /**
  * The list of a run's `auto` files for its prompt, `null` for none: each by name, id and description, after the
@@ -395,15 +401,20 @@ const assertGlob = (glob: string, fileId: string): void => {
 /**
  * The list as it is saved: trimmed titles, patterns and descriptions, patterns only on a `glob` file and a description
  * only on an `auto` one. Refuses a list past the caps, a repeated id, an empty title, a `glob` file without a pattern,
- * or an `auto` file without a one-line description, and a name opening the id form (`isRuleTitleReserved`). `alongside` counts the files the project
- * keeps outside the list (a kept legacy `context`), so the project still holds at most {@link MAX_RULE_FILES}.
+ * or an `auto` file without a one-line description, and a name opening the id form (`isRuleTitleReserved`) unless the file
+ * has it in `stored`, the list saved before. `alongside` counts the files the project keeps outside the list (a kept
+ * legacy `context`), so the project still holds at most {@link MAX_RULE_FILES}.
  */
-export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): RuleFile[] => {
+export const normalizeRuleFiles = (
+    files: RuleFile[],
+    { alongside = 0, stored = [] }: { alongside?: number; stored?: ReadonlyArray<Pick<RuleFile, "id" | "title">> } = {},
+): RuleFile[] => {
     if (files.length + alongside > MAX_RULE_FILES) {
         throw refuse(`A project holds at most ${MAX_RULE_FILES} rule files`, RULE_FILE_REFUSALS.TOO_MANY);
     }
 
     const ids = new Set<string>();
+    const storedTitles = new Map(stored.map((file) => [file.id, file.title]));
 
     const normalized = files.map((file) => {
         const title = file.title.trim();
@@ -422,7 +433,7 @@ export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): R
             );
         }
 
-        if (isRuleTitleReserved(title)) {
+        if (isRuleTitleReserved(title, storedTitles.get(file.id))) {
             throw refuse(`A rule file's name may not start with "id:"`, RULE_FILE_REFUSALS.TITLE_RESERVED, file.id);
         }
 
