@@ -25,7 +25,10 @@ export const LANDING_MESSAGE_FROM_KEY = "landing-initial-message-from";
  * unavailable.
  */
 export const handOffLandingMessage = (text: string, from?: DraftFrom): void => {
-    // The mark first: a write that fails after it leaves no unmarked text behind.
+    // The earlier text goes before its mark, and the new mark goes in before the new text: a write that fails part way
+    // (a full quota) leaves no text, never text without its mark.
+    sessionStorage.removeItem(LANDING_MESSAGE_KEY);
+
     if (from === undefined) {
         sessionStorage.removeItem(LANDING_MESSAGE_FROM_KEY);
     } else {

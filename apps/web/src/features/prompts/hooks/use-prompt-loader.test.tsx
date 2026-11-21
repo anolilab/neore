@@ -6,7 +6,13 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import usePromptLoader from "./use-prompt-loader";
 
 /** Saved prompts the query cache already holds, by id: a cache hit answers in the same render as the id change. */
-const cached = vi.hoisted(() => new Map<string, { content: string; contentBy?: string; contentByImpersonator?: boolean; userId?: string }>());
+const cached = vi.hoisted(
+    () =>
+        new Map<
+            string,
+            { content: string; contentBy?: string; contentByImpersonator?: boolean; userId?: string; variables?: { defaultValue?: string; name: string }[] }
+        >(),
+);
 
 /** The active organization, when a test names one. */
 const organization = vi.hoisted(() => {
@@ -191,6 +197,22 @@ describe(usePromptLoader, () => {
         rerender({ promptId: "prompt-b" });
 
         expect(useChatUIStore.getState().composerText).toBe("Write for me");
+        expect(useChatUIStore.getState().composerDraftFrom).toBeUndefined();
+    });
+
+    it("leaves the viewer's own prompt unmarked when its own default fills in the organization, with none active", () => {
+        session.data = { user: { id: "user-a" } };
+        cached.set("prompt-a", {
+            content: "Write for {{user.organization}}",
+            contentBy: "user-a",
+            contentByImpersonator: false,
+            userId: "user-a",
+            variables: [{ defaultValue: "My shop", name: "user.organization" }],
+        });
+
+        renderHook(() => usePromptLoader("prompt-a"));
+
+        expect(useChatUIStore.getState().composerText).toBe("Write for My shop");
         expect(useChatUIStore.getState().composerDraftFrom).toBeUndefined();
     });
 });

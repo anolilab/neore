@@ -253,25 +253,34 @@ export type VariableSource = "organization" | "thread" | "user";
 
 /**
  * The variables whose value the organization set and the person did not override: its variable defaults, and its name
- * (`user.organization`, auto-populated). Filled into a prompt, they are not the person's own words (`draft-origin.ts`).
+ * (`user.organization`, auto-populated from `organizationName`). Filled into a prompt, they are not the person's own
+ * words (`draft-origin.ts`). Without an active organization's name, `user.organization` is whatever the prompt's own
+ * default says, and that is its author's: `noteSavedPrompt` marks a prompt someone else wrote.
  */
-export const organizationValueNames = (sources: Readonly<Record<string, VariableSource>> | undefined): Set<string> => {
+export const organizationValueNames = (sources: Readonly<Record<string, VariableSource>> | undefined, organizationName: string | undefined): Set<string> => {
     const names = new Set(
         Object.entries(sources ?? {})
             .filter(([, source]) => source === "organization")
             .map(([name]) => name),
     );
 
-    if (sources?.["user.organization"] === undefined) {
+    if (organizationName && sources?.["user.organization"] === undefined) {
         names.add("user.organization");
     }
 
     return names;
 };
 
-/** Whether filling `content` with `values` (as `replaceVariables` does) puts in the value of any of `names`. */
-export const fillsAnyOf = (content: string, values: Readonly<Record<string, string>>, names: ReadonlySet<string>): boolean =>
-    extractVariables(content).some((name) => names.has(name) && Object.hasOwn(values, name));
+/**
+ * Whether filling `content` with `values` (as `replaceVariables` does) puts in the value of any of `names`. An empty value
+ * puts nothing in, and a variable in `typed` holds what the person typed (the fill dialog), not the value in `values`.
+ */
+export const fillsAnyOf = (
+    content: string,
+    values: Readonly<Record<string, string>>,
+    names: ReadonlySet<string>,
+    typed: Readonly<Record<string, string>> = {},
+): boolean => extractVariables(content).some((name) => names.has(name) && !typed[name]?.trim() && Object.hasOwn(values, name) && values[name]?.trim() !== "");
 
 /**
  * List of auto-populated variable names (for documentation/UI)

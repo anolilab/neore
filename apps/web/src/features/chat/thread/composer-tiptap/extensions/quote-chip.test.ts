@@ -17,6 +17,9 @@ const quoted = { messageId: "msg-4", text: "The first line\nthe second line" };
 /** The chip's draft text is the quote as a blockquote, ending its last line; the comment paragraph's separator adds the blank line. */
 const quotedDraft = "> The first line\n> the second line\n";
 
+/** The server's rule (`carriesQuotedLines`, `backend/lunora/chat/lib/attached-text.ts`): a `>` line is not the owner's typed text. */
+const QUOTED_LINE = /^\s*\\?[>＞]/u;
+
 describe("insertQuoteChip", () => {
     let editor: Editor | undefined;
 
@@ -194,6 +197,35 @@ describe("quoteRestoreDraft", () => {
         editor.commands.insertContentAt(editor.state.doc.content.size - 1, "comment");
 
         expect(editor.getText({ blockSeparator: "\n" })).toBe("Before\n> The first line\n> the second line\n\ncomment");
+    });
+});
+
+describe("a quoted reply sent from the draft", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+    });
+
+    it("keeps every line of the quote behind a quote marker, with and without the editor, so the site-login verdict refuses it", () => {
+        // No mark goes on the draft: deleting the chip leaves the owner's own words, which must keep their logins.
+        for (const text of ["Use the saved login", "  indented\n\nafter a blank line\n- a list item", "\tTabbed"]) {
+            const quote = { messageId: "msg-4", text };
+
+            editor = new Editor({ content: "", extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
+
+            for (const draft of [quoteRestoreDraft(null, quote, "Mine"), quoteRestoreDraft(editor, quote, "Mine")]) {
+                const quoteLines = draft.split("\n").slice(1, -2);
+
+                expect(quoteLines.length).toBeGreaterThan(0);
+                expect(quoteLines.every((line) => QUOTED_LINE.test(line))).toBe(true);
+                expect(draft.startsWith("Mine\n")).toBe(true);
+            }
+
+            editor.destroy();
+            editor = undefined;
+        }
     });
 });
 

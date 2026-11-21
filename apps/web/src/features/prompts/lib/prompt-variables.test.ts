@@ -290,19 +290,37 @@ describe("getAllCommonVariables", () => {
 });
 
 describe("an organization's values filled into a prompt", () => {
-    it("names its variable defaults nobody overrode, and its name unless the person set one", () => {
-        expect(organizationValueNames({ brand: "organization", "context.year": "user", tone: "user" })).toStrictEqual(new Set(["brand", "user.organization"]));
-        expect(organizationValueNames({ "user.organization": "thread" })).toStrictEqual(new Set());
-        expect(organizationValueNames(undefined)).toStrictEqual(new Set(["user.organization"]));
+    it("names its variable defaults nobody overrode, and its active name unless the person set one", () => {
+        expect(organizationValueNames({ brand: "organization", "context.year": "user", tone: "user" }, "Acme")).toStrictEqual(
+            new Set(["brand", "user.organization"]),
+        );
+        expect(organizationValueNames({ "user.organization": "thread" }, "Acme")).toStrictEqual(new Set());
+        expect(organizationValueNames(undefined, "Acme")).toStrictEqual(new Set(["user.organization"]));
+        // No active organization: a `user.organization` filled in is the prompt's own default, its author's words.
+        expect(organizationValueNames(undefined, undefined)).toStrictEqual(new Set());
+        expect(organizationValueNames({ brand: "organization" }, "")).toStrictEqual(new Set(["brand"]));
     });
 
     it("tells whether filling a prompt puts one of them in", () => {
-        const names = organizationValueNames({ brand: "organization", tone: "user" });
+        const names = organizationValueNames({ brand: "organization", tone: "user" }, "Acme");
 
         expect(fillsAnyOf("Write as {{brand}}", { brand: "Acme" }, names)).toBe(true);
         expect(fillsAnyOf("For {{user.organization}}", { "user.organization": "Acme" }, names)).toBe(true);
         expect(fillsAnyOf("In a {{tone}} tone", { tone: "dry" }, names)).toBe(false);
         // A variable left unfilled puts nothing in.
         expect(fillsAnyOf("Write as {{brand}}", {}, names)).toBe(false);
+    });
+
+    it("leaves out an empty value and one the person typed into the fill dialog", () => {
+        const names = organizationValueNames({ brand: "organization" }, undefined);
+
+        expect(fillsAnyOf("Write as {{brand}}", { brand: "  " }, names)).toBe(false);
+        expect(fillsAnyOf("Write as {{brand}}", { brand: "" }, names, { brand: "Mine" })).toBe(false);
+        // What the person typed takes the place of the organization's value, whatever that value is.
+        expect(fillsAnyOf("Write as {{brand}}", { brand: "Acme" }, names, { brand: "Mine" })).toBe(false);
+        // A blank field in the dialog leaves the organization's value in.
+        expect(fillsAnyOf("Write as {{brand}}", { brand: "Acme" }, names, { brand: " " })).toBe(true);
+        // Typing one variable leaves the organization's other value marked.
+        expect(fillsAnyOf("{{brand}} for {{team}}", { brand: "Acme", team: "" }, new Set(["brand", "team"]), { team: "Ops" })).toBe(true);
     });
 });

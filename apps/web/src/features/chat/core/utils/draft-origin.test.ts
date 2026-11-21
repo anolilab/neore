@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handOffLandingMessage, LANDING_MESSAGE_FROM_KEY, takeLandingMessage } from "@/features/marketing/stores/landing-store";
 
@@ -180,6 +180,28 @@ describe(handOffLandingMessage, () => {
         handOffLandingMessage("my words");
 
         expect(takeLandingMessage()).toStrictEqual({ from: undefined, text: "my words" });
+    });
+
+    it("leaves no text without its mark when a replacing write fails part way", () => {
+        const quotaError = () => {
+            throw new DOMException("full", "QuotaExceededError");
+        };
+
+        // Typed text replacing a marked template: the text's write fails after the old mark was cleared.
+        handOffLandingMessage("a template", "suggestion");
+        const textWrite = vi.spyOn(Storage.prototype, "setItem").mockImplementation(quotaError);
+
+        expect(() => handOffLandingMessage("my words")).toThrow("full");
+        expect(takeLandingMessage()).toBeUndefined();
+
+        // A marked hand-off whose mark's write fails replaces nothing with unmarked text.
+        textWrite.mockRestore();
+        handOffLandingMessage("my words");
+        const markWrite = vi.spyOn(Storage.prototype, "setItem").mockImplementation(quotaError);
+
+        expect(() => handOffLandingMessage("> quoted", "forwarded")).toThrow("full");
+        markWrite.mockRestore();
+        expect(takeLandingMessage()).toBeUndefined();
     });
 
     it("reads a mark nobody named as a link's", () => {

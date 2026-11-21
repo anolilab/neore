@@ -106,8 +106,8 @@ const usePromptLoader = (promptId: string | undefined) => {
         setComposerText(content);
         noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
 
-        // The organization's name filled in is not the person's own words.
-        if (fillsAnyOf(prompt.content, values, organizationValueNames(undefined))) {
+        // The active organization's name filled in is not the person's own words; the prompt's own default for it is its author's.
+        if (fillsAnyOf(prompt.content, values, organizationValueNames(undefined, activeOrganization?.name))) {
             markComposerDraft("organizationValue");
         }
 

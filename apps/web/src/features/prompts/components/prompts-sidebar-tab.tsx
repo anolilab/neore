@@ -125,14 +125,14 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     /** Marks the draft when `prompt` was filled with a value the organization set (`organizationValueNames`), after its own mark. */
     const noteFilledPrompt = useCallback(
-        (prompt: Doc<"prompts">, values: Record<string, string>) => {
+        (prompt: Doc<"prompts">, values: Record<string, string>, typed?: Record<string, string>) => {
             noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
 
-            if (fillsAnyOf(prompt.content, values, organizationValueNames(resolvedVariables?.sources))) {
+            if (fillsAnyOf(prompt.content, values, organizationValueNames(resolvedVariables?.sources, activeOrganization?.name), typed)) {
                 markComposerDraft("organizationValue");
             }
         },
-        [resolvedVariables?.sources, sessionData?.user?.id],
+        [resolvedVariables?.sources, activeOrganization?.name, sessionData?.user?.id],
     );
 
     // Mutations
@@ -241,14 +241,14 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     );
 
     const handleFillDialogUse = useCallback(
-        (content: string, _newValues: Record<string, string>) => {
+        (content: string, newValues: Record<string, string>) => {
             // Use the content with filled variables
             // Note: newValues could be saved to thread variables in the future
             setComposerText(content);
 
-            // The dialog fills in what it shows (`variableValues`) beside what was typed into it.
+            // The dialog fills in what it shows (`variableValues`), except where the person typed a value into it.
             if (fillDialogPrompt) {
-                noteFilledPrompt(fillDialogPrompt, variableValues);
+                noteFilledPrompt(fillDialogPrompt, variableValues, newValues);
             }
 
             toast.success(t`Prompt added to input`);

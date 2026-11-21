@@ -778,9 +778,9 @@ for a schema table that is neither policed nor listed:
   forwarded messages (`forwarded`), a reply's text sent as a prompt by Generate image/video (`assistantText`), a clicked
   suggestion: follow-ups, the welcome screen, search, canvas quick actions, onboarding templates (`suggestion`), the
   prompt improver's Apply (`improvedPrompt`), a media gallery item's stored prompt, edited or not (`galleryPrompt`), an
-  organization's variable default or name filled into a prompt (`organizationValue`), and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
+  organization's variable default or active name filled into a prompt, not a value the viewer typed into the fill dialog (`organizationValue`), and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
   prompt, edit, steer or local turn an admin sent while impersonating (or, on `/chat/edit`, under a sign-in that cannot
-  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. Still unmarked, and to be marked
+  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. A quoted reply is not marked: its `>` lines refuse the turn on the server. Still unmarked, and to be marked
   before the fill tool ships: bot instructions, personalization and variable defaults an impersonating admin wrote, an
   accepted ghost-text completion, and Restore to input of a collaborator's message in a shared chat.
 
