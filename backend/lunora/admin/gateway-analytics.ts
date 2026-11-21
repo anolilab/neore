@@ -10,7 +10,7 @@ import { v } from "lunorash/server";
  * Requires admin role. Calls the gateway's /internal/admin/routing-analytics
  * endpoint via HMAC-authenticated GET request.
  */
-import { getRoutingAnalytics } from "../chat/lib/gateway-client";
+import { getProviderCacheReadings, getRoutingAnalytics } from "../chat/lib/gateway-client";
 import { adminAction, rateLimit } from "../lib/crpc";
 
 const RoutingAnalyticsSchema = v.object({
@@ -69,4 +69,35 @@ export const getGatewayAnalytics = adminAction
         ctx.log.event("admin.get_gateway_analytics", { period });
 
         return analytics;
+    });
+
+const providerCacheCountsFields = {
+    cachedTokens: v.number(),
+    promptTokens: v.number(),
+    requests: v.number(),
+};
+
+/**
+ * The provider prompt-cache readings from the gateway: prompt tokens and the share each provider served from its own
+ * cache, by hour (models that cached at least once in the window) and by model, over the last 1, 7 or 30 days. A drop
+ * in the hourly share after a deploy shows what a prompt change cost in cache reads.
+ */
+export const getProviderCacheReadingsForAdmin = adminAction
+    .use(rateLimit("admin/read"))
+    .input({ days: v.optional(v.union(v.literal(1), v.literal(7), v.literal(30))) })
+    .output(
+        v.object({
+            days: v.union(v.literal(1), v.literal(7), v.literal(30)),
+            hours: v.array(v.object({ ...providerCacheCountsFields, hour: v.string() })),
+            models: v.array(v.object({ ...providerCacheCountsFields, modelId: v.string(), provider: v.string() })),
+            since: v.string(),
+        }),
+    )
+    .action(async ({ args, ctx }) => {
+        const days = args.days ?? 7;
+        const readings = await getProviderCacheReadings(ctx, days);
+
+        ctx.log.event("admin.get_provider_cache_readings", { days });
+
+        return readings;
     });

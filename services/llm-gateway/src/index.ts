@@ -18,6 +18,7 @@ import { PricingService } from "./providers/pricing.js";
 import { handleMusicRenderBatch } from "./queue/music-render-consumer.js";
 import { handleVideoRenderBatch } from "./queue/video-render-consumer.js";
 import { healthRouter } from "./routes/health.js";
+import { adminProviderCacheRouter } from "./routes/internal/admin-provider-cache.js";
 import { adminTierPoolsRouter } from "./routes/internal/admin-tier-pools.js";
 import { canaryRouter } from "./routes/internal/canary.js";
 import { generateRouter } from "./routes/internal/generate.js";
@@ -112,6 +113,7 @@ app.route("/", webhooksRouter);
 app.route("/", canaryRouter);
 app.route("/", notificationRulesRouter);
 app.route("/", adminTierPoolsRouter);
+app.route("/", adminProviderCacheRouter);
 
 // Routes — Client-facing (stream token auth or user JWT)
 app.route("/", chatRouter);
