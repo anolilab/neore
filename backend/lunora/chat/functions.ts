@@ -4827,6 +4827,16 @@ export const generateFollowupSuggestionsForThread = internalAction
                     ),
                 );
 
+                // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
+                // Narrows the window to this read; deletion does not yet wait for an in-flight suggestion (see the PR thread).
+                const liveThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+                if (!liveThread || liveThread.deletedAt !== undefined || liveThread.deletingAt !== undefined) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
                 const output = await generateFollowupSuggestionsInternal(
                     modelMessages,
                     agent.options.languageModel as LanguageModel,
