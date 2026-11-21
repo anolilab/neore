@@ -62,19 +62,20 @@ vi.mock("@tanstack/react-query", () => {
 
 // The thread the chat shows; a test sets it to a locked chat to check the read is held back.
 const chat = vi.hoisted(() => {
-    return { thread: undefined as { lockedAt?: number } | undefined };
+    return {
+        messages: [
+            { id: "m1", parts: [], role: "user" },
+            { id: "m2", parts: [], role: "assistant" },
+        ] as { id: string; parts: unknown[]; role: string }[],
+        thread: undefined as { lockedAt?: number } | undefined,
+    };
 });
 
 vi.mock("@/features/chat/core/context/chat-context", () => {
-    const messages = [
-        { id: "m1", parts: [], role: "user" },
-        { id: "m2", parts: [], role: "assistant" },
-    ];
-
     return {
         useChatIsRunning: () => false,
         useChatMessages: () => {
-            return { messages };
+            return { messages: chat.messages };
         },
         useChatThread: () => {
             return { thread: chat.thread, threadId: "thread-1" };
@@ -91,6 +92,10 @@ const { default: ComposerFollowupSuggestions } = await import("./composer-follow
 beforeEach(() => {
     useChatUIStore.getState().reset();
     chat.thread = undefined;
+    chat.messages = [
+        { id: "m1", parts: [], role: "user" },
+        { id: "m2", parts: [], role: "assistant" },
+    ];
     readOptions.mockClear();
 });
 
@@ -116,6 +121,18 @@ describe("ComposerFollowupSuggestions", () => {
         expect(await screen.findByText(SUGGESTION)).toBeTruthy();
 
         chat.thread = { lockedAt: 1000 };
+        view.rerender(<ComposerFollowupSuggestions />);
+
+        expect(screen.queryByText(SUGGESTION)).toBeNull();
+    });
+
+    it("does not show the previous reply's chips for a newer reply, while the cache still holds the old one's", async () => {
+        const view = render(<ComposerFollowupSuggestions />);
+
+        expect(await screen.findByText(SUGGESTION)).toBeTruthy();
+
+        // A newer reply on screen: the cache holds "m2"'s suggestions, so none may show for "m4".
+        chat.messages = [...chat.messages, { id: "m3", parts: [], role: "user" }, { id: "m4", parts: [], role: "assistant" }];
         view.rerender(<ComposerFollowupSuggestions />);
 
         expect(screen.queryByText(SUGGESTION)).toBeNull();
