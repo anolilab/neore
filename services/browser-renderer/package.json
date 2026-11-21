@@ -11,7 +11,10 @@
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
         "lint:types": "tsc --noEmit",
-        "lint:types:fast": "tsrs --noEmit"
+        "lint:types:fast": "tsrs --noEmit",
+        "test": "vitest run",
+        "test:browser": "vitest run --config vitest.browser.config.ts",
+        "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"
     },
     "dependencies": {
         "@cloudflare/playwright": "^1.4.0",
@@ -22,9 +25,12 @@
         "@anolilab/eslint-config": "catalog:lint",
         "@anolilab/prettier-config": "catalog:lint",
         "@cloudflare/workers-types": "catalog:build",
+        "@types/node": "catalog:types",
         "eslint": "catalog:lint",
+        "playwright": "catalog:test",
         "prettier": "catalog:lint",
         "typescript": "catalog:tsc",
+        "vitest": "catalog:test",
         "wrangler": "catalog:build"
     },
     "engines": {

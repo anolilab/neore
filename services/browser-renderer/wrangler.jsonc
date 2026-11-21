@@ -7,6 +7,8 @@
     "workers_dev": false,
     "compatibility_date": "2025-09-15",
     "compatibility_flags": ["nodejs_compat"],
+    // As in alchemy.run.ts: a function handed to `page.evaluate` runs in the page, where `__name(…)` does not exist.
+    "keep_names": false,
     "placement": {
         "mode": "smart"
     },

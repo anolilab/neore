@@ -3417,15 +3417,24 @@ importers:
       '@cloudflare/workers-types':
         specifier: catalog:build
         version: 5.20261120.1
+      '@types/node':
+        specifier: catalog:types
+        version: 26.6.6
       eslint:
         specifier: catalog:lint
         version: 10.15.0(jiti@2.7.0)(supports-color@10.2.2)
+      playwright:
+        specifier: catalog:test
+        version: 1.65.1
       prettier:
         specifier: catalog:lint
         version: 3.10.1
       typescript:
         specifier: catalog:tsc
         version: 6.0.3
+      vitest:
+        specifier: catalog:test
+        version: 5.1.1(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(@vitest/browser-playwright@5.1.1)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jsdom@31.0.1(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0))(msw@3.0.3(@types/node@26.6.6)(graphql@16.11.0)(supports-color@10.2.2)(typescript@6.0.3)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
       wrangler:
         specifier: catalog:build
         version: 4.165.0(@cloudflare/workers-types@5.20261120.1)(@types/node@26.6.6)(vitest@5.1.1)

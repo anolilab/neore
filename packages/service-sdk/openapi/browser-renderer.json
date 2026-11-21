@@ -60,6 +60,63 @@
                 }
             }
         },
+        "/login": {
+            "post": {
+                "operationId": "browserLogin",
+                "summary": "Sign in with a saved login: open the login page and type the username and password in one call",
+                "tags": ["Browser"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/BrowserLoginRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login result; never carries the password",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The browser session is busy with another call; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "504": {
+                        "description": "The browser did not start within the budget; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "operationId": "getHealth",
@@ -82,6 +139,49 @@
     },
     "components": {
         "schemas": {
+            "BrowserLoginRequest": {
+                "type": "object",
+                "required": ["url", "origin", "username", "password"],
+                "properties": {
+                    "budgetMs": {
+                        "type": "integer",
+                        "minimum": 20000,
+                        "maximum": 120000,
+                        "description": "The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left"
+                    },
+                    "url": { "type": "string", "description": "The login page; must be on `origin`" },
+                    "origin": { "type": "string", "description": "The exact origin the login was saved for; nothing is typed on any other" },
+                    "username": { "type": "string" },
+                    "password": { "type": "string", "description": "Typed into a password field only; never returned" },
+                    "sessionId": { "type": "string", "description": "Reconnect to an existing browser session" }
+                }
+            },
+            "BrowserLoginResponse": {
+                "type": "object",
+                "properties": {
+                    "success": { "type": "boolean" },
+                    "sessionId": { "type": "string" },
+                    "url": { "type": "string" },
+                    "title": { "type": "string" },
+                    "submitted": {
+                        "type": "boolean",
+                        "description": "The form's own POST went out to the login's origin with the password. It can be true on a failure (the step after it failed): do not send it again. False when it was not sent"
+                    },
+                    "scriptSignIn": {
+                        "type": "boolean",
+                        "description": "The site signs in from a script that reads the password field, which only ever holds a stand-in: nothing was sent, and trying again cannot help"
+                    },
+                    "sessionClosed": {
+                        "type": "boolean",
+                        "description": "The password could not be cleared from the page within the hold, so the page and the browser session were closed and no sessionId is returned"
+                    },
+                    "passwordFieldRemains": {
+                        "type": "boolean",
+                        "description": "A password field is still on the page after sending: the sign-in may have failed"
+                    },
+                    "error": { "type": "string" }
+                }
+            },
             "BrowserActionRequest": {
                 "type": "object",
                 "required": ["action"],

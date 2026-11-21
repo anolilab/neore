@@ -620,7 +620,9 @@ export const NsfwChecker = Cloudflare.Worker("nsfw-checker", {
 // Uses CF Browser Rendering binding for serverless headless Chrome.
 // PRIVATE, like the document parser: reached only through `SERVICE_BROWSER_RENDERER`.
 export const BrowserRenderer = Cloudflare.Worker("browser-renderer", {
-    build: WORKER_BUILD,
+    // No kept names: a function handed to `page.evaluate` runs in the page as its source text, where the `__name(…)`
+    // helper a kept name is wrapped in does not exist.
+    build: { ...WORKER_BUILD, output: { ...WORKER_BUILD.output, keepNames: false } },
     compatibility: { date: "2025-09-15", flags: ["nodejs_compat"] },
     env: {
         BROWSER: Cloudflare.Browser(),

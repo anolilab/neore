@@ -4,6 +4,54 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type BrowserLoginRequest = {
+    /**
+     * The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left
+     */
+    budgetMs?: number;
+    /**
+     * The login page; must be on `origin`
+     */
+    url: string;
+    /**
+     * The exact origin the login was saved for; nothing is typed on any other
+     */
+    origin: string;
+    username: string;
+    /**
+     * Typed into a password field only; never returned
+     */
+    password: string;
+    /**
+     * Reconnect to an existing browser session
+     */
+    sessionId?: string;
+};
+
+export type BrowserLoginResponse = {
+    success?: boolean;
+    sessionId?: string;
+    url?: string;
+    title?: string;
+    /**
+     * The form's own POST went out to the login's origin with the password. It can be true on a failure (the step after it failed): do not send it again. False when it was not sent
+     */
+    submitted?: boolean;
+    /**
+     * The site signs in from a script that reads the password field, which only ever holds a stand-in: nothing was sent, and trying again cannot help
+     */
+    scriptSignIn?: boolean;
+    /**
+     * The password could not be cleared from the page within the hold, so the page and the browser session were closed and no sessionId is returned
+     */
+    sessionClosed?: boolean;
+    /**
+     * A password field is still on the page after sending: the sign-in may have failed
+     */
+    passwordFieldRemains?: boolean;
+    error?: string;
+};
+
 export type BrowserActionRequest = {
     /**
      * The browser action to execute
@@ -112,6 +160,43 @@ export type BrowserActionResponses = {
 };
 
 export type BrowserActionResponse2 = BrowserActionResponses[keyof BrowserActionResponses];
+
+export type BrowserLoginData = {
+    body: BrowserLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/login';
+};
+
+export type BrowserLoginErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorResponse;
+    /**
+     * The browser session is busy with another call; nothing was typed
+     */
+    409: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+    /**
+     * The browser did not start within the budget; nothing was typed
+     */
+    504: ErrorResponse;
+};
+
+export type BrowserLoginError = BrowserLoginErrors[keyof BrowserLoginErrors];
+
+export type BrowserLoginResponses = {
+    /**
+     * Login result; never carries the password
+     */
+    200: BrowserLoginResponse;
+};
+
+export type BrowserLoginResponse2 = BrowserLoginResponses[keyof BrowserLoginResponses];
 
 export type GetHealthData = {
     body?: never;
