@@ -27,6 +27,11 @@ vi.mock("@tanstack/react-router", () => {
         useLocation: () => {
             return { pathname: "/chat" };
         },
+        // The list's file drop zone (`thread-list-drop-zone.tsx`) opens the new chat; no test here drops a file.
+        useNavigate: () => () => Promise.resolve(),
+        useRouter: () => {
+            return { state: { location: { pathname: "/chat" } } };
+        },
     };
 });
 
