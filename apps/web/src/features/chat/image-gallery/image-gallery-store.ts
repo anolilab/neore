@@ -2,7 +2,8 @@ import { create } from "zustand";
 
 /**
  * Which thread's image gallery is open, and at which image. Keyed by thread so that, in the split view, an image
- * opened in one pane never opens the gallery of another (each pane's header mounts its own).
+ * opened in one pane never opens the gallery of another: each chat's `ChatImageGallery`, mounted inside its `Thread`,
+ * renders its own gallery and shows only the selection for its own thread.
  */
 interface ImageGalleryState {
     close: () => void;
