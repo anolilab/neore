@@ -102,6 +102,10 @@ export const isPublicIPv6 = (address: string): boolean => {
         return false;
     }
 
+    if (first === 0x3f_ff && second < 0x10_00) {
+        return false;
+    }
+
     return !(first === 0x20_01 && [0, 0x00_02, 0x0d_b8].includes(second));
 };
 

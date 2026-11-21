@@ -122,11 +122,13 @@ describe("isPublicIPv6", () => {
         "2001:db8::1",
         "64:ff9b::1",
         "2001:2::1",
+        "3fff::1",
+        "3fff:fff::1",
     ])("refuses %s", (address) => {
         expect(isPublicIPv6(address)).toBe(false);
     });
 
-    it.each(["2606:4700:4700::1111", "2a00:1450::1"])("accepts %s", (address) => {
+    it.each(["2606:4700:4700::1111", "2a00:1450::1", "3fff:1000::1"])("accepts %s", (address) => {
         expect(isPublicIPv6(address)).toBe(true);
     });
 });
