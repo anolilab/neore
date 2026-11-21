@@ -60,6 +60,15 @@ describe("POST /login", () => {
         await expect(response.json()).resolves.toStrictEqual({ error: expect.stringContaining("a sign-in needs at least 20 s"), success: false });
     });
 
+    it("refuses a password too short to keep out of the results, before any browser opens", async () => {
+        const { env, pending } = binding();
+        const response = await post(env, "/login", { ...LOGIN, password: "abc" });
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toStrictEqual({ error: expect.stringContaining("shorter than 4 characters is not filled"), success: false });
+        expect(pending).toHaveLength(0);
+    });
+
     it("ends within its budget when the browser does not start, and closes the browser that starts late", async () => {
         const { env, pending } = binding();
         const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000 });

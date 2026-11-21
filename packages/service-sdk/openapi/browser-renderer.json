@@ -152,7 +152,11 @@
                     "url": { "type": "string", "description": "The login page; must be on `origin`" },
                     "origin": { "type": "string", "description": "The exact origin the login was saved for; nothing is typed on any other" },
                     "username": { "type": "string" },
-                    "password": { "type": "string", "description": "Typed into a password field only; never returned" },
+                    "password": {
+                        "type": "string",
+                        "minLength": 4,
+                        "description": "Typed into a password field only; never returned. A shorter one is refused: it could not be kept out of the results"
+                    },
                     "sessionId": { "type": "string", "description": "Reconnect to an existing browser session" }
                 }
             },

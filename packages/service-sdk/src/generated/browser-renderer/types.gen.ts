@@ -19,7 +19,7 @@ export type BrowserLoginRequest = {
     origin: string;
     username: string;
     /**
-     * Typed into a password field only; never returned
+     * Typed into a password field only; never returned. A shorter one is refused: it could not be kept out of the results
      */
     password: string;
     /**

@@ -560,11 +560,17 @@ const MIN_LOGIN_BUDGET_MS = LOGIN_MARGIN_MS + 6000 + TYPE_RESERVE_MS;
 
 const MAX_LOGIN_BUDGET_MS = 120_000;
 
+/**
+ * The shortest password `/login` fills. A shorter one cannot be scrubbed from what the browser returns: its base64 is two
+ * or three characters, found in almost any text, so withholding every match would withhold nearly every result.
+ */
+const MIN_LOGIN_PASSWORD_LENGTH = 4;
+
 const loginSchema = z.object({
     /** The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left. */
     budgetMs: z.int().min(MIN_LOGIN_BUDGET_MS).max(MAX_LOGIN_BUDGET_MS).optional(),
     origin: z.string().max(2048),
-    password: z.string().min(1).max(1024),
+    password: z.string().min(MIN_LOGIN_PASSWORD_LENGTH).max(1024),
     sessionId: z.string().optional(),
     url: z.string().max(8192),
     username: z.string().min(1).max(320),
@@ -656,12 +662,18 @@ app.post("/login", async (c) => {
     // Never the validation message: it may quote what was sent.
     if (!parsed.success) {
         const isBudget = parsed.error.issues.some((issue) => issue.path[0] === "budgetMs");
+        const isShortPassword = parsed.error.issues.some((issue) => issue.path[0] === "password" && issue.code === "too_small");
+        let error = "Invalid login request";
+
+        if (isBudget) {
+            error = `budgetMs must be from ${MIN_LOGIN_BUDGET_MS} to ${MAX_LOGIN_BUDGET_MS}: a sign-in needs at least ${MIN_LOGIN_BUDGET_MS / 1000} s`;
+        } else if (isShortPassword) {
+            error = `A saved password shorter than ${MIN_LOGIN_PASSWORD_LENGTH} characters is not filled: it could not be kept out of what the browser returns`;
+        }
 
         return c.json(
             {
-                error: isBudget
-                    ? `budgetMs must be from ${MIN_LOGIN_BUDGET_MS} to ${MAX_LOGIN_BUDGET_MS}: a sign-in needs at least ${MIN_LOGIN_BUDGET_MS / 1000} s`
-                    : "Invalid login request",
+                error,
                 success: false,
             },
             400,
