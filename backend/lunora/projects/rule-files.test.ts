@@ -226,6 +226,7 @@ describe("normalizeRuleFiles", () => {
         ["too many files", Array.from({ length: MAX_RULE_FILES + 1 }, (_, index) => always(`f${index}`, "x")), RULE_FILE_REFUSALS.TOO_MANY, undefined],
         ["an empty title", [{ ...always("a", "x"), title: " " }], RULE_FILE_REFUSALS.TITLE_MISSING, "a"],
         ["a title past its length", [{ ...always("a", "x"), title: "t".repeat(MAX_RULE_TITLE_LENGTH + 1) }], RULE_FILE_REFUSALS.TITLE_TOO_LONG, "a"],
+        ["a name opening the id form", [{ ...always("a", "x"), title: "  ID:deploy" }], RULE_FILE_REFUSALS.TITLE_RESERVED, "a"],
         ["a glob file without a pattern", [{ ...sql, globs: [] }], RULE_FILE_REFUSALS.PATTERNS_MISSING, "sql"],
         [
             "a glob file past its patterns",

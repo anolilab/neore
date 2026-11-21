@@ -53,4 +53,13 @@ describe("instruction_read", () => {
         await expect(tool.execute({ file: "ID: style-2" }, options)).resolves.toMatchObject({ found: true, text: "Not the deploy file." });
         await expect(tool.execute({ file: "id:<style-2>" }, options)).resolves.toMatchObject({ found: true, text: "Not the deploy file." });
     });
+
+    it("answers an id form that names no file as not found, never by a name", () => {
+        // Saves refuse such a name now, but one stored before still must not be read for an id.
+        const named = { ...style, id: "style-2", title: "id:abc" };
+
+        expect(findInstruction([deploy, named], "id:abc")).toStrictEqual([]);
+        expect(findInstruction([deploy, named], "id:Deploy")).toStrictEqual([]);
+        expect(findInstruction([deploy, named], "id:")).toStrictEqual([]);
+    });
 });

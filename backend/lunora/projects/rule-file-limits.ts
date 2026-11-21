@@ -36,6 +36,7 @@ export const RULE_FILE_REFUSALS = {
     PATTERNS_MISSING: "RULE_FILE_PATTERNS_MISSING",
     PATTERNS_TOO_MANY: "RULE_FILE_PATTERNS_TOO_MANY",
     TITLE_MISSING: "RULE_FILE_TITLE_MISSING",
+    TITLE_RESERVED: "RULE_FILE_TITLE_RESERVED",
     TITLE_TOO_LONG: "RULE_FILE_TITLE_TOO_LONG",
     TOO_LARGE: "RULE_FILES_TOO_LARGE",
     TOO_MANY: "RULE_FILES_TOO_MANY",
@@ -54,6 +55,15 @@ export const isRuleDescriptionValid = (description: string): boolean => {
 
     return trimmed.length > 0 && trimmed.length <= MAX_RULE_DESCRIPTION_LENGTH && !LINE_BREAK_OR_NUL.test(trimmed);
 };
+
+/**
+ * Opens the explicit form of a rule file's id (`id:<id>`) that `instruction_read` reads, in any case. No name starts
+ * with it ({@link isRuleTitleReserved}), so a name never reads as that form.
+ */
+export const RULE_ID_FORM = "id:";
+
+/** Whether `title`, trimmed, starts with {@link RULE_ID_FORM} in any case: a name a save refuses. */
+export const isRuleTitleReserved = (title: string): boolean => title.trim().toLowerCase().startsWith(RULE_ID_FORM);
 
 /** The UTF-8 bytes `files` take stored, as JSON: the measure of {@link MAX_RULE_FILES_BYTES}. */
 export const ruleFilesStoredBytes = (files: ReadonlyArray<unknown>): number => new TextEncoder().encode(JSON.stringify(files)).byteLength;

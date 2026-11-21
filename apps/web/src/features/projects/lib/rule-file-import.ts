@@ -25,12 +25,12 @@ const LINE_BREAK = /\r?\n/u;
 /** A front-matter key: letters only. */
 const KEY = /^[A-Za-z]+$/u;
 
-/** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
-const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
-
-/** A quote around an item. */
+/** A quote at an item's start or end that no quote across it matches. */
 const QUOTE_START = /^["']/u;
 const QUOTE_END = /["']$/u;
+
+/** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
+const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
 
 /** The front matter, an empty block included: after blank lines, its fences may end in spaces, its lines in CRLF. */
 const FRONT_MATTER = /^(?:[\t ]*\r?\n)*---[\t ]*\r?\n(?:([\s\S]*?)\r?\n)?---[\t ]*(?:\r?\n|$)/u;
@@ -95,35 +95,87 @@ const unquoted = (value: string): string => {
         : inner.replaceAll(DOUBLED_SINGLE_QUOTE, "'");
 };
 
+/** Where the quoted item opening at `open` (its quote) ends: after its closing quote; -1 when it does not close in `text`. */
+const quotedEnd = (text: string, open: number): number => {
+    const quote = text[open];
+    let index = open + 1;
+
+    while (index < text.length) {
+        const character = text[index];
+
+        if (quote === '"' && character === "\\") {
+            index += 2;
+        } else if (character !== quote) {
+            index += 1;
+        } else if (quote === "'" && text[index + 1] === "'") {
+            // `''` inside a single-quoted item is one quote.
+            index += 2;
+        } else {
+            return index + 1;
+        }
+    }
+
+    return -1;
+};
+
 /**
- * `[a, b]`, `"a", "b"`, `"a, b"` or `a, b` as its items, quotes dropped. Split at each comma outside a `{a,b}` group, so
- * a `*.{ts,tsx}` group stays one pattern and a quoted list of several patterns still gives each.
+ * `text` split at each comma outside a quoted item and outside a `{a,b}` group. Only a quote opening an item and
+ * closing in `text` quotes it: `don't/*.md` is one plain pattern.
  */
-const listOf = (value: string): string[] => {
-    const trimmed = value.trim();
-    // Brackets only around the whole value make it a list: `src/[ab]` is one pattern, its class kept.
-    const inner = trimmed.startsWith("[") && trimmed.endsWith("]") ? trimmed.slice(1, -1) : trimmed;
+const splitItems = (text: string): string[] => {
     const items: string[] = [];
     let depth = 0;
     let start = 0;
+    let index = 0;
 
-    for (let index = 0; index < inner.length; index += 1) {
-        const character = inner[index];
+    while (index < text.length) {
+        const character = text[index]!;
+        // A quote that does not close on this line (a value continued below) quotes nothing: its commas still split.
+        const end = (character === '"' || character === "'") && text.slice(start, index).trim() === "" ? quotedEnd(text, index) : -1;
+
+        if (end !== -1) {
+            index = end;
+            continue;
+        }
 
         if (character === "{") {
             depth += 1;
         } else if (character === "}") {
             depth = Math.max(0, depth - 1);
         } else if (character === "," && depth === 0) {
-            items.push(inner.slice(start, index));
+            items.push(text.slice(start, index));
             start = index + 1;
         }
+
+        index += 1;
     }
 
-    items.push(inner.slice(start));
+    items.push(text.slice(start));
 
-    // A quote that opened or closed a whole quoted list is left on its first or last item.
-    return items.map((item) => item.trim().replace(QUOTE_START, "").replace(QUOTE_END, "")).filter(Boolean);
+    return items;
+};
+
+/**
+ * `[a, b]`, `"a", "b"`, `"a, b"` or `a, b` as its items, quotes dropped. Split at each comma outside a quoted item and
+ * outside a `{a,b}` group, so `["src/a,b.ts"]` and `*.{ts,tsx}` each stay one pattern. One quoted string that is the
+ * whole value outside brackets is a list of its own (`"a/**, b/*.md"`), as such files write it; a `- item` line
+ * (`isItem`) is one item already.
+ */
+const listOf = (value: string, { isItem = false } = {}): string[] => {
+    const trimmed = value.trim();
+    // Brackets only around the whole value make it a list: `src/[ab]` is one pattern, its class kept.
+    const isBracketed = trimmed.startsWith("[") && trimmed.endsWith("]");
+    const items = splitItems(isBracketed ? trimmed.slice(1, -1) : trimmed).map((item) => item.trim());
+    const [only] = items;
+
+    if (!isItem && !isBracketed && items.length === 1 && only && only !== unquoted(only)) {
+        return splitItems(unquoted(only))
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    // A quote left open or closed on another line (`"a/**,` then `b/*.md"`) is dropped from its item's end.
+    return items.map((item) => (item === unquoted(item) ? item.replace(QUOTE_START, "").replace(QUOTE_END, "") : unquoted(item)).trim()).filter(Boolean);
 };
 
 /** Whether `line` is indented, so it continues the key above it rather than starting one. */
@@ -158,7 +210,7 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
             const item = withoutComment(trimmed.slice(1));
 
             if (key) {
-                fields.get(key)!.push(...listOf(item));
+                fields.get(key)!.push(...listOf(item, { isItem: true }));
             }
 
             continue;

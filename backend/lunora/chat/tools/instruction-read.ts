@@ -11,6 +11,7 @@ import z from "zod/v4";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { toolsLogger } from "../../lib/logger";
+import { RULE_ID_FORM } from "../../projects/rule-file-limits";
 import { oneLine, type RunInstruction } from "../../projects/rule-files";
 import toonEncodeOutput from "./toon-encode";
 
@@ -19,23 +20,22 @@ type InstructionReadOutput =
     | { found: false; names: string[] }
     | { found: true; id: string; name: string; text: string };
 
-/** Opens the explicit form of an id (`id:<id>`), which no name is read as; in any case. */
-const ID_FORM = "id:";
 const ANGLE_BRACKETS = /^<|>$/gu;
 
 /**
- * The files `file` names: with the `id:` form ({@link ID_FORM}) the one with that id; otherwise every one whose id is
+ * The files `file` names: in the `id:` form ({@link RULE_ID_FORM}) the one with that id, or none; otherwise every one whose id is
  * `file` or whose name is, ignoring case and surrounding space. Ids are unique, but names need not be and a name may be
  * another file's id, so more than one means `file` alone does not say which.
  */
 export const findInstruction = (instructions: ReadonlyArray<RunInstruction>, file: string): RunInstruction[] => {
     const wanted = file.trim();
-    // Angle brackets kept from the `id:<its id>` the list and the ambiguous answer show are not part of the id.
-    const explicitId = wanted.toLowerCase().startsWith(ID_FORM) ? wanted.slice(ID_FORM.length).trim().replaceAll(ANGLE_BRACKETS, "") : undefined;
-    const byExplicitId = explicitId ? instructions.find((entry) => entry.id === explicitId) : undefined;
 
-    if (byExplicitId) {
-        return [byExplicitId];
+    if (wanted.toLowerCase().startsWith(RULE_ID_FORM)) {
+        // Angle brackets kept from the `id:<its id>` the list and the ambiguous answer show are not part of the id.
+        const explicitId = wanted.slice(RULE_ID_FORM.length).trim().replaceAll(ANGLE_BRACKETS, "");
+
+        // Never a name: a save refuses one opening the id form, and an id that matches nothing is not found.
+        return instructions.filter((entry) => entry.id === explicitId);
     }
 
     // As the list shows it (`oneLine`), so a name with a line break in it is still found.

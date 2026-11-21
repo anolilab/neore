@@ -99,6 +99,21 @@ describe("toImportedRuleFile", () => {
         });
     });
 
+    it("keeps a comma inside a quoted item of a list in that one pattern", () => {
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: ["src/a,b.ts", "*.md"]\n---\nT')).toMatchObject({ patterns: "src/a,b.ts\n*.md" });
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: ['it''s,a/*.md', 'x/{a,b}/*.ts', docs/**]\n---\nT")).toMatchObject({
+            patterns: "it's,a/*.md\nx/{a,b}/*.ts\ndocs/**",
+        });
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: "a,b.ts", c/*.md\n---\nT')).toMatchObject({ patterns: "a,b.ts\nc/*.md" });
+        expect(toImportedRuleFile("rules/c.mdc", "---\nglobs: don't/*.md, b/*.md\n---\nT")).toMatchObject({ patterns: "don't/*.md\nb/*.md" });
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs:\n  - "src/a,b.ts"\n  - a/*.md\n---\nT')).toMatchObject({ patterns: "src/a,b.ts\na/*.md" });
+    });
+
+    it("still splits a quoted list continued on the next line, or one left open", () => {
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: "a/**,\n  b/*.md"\n---\nT')).toMatchObject({ patterns: "a/**\nb/*.md" });
+        expect(toImportedRuleFile("rules/c.mdc", '---\nglobs: "a/**, b/*.md\n---\nT')).toMatchObject({ patterns: "a/**\nb/*.md" });
+    });
+
     it("splits a quoted list of patterns, reads a block of them line by line, and takes an apostrophe as text", () => {
         expect(toImportedRuleFile("rules/q.mdc", '---\nglobs: "**/*.ts, **/*.tsx"\n---\nT')).toMatchObject({ patterns: "**/*.ts\n**/*.tsx" });
         expect(toImportedRuleFile("rules/b.mdc", "---\nglobs: |\n  a/**\n  b/*.{md,mdx}\n---\nT")).toMatchObject({ patterns: "a/**\nb/*.{md,mdx}" });

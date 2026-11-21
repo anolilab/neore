@@ -510,6 +510,7 @@ describe("project rule files", () => {
 
     it.each([
         ["a name past its length", { title: "t".repeat(201) }, "Name", "may be at most 200 characters"],
+        ["a name opening the id form", { title: "Id: sql" }, "Name", 'may not start with "id:"'],
         [
             "more patterns than a file holds",
             { globs: Array.from({ length: 11 }, (_, index) => `${index}.sql`) },

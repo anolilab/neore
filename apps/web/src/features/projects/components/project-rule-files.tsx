@@ -7,6 +7,7 @@ import type { RuleFileRefusal } from "@neore/backend/rule-file-limits";
 import {
     isRuleDescriptionValid,
     isRuleGlobValid,
+    isRuleTitleReserved,
     MAX_RULE_DESCRIPTION_LENGTH,
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
@@ -90,6 +91,7 @@ const REFUSAL_FIELDS: Partial<Record<RuleFileRefusal, RuleFileField>> = {
     [RULE_FILE_REFUSALS.PATTERNS_MISSING]: "patterns",
     [RULE_FILE_REFUSALS.PATTERNS_TOO_MANY]: "patterns",
     [RULE_FILE_REFUSALS.TITLE_MISSING]: "title",
+    [RULE_FILE_REFUSALS.TITLE_RESERVED]: "title",
     [RULE_FILE_REFUSALS.TITLE_TOO_LONG]: "title",
 };
 
@@ -582,6 +584,7 @@ const ProjectRuleFiles: FC<{
                 return t`"${name}" has more than ${limit} file patterns. Remove some, or move them into another file.`;
             },
             [RULE_FILE_REFUSALS.TITLE_MISSING]: () => t`Give every rule file a name.`,
+            [RULE_FILE_REFUSALS.TITLE_RESERVED]: () => t`A rule file's name may not start with "id:". Rename "${name}".`,
             [RULE_FILE_REFUSALS.TITLE_TOO_LONG]: () => {
                 const limit = numberOf(MAX_RULE_TITLE_LENGTH);
 
@@ -619,6 +622,10 @@ const ProjectRuleFiles: FC<{
 
         if (title.length > MAX_RULE_TITLE_LENGTH) {
             return RULE_FILE_REFUSALS.TITLE_TOO_LONG;
+        }
+
+        if (isRuleTitleReserved(title)) {
+            return RULE_FILE_REFUSALS.TITLE_RESERVED;
         }
 
         // In the backend's order, so a file past two limits is refused for the same one either way.

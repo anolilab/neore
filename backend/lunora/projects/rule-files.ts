@@ -13,6 +13,7 @@ import {
     MAX_RULE_FILES_BYTES,
     isRuleDescriptionValid,
     isRuleGlobValid,
+    isRuleTitleReserved,
     MAX_RULE_DESCRIPTION_LENGTH,
     MAX_RULE_GLOB_LENGTH,
     MAX_RULE_GLOBS,
@@ -394,7 +395,7 @@ const assertGlob = (glob: string, fileId: string): void => {
 /**
  * The list as it is saved: trimmed titles, patterns and descriptions, patterns only on a `glob` file and a description
  * only on an `auto` one. Refuses a list past the caps, a repeated id, an empty title, a `glob` file without a pattern,
- * or an `auto` file without a one-line description. `alongside` counts the files the project
+ * or an `auto` file without a one-line description, and a name opening the id form (`isRuleTitleReserved`). `alongside` counts the files the project
  * keeps outside the list (a kept legacy `context`), so the project still holds at most {@link MAX_RULE_FILES}.
  */
 export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): RuleFile[] => {
@@ -419,6 +420,10 @@ export const normalizeRuleFiles = (files: RuleFile[], { alongside = 0 } = {}): R
                 title ? RULE_FILE_REFUSALS.TITLE_TOO_LONG : RULE_FILE_REFUSALS.TITLE_MISSING,
                 file.id,
             );
+        }
+
+        if (isRuleTitleReserved(title)) {
+            throw refuse(`A rule file's name may not start with "id:"`, RULE_FILE_REFUSALS.TITLE_RESERVED, file.id);
         }
 
         if (file.content.length > MAX_RULE_FILE_LENGTH) {
