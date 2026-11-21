@@ -4478,6 +4478,81 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "browserHumanChecks": {
+      "commitOrdered": false,
+      "fields": {
+        "askedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "inText": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "reported": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "run": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "site": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_threadId_site_askedAt": {
+          "fields": [
+            "threadId",
+            "site",
+            "askedAt"
+          ],
+          "unique": false
+        },
+        "by_threadId_site_run": {
+          "fields": [
+            "threadId",
+            "site",
+            "run"
+          ],
+          "unique": true
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "browserSessions": {
       "commitOrdered": false,
       "fields": {
@@ -28778,6 +28853,40 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "imageIndex": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "imageKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"image\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"message\""
+            }
+          ]
         },
         "messageId": {
           "kind": "string",

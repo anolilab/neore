@@ -118,6 +118,8 @@ export interface MessengerDisconnectedProperties {
 // ── Pins ────────────────────────────────────────────────────────────────────
 export interface MessagePinnedProperties {
     has_note: boolean;
+    /** What was pinned; absent on events sent before image pins existed, which were all message pins. */
+    kind?: "image" | "message";
 }
 
 // ── Chat Import ─────────────────────────────────────────────────────────────

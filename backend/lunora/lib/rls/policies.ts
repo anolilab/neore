@@ -171,6 +171,7 @@ const OWNER_TABLES = [
     "aiUserPreferences",
     "bots",
     "browserExtensions",
+    "browserHumanChecks",
     "browserSessions",
     "chatImportJobs",
     "codingAgentRuns",

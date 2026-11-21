@@ -202,12 +202,17 @@ const main = async () => {
     const nodeVersion = process.versions.node;
     const [major] = nodeVersion.split(".").map(Number);
 
-    if (major < 22) {
-        console.error(`Node.js 22+ is required. You have ${nodeVersion}.`);
+    // The extension-origin helpers are the backend's own TypeScript, which Node
+    // runs as is only with type stripping on (by default from 22.18). Loaded
+    // after this check, so an older Node gets this message, not an import error.
+    if (major < 22 || !process.features.typescript) {
+        console.error(`Node.js 22.18+ is required (with TypeScript type stripping on). You have ${nodeVersion}.`);
         process.exit(1);
     }
 
     console.log(`Node.js ${nodeVersion}`);
+
+    const { carryRetiredExtensionOrigins, listsChromeRedirect } = await import("../backend/lunora/lib/extension-origins.ts");
 
     // 2. Check pnpm install
     if (!fs.existsSync(path.join(rootDir, "node_modules"))) {
@@ -467,19 +472,48 @@ const main = async () => {
         backendChanged = true;
     }
 
+    // Retired: the extension signs in through an app grant, never the cookie.
+    // The Chrome id it held moves to the redirect URIs first, on every run
+    // (piped or not), so the unpacked build keeps signing in.
+    if ("TRUSTED_EXTENSION_ORIGINS" in backendEnv) {
+        const { added, value, withheld } = carryRetiredExtensionOrigins(backendEnv["TRUSTED_EXTENSION_ORIGINS"], backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"]);
+
+        if (added.length > 0) {
+            backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] = value;
+            console.log(`  [move]  TRUSTED_EXTENSION_ORIGINS -> TRUSTED_EXTENSION_REDIRECT_URIS: added ${added.join(", ")}`);
+        }
+
+        if (withheld.length > 0) {
+            console.log(`  [keep]  TRUSTED_EXTENSION_REDIRECT_URIS=none (sign-in off); not added: ${withheld.join(", ")}`);
+        }
+
+        delete backendEnv["TRUSTED_EXTENSION_ORIGINS"];
+        backendChanged = true;
+        console.log("  [drop]  TRUSTED_EXTENSION_ORIGINS");
+    }
+
     // Browser extension. Optional, and only asked on a terminal: a piped or CI
     // run keeps whatever is there (possibly nothing, which just means the
-    // extension cannot sign in). The id appears on the extension's card once
+    // Chrome build cannot sign in). The id appears on the extension's card once
     // apps/browser-extension/dist is loaded unpacked at chrome://extensions.
-    if (process.stdin.isTTY && !backendEnv["TRUSTED_EXTENSION_ORIGINS"]) {
+    // Asked whenever the list has no Chrome redirect yet; the URI is added to
+    // what is there (an unset list starts from the shipped Firefox add-on, the
+    // backend's default), and `none` (sign-in off on purpose) is left alone.
+    const redirectUris = backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"];
+
+    if (process.stdin.isTTY && redirectUris?.trim().toLowerCase() !== "none" && !listsChromeRedirect(redirectUris)) {
         const extensionId = await ask("\n  Unpacked browser extension ID (chrome://extensions, leave blank to skip)");
 
         if (/^[a-p]{32}$/.test(extensionId)) {
-            backendEnv["TRUSTED_EXTENSION_ORIGINS"] = `chrome-extension://${extensionId}`;
-            backendChanged = true;
-            console.log("  [set]   TRUSTED_EXTENSION_ORIGINS");
+            const { added, value } = carryRetiredExtensionOrigins(`chrome-extension://${extensionId}`, redirectUris?.trim() || undefined);
+
+            if (added.length > 0) {
+                backendEnv["TRUSTED_EXTENSION_REDIRECT_URIS"] = value;
+                backendChanged = true;
+                console.log("  [set]   TRUSTED_EXTENSION_REDIRECT_URIS");
+            }
         } else if (extensionId) {
-            console.log("  [skip]  TRUSTED_EXTENSION_ORIGINS — an extension id is 32 letters a–p");
+            console.log("  [skip]  TRUSTED_EXTENSION_REDIRECT_URIS — an extension id is 32 letters a–p");
         }
     }
 

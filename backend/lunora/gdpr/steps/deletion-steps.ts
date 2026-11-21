@@ -215,14 +215,10 @@ export const deleteAuthRecords = internalMutation
 
 // ── Browser data cleanup ────────────────────────────────────────────────
 
-/** Browser sessions, their actions and extensions (`browser/gdpr.ts`). */
+/** Browser sessions, their actions, extensions and the human-check asks, batched (`browser/gdpr.ts`). */
 export const deleteUserBrowserData = internalMutation
     .input({ userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        await eraseBrowserDataForUser(context, userId);
-
-        return null;
-    });
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await eraseBrowserDataForUser(context, userId));
 
 export { deleteParentsWithChildren } from "../batch";

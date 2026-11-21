@@ -50,6 +50,7 @@ import {
     setDispatchOrigin,
     setHeadlessRun,
     setRunOrganizationId,
+    setRunReplyKey,
     setResearchDepth,
     stampSavedToolCalls,
     toPersonalization,
@@ -324,12 +325,16 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
+    // This run's own reply (`ToolCtx.replyKey`): two runs on one continued thread are two replies.
+    const replyKey = `headless:${crypto.randomUUID()}`;
+
     try {
         setResearchDepth(ctx, "balanced");
         setDispatchOrigin(ctx, options.origin);
         setChainSource(ctx, options.chainSource);
         setHeadlessRun(ctx);
         setRunOrganizationId(ctx, options.organizationId);
+        setRunReplyKey(ctx, replyKey);
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
@@ -510,6 +515,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 ...((options.reasoningEffort ?? skill?.config?.reasoningEffort) !== undefined && {
                     reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 }),
+                // The continuation keeps this run's reply key: what the run asked a person about stays asked.
+                replyKey,
                 researchDepth: "balanced",
                 searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
                 shouldAutoContinue,

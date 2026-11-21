@@ -43,9 +43,9 @@ import type { WsTicketMinter } from "./ws-ticket";
 export { FIRST_VALUE_TIMEOUT_MS } from "./live-query-entry";
 
 /** The slice of `LunoraClient` this needs — the real signatures, narrowed so tests can fake it. */
-export type LiveQueryClient = Pick<LunoraClient, "getAuthToken" | "onAuthTokenChange" | "onIdentityChange" | "query" | "setWsToken" | "subscribe">;
+export type LiveQueryClient = Pick<LunoraClient, "getAuthToken" | "onAuthTokenChange" | "onIdentityChange" | "query" | "setWsTicket" | "subscribe">;
 
-type WsTokenProvider = Extract<Parameters<LunoraClient["setWsToken"]>[0], (...args: never[]) => unknown>;
+type WsTicketProvider = Extract<Parameters<LunoraClient["setWsTicket"]>[0], (...args: never[]) => unknown>;
 
 interface LunoraReference {
     __lunoraRef: string;
@@ -176,7 +176,7 @@ export class LiveQueryManager {
         });
 
         // A provider, so every (re)connect mints a fresh ticket for the CURRENT token.
-        this.client.setWsToken(this.wsTokenProvider());
+        this.client.setWsTicket(this.wsTicketProvider());
 
         let subject = tokenSubject(this.client.getAuthToken());
         // Until the first identity change, the cache holds what the server rendered: the one change that keeps it is
@@ -209,10 +209,10 @@ export class LiveQueryManager {
             this.queryClient.removeQueries({ predicate: (query) => isLunoraKey(query.queryKey) && query.queryKey[1] === PROMPT_OUTLINE_REF });
             // Nor the threads they read. Only a hydrating page's first token, the one the server rendered its threads
             // with, keeps them. Any other token from none may follow a cookie session of another account.
-            // A NEW function identity is what makes `setWsToken` close the open
+            // A NEW function identity is what makes `setWsTicket` close the open
             // sockets; the client resends every subscription on reconnect. First: the thread reads below subscribe
             // again at once, and on the previous account's socket a push could refill what they just emptied.
-            this.client.setWsToken(this.wsTokenProvider());
+            this.client.setWsTicket(this.wsTicketProvider());
 
             if (!adoptsHydratedToken) {
                 this.forgetThreadReads();
@@ -226,7 +226,7 @@ export class LiveQueryManager {
                 firstChange = false;
                 // The open sockets were authenticated as the previous account: a new provider closes them, so the
                 // subscriptions below go out on a socket under the current cookie, not the old one.
-                this.client.setWsToken(this.wsTokenProvider());
+                this.client.setWsTicket(this.wsTicketProvider());
                 this.forgetThreadReads();
             }
         });
@@ -297,7 +297,7 @@ export class LiveQueryManager {
      * Resolved by the client at every (re)connect. No bearer means an anonymous
      * socket; a failed mint throws, and the client retries with backoff.
      */
-    private wsTokenProvider(): WsTokenProvider {
+    private wsTicketProvider(): WsTicketProvider {
         return async () => {
             const bearer = this.client.getAuthToken();
 

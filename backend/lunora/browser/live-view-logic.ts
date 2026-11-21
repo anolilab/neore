@@ -21,6 +21,16 @@ export const BROWSER_REAP_MARGIN_MS = 5000;
 /** The `providerSessionId` written when the renderer returned no reusable session: there is nothing to watch. */
 export const NO_PROVIDER_SESSION = "cf-browser-rendering";
 
+/**
+ * Names one browser without revealing it: it changes when the renderer replaces the browser on the same row, so an
+ * open view knows its URL is for a browser that is gone. A digest, so the provider's session id never reaches a client.
+ */
+export const browserIdOf = async (sessionId: string, providerSessionId: string): Promise<string> => {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${sessionId}:${providerSessionId}`));
+
+    return [...new Uint8Array(digest).slice(0, 12)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
 /** The shortest deadline the provider accepts for opening a live view URL; it bounds only the connect, not the view. */
 export const LIVE_VIEW_CONNECT_DEADLINE_MS = 60_000;
 
