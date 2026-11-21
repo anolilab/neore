@@ -47,6 +47,7 @@ import { deleteSkillRows } from "./functions";
 import { canReadSkill } from "./access";
 import { toSkillSlug } from "./markdown";
 import { pickFreeSlug } from "./slug";
+import { storedRow } from "../lib/stored-row";
 
 /** The newest chats scanned for group chats: `threads` has no index on `groupChat`. */
 const GROUP_SCAN_LIMIT = 300;
@@ -329,7 +330,7 @@ export const loadBundleSources = internalQuery
         const notFound = (): never => {
             throw new LunoraError("NOT_FOUND", "One of the items to export was not found");
         };
-        const skills = await Promise.all(args.skillIds.map(async (skillId) => await ctx.db.skills.findFirst({ where: { _id: skillId } })));
+        const skills = await Promise.all(args.skillIds.map(async (skillId) => storedRow(await ctx.db.skills.findFirst({ where: { _id: skillId } }))));
         const triggers = await Promise.all(args.triggerIds.map(async (triggerId) => await ctx.db.get("triggers", triggerId)));
         const threads = await Promise.all(args.groupChatIds.map(async (threadId) => await ctx.db.get("threads", threadId)));
 

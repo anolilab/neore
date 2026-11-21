@@ -98,6 +98,7 @@ export const createAcpCall = async (
 
     const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
     const deadline = now + DEVICE_CALL_DEADLINE_MS;
+    // lunora-advisor-exempt owner_field_from_args_not_auth -- a helper, not a procedure: the call is written only for a device `userId` owns (the read above), so the row's owner is the device's
     const callId = await ctx.db.insert("deviceCalls", {
         createdAt: now,
         deadline,

@@ -9,6 +9,7 @@ export * from "./auth-errors";
 export * from "./hydrate-auth-token";
 export * from "./ids";
 export * from "./live-queries";
+export * from "./live-socket";
 export * from "./live-query-entry";
 export * from "./lunora-helpers";
 export * from "./query-client";

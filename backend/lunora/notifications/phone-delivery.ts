@@ -19,6 +19,7 @@ import { expoAccessToken, isAndroidDataOnlyPushOn } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
 import { threadIdOfLink } from "./locked-link";
 import { approvalToolFallback, PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
+import { storedPage } from "../lib/stored-row";
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 
@@ -63,12 +64,14 @@ export const listPushDevicesForUser = internalQuery
     )
     .query(async ({ args, ctx }) => {
         // The newest phones, at most the cap (the trim on registration keeps it there).
-        const { page } = await ctx.db.pushDevices.findMany({
-            consistency: "primary",
-            limit: MAX_PUSH_DEVICES_PER_USER,
-            orderBy: [{ lastSeenAt: "desc" }],
-            where: { userId: args.userId },
-        });
+        const { page } = storedPage(
+            await ctx.db.pushDevices.findMany({
+                consistency: "primary",
+                limit: MAX_PUSH_DEVICES_PER_USER,
+                orderBy: [{ lastSeenAt: "desc" }],
+                where: { userId: args.userId },
+            }),
+        );
 
         const now = Date.now();
         const ended: { id: (typeof page)[number]["_id"]; lastSeenAt: number; sessionId: string }[] = [];

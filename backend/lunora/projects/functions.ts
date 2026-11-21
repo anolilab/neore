@@ -48,6 +48,7 @@ import {
     type RunInstruction,
     selectRuleFiles,
 } from "./rule-files";
+import { type StoredRow, storedPage, storedRow } from "../lib/stored-row";
 
 /** Patterns one file may carry into `setProjectRuleFiles`: past `MAX_RULE_GLOBS`, so `normalizeRuleFiles` names it. */
 const RULE_GLOBS_INPUT_MAX = 50;
@@ -71,7 +72,7 @@ export const readableProject = async (
     projectId: Id<"projects">,
     userId: string,
     { primary = false } = {},
-): Promise<Doc<"projects"> | null> => {
+): Promise<StoredRow<Doc<"projects">> | null> => {
     const consistency = primary ? { consistency: "primary" as const } : {};
     // Decide on the row's owner and organization past RLS: a project of a member's
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
@@ -90,7 +91,7 @@ export const readableProject = async (
         admitOrganization(context, found.organizationId!);
     }
 
-    return await context.db.projects.findFirst({ where: { _id: projectId }, ...consistency });
+    return storedRow(await context.db.projects.findFirst({ where: { _id: projectId }, ...consistency }));
 };
 
 /** Ids one `in` read binds: D1 takes at most 100 parameters a statement, and the read binds others beside them. */
@@ -146,7 +147,7 @@ export const readableProjectGrantsMeasured = async (
     let readBytes = 0;
 
     for (const ids of inBatches(projectIds)) {
-        const { page } = await systemDb(context).projects.findMany({ ...consistency, where: { _id: { in: ids } } });
+        const { page } = storedPage(await systemDb(context).projects.findMany({ ...consistency, where: { _id: { in: ids } } }));
 
         if (options.measure !== false) {
             for (const row of page) {
@@ -206,8 +207,8 @@ export const projectWithEditableSettings = async (
     projectId: Id<"projects">,
     userId: string,
     { primary = false } = {},
-): Promise<Doc<"projects"> | null> => {
-    const project = await context.db.projects.findFirst({ where: { _id: projectId }, ...(primary && { consistency: "primary" as const }) });
+): Promise<StoredRow<Doc<"projects">> | null> => {
+    const project = storedRow(await context.db.projects.findFirst({ where: { _id: projectId }, ...(primary && { consistency: "primary" as const }) }));
 
     return project && mayEditProject(project, userId) ? project : null;
 };
@@ -222,7 +223,7 @@ export const writableProject = async (
     projectId: Id<"projects">,
     userId: string,
     options: { primary?: boolean } = {},
-): Promise<Doc<"projects"> | null> => {
+): Promise<StoredRow<Doc<"projects">> | null> => {
     const project = await readableProject(context, projectId, userId, options);
 
     return project && (!project.userId || project.userId === userId) ? project : null;
@@ -790,7 +791,7 @@ const editableProject = async (context: MutationCtx, projectId: Id<"projects">, 
 
 /** A stored repo, when the caller may change the project it belongs to (decided on the row's project, never an argument). */
 const editableRepo = async (context: MutationCtx, repoId: Id<"projectRepositories">, userId: string): Promise<Doc<"projectRepositories">> => {
-    const repo = await context.db.projectRepositories.findFirst({ where: { _id: repoId } });
+    const repo = storedRow(await context.db.projectRepositories.findFirst({ where: { _id: repoId } }));
 
     // A delete's marker or the default counter is not a repository: no remove, branch edit or pick reaches it by id.
     if (!repo || !isRepoRow(repo)) {
@@ -822,19 +823,25 @@ const checked = <T>(read: () => T): T => {
  * A project's repo rows, never a delete's marker. More than the cap only while a concurrent add is taking its row back.
  * `primary` reads the authoritative copy, for a check a lagging D1 replica must not answer (the cap).
  */
-const repoRows = async (context: MutationCtx | QueryCtx, projectId: Id<"projects">, { primary = false } = {}): Promise<Doc<"projectRepositories">[]> => {
-    const { page } = await context.db.projectRepositories.findMany({
-        limit: MAX_PROJECT_REPOSITORIES * 2,
-        where: { projectId },
-        ...(primary && { consistency: "primary" as const }),
-    });
+const repoRows = async (
+    context: MutationCtx | QueryCtx,
+    projectId: Id<"projects">,
+    { primary = false } = {},
+): Promise<StoredRow<Doc<"projectRepositories">>[]> => {
+    const { page } = storedPage(
+        await context.db.projectRepositories.findMany({
+            limit: MAX_PROJECT_REPOSITORIES * 2,
+            where: { projectId },
+            ...(primary && { consistency: "primary" as const }),
+        }),
+    );
 
     return page.filter((row) => isRepoRow(row));
 };
 
 /** Whether a delete of the project is in progress: its marker (`deleteProject`) was written within the TTL. */
 const deleteUnderway = async (context: MutationCtx, projectId: Id<"projects">): Promise<boolean> => {
-    const marker = await context.db.projectRepositories.findFirst({ consistency: "primary", where: { projectId, url: DELETION_MARKER_URL } });
+    const marker = storedRow(await context.db.projectRepositories.findFirst({ consistency: "primary", where: { projectId, url: DELETION_MARKER_URL } }));
 
     return marker?.deletingAt !== undefined && marker.deletingAt > context.now - DELETION_MARKER_TTL_MS;
 };
@@ -864,6 +871,27 @@ export const listProjectRepos = authQuery
         // From the primary too: the settings read this right after a change, and a lagging replica would hand back the
         // list from before it.
         return withDefault(await repoRows(context, projectId as Id<"projects">, { primary: true }));
+    });
+
+/**
+ * One of a project's repositories, for importing its instruction files as rule files (`rule-file-repo.ts`): only for
+ * whoever may save the project's rule files ({@link projectWithEditableSettings}), else `null`, as for a missing one.
+ */
+export const repoForRuleFileImport = internalQuery
+    .input({ projectId: v.id("projects"), repoId: v.id("projectRepositories"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(v.null(), v.object({ defaultBranch: v.optional(v.string()), url: v.string() })))
+    .query(async ({ args: { projectId, repoId, userId }, ctx: context }) => {
+        if (!(await projectWithEditableSettings(context, projectId, userId, { primary: true }))) {
+            return null;
+        }
+
+        const repo = storedRow(await context.db.projectRepositories.findFirst({ consistency: "primary", where: { _id: repoId, projectId } }));
+
+        if (!repo || !isRepoRow(repo)) {
+            return null;
+        }
+
+        return { url: repo.url, ...(repo.defaultBranch && { defaultBranch: repo.defaultBranch }) };
     });
 
 /** Rows one URL lookup reads per scope (the caller's own, each page of their organizations'). */
@@ -1165,7 +1193,7 @@ export const setDefaultProjectRepo = authMutation
     .mutation(async ({ args, ctx: context }) => {
         const repo = await editableRepo(context, args.repoId as Id<"projectRepositories">, context.user.userId);
         // The owner and organization the counter copies, from the project as it is now, not the row's copy of them.
-        const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: repo.projectId } });
+        const project = storedRow(await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: repo.projectId } }));
 
         if (!project || (await deleteUnderway(context, repo.projectId))) {
             throw new LunoraError("NOT_FOUND", "Repository not found");

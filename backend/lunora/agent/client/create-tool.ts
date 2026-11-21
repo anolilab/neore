@@ -34,6 +34,8 @@ export type ToolCtx = ActionContext & {
     messageId?: string;
     /** The organization that caps this run's tools; a sub-agent it dispatches inherits it when its parent thread has none. */
     organizationId?: string | null;
+    /** The reply this run belongs to (its first stream): the same through a pause, a resume and an approval's continuation. */
+    replyKey?: string;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;
     /**

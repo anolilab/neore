@@ -13,7 +13,7 @@ import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
 import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
-import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
+import { BROWSER_IDLE_REAP_MS, browserIdOf, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
 const READER = "user-reader";
@@ -446,6 +446,8 @@ describe("an agent action", () => {
 
         expect(after.browserId).not.toBe(before.browserId);
         expect([before.browserId, after.browserId].join(" ")).not.toMatch(PROVIDER_SESSION_ID);
+        // A "Needs you" card records the name the action that showed the check got (`browser-node.ts`): the same one.
+        await expect(browserIdOf(sessionId, "s-2")).resolves.toBe(after.browserId);
     });
 
     it("does not bring back the old browser when an older action finishes after a newer one replaced it", async () => {

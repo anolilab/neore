@@ -1,6 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
+import type { StoredRow } from "@neore/backend/stored-row";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
@@ -27,6 +28,9 @@ import SkillFormDialog from "./skill-form-dialog";
 import type { ListedSkill } from "./skill-item";
 import SkillItem from "./skill-item";
 
+/** A skill row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedSkill = StoredRow<Doc<"skills">>;
+
 // Opened on demand; it pulls the SKILL.md parser and, for a .zip, JSZip.
 const SkillImportDialog = lazy(() => import("./skill-import-dialog"));
 const BundleImportDialog = lazy(() => import("./bundle-import-dialog"));
@@ -46,8 +50,8 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState<SortOption>("recent");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingSkill, setEditingSkill] = useState<Doc<"skills"> | null>(null);
-    const [deletingSkill, setDeletingSkill] = useState<Doc<"skills"> | null>(null);
+    const [editingSkill, setEditingSkill] = useState<SavedSkill | null>(null);
+    const [deletingSkill, setDeletingSkill] = useState<SavedSkill | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [busySkillId, setBusySkillId] = useState<string | null>(null);
     // Agent builder: the dialog, the integrations left to set up after a save,
@@ -167,7 +171,7 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
         [setBuilderSetup, t],
     );
 
-    const handleEditSkill = useCallback((skill: Doc<"skills">) => {
+    const handleEditSkill = useCallback((skill: SavedSkill) => {
         setEditingSkill(skill);
         setIsDialogOpen(true);
     }, []);

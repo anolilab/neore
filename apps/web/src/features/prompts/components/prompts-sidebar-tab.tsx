@@ -4,6 +4,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
+import type { StoredRow } from "@neore/backend/stored-row";
 import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
@@ -37,6 +38,9 @@ import {
 import PromptFormDialog from "./prompt-form-dialog";
 import VariableFillDialog from "./variable-fill-dialog";
 
+/** A prompt row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedPrompt = StoredRow<Doc<"prompts">>;
+
 interface PromptsSidebarTabProps {
     threadId?: string;
 }
@@ -47,13 +51,13 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     const crpc = useCRPC();
     const models = useFeatureFlaggedModels();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingPrompt, setEditingPrompt] = useState<Doc<"prompts"> | null>(null);
+    const [editingPrompt, setEditingPrompt] = useState<SavedPrompt | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [fillDialogPrompt, setFillDialogPrompt] = useState<Doc<"prompts"> | null>(null);
+    const [fillDialogPrompt, setFillDialogPrompt] = useState<SavedPrompt | null>(null);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<"favorites" | "all">>(() => new Set());
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const [promptToDelete, setPromptToDelete] = useState<Doc<"prompts"> | null>(null);
+    const [promptToDelete, setPromptToDelete] = useState<SavedPrompt | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const ITEMS_PER_PAGE = 10;
 
@@ -72,7 +76,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     // Fetch prompts using action (with caching)
     const { mutateAsync: getPrompts } = useMutation(useLunoraActionOptions(api.prompts.functions.getPrompts));
-    const [prompts, setPrompts] = useState<Doc<"prompts">[] | undefined>(undefined);
+    const [prompts, setPrompts] = useState<SavedPrompt[] | undefined>(undefined);
 
     // Fetch prompt count using action (with caching)
     const { mutateAsync: getPromptCount } = useMutation(useLunoraActionOptions(api.prompts.functions.getPromptCount));
@@ -92,7 +96,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
                     return undefined;
                 }
 
-                setPrompts(promptsResult as Doc<"prompts">[]);
+                setPrompts(promptsResult as SavedPrompt[]);
                 setPromptCount(count);
 
                 return undefined;
@@ -132,7 +136,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     /** Marks the draft when `prompt` was filled with a value the organization set (`organizationValueNames`) or an admin wrote as the person (`impersonatedValueNames`), after its own mark. */
     const noteFilledPrompt = useCallback(
-        (prompt: Doc<"prompts">, values: Record<string, string>, typed?: Record<string, string>) => {
+        (prompt: SavedPrompt, values: Record<string, string>, typed?: Record<string, string>) => {
             noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
 
             if (fillsAnyOf(prompt.content, values, organizationValueNames(resolvedVariables?.sources, activeOrganization?.name), typed)) {
@@ -155,7 +159,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     const { mutate: recordUsage } = useMutation(crpc.prompts.functions.recordPromptUsage.mutationOptions());
 
     const handleCopy = useCallback(
-        async (prompt: Doc<"prompts">) => {
+        async (prompt: SavedPrompt) => {
             try {
                 await navigator.clipboard.writeText(prompt.content);
                 setCopiedId(prompt._id);
@@ -170,7 +174,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     // Check if prompt has missing variables
     const getMissingVariables = useCallback(
-        (prompt: Doc<"prompts">) => {
+        (prompt: SavedPrompt) => {
             const variableNames = extractVariables(prompt.content);
             const definitionMap = new Map<string, { defaultValue?: string; name: string }>(
                 (prompt.variables || []).map((v: { defaultValue?: string; name: string }) => [v.name, v] as [string, { defaultValue?: string; name: string }]),
@@ -187,7 +191,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     );
 
     const handleUse = useCallback(
-        (prompt: Doc<"prompts">) => {
+        (prompt: SavedPrompt) => {
             // Validate prompt settings before using
             const validationResult = validatePromptSettings(prompt.model ?? undefined, prompt.reasoningEffort ?? undefined, prompt.enabledFeatures, models);
 
@@ -300,7 +304,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
         setFillDialogPrompt(null);
     }, []);
 
-    const handleEdit = useCallback((prompt: Doc<"prompts">) => {
+    const handleEdit = useCallback((prompt: SavedPrompt) => {
         setEditingPrompt(prompt);
         setIsDialogOpen(true);
     }, []);
@@ -371,8 +375,8 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     // Group prompts: favorites and all prompts
     const promptGroups = useMemo(() => {
-        const favorites: Doc<"prompts">[] = [];
-        const all: Doc<"prompts">[] = [];
+        const favorites: SavedPrompt[] = [];
+        const all: SavedPrompt[] = [];
 
         filteredPrompts.forEach((prompt) => {
             if (prompt.isFavorite) {

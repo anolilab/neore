@@ -26,6 +26,7 @@ import { activeThreadSession } from "./functions";
 import { patchRow } from "../lib/patch";
 import {
     browserAliveUntil,
+    browserIdOf,
     CONTROL_IDLE_MS,
     rendererCallBudget,
     rendererCallHold,
@@ -53,16 +54,6 @@ type ReaderBrowser =
       }
     | { kind: "denied" }
     | { kind: "none" };
-
-/**
- * Names one browser without revealing it: it changes when the renderer replaces the browser on the same row, so an
- * open view knows its URL is for a browser that is gone. A digest, so the provider's session id never reaches a client.
- */
-const browserIdOf = async (sessionId: Id<"browserSessions">, providerSessionId: string): Promise<string> => {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${sessionId}:${providerSessionId}`));
-
-    return [...new Uint8Array(digest).slice(0, 12)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-};
 
 /**
  * Who holds a lease, as `browserSessions.control.by` stores it: a keyed hash of the session and the person, never their

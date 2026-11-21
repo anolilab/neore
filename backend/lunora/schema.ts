@@ -438,6 +438,31 @@ export const schema = defineSchema({
         .index("by_pairingCode", ["pairingCode"])
         .index("by_extensionId", ["extensionId"]),
 
+    /**
+     * A site whose check (a human verification, a sign-in the agent cannot pass) the person was asked to clear during
+     * one reply (`run`: the reply key, `ToolCtx.replyKey`, the reply's first stream; the prompt, then the thread, for a
+     * run that sets none): asked at most once per site per reply (`browser/human-check.ts`).
+     */
+    browserHumanChecks: defineTable({
+        askedAt: v.number(),
+        /** The check was found only in the page's text: a later read too long to read cannot show it gone. */
+        inText: v.optional(v.boolean()),
+        /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
+        reported: v.optional(v.boolean()),
+        run: v.string(),
+        /** The page's host, `""` when it had no readable URL. */
+        site: v.string(),
+        threadId: v.id("threads"),
+        /** The thread's owner, whose shard holds the row, whoever's turn asked. */
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        // Unique: two actions of one reply that claim the same site at once insert one row, so the person is asked once.
+        .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
+        // An earlier reply's recent ask, for the first look after a hand back (`browser/human-check.ts#afterHandBack`).
+        .index("by_threadId_site_askedAt", ["threadId", "site", "askedAt"])
+        .index("by_userId", ["userId"]),
+
     browserSessions: defineTable({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
@@ -766,7 +791,9 @@ export const schema = defineSchema({
         signature: v.string(),
         status: vDeviceCallStatus,
         taintedBy: v.array(vDeviceTaintSource),
-        threadId: v.id("threads"),
+        // Absent for the one call no chat starts: the rule-file editor's read of global instruction files
+        // (`devices/global-instructions.ts`).
+        threadId: v.optional(v.id("threads")),
         // The AI SDK tool call this row answers, so the chat can show its state.
         toolCallId: v.optional(v.string()),
         toolName: v.string(),
@@ -3360,6 +3387,13 @@ export const schema = defineSchema({
 
     threadPins: defineTable({
         createdAt: v.number(),
+        // An image pin's place among the message's images (`kind: "image"`, `imageOrdinals` in chat-ui); a message pin has none.
+        imageIndex: v.optional(v.number()),
+        // An image pin's key, a hash of where its image is stored (`imageKeyOf` in the web app): found wherever the image now
+        // sits, which an image index alone cannot do when an earlier image is gone. No address is stored.
+        imageKey: v.optional(v.string()),
+        // What is pinned: the whole message (absent, as every pin before images), or one image of it.
+        kind: v.optional(v.union(v.literal("message"), v.literal("image"))),
         messageId: v.string(),
         messageRole: v.union(v.literal("user"), v.literal("assistant")),
         note: v.optional(v.string()),

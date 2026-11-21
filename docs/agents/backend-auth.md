@@ -84,9 +84,19 @@ Sign-up requires an invitation, and anonymous (guest) sign-in is refused. `@luno
   each (re)connect and the socket sends the returned single-use, 30s ticket
   (`lib/ws-ticket.ts`, a raw `wsTicket` D1 table redeemed with
   `DELETE … RETURNING`, created lazily per isolate, purged on every mint and
-  on the Worker's `scheduled()` tick). It rides as `?token=` only because that is the one
-  name `LunoraClient`'s `wsToken` provider appends; `requestBearer` reads the
+  on the Worker's `scheduled()` tick). It rides as `?token=`, where `LunoraClient` puts its
+  `wsTicket` (`setWsTicket`); a `wsToken` goes only in the connect frame, which
+  nothing here reads, so a ticket passed that way never arrives. The `POST /_lunora/ws/reauth` that keeps an open
+  socket signed in carries a fresh ticket the same way, and is redeemed too (a
+  ticket-only client sends no bearer there). `requestBearer` reads the
   `Authorization` header alone, and `?token=` is only ever redeemed as a ticket.
+  A ticket stores the exact sign-in it was minted under: the web `sessionId`,
+  or an app grant's `grantSessionId` (never as `sessionId`). The redeem requires
+  that row of `session` to still exist, so a grant revoked between mint and
+  redeem cannot ride another live session of the user. The column was added
+  after the table shipped; `ensureTable` adds it to an older table. A grant's
+  socket now resolves to `{ grantSessionId, userId }`, like its bearer over
+  HTTP, so `callerSessionMarks` and push registration see the grant there too.
 - **The JWT's `iss` and `aud` are the backend's `PUBLIC_ORIGIN`, set explicitly** on the
   `jwt()` plugin in `auth.ts`. better-auth defaults both to `baseURL`, which is `SITE_URL`
   (the WEB origin in every deployed topology), and `@lunora/auth` only allows the request's

@@ -306,6 +306,11 @@ export const setHeadlessRun = (ctx: object): void => {
     (ctx as { headless?: boolean }).headless = true;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `replyKey`; the action ctx has no such field. */
+export const setRunReplyKey = (ctx: object, replyKey: string): void => {
+    (ctx as { replyKey?: string }).replyKey = replyKey;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;
@@ -1580,6 +1585,7 @@ export const resumeApprovedRun = async (
         // And what the saved-login verdict needs of that turn: a snapshot without any of it sets none.
         setRunTurn(ctx, { impersonated: config.impersonated, promptMessageId: config.promptMessageId, systemContext: config.systemContext });
         setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
+        setRunReplyKey(ctx, config.replyKey ?? streamId);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({

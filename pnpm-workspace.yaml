@@ -299,23 +299,24 @@ catalogs:
     tailwind-csstree: 0.4.2
     typescript-eslint: 8.73.0
   lunora:
-    # HELD (2026-11-21): `cli` 490, `lunorash` 478, `d1` 236, `queue` 143. A newer cli
-    # (and lunorash 479, which asks for cli ^480) re-resolves `@lunora/codegen` to 428,
-    # which types every optional column as `?: T | null` in `Doc_*`: about 70 backend
-    # sites (reads passed on as `T | undefined`, `.output()` validators) need a
-    # null-vs-absent migration of their own. `d1` 238 also imports a `sql-store` 239
-    # export while declaring ^237, and codegen 428's app needs `queue` ^144. Move these
-    # four together, with that migration. `client` 291 is what `react` 301 pins exactly,
-    # and `studio` 384 is the newest whose client range admits it (385+ want ^297).
+    # `cli` 505 brings `@lunora/codegen` 428, which types an optional `.global()` column
+    # `?: T | null` though no read returns `null` (lunora#1668): reads narrow it back with
+    # `backend/lunora/lib/stored-row.ts`. `d1` 238 imports a `sql-store` 239 export while
+    # declaring ^237 (lunora#1666): the lockfile must hold `@lunora/sql-store` 239; after a
+    # re-resolve, check it and run `pnpm update --depth 100 @lunora/sql-store`.
+    # `testing` 338 pins `queue` 143 and `bindings` 151, and `lunorash` pins `platform` 80,
+    # so those keep a second copy (none is branded).
+    # HELD: `studio` 384. 385+ want `client` ^297, and `react` 301 (the newest) pins
+    # `client` 291 exactly (lunora#1667). Move `studio` with a `react` that admits ^297.
     "@lunora/auth": 1.0.0-alpha.268
-    "@lunora/bindings": 1.0.0-alpha.151
+    "@lunora/bindings": 1.0.0-alpha.153
     "@lunora/client": 1.0.0-alpha.291
-    "@lunora/cli": 1.0.0-alpha.490
-    "@lunora/d1": 1.0.0-alpha.236
+    "@lunora/cli": 1.0.0-alpha.505
+    "@lunora/d1": 1.0.0-alpha.238
     "@lunora/mail": 1.0.0-alpha.140
     "@lunora/notify": 1.0.0-alpha.113
     "@lunora/payment": 1.0.0-alpha.275
-    "@lunora/queue": 1.0.0-alpha.143
+    "@lunora/queue": 1.0.0-alpha.145
     "@lunora/ratelimit": 1.0.0-alpha.196
     "@lunora/react": 1.0.0-alpha.301
     "@lunora/scheduler": 1.0.0-alpha.171
@@ -326,7 +327,7 @@ catalogs:
     "@lunora/testing": 1.0.0-alpha.338
     "@lunora/workflow": 1.0.0-alpha.111
     "@lunora/wire": 1.0.0-alpha.6
-    lunorash: 1.0.0-alpha.478
+    lunorash: 1.0.0-alpha.479
   markdown:
     "@streamdown/cjk": 1.0.5
     "@streamdown/math": 1.0.4

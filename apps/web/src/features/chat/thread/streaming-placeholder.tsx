@@ -20,6 +20,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { ImageOpenContext } from "@neore/chat-ui/chat/image-open-context";
 import { HOST_RUN_METADATA } from "@neore/chat-ui/utils/host-run-text";
 import type { StreamSpeaker, ToolProgressEvent } from "@neore/chat-ui/utils/stream-line";
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
@@ -739,7 +740,9 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
         return (
             <div className={cn("streaming-placeholder-compact", className)}>
                 <div className="message-text">
-                    <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                    <ImageOpenContext value={null}>
+                        <MessageContent isStreaming={isStreaming} message={streamingMessage} pinImages={false} />
+                    </ImageOpenContext>
                 </div>
                 {isStreaming && <ToolProgressRows state={toolProgress} />}
                 {isStreaming && <HostActivity activity={hostActivity} key={streamId} />}
@@ -762,7 +765,9 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                 <MessageContentWrapper className="text-foreground col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word dark:text-white">
                     {speaker && <SpeakerChip className="mb-1" name={speaker.name} />}
                     <div className="message-text text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading)">
-                        <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                        <ImageOpenContext value={null}>
+                            <MessageContent isStreaming={isStreaming} message={streamingMessage} pinImages={false} />
+                        </ImageOpenContext>
                     </div>
                     {isStreaming && <ToolProgressRows state={toolProgress} />}
                     {isStreaming && <HostActivity activity={hostActivity} key={streamId} />}

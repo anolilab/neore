@@ -6,16 +6,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OPTIONAL_ENV_KEYS } from "./env-validation";
 import {
+    carryRetiredExtensionOrigins,
+    listsChromeRedirect,
     MOBILE_REDIRECT_URI,
     NATIVE_REDIRECT_URI,
-    parseTrustedExtensionOrigins,
     parseTrustedExtensionRedirectUris,
     SHIPPED_FIREFOX_EXTENSION_ID,
     SHIPPED_FIREFOX_REDIRECT_URI,
 } from "./extension-origins";
-
-const CHROME = `chrome-extension://${"a".repeat(32)}`;
-const FIREFOX = "moz-extension://0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b";
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -24,23 +22,9 @@ afterEach(() => {
 /** Quote style is the formatter's call, so match either quote. */
 const GECKO_ID_DECLARATION = /export const GECKO_ID = (["'])(?<id>[^"']+)\1/u;
 
-describe("parseTrustedExtensionOrigins", () => {
-    it("allows nothing when unset or empty", () => {
-        expect(parseTrustedExtensionOrigins(undefined)).toEqual([]);
-        expect(parseTrustedExtensionOrigins("")).toEqual([]);
-        expect(parseTrustedExtensionOrigins(" , ,")).toEqual([]);
-    });
-
-    it("parses a comma-separated list of exact extension origins", () => {
-        expect(parseTrustedExtensionOrigins(` ${CHROME}/ , ${FIREFOX},${CHROME}`)).toEqual([CHROME, FIREFOX]);
-    });
-
-    it("never widens to a wildcard, a bare scheme or a web origin", () => {
-        vi.spyOn(console, "warn").mockImplementation(() => {});
-
-        expect(parseTrustedExtensionOrigins("*,chrome-extension://,chrome-extension://*,https://evil.example,chrome-extension://short")).toEqual([]);
-        expect(console.warn).toHaveBeenCalledTimes(5);
-    });
+describe("parseTrustedExtensionRedirectUris", () => {
+    const FIREFOX_REDIRECT = `https://${"0a".repeat(20)}.extensions.allizom.org/`;
+    const CHROME_REDIRECT = `https://${"b".repeat(32)}.chromiumapp.org/`;
 
     it("accepts the native shell's callback only when listed, and only exactly", () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -54,11 +38,6 @@ describe("parseTrustedExtensionOrigins", () => {
         expect(parseTrustedExtensionRedirectUris("neore://auth/callback/,neore://auth/other,neore://evil")).toEqual([]);
         expect(console.warn).toHaveBeenCalledTimes(3);
     });
-});
-
-describe("parseTrustedExtensionRedirectUris", () => {
-    const FIREFOX_REDIRECT = `https://${"0a".repeat(20)}.extensions.allizom.org/`;
-    const CHROME_REDIRECT = `https://${"b".repeat(32)}.chromiumapp.org/`;
 
     it("admits the mobile callback only when listed, and only exactly", () => {
         vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -105,14 +84,23 @@ describe("parseTrustedExtensionRedirectUris", () => {
         expect(parseTrustedExtensionRedirectUris(CHROME_REDIRECT)).toEqual([CHROME_REDIRECT]);
     });
 
-    it("reaches the deployed Worker: both extension vars are in the optional passthrough", () => {
-        expect(OPTIONAL_ENV_KEYS).toEqual(expect.arrayContaining(["TRUSTED_EXTENSION_ORIGINS", "TRUSTED_EXTENSION_REDIRECT_URIS"]));
+    it("reaches the deployed Worker: the var is in the optional passthrough", () => {
+        expect(OPTIONAL_ENV_KEYS).toContain("TRUSTED_EXTENSION_REDIRECT_URIS");
     });
 
     it("accepts browser-intercepted redirect URIs, with or without the trailing slash", () => {
         expect(parseTrustedExtensionRedirectUris(`${FIREFOX_REDIRECT.slice(0, -1)}, ${CHROME_REDIRECT},${FIREFOX_REDIRECT}`)).toEqual([
             FIREFOX_REDIRECT,
             CHROME_REDIRECT,
+        ]);
+    });
+
+    it("reads a Chrome extension id, bare or as its origin, as the id's redirect URI", () => {
+        const id = "b".repeat(32);
+
+        expect(parseTrustedExtensionRedirectUris(`${id}, chrome-extension://${id}/,${NATIVE_REDIRECT_URI}`)).toEqual([
+            `https://${id}.chromiumapp.org/`,
+            NATIVE_REDIRECT_URI,
         ]);
     });
 
@@ -131,5 +119,72 @@ describe("parseTrustedExtensionRedirectUris", () => {
             ),
         ).toEqual([]);
         expect(console.warn).toHaveBeenCalledTimes(5);
+    });
+});
+
+describe("carryRetiredExtensionOrigins", () => {
+    const ID = "c".repeat(32);
+    const CHROME = `https://${ID}.chromiumapp.org/`;
+
+    it.each([
+        ["an unset list, keeping the Firefox default", undefined, `${SHIPPED_FIREFOX_REDIRECT_URI},${CHROME}`],
+        [
+            "a list with the app callbacks, keeping them",
+            `${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI}`,
+            `${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI},${CHROME}`,
+        ],
+    ])("adds the old Chrome origin's redirect URI to %s", (_label, redirectUris, expected) => {
+        const carried = carryRetiredExtensionOrigins(`chrome-extension://${ID}`, redirectUris);
+
+        expect(carried).toEqual({ added: [CHROME], value: expected, withheld: [] });
+        expect(parseTrustedExtensionRedirectUris(carried.value)).toEqual(expected.split(","));
+    });
+
+    it("moves an old origin written with several trailing slashes, as the retired parser accepted it", () => {
+        expect(carryRetiredExtensionOrigins(`chrome-extension://${ID}//`, undefined)).toEqual({
+            added: [CHROME],
+            value: `${SHIPPED_FIREFOX_REDIRECT_URI},${CHROME}`,
+            withheld: [],
+        });
+    });
+
+    it.each([
+        ["no Chrome origin", "chrome-extension://not-an-id,moz-extension://x", undefined],
+        ["an already listed URI, copied without its slash", `chrome-extension://${ID}/`, `https://${ID}.chromiumapp.org`],
+        ["an id already listed bare", `chrome-extension://${ID}`, ID],
+        ["nothing", undefined, undefined],
+    ])("moves nothing for %s", (_label, origins, redirectUris) => {
+        expect(carryRetiredExtensionOrigins(origins, redirectUris)).toEqual({ added: [], value: redirectUris, withheld: [] });
+    });
+
+    it("keeps a switched-off sign-in off, naming the URI it did not move", () => {
+        expect(carryRetiredExtensionOrigins(`chrome-extension://${ID}`, "none")).toEqual({ added: [], value: "none", withheld: [CHROME] });
+    });
+});
+
+describe("listsChromeRedirect", () => {
+    const ID = "d".repeat(32);
+
+    it.each([
+        ["a redirect URI", `https://${ID}.chromiumapp.org/`],
+        ["a redirect URI without its slash", `https://${ID}.chromiumapp.org`],
+        ["a bare id", ID],
+        ["a chrome-extension:// origin", `chrome-extension://${ID}`],
+        ["an id among other entries", `${NATIVE_REDIRECT_URI}, ${ID} ,${SHIPPED_FIREFOX_REDIRECT_URI}`],
+    ])("counts %s", (_label, raw) => {
+        expect(listsChromeRedirect(raw)).toBe(true);
+    });
+
+    it.each([
+        ["an unset list, the Firefox default", undefined],
+        ["a switched-off sign-in", "none"],
+        ["only the app callbacks", `${NATIVE_REDIRECT_URI},${MOBILE_REDIRECT_URI}`],
+        ["a look-alike host", `https://${ID}.chromiumapp.org.example.com/`],
+        ["a host that only ends in the name", "https://evilchromiumapp.org/"],
+        ["an id with letters past p", "z".repeat(32)],
+    ])("does not count %s", (_label, raw) => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        expect(listsChromeRedirect(raw)).toBe(false);
     });
 });

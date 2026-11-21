@@ -13,7 +13,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
-import { NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
+import { browserIdOf, NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
 import { isServiceBound, serviceFetch } from "../../lib/services";
 import { validateDomain } from "./utilities";
 
@@ -28,6 +28,12 @@ export const executeBrowserAction = internalAction
         browserSettings: v.optional(v.any()),
         direction: v.optional(v.string()),
         fullPage: v.optional(v.boolean()),
+        /**
+         * One of the human-check ladder's own reads (`browser/human-check.ts`), which the agent never asked for: not
+         * charged to the user's browser rate limit. Only `chat/tools/browser.ts` sets it, capped per tool call
+         * (`HUMAN_CHECK_LOOK_BUDGET`); an internal action, so no client or model input reaches it.
+         */
+        ladderLook: v.optional(v.boolean()),
         selector: v.optional(v.string()),
         text: v.optional(v.string()),
         threadId: v.id("threads"),
@@ -103,11 +109,15 @@ export const executeBrowserAction = internalAction
                 // The ended lease this action looks at the page for: once a look came back, the next actions act again.
                 const { inspecting } = use;
 
-                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser.
-                const rlResult = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
-                    identifier: userId,
-                    key: `browser/action:${args.userTier ?? "free"}`,
-                });
+                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser,
+                // nor one of the human-check ladder's own reads.
+                const rlResult =
+                    args.ladderLook === true
+                        ? { ok: true }
+                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
+                              identifier: userId,
+                              key: `browser/action:${args.userTier ?? "free"}`,
+                          });
 
                 if (!rlResult.ok) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
@@ -202,11 +212,26 @@ export const executeBrowserAction = internalAction
                     return returned === undefined ? discarded : handedBackResult(discarded, returned);
                 }
 
+                // The browser this page is on, by the name a "Needs you" card keeps (`browserIdOf`): a check it shows is
+                // asked about on this browser, never on one that replaced it later. No reusable browser, no name.
+                const seen = returnedSessionId === NO_PROVIDER_SESSION ? result : { ...result, browserId: await browserIdOf(sessionId, returnedSessionId) };
+
                 if (returned === undefined) {
-                    return result;
+                    // A navigate, or a click, a typed entry or a scroll that left the page on another URL: the human-check
+                    // ladder reads that page's text once (`browser/human-check.ts`), as these results carry none. A navigate's
+                    // title and URL can look ordinary on a check that only its text shows.
+                    const navigated =
+                        result.success === true &&
+                        ((action === "navigate" && result.content === undefined) ||
+                            (INTERACTIVE_ACTIONS.has(action) &&
+                                result.url !== undefined &&
+                                sessionDocument.currentUrl !== undefined &&
+                                withoutHash(result.url) !== withoutHash(sessionDocument.currentUrl)));
+
+                    return navigated ? { ...seen, navigated: true } : seen;
                 }
 
-                return handedBackResult(result, returned, looksFirst ? action : undefined);
+                return handedBackResult(seen, returned, looksFirst ? action : undefined);
             } catch (error) {
                 // Whether the browser survived is unknown: the row falls back to its last confirmed activity. A call cut off
                 // at its deadline may still be acting in the renderer: its hold runs out on its own, so no person takes
@@ -238,6 +263,16 @@ export const executeBrowserAction = internalAction
         };
     });
 
+/**
+ * A `#fragment` change is the same page: it is no navigation to read again. A query change is one: a search form sent
+ * from a click lands on a new query, and an interstitial there need not add its token to the URL. The read is not
+ * charged to the user's rate limit, and is capped per tool call (`HUMAN_CHECK_LOOK_BUDGET`).
+ */
+const withoutHash = (url: string): string => url.split("#", 1)[0] ?? url;
+
+/** The actions whose result carries the page's URL but neither its title nor its text. */
+const INTERACTIVE_ACTIONS: ReadonlySet<string> = new Set(["click", "scroll", "type"]);
+
 type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 
 /** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
@@ -268,8 +303,13 @@ const handBackNote = (returned: BrowserReturn): string => `The person had contro
 /**
  * The first action after a person drove the browser: the result says so, and names the page the browser is on now. An
  * action that would change the page (`skipped`) was not run; a screenshot of the page came back in its place.
+ * `handedBack` marks it for the human-check ladder (`browser/human-check.ts`), which tells whether a check it asked about cleared.
  */
-const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(result: T, returned: BrowserReturn, skipped?: string): T => {
+const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(
+    result: T,
+    returned: BrowserReturn,
+    skipped?: string,
+): T & { handedBack: true } => {
     const page = result.url === undefined ? "The current page is unknown." : `The browser is now on ${result.url}.`;
     const note = `${handBackNote(returned)} ${page} ${
         skipped === undefined
@@ -277,7 +317,12 @@ const handedBackResult = <T extends { error?: string; success?: boolean; url?: s
             : `Your ${skipped} action was not run: this is a screenshot of the page instead. Look at it, then decide what to do.`
     }`;
 
-    return { ...result, error: result.error === undefined ? note : `${note} ${result.error}`, ...(skipped !== undefined && { success: false }) };
+    return {
+        ...result,
+        error: result.error === undefined ? note : `${note} ${result.error}`,
+        handedBack: true,
+        ...(skipped !== undefined && { success: false }),
+    };
 };
 
 /** What the agent hears from an action whose browser another, concurrent action replaced: look again, on the kept browser. */

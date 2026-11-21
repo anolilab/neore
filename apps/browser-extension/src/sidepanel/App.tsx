@@ -12,6 +12,9 @@ import type { PanelRequest } from "@/page-context/panel-request";
 import { subscribePanelRequests } from "@/page-context/panel-request";
 import { languageName, quickPrompt } from "@/page-context/quick-prompts";
 
+import type { AccountPanel } from "./account-panel";
+import { panelFor, subscribeWhileCurrent, THREADS_VIEW, withCreatedThread } from "./account-panel";
+
 const newChat = (seed?: ChatSeed): View => {
     return { key: crypto.randomUUID(), seed, threadId: null, type: "chat" };
 };
@@ -33,8 +36,25 @@ const seedFor = async (request: Exclude<PanelRequest, { kind: "error" }>): Promi
 
 export default function App() {
     const { data: session, isPending } = useSession();
-    const [view, setView] = useState<View>({ type: "threads" });
-    const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+    const userId = session?.user.id;
+    const [panel, setPanel] = useState<AccountPanel>({ activeOrgId: null, userId, view: THREADS_VIEW });
+    const { activeOrgId, view } = panelFor(panel, userId);
+    const setView = useCallback(
+        (next: View) => {
+            setPanel((current) => {
+                return { ...panelFor(current, userId), view: next };
+            });
+        },
+        [userId],
+    );
+    const setActiveOrgId = useCallback(
+        (next: string | null) => {
+            setPanel((current) => {
+                return { ...panelFor(current, userId), activeOrgId: next };
+            });
+        },
+        [userId],
+    );
     const [notice, setNotice] = useState<string>();
     const isSignedIn = Boolean(session);
 
@@ -45,21 +65,29 @@ export default function App() {
             return undefined;
         }
 
-        return subscribePanelRequests((request) => {
+        return subscribeWhileCurrent(subscribePanelRequests, async (request) => {
             if (request.kind === "error") {
-                setNotice(request.message);
-
-                return;
+                return () => setNotice(request.message);
             }
 
-            setNotice(undefined);
-            void seedFor(request).then((seed) => setView(newChat(seed)));
-        });
-    }, [isSignedIn]);
+            const seed = await seedFor(request);
 
-    const onThreadCreated = useCallback((threadId: string) => {
-        setView((current) => (current.type === "chat" ? { ...current, threadId } : current));
-    }, []);
+            return () => {
+                setNotice(undefined);
+                setView(newChat(seed));
+            };
+        });
+    }, [isSignedIn, setView]);
+
+    const chatKey = view.type === "chat" ? view.key : undefined;
+    const onThreadCreated = useCallback(
+        (threadId: string) => {
+            if (chatKey !== undefined) {
+                setPanel((current) => withCreatedThread(current, chatKey, threadId));
+            }
+        },
+        [chatKey],
+    );
 
     if (isPending) {
         return (
