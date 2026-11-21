@@ -4553,6 +4553,22 @@ const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPAT
 /** A call with less budget than this cannot finish, so it is not started. */
 const MIN_MODEL_BUDGET_MS = 10 * 1000;
 
+/**
+ * The cache write of a paid reply whose first write failed. One write per dispatch: a write that throws is retried by the scheduler's own
+ * policy (with backoff), and a refused write (a newer reply) returns quietly. No model call and no charge is made here.
+ */
+export const retryFollowupCache = internalAction
+    .input({
+        lastMessageId: v.string().max(MAX_LENGTH.id),
+        order: v.number(),
+        replyAt: v.number(),
+        suggestions: v.array(v.string().max(MAX_LENGTH.long)),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
+    .action(async ({ args, ctx }) => {
+        await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, args);
+    });
+
 export const generateFollowupSuggestionsForThread = internalAction
     .input({
         threadId: v.string(),
@@ -4901,13 +4917,23 @@ export const generateFollowupSuggestionsForThread = internalAction
                 }
 
                 // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached.
-                await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
+                const cacheWrite = {
                     lastMessageId,
                     order: newest.order,
                     replyAt: newest.createdAt ?? newest._creationTime,
                     suggestions,
                     threadId,
-                });
+                };
+
+                try {
+                    await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, cacheWrite);
+                } catch (cacheError) {
+                    // The charge is taken and the suggestions are in hand: the write is retried with them, no model call and no second charge.
+                    // The claim stays held for the retries, so a run does not call the model again for this reply meanwhile.
+                    chatLogger.error(`[generateFollowupSuggestionsForThread] Cache write failed, retrying it: ${threadId}`, cacheError);
+                    await context.scheduler.runAfter(0, internal.chat.functions.retryFollowupCache, cacheWrite);
+                }
+
                 paid.cached = true;
 
                 chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
