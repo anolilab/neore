@@ -50,7 +50,8 @@ export const vToolRunConfig = v.object({
      */
     headlessApproved: v.optional(v.array(v.string())),
     /**
-     * Whether an admin acting as the owner sent the turn that paused, as `/chat/start` recorded it. Absent (a run path
+     * Whether the turn that paused is not the owner's own: sent by an admin acting as the owner or from a browser-extension
+     * sign-in (as `/chat/start` recorded it), or answered from a session `callerSessionNotOwn` rejects. Absent (a run path
      * that records none, or an older snapshot) is not `false`: the continuation then gets no saved login.
      */
     impersonated: v.optional(v.boolean()),

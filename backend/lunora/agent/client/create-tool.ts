@@ -11,7 +11,11 @@ import type { ActionCtx as ActionContext } from "./types";
 export type ResearchDepth = "speed" | "balanced" | "thorough";
 
 export type RunTurn = {
-    /** Whether an admin acting as the owner sent the turn, as `/chat/start` recorded it from the session. */
+    /**
+     * Whether the turn is not the owner's own, as `/chat/start` recorded it from the session: an admin acting as the
+     * owner, or a browser-extension sign-in. An approval answered from a session `callerSessionNotOwn` rejects (gone,
+     * expired, foreign or extension) sets it on the continuation too. The saved-login verdict refuses it whatever the cause.
+     */
     impersonated: boolean;
     /** The turn's prompt row. Not `ToolCtx.promptMessageId`, which a resumed or approved run points at its own last row. */
     promptMessageId: string;
