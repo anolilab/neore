@@ -17,6 +17,7 @@ import HierarchicalThreadList from "./hierarchical-thread-list";
 import usePersistedCollapseState from "./hooks/use-persisted-collapse-state";
 import { useThreadListPlaceholder } from "./hooks/use-thread-list-cache";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
+import ThreadListDropZone from "./thread-list-drop-zone";
 import type { GroupType, LoadingStates } from "./types";
 
 // Lazy: a dialog opened on demand, with its icon picker and project panels.
@@ -262,45 +263,47 @@ const ThreadList: FC = () => {
 
     return (
         <DateBoundariesProvider>
-            <div className="text-brand-black dark:text-brand-white flex flex-col items-stretch gap-1.5">
-                <HierarchicalThreadList
-                    collapsedGroups={collapsedGroups}
-                    collapsedProjects={collapsedProjects}
-                    currentThreadId={currentThreadId}
-                    expandedThreads={expandedThreads}
-                    isSearchError={isSearchError}
-                    isSearchLoading={isSearchLoading}
-                    isSelectionMode={isSelectionMode}
-                    lastSelectedIndex={lastSelectedIndex}
-                    loadingStates={loadingStates}
-                    messageSearchResults={messageSearchResults}
-                    onExitSelectionMode={exitSelectionMode}
-                    searchQuery={shownQuery}
-                    searchType={searchType}
-                    selectedCategory={selectedCategory}
-                    selectedThreadIds={selectedThreadIds}
-                    setLastSelectedIndex={setLastSelectedIndex}
-                    setLoadingStates={setLoadingStates}
-                    setSelectedThreadIds={setSelectedThreadIds}
-                    setShowKeyboardHelp={setShowKeyboardHelp}
-                    showKeyboardHelp={showKeyboardHelp}
-                    threadRelationships={threadRelationships ?? []}
-                    threadSearchResults={threadSearchResults}
-                    toggleExpanded={toggleExpanded}
-                    toggleGroupCollapsed={toggleGroupCollapsed}
-                />
-                {hasOpenedAddProject && (
-                    <Suspense fallback={null}>
-                        <AddProjectDialog onClose={closeAddProjectDialog} onCreateNew={openCreateProjectDialog} open={showAddProjectDialog} />
-                    </Suspense>
-                )}
-                {hasOpenedProjectForm && (
-                    <Suspense fallback={null}>
-                        <ProjectFormDialog editingProject={editingProject} onClose={closeProjectFormDialog} open={showProjectFormDialog} />
-                    </Suspense>
-                )}
-                <ManageThreadTagsDialog onOpenChange={setShowManageTagsDialog} open={showManageTagsDialog} />
-            </div>
+            <ThreadListDropZone>
+                <div className="text-brand-black dark:text-brand-white flex flex-col items-stretch gap-1.5">
+                    <HierarchicalThreadList
+                        collapsedGroups={collapsedGroups}
+                        collapsedProjects={collapsedProjects}
+                        currentThreadId={currentThreadId}
+                        expandedThreads={expandedThreads}
+                        isSearchError={isSearchError}
+                        isSearchLoading={isSearchLoading}
+                        isSelectionMode={isSelectionMode}
+                        lastSelectedIndex={lastSelectedIndex}
+                        loadingStates={loadingStates}
+                        messageSearchResults={messageSearchResults}
+                        onExitSelectionMode={exitSelectionMode}
+                        searchQuery={shownQuery}
+                        searchType={searchType}
+                        selectedCategory={selectedCategory}
+                        selectedThreadIds={selectedThreadIds}
+                        setLastSelectedIndex={setLastSelectedIndex}
+                        setLoadingStates={setLoadingStates}
+                        setSelectedThreadIds={setSelectedThreadIds}
+                        setShowKeyboardHelp={setShowKeyboardHelp}
+                        showKeyboardHelp={showKeyboardHelp}
+                        threadRelationships={threadRelationships ?? []}
+                        threadSearchResults={threadSearchResults}
+                        toggleExpanded={toggleExpanded}
+                        toggleGroupCollapsed={toggleGroupCollapsed}
+                    />
+                    {hasOpenedAddProject && (
+                        <Suspense fallback={null}>
+                            <AddProjectDialog onClose={closeAddProjectDialog} onCreateNew={openCreateProjectDialog} open={showAddProjectDialog} />
+                        </Suspense>
+                    )}
+                    {hasOpenedProjectForm && (
+                        <Suspense fallback={null}>
+                            <ProjectFormDialog editingProject={editingProject} onClose={closeProjectFormDialog} open={showProjectFormDialog} />
+                        </Suspense>
+                    )}
+                    <ManageThreadTagsDialog onOpenChange={setShowManageTagsDialog} open={showManageTagsDialog} />
+                </div>
+            </ThreadListDropZone>
         </DateBoundariesProvider>
     );
 };

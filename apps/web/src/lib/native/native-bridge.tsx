@@ -1,10 +1,11 @@
 import { useLingui } from "@lingui/react/macro";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import type { JSX } from "react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { SIGNED_OUT } from "@/features/chat/core/utils/signed-out";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { trackEvent } from "@/lib/analytics";
@@ -27,10 +28,20 @@ const requestSend = async (text: string): Promise<void> => {
 };
 
 /** Lazy, like `requestSend`: the new-thread composer takes the files and attaches them (`composer-submit.ts`). */
-const requestAttach = async (files: File[]): Promise<void> => {
+
+/**
+ * Queues a dock drop for the new-chat composer. Returns the number of files of an earlier drop it replaced (another
+ * account's), or `"switched"` when the account changed while the composer code loaded: the switch has let go of drops
+ * for the account before already, so these are not queued either.
+ */
+const requestAttach = async (files: File[], accountId: string | undefined, currentAccount: () => string | undefined): Promise<number | "switched"> => {
     const { requestComposerAttach } = await import("@/features/chat/core/utils/composer-submit");
 
-    requestComposerAttach({ files });
+    if (accountId !== undefined && currentAccount() !== accountId) {
+        return "switched";
+    }
+
+    return requestComposerAttach({ accountId, files });
 };
 
 /**
@@ -51,7 +62,31 @@ const NativeBridge = (): JSX.Element | null => {
     const navigate = useNavigate();
     const router = useRouter();
     const { authClient } = useAuth();
-    const { data: session } = authClient.useSession();
+    const { data: session, isPending: sessionPending } = authClient.useSession();
+    // The account a dock drop is for: undefined only while the session loads (the composer that opens takes it), and
+    // signed out once it has loaded with no user. Read from a ref when a drop starts to be taken from the shell, so a
+    // session that resolves never re-subscribes the listener mid-drain, and a switch during it never re-tags the files.
+    const sessionUserId = session?.user?.id ?? (sessionPending ? undefined : SIGNED_OUT);
+    const sessionUserIdRef = useRef(sessionUserId);
+
+    useEffect(() => {
+        sessionUserIdRef.current = sessionUserId;
+    }, [sessionUserId]);
+
+    // Read by the dock listener from a ref, so a locale change never re-subscribes it mid-drain either.
+    const discardedMessage = t`The files arrived while the account changed, so they were not attached. Drop them again.`;
+    const discardedMessageRef = useRef(discardedMessage);
+
+    useEffect(() => {
+        discardedMessageRef.current = discardedMessage;
+    }, [discardedMessage]);
+
+    const replacedMessage = t`Files dropped earlier for another account were not attached. Drop them again.`;
+    const replacedMessageRef = useRef(replacedMessage);
+
+    useEffect(() => {
+        replacedMessageRef.current = replacedMessage;
+    }, [replacedMessage]);
     const afterFirstPaint = useAfterFirstPaint();
     const [hasDeviceTools, setHasDeviceTools] = useState(false);
 
@@ -94,12 +129,29 @@ const NativeBridge = (): JSX.Element | null => {
 
     useEffect(
         () =>
-            onNativeFiles((files) => {
-                void (async () => {
-                    await requestAttach(files);
-                    await openNewChat();
-                })();
-            }),
+            onNativeFiles(
+                (files, accountId) => {
+                    void (async () => {
+                        const queued = await requestAttach(files, accountId, () => sessionUserIdRef.current);
+
+                        if (queued === "switched") {
+                            toast.error(discardedMessageRef.current);
+
+                            return;
+                        }
+
+                        if (queued > 0) {
+                            toast.error(replacedMessageRef.current);
+                        }
+
+                        await openNewChat();
+                    })();
+                },
+                () => sessionUserIdRef.current,
+                () => {
+                    toast.error(discardedMessageRef.current);
+                },
+            ),
         [openNewChat],
     );
 
