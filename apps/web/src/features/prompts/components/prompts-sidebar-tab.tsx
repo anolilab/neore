@@ -21,12 +21,12 @@ import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
-import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
+import { markComposerDraft, noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import validatePromptSettings from "../lib/prompt-validation";
-import { extractVariables, getAutoPopulatedVariables, replaceVariables } from "../lib/prompt-variables";
+import { extractVariables, fillsAnyOf, getAutoPopulatedVariables, organizationValueNames, replaceVariables } from "../lib/prompt-variables";
 import PromptFormDialog from "./prompt-form-dialog";
 import VariableFillDialog from "./variable-fill-dialog";
 
@@ -122,6 +122,18 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
             ...resolvedVariables?.values,
         };
     }, [resolvedVariables, sessionData, activeOrganization]);
+
+    /** Marks the draft when `prompt` was filled with a value the organization set (`organizationValueNames`), after its own mark. */
+    const noteFilledPrompt = useCallback(
+        (prompt: Doc<"prompts">, values: Record<string, string>, typed?: Record<string, string>) => {
+            noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
+
+            if (fillsAnyOf(prompt.content, values, organizationValueNames(resolvedVariables?.sources, activeOrganization?.name), typed)) {
+                markComposerDraft("organizationValue");
+            }
+        },
+        [resolvedVariables?.sources, activeOrganization?.name, sessionData?.user?.id],
+    );
 
     // Mutations
     const { mutateAsync: createPrompt } = useMutation(crpc.prompts.functions.createPrompt.mutationOptions());
@@ -220,22 +232,23 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
             // Use Zustand store to set the composer text
             setComposerText(content);
-            noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
+            noteFilledPrompt(prompt, values);
             toast.success(t`Prompt added to input`);
             // Record usage
             recordUsage({ promptId: prompt._id });
         },
-        [setComposerText, t, variableValues, getMissingVariables, models, recordUsage, threadId, setSelectedModel, setPendingSettings, sessionData?.user?.id],
+        [setComposerText, t, variableValues, getMissingVariables, models, recordUsage, threadId, setSelectedModel, setPendingSettings, noteFilledPrompt],
     );
 
     const handleFillDialogUse = useCallback(
-        (content: string, _newValues: Record<string, string>) => {
+        (content: string, newValues: Record<string, string>) => {
             // Use the content with filled variables
             // Note: newValues could be saved to thread variables in the future
             setComposerText(content);
 
+            // The dialog fills in what it shows (`variableValues`), except where the person typed a value into it.
             if (fillDialogPrompt) {
-                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, { replaced: true });
+                noteFilledPrompt(fillDialogPrompt, variableValues, newValues);
             }
 
             toast.success(t`Prompt added to input`);
@@ -247,15 +260,16 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
             setFillDialogPrompt(null);
         },
-        [setComposerText, t, fillDialogPrompt, recordUsage, sessionData?.user?.id],
+        [setComposerText, t, fillDialogPrompt, recordUsage, noteFilledPrompt, variableValues],
     );
 
     const handleFillDialogUseAnyway = useCallback(
         (content: string) => {
             setComposerText(content);
 
+            // The dialog fills in what it shows (`variableValues`) beside what was typed into it.
             if (fillDialogPrompt) {
-                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, { replaced: true });
+                noteFilledPrompt(fillDialogPrompt, variableValues);
             }
 
             toast.success(t`Prompt added with placeholders`);
@@ -267,7 +281,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
             setFillDialogPrompt(null);
         },
-        [setComposerText, t, fillDialogPrompt, recordUsage, sessionData?.user?.id],
+        [setComposerText, t, fillDialogPrompt, recordUsage, noteFilledPrompt, variableValues],
     );
 
     const handleFillDialogCancel = useCallback(() => {

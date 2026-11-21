@@ -9,11 +9,11 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
-    "add-rule-file-description",
     "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
-    "session-options-to-session-state"
+    "session-options-to-session-state",
+    "widen-not-typed-steer-drafts"
   ],
   "tables": {
     "account": {
@@ -20500,6 +20500,41 @@
                         "nullable": false,
                         "optional": false,
                         "unique": false,
+                        "literal": "\"assistantText\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"forwarded\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"galleryPrompt\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"improvedPrompt\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"organizationValue\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
                         "literal": "\"promptLink\""
                       },
                       {
@@ -20515,6 +20550,13 @@
                         "optional": false,
                         "unique": false,
                         "literal": "\"shellLink\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"suggestion\""
                       }
                     ]
                   },

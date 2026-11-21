@@ -66,6 +66,7 @@ const { CODING_AGENTS } = await import("../coding-agents/commands");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
 const { MODEL_LOOKUP } = await import("@neore/ai/models");
 const { isLeadAgentName, messageRefusal } = await import("./site-login-turn");
+const { NOT_TYPED_DRAFTS } = await import("../lib/not-typed-text");
 const { SITE_LOGIN_CHANGED } = await import("./lib/site-login-shape");
 
 // The model a lead run is named for.
@@ -564,10 +565,17 @@ describe("which chats may use a login", () => {
         expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
     });
 
-    it("a prompt, a row above it or a step the owner did not type gets none: a link's or someone else's saved prompt, an admin's", async () => {
+    it("a prompt, a row above it or a step the owner did not type gets none: every draft source, an admin's", async () => {
         await save({ password: PASSWORD });
 
-        const marks = [{ draft: "promptLink" }, { draft: "shellLink" }, { draft: "sharedPrompt" }, { impersonated: true }];
+        // Every draft source: a link, the shell, someone else's prompt, forwarded messages, a reply sent on, a suggestion,
+        // the improver's rewrite, a gallery prompt, an organization's value.
+        const marks = [
+            ...NOT_TYPED_DRAFTS.map((draft) => {
+                return { draft };
+            }),
+            { impersonated: true },
+        ];
         const markedMessage = (notTyped: unknown) => {
             return { content: [{ providerOptions: { neore: { notTyped } }, text: "Sign in", type: "text" }], role: "user" };
         };
@@ -595,7 +603,10 @@ describe("which chats may use a login", () => {
             return { content: [{ providerOptions: { neore: { notTyped } }, text: "Sign in", type: "text" }], role: "user" };
         };
 
-        expect(messageRefusal(withMark({ draft: "promptLink" }))).toBe("draft-promptLink");
+        for (const draft of NOT_TYPED_DRAFTS) {
+            expect(messageRefusal(withMark({ draft }))).toBe(`draft-${draft}`);
+        }
+
         expect(messageRefusal(withMark({ draft: "sharedPrompt", impersonated: true }))).toBe("impersonated");
         // A mark nobody classified refuses too.
         expect(messageRefusal(withMark({ by: "someone" }))).toBe("impersonated");

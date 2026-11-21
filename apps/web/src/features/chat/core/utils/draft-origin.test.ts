@@ -1,8 +1,19 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { handOffLandingMessage, LANDING_MESSAGE_FROM_KEY, takeLandingMessage } from "@/features/marketing/stores/landing-store";
 
 import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
-import { composerDraftFrom, draftFromField, isOwnPromptContent, markComposerDraft, noteSavedPrompt, prefillDraftFrom } from "./draft-origin";
+import {
+    composerDraftFrom,
+    draftFromField,
+    holdLandingDraft,
+    isOwnPromptContent,
+    markComposerDraft,
+    markPrefilledDraft,
+    noteSavedPrompt,
+    prefillDraftFrom,
+} from "./draft-origin";
 
 const ui = () => useChatUIStore.getState();
 
@@ -141,7 +152,102 @@ describe(isOwnPromptContent, () => {
 
 describe(prefillDraftFrom, () => {
     it("marks a chat's `?initialMessage=` prefill, which a link wrote, and not the new chat's hand-off of typed text", () => {
-        expect(prefillDraftFrom("thread-1")).toBe("promptLink");
-        expect(prefillDraftFrom(undefined)).toBeUndefined();
+        holdLandingDraft("my words", undefined);
+
+        expect(prefillDraftFrom("thread-1", "my words")).toBe("promptLink");
+        expect(prefillDraftFrom(undefined, "my words")).toBeUndefined();
+    });
+
+    it("gives the new chat's prefill its hand-off's mark each time it is applied, and only for that text", () => {
+        holdLandingDraft("> quoted", "forwarded");
+
+        expect(prefillDraftFrom(undefined, "> quoted")).toBe("forwarded");
+        // A remounted composer applies the same prefill again.
+        expect(prefillDraftFrom(undefined, "> quoted")).toBe("forwarded");
+        expect(prefillDraftFrom(undefined, "other text")).toBeUndefined();
+
+        holdLandingDraft("a template", "suggestion");
+
+        expect(prefillDraftFrom(undefined, "a template")).toBe("suggestion");
+        expect(prefillDraftFrom(undefined, "> quoted")).toBeUndefined();
+    });
+});
+
+/** The chat index reading a hand-off, then the composer putting its text in (`chat/index.tsx`, `composer.tsx`). */
+const applyHandOff = (): void => {
+    const handOff = takeLandingMessage();
+
+    if (handOff) {
+        holdLandingDraft(handOff.text, handOff.from);
+        ui().setComposerText(handOff.text);
+        markPrefilledDraft(undefined, handOff.text);
+    }
+};
+
+describe(markPrefilledDraft, () => {
+    it("clears an unsent draft's mark when typed text from the home page replaces it", () => {
+        ui().setComposerText("> quoted");
+        markComposerDraft("forwarded");
+
+        handOffLandingMessage("my words");
+        applyHandOff();
+
+        expect(composerDraftFrom()).toBeUndefined();
+    });
+
+    it("marks a forwarded hand-off that replaces the person's own unsent draft, again after a remount", () => {
+        ui().setComposerText("my words");
+
+        handOffLandingMessage("> quoted", "forwarded");
+        applyHandOff();
+
+        expect(composerDraftFrom()).toBe("forwarded");
+
+        markPrefilledDraft(undefined, "> quoted");
+
+        expect(composerDraftFrom()).toBe("forwarded");
+    });
+});
+
+describe(handOffLandingMessage, () => {
+    it("hands forwarded text over with its mark, and typed text with none left over from an earlier hand-off", () => {
+        handOffLandingMessage("> quoted", "forwarded");
+
+        expect(takeLandingMessage()).toStrictEqual({ from: "forwarded", text: "> quoted" });
+        expect(takeLandingMessage()).toBeUndefined();
+
+        handOffLandingMessage("> quoted", "forwarded");
+        handOffLandingMessage("my words");
+
+        expect(takeLandingMessage()).toStrictEqual({ from: undefined, text: "my words" });
+    });
+
+    it("leaves no text without its mark when a replacing write fails part way", () => {
+        const quotaError = () => {
+            throw new DOMException("full", "QuotaExceededError");
+        };
+
+        // Typed text replacing a marked template: the text's write fails after the old mark was cleared.
+        handOffLandingMessage("a template", "suggestion");
+        const textWrite = vi.spyOn(Storage.prototype, "setItem").mockImplementation(quotaError);
+
+        expect(() => handOffLandingMessage("my words")).toThrow("full");
+        expect(takeLandingMessage()).toBeUndefined();
+
+        // A marked hand-off whose mark's write fails replaces nothing with unmarked text.
+        textWrite.mockRestore();
+        handOffLandingMessage("my words");
+        const markWrite = vi.spyOn(Storage.prototype, "setItem").mockImplementation(quotaError);
+
+        expect(() => handOffLandingMessage("> quoted", "forwarded")).toThrow("full");
+        markWrite.mockRestore();
+        expect(takeLandingMessage()).toBeUndefined();
+    });
+
+    it("reads a mark nobody named as a link's", () => {
+        handOffLandingMessage("> quoted");
+        sessionStorage.setItem(LANDING_MESSAGE_FROM_KEY, "typed");
+
+        expect(takeLandingMessage()).toStrictEqual({ from: "promptLink", text: "> quoted" });
     });
 });

@@ -51,6 +51,7 @@ import {
     userTextContent,
     withNotTypedMarks,
 } from "../lib/not-typed-text";
+import { vDraftFrom } from "../lib/not-typed-text-validator";
 
 /** Regenerate the reply to `messageId` (a prompt), or save an edit of it. Requires `threadId`. */
 export interface LocalTurnBranch {
@@ -237,7 +238,7 @@ export const saveLocalTurn = authMutation
     .input({
         /** Regenerate the reply to a prompt, or save an edit of it, as a sibling branch. */
         branch: v.optional(v.object({ kind: v.union(v.literal("regenerate"), v.literal("edit")), messageId: v.id("messages") })),
-        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"), v.literal("impersonated"))),
+        draftFrom: v.optional(vDraftFrom),
         error: v.optional(v.string().check((value) => value.length <= MAX_LOCAL_ERROR_CHARS * 4, { message: "Error too long" })),
         language: v.optional(v.string().check((value) => value.length <= 20, { message: "Invalid language" })),
         /** `custom:<providerId>/<modelId>` naming the caller's own `local-browser` endpoint. */

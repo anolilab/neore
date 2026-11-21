@@ -13,7 +13,7 @@
   input, by ONE function: `site-login-turn.ts#siteLoginTurnVerdict`, an ALLOWLIST. Both queries use it, and the fill
   tool of the next part must call it too (through `usableSiteLogins`), never a check of its own. Safe, and only this:
   the owner's own typed text (their row, text parts with no mark, attachment, guest or outside-agent text, goal note,
-  compressed history or quote-like line, `carriesQuotedLines`: a forward, a quoted reply and a rich paste are unmarked `>` lines), the lead model's own replies (text, reasoning, tool calls; no speaker, `acp-host`, sources,
+  compressed history or quote-like line, `carriesQuotedLines`: a quoted reply and a rich paste are unmarked `>` lines; a forward is also marked), the lead model's own replies (text, reasoning, tool calls; no speaker, `acp-host`, sources,
   memories, file, `neore…` metadata but `neoreGateway`), rows whose `agentName` is a model id or unset
   (`isLeadAgentName`: lead rows and the prompt carry the model id; every other writer names itself, and a test pins
   that none of those names is a model id), results of `SAFE_RESULT_TOOLS`, built-in tools only (`toolSources`), and a
@@ -56,16 +56,23 @@
   Text the owner did not type is marked where it is saved (`lib/not-typed-text.ts`, `neore.notTyped`) and refused by
   name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=` or
   `?initialMessage=` link, anything the desktop shell hands over (a `neore://new?text=` link, a share, the Quick
-  Composer) or a saved prompt whose words (content, variable defaults) not all the viewer wrote, unimpersonated (`isOwnPromptContent`;
+  Composer), a saved prompt whose words (content, variable defaults) not all the viewer wrote, unimpersonated (`isOwnPromptContent`;
   `prompts/content-author.ts` records them from the session, never `userId`, and only grows: another writer or an
-  impersonated write of any part stays on the row until a restore). `usePromptLoader` waits for the session first. The web client marks the draft itself, never matches text: the mark stays
+  impersonated write of any part stays on the row until a restore), forwarded messages (`handOffLandingMessage` carries
+  the mark to the new chat), a reply's text sent as a prompt (Generate image/video, `assistantText`), any suggestion
+  clicked (follow-ups, welcome screen, search, canvas quick actions, onboarding templates), the prompt improver's Apply,
+  a gallery item's stored prompt even edited, and an organization's variable default or active name filled into a
+  prompt (`organizationValueNames`; not a value typed into the fill dialog, nor the prompt's own `user.organization` default). `usePromptLoader` waits for the session first. The web client marks the draft itself, never matches text: the mark stays
   through edits, pane switches, a reload, the queue and a failed send, and goes when the draft is sent or emptied
   (`features/chat/core/utils/draft-origin.ts`); each send names it as `draftFrom`. An edit keeps the original's mark;
   a steer's lives in `persistentStreams.notTypedSteers` until delivery. A stateless run saves its prompt again: pass it
   through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
-  admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. Still unmarked, to mark (a draft
-  kind the verdict names) before the fill ships: forwarded messages, Generate image/video (the reply's text sent as a
-  prompt), follow-up and welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt, an organization's variable defaults filled into a prompt (`getResolvedVariables`), the organization's name a loaded prompt fills in (`getAutoPopulatedVariables`); and bot instructions and personalization an impersonating admin wrote (a
-  `systemContext` kind that refuses). The allowlist refuses a step holding a page's result or an approval's
+  admin's prompt again as `draftFrom: "impersonated"`. A quoted reply (the quote chip) is refused by its
+  `>` lines (`carriesQuotedLines`), not marked, so deleting the chip leaves typed text usable. A plain-text paste stays unseen. A new draft kind goes in
+  `NOT_TYPED_DRAFTS` and `vNotTypedDraft` (`not-typed-text-validator.ts`; a type check fails until both agree), which the
+  stored mark, `steerRun` and `saveLocalTurn` use; the `/chat/start`, steer and verdict tests walk the list. Still unmarked, to mark
+  before the fill ships: bot instructions and personalization an impersonating admin wrote (a `systemContext` kind
+  that refuses) and the variable defaults one wrote; an accepted ghost-text completion (`composer-tiptap/extensions/ghost-completion.ts`);
+  Restore to input of a collaborator's message in a shared chat. The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

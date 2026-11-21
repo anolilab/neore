@@ -1,13 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import { guestTextPart } from "../chat/lib/attached-text";
-import { mergeNotTypedMarks, notTypedMarksOfMessage, notTypedMarksOfPart, parseNotTypedDraft, userTextContent, withNotTypedMarks } from "./not-typed-text";
+import {
+    NOT_TYPED_DRAFTS,
+    mergeNotTypedMarks,
+    notTypedMarksOfMessage,
+    notTypedMarksOfPart,
+    parseNotTypedDraft,
+    userTextContent,
+    withNotTypedMarks,
+} from "./not-typed-text";
 
 describe("the mark on text the owner did not type", () => {
     it("reads a request's draft source, refusing one nobody named", () => {
         expect(parseNotTypedDraft(undefined)).toBeUndefined();
         expect(parseNotTypedDraft("promptLink")).toBe("promptLink");
         expect(parseNotTypedDraft("sharedPrompt")).toBe("sharedPrompt");
+
+        for (const draft of ["forwarded", "assistantText", "suggestion", "improvedPrompt", "galleryPrompt", "organizationValue"] as const) {
+            expect(NOT_TYPED_DRAFTS).toContain(draft);
+            expect(parseNotTypedDraft(draft)).toBe(draft);
+        }
+
         expect(parseNotTypedDraft("typed")).toBeNull();
         expect(parseNotTypedDraft(1)).toBeNull();
     });
