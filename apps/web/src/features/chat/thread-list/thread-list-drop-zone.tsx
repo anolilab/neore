@@ -17,15 +17,36 @@ import type { FC, ReactNode } from "react";
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 
-import { requestComposerAttach } from "@/features/chat/core/utils/composer-submit";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
+import { requestComposerAttach, withdrawComposerAttach } from "@/features/chat/core/utils/composer-submit";
+import { showError } from "@/lib/toast";
 
 /** Whether `pathname` is the new-chat page, whose composer takes the files without a navigation. */
 export const isNewChatPath = (pathname: string): boolean => pathname === "/chat" || pathname === "/chat/";
+
+/**
+ * Opens the new chat for a drop. When the navigation does not land there (the update dialog stopped it, say), the files
+ * are taken back, so they never turn up in some later new chat; the result says whether it landed.
+ */
+export const openNewChatFor = async (files: ReadonlyArray<File>, go: () => Promise<unknown>, currentPath: () => string): Promise<boolean> => {
+    await go().catch(() => undefined);
+
+    if (isNewChatPath(currentPath())) {
+        return true;
+    }
+
+    withdrawComposerAttach(files);
+
+    return false;
+};
 
 const ThreadListDropZone: FC<{ children: ReactNode }> = ({ children }) => {
     const { t } = useLingui();
     const navigate = useNavigate();
     const router = useRouter();
+    // The files are for this account: a composer of another one (after an account switch) never uploads them.
+    const { data: session } = useAuthSession();
+    const accountId = session?.user?.id;
 
     const onDrop = useCallback(
         (files: File[]) => {
@@ -34,13 +55,25 @@ const ThreadListDropZone: FC<{ children: ReactNode }> = ({ children }) => {
             }
 
             // Held until the new-chat composer takes them, so the drop survives the navigation below.
-            requestComposerAttach({ files });
+            requestComposerAttach({ accountId, files });
 
-            if (!isNewChatPath(router.state.location.pathname)) {
-                void navigate({ search: {}, to: "/chat" });
+            if (isNewChatPath(router.state.location.pathname)) {
+                return;
             }
+
+            void openNewChatFor(
+                files,
+                () => navigate({ search: {}, to: "/chat" }),
+                () => router.state.location.pathname,
+            ).then((landed: boolean) => {
+                if (!landed) {
+                    showError(t`The new chat could not open, so the files were not attached. Drop them again.`);
+                }
+
+                return landed;
+            });
         },
-        [navigate, router],
+        [accountId, navigate, router, t],
     );
 
     const { getRootProps, isDragActive } = useDropzone({ multiple: true, noClick: true, noKeyboard: true, onDrop });

@@ -12,6 +12,7 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import Assistant from "@/features/chat/assistant";
 import { useLinkSearchAsWritten, usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { hasPendingComposerAttach } from "@/features/chat/core/utils/composer-submit";
 import { holdLandingDraft } from "@/features/chat/core/utils/draft-origin";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
@@ -144,7 +145,9 @@ const ChatPage = () => {
             composerText.trim() !== "" ||
             composerAttachments.length > 0 ||
             ((focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value.trim() !== "") ||
-            (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "");
+            (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "") ||
+            // Files dropped on the sidebar or the dock icon wait for this page's composer.
+            hasPendingComposerAttach();
 
         if (hasDraft) {
             return;

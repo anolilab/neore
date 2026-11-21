@@ -35,6 +35,16 @@ vi.mock("@tanstack/react-router", () => {
     };
 });
 
+// The list's file drop zone tags a drop with the account; no test here drops a file.
+vi.mock("@/features/auth/hooks/use-auth-session", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("@/features/auth/hooks/use-auth-session")>()),
+        useAuthSession: () => {
+            return { data: null };
+        },
+    };
+});
+
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     const organization = { data: null };
 

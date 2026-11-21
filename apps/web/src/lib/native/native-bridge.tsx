@@ -27,10 +27,10 @@ const requestSend = async (text: string): Promise<void> => {
 };
 
 /** Lazy, like `requestSend`: the new-thread composer takes the files and attaches them (`composer-submit.ts`). */
-const requestAttach = async (files: File[]): Promise<void> => {
+const requestAttach = async (files: File[], accountId: string | undefined): Promise<void> => {
     const { requestComposerAttach } = await import("@/features/chat/core/utils/composer-submit");
 
-    requestComposerAttach({ files });
+    requestComposerAttach({ accountId, files });
 };
 
 /**
@@ -52,6 +52,8 @@ const NativeBridge = (): JSX.Element | null => {
     const router = useRouter();
     const { authClient } = useAuth();
     const { data: session } = authClient.useSession();
+    // The account a dock drop is for; undefined while the session loads, when the composer that opens takes it.
+    const sessionUserId = session?.user?.id;
     const afterFirstPaint = useAfterFirstPaint();
     const [hasDeviceTools, setHasDeviceTools] = useState(false);
 
@@ -96,11 +98,11 @@ const NativeBridge = (): JSX.Element | null => {
         () =>
             onNativeFiles((files) => {
                 void (async () => {
-                    await requestAttach(files);
+                    await requestAttach(files, sessionUserId);
                     await openNewChat();
                 })();
             }),
-        [openNewChat],
+        [openNewChat, sessionUserId],
     );
 
     useEffect(

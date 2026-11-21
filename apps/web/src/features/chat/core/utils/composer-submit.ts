@@ -25,19 +25,52 @@ export const requestComposerSubmit = (request: ComposerSubmitRequest): void => {
 export const onComposerSubmitRequest = (handler: (request: ComposerSubmitRequest) => void): (() => void) => composerSubmitChannel.consume(handler);
 
 export interface ComposerAttachRequest {
+    /** The account the files were dropped for; absent when it was not known yet (a dock drop while the app starts). */
+    accountId?: string;
     files: File[];
 }
 
 const composerAttachChannel = createRequestChannel<ComposerAttachRequest>();
 
 /**
- * Files dropped on the dock icon. The new-thread composer attaches them through its normal upload path; nothing is sent.
- * Drops that arrive before the composer takes them are joined, so a second drop does not replace the first.
+ * Files dropped on the dock icon or the sidebar's thread list. The new-thread composer attaches them through its normal
+ * upload path; nothing is sent. Drops that arrive before the composer takes them are joined, so a second drop does not
+ * replace the first; a drop for another account replaces the held one, so files never mix across accounts.
  */
 export const requestComposerAttach = (request: ComposerAttachRequest): void => {
-    const held = composerAttachChannel.store.getState().pending?.payload.files ?? [];
+    const held = composerAttachChannel.store.getState().pending?.payload;
+    const files = held && held.accountId === request.accountId ? [...held.files, ...request.files] : request.files;
 
-    composerAttachChannel.request({ files: [...held, ...request.files] });
+    composerAttachChannel.request({ accountId: request.accountId, files });
 };
 
-export const onComposerAttachRequest = (handler: (request: ComposerAttachRequest) => void): (() => void) => composerAttachChannel.consume(handler);
+/** Whether dropped files still wait for the new-chat composer: the resume-last-chat redirect must not leave them behind. */
+export const hasPendingComposerAttach = (): boolean => composerAttachChannel.store.getState().pending !== null;
+
+/** Takes `files` back from a request still waiting, for a drop whose new chat could not open. */
+export const withdrawComposerAttach = (files: ReadonlyArray<File>): void => {
+    const { pending, take } = composerAttachChannel.store.getState();
+
+    if (!pending) {
+        return;
+    }
+
+    const rest = pending.payload.files.filter((file: File) => !files.includes(file));
+
+    if (rest.length === 0) {
+        take();
+    } else {
+        composerAttachChannel.request({ ...pending.payload, files: rest });
+    }
+};
+
+/**
+ * Hands dropped files to the new-thread composer of `accountId`. A request for another account (one made before an
+ * account switch) is taken and dropped, never uploaded under this account.
+ */
+export const onComposerAttachRequest = (accountId: string, handler: (request: ComposerAttachRequest) => void): (() => void) =>
+    composerAttachChannel.consume((request: ComposerAttachRequest) => {
+        if (request.accountId === undefined || request.accountId === accountId) {
+            handler(request);
+        }
+    });
