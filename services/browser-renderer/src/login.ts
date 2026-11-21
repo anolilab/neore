@@ -463,7 +463,8 @@ const armGuard = async (
         const body = request.postDataBuffer();
         const isLarge = body !== null && body.length > MAX_GUARDED_BODY_BYTES;
         const isOwn = frameOf(request)?.page() === page && originOf(request.url()) === origin;
-        const isAdmitted = body === null && request.url() === admitted && request.isNavigationRequest() && frameOf(request) === page.mainFrame();
+        const isAdmitted =
+            body === null && withoutFragment(request.url()) === admitted && request.isNavigationRequest() && frameOf(request) === page.mainFrame();
 
         if (isSecretAddress(request.url())) {
             attempt ??= "the password in an address";
@@ -667,7 +668,8 @@ const armGuard = async (
     return {
         /** Lets the main frame load `url` by GET, wherever it is: the cleanup's reload of the page the sign-in landed on. */
         admit: (url: string): void => {
-            admitted = url;
+            // Without its fragment: a request's address never carries one, so an admitted page with a fragment would match nothing.
+            admitted = withoutFragment(url);
         },
         /** Whether the final answer to the form's own navigation arrived. */
         answered: () => !isCounting,
