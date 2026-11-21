@@ -29,12 +29,18 @@ const HOLDER = /^[\da-f]{64}$/u;
 const SIGNING_SECRET = "browser-control-test-secret";
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
 
-const { config, registry, sessionFrom } = vi.hoisted(() => {
+const { config, impersonation, registry, sessionFrom } = vi.hoisted(() => {
+    // Set while a test acts as an admin impersonating the signed-in user.
+    const state: { by?: string } = {};
+
     return {
         config: { accountId: "account-1", token: "token-1" },
+        impersonation: state,
         registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                : null,
     };
 });
 
@@ -209,6 +215,7 @@ beforeEach(async () => {
 
 afterEach(() => {
     delete replica.grant;
+    impersonation.by = undefined;
     actionStart.hook = undefined;
     rendererStart.hook = undefined;
     vi.restoreAllMocks();
@@ -703,6 +710,58 @@ describe("taking control of the browser", () => {
         await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "left", until: NOW });
     });
 
+    it("ends the lease as handed back when the view that held it handed back while a failed renewal minted", async () => {
+        await addSession();
+        const { claim } = await take(OWNER);
+
+        fetchMock.mockImplementationOnce(async () => {
+            await giveBack(OWNER, "handed_back", claim);
+
+            return answer(500, {});
+        });
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        // The agent's next action hears that the person gave the browser back, not that they left the view.
+        await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "handed_back", until: NOW });
+        await expect(control()).resolves.not.toHaveProperty("renewingEnded");
+    });
+
+    it("ends the lease as handed back when a second renewal fails after the open view handed back under the first", async () => {
+        await addSession();
+        const { claim } = await take(OWNER);
+
+        fetchMock.mockImplementationOnce(async () => {
+            await giveBack(OWNER, "handed_back", claim);
+            // Another tab renews while the first renewal still mints, and gets no view either.
+            fetchMock.mockResolvedValueOnce(answer(500, {}));
+            await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "handed_back", until: NOW });
+    });
+
+    it("takes, keeps and drives no browser for an admin impersonating the owner, but lets a lease be handed back", async () => {
+        await addSession();
+        const { claim } = await take(OWNER);
+
+        impersonation.by = "admin-1";
+        fetchMock.mockClear();
+
+        await expect(take(OWNER)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(keep(OWNER, claim)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(as(OWNER).action(navigateInControl as never, { claim, threadId, url: "https://example.com/next" } as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(renderer).not.toHaveBeenCalled();
+
+        await giveBack(OWNER, "handed_back", claim);
+        await expect(control()).resolves.toMatchObject({ claim, ended: "handed_back" });
+    });
+
     it("keeps the open view's claim through a renewal made while another renewal is minted", async () => {
         await addSession();
         const { claim } = await take(OWNER);
@@ -1077,6 +1136,29 @@ describe("opening a page while in control", () => {
         expect(renderer).not.toHaveBeenCalled();
     });
 
+    it("tells the person the browser closed when the renderer opened the page in a new browser", async () => {
+        await addSession();
+        await take(OWNER);
+        // The old browser expired: the renderer opened the page in a new one, and the lease ends with the old one.
+        renderer.mockResolvedValueOnce({ data: { sessionId: "s-2", success: true, url: "https://example.com/next" }, response: { ok: true } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ control: { ended: "browser_closed" }, providerSessionId: "s-2" });
+    });
+
+    it("tells the person the browser closed when the row moved on to another browser while the page loaded", async () => {
+        const sessionId = await addSession();
+
+        await take(OWNER);
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { providerSessionId: "s-3" }));
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+    });
+
     it("forgets a browser the renderer closed after a blocked redirect, and ends the lease with it", async () => {
         await addSession();
         await take(OWNER);
@@ -1124,7 +1206,8 @@ describe("opening a page while in control", () => {
             return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
         });
 
-        await navigate(OWNER);
+        // The page loaded in a browser the thread no longer has: the person is told it closed, not that it opened.
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
 
         const audits = (await harness.run(async (ctx: any) => await ctx.db.query("browserActions").collect())) as { sessionId: string }[];
 

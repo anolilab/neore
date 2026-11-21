@@ -4539,6 +4539,28 @@
               "optional": true,
               "unique": false
             },
+            "renewingEnded": {
+              "kind": "union",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"handed_back\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"left\""
+                }
+              ]
+            },
             "since": {
               "kind": "number",
               "nullable": false,

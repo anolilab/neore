@@ -8,7 +8,7 @@
  * locked thread shows neither (no passcode proof reaches either procedure), and neither does a trashed one.
  */
 import { browserAction, type BrowserActionResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
@@ -84,7 +84,21 @@ const claimNames = <C extends { claim: string; renewing?: string }>(control: C |
     control !== undefined && (control.claim === claim || control.renewing === claim);
 
 /** The lease without a renewal in flight. */
-const settled = <C extends { renewing?: string }>({ renewing: _renewing, ...control }: C): Omit<C, "renewing"> => control;
+const settled = <C extends { renewing?: string; renewingEnded?: string }>({
+    renewing: _renewing,
+    renewingEnded: _renewingEnded,
+    ...control
+}: C): Omit<C, "renewing" | "renewingEnded"> => control;
+
+/**
+ * Takes, keeps and drives no browser while an admin acts as the owner: the browser is signed in to the owner's sites,
+ * and what is opened in it is recorded as the owner's own. `handBack` stays open, so a lease can always be ended.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "The browser cannot be controlled while impersonating");
+    }
+};
 
 /** The caller holds the lease on `session` (handed back or not, lapsed or not): its `by` is theirs. */
 const holdsLease = async (session: Pick<Doc<"browserSessions">, "_id" | "control">, userId: string): Promise<boolean> => {
@@ -409,7 +423,8 @@ export const claimControl = internalMutation
                     ...(current.navigatingUntil !== undefined && { navigatingUntil: current.navigatingUntil }),
                     // The view that holds the lease goes on under its claim while this one is minted (a renewal
                     // during another keeps the claim of the view that holds it, not that of the mint still running).
-                    renewing: current.renewing ?? current.claim,
+                    // That view closed during the mint still running: no view holds the lease, and how it closed stands.
+                    ...(current.renewingEnded === undefined ? { renewing: current.renewing ?? current.claim } : { renewingEnded: current.renewingEnded }),
                     since: current.since,
                     until,
                 },
@@ -473,13 +488,17 @@ export const dropControlClaim = internalMutation
         }
 
         // A renewal: the lease goes on, under the claim of the view that still holds it. That view closed while this
-        // one was minted (`handBack` dropped `renewing`): no view holds the lease, which ends as a view left.
+        // one was minted (`handBack` dropped `renewing`): no view holds the lease, which ends the way that view closed.
         if (previousClaim !== undefined) {
             await patchRow(ctx.db, "browserSessions", session, {
                 control:
                     control.renewing === previousClaim
                         ? { ...settled(control), claim: previousClaim }
-                        : { ...settled(control), ended: "left" as const, until: Math.max(ctx.now, control.navigatingUntil ?? 0) },
+                        : {
+                              ...settled(control),
+                              ended: control.renewingEnded ?? ("left" as const),
+                              until: Math.max(ctx.now, control.navigatingUntil ?? 0),
+                          },
             });
 
             return;
@@ -534,7 +553,10 @@ export const takeControl = authAction
         ),
     )
     .action(async ({ args: { threadId }, ctx }) => {
-        const { userId } = ctx.user;
+        const { impersonatedBy, userId } = ctx.user;
+
+        refuseImpersonation(impersonatedBy);
+
         const claim = await ctx.runMutation(internal.browser.live_view.claimControl, { threadId, userId });
 
         if (claim.kind === "denied") {
@@ -649,6 +671,8 @@ export const keepControl = authMutation
     .use(rateLimit("browser/control"))
     .output(v.union(v.null(), v.object({ until: v.number() })))
     .mutation(async ({ args: { claim, threadId }, ctx }) => {
+        refuseImpersonation(ctx.user.impersonatedBy);
+
         const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now, { primary: true });
         const control = browser.kind === "watchable" ? browser.session.control : undefined;
 
@@ -691,9 +715,9 @@ export const handBack = authMutation
             (await holdsLease(session, ctx.user.userId))
         ) {
             // A view a renewal is replacing closed: the renewal decides (another tab of the person's may be taking
-            // over), and ends the lease if it fails, as no view holds it then.
+            // over), and ends the lease the way this view closed if it fails, as no view holds it then.
             if (session.control.claim !== claim) {
-                await patchRow(systemDb(ctx), "browserSessions", session, { control: settled(session.control) });
+                await patchRow(systemDb(ctx), "browserSessions", session, { control: { ...settled(session.control), renewingEnded: reason } });
 
                 return null;
             }
@@ -720,9 +744,18 @@ export const handBack = authMutation
 export const navigateInControl = authAction
     .input({ claim: v.string(), threadId: v.id("threads"), url: v.string().max(2048) })
     .use(rateLimit("browser/control"))
-    .output(v.union(v.object({ status: v.literal("ok"), url: v.optional(v.string()) }), v.object({ error: v.string(), status: v.literal("refused") })))
+    .output(
+        v.union(
+            v.object({ status: v.literal("ok"), url: v.optional(v.string()) }),
+            /** The thread's browser was closed or replaced while the page loaded: what loaded is no longer the browser in the view. */
+            v.object({ status: v.literal("closed") }),
+            v.object({ error: v.string(), status: v.literal("refused") }),
+        ),
+    )
     .action(async ({ args: { claim, threadId, url }, ctx }) => {
-        const { userId } = ctx.user;
+        const { impersonatedBy, userId } = ctx.user;
+
+        refuseImpersonation(impersonatedBy);
 
         if (!isServiceBound(ctx, "browserRenderer")) {
             return { error: "Browser automation is not configured.", status: "refused" as const };
@@ -772,8 +805,10 @@ export const navigateInControl = authAction
         // chat read that, and what the person opens is theirs; only the owner's history shows it, and whether they or a collaborator opened it. Before the lease's hold ends, so the agent
         // never acts on a row that still names a browser that is gone. A failed write never keeps the hold: the agent's
         // next action finds a browser that is gone on its own path, as it does one the provider reaped.
+        let logged: { replaced: boolean } | undefined;
+
         try {
-            await ctx.runMutation(internal.browser.functions.logAction, {
+            logged = await ctx.runMutation(internal.browser.functions.logAction, {
                 action: "navigate",
                 actor: navigation.byOwner ? "owner" : "collaborator",
                 durationMs: Date.now() - startedAt,
@@ -794,6 +829,12 @@ export const navigateInControl = authAction
                     userId,
                 });
             }
+        }
+
+        // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened
+        // the page in a new browser (the old one expired), which ended the lease: the person's view shows a browser gone.
+        if (logged?.replaced === true || (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)) {
+            return { status: "closed" as const };
         }
 
         if (result?.success !== true) {

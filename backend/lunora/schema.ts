@@ -451,6 +451,8 @@ export const schema = defineSchema({
                  * renewal settles (then it goes) or fails (then it is `claim` again).
                  */
                 renewing: v.optional(v.string()),
+                /** The view under `renewing` closed (handed back or left) while the renewal mints: a failed renewal ends the lease so. */
+                renewingEnded: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
                 since: v.number(),
                 until: v.number(),
             }),
