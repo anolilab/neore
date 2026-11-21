@@ -83,6 +83,7 @@ vi.mock("@/lib/toast", () => {
 });
 
 const { canPinImage, default: PinnableImage, imagePinText } = await import("./pinnable-image");
+const { imageKeyOf } = await import("./pinned-image-preview");
 
 const PIN_BUTTON = { name: "Pin image" };
 const generated = { image: "https://files.example/fox.png", prompt: "A fox logo", type: "image" as const };
@@ -127,7 +128,7 @@ describe("PinnableImage", () => {
             messageId: "m1",
             messageRole: "assistant",
             imageIndex: 3,
-            imageKey: "files.example/fox.png",
+            imageKey: imageKeyOf(generated.image),
             selectedText: "A fox logo",
             threadId: "k17abc",
         });

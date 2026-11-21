@@ -75,9 +75,11 @@ describe(findPinnedImage, () => {
             ],
         };
 
-        expect(findPinnedImage([before], "m6", 1, "api.test/agent-files/b")?.url).toBe(pinned);
-        expect(findPinnedImage([after], "m6", 1, "api.test/agent-files/b")?.url).toBe("https://api.test/agent-files/b?sig=2");
-        expect(findPinnedImage([after], "m6", 0, "api.test/agent-files/a")).toBeNull();
+        const key = imageKeyOf(pinned);
+
+        expect(findPinnedImage([before], "m6", 1, key)?.url).toBe(pinned);
+        expect(findPinnedImage([after], "m6", 1, key)?.url).toBe("https://api.test/agent-files/b?sig=2");
+        expect(findPinnedImage([after], "m6", 0, imageKeyOf("https://api.test/agent-files/a?sig=1"))).toBeNull();
     });
 
     it("tells apart two hosts serving one path, and lets the place decide between copies of one file", () => {
@@ -90,10 +92,12 @@ describe(findPinnedImage, () => {
             ],
         };
 
-        expect(findPinnedImage([reply2], "m9", 1, "api.test/logo.png")?.url).toBe("https://api.test/logo.png?sig=1");
-        expect(findPinnedImage([reply2], "m9", 0, "cdn.example/logo.png")?.url).toBe("https://cdn.example/logo.png");
+        const stored = imageKeyOf("https://api.test/logo.png?sig=1");
+
+        expect(findPinnedImage([reply2], "m9", 1, stored)?.url).toBe("https://api.test/logo.png?sig=1");
+        expect(findPinnedImage([reply2], "m9", 0, imageKeyOf("https://cdn.example/logo.png"))?.url).toBe("https://cdn.example/logo.png");
         // Two copies of one key and a place that is neither of them: the label, not a guess.
-        expect(findPinnedImage([reply2], "m9", 0, "api.test/logo.png")).toBeNull();
+        expect(findPinnedImage([reply2], "m9", 0, stored)).toBeNull();
     });
 
     it("keeps finding the pinned image after an edit removes the text before it", () => {
@@ -119,8 +123,15 @@ describe(findPinnedImage, () => {
 });
 
 describe(imageKeyOf, () => {
-    it("keeps a stored image's path, without host or signature, and nothing for an inline image", () => {
-        expect(imageKeyOf("https://api.test/agent-files/abc?sig=1&exp=2")).toBe("api.test/agent-files/abc");
+    it("keys a stored image by its path whatever the domain, another host's by host and path, and an inline one not at all", () => {
+        const key = imageKeyOf("https://api.test/agent-files/abc?sig=1&exp=2");
+
+        // The same file signed again, or served after the app's domain moved: the same key, and no address in it.
+        expect(imageKeyOf("https://api.test/agent-files/abc?sig=9&exp=5")).toBe(key);
+        expect(imageKeyOf("https://new.example/agent-files/abc?sig=1")).toBe(key);
+        expect(key).not.toContain("agent-files");
+        // Another host's image: its host counts.
+        expect(imageKeyOf("https://cdn.one/a.png")).not.toBe(imageKeyOf("https://cdn.two/a.png"));
         expect(imageKeyOf("data:image/png;base64,iVBORw0KGgo=")).toBeUndefined();
         expect(imageKeyOf("not a url")).toBeUndefined();
     });

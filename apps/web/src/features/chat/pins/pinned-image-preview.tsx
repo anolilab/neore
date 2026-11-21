@@ -32,15 +32,38 @@ const sourceOf = (part: PartLike): string | undefined => {
 };
 
 /**
- * An image's key: the host and path of its link, without scheme or signature, which stay the same when the link is
- * signed again, and tell apart two hosts serving the same path. `undefined` for an image with no web link (a `data:`
- * URL). Not a link itself: nothing signs or serves it.
+ * A short, stable hash: two polynomial hashes over different primes, about 61 bits together. Enough to tell the images
+ * of one message apart, and nothing can be read back from it.
+ */
+const hashOf = (text: string): string => {
+    let first = 0;
+    let second = 0;
+
+    for (const character of text) {
+        const code = character.codePointAt(0) ?? 0;
+
+        first = (first * 31 + code) % 2_147_483_647;
+        second = (second * 131 + code) % 1_000_000_007;
+    }
+
+    return `${first.toString(36)}${second.toString(36)}`;
+};
+
+/**
+ * An image's key, kept with its pin to find it again: a hash, so no address of the file is stored. A signed link to our
+ * own storage (`sig`) is keyed by its path alone, which stays the same when it is signed again or the app's domain
+ * moves; another host's image by its host and path, so two hosts serving one path stay apart. `undefined` for an image
+ * with no web link (a `data:` URL).
  */
 export const imageKeyOf = (source: string): string | undefined => {
     try {
         const url = new URL(source);
 
-        return url.protocol === "http:" || url.protocol === "https:" ? `${url.host}${url.pathname}` : undefined;
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+            return undefined;
+        }
+
+        return hashOf(url.searchParams.has("sig") ? `storage ${url.pathname}` : `${url.host} ${url.pathname}`);
     } catch {
         return undefined;
     }
