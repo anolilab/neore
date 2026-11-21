@@ -33,7 +33,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { fitTitle, importRuleFiles, needsMode } from "../lib/rule-file-import";
+import { fitTitle, importRuleFiles, needsMode, unreservedTitle } from "../lib/rule-file-import";
 import type { RepoImportResult } from "./repo-rule-file-import";
 import RepoRuleFileImport from "./repo-rule-file-import";
 
@@ -510,9 +510,12 @@ const ProjectRuleFiles: FC<{
         // A name longer than a save takes (a repository's file name) is cut to fit, and told apart from the others.
         const titles = new Set(base.map((file) => file.title));
         let shortened = 0;
+        let renamed = 0;
 
         for (const file of read.imported) {
-            const title = fitTitle(file.title, titles, MAX_RULE_TITLE_LENGTH);
+            // A name opening the id form, which a save refuses (a file named `id:setup.md`), is renamed and said.
+            const unreserved = unreservedTitle(file.title);
+            const title = fitTitle(unreserved, titles, MAX_RULE_TITLE_LENGTH);
             const draftFile = { ...file, id: crypto.randomUUID(), title };
             // What it adds to the stored list: its JSON, and a comma after the one before it.
             const cost = ruleFilesStoredBytes(toSaved([draftFile], legacyTitle)) - (bytes > 2 ? 1 : 2);
@@ -524,7 +527,8 @@ const ProjectRuleFiles: FC<{
             } else {
                 added.push(draftFile);
                 titles.add(title);
-                shortened += title === file.title ? 0 : 1;
+                shortened += title === unreserved ? 0 : 1;
+                renamed += unreserved === file.title ? 0 : 1;
                 bytes += cost;
             }
         }
@@ -547,6 +551,8 @@ const ProjectRuleFiles: FC<{
         const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
         const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
         const unreadable = t`${plural(read.unreadable, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large.`;
+        const { duplicates } = read;
+        const duplicatesNote = t`${plural(duplicates, { one: "# file was left out as the same file as another picked", other: "# files were left out as the same file as another picked" })}: the same text would apply twice.`;
         const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;
         const length = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
         const size = formatNumber(MAX_RULE_FILES_BYTES / 1_000_000, i18n.locale);
@@ -554,14 +560,17 @@ const ProjectRuleFiles: FC<{
 
         const titleLimit = formatNumber(MAX_RULE_TITLE_LENGTH, i18n.locale);
         const shortenedNote = t`${plural(shortened, { one: "# name was", other: "# names were" })} shortened to ${titleLimit} characters.`;
+        const renamedNote = t`${plural(renamed, { one: "# name opened with id:, which names a file by its id, so it now opens with id-", other: "# names opened with id:, which names a file by its id, so they now open with id-" })} instead.`;
 
         setImportNote(
             [
                 ...addedNote,
                 ...(shortened > 0 ? [shortenedNote] : []),
+                ...(renamed > 0 ? [renamedNote] : []),
                 ...(toSet > 0 ? [setNote] : []),
                 ...(skipped > 0 ? [left] : []),
                 ...(tooLarge > 0 ? [tooLargeNote] : []),
+                ...(duplicates > 0 ? [duplicatesNote] : []),
                 ...(read.unreadable > 0 ? [unreadable] : []),
                 ...(read.notRead > 0 ? [notRead] : []),
             ].join(" "),
@@ -599,7 +608,7 @@ const ProjectRuleFiles: FC<{
 
         if (picked.length > 0) {
             runImport(async () => {
-                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), notRead: 0, unreadable: 0 };
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, unreadable: 0 };
             });
         }
     };

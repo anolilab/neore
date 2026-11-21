@@ -327,6 +327,18 @@ describe(listRepoRuleFiles, () => {
         });
     });
 
+    it("stops at a rules folder whose cut tree shows no Markdown, never offering a later folder's files", async () => {
+        const { calls, request } = fakeHost({
+            [`${REPO}/commits`]: commits,
+            [tree("tree-.rules")]: { tree: [blob("notes.txt")], truncated: true },
+            [tree("tree-root")]: { tree: [blob("AGENTS.md"), folder(".rules"), folder("rules")], truncated: false },
+            [tree("tree-rules")]: { tree: [blob("style.md")], truncated: false },
+        });
+
+        await expect(listRepoRuleFiles(request, ADDRESS)).resolves.toMatchObject({ files: [{ path: "AGENTS.md" }], truncated: true });
+        expect(calls.map(({ path }) => path)).not.toContain(tree("tree-rules"));
+    });
+
     it("lists nothing in a repository with no commit, and passes on any other host failure", async () => {
         await expect(listRepoRuleFiles(fakeHost({ [`${REPO}/commits`]: new HostApiError("empty", 409) }).request, ADDRESS)).resolves.toStrictEqual({
             files: [],

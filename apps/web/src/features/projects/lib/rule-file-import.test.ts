@@ -1,6 +1,7 @@
+import { isRuleTitleReserved } from "@neore/backend/rule-file-limits";
 import { describe, expect, it } from "vitest";
 
-import { fitTitle, importRuleFiles, importRuleTexts, needsMode, toImportedRuleFile } from "./rule-file-import";
+import { fitTitle, importRuleFiles, importRuleTexts, needsMode, toImportedRuleFile, unreservedTitle } from "./rule-file-import";
 
 describe("toImportedRuleFile", () => {
     it.each(["AGENTS.md", "CLAUDE.md", "GEMINI.md", "claude.md"])("imports %s whole as one always file under its own name", (path) => {
@@ -252,5 +253,15 @@ describe("fitTitle", () => {
 
         expect(cut).toBe("abcdefghi");
         expect(cut.length).toBeLessThanOrEqual(10);
+    });
+});
+
+describe("unreservedTitle", () => {
+    it("turns a name opening the id form, in any case, into one a save takes, and keeps any other", () => {
+        expect(unreservedTitle("id:setup")).toBe("id-setup");
+        expect(unreservedTitle(" ID:setup")).toBe(" ID-setup");
+        expect(isRuleTitleReserved(unreservedTitle("id:setup"))).toBe(false);
+        expect(unreservedTitle("setup id:x")).toBe("setup id:x");
+        expect(unreservedTitle("idea")).toBe("idea");
     });
 });

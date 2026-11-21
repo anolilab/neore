@@ -83,7 +83,7 @@
 - **Import from a repository** (`rule-file-repo.ts`, `source-control/repo-rule-files.ts`): two actions, list then read,
   with the person's own GitHub token, for whoever may save the rule files (`repoForRuleFileImport`) and a repository the
   project lists. A listing pins one commit and walks git trees by SHA (never `ref:path`, never recursive; a cut tree
-  is reported as `truncated`); the read takes that commit's SHA, never a branch, lists it again (found under this repository,
+  is reported as `truncated`, and a rules folder whose cut tree shows no Markdown is still the one listed); the read takes that commit's SHA, never a branch, lists it again (found under this repository,
   `/git/commits/{sha}`) without following links and reads only what that listing offers, by the blob SHA the listing
   gave (a link's only when that SHA is a file it may lead to), never through the contents API (it follows symlinks).
   Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included (`fetchBudget`, under the
@@ -94,4 +94,5 @@
   `RULE_FILE_FRONT_MATTER`, as the import counts) and `REPO_RULE_FILES_READ_BYTES` together, and
   store nothing: the editor turns the text into drafts with the upload's rules (`importRuleTexts`; an instruction-file
   name is `always` only at the top), leaving out and counting what a save would refuse (count, length, list size) and
-  cutting a name past `MAX_RULE_TITLE_LENGTH` (`fitTitle`).
+  cutting a name past `MAX_RULE_TITLE_LENGTH` (`fitTitle`), renaming one a save reserves (`unreservedTitle`), and reading one
+  pick per blob SHA (a link to a picked file is its text again).

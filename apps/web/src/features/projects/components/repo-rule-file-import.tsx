@@ -20,10 +20,12 @@ import type { ImportedRuleFile } from "../lib/rule-file-import";
 import { importRuleTexts } from "../lib/rule-file-import";
 
 /**
- * What a repository import read: the files as the upload import turns them into drafts, those it could not read, and
- * those it had no requests left for (`notRead`), which another import reads.
+ * What a repository import read: the files as the upload import turns them into drafts, those it could not read, those
+ * it had no requests left for (`notRead`), which another import reads, and picks left out as the same file as one
+ * before them (`duplicates`: a link such as `CLAUDE.md → AGENTS.md`, whose text would apply twice).
  */
 export interface RepoImportResult {
+    duplicates: number;
     imported: ImportedRuleFile[];
     notRead: number;
     skipped: number;
@@ -63,6 +65,30 @@ const repoName = (url: string): string => url.replace(HOST_PREFIX, "").replace(G
  */
 const mayBeTooLong = (file: FoundFile): boolean => isPickable(file) && file.size > MAX_RULE_FILE_LENGTH;
 
+/** For each pickable file whose blob an earlier one by path has (a link to it), that earlier file's path. */
+const sameFileAs = (files: ReadonlyArray<FoundFile>): Map<string, string> => {
+    const first = new Map<string, string>();
+    const same = new Map<string, string>();
+
+    const byPath = files.toSorted((left, right) => left.path.localeCompare(right.path));
+
+    for (const file of byPath) {
+        if (!isPickable(file) || file.sha === undefined) {
+            continue;
+        }
+
+        const earlier = first.get(file.sha);
+
+        if (earlier === undefined) {
+            first.set(file.sha, file.path);
+        } else {
+            same.set(file.path, earlier);
+        }
+    }
+
+    return same;
+};
+
 /**
  * Rule files from one of the project's repositories (`listRepoRuleFiles`, `readRepoRuleFiles`): the person picks the
  * repository, sees which instruction files it holds, picks them, and `runImport` reads them and adds them as drafts (`null`: a failure the panel shows, nothing added).
@@ -83,6 +109,9 @@ const RepoRuleFileImport: FC<{
     const [repoId, setRepoId] = useState<string | undefined>(undefined);
     const [listed, setListed] = useState<Listing | undefined>(undefined);
     const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+    // The person's latest picks and a count of their changes, read when a read answers: changes made while it read stay.
+    const latestPicks = useRef<ReadonlySet<string>>(picked);
+    const pickChanges = useRef(0);
     const [looking, setLooking] = useState(false);
     const [failure, setFailure] = useState<Failure | "unknown" | undefined>(undefined);
     // Counts the panel's requests: an answer to one a switch, a Cancel or a newer request overtook is dropped.
@@ -107,6 +136,13 @@ const RepoRuleFileImport: FC<{
         setFocusRequest((count) => count + 1);
     };
 
+    /** Sets the picks, as the panel's own (`byPerson` false) or as the person's change. */
+    const choose = (next: ReadonlySet<string>, byPerson: boolean) => {
+        latestPicks.current = next;
+        pickChanges.current += byPerson ? 1 : 0;
+        setPicked(next);
+    };
+
     const first = repositories?.[0];
 
     if (!repositories || !first) {
@@ -126,6 +162,7 @@ const RepoRuleFileImport: FC<{
     // A listing of another repository than the one shown (a refresh removed it, or made another the default) is none.
     const listing = listed?.repoId === chosen.id ? listed : undefined;
     const found = listing?.files;
+    const duplicateOf = sameFileAs(found ?? []);
 
     const failureText: Record<Failure | "unknown", string> = {
         forbidden: t`Your GitHub account cannot read this repository.`,
@@ -145,6 +182,8 @@ const RepoRuleFileImport: FC<{
         too_deep: t`(links through too many other links)`,
         too_long: t`(link not followed: what it links to has too long a name)`,
     };
+
+    const sameText = (path: string): string => t`(same file as ${path})`;
 
     const look = () => {
         request.current += 1;
@@ -167,7 +206,13 @@ const RepoRuleFileImport: FC<{
                 }
 
                 setListed({ commit: outcome.commit, files: outcome.files, omitted: outcome.omitted ?? 0, repoId: listedRepo, truncated: outcome.truncated });
-                setPicked(new Set(outcome.files.filter((file) => isPickable(file) && !mayBeTooLong(file)).map((file) => file.path)));
+                // A link to another listed file is not ticked: its text would apply twice.
+                const same = sameFileAs(outcome.files);
+
+                choose(
+                    new Set(outcome.files.filter((file) => isPickable(file) && !mayBeTooLong(file) && !same.has(file.path)).map((file) => file.path)),
+                    false,
+                );
 
                 return undefined;
             })
@@ -185,11 +230,28 @@ const RepoRuleFileImport: FC<{
 
         // The repository and commit listed: a branch moved since, or another repository chosen, never changes what is read.
         const readArgs = { commit, projectId: projectId as Id<"projects">, repoId: listing.repoId as Id<"projectRepositories"> };
-        // In the order the import takes them: the first a project can hold are read, the rest counted as left out.
-        const all = [...picked].toSorted((left, right) => left.localeCompare(right));
-        const paths = all.slice(0, MAX_RULE_FILES);
         // Each with the blob its listing found, so the read need not follow links again.
         const shas = new Map(listing.files.map((file) => [file.path, file.sha]));
+        // In the order the import takes them, one pick of each blob (the first by path; a link to it is the same text):
+        // the first a project can hold are read, the rest counted as left out.
+        const taken = new Set<string>();
+        const all = [...picked]
+            .toSorted((left, right) => left.localeCompare(right))
+            .filter((path) => {
+                const sha = shas.get(path);
+
+                if (sha === undefined) {
+                    return true;
+                }
+
+                const repeat = taken.has(sha);
+
+                taken.add(sha);
+
+                return !repeat;
+            });
+        const duplicates = picked.size - all.length;
+        const paths = all.slice(0, MAX_RULE_FILES);
         const files = paths.map((path) => {
             const sha = shas.get(path);
 
@@ -198,6 +260,7 @@ const RepoRuleFileImport: FC<{
 
         request.current += 1;
         const asked = request.current;
+        const changesAtRead = pickChanges.current;
 
         runImport(async () => {
             // A read that failed is said in the panel, as a refusal is.
@@ -219,15 +282,28 @@ const RepoRuleFileImport: FC<{
             const notRead = outcome.files.flatMap((file) => (file.status === "not_read" ? [file.path] : []));
             const read = await importRuleTexts(texts, MAX_RULE_FILES);
 
-            if (notRead.length > 0) {
+            // What this read answered, and any pick of a blob it answered: importing again adds nothing twice.
+            const answered = new Set(outcome.files.flatMap((file) => (file.status === "not_read" ? [] : [file.path])));
+            const answeredShas = new Set([...answered].flatMap((path) => shas.get(path) ?? []));
+            const left = [...latestPicks.current].filter((path) => {
+                const sha = shas.get(path);
+
+                return !answered.has(path) && (sha === undefined || !answeredShas.has(sha));
+            });
+
+            if (pickChanges.current !== changesAtRead && left.length > 0) {
+                // Picks changed while it read stay as the person left them, less those.
+                choose(new Set(left), false);
+            } else if (notRead.length > 0) {
                 // Open with only those ticked, so importing again adds the rest and nothing twice.
-                setPicked(new Set(notRead));
+                choose(new Set(notRead), false);
             } else {
                 toggle(false);
             }
 
             return {
                 ...read,
+                duplicates,
                 notRead: notRead.length,
                 skipped: read.skipped + all.length - paths.length,
                 unreadable: outcome.files.length - texts.length - notRead.length,
@@ -287,7 +363,7 @@ const RepoRuleFileImport: FC<{
                                     checked={picked.has(file.path)}
                                     disabled={!isPickable(file)}
                                     onCheckedChange={(checked) => {
-                                        const next = new Set(picked);
+                                        const next = new Set(latestPicks.current);
 
                                         if (checked) {
                                             next.add(file.path);
@@ -295,13 +371,16 @@ const RepoRuleFileImport: FC<{
                                             next.delete(file.path);
                                         }
 
-                                        setPicked(next);
+                                        choose(next, true);
                                     }}
                                 />
                                 <span className="font-mono text-xs">{file.path}</span>
                                 {file.tooLarge && <span className="text-muted-foreground text-xs">{t`(too large)`}</span>}
                                 {file.refused && <span className="text-muted-foreground text-xs">{refusalText[file.refused]}</span>}
                                 {mayBeTooLong(file) && <span className="text-muted-foreground text-xs">{t`(may be too long)`}</span>}
+                                {duplicateOf.has(file.path) && (
+                                    <span className="text-muted-foreground text-xs">{sameText(duplicateOf.get(file.path) ?? "")}</span>
+                                )}
                             </Label>
                         </li>
                     ))}

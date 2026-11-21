@@ -82,6 +82,8 @@ vi.mock("@/features/auth/lib/utilities", () => {
 
 const NEEDS_A_PATTERN = /needs at least one pattern/u;
 const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
+const COPY_OF_A = /^rules\/z\.md\s*\(same file as rules\/a\.md\)$/u;
+const LINKED_COPY = /^CLAUDE\.md\s*\(same file as AGENTS\.md\)$/u;
 const REFUSED_LINK = /^GEMINI\.md\s*\(links to a file outside the ones listed here\)$/u;
 const WIDE_FILE = /^rules\/wide\.md\s*\(may be too long\)$/u;
 
@@ -1262,10 +1264,96 @@ describe("project rule files imported from the project's repository", () => {
         expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(5);
     });
 
-    it("shortens a file name past what a save takes, keeping two that start alike apart, and the drafts save", async () => {
+    it("keeps the picks the person changed while a read ran, less what it answered and any copy of it", async () => {
+        const user = userEvent.setup();
+        let answer: ((value: unknown) => void) | undefined;
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [
+                ...["a", "b", "c"].map((name) => {
+                    return { path: `rules/${name}.md`, sha: `sha-${name}`, size: 10, tooLarge: false };
+                }),
+                // A link to rules/a.md: the same blob.
+                { path: "rules/z.md", sha: "sha-a", size: 10, tooLarge: false },
+            ],
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockImplementation(
+            async () =>
+                // The configured Node range predates `Promise.withResolvers`.
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+                await new Promise((resolve) => {
+                    answer = resolve;
+                }),
+        );
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        await user.click(await screen.findByRole("button", { name: "Import selected" }));
+
+        const found = screen.getByRole("list", { name: "Files found" });
+
+        await user.click(within(found).getByRole("checkbox", { name: "rules/c.md" }));
+        await user.click(within(found).getByRole("checkbox", { name: COPY_OF_A }));
+        answer?.({
+            files: [
+                { path: "rules/a.md", status: "ok", text: "---\nalwaysApply: true\n---\nText" },
+                { path: "rules/b.md", status: "not_read" },
+                { path: "rules/c.md", status: "not_read" },
+            ],
+            status: "ok",
+        });
+
+        expect(await screen.findByText("1 rule file imported. Review, then save. 2 files were not read this time: import again to add the rest.")).toBeTruthy();
+        expect(within(found).getByRole("checkbox", { name: "rules/a.md" }).getAttribute("aria-checked")).toBe("false");
+        expect(within(found).getByRole("checkbox", { name: "rules/b.md" }).getAttribute("aria-checked")).toBe("true");
+        expect(within(found).getByRole("checkbox", { name: "rules/c.md" }).getAttribute("aria-checked")).toBe("false");
+        expect(within(found).getByRole("checkbox", { name: COPY_OF_A }).getAttribute("aria-checked")).toBe("false");
+    });
+
+    it("ticks a link to another listed file off, says which, and reads one file of the same blob however both are picked", async () => {
+        const user = userEvent.setup();
+
+        backend.repos = [REPO];
+        backend.repoList.mockResolvedValue({
+            commit: COMMIT,
+            files: [
+                { path: "AGENTS.md", sha: "sha-agents", size: 20, tooLarge: false },
+                { path: "CLAUDE.md", sha: "sha-agents", size: 20, tooLarge: false },
+            ],
+            status: "ok",
+            truncated: false,
+        });
+        backend.repoRead.mockResolvedValue({ files: [{ path: "AGENTS.md", status: "ok", text: "Use pnpm." }], status: "ok" });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from repository" }));
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const link = within(await screen.findByRole("list", { name: "Files found" })).getByRole("checkbox", {
+            name: LINKED_COPY,
+        });
+
+        expect(link.getAttribute("aria-checked")).toBe("false");
+
+        await user.click(link);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(backend.repoRead).toHaveBeenCalledWith({ commit: COMMIT, files: [{ path: "AGENTS.md", sha: "sha-agents" }], projectId: "p1", repoId: "repo1" });
+        expect(
+            await screen.findByText(
+                "1 rule file imported. Review, then save. 1 file was left out as the same file as another picked: the same text would apply twice.",
+            ),
+        ).toBeTruthy();
+    });
+
+    it("shortens a file name past what a save takes, keeping two that start alike apart, renames one opening the id form, and the drafts save", async () => {
         const user = userEvent.setup();
         const long = "n".repeat(250);
-        const paths = [`rules/${long}a.md`, `rules/${long}b.md`];
+        // And one opening the id form, which a save refuses for a new name.
+        const paths = [`rules/${long}a.md`, `rules/${long}b.md`, "rules/id:setup.md"];
 
         backend.repos = [REPO];
         backend.repoList.mockResolvedValue({
@@ -1287,11 +1375,15 @@ describe("project rule files imported from the project's repository", () => {
         await user.click(screen.getByRole("button", { name: "Find files" }));
         await user.click(await screen.findByRole("button", { name: "Import selected" }));
 
-        expect(await screen.findByText("2 rule files imported. Review, then save. 2 names were shortened to 200 characters.")).toBeTruthy();
+        expect(
+            await screen.findByText(
+                "3 rule files imported. Review, then save. 2 names were shortened to 200 characters. 1 name opened with id:, which names a file by its id, so it now opens with id- instead.",
+            ),
+        ).toBeTruthy();
 
         const names = screen.getAllByRole("textbox", { name: "Name" }).map((input) => (input as HTMLInputElement).value);
 
-        expect(names.slice(2)).toStrictEqual(["n".repeat(200), `${"n".repeat(196)} (2)`]);
+        expect(names.slice(2)).toStrictEqual(["id-setup", "n".repeat(200), `${"n".repeat(196)} (2)`]);
 
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 

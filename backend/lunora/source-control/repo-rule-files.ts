@@ -386,7 +386,7 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
 
     /**
      * The root instruction files and the first {@link MAX_LISTED_FOLDER_FILES} Markdown files, by path, of the first
-     * rules folder holding any (not its subfolders), links not yet followed; `omitted` counts the folder's files past
+     * rules folder holding any, or whose cut tree may (not its subfolders), links not yet followed; `omitted` counts the folder's files past
      * the cap. `offers` accepts the paths a link may lead to: a root file, or a file of that folder (one past the cap
      * included, as it is there), whose files, links left out, are `targets` by blob SHA.
      */
@@ -401,7 +401,9 @@ const snapshot = (request: HostRequest, address: RepoAddress, root: Tree) => {
             const tree = await treeAt(folder);
             const files = tree ? importableIn(folder, tree) : [];
 
-            if (files.length > 0) {
+            // A cut tree showing no Markdown may still hold some: it is the first rules folder all the same, so the
+            // listing stops at it with what it shows and says it was cut, never offering a later folder's.
+            if (files.length > 0 || tree?.truncated === true) {
                 const first = files.toSorted((left, right) => left.path.localeCompare(right.path)).slice(0, MAX_LISTED_FOLDER_FILES);
 
                 candidates = [...candidates, ...first];

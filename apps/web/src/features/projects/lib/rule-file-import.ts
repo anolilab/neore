@@ -5,7 +5,7 @@
  * read when needed with no description, which the editor will not save until the person says when, or picks another mode.
  * The text is the file's, front matter removed. Nothing is saved here: the editor adds them as unsaved drafts.
  */
-import { RULE_FILE_FRONT_MATTER } from "@neore/backend/rule-file-limits";
+import { isRuleTitleReserved, RULE_FILE_FRONT_MATTER } from "@neore/backend/rule-file-limits";
 
 export interface ImportedRuleFile {
     content: string;
@@ -388,6 +388,15 @@ export const fitTitle = (title: string, taken: ReadonlySet<string>, max: number)
 
     return candidate;
 };
+
+const ID_FORM_OPENING = /^(\s*id):/iu;
+
+/**
+ * `title` as a save takes it when it opens the id form (`id:`, {@link isRuleTitleReserved}), which a save refuses for a
+ * new name: that opening's colon becomes a hyphen (`id:setup` → `id-setup`), so the file keeps a name that reads as its
+ * own. Any other title is kept as it is.
+ */
+export const unreservedTitle = (title: string): string => (isRuleTitleReserved(title) ? title.replace(ID_FORM_OPENING, "$1-") : title);
 
 /** Whether an imported file said nothing of when it applies: a draft the person must finish before it saves. */
 export const needsMode = (file: Pick<ImportedRuleFile, "description" | "mode">): boolean => file.mode === "auto" && file.description.trim() === "";
