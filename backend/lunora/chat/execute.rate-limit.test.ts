@@ -85,6 +85,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: null,
                 userProviderKeys: undefined,
             };
@@ -254,7 +255,7 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { resume?: string; skill?: { rawArgs: string; slug: string } } = {}) =>
+const run = async (extra: { impersonated?: boolean; resume?: string; skill?: { rawArgs: string; slug: string } } = {}) =>
     await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
@@ -431,13 +432,14 @@ describe("a provider rate limit on the first model call", () => {
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
     });
 
-    it("keeps a goal round's skill on the resume it queues", async () => {
+    it("keeps a goal round's skill, and who sent the turn, on the resume it queues", async () => {
         modelState.model = planned([rateLimited()]);
 
-        await run({ skill: { rawArgs: "the thread", slug: "summarise" } });
+        await run({ impersonated: true, skill: { rawArgs: "the thread", slug: "summarise" } });
 
         expect(enqueued).toHaveLength(1);
-        expect(enqueued[0]!.args).toMatchObject({ skill: { rawArgs: "the thread", slug: "summarise" } });
+        // The resume re-enters with these arguments: without `impersonated` it would read as not known.
+        expect(enqueued[0]!.args).toMatchObject({ impersonated: true, skill: { rawArgs: "the thread", slug: "summarise" } });
     });
 
     it("ignores a redelivery of the original job while the run is paused", async () => {

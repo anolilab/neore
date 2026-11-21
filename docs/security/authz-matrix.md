@@ -767,8 +767,12 @@ for a schema table that is neither policed nor listed:
   `siteLoginForFill`, never a client procedure. Both decide only through `vault/site-login-turn.ts#siteLoginTurnVerdict`,
   an ALLOWLIST: anything not known to be safe refuses. The turn must be the owner's own at the app
   (`isOwnInteractiveTurn`: `startedBy` the owner, origin `lead`, not headless, not impersonated; a public API run records
-  the key's owner as `startedBy`, so that alone is not enough), offered built-in tools only, its system prompt only the
-  app's instructions, the owner's personalization and the teammate's instructions. The thread must pass
+  the key's owner as `startedBy`, so that alone is not enough). Impersonation is recorded on the run's job at `/chat/start`
+  from the session, never the body, and carried by a pause and an approval's snapshot; a run that recorded none, or a
+  turn missing its prompt or system-prompt kinds, gets no login (`ToolCtx.runTurn`, `siteLoginTurnOf`). Offered built-in
+  tools only, its system prompt only the app's instructions, the owner's personalization, the teammate's instructions,
+  our own agent and search mode text and the task plan (enabled skills, an invoked skill and the attached-documents note
+  refuse). The thread must pass
   `loadEligibleThread`, be tagged `chat` and nothing else, and not be a coding agent's, handed over, imported, derived
   (any `threadRelationships` row) or summarised. Every saved row on the prompt's path, prompt included, and every one of
   the step's messages must be the owner's own typed text, the lead model's own reply (`agentName` a model id or unset; no

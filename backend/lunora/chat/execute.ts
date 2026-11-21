@@ -54,6 +54,7 @@ import {
     setResearchDepth,
     setRunOrganizationId,
     setRunStartedBy,
+    setRunTurn,
     setThreadStatus,
     stampSavedToolCalls,
 } from "./lib/agent-run";
@@ -80,6 +81,7 @@ import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
 import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
+import { agentPromptKinds } from "./lib/system-context-kinds";
 import { vAskUserAnswers } from "./tools/ask-user-validators";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
@@ -90,7 +92,20 @@ export const runStreamingAgent = internalAction
     .input(runStreamingAgentFields)
     .action(
         async ({
-            args: { isAnonymous, messageId, organizationId, origin, resume, skill: goalSkill, streamId, streamingConfig, threadId, userId, userPrompt },
+            args: {
+                impersonated,
+                isAnonymous,
+                messageId,
+                organizationId,
+                origin,
+                resume,
+                skill: goalSkill,
+                streamId,
+                streamingConfig,
+                threadId,
+                userId,
+                userPrompt,
+            },
             ctx,
         }) => {
             // Everything before the first token is on the user's wait, so the reads
@@ -622,6 +637,22 @@ export const runStreamingAgent = internalAction
                     );
                 }
 
+                // One kind per piece of the final system prompt: the context's, then what `getAgent` and the note above added.
+                const systemContext = [
+                    ...runContext.systemContext,
+                    ...agentPromptKinds({
+                        enabledSkills: skillRun.enabledSkills.length > 0,
+                        fileNote: Boolean(fileIds && fileIds.length > 0),
+                        hasAgentMode: agentMode.enableDatasource || agentMode.enableKnowledge || agentMode.enablePlanner,
+                        // The search mode picks the tools here; `getAgent` is not given it, so no citation rules are added.
+                        hasSearchMode: false,
+                        skillInstructions: Boolean(invokedSkill?.instructions),
+                        taskPlan: taskAnalysis !== undefined && taskAnalysis.taskType !== "general",
+                    }),
+                ];
+
+                setRunTurn(ctx, { impersonated, promptMessageId: messageId, systemContext });
+
                 if (additionalParts.length > 0) {
                     const baseInstructions = agent.options.instructions || "";
                     const additionalContext = additionalParts.join("\n\n");
@@ -634,6 +665,7 @@ export const runStreamingAgent = internalAction
 
                 // The job's own arguments: what a pause or an interrupted run's resume re-enters the job with.
                 const runArgs = {
+                    ...(impersonated !== undefined && { impersonated }),
                     isAnonymous,
                     messageId,
                     organizationId,
@@ -858,6 +890,7 @@ export const runStreamingAgent = internalAction
                             autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                             ...(origin === "outside_agent" && { dispatchOrigin: origin }),
                             ...(organizationId && { organizationId }),
+                            ...(impersonated !== undefined && { impersonated }),
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
                             mcpToolFingerprints: toolResult.mcpToolFingerprints,
@@ -873,6 +906,7 @@ export const runStreamingAgent = internalAction
                             searchMode: effectiveSearchMode,
                             shouldAutoContinue: isAutoContinue,
                             startedBy: userId,
+                            systemContext,
                             toolNames: Object.keys(tools),
                             toolPermissionKeys: toolResult.permissionKeys,
                             // A continuation does not reload the context, so the quick check reads this off the snapshot.

@@ -10,6 +10,15 @@ import type { ActionCtx as ActionContext } from "./types";
 
 export type ResearchDepth = "speed" | "balanced" | "thorough";
 
+export type RunTurn = {
+    /** Whether an admin acting as the owner sent the turn, as `/chat/start` recorded it from the session. */
+    impersonated: boolean;
+    /** The turn's prompt row. Not `ToolCtx.promptMessageId`, which a resumed or approved run points at its own last row. */
+    promptMessageId: string;
+    /** One kind per piece of the run's system prompt (`chat/lib/system-context-kinds.ts`). */
+    systemContext: ReadonlyArray<string>;
+};
+
 export type ToolCtx = ActionContext & {
     agent?: Agent;
     /** The task, trigger or eval run whose chain this run belongs to, for a sub-agent it starts to carry; unset for the owner's chat. */
@@ -23,6 +32,11 @@ export type ToolCtx = ActionContext & {
     organizationId?: string | null;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;
+    /**
+     * What the saved-login verdict needs of the turn and only the run knows (`vault/site-login-turn.ts`), set whole by
+     * `setRunTurn` or not at all: unset (a run path that records none) is no answer, and refuses a login.
+     */
+    runTurn?: RunTurn;
     /** Who started the turn this run belongs to; a continuation runs as the thread's owner whoever that was. Unset when the run never said. */
     startedBy?: string;
     threadId?: string;

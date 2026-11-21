@@ -270,3 +270,27 @@ export const widenNotTypedSteerCollaborator = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A run's stored arguments (`persistentStreams.runArgs`, and `pause.run`) gained an optional `impersonated`: whether an
+ * admin acting as the owner sent the turn (`chat/lib/streaming-run-args.ts`). Nothing to fill: a row without it reads as
+ * not known, which gives the turn no saved login. A no-op, so `lunora prepare` records the added optional key.
+ */
+export const addRunArgsImpersonated = defineMigration({
+    id: "add-run-args-impersonated",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * The stored config gained an optional `impersonated` and `systemContext` (`chat/lib/tool-run-config.ts`): what the
+ * saved-login verdict needs of the paused turn. Nothing to fill: a row without them gives its continuation no saved login.
+ * A no-op, so `lunora prepare` records the added optional keys.
+ */
+export const addApprovalRunTurn = defineMigration({
+    id: "add-approval-run-turn",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

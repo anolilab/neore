@@ -41,7 +41,12 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
         /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
-        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined },
+        toolsState: {
+            allowTools: false,
+            /** The action ctx the tools were built with: the tools get it as their `ToolCtx`. */
+            ctx: undefined as { runTurn?: unknown } | undefined,
+            options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined,
+        },
     };
 });
 
@@ -76,6 +81,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: null,
                 untrustedContext: false,
                 userProviderKeys: undefined,
@@ -109,7 +115,8 @@ vi.mock("./lib/auto-model", async (importOriginal) => {
 vi.mock("./lib/agent-tools", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-tools")>()),
-        buildAgentTools: vi.fn(async (_ctx: unknown, options: { untrustedContext?: Promise<boolean> | boolean }) => {
+        buildAgentTools: vi.fn(async (ctx: { runTurn?: unknown }, options: { untrustedContext?: Promise<boolean> | boolean }) => {
+            toolsState.ctx = ctx;
             toolsState.options = options;
 
             return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
@@ -222,6 +229,7 @@ beforeEach(async () => {
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
+    toolsState.ctx = undefined;
     toolsState.options = undefined;
 
     harness = lunoraTest(schema as never);
@@ -255,7 +263,9 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) => {
+const run = async (
+    extra: { impersonated?: boolean; model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {},
+) => {
     const { model = "test-model", ...rest } = extra;
 
     return await harness.action(
@@ -316,6 +326,32 @@ describe("runStreamingAgent: a successful turn", () => {
         expect(usageArgs).toMatchObject({ date: expect.stringMatching(ISO_DATE), replyKey: expect.any(String), tokens: 8, userId: OWNER });
         // A plain turn has no invoked skill, so the usage page files it under the assistant.
         expect(usageArgs).not.toHaveProperty("skillName");
+    });
+});
+
+describe("runStreamingAgent: the turn its tools see", () => {
+    it.each([false, true])(
+        "hands the tools the turn as /chat/start recorded it (impersonated: %s), its prompt and its system prompt's kinds",
+        async (impersonated) => {
+            toolsState.allowTools = true;
+
+            await run({ impersonated });
+
+            expect(toolsState.ctx?.runTurn).toStrictEqual({
+                impersonated,
+                promptMessageId: ids.messageId,
+                systemContext: expect.arrayContaining(["instructions"]),
+            });
+        },
+    );
+
+    it("hands them no turn when the job does not say whether an admin sent it, which refuses a saved login", async () => {
+        toolsState.allowTools = true;
+
+        await run();
+
+        expect(toolsState.ctx).toBeDefined();
+        expect(toolsState.ctx?.runTurn).toBeUndefined();
     });
 });
 

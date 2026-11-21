@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SAFE_SYSTEM_CONTEXT } from "../../vault/site-login-turn";
-import { type SystemContextPieces, systemContextKinds } from "./system-context-kinds";
+import { agentPromptKinds, type AgentPromptPieces, type SystemContextPieces, systemContextKinds } from "./system-context-kinds";
 
 const none: SystemContextPieces = {
     bot: null,
@@ -50,6 +50,33 @@ describe(systemContextKinds, () => {
             { systemPrompt: "request" as const },
         ]) {
             expect(safe(systemContextKinds({ ...none, ...pieces }))).toBe(false);
+        }
+    });
+});
+
+const noAgentPieces: AgentPromptPieces = {
+    enabledSkills: false,
+    fileNote: false,
+    hasAgentMode: false,
+    hasSearchMode: false,
+    skillInstructions: false,
+    taskPlan: false,
+};
+
+describe(agentPromptKinds, () => {
+    it("names our own mode text and the task plan as safe kinds", () => {
+        const kinds = agentPromptKinds({ ...noAgentPieces, hasAgentMode: true, hasSearchMode: true, taskPlan: true });
+
+        expect(kinds).toStrictEqual(["agent-mode", "search-mode", "task-plan"]);
+        expect(safe(kinds)).toBe(true);
+    });
+
+    it("gives skills, an invoked skill's instructions and the attached-documents note kinds the verdict refuses", () => {
+        for (const pieces of [{ enabledSkills: true }, { skillInstructions: true }, { fileNote: true }]) {
+            const kinds = agentPromptKinds({ ...noAgentPieces, ...pieces });
+
+            expect(kinds).toHaveLength(1);
+            expect(safe(kinds)).toBe(false);
         }
     });
 });

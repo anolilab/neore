@@ -5,10 +5,12 @@
     "add-agent-commands-persistent-chunks",
     "add-approval-bot-lookup",
     "add-approval-chain-source",
+    "add-approval-run-turn",
     "add-approval-tool-origins",
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-run-args-impersonated",
     "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
@@ -20759,6 +20761,12 @@
               "optional": false,
               "unique": false,
               "fields": {
+                "impersonated": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
                 "isAnonymous": {
                   "kind": "boolean",
                   "nullable": false,
@@ -21072,6 +21080,12 @@
           "optional": true,
           "unique": false,
           "fields": {
+            "impersonated": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "isAnonymous": {
               "kind": "boolean",
               "nullable": false,
@@ -29595,6 +29609,12 @@
                 "unique": false
               }
             },
+            "impersonated": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "instructions": {
               "kind": "string",
               "nullable": false,
@@ -29755,6 +29775,20 @@
               "optional": true,
               "unique": false,
               "ref": "subAgentRuns"
+            },
+            "systemContext": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "toolNames": {
               "kind": "array",

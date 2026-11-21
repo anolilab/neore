@@ -156,3 +156,55 @@ describe("a resumed sub-agent child's own delegation", () => {
         expect(delegated).toHaveProperty("row");
     });
 });
+
+describe("a resumed run's turn", () => {
+    const resumeWith = async (snapshot: Record<string, unknown>): Promise<unknown> => {
+        let seen: unknown = "unset";
+
+        vi.mocked(getAgent).mockResolvedValue({
+            approveToolCall: vi.fn(async (toolCtx: { runTurn?: unknown }) => {
+                seen = toolCtx.runTurn;
+
+                throw new Error("stop");
+            }),
+            options: {},
+        } as never);
+
+        await resumeApprovedRun(
+            {
+                runQuery: vi.fn(async () => {
+                    return { toolName: TOOL };
+                }),
+            } as never,
+            {
+                approvalId: "approval-1",
+                approved: true,
+                config: {
+                    autoMediaEnrichment: false,
+                    mcpServerNames: [],
+                    model: "gpt-4o",
+                    researchDepth: "balanced",
+                    searchMode: "chat",
+                    shouldAutoContinue: false,
+                    toolNames: [TOOL],
+                    ...snapshot,
+                } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId,
+            },
+        ).catch(() => undefined);
+
+        return seen;
+    };
+
+    it("is the paused turn's, read from the snapshot: who sent it, its prompt and its system prompt's kinds", async () => {
+        const turn = { impersonated: true, promptMessageId: "prompt-1", systemContext: ["instructions", "skills"] };
+
+        expect(await resumeWith(turn)).toStrictEqual(turn);
+    });
+
+    it("is none for a snapshot that does not say whether an admin sent it", async () => {
+        expect(await resumeWith({ promptMessageId: "prompt-1", systemContext: ["instructions"] })).toBeUndefined();
+    });
+});
