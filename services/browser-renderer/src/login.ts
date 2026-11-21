@@ -433,25 +433,24 @@ const armGuard = async (
                     ? withPassword(body, request.headers()["content-type"] ?? "", { name: form.name, stand }, password)
                     : null;
 
+            // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later. A sign-in
+            // given up while that command was on its way is not sent: its result already says so.
             if (filled === null) {
                 isChanged = true;
-            } else if (await shield()) {
-                // The answer may show what was sent: no script of it runs, so none reads it or keeps it for later.
+            } else if (!(await shield())) {
+                isUnshielded = true;
+            } else if (isExpecting) {
                 try {
-                    // It rejects only before it hands the request on (one already handled). Once it resolves, whether the
-                    // bytes reach the site is unknown: that counts as sent, so the sign-in is never sent again.
+                    // It rejects only for a route already handled, when nothing is handed on. Once it resolves, the
+                    // request goes on when this handler returns, and whether it reaches the site is unknown: that counts
+                    // as sent, so the sign-in is never sent again.
                     await route.fallback({ postData: filled });
                     sent = request;
 
                     return;
                 } catch {
                     isUnsent = true;
-                    await route.abort("blockedbyclient").catch(() => undefined);
-
-                    return;
                 }
-            } else {
-                isUnshielded = true;
             }
         } else if (isOwn && body?.includes(stand)) {
             isScripted ||= ["fetch", "xhr"].includes(request.resourceType());
@@ -463,7 +462,7 @@ const armGuard = async (
             attempt ??= `a request to ${originOf(request.url()) ?? "another site"}`;
         }
 
-        await route.abort("blockedbyclient");
+        await route.abort("blockedbyclient").catch(() => undefined);
     };
 
     /** The final answer to the form's own navigation, after any redirects: what loads from here is the next page's. */
@@ -596,6 +595,10 @@ const armGuard = async (
         disarm,
         expectSubmit: (): void => {
             isExpecting = true;
+        },
+        /** Ends the wait for the form's POST: one that arrives later, or is still waiting on the scripts going off, is not sent. */
+        giveUp: (): void => {
+            isExpecting = false;
         },
         /** Whether a script sent what it read from the field: such a sign-in is not one the stand-in can fill. */
         scripted: () => isScripted,
@@ -1061,7 +1064,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
             // The form's controls in document order, those outside it by a `form` attribute included.
             const userHandle = await field.evaluateHandle((input) => {
-                const before = [...((input as HTMLInputElement).form?.elements ?? [])].filter(
+                const { form: owner } = input as HTMLInputElement;
+                // Read by the prototype's getter: a control named `elements` hides the form's own.
+                const controls = owner
+                    ? (Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "elements")?.get?.call(owner) as HTMLFormControlsCollection)
+                    : [];
+                const before = [...controls].filter(
                     (candidate): candidate is HTMLInputElement =>
                         candidate instanceof HTMLInputElement &&
                         ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
@@ -1242,6 +1250,9 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     }
 
     const armed = guard;
+
+    // The result is settled: a send still on its way must not go out under it.
+    armed.giveUp();
     // Both, even when one of them hangs or fails.
     const release = async (): Promise<void> => {
         await Promise.allSettled([armed.disarm(), lock?.release()]);
@@ -1278,7 +1289,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     }
 
     if (!result.success) {
-        return result;
+        // A send handed on while the result was being settled counts.
+        return { ...result, submitted: armed.submitted() };
     }
 
     return { ...result, passwordFieldRemains, title: scrub(title), url: landedAt };

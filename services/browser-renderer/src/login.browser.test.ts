@@ -245,34 +245,58 @@ describe(signIn, () => {
         };
     };
 
-    /** Calls `around` in place of each `route.fallback` of the browser, until `afterEach` puts the method back. */
-    const aroundFallback = async (around: (fallback: (options?: FallbackOptions) => Promise<void>, options?: FallbackOptions) => Promise<void>) => {
-        let prototype: Pick<Route, "fallback"> | undefined;
+    /**
+     * Has each `route.fallback` of the browser go through `fallback`, and tells `abort` of each `route.abort`, until
+     * `afterEach` puts the methods back.
+     */
+    const aroundRoutes = async (spies: {
+        abort?: (route: Route) => void;
+        fallback?: (next: (options?: FallbackOptions) => Promise<void>, options: FallbackOptions | undefined, route: Route) => Promise<void>;
+    }) => {
+        let prototype: Pick<Route, "abort" | "fallback"> | undefined;
 
         await page.route("**/probe", async (route) => {
-            prototype = Object.getPrototypeOf(route) as Pick<Route, "fallback">;
+            prototype = Object.getPrototypeOf(route) as Pick<Route, "abort" | "fallback">;
             await route.fulfill({ body: "" });
         });
         await page.goto(`${login.origin}/probe`);
         await page.unroute("**/probe");
 
-        const owner = prototype as Pick<Route, "fallback">;
-        const { fallback } = owner;
+        const owner = prototype as Pick<Route, "abort" | "fallback">;
+        const { abort, fallback } = owner;
 
-        owner.fallback = new Proxy(fallback, {
-            apply: async (target, route, [options]: [FallbackOptions?]) =>
-                around(async (next) => Reflect.apply(target, route, [next]) as Promise<void>, options),
-        });
-        restoreFallback = () => {
+        if (spies.fallback) {
+            const around = spies.fallback;
+
+            owner.fallback = new Proxy(fallback, {
+                apply: async (target, route: Route, [options]: [FallbackOptions?]) =>
+                    around(async (next) => Reflect.apply(target, route, [next]) as Promise<void>, options, route),
+            });
+        }
+
+        if (spies.abort) {
+            const told = spies.abort;
+
+            owner.abort = new Proxy(abort, {
+                apply: async (target, route: Route, args: Parameters<Route["abort"]>) => {
+                    told(route);
+
+                    return Reflect.apply(target, route, args) as Promise<void>;
+                },
+            });
+        }
+
+        restoreRoutes = () => {
+            owner.abort = abort;
             owner.fallback = fallback;
         };
     };
 
-    let restoreFallback = (): void => undefined;
+    let restoreRoutes = (): void => undefined;
 
     afterEach(() => {
-        restoreFallback();
-        restoreFallback = () => undefined;
+        restoreRoutes();
+        restoreRoutes = () => undefined;
     });
 
     it("sends the form by POST to the login's origin and reports where it landed", async () => {
@@ -1096,54 +1120,100 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([]);
     });
 
-    it("hands on the form's POST with the password only once when the page submits it again while the first waits", async () => {
+    /** The bodies `route.fallback` hands on with the password; `handled` is told of every route handed on or aborted. */
+    const forwardedPasswords = async (handled: (route: Route) => void = () => undefined): Promise<string[]> => {
         const forwarded: string[] = [];
 
-        await aroundFallback(async (fallback, options) => {
-            const { postData } = options ?? {};
+        await aroundRoutes({
+            abort: handled,
+            fallback: async (next, options, route) => {
+                const { postData } = options ?? {};
 
-            if (typeof postData === "string" || Buffer.isBuffer(postData)) {
-                forwarded.push(String(postData));
+                if ((typeof postData === "string" || Buffer.isBuffer(postData)) && String(postData).includes(SAVED_SECRET)) {
+                    forwarded.push(String(postData));
+                }
+
+                handled(route);
+
+                return next(options);
+            },
+        });
+
+        return forwarded;
+    };
+
+    it("hands on the form's POST with the password only once when the page submits it again while the first waits", async () => {
+        const secondHandled = Promise.withResolvers<void>();
+        // The first POST is held until the second is dealt with: the first one dealt with is the second.
+        const forwarded = await forwardedPasswords((route) => {
+            if (route.request().method() === "POST" && route.request().url().endsWith("/session")) {
+                secondHandled.resolve();
             }
-
-            return fallback(options);
         });
         let first: Promise<unknown> = Promise.resolve();
 
-        // The first send waits on the scripts going off; the page submits the form again meanwhile.
+        // The first send's command answers only once the page has submitted the form again and that POST was dealt with.
         scriptsOff(async (call, send) => {
             if (call !== 1) {
                 return send();
             }
 
-            first = new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            })
-                .then(send)
-                .catch(() => undefined);
+            first = secondHandled.promise.then(send).catch(() => undefined);
 
             return first;
         });
+        // Again from a later task: one in the same task would replace the first submission before it is sent.
         fixture.page = loginForm(
             `document.forms[0].addEventListener("submit", () => setTimeout(() => HTMLFormElement.prototype.submit.call(document.forms[0]), 100));`,
         );
 
         await run();
-        // The first send's handler, which goes on once its command answers.
+        // The first send's handler goes on once its command answers.
         await first;
         await new Promise(setImmediate);
 
-        expect(forwarded.filter((body) => body.includes(SAVED_SECRET))).toHaveLength(1);
-        expect(sessionPosts().filter((hit) => hit.body.includes(SAVED_SECRET)).length).toBeLessThanOrEqual(1);
+        expect(forwarded).toHaveLength(1);
+    });
+
+    it("does not send a form whose scripts-off command answers only after the sign-in gave up waiting", async () => {
+        const forwarded = await forwardedPasswords();
+        let offset = 0;
+        const cleanupStarted = Promise.withResolvers<void>();
+        let first: Promise<unknown> = Promise.resolve();
+
+        // The send's command answers once the cleanup sends its own; meanwhile the wait for the send runs out.
+        scriptsOff(async (call, send) => {
+            if (call === 1) {
+                offset += 6000;
+                first = cleanupStarted.promise.then(send).catch(() => undefined);
+
+                return first;
+            }
+
+            cleanupStarted.resolve();
+
+            return send();
+        });
+        fixture.page = loginForm();
+
+        const result = await run(() => Date.now() + offset);
+
+        await first;
+        await new Promise(setImmediate);
+
+        expect(result).toMatchObject({ submitted: false, success: false });
+        expect(forwarded).toStrictEqual([]);
     });
 
     it("reports a form POST that could not be handed on as not sent", async () => {
-        await aroundFallback(async (fallback, options) => {
-            if (options?.postData !== undefined) {
-                throw new Error("Route is already handled!");
-            }
+        await aroundRoutes({
+            fallback: async (next, options) => {
+                if (options?.postData !== undefined) {
+                    throw new Error("Route is already handled!");
+                }
 
-            return fallback(options);
+                return next(options);
+            },
         });
         fixture.page = loginForm();
 
