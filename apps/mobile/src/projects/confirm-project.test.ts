@@ -18,12 +18,20 @@ describe("confirmProject", () => {
         vi.useRealTimers();
     });
 
-    it("reads the project by id and reports an answer, whether or not the project is still there", async () => {
-        const query = vi.fn(async () => null);
+    it("reads the project by id and reports an answer", async () => {
+        const query = vi.fn(async () => {
+            return { _id: "p1" };
+        });
 
-        await expect(confirmProject(clientWith(query as never), "p1")).resolves.toEqual({ kind: "answered" });
+        await expect(confirmProject(clientWith(query as never), "p1")).resolves.toEqual({ found: true, kind: "answered" });
 
         expect(query).toHaveBeenCalledWith(api.projects.functions.getProject, { projectId: "p1" }, { signal: expect.any(AbortSignal) });
+    });
+
+    it("reports an answer that finds no project, as an answer that the project is not there", async () => {
+        const client = clientWith((async () => null) as never);
+
+        await expect(confirmProject(client, "p1")).resolves.toEqual({ found: false, kind: "answered" });
     });
 
     it("reports a refusal with the server's message", async () => {
@@ -42,7 +50,7 @@ describe("confirmProject", () => {
         await expect(confirmProject(client, "p1")).resolves.toEqual({ kind: "unreachable" });
     });
 
-    it("reports nothing for an unauthorized read, which the next refresh reads again", async () => {
+    it("reports nothing for an unauthorized read, which the next token reads again", async () => {
         const client = clientWith((async () => {
             throw coded("Unauthorized", "UNAUTHORIZED");
         }) as never);
@@ -82,24 +90,59 @@ describe("confirmProject", () => {
 });
 
 describe("confirmOnTick", () => {
-    it("reports an answer to the connection and the screen", async () => {
+    it("reports a found project to the connection and clears the screen", async () => {
         const reportRead = vi.fn();
-        const showRefusal = vi.fn();
+        const show = vi.fn();
 
-        confirmOnTick({ client: clientWith((async () => null) as never), projectId: "p1", reportRead, showRefusal });
+        const client = clientWith((async () => {
+            return { _id: "p1" };
+        }) as never);
+
+        confirmOnTick({ client, projectId: "p1", reportRead, show });
 
         await vi.waitFor(() => {
             expect(reportRead).toHaveBeenCalledWith("succeeded");
         });
-        expect(showRefusal).toHaveBeenCalledWith(undefined);
+        expect(show).toHaveBeenCalledWith(undefined);
+    });
+
+    it("reports a missing project as a successful read, and tells the screen it is gone", async () => {
+        const reportRead = vi.fn();
+        const show = vi.fn();
+
+        confirmOnTick({ client: clientWith((async () => null) as never), projectId: "p1", reportRead, show });
+
+        await vi.waitFor(() => {
+            expect(reportRead).toHaveBeenCalledWith("succeeded");
+        });
+        expect(show).toHaveBeenCalledWith({ kind: "gone" });
+    });
+
+    it("shows a refusal and reports no success", async () => {
+        const reportRead = vi.fn();
+        const show = vi.fn();
+
+        confirmOnTick({
+            client: clientWith((async () => {
+                throw new Error("FORBIDDEN");
+            }) as never),
+            projectId: "p1",
+            reportRead,
+            show,
+        });
+
+        await vi.waitFor(() => {
+            expect(show).toHaveBeenCalledWith({ kind: "refused", message: "FORBIDDEN" });
+        });
+        expect(reportRead).not.toHaveBeenCalled();
     });
 
     it("drops the result of a read the screen has moved on from", async () => {
         const pending = Promise.withResolvers<null>();
         const reportRead = vi.fn();
-        const showRefusal = vi.fn();
+        const show = vi.fn();
 
-        const cancel = confirmOnTick({ client: clientWith((() => pending.promise) as never), projectId: "p1", reportRead, showRefusal });
+        const cancel = confirmOnTick({ client: clientWith((() => pending.promise) as never), projectId: "p1", reportRead, show });
 
         cancel();
         pending.resolve(null);
@@ -108,6 +151,6 @@ describe("confirmOnTick", () => {
         });
 
         expect(reportRead).not.toHaveBeenCalled();
-        expect(showRefusal).not.toHaveBeenCalled();
+        expect(show).not.toHaveBeenCalled();
     });
 });

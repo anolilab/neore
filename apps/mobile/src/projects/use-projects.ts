@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
 import { useOffline } from "@/offline/offline-context";
 
+import type { ConfirmView } from "./confirm-project";
 import { confirmOnTick } from "./confirm-project";
 import type { Live, Scoped } from "./live-follow";
 import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
@@ -45,22 +46,31 @@ export const useProject = (projectId: string): Live<ProjectRow> =>
 export const useProjectThreads = (projectId: string): Live<ProjectThreadRow> =>
     useLive((onRows, onError) => watchProjectThreads(getClient(), projectId, onRows, onError), `threads:${projectId}`);
 
+export interface ProjectConfirmState {
+    /** The server says the project is gone or not shared, while the live rows still show it. Its new-chat control stays off. */
+    gone: boolean;
+    /** The server's refusal of the last read, while the connection is still unconfirmed. */
+    refusal: string | undefined;
+}
+
+const NOT_CONFIRMED: ProjectConfirmState = { gone: false, refusal: undefined };
+
 /**
  * Write controls wait while a reconnect is unconfirmed. A reconnect that only resumes the project's subscription never
- * answers it, so the screen asks the server about its own project once per refresh tick while it waits. The tick, not
- * the connection state, starts the read: the refresh that follows a reconnect renews the token first, and a read sent
- * before then could go out on a lapsed one. Returns the refusal the server gave, while the connection is unconfirmed.
+ * answers it, so the screen asks the server about its own project once per refresh tick while it waits, and again when a
+ * new token is minted (a tick can come before the renewal lands). What a read showed is kept with the scope it was read
+ * for, and a "gone" answer holds only for the live rows it was read against: a newer live answer replaces it.
  */
-export const useProjectConfirm = (projectId: string): string | undefined => {
-    const { hasToken, status, user } = useAuth();
+export const useProjectConfirm = (projectId: string, liveRows: unknown): ProjectConfirmState => {
+    const { hasToken, status, tokenSerial, user } = useAuth();
     const { isChecking, isOffline, refreshTick, reportRead } = useOffline();
     const scope = status === "signed-in" && hasToken && user ? `${user.id}:confirm:${projectId}` : undefined;
-    const [refusal, setRefusal] = useState<string | undefined>();
+    const [shown, setShown] = useState<{ rows: unknown; scope: string; view: ConfirmView } | undefined>();
     // The read decides from the state at the tick it runs on; the tick's own render is the one that holds it.
-    const connection = useRef({ isChecking, isOffline });
+    const connection = useRef({ isChecking, isOffline, liveRows });
 
     useEffect(() => {
-        connection.current = { isChecking, isOffline };
+        connection.current = { isChecking, isOffline, liveRows };
     });
 
     useEffect(() => {
@@ -70,9 +80,24 @@ export const useProjectConfirm = (projectId: string): string | undefined => {
             return undefined;
         }
 
-        return confirmOnTick({ client: getClient(), projectId, reportRead, showRefusal: setRefusal });
-    }, [projectId, refreshTick, reportRead, scope]);
+        return confirmOnTick({
+            client: getClient(),
+            projectId,
+            reportRead,
+            show: (view) => {
+                setShown(view === undefined ? undefined : { rows: connection.current.liveRows, scope, view });
+            },
+        });
+    }, [projectId, refreshTick, reportRead, scope, tokenSerial]);
 
-    // Once the connection is confirmed, by this read or by a live answer, an old refusal no longer describes it.
-    return isChecking ? refusal : undefined;
+    if (shown === undefined || shown.scope !== scope) {
+        return NOT_CONFIRMED;
+    }
+
+    if (shown.view.kind === "gone") {
+        return { gone: shown.rows === liveRows, refusal: undefined };
+    }
+
+    // Once the connection is confirmed, by a read or by a live answer, an old refusal no longer describes it.
+    return { gone: false, refusal: isChecking ? shown.view.message : undefined };
 };

@@ -67,6 +67,6 @@
   the registering session lives, so a failed release still stops the pushes once the revoke lands. Pushes carry only a generic alert and ids, except for an Android phone whose registration says `buildsAlert` (set only while its background task, `PHONE_PUSH_TASK`, is registered): that phone gets a data-only push, and its task builds the alert (`src/notifications/background-task.ts`, `push-content.ts`). Tool approvals stay notification-style on every phone.
 - **Project writes after a reconnect** (`src/projects/use-projects.ts` `useProjectConfirm`, `confirm-project.ts`) — the
   write controls wait for `canWrite`, which a live subscription clears only by answering rows; a reconnect that only
-  resumes it never does. So a project screen reads its own project once per refresh tick while it waits (the tick comes
-  after the token renews). Answered → `reportRead("succeeded")`; refused → the screen stays blocked and shows the error;
+  resumes it never does. So a project screen reads its own project once per refresh tick and once per minted token while it
+  waits (a tick can come before the renewal lands). Answered → `reportRead("succeeded")`; refused → the screen stays blocked and shows the error; a project the answer says is missing still counts as answered, but its new-chat control stays off until a newer live answer;
   a network failure, a timeout or an unauthorized read reports nothing. Upstream: `docs/agents/lunora-upstream.md`.

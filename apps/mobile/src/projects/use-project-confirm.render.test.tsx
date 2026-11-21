@@ -40,6 +40,7 @@ const signedIn = (overrides: Partial<AuthValue> = {}): AuthValue => {
         signIn: async () => undefined,
         signOut: async () => undefined,
         status: "signed-in",
+        tokenSerial: 0,
         user: { id: "u1" } as AuthValue["user"],
         ...overrides,
     };
@@ -49,20 +50,24 @@ const connection = (overrides: Partial<OfflineValue> = {}): OfflineValue => {
     return { cache: undefined, isChecking: true, isOffline: false, refreshTick: 0, reportRead, ...overrides };
 };
 
+const coded = (message: string, code: string): Error => Object.assign(new Error(message), { code });
+
 describe("useProjectConfirm", () => {
     let container: HTMLDivElement;
     let root: Root;
     let auth: AuthValue;
     let offline: OfflineValue;
+    // The live rows the screen shows: the same array until the subscription answers again.
+    let liveRows: unknown[];
 
-    const Probe = ({ projectId }: { projectId: string }) => {
-        const refusal = useProjectConfirm(projectId);
+    const Probe = ({ projectId, rows }: { projectId: string; rows: unknown[] }) => {
+        const confirm = useProjectConfirm(projectId, rows);
 
-        return createElement("p", null, refusal ?? "none");
+        return createElement("p", null, confirm.refusal ?? (confirm.gone ? "gone" : "none"));
     };
 
     const render = async () => {
-        const probe = createElement(Probe, { projectId: "p1" });
+        const probe = createElement(Probe, { projectId: "p1", rows: liveRows });
         const withOffline = createElement(OfflineContext, { value: offline }, probe);
         const tree = createElement(AuthContext, { value: auth }, withOffline);
 
@@ -86,9 +91,10 @@ describe("useProjectConfirm", () => {
         root = createRoot(container);
         auth = signedIn();
         offline = connection();
+        liveRows = [];
         reportRead.mockClear();
         harness.query.mockReset();
-        harness.query.mockResolvedValue(null);
+        harness.query.mockResolvedValue({ _id: "p1" });
     });
 
     afterEach(() => {
@@ -119,6 +125,22 @@ describe("useProjectConfirm", () => {
         await render();
         await flush();
         expect(harness.query).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads again once a new token is minted while the connection is unconfirmed", async () => {
+        harness.query.mockRejectedValueOnce(coded("Unauthorized", "UNAUTHORIZED"));
+        await render();
+        await flush();
+
+        expect(harness.query).toHaveBeenCalledTimes(1);
+        expect(reportRead).not.toHaveBeenCalled();
+
+        auth = signedIn({ tokenSerial: 1 });
+        await render();
+        await flush();
+
+        expect(harness.query).toHaveBeenCalledTimes(2);
+        expect(reportRead).toHaveBeenCalledWith("succeeded");
     });
 
     it("does not read while offline", async () => {
@@ -168,6 +190,22 @@ describe("useProjectConfirm", () => {
         expect(container.textContent).toBe("none");
     });
 
+    it("does not show another account's refusal for the same project", async () => {
+        harness.query.mockRejectedValueOnce(new Error("FORBIDDEN"));
+        await render();
+        await flush();
+        expect(container.textContent).toBe("FORBIDDEN");
+
+        // A second account's read is still pending: nothing of the first account's refusal may show.
+        harness.query.mockImplementation(() => new Promise(() => {}));
+        auth = signedIn({ user: { id: "u2" } as AuthValue["user"] });
+        offline = connection({ refreshTick: 1 });
+        await render();
+        await flush();
+
+        expect(container.textContent).toBe("none");
+    });
+
     it("reports nothing on a network failure, and shows no refusal", async () => {
         harness.query.mockRejectedValue(new TypeError("Network request failed"));
         await render();
@@ -189,5 +227,27 @@ describe("useProjectConfirm", () => {
 
         expect(container.textContent).toBe("none");
         expect(reportRead).toHaveBeenCalledWith("succeeded");
+    });
+
+    it("marks the project gone when a read finds nothing, while the live rows still show it", async () => {
+        harness.query.mockResolvedValue(null);
+        await render();
+        await flush();
+
+        expect(reportRead).toHaveBeenCalledWith("succeeded");
+        expect(container.textContent).toBe("gone");
+    });
+
+    it("drops the gone mark once the live rows are answered again", async () => {
+        harness.query.mockResolvedValue(null);
+        await render();
+        await flush();
+        expect(container.textContent).toBe("gone");
+
+        liveRows = [{ id: "p1" }];
+        await render();
+        await flush();
+
+        expect(container.textContent).toBe("none");
     });
 });

@@ -11,11 +11,14 @@ export const CONFIRM_READ_TIMEOUT_MS = 10_000;
 
 /**
  * What one read of a project told the app:
- * - `answered`: the server answered, whether the project is still there or not. The connection works.
+ * - `answered`: the server answered. The connection works. `found` is false when the project is gone or not shared.
  * - `refused`: the server answered with an error. The screen stays blocked and shows the message.
  * - `unreachable`: no verdict. Nothing is learned, so nothing is reported.
  */
-export type ConfirmOutcome = { kind: "answered" } | { kind: "refused"; message: string } | { kind: "unreachable" };
+export type ConfirmOutcome = { found: boolean; kind: "answered" } | { kind: "refused"; message: string } | { kind: "unreachable" };
+
+/** What a screen shows about its project after a read: the project is gone, or the server refused the read. */
+export type ConfirmView = { kind: "gone" } | { kind: "refused"; message: string };
 
 /** The slice of the client this uses, so tests can fake it. */
 export type ConfirmClient = Pick<LunoraClient, "query">;
@@ -45,9 +48,9 @@ export const confirmProject = async (client: ConfirmClient, projectId: string, t
     // A read given up after its deadline still settles later; its failure is classified here, so it is never unhandled.
     const read = async (): Promise<ConfirmOutcome> => {
         try {
-            await client.query(api.projects.functions.getProject, { projectId: projectId as Id<"projects"> }, { signal: controller.signal });
+            const project = await client.query(api.projects.functions.getProject, { projectId: projectId as Id<"projects"> }, { signal: controller.signal });
 
-            return { kind: "answered" };
+            return { found: Boolean(project), kind: "answered" };
         } catch (error: unknown) {
             return classify(error);
         }
@@ -62,18 +65,19 @@ export const confirmProject = async (client: ConfirmClient, projectId: string, t
 
 /**
  * What one refresh tick does for a screen whose write controls wait: one read, reported to the connection and to the
- * screen. The returned function drops the result when the screen moves on before the read answers.
+ * screen. An answer for a missing project is still a successful read, but the screen is told the project is gone.
+ * `show(undefined)` clears what was shown. The returned function drops the result when the screen moves on first.
  */
 export const confirmOnTick = ({
     client,
     projectId,
     reportRead,
-    showRefusal,
+    show,
 }: {
     client: ConfirmClient;
     projectId: string;
     reportRead: (outcome: "failed" | "succeeded") => void;
-    showRefusal: (message: string | undefined) => void;
+    show: (view: ConfirmView | undefined) => void;
 }): () => void => {
     let isCancelled = false;
 
@@ -85,10 +89,10 @@ export const confirmOnTick = ({
         }
 
         if (outcome.kind === "answered") {
-            showRefusal(undefined);
+            show(outcome.found ? undefined : { kind: "gone" });
             reportRead("succeeded");
         } else if (outcome.kind === "refused") {
-            showRefusal(outcome.message);
+            show({ kind: "refused", message: outcome.message });
         }
     });
 
