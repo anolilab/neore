@@ -76,6 +76,7 @@ msgstr "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "\"{fileName}\" could not be uploaded. Check your connection and try again."
 
+#: src/features/chat/thread/composer-input.tsx:1146
 #~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
 #~ msgstr "\"{fileName}\" could not be uploaded. Remove it to send."
 
@@ -87,11 +88,11 @@ msgstr "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB.
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 
-#: src/features/projects/components/project-rule-files.tsx:611
+#: src/features/projects/components/project-rule-files.tsx:616
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 
-#: src/features/projects/components/project-rule-files.tsx:594
+#: src/features/projects/components/project-rule-files.tsx:599
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 
@@ -241,7 +242,7 @@ msgid "{0, plural, one {# file changed} other {# files changed}}"
 msgstr "{0, plural, one {# file changed} other {# files changed}}"
 
 #. placeholder {0}: read.unreadable
-#: src/features/projects/components/project-rule-files.tsx:534
+#: src/features/projects/components/project-rule-files.tsx:539
 msgid "{0, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large."
 msgstr "{0, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large."
 
@@ -361,7 +362,7 @@ msgid "{0, plural, one {# required or unknown check is still running} other {# r
 msgstr "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 
 #. placeholder {0}: added.length
-#: src/features/projects/components/project-rule-files.tsx:530
+#: src/features/projects/components/project-rule-files.tsx:535
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
 msgstr "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
 
@@ -1444,7 +1445,7 @@ msgstr "{server} · until {until}"
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 
-#: src/features/projects/components/project-rule-files.tsx:533
+#: src/features/projects/components/project-rule-files.tsx:538
 msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
 msgstr "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
 
@@ -1498,7 +1499,7 @@ msgstr "{title}: {0}"
 msgid "{title}: {0}. {exitText}"
 msgstr "{title}: {0}. {exitText}"
 
-#: src/features/projects/components/project-rule-files.tsx:537
+#: src/features/projects/components/project-rule-files.tsx:542
 msgid "{tooLarge, plural, one {# file was left out as too large} other {# files were left out as too large}}: a rule file holds at most {length} characters, and all of a project's together at most {size} MB."
 msgstr "{tooLarge, plural, one {# file was left out as too large} other {# files were left out as too large}}: a rule file holds at most {length} characters, and all of a project's together at most {size} MB."
 
@@ -1510,7 +1511,7 @@ msgstr "{toolId} API key removed"
 msgid "{toolId} API key saved"
 msgstr "{toolId} API key saved"
 
-#: src/features/projects/components/project-rule-files.tsx:531
+#: src/features/projects/components/project-rule-files.tsx:536
 msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
 msgstr "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
 
@@ -1893,7 +1894,7 @@ msgstr "A document editor that thinks with you."
 msgid "A few questions first"
 msgstr "A few questions first"
 
-#: src/features/projects/components/project-rule-files.tsx:607
+#: src/features/projects/components/project-rule-files.tsx:612
 msgid "A file applied when files match needs at least one pattern."
 msgstr "A file applied when files match needs at least one pattern."
 
@@ -1901,7 +1902,7 @@ msgstr "A file applied when files match needs at least one pattern."
 msgid "A file only its owner can read (no keychain available)"
 msgstr "A file only its owner can read (no keychain available)"
 
-#: src/features/projects/components/project-rule-files.tsx:601
+#: src/features/projects/components/project-rule-files.tsx:606
 msgid "A file read when needed needs a line saying when to read it."
 msgstr "A file read when needed needs a line saying when to read it."
 
@@ -2018,7 +2019,7 @@ msgstr "A placeholder or @mention outside quotes is read as null here, so this e
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "A project can list at most {MAX_REPOSITORIES} repositories."
 
-#: src/features/projects/components/project-rule-files.tsx:628
+#: src/features/projects/components/project-rule-files.tsx:633
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "A project holds at most {limit} rule files. Remove one first."
 
@@ -2056,11 +2057,11 @@ msgstr "A reply that used memories shows a \"Memories used\" list, so you can se
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 
-#: src/features/projects/components/project-rule-files.tsx:618
+#: src/features/projects/components/project-rule-files.tsx:623
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "A rule file's name may be at most {limit} characters."
 
-#: src/features/projects/components/project-rule-files.tsx:614
+#: src/features/projects/components/project-rule-files.tsx:619
 msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
 msgstr "A rule file's name may not start with \"id:\". Rename \"{name}\"."
 
@@ -2624,7 +2625,7 @@ msgstr "Add reference images to maintain consistency"
 msgid "Add row"
 msgstr "Add row"
 
-#: src/features/projects/components/project-rule-files.tsx:841
+#: src/features/projects/components/project-rule-files.tsx:846
 msgid "Add rule file"
 msgstr "Add rule file"
 
@@ -3631,7 +3632,7 @@ msgstr "An agent (skill)"
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "An agent works the task on its own, then a verifier checks the result against your success criteria."
 
-#: src/features/projects/components/project-rule-files.tsx:847
+#: src/features/projects/components/project-rule-files.tsx:852
 msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
 msgstr "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
 
@@ -5421,8 +5422,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Browse, fork, and remix workflows shared by the community"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:213
-#: src/features/chat/browser-live-view/browser-live-view.tsx:322
+#: src/features/chat/browser-live-view/browser-live-view.tsx:951
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1151
 msgid "Browser"
 msgstr "Browser"
 
@@ -8149,6 +8150,14 @@ msgstr "Control depth of field with aperture setting"
 #: src/features/settings/components/account/account-settings.tsx:159
 msgid "Control how your personal information is displayed in the UI."
 msgstr "Control how your personal information is displayed in the UI."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:475
+msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
+msgstr "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:476
+msgid "Control of the browser is back with the agent."
+msgstr "Control of the browser is back with the agent."
 
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:22
 msgid "Control panel"
@@ -10893,7 +10902,7 @@ msgid "Discard"
 msgstr "Discard"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:921
+#: src/features/projects/components/project-rule-files.tsx:926
 msgid "Discard changes"
 msgstr "Discard changes"
 
@@ -11522,7 +11531,7 @@ msgstr "Each connection gets its own webhook address, and the app sends new mess
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 
-#: src/features/projects/components/project-rule-files.tsx:605
+#: src/features/projects/components/project-rule-files.tsx:610
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 
@@ -15815,7 +15824,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab secret token (X-Gitlab-Token)"
 
-#: src/features/projects/components/project-rule-files.tsx:613
+#: src/features/projects/components/project-rule-files.tsx:618
 msgid "Give every rule file a name."
 msgstr "Give every rule file a name."
 
@@ -15826,6 +15835,10 @@ msgstr "Give people access to this page, or publish a read-only link."
 #: src/features/settings/components/chat/mcp/popular-servers.ts:264
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "Global analyst research, market analysis, and investment data"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1064
+msgid "Go"
+msgstr "Go"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
 #: src/features/auth/components/auth/auth-card.tsx:497
@@ -16402,6 +16415,10 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "Hand (pan)"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:974
+msgid "Hand back"
+msgstr "Hand back"
+
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:74
 msgid "Hand over a summary"
 msgstr "Hand over a summary"
@@ -16557,7 +16574,7 @@ msgstr "Hide column"
 msgid "Hide follow-up suggestions"
 msgstr "Hide follow-up suggestions"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:231
+#: src/features/chat/browser-live-view/browser-live-view.tsx:969
 msgid "Hide live view"
 msgstr "Hide live view"
 
@@ -17322,7 +17339,7 @@ msgstr "Import conversations from ChatGPT, Google Gemini, Claude, a Neore data e
 msgid "Import failed"
 msgstr "Import failed"
 
-#: src/features/projects/components/project-rule-files.tsx:852
+#: src/features/projects/components/project-rule-files.tsx:857
 msgid "Import files"
 msgstr "Import files"
 
@@ -17343,7 +17360,7 @@ msgstr "Import Notion export (.zip)"
 msgid "Import one kind of export at a time."
 msgstr "Import one kind of export at a time."
 
-#: src/features/projects/components/project-rule-files.tsx:862
+#: src/features/projects/components/project-rule-files.tsx:867
 msgid "Import rule folder"
 msgstr "Import rule folder"
 
@@ -17793,7 +17810,7 @@ msgstr "instructions"
 msgid "Instructions"
 msgstr "Instructions"
 
-#: src/features/projects/components/project-rule-files.tsx:780
+#: src/features/projects/components/project-rule-files.tsx:785
 msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
 msgstr "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
 
@@ -18272,6 +18289,10 @@ msgstr "Kazakhstan"
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:54
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "Keep accepting the old secret for 24 hours"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1007
+msgid "Keep control"
+msgstr "Keep control"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:122
 msgid "Keep current rows"
@@ -19236,9 +19257,13 @@ msgstr "Live preview — renders when the component finishes streaming"
 msgid "Live preview — updating as the artifact streams"
 msgstr "Live preview — updating as the artifact streams"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:267
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Live view of the agent's browser (read-only)"
 msgstr "Live view of the agent's browser (read-only)"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
+msgid "Live view of the agent's browser (you have control)"
+msgstr "Live view of the agent's browser (you have control)"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:37
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
@@ -22483,6 +22508,10 @@ msgstr "No images yet"
 msgid "No indexed files available. Files are still being processed."
 msgstr "No indexed files available. Files are still being processed."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
+msgid "No input for a while: control goes back to the agent in under a minute."
+msgstr "No input for a while: control goes back to the agent in under a minute."
+
 #: src/features/projects/components/repo-rule-file-import.tsx:212
 msgid "No instruction files were found in this repository."
 msgstr "No instruction files were found in this repository."
@@ -22507,7 +22536,7 @@ msgstr "No languages found"
 msgid "No lens selected"
 msgstr "No lens selected"
 
-#: src/features/projects/components/project-rule-files.tsx:528
+#: src/features/projects/components/project-rule-files.tsx:533
 msgid "No Markdown files were found to import."
 msgstr "No Markdown files were found to import."
 
@@ -24276,9 +24305,13 @@ msgstr "Opening pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:238
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1015
 msgid "Opening the live view…"
 msgstr "Opening the live view…"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1070
+msgid "Opening the page. This can take up to a minute."
+msgstr "Opening the page. This can take up to a minute."
 
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
@@ -24714,6 +24747,7 @@ msgstr "Page {currentPage} of {totalPages}"
 msgid "Page added. It is being fetched and indexed."
 msgstr "Page added. It is being fetched and indexed."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1049
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "Page address"
@@ -28742,11 +28776,11 @@ msgstr "Rubric"
 msgid "Rule file {0}"
 msgstr "Rule file {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:778
+#: src/features/projects/components/project-rule-files.tsx:783
 msgid "Rule files"
 msgstr "Rule files"
 
-#: src/features/projects/components/project-rule-files.tsx:760
+#: src/features/projects/components/project-rule-files.tsx:765
 msgid "Rule files saved."
 msgstr "Rule files saved."
 
@@ -29079,7 +29113,7 @@ msgstr "Save Image"
 msgid "Save login"
 msgstr "Save login"
 
-#: src/features/projects/components/project-rule-files.tsx:935
+#: src/features/projects/components/project-rule-files.tsx:940
 msgid "Save or discard your rule file changes first."
 msgstr "Save or discard your rule file changes first."
 
@@ -29091,7 +29125,7 @@ msgstr "Save preset"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 
-#: src/features/projects/components/project-rule-files.tsx:901
+#: src/features/projects/components/project-rule-files.tsx:906
 msgid "Save rule files"
 msgstr "Save rule files"
 
@@ -29169,7 +29203,7 @@ msgstr "Saving tools…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:901
+#: src/features/projects/components/project-rule-files.tsx:906
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -31184,7 +31218,8 @@ msgstr "Some images from this run could not be saved."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Some steps had no pricing data; the total is a minimum."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:217
+#: src/features/chat/browser-live-view/browser-live-view.tsx:955
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1027
 msgid "Someone else has control of this browser."
 msgstr "Someone else has control of this browser."
 
@@ -32864,9 +32899,17 @@ msgstr "Taiwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Take an input image, remove the background, then apply style transfer"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:992
+msgid "Take control"
+msgstr "Take control"
+
 #: src/features/chat/group/group-mode.ts:75
 msgid "Take turns"
 msgstr "Take turns"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
+msgid "Taking control is not available while impersonating."
+msgstr "Taking control is not available while impersonating."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:672
 msgid "Taking screenshot..."
@@ -33492,6 +33535,16 @@ msgstr "That message is too long to send from here."
 msgid "That message was already sent."
 msgstr "That message was already sent."
 
+#. placeholder {0}: result.error
+#: src/features/chat/browser-live-view/browser-live-view.tsx:890
+msgid "That page could not be opened: {0}"
+msgstr "That page could not be opened: {0}"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:624
+#: src/features/chat/browser-live-view/browser-live-view.tsx:910
+msgid "That page could not be opened."
+msgstr "That page could not be opened."
+
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
 msgstr "That passcode is not right."
@@ -33593,6 +33646,10 @@ msgstr "the agent does not offer that choice"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "The agent finished without giving a guide. Write it again."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1026
+msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
+msgstr "The agent is finishing a browser action, which can take over a minute. Try again shortly."
+
 #: src/features/chat/host/host-send-errors.ts:22
 msgid "The agent is still opening its session. Try again in a moment."
 msgstr "The agent is still opening its session. Try again in a moment."
@@ -33601,7 +33658,7 @@ msgstr "The agent is still opening its session. Try again in a moment."
 msgid "The agent is still working on the last message."
 msgstr "The agent is still working on the last message."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:214
+#: src/features/chat/browser-live-view/browser-live-view.tsx:952
 msgid "The agent is using a browser"
 msgstr "The agent is using a browser"
 
@@ -33624,6 +33681,14 @@ msgstr "The agent made no file changes."
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "The agent on your computer is reading the change…"
 msgstr "The agent on your computer is reading the change…"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:884
+msgid "The agent's browser closed while the page loaded."
+msgstr "The agent's browser closed while the page loaded."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:766
+msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
+msgstr "The agent's browser was replaced, and control went back to the agent. You can take control again."
 
 #. placeholder {0}: pendingDelete?.site ?? ""
 #: src/features/vault/components/site-logins.tsx:575
@@ -33694,6 +33759,10 @@ msgstr "The bot's tools were saved"
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
 msgstr "The browser cannot read this video to capture a frame"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:859
+msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
+msgstr "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
@@ -33812,7 +33881,7 @@ msgstr "The dataset, its cases and every run of it are removed."
 msgid "The description is cut short."
 msgstr "The description is cut short."
 
-#: src/features/projects/components/project-rule-files.tsx:599
+#: src/features/projects/components/project-rule-files.tsx:604
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "The description of \"{name}\" must be at most {limit} characters on one line."
 
@@ -33891,7 +33960,7 @@ msgstr "The file is still attached and will be sent with your message."
 msgid "The file was not imported:"
 msgstr "The file was not imported:"
 
-#: src/features/projects/components/project-rule-files.tsx:566
+#: src/features/projects/components/project-rule-files.tsx:571
 msgid "The files could not be read."
 msgstr "The files could not be read."
 
@@ -34064,14 +34133,15 @@ msgstr "The link may be wrong, or its owner has made the conversation private or
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "The link may be wrong, or its owner has unpublished or deleted the page."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:249
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
 msgid "The live view could not be opened."
 msgstr "The live view could not be opened."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:223
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr "The live view could not be opened. Try again."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:243
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1020
 msgid "The live view is not available right now."
 msgstr "The live view is not available right now."
 
@@ -34202,6 +34272,10 @@ msgstr "The page agent could not edit this page"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "The page now shows the other version. Copy anything you want to keep from yours."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1075
+msgid "The page you opened is still loading."
+msgstr "The page you opened is still loading."
+
 #: src/features/pages/components/pages-sidebar.tsx:282
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
@@ -34307,7 +34381,7 @@ msgstr "The retry is taking longer than expected"
 msgid "The right model, every time."
 msgstr "The right model, every time."
 
-#: src/features/projects/components/project-rule-files.tsx:785
+#: src/features/projects/components/project-rule-files.tsx:790
 msgid "The rule files could not be loaded."
 msgstr "The rule files could not be loaded."
 
@@ -35501,7 +35575,7 @@ msgstr "Today"
 msgid "Today, {label}"
 msgstr "Today, {label}"
 
-#: src/features/projects/components/project-rule-files.tsx:623
+#: src/features/projects/components/project-rule-files.tsx:628
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 
@@ -35647,7 +35721,7 @@ msgstr "Too many attempts. Wait a few seconds, then try again."
 msgid "too many files"
 msgstr "too many files"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:249
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1034
 msgid "Too many live views were opened. Try again later."
 msgstr "Too many live views were opened. Try again later."
 
@@ -36050,8 +36124,8 @@ msgstr "Try adjusting your search terms."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:253
-#: src/features/chat/browser-live-view/browser-live-view.tsx:337
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1166
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -38126,7 +38200,7 @@ msgstr "Want to continue from here?"
 msgid "Watch"
 msgstr "Watch"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:231
+#: src/features/chat/browser-live-view/browser-live-view.tsx:969
 msgid "Watch live"
 msgstr "Watch live"
 
@@ -38539,7 +38613,7 @@ msgstr "Where thoughts<0/><1>become actions.</1>"
 msgid "Where you stay in control"
 msgstr "Where you stay in control"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:324
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1153
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Whether the agent is using a browser could not be checked."
 
@@ -39006,6 +39080,11 @@ msgstr "You chose these integrations in the agent builder. Each one opens for yo
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:509
+#: src/features/chat/browser-live-view/browser-live-view.tsx:838
+msgid "You handed the browser back to the agent."
+msgstr "You handed the browser back to the agent."
+
 #: src/features/auth/components/team/leave-team-dialog.tsx:47
 msgid "You have left the team"
 msgstr "You have left the team"
@@ -39060,9 +39139,19 @@ msgstr "You have used today's messages. Try again later."
 msgid "You have used today's translations. Try again later."
 msgstr "You have used today's translations. Try again later."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:338
+msgid "You may not take control of this browser."
+msgstr "You may not take control of this browser."
+
 #: src/components/error-boundaries/route-error-boundary.tsx:61
 msgid "You need to sign in to access this page."
 msgstr "You need to sign in to access this page."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:514
+#: src/features/chat/browser-live-view/browser-live-view.tsx:838
+#: src/features/chat/browser-live-view/browser-live-view.tsx:886
+msgid "You no longer have control of the browser."
+msgstr "You no longer have control of the browser."
 
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:111
 msgid "You pay for the Team plan of these organizations. Deleting your account cancels it immediately, and their members lose Team features:"
@@ -39214,6 +39303,10 @@ msgstr "Your chats and {0}"
 #: src/features/vault/components/site-logins.tsx:434
 msgid "Your chats and the bots you chose"
 msgstr "Your chats and the bots you chose"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1084
+msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
+msgstr "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"

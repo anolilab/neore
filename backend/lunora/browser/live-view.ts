@@ -166,7 +166,8 @@ const readerBrowser = async (
  * by the clock, so the client stops showing the status then and asks again, and every answer after it is `null`.
  */
 export const getThreadBrowser = authQuery
-    .input({ threadId: v.id("threads") })
+    /** `claim`: a view's own claim. The answer then says whether the lease is that view's, not only the caller's. */
+    .input({ claim: v.optional(v.string()), threadId: v.id("threads") })
     .output(
         v.union(
             v.null(),
@@ -174,8 +175,11 @@ export const getThreadBrowser = authQuery
                 accessUntil: v.optional(v.number()),
                 browserId: v.string(),
                 canControl: v.boolean(),
-                /** A person drives the browser until `until`; `byYou`: the caller. */
-                control: v.optional(v.object({ byYou: v.boolean(), until: v.number() })),
+                /**
+                 * A person drives the browser until `until`; `byYou`: the caller (from any of their tabs). `byClaim`, only
+                 * with a `claim` asked for: the lease is the one that claim names, and not handed back.
+                 */
+                control: v.optional(v.object({ byClaim: v.optional(v.boolean()), byYou: v.boolean(), until: v.number() })),
                 currentUrl: v.optional(v.string()),
                 idleUntil: v.number(),
                 /**
@@ -186,18 +190,27 @@ export const getThreadBrowser = authQuery
             }),
         ),
     )
-    .query(async ({ args: { threadId }, ctx }) => {
+    .query(async ({ args: { claim, threadId }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now);
 
         if (browser.kind !== "watchable") {
             return null;
         }
 
+        const { control } = browser;
+        const lease = browser.session.control;
+
         return {
             ...(browser.accessUntil !== undefined && { accessUntil: browser.accessUntil }),
             browserId: browser.browserId,
             canControl: browser.canControl,
-            ...(browser.control !== undefined && { control: { byYou: browser.control.byCaller, until: browser.control.until } }),
+            ...(control !== undefined && {
+                control: {
+                    ...(claim !== undefined && { byClaim: control.byCaller && lease?.ended === undefined && claimNames(lease, claim) }),
+                    byYou: control.byCaller,
+                    until: control.until,
+                },
+            }),
             currentUrl: browser.currentUrl,
             idleUntil: browser.idleUntil,
             now: ctx.now,
@@ -380,6 +393,8 @@ export const claimControl = internalMutation
                 providerSessionId: v.string(),
                 /** An earlier lease ended and the agent was not told yet: a dropped claim puts that note back. */
                 returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+                /** When the lease this claim wrote ends unrenewed. */
+                until: v.number(),
             }),
         ),
     )
@@ -436,6 +451,7 @@ export const claimControl = internalMutation
                 kind: "ok" as const,
                 previousClaim: current.renewing ?? current.claim,
                 providerSessionId: browser.providerSessionId,
+                until,
                 ...(current.ended !== undefined && { handedBack: current.ended }),
             };
         }
@@ -447,7 +463,7 @@ export const claimControl = internalMutation
             control: { by, claim, since: ctx.now, until },
         });
 
-        return { claim, fresh: true, kind: "ok" as const, providerSessionId: browser.providerSessionId, ...(returned !== undefined && { returned }) };
+        return { claim, fresh: true, kind: "ok" as const, providerSessionId: browser.providerSessionId, until, ...(returned !== undefined && { returned }) };
     });
 
 /**
@@ -515,15 +531,28 @@ export const dropControlClaim = internalMutation
 /**
  * A renewal's mint came back and was checked: the lease is this claim's alone from now on (`renewing` goes). `false`:
  * the lease is no longer this claim's, or was handed back or lapsed meanwhile, and no URL may be returned.
+ *
+ * `ownView`: the renewal refreshes the view that holds the claim it replaced (not another of the person's tabs taking
+ * over). That view closed while it was minted (`renewingEnded`): nothing would show the new view, so the lease ends the
+ * way that view closed, as its hand back would have ended it.
  */
 export const settleControlClaim = internalMutation
-    .input({ claim: v.string(), threadId: v.id("threads") })
+    .input({ claim: v.string(), ownView: v.optional(v.boolean()), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args: { claim, threadId }, ctx }) => {
+    .mutation(async ({ args: { claim, ownView, threadId }, ctx }) => {
         const session = await activeThreadSession(ctx.db, threadId);
         const control = session?.control;
 
         if (session === null || control?.claim !== claim || control.ended !== undefined || controlStateOf(session, ctx.now) !== "person") {
+            return false;
+        }
+
+        if (ownView === true && control.renewingEnded !== undefined) {
+            await patchRow(ctx.db, "browserSessions", session, {
+                ...activeNow(session, ctx.now),
+                control: { ...settled(control), ended: control.renewingEnded, until: Math.max(ctx.now, control.navigatingUntil ?? 0) },
+            });
+
             return false;
         }
 
@@ -543,16 +572,20 @@ export const settleControlClaim = internalMutation
  * the claim after the provider minted it, and is never returned to a caller who no longer holds the lease.
  */
 export const takeControl = authAction
-    .input({ threadId: v.id("threads") })
+    /** `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover. */
+    .input({ renews: v.optional(v.string()), threadId: v.id("threads") })
     .use(rateLimit("browser/liveView"))
     .output(
         v.union(
-            /** `claim` names this lease: the view passes it to `keepControl`, `handBack` and `navigateInControl`. */
-            v.object({ claim: v.string(), connectBy: v.number(), status: v.literal("ok"), url: v.string() }),
+            /**
+             * `claim` names this lease: the view passes it to `keepControl`, `handBack` and `navigateInControl`. `until`:
+             * when the lease ends unrenewed, on the server's clock, so the view need not wait for a status read to know.
+             */
+            v.object({ claim: v.string(), connectBy: v.number(), status: v.literal("ok"), until: v.number(), url: v.string() }),
             v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
-    .action(async ({ args: { threadId }, ctx }) => {
+    .action(async ({ args: { renews, threadId }, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
@@ -645,7 +678,11 @@ export const takeControl = authAction
         // A renewal is done: the claim it replaced goes, so the view that held it is told to close.
         if (claim.previousClaim !== undefined) {
             const held = await ctx
-                .runMutation(internal.browser.live_view.settleControlClaim, { claim: claim.claim, threadId })
+                .runMutation(internal.browser.live_view.settleControlClaim, {
+                    claim: claim.claim,
+                    threadId,
+                    ...(renews !== undefined && renews === claim.previousClaim && { ownView: true }),
+                })
                 .catch(async (error: unknown) => {
                     await drop();
 
@@ -659,7 +696,7 @@ export const takeControl = authAction
 
         ctx.log.event("browser.control_taken", { ok: true, reason: claim.fresh ? "fresh" : "renewed" });
 
-        return { claim: claim.claim, connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, url };
+        return { claim: claim.claim, connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, until: claim.until, url };
     });
 
 /**
@@ -700,13 +737,24 @@ export const keepControl = authMutation
 /**
  * The person gives the browser back (`handed_back`) or left the view (`left`); the agent's next action is told. Takes
  * no thread decision and no rate limit: it only ends the caller's own lease, and only the one `claim` names, so an
- * older tab of theirs closing never ends the lease a newer tab took.
+ * older tab of theirs closing never ends the lease a newer tab took. Answers whether that claim's lease is handed back
+ * now (also when an earlier send of the same hand back ended it): `false` when it was no longer the claim's (another
+ * of the person's tabs took over, or the lease ran out), so the view does not say it handed anything back.
  */
 export const handBack = authMutation
     .input({ claim: v.string(), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
         const session = await activeThreadSession(systemDb(ctx), threadId);
+
+        // A send again of a hand back that already landed (its answer did not get through): it changes nothing.
+        if (
+            session?.control?.claim === claim &&
+            (session.control.ended === "handed_back" || session.control.ended === "left") &&
+            (await holdsLease(session, ctx.user.userId))
+        ) {
+            return true;
+        }
 
         if (
             session !== null &&
@@ -719,7 +767,7 @@ export const handBack = authMutation
             if (session.control.claim !== claim) {
                 await patchRow(systemDb(ctx), "browserSessions", session, { control: { ...settled(session.control), renewingEnded: reason } });
 
-                return null;
+                return false;
             }
 
             // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
@@ -730,9 +778,11 @@ export const handBack = authMutation
                 control: { ...session.control, ended: reason, until },
             });
             ctx.log.event("browser.control_returned", { reason });
+
+            return true;
         }
 
-        return null;
+        return false;
     });
 
 /**
