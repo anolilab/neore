@@ -23,6 +23,7 @@ import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { threadIdOfLink } from "./locked-link";
+import { storedPage } from "../lib/stored-row";
 
 /** Notification rows one job rewrites. A user with more continues in the next job. */
 export const REDACT_BATCH = 200;
@@ -44,11 +45,13 @@ export const scheduleGranteeRedaction = async (ctx: Pick<MutationCtx, "db" | "sc
     let cursor: string | null = null;
 
     for (;;) {
-        const batch: { continueCursor: string | null; isDone: boolean; page: { acceptedBy?: string }[] } = await ctx.db.threadInvites.findMany({
-            cursor,
-            limit: INVITE_PAGE,
-            where: { threadId },
-        });
+        const batch: { continueCursor: string | null; isDone: boolean; page: { acceptedBy?: string }[] } = storedPage(
+            await ctx.db.threadInvites.findMany({
+                cursor,
+                limit: INVITE_PAGE,
+                where: { threadId },
+            }),
+        );
 
         for (const userId of granteesOf(batch.page, ownerId)) {
             grantees.add(userId);

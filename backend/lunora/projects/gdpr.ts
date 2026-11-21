@@ -19,6 +19,7 @@ import { vSubAgentRoles } from "../sub-agents/validators";
 import { PROJECTS_PER_DETAILS_READ, PROJECTS_PER_RULE_FILES_READ } from "./export-pages";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL, isRepoRow } from "./repositories";
 import { findProjectRowsMeasured, projectRowsReadBytes } from "./project-row";
+import { storedPage } from "../lib/stored-row";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
@@ -129,7 +130,9 @@ export const eraseOrganizationRepositories = internalMutation
     .output(v.null())
     .mutation(async ({ args: { cursor, organizationId }, ctx }) => {
         // From the primary: a replica's stale copy could still show a row under this organization after its project moved.
-        const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: cursor ?? null, limit: BATCH, where: { organizationId } });
+        const page = storedPage(
+            await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: cursor ?? null, limit: BATCH, where: { organizationId } }),
+        );
 
         const projects = new Map<string, Promise<Doc<"projects"> | null>>();
 
@@ -165,7 +168,9 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         // From the primary, like the organization read below: no stale `organizationId` decides a delete.
-        const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: args.cursor ?? null, limit: ORPHAN_SWEEP_PAGE_SIZE });
+        const page = storedPage(
+            await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: args.cursor ?? null, limit: ORPHAN_SWEEP_PAGE_SIZE }),
+        );
         const gone = new Map<string, boolean>();
         const projects = new Map<string, Promise<Doc<"projects"> | null>>();
         let deleted = 0;
@@ -229,12 +234,14 @@ export const collectProjectRepositoriesForExport = internalQuery
     .input({ cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ cursor: v.union(v.string(), v.null()), projectRepositories: v.array(v.any()) }))
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        const result = await ctx.db.projectRepositories.findMany({
-            cursor: cursor ?? null,
-            limit: REPOSITORY_EXPORT_PAGE,
-            orderBy: [{ _creationTime: "asc" }],
-            where: { userId },
-        });
+        const result = storedPage(
+            await ctx.db.projectRepositories.findMany({
+                cursor: cursor ?? null,
+                limit: REPOSITORY_EXPORT_PAGE,
+                orderBy: [{ _creationTime: "asc" }],
+                where: { userId },
+            }),
+        );
         const projectRepositories = result.page
             .filter((row) => isRepoRow(row))
             .map(({ createdAt, defaultAt, defaultBranch, projectId, url }) => {
