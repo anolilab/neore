@@ -196,6 +196,19 @@ describe("a late run cannot replace a newer cache", () => {
         await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-later", suggestions: ["later?"] });
     });
 
+    // A refused charge clears the reply's suggestions with an empty write under the same guard, so nothing shows without its unit.
+    it("an empty write clears the reply's suggestions, and an older run's clear does not clear a newer reply's", async () => {
+        await cache("reply-new", 5, ["newer?"]);
+        await cache("reply-new", 5, []);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: [] });
+
+        await cache("reply-newer", 7, ["newest?"]);
+        await cache("reply-new", 5, []);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-newer", suggestions: ["newest?"] });
+    });
+
     // The write reports whether it landed: the unit is taken for a written reply only, so a refused one is charged nothing.
     it("reports true for a written reply and false for a refused one", async () => {
         await expect(

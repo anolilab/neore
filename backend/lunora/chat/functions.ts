@@ -4577,7 +4577,12 @@ export const retryFollowupCache = internalAction
             return;
         }
 
-        await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId, requestId, userId: chargedUserId });
+        const charged = await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId, requestId, userId: chargedUserId });
+
+        // No unit, no suggestion: the written suggestions are cleared for this reply, as the job does for its own refused charge.
+        if (!charged) {
+            await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...write, suggestions: [] });
+        }
     });
 
 export const generateFollowupSuggestionsForThread = internalAction
@@ -4939,8 +4944,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
-                // Written, so the reply's suggestions are shown and the claim is kept whatever the charge does. The Text unit is taken
-                // now; it is keyed per reply, so a retry is not charged twice. A refused charge leaves the written suggestions in place.
+                // Written, and the claim is kept whatever the charge does. The Text unit is taken now; it is keyed per reply, so a retry is
+                // not charged twice. A refused charge clears the written suggestions (below), so nothing shows without its unit.
                 paid.cached = true;
 
                 const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
@@ -4952,7 +4957,10 @@ export const generateFollowupSuggestionsForThread = internalAction
                 });
 
                 if (!charged) {
-                    chatLogger.warn(`[generateFollowupSuggestionsForThread] The Text unit was refused after the suggestions were written: ${threadId}`);
+                    // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown
+                    // that was not paid for. The claim stays held, so the model is not called again for this reply.
+                    chatLogger.warn(`[generateFollowupSuggestionsForThread] The Text unit was refused; clearing the suggestions: ${threadId}`);
+                    await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...cacheWrite, suggestions: [] });
                 }
 
                 chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
