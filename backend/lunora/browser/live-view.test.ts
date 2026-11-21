@@ -618,6 +618,8 @@ describe("taking control of the browser", () => {
         await expect(giveBack(OWNER, "left")).resolves.toBe(true);
         // Sent again (its answer was lost): it says so again, and changes nothing.
         await expect(giveBack(OWNER, "left")).resolves.toBe(true);
+        // Someone else sending that claim is told nothing about the lease.
+        await expect(giveBack(WRITER, "left")).resolves.toBe(false);
 
         await expect(control()).resolves.toMatchObject({ ended: "left", until: NOW + 60_000 });
         await expect(statusFor(READER)).resolves.not.toHaveProperty("control");
@@ -724,6 +726,66 @@ describe("taking control of the browser", () => {
 
         await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
         await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "left", until: NOW });
+    });
+
+    it("ends the lease the way a view closed while its own renewal minted, and gives that renewal no URL", async () => {
+        await addSession();
+        const { claim } = await take(OWNER);
+
+        fetchMock.mockImplementationOnce(async () => {
+            // The card closes while its expired URL is renewed: it hands back the claim it holds.
+            await expect(giveBack(OWNER, "left", claim)).resolves.toBe(false);
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(as(OWNER).action(takeControl as never, { renews: claim, threadId } as never)).resolves.toEqual({ status: "unavailable" });
+        // No view shows the renewal's claim: the agent is not held off until the idle timeout.
+        await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "left", until: NOW });
+        await expect(control()).resolves.not.toHaveProperty("renewing");
+        await expect(control()).resolves.not.toHaveProperty("renewingEnded");
+        // The renewal's own claim, handed back once its answer came, changes nothing and says the lease is back.
+        await expect(giveBack(OWNER, "left")).resolves.toBe(true);
+        await expect(control()).resolves.toMatchObject({ ended: "left", until: NOW });
+    });
+
+    it.each(["handed_back", "left"] as const)(
+        "ends the lease as %s, after a page still loading, when its view closed while its own renewal minted",
+        async (reason) => {
+            await addSession();
+            const { claim } = await take(OWNER);
+            const loadsUntil = NOW + 10_000;
+
+            fetchMock.mockImplementationOnce(async () => {
+                await harness.run(async (ctx: any) => {
+                    const row = await ctx.db.query("browserSessions").first();
+
+                    await ctx.db.patch("browserSessions", row._id, { control: { ...row.control, navigatingUntil: loadsUntil } });
+                });
+                await giveBack(OWNER, reason, claim);
+
+                return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+            });
+
+            await expect(as(OWNER).action(takeControl as never, { renews: claim, threadId } as never)).resolves.toEqual({ status: "unavailable" });
+            // The agent waits for the person's page, then hears how the view closed.
+            await expect(control()).resolves.toMatchObject({ ended: reason, until: loadsUntil });
+        },
+    );
+
+    it("settles a renewal naming a claim other than the one it replaces as a takeover, though that view closed", async () => {
+        await addSession();
+        const { claim } = await take(OWNER);
+
+        fetchMock.mockImplementationOnce(async () => {
+            await giveBack(OWNER, "left", claim);
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(as(OWNER).action(takeControl as never, { renews: "another-tab", threadId } as never)).resolves.toMatchObject({ status: "ok" });
+        await expect(control()).resolves.not.toHaveProperty("ended");
+        await expect(control()).resolves.not.toHaveProperty("renewingEnded");
     });
 
     it("ends the lease as handed back when the view that held it handed back while a failed renewal minted", async () => {

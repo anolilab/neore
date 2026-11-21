@@ -426,7 +426,11 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         setView({ attempt: asked.attempt, browserId, kind: "opening", mode, renewed });
         // Hidden again, or hidden and opened again, while it was asked for: that older answer (and its credential) is
         // dropped, whatever order the answers arrive in.
-        void (mode === "control" ? takeControl({ threadId }) : openLiveView({ threadId }))
+        // A renewal names the claim of the view it refreshes: should this view close while it is minted, the server
+        // ends the lease with it instead of handing the new one to no view (another of the person's tabs names none).
+        const renews = renewed ? claimRef.current : undefined;
+
+        void (mode === "control" ? takeControl({ threadId, ...(renews !== undefined && { renews }) }) : openLiveView({ threadId }))
             .then((result: Answer) => {
                 if (mode === "control") {
                     tookControl(asked.attempt, result);

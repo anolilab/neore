@@ -531,15 +531,28 @@ export const dropControlClaim = internalMutation
 /**
  * A renewal's mint came back and was checked: the lease is this claim's alone from now on (`renewing` goes). `false`:
  * the lease is no longer this claim's, or was handed back or lapsed meanwhile, and no URL may be returned.
+ *
+ * `ownView`: the renewal refreshes the view that holds the claim it replaced (not another of the person's tabs taking
+ * over). That view closed while it was minted (`renewingEnded`): nothing would show the new view, so the lease ends the
+ * way that view closed, as its hand back would have ended it.
  */
 export const settleControlClaim = internalMutation
-    .input({ claim: v.string(), threadId: v.id("threads") })
+    .input({ claim: v.string(), ownView: v.optional(v.boolean()), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args: { claim, threadId }, ctx }) => {
+    .mutation(async ({ args: { claim, ownView, threadId }, ctx }) => {
         const session = await activeThreadSession(ctx.db, threadId);
         const control = session?.control;
 
         if (session === null || control?.claim !== claim || control.ended !== undefined || controlStateOf(session, ctx.now) !== "person") {
+            return false;
+        }
+
+        if (ownView === true && control.renewingEnded !== undefined) {
+            await patchRow(ctx.db, "browserSessions", session, {
+                ...activeNow(session, ctx.now),
+                control: { ...settled(control), ended: control.renewingEnded, until: Math.max(ctx.now, control.navigatingUntil ?? 0) },
+            });
+
             return false;
         }
 
@@ -559,7 +572,8 @@ export const settleControlClaim = internalMutation
  * the claim after the provider minted it, and is never returned to a caller who no longer holds the lease.
  */
 export const takeControl = authAction
-    .input({ threadId: v.id("threads") })
+    /** `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover. */
+    .input({ renews: v.optional(v.string()), threadId: v.id("threads") })
     .use(rateLimit("browser/liveView"))
     .output(
         v.union(
@@ -571,7 +585,7 @@ export const takeControl = authAction
             v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
-    .action(async ({ args: { threadId }, ctx }) => {
+    .action(async ({ args: { renews, threadId }, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
@@ -664,7 +678,11 @@ export const takeControl = authAction
         // A renewal is done: the claim it replaced goes, so the view that held it is told to close.
         if (claim.previousClaim !== undefined) {
             const held = await ctx
-                .runMutation(internal.browser.live_view.settleControlClaim, { claim: claim.claim, threadId })
+                .runMutation(internal.browser.live_view.settleControlClaim, {
+                    claim: claim.claim,
+                    threadId,
+                    ...(renews !== undefined && renews === claim.previousClaim && { ownView: true }),
+                })
                 .catch(async (error: unknown) => {
                     await drop();
 
@@ -729,8 +747,12 @@ export const handBack = authMutation
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
         const session = await activeThreadSession(systemDb(ctx), threadId);
 
-        // A send again of a hand back that already landed (its answer did not get through).
-        if (session?.control?.claim === claim && (session.control.ended === "handed_back" || session.control.ended === "left")) {
+        // A send again of a hand back that already landed (its answer did not get through): it changes nothing.
+        if (
+            session?.control?.claim === claim &&
+            (session.control.ended === "handed_back" || session.control.ended === "left") &&
+            (await holdsLease(session, ctx.user.userId))
+        ) {
             return true;
         }
 

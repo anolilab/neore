@@ -765,6 +765,39 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-2", reason: "handed_back", threadId: THREAD });
         });
 
+        it("names the claim a renewal refreshes, and hands back both claims when the person hides the view while it is minted", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const renewal: ((value: unknown) => void)[] = [];
+
+            await takeControl(queryClient, Date.now() + 90_000, false);
+            expect(backend.take.mock.calls[0]?.[0]).toEqual({ threadId: THREAD });
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        renewal.push(resolve);
+                    }),
+            );
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+            // The server can tell this view's renewal from another tab taking over, and ends the lease if this view closes.
+            expect(backend.take.mock.calls[1]?.[0]).toEqual({ renews: "claim-1", threadId: THREAD });
+
+            await userEvent.click(screen.getByRole("button", { name: "Hide live view" }));
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+
+            await act(async () => {
+                renewal[0]?.({ claim: "claim-2", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: OTHER_URL });
+            });
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([
+                { claim: "claim-1", reason: "left", threadId: THREAD },
+                { claim: "claim-2", reason: "left", threadId: THREAD },
+            ]);
+            expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+        });
+
         it("closes the interactive view and hands back when a renewal answers unavailable", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
