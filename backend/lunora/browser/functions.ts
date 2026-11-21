@@ -10,6 +10,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { controlStateOf, watchableSessionId } from "./live-view-logic";
 // ── Utility ─────────────────────────────────────────────────────────────
 
 /** Generate a cryptographically random 8-character uppercase pairing code. */
@@ -111,19 +112,76 @@ const holdsAfter = (holds: ReadonlyArray<number> | undefined, now: number, relea
 };
 
 /**
- * A browser action is about to run on this session's browser: it holds the browser until `until` (the renderer
- * call's deadline), so a slow action does not read as idle. Only for a browser that is still alive; a reaped one is
- * replaced by the renderer, and the row shows it again once {@link logAction} records the new one. Each action adds
- * its own hold beside those of actions still running.
+ * Both hold lists still ahead of `now`, less the one hold `released` (an action's own) from the list it took it in
+ * (`reaped`: `reapedHolds`): the patch every end of an action writes. The list is named, never guessed from the value:
+ * two actions that start in the same millisecond have the same deadline.
+ */
+const holdsReleased = (
+    session: Pick<Doc<"browserSessions">, "inUseHolds" | "reapedHolds">,
+    now: number,
+    released?: { reaped?: boolean; until: number },
+): { inUseHolds: number[] | undefined; reapedHolds: number[] | undefined } => {
+    return {
+        inUseHolds: holdsAfter(session.inUseHolds, now, released?.reaped === true ? undefined : released?.until),
+        reapedHolds: holdsAfter(session.reapedHolds, now, released?.reaped === true ? released.until : undefined),
+    };
+};
+
+/**
+ * A browser action is about to run on this session's browser. In one transaction with {@link takeControl}'s claim, so
+ * an agent action and a person's control never overlap:
+ * - `controlled`: a person drives the browser; the action must not run.
+ * - `returned`: a person drove it and gave it back, and the agent has not looked at the page since. Every action
+ *   that starts until one has looked hears it (`inspecting` names the lease), so actions side by side all look first;
+ *   only {@link logAction} of a look that came back clears it, so a failed or lost one leaves the next to look again.
+ * - `held`: every action that runs holds the row until `until` (the renderer call's deadline), so no person takes
+ *   control while it acts. On a browser still alive the hold is in `inUseHolds`, and a slow action does not read as
+ *   idle; on one the row reads as reaped (the renderer may reconnect to it, or replace it, and {@link logAction} records
+ *   the new one) it is in `reapedHolds`, which keeps nothing alive, so the old browser is not offered meanwhile. Each
+ *   action adds its own hold beside those of actions still running.
  */
 export const beginSessionUse = internalMutation
     .input({ sessionId: v.id("browserSessions"), until: v.number() })
+    .output(
+        v.object({
+            controlled: v.boolean(),
+            held: v.boolean(),
+            inspecting: v.optional(v.string()),
+            /** The hold is in `reapedHolds`: the action names it when it ends ({@link endSessionUse}, {@link logAction}). */
+            reaped: v.optional(v.boolean()),
+            returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+        }),
+    )
     .mutation(async ({ args: { sessionId, until }, ctx }) => {
         const session = await ctx.db.get("browserSessions", sessionId);
 
-        if (session) {
-            await patchRow(ctx.db, "browserSessions", session, { inUseHolds: [...(holdsAfter(session.inUseHolds, ctx.now) ?? []), until] });
+        if (!session || session.status !== "active") {
+            return { controlled: false, held: false };
         }
+
+        const control = controlStateOf(session, ctx.now);
+
+        if (control === "person") {
+            return { controlled: true, held: false };
+        }
+
+        const alive = watchableSessionId(session, ctx.now) !== undefined;
+        const inspecting = control === "returned" ? session.control : undefined;
+        const holds = holdsReleased(session, ctx.now);
+
+        await patchRow(
+            ctx.db,
+            "browserSessions",
+            session,
+            alive ? { ...holds, inUseHolds: [...(holds.inUseHolds ?? []), until] } : { ...holds, reapedHolds: [...(holds.reapedHolds ?? []), until] },
+        );
+
+        return {
+            controlled: false,
+            held: true,
+            ...(!alive && { reaped: true }),
+            ...(inspecting !== undefined && { inspecting: inspecting.claim, returned: inspecting.ended ?? ("idle" as const) }),
+        };
     });
 
 /**
@@ -131,23 +189,29 @@ export const beginSessionUse = internalMutation
  * the hold of another action still running stays.
  */
 export const endSessionUse = internalMutation
-    .input({ sessionId: v.id("browserSessions"), until: v.number() })
-    .mutation(async ({ args: { sessionId, until }, ctx }) => {
+    .input({ reaped: v.optional(v.boolean()), sessionId: v.id("browserSessions"), until: v.number() })
+    .mutation(async ({ args: { reaped, sessionId, until }, ctx }) => {
         const session = await ctx.db.get("browserSessions", sessionId);
 
         if (session) {
-            await patchRow(ctx.db, "browserSessions", session, { inUseHolds: holdsAfter(session.inUseHolds, ctx.now, until) });
+            await patchRow(ctx.db, "browserSessions", session, holdsReleased(session, ctx.now, { reaped, until }));
         }
     });
 
 export const logAction = internalMutation
     .input({
         action: v.string(),
+        /** The person in control who did this (`navigateInControl`); absent: the agent. */
+        actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
         currentUrl: v.optional(v.string()),
         durationMs: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
+        /** The hold `heldUntil` names is in `reapedHolds` ({@link beginSessionUse}). */
+        heldReaped: v.optional(v.boolean()),
         /** The hold this action took with {@link beginSessionUse}, if it took one. */
         heldUntil: v.optional(v.number()),
+        /** The ended lease whose page this action looked at, and the look came back ({@link beginSessionUse}): it is done with. */
+        inspected: v.optional(v.string()),
         providerSessionId: v.optional(v.string()),
         sessionId: v.id("browserSessions"),
         /** When the action started: its page is written only if no action that started later wrote one already. */
@@ -159,18 +223,23 @@ export const logAction = internalMutation
         value: v.optional(v.string()),
     })
     /**
+     * `closed`: the session was closed while this action ran (a later action may already run a fresh browser), so its
+     * result is of a browser the thread no longer has.
      * `replaced`: the row moved on to another browser while this action ran, so its result is of a browser the thread
      * no longer uses; `currentUrl` is then the kept browser's page, for the agent to look at again.
      */
-    .output(v.object({ currentUrl: v.optional(v.string()), replaced: v.boolean() }))
+    .output(v.object({ closed: v.optional(v.boolean()), currentUrl: v.optional(v.string()), replaced: v.boolean() }))
     .mutation(
         async ({
             args: {
                 action,
+                actor,
                 currentUrl,
                 durationMs,
                 errorMessage,
+                heldReaped,
                 heldUntil,
+                inspected,
                 providerSessionId,
                 sessionId,
                 startedAt,
@@ -183,6 +252,7 @@ export const logAction = internalMutation
         }) => {
             await ctx.db.insert("browserActions", {
                 action,
+                actor,
                 durationMs,
                 errorMessage,
                 sessionId,
@@ -198,13 +268,19 @@ export const logAction = internalMutation
                 return { replaced: false };
             }
 
-            const inUseHolds = holdsAfter(session.inUseHolds, ctx.now, heldUntil);
+            const holds = holdsReleased(session, ctx.now, heldUntil === undefined ? undefined : { reaped: heldReaped, until: heldUntil });
+
+            // Closed while this action ran (the person ended it, or the run did): nothing of this result is the thread's
+            // browser any more, and a closed row is never brought back to life.
+            if (session.status !== "active") {
+                return { closed: true, replaced: true };
+            }
 
             // Another action moved the row to a newer browser while this one ran (it replaced the old browser, or the
             // renderer closed it): this result is about a browser the row no longer names. Only the audit row and the
             // end of its own hold are kept; its id, page and activity would bring the old browser back.
             if ((session.providerSessionId ?? null) !== startedWithProviderSessionId) {
-                await patchRow(ctx.db, "browserSessions", session, { inUseHolds });
+                await patchRow(ctx.db, "browserSessions", session, holds);
 
                 return { ...(session.currentUrl !== undefined && { currentUrl: session.currentUrl }), replaced: true };
             }
@@ -225,11 +301,24 @@ export const logAction = internalMutation
             // Every action keeps the provider's browser alive for another idle window; the live view reads this to tell
             // a running browser from one the provider has reaped (`browser/live-view-logic.ts`). This action's hold ends;
             // the holds of actions still running stay.
+            // The agent saw the page a person left: the lease is done with (not when the look was of a browser the row no
+            // longer names, above: the next action looks again).
+            const looked = inspected !== undefined && session.control?.claim === inspected && controlStateOf(session, ctx.now) === "returned";
+            // A person's lease is on the browser their view shows: once it is gone, the lease ends with it, and the
+            // agent's next action hears that a person drove and that their browser was closed. Also over a hand back
+            // made while the page loaded: what the agent needs to know is that the browser it had is gone.
+            const leaseEnds = replaced && session.control !== undefined && controlStateOf(session, ctx.now) === "person";
+
             await patchRow(ctx.db, "browserSessions", session, {
-                inUseHolds,
+                ...holds,
                 // Never back in time: an older action finishing late must not shorten the window a newer one opened.
                 lastActivityAt: Math.max(session.lastActivityAt, ctx.now),
                 ...page,
+                ...(leaseEnds &&
+                    session.control !== undefined && {
+                        control: { ...session.control, ended: "browser_closed" as const, navigatingUntil: undefined, until: ctx.now },
+                    }),
+                ...(looked && { control: undefined }),
             });
 
             return { replaced: false };

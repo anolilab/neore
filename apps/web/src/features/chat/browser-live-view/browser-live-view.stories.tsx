@@ -13,8 +13,10 @@ const STAND_IN_VIEW = `data:text/html,${encodeURIComponent("<!doctype html><titl
 
 const running = lunora(api.browser.live_view.getThreadBrowser, {
     browserId: "browser-1",
+    canControl: true,
     currentUrl: "https://example.com/account/login",
     idleUntil: STORY_NOW + 60_000,
+    now: STORY_NOW,
 });
 
 const meta = {
