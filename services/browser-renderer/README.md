@@ -75,15 +75,19 @@ service worker (`src/channels.ts`). Other tabs of the session are closed when it
 these fails rather than signs in. Speculation rules, whose
 prefetches and prerenders the browser sends past request interception, are taken out too: a `Speculation-Rules` header
 is dropped from the tab's documents, and each `<script type="speculationrules">` is removed as it is added, in the
-document and in every shadow root a script makes or reaches. A rule set that stays (one in a declarative shadow root no
-script touched) means nothing is typed, and a speculative load the browser starts once the password is typed counts as an
-attempt.
+document and in every shadow root a script makes or reaches, including one whose type a script changes after it is in.
+So that the page cannot parse rules where no script reaches (a declarative shadow root), `document.open` and
+`document.write` throw once the page is parsed and a top-level `blob:` page is stopped. A rule set that stays (one in a
+declarative shadow root of the page as served) means nothing is typed, and a speculative load the browser starts once
+the password is typed counts as an attempt; that is reported, not stopped, since the browser has already sent it.
 
 Not closed: a `<link rel="preconnect">` (or `dns-prefetch`, where the browser does it) to a host the password is spelled
 into. The browser looks the host up and connects as the element is added, in a context of its own profile (the one
 Browser Rendering gives); request interception never sees it, and neither a `Content-Security-Policy` nor
 `X-DNS-Prefetch-Control` stops it. Chromium's `Connection-Allowlist` header does, but it also fails every redirect a
-navigation of the page meets (a sign-in's `303` included), so it is not used.
+navigation of the page meets (a sign-in's `303` included), so it is not used. Nor is a page a script replaces with its
+own markup through a `javascript:` address: that document cannot be told from a reload, so rules in a declarative shadow
+root of it are sent.
 
 `test:browser` drives `src/login.ts` through local test sites on 127.0.0.1 and 127.0.0.2 (two origins), with
 cross-site frames in their own process, and needs

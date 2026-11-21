@@ -15,7 +15,9 @@ import type { CDPSession, Page, Route } from "@cloudflare/playwright";
  * service worker (`navigator.serviceWorker`, `BroadcastChannel`), whose sockets nothing here sees either: gone rather
  * than throwing, so a site that checks for them goes on without. `window.open` (and `document.open` with three
  * arguments, the same call) returns `null`: a new window's first blank document is a fresh realm the opener could
- * script before the lock reaches it.
+ * script before the lock reaches it. Speculation rules, whose loads the browser sends itself, are taken out (below); so
+ * that every rule set a script adds is one they reach, a parsed document cannot be written to again (`document.open`,
+ * `write`, `writeln` throw once it is no longer loading) and a top-level `blob:` page is stopped before it parses.
  */
 const PAGE_LOCK = `(() => {
     const refuse = (name) => function () { throw new DOMException(name + " is off while a saved login signs in", "SecurityError"); };
@@ -39,8 +41,15 @@ const PAGE_LOCK = `(() => {
     delete Navigator.prototype.serviceWorker;
     delete globalThis.BroadcastChannel;
     fix(globalThis, "open", () => null);
-    const { open } = Document.prototype;
-    fix(Document.prototype, "open", function (...args) { return args.length > 2 ? null : open.apply(this, args); });
+    // A page the tab's own script made (a \`blob:\` address) holds whatever that script put in it: it is not loaded.
+    if (window === top && location.protocol === "blob:") window.stop();
+    // A parsed document written to again is parsed again, into declarative shadow roots no script reaches (below).
+    const { open, write, writeln } = Document.prototype;
+    const stateOf = Object.getOwnPropertyDescriptor(Document.prototype, "readyState").get;
+    const parsing = (target, name) => apply(stateOf, target, []) === "loading" || refuse(name)();
+    fix(Document.prototype, "open", function (...args) { return args.length > 2 ? null : parsing(this, "document.open") && apply(open, this, args); });
+    fix(Document.prototype, "write", function () { return parsing(this, "document.write") && apply(write, this, arguments); });
+    fix(Document.prototype, "writeln", function () { return parsing(this, "document.writeln") && apply(writeln, this, arguments); });
     // Every \`<script type="speculationrules">\` is taken out before the browser reads it (an observer's callback runs
     // first), in the document and in each shadow root a script makes or reaches. What runs later uses only what is
     // captured here, read by index: the page may have changed every prototype by then.
@@ -54,15 +63,24 @@ const PAGE_LOCK = `(() => {
     const typeOf = getOwnPropertyDescriptor(HTMLScriptElement.prototype, "type").get;
     const sizeOf = getOwnPropertyDescriptor(NodeList.prototype, "length").get;
     const { item } = NodeList.prototype;
+    const nameOf = getOwnPropertyDescriptor(Element.prototype, "localName").get;
+    const [kindOf, targetOf, oldValueOf] = ["type", "target", "oldValue"].map((name) => getOwnPropertyDescriptor(MutationRecord.prototype, name).get);
+    const isRules = (type) => typeof type === "string" && apply(includes, apply(toLowerCase, type, []), ["speculationrules"]);
+    // A rule set stays once read, whatever its script's type becomes: a script whose type was rules is taken out too.
+    const watching = { attributeFilter: ["type"], attributeOldValue: true, characterData: true, childList: true, subtree: true };
     const root = document;
     const roots = [root];
     const kept = new WeakSet();
-    const sweep = () => {
+    const sweep = (records) => {
+        for (let at = 0; at < records.length; at++) {
+            const target = apply(targetOf, records[at], []);
+            if (apply(kindOf, records[at], []) === "attributes" && apply(nameOf, target, []) === "script" && isRules(apply(oldValueOf, records[at], []))) apply(remove, target, []);
+        }
         for (let at = 0; at < roots.length; at++) {
             const scripts = apply(roots[at] === root ? inDocument : inFragment, roots[at], ["script"]);
             for (let index = apply(sizeOf, scripts, []) - 1; index >= 0; index--) {
                 const script = apply(item, scripts, [index]);
-                if (apply(includes, apply(toLowerCase, apply(typeOf, script, []), []), ["speculationrules"])) apply(remove, script, []);
+                if (isRules(apply(typeOf, script, []))) apply(remove, script, []);
             }
         }
     };
@@ -71,11 +89,11 @@ const PAGE_LOCK = `(() => {
         if (shadow && !apply(isKept, kept, [shadow])) {
             apply(keep, kept, [shadow]);
             defineProperty(roots, roots.length, { configurable: true, enumerable: true, value: shadow, writable: true });
-            apply(observe, observer, [shadow, { characterData: true, childList: true, subtree: true }]);
+            apply(observe, observer, [shadow, watching]);
         }
         return shadow;
     };
-    apply(observe, observer, [root, { characterData: true, childList: true, subtree: true }]);
+    apply(observe, observer, [root, watching]);
     fix(Element.prototype, "attachShadow", function () { return watch(apply(attachShadow, this, arguments)); });
     for (const target of [Element.prototype, globalThis.ElementInternals?.prototype]) {
         const { get } = target ? getOwnPropertyDescriptor(target, "shadowRoot") : {};
