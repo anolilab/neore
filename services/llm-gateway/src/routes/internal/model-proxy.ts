@@ -531,7 +531,10 @@ modelProxyRouter.openapi(
                 status: 200,
             });
         } catch (error) {
-            c.executionCtx.waitUntil(policy.recordHealth.failure());
+            // A caller that cancelled ended the call itself: the provider did not fail, so the health tracker is not told it did.
+            if (!c.req.raw.signal.aborted) {
+                c.executionCtx.waitUntil(policy.recordHealth.failure());
+            }
 
             if (error instanceof GatewayError) {
                 return c.json(error.toJSON(), error.statusCode);
