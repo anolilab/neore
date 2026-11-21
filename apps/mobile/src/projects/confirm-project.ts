@@ -48,7 +48,12 @@ export const confirmProject = async (client: ConfirmClient, projectId: string, t
     // A read given up after its deadline still settles later; its failure is classified here, so it is never unhandled.
     const read = async (): Promise<ConfirmOutcome> => {
         try {
-            const project = await client.query(api.projects.functions.getProject, { projectId: projectId as Id<"projects"> }, { signal: controller.signal });
+            // Primary: "not there" is taken as proof, so a lagging replica must not answer it.
+            const project = await client.query(
+                api.projects.functions.getProject,
+                { primary: true, projectId: projectId as Id<"projects"> },
+                { signal: controller.signal },
+            );
 
             return { found: Boolean(project), kind: "answered" };
         } catch (error: unknown) {

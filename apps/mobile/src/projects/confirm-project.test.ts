@@ -25,7 +25,7 @@ describe("confirmProject", () => {
 
         await expect(confirmProject(clientWith(query as never), "p1")).resolves.toEqual({ found: true, kind: "answered" });
 
-        expect(query).toHaveBeenCalledWith(api.projects.functions.getProject, { projectId: "p1" }, { signal: expect.any(AbortSignal) });
+        expect(query).toHaveBeenCalledWith(api.projects.functions.getProject, { primary: true, projectId: "p1" }, { signal: expect.any(AbortSignal) });
     });
 
     it("reports an answer that finds no project, as an answer that the project is not there", async () => {
