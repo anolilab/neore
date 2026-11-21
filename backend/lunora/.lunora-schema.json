@@ -28779,6 +28779,28 @@
           "optional": false,
           "unique": false
         },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"image\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"message\""
+            }
+          ]
+        },
         "messageId": {
           "kind": "string",
           "nullable": false,
@@ -28809,6 +28831,12 @@
         },
         "note": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "partIndex": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false

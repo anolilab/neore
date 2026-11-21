@@ -6,6 +6,18 @@ import { MAX_LENGTH } from "../../lib/validators";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 
+/** The highest part index an image pin may name; a reply has far fewer parts. */
+export const MAX_PINNED_PART_INDEX = 999;
+
+const vPinKind = v.union(v.literal("message"), v.literal("image"));
+
+/**
+ * Whether a pin's kind and part index fit together: an image pin names the part it pins, a message pin names none.
+ * Pure; pinned by `pins/functions.test.ts`.
+ */
+export const isPinShapeValid = ({ kind, partIndex }: { kind?: "image" | "message"; partIndex?: number }): boolean =>
+    kind === "image" ? partIndex !== undefined : partIndex === undefined;
+
 export const getThreadPins = authQuery
     .input({
         threadId: v.id("threads"),
@@ -17,9 +29,11 @@ export const getThreadPins = authQuery
                 _creationTime: v.number(),
                 _id: v.string(),
                 createdAt: v.number(),
+                kind: v.optional(vPinKind),
                 messageId: v.string(),
                 messageRole: v.string(),
                 note: v.optional(v.string()),
+                partIndex: v.optional(v.number()),
                 selectedText: v.optional(v.string()),
                 threadId: v.string(),
                 updatedAt: v.number(),
@@ -49,16 +63,23 @@ export const getThreadPins = authQuery
 export const createPin = authMutation
     .use(rateLimit("pins/create"))
     .input({
+        // Absent or "message" pins the whole message; "image" pins the image at `partIndex`.
+        kind: v.optional(vPinKind),
         messageId: v.string().max(MAX_LENGTH.id),
         messageRole: v.string().max(MAX_LENGTH.short),
+        partIndex: v.optional(v.number().int().min(0).max(MAX_PINNED_PART_INDEX)),
         selectedText: v.optional(v.string().max(MAX_LENGTH.document)),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.string())
-    .mutation(async ({ args: { messageId, messageRole, selectedText, threadId, unlockProof }, ctx: context }) => {
+    .mutation(async ({ args: { kind, messageId, messageRole, partIndex, selectedText, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
         const { now } = context;
+
+        if (!isPinShapeValid({ kind, partIndex })) {
+            throw new LunoraError("BAD_REQUEST", "An image pin names the part it pins; a message pin names none");
+        }
 
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
@@ -68,6 +89,8 @@ export const createPin = authMutation
 
         const pinId = await context.db.insert("threadPins", {
             createdAt: now,
+            // A message pin is stored as before (no kind), so old and new rows read the same.
+            ...(kind === "image" && { kind, partIndex }),
             messageId,
             messageRole,
             selectedText,
@@ -76,7 +99,7 @@ export const createPin = authMutation
             userId,
         });
 
-        context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, messageRole });
+        context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, kind: kind ?? "message", messageRole });
 
         return pinId;
     });

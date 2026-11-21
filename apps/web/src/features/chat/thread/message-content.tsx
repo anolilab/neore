@@ -20,6 +20,7 @@ import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
 import useMCPToolMeta from "@/features/chat/core/hooks/use-mcp-tool-meta";
 import LinkPreviewSlot from "@/features/chat/link-preview/link-preview-slot";
+import PinnableImage from "@/features/chat/pins/pinnable-image";
 import ToolAutoApproval from "@/features/chat/thread/tool-auto-approval";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
 import KnowledgeSourceGroup from "@/features/knowledge/components/knowledge-source-group";
@@ -168,6 +169,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
         return {
             DeviceToolCall,
             DocumentArtifact,
+            Image: PinnableImage,
             McpApp,
             PresentationArtifact,
             SandboxFiles,

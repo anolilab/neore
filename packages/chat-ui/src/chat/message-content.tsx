@@ -76,6 +76,18 @@ const IMAGE_GENERATING_MARKER = "__IMAGE_GENERATING__";
 const VIDEO_GENERATING_MARKER = "__VIDEO_GENERATING__";
 const AUDIO_GENERATING_MARKER = "__AUDIO_GENERATING__";
 
+/** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
+export interface ImagePlace {
+    messageId?: string;
+    /** The role of the message the image is in (`"user"`, `"assistant"`). */
+    messageRole?: string;
+    /** The image's index in `message.parts`. */
+    partIndex?: number;
+}
+
+/** What the `Image` renderer is given: the image, and where it sits (absent when a caller renders one on its own). */
+export type ImageRendererProps = ImagePlace & { part: ImagePart };
+
 interface MessageContentProps {
     /** The accessible name of the inline `[n]` citation marker for source `n` — pass a translated one. Keep it stable (module scope or memoized). */
     citationLabel?: (index: number) => string;
@@ -89,7 +101,7 @@ interface MessageContentProps {
         DeviceToolCall?: FC<{ part: ToolPart }>;
         DocumentArtifact?: FC<{ documentId: string; kind: string; title: string; version: number }>;
         File?: FC<{ part: FilePart }>;
-        Image?: FC<{ part: ImagePart }>;
+        Image?: FC<ImageRendererProps>;
         McpApp?: FC<{ part: ToolPart; resourceUri: string; serverName: string; toolName: string }>;
         PresentationArtifact?: FC<{ presentationId: string; slideCount: number; styleName?: string; title: string }>;
         Reasoning?: FC<{ isStreaming?: boolean; literalImages?: boolean; text: string }>;
@@ -356,13 +368,27 @@ const FileLoadingFallback: FC<{ name?: string }> = memo(({ name }) => {
 FileLoadingFallback.displayName = "FileLoadingFallback";
 
 /** One file part: an image, or the preview its type maps to (`FILE_RENDERERS`), falling back to the download card. */
-const FilePartView: FC<{ generationPrompt?: string; Image: FC<{ part: ImagePart }>; part: FilePart }> = ({ generationPrompt, Image, part }) => {
+const FilePartView: FC<ImagePlace & { generationPrompt?: string; Image: FC<ImageRendererProps>; part: FilePart }> = ({
+    generationPrompt,
+    Image,
+    messageId,
+    messageRole,
+    part,
+    partIndex,
+}) => {
     const { filename, mediaType, nsfwStatus } = part;
     const fileUrl = part.url || part.data;
     const type = fileUrl ? getFileRendererType(mediaType, filename) : "generic";
 
     if (type === "image") {
-        return <Image part={{ filename, image: fileUrl ?? "", nsfwStatus, prompt: generationPrompt, type: "image" }} />;
+        return (
+            <Image
+                messageId={messageId}
+                messageRole={messageRole}
+                part={{ filename, image: fileUrl ?? "", nsfwStatus, prompt: generationPrompt, type: "image" }}
+                partIndex={partIndex}
+            />
+        );
     }
 
     const Renderer = FILE_RENDERERS[type];
@@ -416,9 +442,9 @@ const NsfwBlockedPlaceholder: FC<{ nsfwStatus: string }> = memo(({ nsfwStatus })
 NsfwBlockedPlaceholder.displayName = "NsfwBlockedPlaceholder";
 
 /**
- * Default Image renderer
+ * Default Image renderer. Exported so an `Image` override can wrap it rather than copy it.
  */
-const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
+export const DefaultImage: FC<ImageRendererProps> = memo(({ part }) => {
     const { t } = useLingui();
 
     // Show placeholder for blocked or checking images
@@ -885,7 +911,17 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 const filePart = part as FilePart;
                 const fileUrl = filePart.url || filePart.data;
 
-                renderedParts.push(<FilePartView generationPrompt={generationPrompt} Image={Image} key={key} part={filePart} />);
+                renderedParts.push(
+                    <FilePartView
+                        generationPrompt={generationPrompt}
+                        Image={Image}
+                        key={key}
+                        messageId={message.id}
+                        messageRole={message.role}
+                        part={filePart}
+                        partIndex={i}
+                    />,
+                );
 
                 // Art. 50(4): assistant output is labelled where it is shown, not only on hover.
                 if (message.role === "assistant" && fileUrl) {
@@ -898,7 +934,15 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
             case "image": {
                 const imagePart = part as unknown as ImagePart;
 
-                renderedParts.push(<Image key={key} part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart} />);
+                renderedParts.push(
+                    <Image
+                        key={key}
+                        messageId={message.id}
+                        messageRole={message.role}
+                        part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart}
+                        partIndex={i}
+                    />,
+                );
 
                 if (message.role === "assistant") {
                     renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
