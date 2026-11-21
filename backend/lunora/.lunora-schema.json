@@ -6,10 +6,13 @@
     "add-approval-bot-lookup",
     "add-approval-chain-source",
     "add-approval-project-id",
+    "add-approval-run-turn",
     "add-approval-tool-origins",
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-run-args-impersonated",
+    "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
     "drop-agent-option-fields",
@@ -4467,6 +4470,81 @@
           "fields": [
             "userId",
             "status"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "browserHumanChecks": {
+      "commitOrdered": false,
+      "fields": {
+        "askedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "inText": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "reported": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "run": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "site": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_threadId_site_askedAt": {
+          "fields": [
+            "threadId",
+            "site",
+            "askedAt"
+          ],
+          "unique": false
+        },
+        "by_threadId_site_run": {
+          "fields": [
+            "threadId",
+            "site",
+            "run"
+          ],
+          "unique": true
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
           ],
           "unique": false
         }
@@ -13788,6 +13866,12 @@
           "optional": false,
           "unique": false
         },
+        "reportRetryAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "reportedToProvider": {
           "kind": "boolean",
           "nullable": false,
@@ -13802,6 +13886,16 @@
             "idempotencyKey"
           ],
           "unique": true
+        },
+        "by_provider_unreported_due": {
+          "fields": [
+            "provider",
+            "reportedToProvider",
+            "reportRetryAt",
+            "createdAt",
+            "idempotencyKey"
+          ],
+          "unique": false
         },
         "by_reference_created": {
           "fields": [
@@ -20652,6 +20746,13 @@
                         "nullable": false,
                         "optional": false,
                         "unique": false,
+                        "literal": "\"extension\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
                         "literal": "\"forwarded\""
                       },
                       {
@@ -20760,6 +20861,12 @@
               "optional": false,
               "unique": false,
               "fields": {
+                "impersonated": {
+                  "kind": "boolean",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
                 "isAnonymous": {
                   "kind": "boolean",
                   "nullable": false,
@@ -20921,6 +21028,20 @@
                     }
                   }
                 },
+                "systemContext": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "refined": true
+                },
                 "threadId": {
                   "kind": "string",
                   "nullable": false,
@@ -21073,6 +21194,12 @@
           "optional": true,
           "unique": false,
           "fields": {
+            "impersonated": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "isAnonymous": {
               "kind": "boolean",
               "nullable": false,
@@ -21233,6 +21360,20 @@
                   "unique": false
                 }
               }
+            },
+            "systemContext": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "threadId": {
               "kind": "string",
@@ -22201,6 +22342,414 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "subAgentRoles": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "architecture": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "design": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "general": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "implementation": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "research": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "review": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "security": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "test": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            }
+          }
         },
         "title": {
           "kind": "string",
@@ -24261,6 +24810,12 @@
           "optional": true,
           "unique": false
         },
+        "clientGrant": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -25746,6 +26301,103 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "role": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "instructions": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "instructionsBy": {
+              "kind": "literal",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "literal": "\"projectOwner\""
+            },
+            "model": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "name": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"architecture\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"design\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"general\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"implementation\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"research\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"review\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"security\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"test\""
+                }
+              ]
+            },
+            "reasoningEffort": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
         },
         "runner": {
           "kind": "union",
@@ -28202,6 +28854,40 @@
           "optional": false,
           "unique": false
         },
+        "imageIndex": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "imageKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"image\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"message\""
+            }
+          ]
+        },
         "messageId": {
           "kind": "string",
           "nullable": false,
@@ -29609,6 +30295,12 @@
                 "unique": false
               }
             },
+            "impersonated": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
             "instructions": {
               "kind": "string",
               "nullable": false,
@@ -29776,6 +30468,20 @@
               "optional": true,
               "unique": false,
               "ref": "subAgentRuns"
+            },
+            "systemContext": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "refined": true
+              },
+              "refined": true
             },
             "toolNames": {
               "kind": "array",
@@ -31952,6 +32658,414 @@
             "nullable": false,
             "optional": false,
             "unique": false
+          }
+        },
+        "subAgentRoles": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "architecture": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "design": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "general": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "implementation": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "research": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "review": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "security": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "test": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "instructions": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "mode": {
+                  "kind": "union",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "members": [
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"always\""
+                    },
+                    {
+                      "kind": "literal",
+                      "nullable": false,
+                      "optional": false,
+                      "unique": false,
+                      "literal": "\"prefer\""
+                    }
+                  ]
+                },
+                "model": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "reasoningEffort": {
+                  "kind": "number",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            }
           }
         },
         "taskEmailEnabled": {

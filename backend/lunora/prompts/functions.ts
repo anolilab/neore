@@ -24,6 +24,7 @@ import { FREE_PROMPT_LIMIT, VARIABLE_REGEX } from "./constants";
 import { contentAuthorAfterEdit, contentAuthorOfSession, copiedContentAuthor, variableDefaults } from "./content-author";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { type StoredRow, storedRow, storedRows } from "../lib/stored-row";
 
 // `prompts`, `promptHistory` and `userVariableDefaults` are `.global()` (D1):
 // they have no legacy `ctx.db.query(...)` reader, so every read goes through the
@@ -171,7 +172,7 @@ export const getPrompts = authAction
         favoriteOnly: v.optional(v.boolean()),
         sortBy: v.optional(v.union(v.literal("recent"), v.literal("mostUsed"), v.literal("recentlyUsed"), v.literal("alphabetical"))),
     })
-    .action(async ({ args: { favoriteOnly, sortBy = "recent" }, ctx }): Promise<Doc<"prompts">[]> => {
+    .action(async ({ args: { favoriteOnly, sortBy = "recent" }, ctx }): Promise<StoredRow<Doc<"prompts">>[]> => {
         const { userId } = ctx.user;
 
         // Handle anonymous users - return empty array if no userId
@@ -183,7 +184,7 @@ export const getPrompts = authAction
 
         const cache = new ActionCache<
             { favoriteOnly: boolean | null; organizationId: string | null; sortBy?: "alphabetical" | "mostUsed" | "recent" | "recentlyUsed"; userId: string },
-            Doc<"prompts">[]
+            StoredRow<Doc<"prompts">>[]
         >(undefined, {
             action: internal.prompts.functions.calculatePrompts,
             name: "prompts",
@@ -209,11 +210,11 @@ export const getPrompt = authQuery
     .input({
         promptId: v.id("prompts"),
     })
-    .query(async ({ args: { promptId }, ctx }): Promise<Doc<"prompts"> | null> => {
+    .query(async ({ args: { promptId }, ctx }): Promise<StoredRow<Doc<"prompts">> | null> => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
-        const prompt = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
+        const prompt = storedRow(await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } }));
 
         if (!prompt) {
             return null;
@@ -352,7 +353,7 @@ export const updatePrompt = authMutation
             const organizationId = ctx.user.activeOrganization?.id;
             const { now } = ctx;
 
-            const existing = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
+            const existing = storedRow(await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } }));
 
             if (!existing) {
                 throw new LunoraError("NOT_FOUND", "Prompt not found");
@@ -544,7 +545,7 @@ export const searchPrompts = authQuery
         query: v.string().max(MAX_LENGTH.long),
         tags: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
     })
-    .query(async ({ args: { query, tags }, ctx }): Promise<Doc<"prompts">[]> => {
+    .query(async ({ args: { query, tags }, ctx }): Promise<StoredRow<Doc<"prompts">>[]> => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
@@ -565,7 +566,7 @@ export const searchPrompts = authQuery
             // Combine and deduplicate
             const allPrompts = [...userPrompts, ...orgPrompts];
 
-            return allPrompts.filter((prompt, index, self) => index === self.findIndex((p) => p._id === prompt._id));
+            return storedRows(allPrompts.filter((prompt, index, self) => index === self.findIndex((p) => p._id === prompt._id)));
         }
 
         // Limit search results to prevent timeout
@@ -621,7 +622,7 @@ export const searchPrompts = authQuery
             });
         }
 
-        return uniqueResults;
+        return storedRows(uniqueResults);
     });
 
 /**
@@ -864,7 +865,7 @@ export const restorePromptVersion = authMutation
 
         // Find the history entry for the specified version
         // Limit to 10 entries per prompt/version combination (should be unique anyway)
-        const historyEntry = await ctx.db.promptHistory.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { promptId, version } });
+        const historyEntry = storedRow(await ctx.db.promptHistory.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { promptId, version } }));
 
         if (!historyEntry) {
             throw new LunoraError("NOT_FOUND", `Version ${version} not found for this prompt`);
@@ -939,7 +940,7 @@ export const duplicatePrompt = authMutation
         await assertPromptQuota(ctx);
 
         // The copy is the duplicating user's, the words still their writer's.
-        const author = copiedContentAuthor(existing);
+        const author = copiedContentAuthor(storedRow(existing));
         const newPromptId = await ctx.db.insert("prompts", {
             content: existing.content,
             ...author,
@@ -1371,7 +1372,7 @@ export const setUserVariableDefaults = authMutation
         const { now } = ctx;
 
         // Check if defaults already exist for this user
-        const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } });
+        const existing = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }));
 
         if (existing) {
             await ctx.db.patch("userVariableDefaults", existing._id, {
@@ -1428,7 +1429,7 @@ export const setOrganizationVariableDefaults = authMutation
         }
 
         // Check if defaults already exist for this organization
-        const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } });
+        const existing = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }));
 
         if (existing) {
             await ctx.db.patch("userVariableDefaults", existing._id, {
@@ -1480,9 +1481,11 @@ export const getResolvedVariables = authQuery
         // Run all 3 independent queries in parallel
         const [orgDefaults, userDefaults, threadVariables] = await Promise.all([
             // 1. Organization defaults (lowest priority)
-            organizationId ? ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }) : Promise.resolve(null),
+            organizationId
+                ? ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }).then(storedRow)
+                : Promise.resolve(null),
             // 2. User defaults (medium priority)
-            ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }),
+            ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }).then(storedRow),
             // 3. Thread overrides (highest priority)
             threadId
                 ? ctx.db

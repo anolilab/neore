@@ -466,13 +466,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { dedupId: stepDedupId(scope, "anonymise-gateway-usage-deductions", round) },
                 ),
         );
-        await context.step.do(
+        await drain(
             "delete-user-browser-data",
-            async () =>
+            async (round) =>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserBrowserData,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(scope, "delete-user-browser-data") },
+                    { dedupId: stepDedupId(scope, "delete-user-browser-data", round) },
                 ),
         );
 

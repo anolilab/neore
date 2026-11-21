@@ -65,7 +65,8 @@ const { SUB_AGENT_NAME } = await import("../sub-agents/logic");
 const { CODING_AGENTS } = await import("../coding-agents/commands");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
 const { MODEL_LOOKUP } = await import("@neore/ai/models");
-const { isLeadAgentName, messageRefusal } = await import("./site-login-turn");
+const { isLeadAgentName, messageRefusal, siteLoginTurnOf } = await import("./site-login-turn");
+const { setRunTurn } = await import("../chat/lib/agent-run");
 const { NOT_TYPED_DRAFTS } = await import("../lib/not-typed-text");
 const { SITE_LOGIN_CHANGED } = await import("./lib/site-login-shape");
 
@@ -541,6 +542,40 @@ describe("which chats may use a login", () => {
         expect(await forFill(plainThread, SITE, OWNER, { impersonated: true })).toBeNull();
     });
 
+    it("a tool builds the turn from its run's record, and a run that recorded none, or not all of it, gives no turn at all", async () => {
+        await save({ password: PASSWORD });
+
+        const promptMessageId = await promptFor(plainThread);
+        const call = { stepMessages: [{ content: "Sign in and check my order", role: "user" }], toolSources: ["builtin"] };
+        const toolCtx = (turn: Parameters<typeof setRunTurn>[1]) => {
+            const ctx = { dispatchOrigin: "lead" as const, startedBy: OWNER };
+
+            setRunTurn(ctx, turn);
+
+            return ctx;
+        };
+        const full = { impersonated: false, promptMessageId, systemContext: ["instructions"] };
+
+        // An older snapshot or a run path that records nothing: never an allowing default.
+        for (const partial of [
+            undefined,
+            { ...full, impersonated: undefined },
+            { ...full, promptMessageId: undefined },
+            { ...full, systemContext: undefined },
+        ]) {
+            expect(siteLoginTurnOf(toolCtx(partial), call)).toBeNull();
+        }
+
+        const runAs = async (impersonated: boolean) => {
+            const turn = siteLoginTurnOf(toolCtx({ ...full, impersonated }), call);
+
+            return await harness.run(async (ctx: any) => await ctx.runQuery(listUsableSiteLogins, { threadId: plainThread, turn, userId: OWNER }));
+        };
+
+        expect(await runAs(false)).toStrictEqual([{ site: SITE }]);
+        expect(await runAs(true)).toStrictEqual([]);
+    });
+
     it("a prompt the owner did not type gets none: an outside agent's (a regenerate runs with no origin), a guest's, a goal round's, someone else's", async () => {
         await save({ password: PASSWORD });
 
@@ -763,6 +798,8 @@ describe("which chats may use a login", () => {
             ["instructions", "project"],
             ["instructions", "threadInstructions"],
             ["instructions", "skills"],
+            ["instructions", "skill-instructions"],
+            ["instructions", "attached-documents"],
             ["instructions", "threadNotes"],
             ["instructions", "attachedDocuments"],
             ["instructions", "somethingNew"],
@@ -788,7 +825,11 @@ describe("which chats may use a login", () => {
         ];
 
         expect(
-            await usable(plainThread, OWNER, { stepMessages: safeStep, systemContext: ["instructions", "personalization", "teammate"], toolSources: [] }),
+            await usable(plainThread, OWNER, {
+                stepMessages: safeStep,
+                systemContext: ["instructions", "personalization", "teammate", "agent-mode", "search-mode", "task-plan"],
+                toolSources: [],
+            }),
         ).toStrictEqual([{ site: SITE }]);
 
         // An earlier turn read a page: the tool result is still on the prompt's path, whatever the caller reports.

@@ -58,6 +58,7 @@ import {
     discardRunSecrets,
     setDispatchOrigin,
     setRunOrganizationId,
+    setRunReplyKey,
     setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
@@ -305,6 +306,8 @@ const runSpeaker = async (
         setResearchDepth(ctx, turn.researchDepth);
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
+        // Per reply, not per group thread: a site's check is asked about once in this reply, and again in the next.
+        setRunReplyKey(ctx, turn.replyKey);
         setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
         const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);

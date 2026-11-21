@@ -330,7 +330,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
             {
                 onError: (error) => showError(error as Error),
                 onSuccess: () => {
-                    trackEvent("message_pinned", { has_note: false });
+                    trackEvent("message_pinned", { has_note: false, kind: "message" });
                     useChatUIStore.getState().setActiveRightSidebarTab("pins");
                 },
             },

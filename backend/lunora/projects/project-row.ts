@@ -1,5 +1,6 @@
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import type { StoredRow } from "../lib/stored-row";
 
 type ProjectTable = QueryCtx["db"]["projects"];
 type FindManyArgs = NonNullable<Parameters<ProjectTable["findMany"]>[0]>;
@@ -18,7 +19,7 @@ export const projectRowsReadBytes = (rows: ReadonlyArray<object>): number =>
  */
 export const findProjectRowsMeasured = async (projects: ProjectTable, args: Omit<FindManyArgs, "select">) => {
     const result = await projects.findMany(args as FindManyArgs);
-    const page = result.page as Doc<"projects">[];
+    const page = result.page as StoredRow<Doc<"projects">>[];
 
     return { ...result, page, readBytes: projectRowsReadBytes(page) };
 };

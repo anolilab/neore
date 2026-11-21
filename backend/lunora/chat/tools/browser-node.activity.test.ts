@@ -14,6 +14,7 @@ import {
     BROWSER_IDLE_REAP_MS,
     BROWSER_REAP_MARGIN_MS,
     browserAliveUntil,
+    browserIdOf,
     CONTROL_IDLE_MS,
     RENDERER_CALL_SETTLE_MS,
     rendererCallHold,
@@ -433,6 +434,28 @@ describe("two first browser actions at once", () => {
 
         expect(actions).toHaveLength(2);
     });
+    it("runs the human-check ladder's own reads without charging the user's browser limit", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValue(answered({ content: "Page", sessionId: "s-1", success: true, url: "https://example.com/before" }));
+
+        await expect(
+            harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(executeBrowserAction, { action: "extract", ladderLook: true, threadId, userId: OWNER, userTier: "free" }),
+            ),
+        ).resolves.toMatchObject({ success: true });
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("rateLimits").collect())).resolves.toEqual([]);
+
+        // Also once the user's own limit is spent.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 20, identifier: OWNER, key: "browser/action:free" }));
+        await expect(
+            harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(executeBrowserAction, { action: "screenshot", ladderLook: true, threadId, userId: OWNER, userTier: "free" }),
+            ),
+        ).resolves.toMatchObject({ success: true });
+        expect(renderer).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe("a browser action after the provider reaped the browser", () => {
@@ -566,7 +589,8 @@ describe("a browser a person took control of", () => {
 
         // The planned click is not run: a screenshot of the page the person left comes back in its place.
         expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "screenshot", sessionId: "s-1" } });
-        expect(result).toMatchObject({ screenshot: "png", success: false, url: "https://example.com/person" });
+        // Marked as the first look since the hand back, for the human-check ladder (`browser/human-check.ts`).
+        expect(result).toMatchObject({ handedBack: true, screenshot: "png", success: false, url: "https://example.com/person" });
         expect(result.error).toContain(reason);
         expect(result.error).toContain("The browser is now on https://example.com/person.");
         expect(result.error).toContain("Your click action was not run");
@@ -576,7 +600,17 @@ describe("a browser a person took control of", () => {
 
         expect(after.control).toBeUndefined();
         renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/next" }));
-        await expect(act("click")).resolves.toEqual({ sessionId: "s-1", success: true, url: "https://example.com/next" });
+        // The click moved the page on, so the human-check ladder reads it once (`browser/human-check.ts`).
+        await expect(act("click")).resolves.toEqual({
+            browserId: await browserIdOf(sessionId, "s-1"),
+            navigated: true,
+            sessionId: "s-1",
+            success: true,
+            url: "https://example.com/next",
+        });
+        // So does a navigate, whose result has a title but no text: a check only its text shows is read for too.
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, title: "example.com", url: "https://example.com/" }));
+        await expect(act("navigate")).resolves.toMatchObject({ navigated: true, success: true });
     });
 
     it("tells of a hand back on a rate-limited action, and again on the next action", async () => {
@@ -711,6 +745,24 @@ describe("a browser session closed while an action ran", () => {
         expect(result.success).toBe(false);
         expect(result.error).toContain("The person had control of the browser and handed it back");
         expect(result.error).toContain(BROWSER_CLOSED_DURING_ACTION);
+    });
+
+    it("names the browser each result's page is on, so an ask is for that browser, and no browser when none was kept", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, title: "Just a moment...", url: "https://shop.example.com/" }));
+        const first = (await act("screenshot")) as { browserId?: string };
+
+        // The renderer replaced the browser on the same row: its page is of another browser, by another name.
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://shop.example.com/" }));
+        const replaced = (await act("screenshot")) as { browserId?: string };
+
+        expect(first.browserId).toBe(await browserIdOf(sessionId, "s-1"));
+        expect(replaced.browserId).toBe(await browserIdOf(sessionId, "s-2"));
+        expect(replaced.browserId).not.toBe(first.browserId);
+
+        // The renderer kept no browser (it closed it): nothing is named, so the card offers no Take control.
+        renderer.mockResolvedValueOnce(answered({ success: true, url: "https://shop.example.com/" }));
+        await expect(act("screenshot")).resolves.not.toHaveProperty("browserId");
     });
 
     it("never hands the old action's result to the agent once a new action opened a fresh browser", async () => {

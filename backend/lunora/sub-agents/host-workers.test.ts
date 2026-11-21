@@ -610,6 +610,25 @@ describe("the end of a host turn", () => {
         expect(JSON.parse(last!.envelope as string).taintedBy).toEqual(expect.arrayContaining(["web", "knowledge", "mcp", "device", "files"]));
     });
 
+    it("sends a lead's task after the worker's role instructions", async () => {
+        const device = await pairedDevice();
+        const receipt = await createHostWorker(device);
+
+        // The worker's first run launched with a role; every later run keeps it.
+        await run(
+            async (context) => await context.db.patch("subAgentRuns", receipt.runId, { role: { instructions: "Name the file.", model: "m", name: "review" } }),
+        );
+        await sessionOpen(device, receipt.workerId);
+        await finishTurn(device, receipt.workerId);
+        await dispatchFromLead(receipt.workerId, "call-lead-role");
+
+        const leadText = JSON.parse((await sendCalls()).at(-1)!.envelope as string).input.text as string;
+
+        expect(leadText.startsWith("ROLE: review\n")).toBe(true);
+        expect(leadText).toContain("Name the file.");
+        expect(leadText.indexOf("Name the file.")).toBeLessThan(leadText.indexOf("From the lead"));
+    });
+
     it("starts the next queued message when the turn ends", async () => {
         const device = await pairedDevice();
         const receipt = await createHostWorker(device);

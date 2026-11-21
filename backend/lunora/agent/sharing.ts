@@ -11,6 +11,7 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx as Que
  */
 import { assert } from "../lib/error-helpers";
 import { withoutUndefined } from "../lib/patch";
+import { storedRow, storedRows } from "../lib/stored-row";
 import { isThreadLocked } from "../lib/thread-lock";
 import { meetsThreadPermission, resolveThreadReadAccess, type ThreadPermission } from "./thread-read-access";
 
@@ -48,7 +49,7 @@ export const getThreadAccess = internalQuery
             v.null(),
         ),
     )
-    .query(async ({ args, ctx }) => await ctx.db.threadAccess.findFirst({ where: { threadId: args.threadId, userId: args.userId } }));
+    .query(async ({ args, ctx }) => storedRow(await ctx.db.threadAccess.findFirst({ where: { threadId: args.threadId, userId: args.userId } })));
 
 /**
  * The owner of `threadId` when `userId` holds an unexpired grant on it — the
@@ -59,7 +60,7 @@ export const getThreadAccess = internalQuery
  * `threadAccess` is `.global()`, so this answers from any shard.
  */
 export const grantOwnerForThread = async (context: Pick<QueryContext, "db">, threadId: string, userId: string): Promise<string | null> => {
-    const grant = await context.db.threadAccess.findFirst({ where: { threadId: threadId as Id<"threads">, userId } });
+    const grant = storedRow(await context.db.threadAccess.findFirst({ where: { threadId: threadId as Id<"threads">, userId } }));
 
     if (!grant?.ownerId || (grant.expiresAt !== undefined && grant.expiresAt <= Date.now())) {
         return null;
@@ -101,14 +102,14 @@ export const listThreadAccess = internalQuery
 export const listThreadAccessHandler = async (context: QueryContext, args: { threadId: Id<"threads"> }) => {
     const { page } = await context.db.threadAccess.findMany({ limit: 100, orderBy: [{ userId: "asc" }], where: { threadId: args.threadId } });
 
-    return page;
+    return storedRows(page);
 };
 
 /** A thread's invites (`.global()`), oldest first. */
 const loadThreadInvites = async (context: Pick<QueryContext, "db">, threadId: Id<"threads">) => {
     const { page } = await context.db.threadInvites.findMany({ limit: 100, orderBy: [{ _creationTime: "asc" }], where: { threadId } });
 
-    return page;
+    return storedRows(page);
 };
 
 export const createThreadAccess = internalMutation
@@ -252,7 +253,7 @@ export const getThreadInvite = internalQuery
             v.null(),
         ),
     )
-    .query(async ({ args, ctx }) => await ctx.db.threadInvites.findFirst({ where: { inviteToken: args.inviteToken } }));
+    .query(async ({ args, ctx }) => storedRow(await ctx.db.threadInvites.findFirst({ where: { inviteToken: args.inviteToken } })));
 
 export const getThreadInviteById = internalQuery
     .input({
@@ -277,7 +278,7 @@ export const getThreadInviteById = internalQuery
             v.null(),
         ),
     )
-    .query(async ({ args, ctx }) => await ctx.db.threadInvites.findFirst({ where: { _id: args.inviteId } }));
+    .query(async ({ args, ctx }) => storedRow(await ctx.db.threadInvites.findFirst({ where: { _id: args.inviteId } })));
 
 export const listThreadInvites = internalQuery
     .input({

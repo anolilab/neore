@@ -55,7 +55,7 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/core/utils/capture-screen";
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
-import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
+import { onComposerAttachRequest, onComposerSubmitRequest, SIGNED_OUT } from "@/features/chat/core/utils/composer-submit";
 import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import { composerDraftFrom, draftFromField, markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
@@ -113,9 +113,6 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
 
     return new File([await response.blob()], fileName, { type: fileType });
 };
-
-/** The account key of a guest whose session has loaded, so a sign-in during a waiting send reads as an account change. */
-const SIGNED_OUT = "signed-out";
 
 /** Messages already toasted (no second announcement), and those a retry cannot fix (too large, unsupported, content mismatch). */
 const toastedMessages = new Set<string>();
@@ -1402,16 +1399,17 @@ const ComposerInput = ({
         setAutoSubmitRequest((count) => count + 1);
     });
 
-    // Files dropped on the dock icon (`core/utils/composer-submit.ts`) are attached the same way as a drop: uploaded, never sent.
+    // Files dropped on the dock icon or the sidebar (`core/utils/composer-submit.ts`) are attached the same way as a drop:
+    // uploaded, never sent, and only for the account they were dropped for, so the wait for the session comes first.
     useEffect(() => {
-        if (!isAutoSubmitTarget) {
+        if (!isAutoSubmitTarget || accountId === undefined) {
             return undefined;
         }
 
-        return onComposerAttachRequest(({ files }) => {
+        return onComposerAttachRequest(accountId, ({ files }) => {
             void handleFileSelect(files);
         });
-    }, [isAutoSubmitTarget, handleFileSelect]);
+    }, [accountId, isAutoSubmitTarget, handleFileSelect]);
 
     useEffect(() => {
         if (autoSubmitTextRef.current === null || autoSubmitTextRef.current !== text || disabled || isStreaming) {

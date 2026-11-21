@@ -87,7 +87,7 @@ describe("POST /extension/auth/authorize", () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({ code: expect.any(String) });
-        expect(runQuery).toHaveBeenCalledWith(expect.anything(), { sessionId: "sid-1", userId: USER });
+        expect(runQuery).toHaveBeenCalledWith(expect.anything(), { sessionId: "sid-1", userId: USER, viaGrant: false });
         expect(state.codes).toHaveLength(1);
     });
 

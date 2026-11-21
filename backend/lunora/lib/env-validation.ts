@@ -166,11 +166,7 @@ const optionalEnvSchema = z.object({
     SIGNUP_INVITE_ONLY: z.string().trim().optional(),
     SLACK_CONNECTOR_CLIENT_ID: z.string().trim().optional(),
     SLACK_CONNECTOR_CLIENT_SECRET: z.string().trim().optional(),
-    // Browser extension origins, comma-separated. Optional: unset means the
-    // extension cannot sign in. Parsed to an exact list by
-    // `lib/extension-origins.ts`, which drops wildcards and malformed entries.
-    TRUSTED_EXTENSION_ORIGINS: z.string().trim().optional(),
-    // `identity.launchWebAuthFlow` redirect URIs for the Firefox extension's sign-in,
+    // `identity.launchWebAuthFlow` redirect URIs for the browser extension's sign-in,
     // comma-separated. Optional: unset means the shipped add-on's URI, `none` means
     // off. Parsed by
     // `lib/extension-origins.ts#parseTrustedExtensionRedirectUris`.

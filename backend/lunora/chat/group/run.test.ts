@@ -524,6 +524,33 @@ describe("runGroupTurn — MCP tool progress", () => {
     });
 });
 
+describe("runGroupTurn — tool context", () => {
+    it("names each speaker's reply, not the group thread, so a site is asked about once per reply", async () => {
+        const { createTool } = await import("../../agent/client");
+        const replyKeys: (string | undefined)[] = [];
+
+        await setGroup("supervisor", ["writer"]);
+        routerScript.speakers = ["p1"];
+        speakerTools.set("all", {
+            probe: createTool({
+                description: "records the reply key",
+                execute: async (toolCtx) => {
+                    replyKeys.push(toolCtx.replyKey);
+
+                    return "ok";
+                },
+                inputSchema: z.object({}),
+            }),
+        });
+        speakerModels.set("INSTR:writer", scriptedModel([toolCallStep("probe", "call-1"), textStep("writer after the tool.")]));
+
+        await runTurn();
+
+        expect(replyKeys).toStrictEqual([streamId]);
+        expect(replyKeys).not.toContain(threadId);
+    });
+});
+
 describe("runGroupTurn — stop", () => {
     it("lets the current speaker finish and never starts the next one", async () => {
         await setGroup("supervisor", ["writer", "checker"]);

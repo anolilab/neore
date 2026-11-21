@@ -2,7 +2,7 @@ import type { Infer, Validator } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import { vGroupChat } from "../chat/group/validators";
-import { vWorkerPolicy } from "../sub-agents/validators";
+import { vSubAgentRoles, vWorkerPolicy } from "../sub-agents/validators";
 import { vAgentRef } from "./agent-switch-validators";
 import { vVectorDimension } from "./vector/tables";
 
@@ -885,6 +885,8 @@ export const vProjectCreateFields = {
     // Workflow fields
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
     publicAccessToken: v.optional(v.string()),
+    // Written only through `projects/functions.ts:setProjectSubAgentRole`; here so every project output carries it.
+    subAgentRoles: v.optional(vSubAgentRoles),
     title: v.string(),
     userId: v.optional(v.string()),
     workflowContent: v.optional(vWorkflowContent),

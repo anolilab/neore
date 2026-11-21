@@ -70,7 +70,7 @@ export const authorizeExtensionHttpAction = async (context: HttpActionCtx, reque
         const { sessionId } = ((await context.auth.getIdentity()) ?? {}) as { sessionId?: unknown };
         const session =
             userId && typeof sessionId === "string"
-                ? await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId, userId })
+                ? await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId, userId, viaGrant: false })
                 : null;
         const result = await authorizeExtension(createExtensionGrantStore(getAuth()), { ...body, session, trustedRedirectUris, userId });
 

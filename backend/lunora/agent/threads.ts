@@ -6,6 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { deleteHumanChecksOfThread } from "../browser/gdpr";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
@@ -552,6 +553,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
 
         // The follow rows of the thread (`chat/follows/functions.ts`), one batch per call; the thread goes once none are left.
         if (!(await deleteFollowRowsOfThread(context, args.threadId))) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
+
+        // The sites its runs asked the person to clear (`browser/human-check.ts`), one batch per call as the rows above.
+        if (!(await deleteHumanChecksOfThread(context, args.threadId))) {
             return { cursor: messages.continueCursor, isDone: false };
         }
 

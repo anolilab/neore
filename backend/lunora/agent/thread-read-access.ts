@@ -6,6 +6,7 @@ import { admitThread, systemDb } from "../lib/rls/scope";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 
 import { isUnlockProofValid } from "./thread-passcode";
+import { storedRow } from "../lib/stored-row";
 
 /**
  * Who may read a thread's raw message rows through a CLIENT-reachable procedure.
@@ -112,10 +113,12 @@ export const resolveThreadReadAccess = async (
     if (userId) {
         // `.global()` (D1): a grant is read from whichever shard the caller is on.
         // `primary`: a caller about to write on the strength of the grant must not see one a replica still holds.
-        const access = await context.db.threadAccess.findFirst({
-            ...(options.primary === true && { consistency: "primary" as const }),
-            where: { threadId, userId },
-        });
+        const access = storedRow(
+            await context.db.threadAccess.findFirst({
+                ...(options.primary === true && { consistency: "primary" as const }),
+                where: { threadId, userId },
+            }),
+        );
 
         if (access && hasThreadReadAccess({ access, now: Date.now(), thread, userId })) {
             admitThread(context, threadId, access.permission, userId);

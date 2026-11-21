@@ -60,7 +60,15 @@ import {
     vReviewVerdict,
 } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
-import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
+import {
+    vDispatchSource,
+    vSubAgentRoles,
+    vSubAgentRunMode,
+    vSubAgentRunner,
+    vSubAgentRunRole,
+    vSubAgentRunStatus,
+    vWorkerPolicy,
+} from "./sub-agents/validators";
 import {
     vGoalStatus,
     vTaskRunDestination,
@@ -429,6 +437,31 @@ export const schema = defineSchema({
         .index("by_userId_status", ["userId", "status"])
         .index("by_pairingCode", ["pairingCode"])
         .index("by_extensionId", ["extensionId"]),
+
+    /**
+     * A site whose check (a human verification, a sign-in the agent cannot pass) the person was asked to clear during
+     * one reply (`run`: the reply key, `ToolCtx.replyKey`, the reply's first stream; the prompt, then the thread, for a
+     * run that sets none): asked at most once per site per reply (`browser/human-check.ts`).
+     */
+    browserHumanChecks: defineTable({
+        askedAt: v.number(),
+        /** The check was found only in the page's text: a later read too long to read cannot show it gone. */
+        inText: v.optional(v.boolean()),
+        /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
+        reported: v.optional(v.boolean()),
+        run: v.string(),
+        /** The page's host, `""` when it had no readable URL. */
+        site: v.string(),
+        threadId: v.id("threads"),
+        /** The thread's owner, whose shard holds the row, whoever's turn asked. */
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        // Unique: two actions of one reply that claim the same site at once insert one row, so the person is asked once.
+        .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
+        // An earlier reply's recent ask, for the first look after a hand back (`browser/human-check.ts#afterHandBack`).
+        .index("by_threadId_site_askedAt", ["threadId", "site", "askedAt"])
+        .index("by_userId", ["userId"]),
 
     browserSessions: defineTable({
         completedAt: v.optional(v.number()),
@@ -2259,6 +2292,8 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
+        subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
@@ -2616,6 +2651,9 @@ export const schema = defineSchema({
     session: defineTable({
         activeOrganizationId: v.optional(v.string()),
         activeTeamId: v.optional(v.string()),
+        // Which app a grant's session was made for (`auth/lib/sign-in-standing.ts#ClientGrantKind`), set only by the code
+        // exchange from the code's redirect URI; unset on a web session. A browser extension's text is not the owner's typing.
+        clientGrant: v.optional(v.string()),
         createdAt: v.number(),
         expiresAt: v.number(),
         impersonatedBy: v.optional(v.string()),
@@ -2934,6 +2972,8 @@ export const schema = defineSchema({
         resultPostedAt: v.optional(v.number()),
         // The approval id the run last resumed with (`resumeRunForAnswer`): its continuation streams under that key.
         resumedBy: v.optional(v.string()),
+        // The role the run launched with, resolved at admission (`sub-agents/roles.ts`).
+        role: v.optional(vSubAgentRunRole),
         runner: v.optional(vSubAgentRunner),
         skillSlug: v.optional(v.string()),
         startedAt: v.optional(v.number()),
@@ -3347,6 +3387,13 @@ export const schema = defineSchema({
 
     threadPins: defineTable({
         createdAt: v.number(),
+        // An image pin's place among the message's images (`kind: "image"`, `imageOrdinals` in chat-ui); a message pin has none.
+        imageIndex: v.optional(v.number()),
+        // An image pin's key, a hash of where its image is stored (`imageKeyOf` in the web app): found wherever the image now
+        // sits, which an image index alone cannot do when an earlier image is gone. No address is stored.
+        imageKey: v.optional(v.string()),
+        // What is pinned: the whole message (absent, as every pin before images), or one image of it.
+        kind: v.optional(v.union(v.literal("message"), v.literal("image"))),
         messageId: v.string(),
         messageRole: v.union(v.literal("user"), v.literal("assistant")),
         note: v.optional(v.string()),
@@ -3980,6 +4027,8 @@ export const schema = defineSchema({
         sendBehavior: v.optional(v.string()),
         // First-run setup steps the user skipped (`auth/setup-steps.ts`): "pair" | "ssh" | "agent". At most 8, capped by `auth/lib/setup-step-limits.ts`. Absent = none.
         setupStepsSkipped: v.optional(v.array(v.string())),
+        // A model and instructions per kind of delegated work (`sub-agents/roles.ts`).
+        subAgentRoles: v.optional(vSubAgentRoles),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),

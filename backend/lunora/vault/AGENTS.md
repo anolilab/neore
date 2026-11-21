@@ -44,15 +44,25 @@
 - The fill itself (browser tool, approval per site per thread, activity entry) is the next part; these are its rules. It passes
   `siteLoginForFill` the origin of the page the browser is on, never a site the model names; checks that origin again
   inside the browser-renderer right before typing, after any navigation; and decrypts and types in one action, never
-  returning the ciphertext from a workflow step or putting it in a queue payload. It fills the turn from its tool context
-  (`dispatchOrigin`, `headless`, `startedBy`, `promptMessageId`; `ToolCtx.messageId` is never set), `stepMessages` as
-  `ToolExecutionOptions.messages` holds them (never filtered), `toolSources` with one entry per offered tool, and
-  `systemContext` with one kind per piece pushed onto the system prompt where it is assembled (`instructions` always; a
-  piece it cannot name, a request's own instructions, or a built-in whose description lists stored text such as skills
-  or workers gets a kind of its own, which refuses). A failed
-  read of the turn is a refusal. No turn records
-  impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
-  `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.
+  returning the ciphertext from a workflow step or putting it in a queue payload. It fills the turn with `siteLoginTurnOf`
+  from its tool context (`dispatchOrigin`, `headless`, `startedBy`, and `runTurn`: `impersonated`, the turn's own
+  `promptMessageId`, `systemContext`; never `ToolCtx.promptMessageId`, which a resumed or approved run points at its own
+  row), `stepMessages` as `ToolExecutionOptions.messages` holds them (never filtered) and `toolSources` with one entry
+  per offered tool. `runTurn` is set whole or not at all (`setRunTurn`): `/chat/start` records `impersonated` from the
+  session on the job (none without a sign-in session), `runStreamingAgent` adds the prompt and the kinds, and the
+  approval snapshot and a pause's stored arguments carry them; a resume runs on the union of the stored kinds and the
+  rebuilt ones, never fewer (`resumedSystemContext`; stored none: `unrecorded`, refused). An approval, question or secret answered by an admin
+  acting as the owner, or from a sign-in whose session row cannot be read as theirs (gone, expired), marks its continuation
+  impersonated (`claimToolApproval`'s `answeredByImpersonator`); steers and local turns are marked by the same
+  check (`auth/lib/caller-session.ts#callerSessionMarks`). Only `/chat/start` sets `impersonated`; every other run path
+  (edit, group, headless, aside, goal rounds) sets none, which refuses. The owner's desktop and phone apps count as the
+  owner typing; a browser extension's grant does not (it relays page text): its sends are marked `extension`, its answers
+  and its `/chat/start` turn impersonated. The app is the session row's `clientGrant`, set by the code exchange from the
+  code's redirect URI, never the request; a grant naming none or an unknown one is the extension's
+  (`auth/lib/sign-in-standing.ts`). The Chrome build signs in with the web app's cookie `sid`, which cannot be told apart. `systemContext` is `loadRunContext`'s kinds plus
+  `agentPromptKinds` for what `getAgent` and the run add: `agent-mode`, `search-mode` and `task-plan` are safe (our own
+  text; the plan quotes only the prompt), `skills`, `skill-instructions` and `attached-documents` refuse. A new piece
+  of the system prompt gets a kind of its own there. A failed read of the turn is a refusal.
   Text the owner did not type is marked where it is saved (`lib/not-typed-text.ts`, `neore.notTyped`) and refused by
   name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=` or
   `?initialMessage=` link, anything the desktop shell hands over (a `neore://new?text=` link, a share, the Quick
@@ -78,7 +88,7 @@
   added over the stored one, `prompts/functions.ts#markedNames`;
   `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
   system-prompt piece (`chat/lib/system-context-kinds.ts`, `systemContext`): a marked one is `…-impersonated`, and a
-  thread's own language `thread-language`, which refuse; the fill adds `getAgent`'s pieces (skills, modes). An accepted
+  thread's own language `thread-language`, which refuse. An accepted
   ghost-text completion marks an unmarked draft `suggestion`; Restore to input and prompt history of a message another
   person wrote mark it `collaborator`: a collaborator's turn saves its prompt under their own `userId`, and a saved
   row naming nobody counts as someone else's (`features/chat/core/utils/message-author.ts`). No mark is backfilled: the

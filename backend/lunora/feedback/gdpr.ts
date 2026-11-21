@@ -10,6 +10,7 @@ import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
 import { vFeedbackKind } from "./validators";
+import { storedPage } from "../lib/stored-row";
 
 const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
@@ -51,7 +52,7 @@ export const collectFeedbackForExport = internalQuery
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        const page = await ctx.db.feedback.findMany({ cursor, limit: BATCH, orderBy: [{ createdAt: "asc" }], where: { userId } });
+        const page = storedPage(await ctx.db.feedback.findMany({ cursor, limit: BATCH, orderBy: [{ createdAt: "asc" }], where: { userId } }));
 
         return {
             continueCursor: page.isDone ? undefined : (page.continueCursor ?? undefined),

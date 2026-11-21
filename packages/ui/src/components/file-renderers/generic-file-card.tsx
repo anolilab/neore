@@ -2,6 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import cn from "@ui/utils/cn";
+import { saveOnClick } from "@ui/utils/save-from-url";
 import { Download, File, FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo } from "lucide-react";
 import type { FC } from "react";
 import { memo, useMemo } from "react";
@@ -95,6 +96,7 @@ const GenericFileCard: FC<GenericFileCardProps> = memo(({ className, description
             )}
             download={filename}
             href={url}
+            onClick={saveOnClick(url, filename)}
             rel="noopener noreferrer"
             target="_blank"
         >
