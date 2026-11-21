@@ -5,6 +5,7 @@
     "add-agent-commands-persistent-chunks",
     "add-approval-bot-lookup",
     "add-approval-chain-source",
+    "add-approval-project-id",
     "add-approval-run-turn",
     "add-approval-tool-origins",
     "add-group-pause-file-ids",
@@ -21896,6 +21897,12 @@
                 "optional": false,
                 "unique": false
               },
+              "description": {
+                "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
               "globs": {
                 "kind": "array",
                 "nullable": false,
@@ -21926,6 +21933,13 @@
                     "optional": false,
                     "unique": false,
                     "literal": "\"always\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"auto\""
                   },
                   {
                     "kind": "literal",
@@ -29690,6 +29704,13 @@
               "unique": false
             },
             "organizationId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
+            "projectId": {
               "kind": "string",
               "nullable": false,
               "optional": true,

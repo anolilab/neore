@@ -1,10 +1,14 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import type { RuleFileRefusal } from "@neore/backend/rule-file-limits";
 import {
+    isRuleDescriptionValid,
     isRuleGlobValid,
+    isRuleTitleReserved,
+    MAX_RULE_DESCRIPTION_LENGTH,
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
     MAX_RULE_FILES_BYTES,
@@ -22,12 +26,14 @@ import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { Textarea } from "@neore/ui/components/textarea";
 import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import type { FC } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, FileUp, FolderUp, Plus, Trash2 } from "lucide-react";
+import type { ChangeEvent, FC, KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+import { importRuleFiles, needsMode } from "../lib/rule-file-import";
 
 /** The id and name the backend gives a project's older single context (`LEGACY_CONTEXT_RULE_ID`). */
 const LEGACY_CONTEXT_ID = "context";
@@ -64,10 +70,10 @@ const limitRefusal = (error: unknown, files: RuleFileDraft[]): { code: RuleFileR
     return file && { code: code as RuleFileRefusal, file };
 };
 
-type RuleFileMode = "always" | "glob";
+type RuleFileMode = "always" | "auto" | "glob";
 
 /** A file's field a save was refused for: marked invalid, described by the error and focused. */
-type RuleFileField = "content" | "patterns" | "title";
+type RuleFileField = "content" | "description" | "patterns" | "title";
 
 /** What a save is refused for: a file's field, or (no field) the list as a whole, which only the error names. */
 interface RuleFileProblem {
@@ -79,16 +85,20 @@ interface RuleFileProblem {
 /** The field each refusal names. */
 const REFUSAL_FIELDS: Partial<Record<RuleFileRefusal, RuleFileField>> = {
     [RULE_FILE_REFUSALS.CONTENT_TOO_LONG]: "content",
+    [RULE_FILE_REFUSALS.DESCRIPTION_INVALID]: "description",
+    [RULE_FILE_REFUSALS.DESCRIPTION_MISSING]: "description",
     [RULE_FILE_REFUSALS.PATTERN_INVALID]: "patterns",
     [RULE_FILE_REFUSALS.PATTERNS_MISSING]: "patterns",
     [RULE_FILE_REFUSALS.PATTERNS_TOO_MANY]: "patterns",
     [RULE_FILE_REFUSALS.TITLE_MISSING]: "title",
+    [RULE_FILE_REFUSALS.TITLE_RESERVED]: "title",
     [RULE_FILE_REFUSALS.TITLE_TOO_LONG]: "title",
 };
 
-/** A rule file as the editor holds it: its patterns as typed, one per line. */
+/** A rule file as the editor holds it: its patterns as typed, one per line; a description kept while its mode changes. */
 interface RuleFileDraft {
     content: string;
+    description: string;
     id: string;
     mode: RuleFileMode;
     patterns: string;
@@ -101,8 +111,15 @@ const patternsOf = (patterns: string): string[] =>
         .map((pattern) => pattern.trim())
         .filter(Boolean);
 
-const toDraft = (file: { content: string; globs?: string[]; id: string; mode: RuleFileMode; title: string }): RuleFileDraft => {
-    return { content: file.content, id: file.id, mode: file.mode, patterns: (file.globs ?? []).join("\n"), title: file.title };
+const toDraft = (file: { content: string; description?: string; globs?: string[]; id: string; mode: RuleFileMode; title: string }): RuleFileDraft => {
+    return {
+        content: file.content,
+        description: file.description ?? "",
+        id: file.id,
+        mode: file.mode,
+        patterns: (file.globs ?? []).join("\n"),
+        title: file.title,
+    };
 };
 
 /** `files` with the one at `index` swapped with its neighbour `offset` away. */
@@ -126,6 +143,7 @@ const sameFile = (file: RuleFileDraft | undefined, saved: RuleFileDraft): boolea
     file.title === saved.title &&
     file.mode === saved.mode &&
     file.patterns === saved.patterns &&
+    file.description === saved.description &&
     file.content === saved.content;
 
 /** The name a file is saved under: the older context's shown in the person's language goes back to the backend's own. */
@@ -135,11 +153,12 @@ const savedTitle = (file: RuleFileDraft, legacyTitle: string): string => {
     return title === legacyTitle && file.id === LEGACY_CONTEXT_ID ? LEGACY_CONTEXT_TITLE : title;
 };
 
-/** The list as `setProjectRuleFiles` takes it: patterns only on a file applied by pattern. */
+/** The list as `setProjectRuleFiles` takes it: patterns only on a file applied by pattern, a description only on one read when needed. */
 const toSaved = (files: RuleFileDraft[], legacyTitle: string) =>
     files.map((file) => {
         return {
             content: file.content,
+            ...(file.mode === "auto" && { description: file.description.trim() }),
             ...(file.mode === "glob" && { globs: patternsOf(file.patterns) }),
             id: file.id,
             mode: file.mode,
@@ -149,7 +168,7 @@ const toSaved = (files: RuleFileDraft[], legacyTitle: string) =>
 
 interface ListedRuleFiles {
     canEdit: boolean;
-    files: { content: string; globs?: string[]; id: string; mode: RuleFileMode; title: string }[];
+    files: { content: string; description?: string; globs?: string[]; id: string; mode: RuleFileMode; title: string }[];
     legacyContextId?: string;
     revision: string;
 }
@@ -197,6 +216,15 @@ const RuleFileFields: FC<{
     const id = useId();
     const name = file.title.trim() || t`Rule file ${index + 1}`;
     const invalidProps = (field: RuleFileField) => (invalid === field ? { "aria-describedby": errorId, "aria-invalid": true } : {});
+    // Inside the project's form: Enter in a one-line field saves the rule files, the editor's own action, never the project.
+    const saveOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+            return;
+        }
+
+        event.preventDefault();
+        onSave();
+    };
 
     // By id, not a ref: `Textarea` would hand a ref past its field control's own (`packages/ui` `Textarea`).
     useEffect(() => {
@@ -235,15 +263,7 @@ const RuleFileFields: FC<{
                         autoComplete="off"
                         id={`${id}-title`}
                         onChange={(event) => onChange({ ...file, title: event.target.value })}
-                        onKeyDown={(event) => {
-                            // Inside the project's form: Enter saves the rule files, the editor's own action, never the project.
-                            if (event.key !== "Enter" || event.nativeEvent.isComposing) {
-                                return;
-                            }
-
-                            event.preventDefault();
-                            onSave();
-                        }}
+                        onKeyDown={saveOnEnter}
                         value={file.title}
                         {...invalidProps("title")}
                     />
@@ -269,8 +289,34 @@ const RuleFileFields: FC<{
                         <RadioGroupItem value="glob" />
                         {t`When files match`}
                     </Label>
+                    <Label className="flex items-center gap-2 font-normal">
+                        <RadioGroupItem value="auto" />
+                        {t`When needed`}
+                    </Label>
                 </RadioGroup>
             </div>
+            {file.mode === "auto" && (
+                <div className="space-y-1">
+                    <Label htmlFor={`${id}-description`}>
+                        {t`When to read it`}
+                        <span aria-hidden="true" className="text-destructive">
+                            *
+                        </span>
+                    </Label>
+                    <Input
+                        aria-required="true"
+                        autoComplete="off"
+                        id={`${id}-description`}
+                        maxLength={MAX_RULE_DESCRIPTION_LENGTH}
+                        onChange={(event) => onChange({ ...file, description: event.target.value })}
+                        onKeyDown={saveOnEnter}
+                        placeholder={t`For example: how we write database migrations`}
+                        value={file.description}
+                        {...invalidProps("description")}
+                    />
+                    <p className="text-muted-foreground text-xs">{t`Chats see the name and this line, and read the file when it applies.`}</p>
+                </div>
+            )}
             {file.mode === "glob" && (
                 <div className="space-y-1">
                     <Label htmlFor={`${id}-patterns`}>
@@ -403,7 +449,33 @@ const ProjectRuleFiles: FC<{
         onSavingChange?.(isSaving);
     }, [isSaving, onSavingChange]);
 
+    /** How a file's mode reads where it cannot be changed. */
+    const modeLabel = (file: RuleFileDraft): string => {
+        if (file.mode === "always") {
+            return t`Always`;
+        }
+
+        return file.mode === "auto" ? t`When needed` : patternsOf(file.patterns).join(", ");
+    };
+
     const conflictMessage = t`These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again.`;
+
+    const fileInput = useRef<HTMLInputElement>(null);
+    const folderInput = useRef<HTMLInputElement>(null);
+    // What the last import added, said beside its buttons.
+    const [importNote, setImportNote] = useState("");
+    // One import at a time: its buttons wait while the picked files are read.
+    const [importing, setImporting] = useState(false);
+    // The list, its revision and the draft as last rendered: an import applies onto them once its files are read, never
+    // onto the ones it started with (a save, an edit or a read may have landed meanwhile).
+    const latest = useRef({ draft, revision: data?.revision ?? "", savedFiles });
+    // Bumped by Discard: an import still reading then adds nothing.
+    const importGeneration = useRef(0);
+
+    // Before any later event's handler can run, so an import never applies onto a list older than the one shown.
+    useLayoutEffect(() => {
+        latest.current = { draft, revision: data?.revision ?? "", savedFiles };
+    });
 
     const change = (next: RuleFileDraft[]) => {
         if (draft === null) {
@@ -412,6 +484,76 @@ const ProjectRuleFiles: FC<{
 
         setDraft(next);
         setStatus("");
+        setImportNote("");
+    };
+
+    /** Adds the picked Markdown files as unsaved drafts, up to the project's limit; the person saves them like any edit. */
+    const importPicked = async (event: ChangeEvent<HTMLInputElement>) => {
+        const input = event.currentTarget;
+        const picked = [...(input.files ?? [])];
+
+        // Cleared, so picking the same file again imports it again.
+        input.value = "";
+
+        if (picked.length === 0) {
+            return;
+        }
+
+        const generation = importGeneration.current;
+        // Up to the project's limit, not the room left now: a draft removed while the files are read frees room the import takes.
+        const read = await importRuleFiles(picked, MAX_RULE_FILES);
+
+        if (generation !== importGeneration.current) {
+            return;
+        }
+
+        // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
+        // room left now is taken.
+        const now = latest.current;
+        const base = now.draft ?? now.savedFiles;
+        const added = read.imported.slice(0, Math.max(0, MAX_RULE_FILES - base.length));
+        const skipped = read.skipped + read.imported.length - added.length;
+
+        if (added.length > 0) {
+            if (now.draft === null) {
+                setBaseRevision(now.revision);
+            }
+
+            setDraft([
+                ...base,
+                ...added.map((file) => {
+                    return { ...file, id: crypto.randomUUID() };
+                }),
+            ]);
+            setStatus("");
+        }
+
+        const toSet = added.filter((file) => needsMode(file)).length;
+        const noneFound = read.imported.length === 0 ? [t`No Markdown files were found to import.`] : [];
+        const addedNote =
+            added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
+        const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
+        const limit = formatNumber(MAX_RULE_FILES, i18n.locale);
+        const left = t`${plural(skipped, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files.`;
+
+        setImportNote([...addedNote, ...(toSet > 0 ? [setNote] : []), ...(skipped > 0 ? [left] : [])].join(" "));
+    };
+
+    /** Reads the picked files, one import at a time. */
+    const onImport = (event: ChangeEvent<HTMLInputElement>) => {
+        if (importing) {
+            const input = event.currentTarget;
+
+            input.value = "";
+
+            return;
+        }
+
+        setImporting(true);
+        importPicked(event)
+            .catch(() => setImportNote(t`The files could not be read.`))
+            .then(() => setImporting(false))
+            .catch(() => undefined);
     };
 
     /** How a refusal reads, for `file` when it names one; the editor's own check and the backend's word it alike. */
@@ -424,6 +566,12 @@ const ProjectRuleFiles: FC<{
 
                 return t`"${name}" is longer than ${limit} characters. Shorten it or split it into several files.`;
             },
+            [RULE_FILE_REFUSALS.DESCRIPTION_INVALID]: () => {
+                const limit = numberOf(MAX_RULE_DESCRIPTION_LENGTH);
+
+                return t`The description of "${name}" must be at most ${limit} characters on one line.`;
+            },
+            [RULE_FILE_REFUSALS.DESCRIPTION_MISSING]: () => t`A file read when needed needs a line saying when to read it.`,
             [RULE_FILE_REFUSALS.PATTERN_INVALID]: () => {
                 const limit = numberOf(MAX_RULE_GLOB_LENGTH);
 
@@ -436,6 +584,7 @@ const ProjectRuleFiles: FC<{
                 return t`"${name}" has more than ${limit} file patterns. Remove some, or move them into another file.`;
             },
             [RULE_FILE_REFUSALS.TITLE_MISSING]: () => t`Give every rule file a name.`,
+            [RULE_FILE_REFUSALS.TITLE_RESERVED]: () => t`A rule file's name may not start with "id:". Rename "${name}".`,
             [RULE_FILE_REFUSALS.TITLE_TOO_LONG]: () => {
                 const limit = numberOf(MAX_RULE_TITLE_LENGTH);
 
@@ -475,9 +624,18 @@ const ProjectRuleFiles: FC<{
             return RULE_FILE_REFUSALS.TITLE_TOO_LONG;
         }
 
+        // A name the file already has saved keeps saving, as the backend keeps it.
+        if (isRuleTitleReserved(title, savedFiles.find((stored) => stored.id === file.id)?.title)) {
+            return RULE_FILE_REFUSALS.TITLE_RESERVED;
+        }
+
         // In the backend's order, so a file past two limits is refused for the same one either way.
         if (file.id !== keptLegacyId && file.content.length > MAX_RULE_FILE_LENGTH) {
             return RULE_FILE_REFUSALS.CONTENT_TOO_LONG;
+        }
+
+        if (file.mode === "auto" && !isRuleDescriptionValid(file.description)) {
+            return file.description.trim() ? RULE_FILE_REFUSALS.DESCRIPTION_INVALID : RULE_FILE_REFUSALS.DESCRIPTION_MISSING;
         }
 
         if (file.mode === "glob") {
@@ -573,6 +731,7 @@ const ProjectRuleFiles: FC<{
             setBaseRevision(written.revision);
             setError(undefined);
             setStatus(t`Rule files saved.`);
+            setImportNote("");
             refetch().catch(() => undefined);
         } catch (saveError) {
             // A limit the backend holds that this editor did not (an older client): worded and placed as the editor's own.
@@ -591,7 +750,7 @@ const ProjectRuleFiles: FC<{
             <div className="space-y-1">
                 <h3 className="text-sm font-medium" id={headingId}>{t`Rule files`}</h3>
                 <p className="text-muted-foreground text-xs">
-                    {t`Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql.`}
+                    {t`Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them.`}
                 </p>
             </div>
             {isError && (
@@ -605,8 +764,9 @@ const ProjectRuleFiles: FC<{
                         <li className="space-y-1 text-sm" key={file.id}>
                             <div className="flex items-center gap-2">
                                 <span className="font-medium">{file.title}</span>
-                                <Badge variant="outline">{file.mode === "always" ? t`Always` : patternsOf(file.patterns).join(", ")}</Badge>
+                                <Badge variant="outline">{modeLabel(file)}</Badge>
                             </div>
+                            {file.mode === "auto" && <p className="text-muted-foreground text-xs">{file.description}</p>}
                             <p className="text-muted-foreground max-h-48 overflow-y-auto break-words whitespace-pre-wrap">{file.content}</p>
                         </li>
                     ))}
@@ -643,7 +803,9 @@ const ProjectRuleFiles: FC<{
                         <Button
                             disabled={files.length >= MAX_RULE_FILES}
                             id={addId}
-                            onClick={() => change([...files, { content: "", id: crypto.randomUUID(), mode: "always", patterns: "", title: "" }])}
+                            onClick={() =>
+                                change([...files, { content: "", description: "", id: crypto.randomUUID(), mode: "always", patterns: "", title: "" }])
+                            }
                             size="sm"
                             type="button"
                             variant="outline"
@@ -651,6 +813,50 @@ const ProjectRuleFiles: FC<{
                             <Plus aria-hidden="true" className="size-4" />
                             {t`Add rule file`}
                         </Button>
+                        <Button
+                            disabled={importing || files.length >= MAX_RULE_FILES}
+                            onClick={() => fileInput.current?.click()}
+                            size="sm"
+                            title={t`An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files`}
+                            type="button"
+                            variant="outline"
+                        >
+                            <FileUp aria-hidden="true" className="size-4" />
+                            {t`Import files`}
+                        </Button>
+                        <Button
+                            disabled={importing || files.length >= MAX_RULE_FILES}
+                            onClick={() => folderInput.current?.click()}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                        >
+                            <FolderUp aria-hidden="true" className="size-4" />
+                            {t`Import rule folder`}
+                        </Button>
+                        <input
+                            accept=".md,.mdc,.markdown,text/markdown"
+                            aria-hidden="true"
+                            className="hidden"
+                            data-testid="rule-file-import"
+                            multiple
+                            onChange={onImport}
+                            ref={fileInput}
+                            tabIndex={-1}
+                            type="file"
+                        />
+                        {/* `webkitdirectory` keeps each file's path inside the folder (`webkitRelativePath`). */}
+                        <input
+                            aria-hidden="true"
+                            className="hidden"
+                            data-testid="rule-folder-import"
+                            multiple
+                            onChange={onImport}
+                            ref={folderInput}
+                            tabIndex={-1}
+                            type="file"
+                            {...{ directory: "", webkitdirectory: "" }}
+                        />
                         {draft && (
                             <>
                                 <Button
@@ -672,7 +878,10 @@ const ProjectRuleFiles: FC<{
                                     onClick={() => {
                                         // Read again: after a refused save the cached list is the one another save replaced.
                                         refetch().catch(() => undefined);
+                                        // An import still reading is discarded with the rest.
+                                        importGeneration.current += 1;
                                         setDraft(null);
+                                        setImportNote("");
                                         setBlocked(false);
                                         setError(undefined);
                                         setInvalid(undefined);
@@ -688,6 +897,10 @@ const ProjectRuleFiles: FC<{
                     </div>
                 </>
             )}
+            {/* Kept mounted, so a screen reader announces each note as it changes. */}
+            <p className={importNote ? "text-muted-foreground text-xs" : "sr-only"} role="status">
+                {importNote}
+            </p>
             {showBlocked && (
                 // Read as Save's description once focus lands there; announced itself only when there is no Save to focus.
                 <p className="text-destructive text-sm" id={blockedId} role={canEdit ? undefined : "alert"}>

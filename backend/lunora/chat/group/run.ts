@@ -710,7 +710,8 @@ const loadTurnContext = async (
     return {
         agentPrefs,
         baseModel: args.baseModel,
-        extraContext: runContext.contextParts,
+        // A group turn lists no `auto` files, so the list's cost never takes room from its project text.
+        extraContext: runContext.contextPartsWithoutInstructions,
         fileIds: args.fileIds,
         isAnonymous: args.isAnonymous,
         mcpServerNames: args.mcpServerNames,

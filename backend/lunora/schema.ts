@@ -2212,9 +2212,11 @@ export const schema = defineSchema({
         files: v.array(
             v.object({
                 content: v.string(),
+                // An `auto` file's one-line description (`projects/rule-files.ts`).
+                description: v.optional(v.string()),
                 globs: v.optional(v.array(v.string())),
                 id: v.string(),
-                mode: v.union(v.literal("always"), v.literal("glob")),
+                mode: v.union(v.literal("always"), v.literal("auto"), v.literal("glob")),
                 title: v.string(),
             }),
         ),

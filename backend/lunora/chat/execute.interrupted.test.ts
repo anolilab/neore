@@ -103,6 +103,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: modelState.memory,
                 prefs: {
@@ -111,6 +112,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                     personalization: undefined,
                     timezone: "Europe/Berlin",
                 },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
                 systemContext: ["instructions"],

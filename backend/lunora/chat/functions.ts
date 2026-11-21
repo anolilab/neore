@@ -4784,12 +4784,14 @@ export const streamAsync = internalAction
 
         if (appThread?.projectId) {
             // The access `createThread` applied (owner or organization member), not the owner-only read.
-            projectContext =
-                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
-                    ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
-                    projectId: appThread.projectId as Id<"projects">,
-                    userId,
-                })) ?? undefined;
+            // This run has no tools, so the `auto` files are neither listed nor read.
+            const project = await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
+                projectId: appThread.projectId as Id<"projects">,
+                userId,
+            });
+
+            projectContext = project?.textWithoutInstructions ?? project?.text ?? undefined;
         }
 
         // Get model definition

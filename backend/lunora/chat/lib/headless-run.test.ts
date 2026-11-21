@@ -33,6 +33,8 @@ const seen = vi.hoisted(() => {
         prepareSteps: [] as unknown[],
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
+        /** The tools' own gates removed `instruction_read`. */
+        removesInstructionRead: false,
         replies: [] as string[],
         // Extra fields of the next generation's result (its prompt's order, its steps).
         result: {} as Record<string, unknown>,
@@ -116,8 +118,11 @@ vi.mock("./agent-tools", async () => {
     const webSearch = createTool({ description: "Search the web", execute: async () => "results", inputSchema: z.object({}) });
 
     return {
-        buildAgentTools: async (_ctx: unknown, options: unknown) => {
+        buildAgentTools: async (_ctx: unknown, options: { instructions?: ReadonlyArray<unknown> }) => {
             seen.buildOptions.push(options);
+
+            // Offered as a candidate; the gates that remove it are `agent-tools.bot-selection.test.ts`'s.
+            const instructionRead = (options.instructions?.length ?? 0) > 0 && !seen.removesInstructionRead ? { instruction_read: {} } : {};
 
             return {
                 mcpClients: [],
@@ -129,7 +134,7 @@ vi.mock("./agent-tools", async () => {
                 permissionKeys: { browser: "builtin:browser", mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
                 // The notes search is set to `ask`, a tool kept for a run that may pause.
                 requiresApproval: ["mcp_notes_search"],
-                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: { needsApproval: true }, webSearch },
+                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: { needsApproval: true }, webSearch, ...instructionRead },
             };
         },
     };
@@ -264,6 +269,60 @@ describe("runHeadlessAgent hidden characters", () => {
 
     it("refuses a prompt that was only hidden characters", async () => {
         await expect(run("\u{E0069}\u{E0067}")).rejects.toThrow(EMPTY_AFTER_STRIPPING);
+    });
+});
+
+describe("runHeadlessAgent project instructions", () => {
+    beforeEach(() => {
+        seen.removesInstructionRead = false;
+    });
+
+    const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+    const run = (tools: "headless" | "none", model = "test-model") =>
+        runHeadlessAgent(fakeCtx(), {
+            memory: false,
+            model,
+            organizationId: null,
+            origin: "trigger",
+            personalization: "none",
+            projectInstructions: { instructions, projectId: "project-a", systemWithoutInstructions: "PROJECT CONTEXT:\nBe brief.\n\nAlso this." },
+            prompt: "Do the task",
+            system: "PROJECT CONTEXT:\nBe brief.",
+            thread: { title: "t" },
+            tools,
+            userId: "owner",
+        });
+
+    it("lists the project's auto files after its context and offers instruction_read over them", async () => {
+        await run("headless");
+
+        expect(seen.tools.at(-1)).toContain("instruction_read");
+        expect(seen.system.at(-1)).toContain("PROJECT CONTEXT:\nBe brief.\n\nInstruction files you can read with the instruction_read tool");
+        expect(seen.system.at(-1)).toContain("- Deploy (id: d): How to deploy");
+        expect(seen.system.at(-1)).not.toContain("Run the script.");
+    });
+
+    it("neither lists nor offers them to a run without tools", async () => {
+        await run("none");
+
+        expect(seen.tools.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).not.toContain("instruction_read");
+    });
+
+    it("neither lists them nor gives up their room once the tools' own gates removed instruction_read", async () => {
+        seen.removesInstructionRead = true;
+        await run("headless");
+
+        expect(seen.tools.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).toContain("PROJECT CONTEXT:\nBe brief.\n\nAlso this.");
+    });
+
+    it("neither lists nor offers them to a model that cannot call tools", async () => {
+        await run("headless", "cf-gemma-3-12b");
+
+        expect(seen.tools.at(-1)).not.toContain("instruction_read");
+        expect(seen.system.at(-1)).not.toContain("instruction_read");
     });
 });
 
@@ -982,6 +1041,30 @@ describe("runHeadlessAgent pauseForApproval", () => {
         const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
 
         expect(recorded!.config.organizationId).toBe("org-a");
+    });
+
+    it("saves the project its auto files came from, so the continuation reads that project's, not the thread's", async () => {
+        const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+        const snapshotOf = async (extra: Partial<Parameters<typeof runHeadlessAgent>[1]>) => {
+            seen.saved = [approvalRequest];
+
+            const ctx = fakeCtx();
+
+            await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID }, ...extra });
+
+            const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+            return recorded!.config;
+        };
+
+        // An allowlist removes it like any other tool, so this one names it.
+        await expect(
+            snapshotOf({ projectInstructions: { instructions, projectId: "project-a" }, toolAllowlist: ["instruction_read", "mcp_notes_search", "webSearch"] }),
+        ).resolves.toMatchObject({
+            projectId: "project-a",
+            toolNames: expect.arrayContaining(["instruction_read"]),
+        });
+        await expect(snapshotOf({})).resolves.not.toHaveProperty("projectId");
     });
 
     it("labels the saved MCP calls with their real server before recording the request, as an interactive pause does", async () => {
