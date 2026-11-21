@@ -996,10 +996,12 @@ export const runStreamingAgent = internalAction
 
                 // A reply paused on an approval is not finished: its suggestions wait for the reply that finishes after it.
                 if (!finished.paused) {
-                    void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
-                        threadId,
-                        userId,
-                    });
+                    // Handed off before the action returns, so the job is not lost with it. A failed hand-off is logged: the reply is saved.
+                    await ctx.scheduler
+                        .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId })
+                        .catch((error: unknown) => {
+                            streamLogger.warn(`[AgentRun] Could not queue the follow-up suggestions of ${threadId}:`, error);
+                        });
                 }
 
                 await setThreadStatus(ctx, threadId, "active", { awaitingInput: finished.awaitingInput, replied: !finished.paused });
@@ -1261,7 +1263,9 @@ export const continueAfterToolApproval = internalAction
             // A reply that finishes after an approval gets its suggestions, as any finished reply does. A continuation that saved only tool
             // results has no new reply to suggest for, and a sub-agent's child thread does not get any.
             if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped && resumed.savedReply === true) {
-                void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId });
+                await ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId }).catch((error: unknown) => {
+                    streamLogger.warn(`[ToolApproval] Could not queue the follow-up suggestions of ${threadId}:`, error);
+                });
             }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
