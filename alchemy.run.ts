@@ -826,7 +826,8 @@ export default Alchemy.Stack(
             // Production only, for the same reason as the backend's crons.
             // `global_fetch_strictly_public`: the gateway calls the backend by its public URL,
             // which on workers.dev is another Worker of this account (see `Website`).
-            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public"] },
+            // `enable_request_signal`: the request's signal aborts when the caller disconnects, so a cancelled model call stops at the provider.
+            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public", "enable_request_signal"] },
             crons: stage === "production" ? [...GATEWAY_CRONS] : [],
             domain: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
             env: llmGatewayEnv(website.url),

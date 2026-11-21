@@ -4925,11 +4925,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
-                // A collaborator whose access was removed since the job read the thread is not sent to a model under it.
-                if (
-                    userId !== ownerUserId &&
-                    !(await context.runQuery(internal.agent.sharing.getThreadAccess, { threadId: threadId as Id<"threads">, userId }))
-                ) {
+                // A collaborator whose access was removed, or has expired, since the job read the thread is not sent to a model under it.
+                // The lookup returns expired grants too, so a grant counts only while it has not expired.
+                const grant =
+                    userId === ownerUserId
+                        ? undefined
+                        : await context.runQuery(internal.agent.sharing.getThreadAccess, { threadId: threadId as Id<"threads">, userId });
+
+                if (userId !== ownerUserId && (!grant || (grant.expiresAt !== undefined && grant.expiresAt <= Date.now()))) {
                     chatLogger.debug(`[generateFollowupSuggestionsForThread] The actor's access was removed, not sending: ${threadId}`);
                     await giveBackPaidClaim();
 
@@ -5024,14 +5027,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                     { shardKey: chargedUserId },
                 );
 
-                if (!charged) {
+                if (charged) {
+                    chatLogger.info(`[generateFollowupSuggestionsForThread] Stored ${suggestions.length} suggestions for thread: ${threadId}`);
+                } else {
                     // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown
                     // that was not paid for. The claim stays held, so the model is not called again for this reply.
                     chatLogger.warn(`[generateFollowupSuggestionsForThread] The Text unit was refused; clearing the suggestions: ${threadId}`);
                     await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...cacheWrite, suggestions: [] });
                 }
-
-                chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
             } finally {
                 // The request has settled, so the chat may be locked again.
                 await context.runMutation(internal.agent.followup_suggestions.endFollowupDispatch, {
