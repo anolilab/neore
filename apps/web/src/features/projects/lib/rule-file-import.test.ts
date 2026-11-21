@@ -80,6 +80,15 @@ describe("toImportedRuleFile", () => {
         });
     });
 
+    it("splits a quoted list of patterns, reads a block of them line by line, and takes an apostrophe as text", () => {
+        expect(toImportedRuleFile("rules/q.mdc", '---\nglobs: "**/*.ts, **/*.tsx"\n---\nT')).toMatchObject({ patterns: "**/*.ts\n**/*.tsx" });
+        expect(toImportedRuleFile("rules/b.mdc", "---\nglobs: |\n  a/**\n  b/*.{md,mdx}\n---\nT")).toMatchObject({ patterns: "a/**\nb/*.{md,mdx}" });
+        expect(toImportedRuleFile("rules/a.md", "---\ndescription: For the user's settings # owner note\n---\nT")).toMatchObject({
+            description: "For the user's settings",
+            mode: "auto",
+        });
+    });
+
     it("reads front matter after a byte-order mark", () => {
         expect(toImportedRuleFile("rules/bom.md", "\u{FEFF}---\nglobs: *.ts\n---\nTyped.")).toMatchObject({
             content: "Typed.",

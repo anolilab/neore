@@ -28,28 +28,40 @@ const KEY = /^[A-Za-z]+$/u;
 /** A block value's header: `|` or `>`, with an optional chomping sign and indentation digit (`>-`, `|+`, `>2`). */
 const BLOCK_HEADER = /^[>|][-+1-9]{0,2}$/u;
 
-/** The brackets around an inline list. */
+/** The brackets around an inline list, and a quote around an item. */
 const LIST_OPEN = /^\[/u;
 const LIST_CLOSE = /\]$/u;
+const QUOTE_START = /^["']/u;
+const QUOTE_END = /["']$/u;
 
 /** The front matter, an empty block included. */
 const FRONT_MATTER = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(?:\r?\n|$)/u;
 
-/** `value` before a ` #` comment outside quotes (YAML: a `#` that starts the value or follows a space). */
+/** Where a quoted scalar may open in a value: at its start, or after `[` or `,` in an inline list. */
+const QUOTE_OPENS_AFTER = new Set(["", ",", "["]);
+
+/**
+ * `value` before a ` #` comment (YAML: a `#` that starts the value or follows a space), outside a quoted scalar. A quote
+ * opens one only where a scalar starts, so the apostrophe in `the user's settings` is text.
+ */
 const withoutComment = (value: string): string => {
     let quote: string | undefined;
+    // The last character before this one that is not a space.
+    let previous = "";
 
     for (let index = 0; index < value.length; index += 1) {
-        const character = value[index];
+        const character = value[index]!;
 
         if (quote) {
-            if (character === quote) {
-                quote = undefined;
-            }
-        } else if (character === '"' || character === "'") {
+            quote = character === quote ? undefined : quote;
+        } else if ((character === '"' || character === "'") && QUOTE_OPENS_AFTER.has(previous)) {
             quote = character;
         } else if (character === "#" && (index === 0 || value[index - 1] === " " || value[index - 1] === "\t")) {
             return value.slice(0, index).trimEnd();
+        }
+
+        if (character !== " " && character !== "\t") {
+            previous = character;
         }
     }
 
@@ -65,55 +77,32 @@ const unquoted = (value: string): string => {
 };
 
 /**
- * `[a, b]`, `"a", "b"` or `a, b` as its items, quotes dropped. A comma inside quotes or a `{a,b}` group is part of the
- * item, so a `*.{ts,tsx}` group stays one pattern.
+ * `[a, b]`, `"a", "b"`, `"a, b"` or `a, b` as its items, quotes dropped. Split at each comma outside a `{a,b}` group, so
+ * a `*.{ts,tsx}` group stays one pattern and a quoted list of several patterns still gives each.
  */
 const listOf = (value: string): string[] => {
     const inner = value.trim().replace(LIST_OPEN, "").replace(LIST_CLOSE, "");
     const items: string[] = [];
     let depth = 0;
-    let quote: string | undefined;
     let start = 0;
 
     for (let index = 0; index < inner.length; index += 1) {
         const character = inner[index];
 
-        if (quote) {
-            quote = character === quote ? undefined : quote;
-            continue;
-        }
-
-        switch (character) {
-            case '"':
-            case "'": {
-                quote = character;
-                break;
-            }
-            case ",": {
-                if (depth === 0) {
-                    items.push(inner.slice(start, index));
-                    start = index + 1;
-                }
-
-                break;
-            }
-            case "{": {
-                depth += 1;
-                break;
-            }
-            case "}": {
-                depth = Math.max(0, depth - 1);
-                break;
-            }
-            default: {
-                break;
-            }
+        if (character === "{") {
+            depth += 1;
+        } else if (character === "}") {
+            depth = Math.max(0, depth - 1);
+        } else if (character === "," && depth === 0) {
+            items.push(inner.slice(start, index));
+            start = index + 1;
         }
     }
 
     items.push(inner.slice(start));
 
-    return items.map((item) => unquoted(item)).filter(Boolean);
+    // A quote that opened or closed a whole quoted list is left on its first or last item.
+    return items.map((item) => item.trim().replace(QUOTE_START, "").replace(QUOTE_END, "")).filter(Boolean);
 };
 
 /** Whether `line` is indented, so it continues the key above it rather than starting one. */
@@ -193,7 +182,8 @@ const splitFrontMatter = (text: string): { body: string; fields: Map<string, str
 
         const value = parts.filter(Boolean).join(" ");
 
-        fields.set(key, key === "globs" ? listOf(value) : [isBlock ? value : unquoted(value)]);
+        // Patterns are read line by line: a block or continued `globs:` value gives one or more on each line.
+        fields.set(key, key === "globs" ? parts.flatMap((part) => listOf(part)) : [isBlock ? value : unquoted(value)]);
     }
 
     return { body: text.slice(match[0].length), fields };

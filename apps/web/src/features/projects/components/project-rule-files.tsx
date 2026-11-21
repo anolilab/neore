@@ -27,7 +27,7 @@ import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, FileUp, FolderUp, Plus, Trash2 } from "lucide-react";
 import type { ChangeEvent, FC } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -468,7 +468,8 @@ const ProjectRuleFiles: FC<{
     // Bumped by Discard: an import still reading then adds nothing.
     const importGeneration = useRef(0);
 
-    useEffect(() => {
+    // Before any later event's handler can run, so an import never applies onto a list older than the one shown.
+    useLayoutEffect(() => {
         latest.current = { draft, revision: data?.revision ?? "", savedFiles };
     });
 

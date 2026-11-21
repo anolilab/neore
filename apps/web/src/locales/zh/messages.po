@@ -89,11 +89,11 @@ msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
-#: src/features/projects/components/project-rule-files.tsx:578
+#: src/features/projects/components/project-rule-files.tsx:579
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "“{name}”的文件模式超过 {limit} 个。请删除一些，或移到另一个文件中。"
 
-#: src/features/projects/components/project-rule-files.tsx:561
+#: src/features/projects/components/project-rule-files.tsx:562
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "“{name}”超过 {limit} 个字符。请缩短，或拆分为多个文件。"
 
@@ -350,7 +350,7 @@ msgid "{0, plural, one {# required or unknown check is still running} other {# r
 msgstr "{0, plural, other {# 项必需或未知检查仍在运行}}"
 
 #. placeholder {0}: added.length
-#: src/features/projects/components/project-rule-files.tsx:528
+#: src/features/projects/components/project-rule-files.tsx:529
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
 msgstr "{0, plural, other {已导入 # 个规则文件。}} 请检查后保存。"
 
@@ -1433,7 +1433,7 @@ msgstr "{server} · 截至 {until}"
 msgid "{skipped, plural, one {# file could not be imported and was} other {# files could not be imported and were}} left out"
 msgstr "{skipped, plural, other {有 # 个文件无法导入，已被跳过}}"
 
-#: src/features/projects/components/project-rule-files.tsx:531
+#: src/features/projects/components/project-rule-files.tsx:532
 msgid "{skipped, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files."
 msgstr "{skipped, plural, other {有 # 个文件未导入。}} 一个项目最多包含 {limit} 个规则文件。"
 
@@ -1495,7 +1495,7 @@ msgstr "{toolId} API 密钥已移除"
 msgid "{toolId} API key saved"
 msgstr "{toolId} API 密钥已保存"
 
-#: src/features/projects/components/project-rule-files.tsx:529
+#: src/features/projects/components/project-rule-files.tsx:530
 msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
 msgstr "{toSet, plural, other {# 个文件未说明何时适用}}：请设置描述或选择其他模式。"
 
@@ -1878,7 +1878,7 @@ msgstr "与你一起思考的文档编辑器。"
 msgid "A few questions first"
 msgstr "先回答几个问题"
 
-#: src/features/projects/components/project-rule-files.tsx:574
+#: src/features/projects/components/project-rule-files.tsx:575
 msgid "A file applied when files match needs at least one pattern."
 msgstr "“文件匹配时”应用的规则文件至少需要一个模式。"
 
@@ -1886,7 +1886,7 @@ msgstr "“文件匹配时”应用的规则文件至少需要一个模式。"
 msgid "A file only its owner can read (no keychain available)"
 msgstr "仅所有者可读取的文件（无可用的钥匙串）"
 
-#: src/features/projects/components/project-rule-files.tsx:568
+#: src/features/projects/components/project-rule-files.tsx:569
 msgid "A file read when needed needs a line saying when to read it."
 msgstr "按需读取的文件需要一行说明何时读取它。"
 
@@ -2003,7 +2003,7 @@ msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在�
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "一个项目最多可列出 {MAX_REPOSITORIES} 个仓库。"
 
-#: src/features/projects/components/project-rule-files.tsx:594
+#: src/features/projects/components/project-rule-files.tsx:595
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "一个项目最多包含 {limit} 个规则文件。请先删除一个。"
 
@@ -2041,7 +2041,7 @@ msgstr "使用了记忆的回复会显示“已使用的记忆”列表，方便
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "经路由或被提及的一轮最多有三位发言者。并行一轮最多有四个回答和一份综合结果，辩论最多进行三轮。"
 
-#: src/features/projects/components/project-rule-files.tsx:584
+#: src/features/projects/components/project-rule-files.tsx:585
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "规则文件的名称最多 {limit} 个字符。"
 
@@ -2605,7 +2605,7 @@ msgstr "添加参考图以保持一致性"
 msgid "Add row"
 msgstr "添加行"
 
-#: src/features/projects/components/project-rule-files.tsx:802
+#: src/features/projects/components/project-rule-files.tsx:803
 msgid "Add rule file"
 msgstr "添加规则文件"
 
@@ -3612,7 +3612,7 @@ msgstr "智能体（技能）"
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "智能体会自主处理任务，然后由验证器根据你的成功标准检查结果。"
 
-#: src/features/projects/components/project-rule-files.tsx:808
+#: src/features/projects/components/project-rule-files.tsx:809
 msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
 msgstr "AGENTS.md、CLAUDE.md 或 GEMINI.md 文件，或其他 Markdown 文件"
 
@@ -10869,7 +10869,7 @@ msgid "Discard"
 msgstr "放弃"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:881
+#: src/features/projects/components/project-rule-files.tsx:882
 msgid "Discard changes"
 msgstr "放弃更改"
 
@@ -11498,7 +11498,7 @@ msgstr "每个连接都有自己的 Webhook 地址，应用会将新消息发送
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "每个 Discord 频道会在 Neore Chat 中创建一个单独的对话。AI 会在频道中自动回复。"
 
-#: src/features/projects/components/project-rule-files.tsx:572
+#: src/features/projects/components/project-rule-files.tsx:573
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "“{name}”中的每个文件模式必须在一行内，且最多 {limit} 个字符。"
 
@@ -15770,7 +15770,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab 密钥令牌（X-Gitlab-Token）"
 
-#: src/features/projects/components/project-rule-files.tsx:580
+#: src/features/projects/components/project-rule-files.tsx:581
 msgid "Give every rule file a name."
 msgstr "请为每个规则文件命名。"
 
@@ -17277,7 +17277,7 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
-#: src/features/projects/components/project-rule-files.tsx:813
+#: src/features/projects/components/project-rule-files.tsx:814
 msgid "Import files"
 msgstr "导入文件"
 
@@ -17293,7 +17293,7 @@ msgstr "导入 Notion 导出文件（.zip）"
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
 
-#: src/features/projects/components/project-rule-files.tsx:823
+#: src/features/projects/components/project-rule-files.tsx:824
 msgid "Import rule folder"
 msgstr "导入规则文件夹"
 
@@ -17739,7 +17739,7 @@ msgstr "指令"
 msgid "Instructions"
 msgstr "指令"
 
-#: src/features/projects/components/project-rule-files.tsx:741
+#: src/features/projects/components/project-rule-files.tsx:742
 msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
 msgstr "添加到此项目聊天中的说明：始终应用、仅当聊天附件匹配 **/*.sql 等模式时应用，或由聊天在需要时读取。"
 
@@ -22436,7 +22436,7 @@ msgstr "未找到语言"
 msgid "No lens selected"
 msgstr "未选择镜头"
 
-#: src/features/projects/components/project-rule-files.tsx:526
+#: src/features/projects/components/project-rule-files.tsx:527
 msgid "No Markdown files were found to import."
 msgstr "未找到可导入的 Markdown 文件。"
 
@@ -28666,11 +28666,11 @@ msgstr "评分标准"
 msgid "Rule file {0}"
 msgstr "规则文件 {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:739
+#: src/features/projects/components/project-rule-files.tsx:740
 msgid "Rule files"
 msgstr "规则文件"
 
-#: src/features/projects/components/project-rule-files.tsx:721
+#: src/features/projects/components/project-rule-files.tsx:722
 msgid "Rule files saved."
 msgstr "规则文件已保存。"
 
@@ -29003,7 +29003,7 @@ msgstr "保存图像"
 msgid "Save login"
 msgstr "保存登录信息"
 
-#: src/features/projects/components/project-rule-files.tsx:895
+#: src/features/projects/components/project-rule-files.tsx:896
 msgid "Save or discard your rule file changes first."
 msgstr "请先保存或放弃你对规则文件的更改。"
 
@@ -29015,7 +29015,7 @@ msgstr "保存预设"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "保存可复用的系统提示词，并将其绑定到特定模型。使用“优化”按钮，通过提示词优化器改进每个预设。"
 
-#: src/features/projects/components/project-rule-files.tsx:861
+#: src/features/projects/components/project-rule-files.tsx:862
 msgid "Save rule files"
 msgstr "保存规则文件"
 
@@ -29093,7 +29093,7 @@ msgstr "正在保存工具…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:861
+#: src/features/projects/components/project-rule-files.tsx:862
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -33732,7 +33732,7 @@ msgstr "数据集、其用例及所有运行记录都将被删除。"
 msgid "The description is cut short."
 msgstr "描述已被截断。"
 
-#: src/features/projects/components/project-rule-files.tsx:566
+#: src/features/projects/components/project-rule-files.tsx:567
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
 
@@ -33811,7 +33811,7 @@ msgstr "文件仍在附件中，会随你的消息一起发送。"
 msgid "The file was not imported:"
 msgstr "文件未导入："
 
-#: src/features/projects/components/project-rule-files.tsx:548
+#: src/features/projects/components/project-rule-files.tsx:549
 msgid "The files could not be read."
 msgstr "无法读取这些文件。"
 
@@ -34220,7 +34220,7 @@ msgstr "重试耗时比预期更长"
 msgid "The right model, every time."
 msgstr "每次都用对模型。"
 
-#: src/features/projects/components/project-rule-files.tsx:746
+#: src/features/projects/components/project-rule-files.tsx:747
 msgid "The rule files could not be loaded."
 msgstr "无法加载规则文件。"
 
@@ -35414,7 +35414,7 @@ msgstr "今天"
 msgid "Today, {label}"
 msgstr "今天，{label}"
 
-#: src/features/projects/components/project-rule-files.tsx:589
+#: src/features/projects/components/project-rule-files.tsx:590
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "这些规则文件合计超过 {limit} MB。请缩短或删除其中一些。"
 
