@@ -83,7 +83,10 @@
 - **Import from a repository** (`rule-file-repo.ts`, `source-control/repo-rule-files.ts`): two actions, list then read,
   with the person's own GitHub token, for whoever may save the rule files (`repoForRuleFileImport`) and a repository the
   project lists. A listing pins one commit and walks git trees by SHA (never `ref:path`, never recursive; a cut tree
-  is reported as `truncated`); the read takes that commit's SHA, never a branch. They read only `isImportablePath`
+  is reported as `truncated`); the read takes that commit's SHA, never a branch, lists it again (found under this repository,
+  `/git/commits/{sha}`) and reads only what that listing offers, by blob SHA, never through the contents API (it
+  follows symlinks). A symlink is followed only to another path of the same listing (a root file or the
+  listed folder's), inside the repository (`resolveLinkTarget`); any other is listed `refused` and its target never read. They read only `isImportablePath`
   paths (root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, Markdown right in one `RULE_FOLDERS` folder), within
   `REPO_RULE_FILE_MAX_BYTES` and `MAX_RULE_FILE_LENGTH` characters each (counted without front matter,
   `RULE_FILE_FRONT_MATTER`, as the import counts) and `REPO_RULE_FILES_READ_BYTES` together, and

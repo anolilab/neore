@@ -82,6 +82,7 @@ vi.mock("@/features/auth/lib/utilities", () => {
 
 const NEEDS_A_PATTERN = /needs at least one pattern/u;
 const HUGE_FILE = /^rules\/huge\.md\s*\(too large\)$/u;
+const REFUSED_LINK = /^GEMINI\.md\s*\(links to a file that is not an instruction file\)$/u;
 const WIDE_FILE = /^rules\/wide\.md\s*\(may be too long\)$/u;
 
 const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
@@ -941,6 +942,7 @@ describe("project rule files imported from the project's repository", () => {
             truncated: false,
             files: [
                 { path: "AGENTS.md", size: 20, tooLarge: false },
+                { path: "GEMINI.md", refused: "link", size: 4, tooLarge: false },
                 { path: "rules/huge.md", size: 900_000, tooLarge: true },
             ],
             status: "ok",
@@ -959,6 +961,8 @@ describe("project rule files imported from the project's repository", () => {
 
         expect(within(found).getByRole("checkbox", { name: "AGENTS.md" }).getAttribute("aria-checked")).toBe("true");
         expect(within(found).getByRole("checkbox", { name: HUGE_FILE }).getAttribute("aria-disabled")).toBe("true");
+        // A symlink to a file that is not an instruction file: listed, never picked or read.
+        expect(within(found).getByRole("checkbox", { name: REFUSED_LINK }).getAttribute("aria-disabled")).toBe("true");
 
         await user.click(screen.getByRole("button", { name: "Import selected" }));
 

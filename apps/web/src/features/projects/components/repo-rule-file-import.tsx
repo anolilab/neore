@@ -26,7 +26,11 @@ export interface RepoImportResult {
     unreadable: number;
 }
 
-type FoundFile = { path: string; size: number; tooLarge: boolean };
+/** `refused`: a symlink leading outside the rule-file paths, listed but never read. */
+type FoundFile = { path: string; refused?: "link"; size: number; tooLarge: boolean };
+
+/** Whether a found file can be picked at all. */
+const isPickable = (file: FoundFile): boolean => !file.tooLarge && file.refused === undefined;
 
 /** One listing: the repository and commit it read, so the import reads those files there and nowhere else. */
 interface Listing {
@@ -48,7 +52,7 @@ const repoName = (url: string): string => url.replace(HOST_PREFIX, "").replace(G
  * Whether a found file may hold more characters than a rule file may: its bytes say so only past that many (a character
  * is one byte or more), so it is offered but not ticked, and the read refuses it if it does.
  */
-const mayBeTooLong = (file: FoundFile): boolean => !file.tooLarge && file.size > MAX_RULE_FILE_LENGTH;
+const mayBeTooLong = (file: FoundFile): boolean => isPickable(file) && file.size > MAX_RULE_FILE_LENGTH;
 
 /**
  * Rule files from one of the project's repositories (`listRepoRuleFiles`, `readRepoRuleFiles`): the person picks the
@@ -146,7 +150,7 @@ const RepoRuleFileImport: FC<{
                 }
 
                 setListed({ commit: outcome.commit, files: outcome.files, repoId: listedRepo, truncated: outcome.truncated });
-                setPicked(new Set(outcome.files.filter((file) => !file.tooLarge && !mayBeTooLong(file)).map((file) => file.path)));
+                setPicked(new Set(outcome.files.filter((file) => isPickable(file) && !mayBeTooLong(file)).map((file) => file.path)));
 
                 return undefined;
             })
@@ -241,7 +245,7 @@ const RepoRuleFileImport: FC<{
                             <Label className="flex items-center gap-2 text-sm font-normal">
                                 <Checkbox
                                     checked={picked.has(file.path)}
-                                    disabled={file.tooLarge}
+                                    disabled={!isPickable(file)}
                                     onCheckedChange={(checked) => {
                                         const next = new Set(picked);
 
@@ -256,6 +260,9 @@ const RepoRuleFileImport: FC<{
                                 />
                                 <span className="font-mono text-xs">{file.path}</span>
                                 {file.tooLarge && <span className="text-muted-foreground text-xs">{t`(too large)`}</span>}
+                                {file.refused === "link" && (
+                                    <span className="text-muted-foreground text-xs">{t`(links to a file that is not an instruction file)`}</span>
+                                )}
                                 {mayBeTooLong(file) && <span className="text-muted-foreground text-xs">{t`(may be too long)`}</span>}
                             </Label>
                         </li>

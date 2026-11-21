@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 import { HostApiError } from "./origin-fetch";
 import type { HostRequest } from "./origin-fetch";
 import { MAX_RULE_FILE_LENGTH } from "../projects/rule-file-limits";
-import { isImportablePath, listRepoRuleFiles, readRepoRuleFiles, REPO_RULE_FILE_MAX_BYTES, REPO_RULE_FILES_READ_BYTES } from "./repo-rule-files";
+import {
+    isImportablePath,
+    listRepoRuleFiles,
+    readRepoRuleFiles,
+    REPO_RULE_FILE_MAX_BYTES,
+    REPO_RULE_FILES_READ_BYTES,
+    resolveLinkTarget,
+} from "./repo-rule-files";
 
 const ADDRESS = { name: "hello", owner: "octo", ref: "main" };
 const REPO = "/repos/octo/hello";
-const BASE = `${REPO}/contents`;
 const COMMIT = "c".repeat(40);
 
 /** A host answering each path from `routes`, recording the paths and queries asked. */
@@ -45,10 +51,56 @@ const commits = [{ commit: { tree: { sha: "tree-root" } }, sha: COMMIT }];
 
 const tree = (sha: string) => `${REPO}/git/trees/${sha}`;
 
-const encoded = (text: string) => {
-    const bytes = new TextEncoder().encode(text);
+const base64 = (bytes: Uint8Array): string => {
+    let binary = "";
 
-    return { content: btoa(String.fromCodePoint(...bytes)), encoding: "base64", size: bytes.byteLength, type: "file" };
+    for (const byte of bytes) {
+        binary += String.fromCodePoint(byte);
+    }
+
+    return btoa(binary);
+};
+
+/** A file of {@link repoAt}: its text, a symlink to `link`, or only a size (a blob the host would not send). */
+type FakeFile = string | { link: string } | { size: number };
+
+/**
+ * The host routes of a repository at {@link COMMIT} holding `files` by path: its commit, the trees of the root and
+ * each folder (`tree-<folder>`), and each blob (`blob-<path>`, slashes as `_`), a link's holding its target's path.
+ */
+const repoAt = (files: Record<string, FakeFile>): Record<string, unknown> => {
+    const routes: Record<string, unknown> = { [`${REPO}/git/commits/${COMMIT}`]: { sha: COMMIT, tree: { sha: "tree-root" } } };
+    const trees = new Map<string, unknown[]>([["root", []]]);
+
+    for (const [path, file] of Object.entries(files)) {
+        const slash = path.lastIndexOf("/");
+        const folderPath = slash === -1 ? "root" : path.slice(0, slash);
+        const name = path.slice(slash + 1);
+
+        if (folderPath !== "root" && !trees.has(folderPath)) {
+            trees.set(folderPath, []);
+            trees.get("root")!.push(folder(folderPath));
+        }
+
+        const sha = `blob-${path.replaceAll("/", "_")}`;
+
+        if (typeof file === "object" && "size" in file) {
+            trees.get(folderPath)!.push({ mode: "100644", path: name, sha, size: file.size, type: "blob" });
+            routes[`${REPO}/git/blobs/${sha}`] = { content: "", encoding: "base64", size: file.size };
+            continue;
+        }
+
+        const bytes = new TextEncoder().encode(typeof file === "string" ? file : file.link);
+
+        trees.get(folderPath)!.push({ mode: typeof file === "string" ? "100644" : "120000", path: name, sha, size: bytes.byteLength, type: "blob" });
+        routes[`${REPO}/git/blobs/${sha}`] = { content: base64(bytes), encoding: "base64", size: bytes.byteLength };
+    }
+
+    for (const [folderPath, entries] of trees) {
+        routes[tree(`tree-${folderPath}`)] = { tree: entries, truncated: false };
+    }
+
+    return routes;
 };
 
 describe(listRepoRuleFiles, () => {
@@ -99,23 +151,89 @@ describe(listRepoRuleFiles, () => {
         ]);
     });
 
-    it("asks for no folder the root does not hold, lists a symlink as a file, and marks a file past the limit", async () => {
+    it("asks for no folder the root does not hold, and marks a file past the limit", async () => {
         const { calls, request } = fakeHost({
             [`${REPO}/commits`]: commits,
-            [tree("tree-root")]: {
-                tree: [blob("GEMINI.md", REPO_RULE_FILE_MAX_BYTES + 1), { mode: "120000", path: "CLAUDE.md", sha: "s", size: 9, type: "blob" }],
-            },
+            [tree("tree-root")]: { tree: [blob("GEMINI.md", REPO_RULE_FILE_MAX_BYTES + 1)] },
+        });
+
+        await expect(listRepoRuleFiles(request, ADDRESS)).resolves.toStrictEqual({
+            commit: COMMIT,
+            files: [{ path: "GEMINI.md", size: REPO_RULE_FILE_MAX_BYTES + 1, tooLarge: true }],
+            truncated: false,
+        });
+        expect(calls).toHaveLength(2);
+    });
+
+    it("follows a symlink only to another instruction file, listing the rest as refused without reading their target", async () => {
+        const { calls, request } = fakeHost({
+            ...repoAt({
+                "AGENTS.md": "# Rules",
+                "CLAUDE.md": { link: "AGENTS.md" },
+                "GEMINI.md": { link: ".env" },
+                "rules/escape.md": { link: "../../outside.md" },
+                "rules/loop.md": { link: "loop.md" },
+                "rules/style.md": { link: "../CLAUDE.md" },
+            }),
+            [`${REPO}/commits`]: commits,
         });
 
         await expect(listRepoRuleFiles(request, ADDRESS)).resolves.toStrictEqual({
             commit: COMMIT,
             files: [
-                { path: "CLAUDE.md", size: 9, tooLarge: false },
-                { path: "GEMINI.md", size: REPO_RULE_FILE_MAX_BYTES + 1, tooLarge: true },
+                { path: "AGENTS.md", size: 7, tooLarge: false },
+                // Listed with its target's size: the read takes the target's blob.
+                { path: "CLAUDE.md", size: 7, tooLarge: false },
+                { path: "GEMINI.md", refused: "link", size: 4, tooLarge: false },
+                { path: "rules/escape.md", refused: "link", size: 16, tooLarge: false },
+                { path: "rules/loop.md", refused: "link", size: 7, tooLarge: false },
+                { path: "rules/style.md", size: 7, tooLarge: false },
             ],
             truncated: false,
         });
-        expect(calls).toHaveLength(2);
+        // Only links' own blobs are read while listing, never a file's.
+        expect(calls.filter((call) => call.path.includes("/git/blobs/")).map((call) => call.path.split("/").at(-1))).not.toContain("blob-AGENTS.md");
+    });
+
+    it("follows a link only into the listing: never to a rules folder it passed over, never past a chain's depth, never a long target", async () => {
+        const { calls, request } = fakeHost({
+            ...repoAt({
+                ".rules/a.md": { link: "../rules/skipped.md" },
+                ".rules/b.md": "listed",
+                ".rules/deep0.md": { link: "deep1.md" },
+                ".rules/deep1.md": { link: "deep2.md" },
+                ".rules/deep2.md": { link: "deep3.md" },
+                ".rules/deep3.md": { link: "deep4.md" },
+                ".rules/deep4.md": { link: "b.md" },
+                ".rules/long.md": { link: `${"x/".repeat(600)}b.md` },
+                "rules/skipped.md": "passed over",
+            }),
+            [`${REPO}/commits`]: commits,
+        });
+        const { files } = await listRepoRuleFiles(request, ADDRESS);
+
+        expect(files.map((file) => [file.path, file.refused ?? "ok"])).toStrictEqual([
+            [".rules/a.md", "link"],
+            [".rules/b.md", "ok"],
+            // Five links from deep0 to the file, one past the limit; four from deep1.
+            [".rules/deep0.md", "link"],
+            [".rules/deep1.md", "ok"],
+            [".rules/deep2.md", "ok"],
+            [".rules/deep3.md", "ok"],
+            [".rules/deep4.md", "ok"],
+            [".rules/long.md", "link"],
+        ]);
+        expect(calls.map((call) => call.path)).not.toContain(`${REPO}/git/blobs/blob-.rules_long.md`);
+        expect(calls.map((call) => call.path)).not.toContain(`${REPO}/git/blobs/blob-rules_skipped.md`);
+    });
+
+    it("lists no entry without a size, whose bytes could not be checked before reading it", async () => {
+        const { request } = fakeHost({
+            [`${REPO}/commits`]: commits,
+            [tree("tree-root")]: { tree: [{ mode: "100644", path: "AGENTS.md", sha: "s", type: "blob" }] },
+        });
+
+        await expect(listRepoRuleFiles(request, ADDRESS)).resolves.toMatchObject({ files: [] });
     });
 
     it("says when a tree the host cut may hide files, listing what it holds", async () => {
@@ -157,27 +275,88 @@ describe(isImportablePath, () => {
     });
 });
 
+describe(resolveLinkTarget, () => {
+    it.each([
+        ["CLAUDE.md", "AGENTS.md", "AGENTS.md"],
+        ["CLAUDE.md", "./rules/a.md", "rules/a.md"],
+        ["rules/a.md", "../AGENTS.md", "AGENTS.md"],
+        ["rules/a.md", "../../outside.md", undefined],
+        ["AGENTS.md", "../AGENTS.md", undefined],
+        ["AGENTS.md", "/etc/passwd", undefined],
+        ["AGENTS.md", ".", undefined],
+    ])("%s → %s is %s", (link, target, expected) => {
+        expect(resolveLinkTarget(link, target)).toBe(expected);
+    });
+});
+
 describe(readRepoRuleFiles, () => {
-    it("decodes each file as UTF-8 and says which are gone", async () => {
-        const host = fakeHost({ [`${BASE}/AGENTS.md`]: encoded("# Règles\nUse pnpm.") });
-        const { calls } = host;
+    it("decodes each file as UTF-8 at the listing's commit, found under this repository, and says which are gone", async () => {
+        const host = fakeHost(repoAt({ "AGENTS.md": "# Règles\nUse pnpm." }));
 
         await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, ["AGENTS.md", "CLAUDE.md"])).resolves.toStrictEqual([
             { path: "AGENTS.md", status: "ok", text: "# Règles\nUse pnpm." },
             { path: "CLAUDE.md", status: "missing" },
         ]);
-        // At the listing's commit, never the branch: a branch moved since would give other files.
-        expect(calls.map((call) => call.query)).toStrictEqual([{ ref: COMMIT }, { ref: COMMIT }]);
+        // The commit is looked up under this repository, and the files by their blobs: never a branch, never a path the host resolves.
+        expect(host.calls.map((call) => call.path)).toStrictEqual([`${REPO}/git/commits/${COMMIT}`, tree("tree-root"), `${REPO}/git/blobs/blob-AGENTS.md`]);
+    });
+
+    it("reads nothing at a commit this repository does not hold", async () => {
+        const host = fakeHost(repoAt({ "AGENTS.md": "# Rules" }));
+        const elsewhere = "d".repeat(40);
+
+        await expect(readRepoRuleFiles(host.request, ADDRESS, elsewhere, ["AGENTS.md"])).resolves.toStrictEqual([{ path: "AGENTS.md", status: "missing" }]);
+        expect(host.calls).toHaveLength(1);
+    });
+
+    it("reads nothing from a repository emptied since its listing, nor a blob the host sends other than as base64", async () => {
+        const emptied = fakeHost({ [`${REPO}/git/commits/${COMMIT}`]: new HostApiError("empty", 409) });
+
+        await expect(readRepoRuleFiles(emptied.request, ADDRESS, COMMIT, ["AGENTS.md"])).resolves.toStrictEqual([{ path: "AGENTS.md", status: "missing" }]);
+
+        const routes = repoAt({ "AGENTS.md": "# Rules", "CLAUDE.md": "# Other" });
+
+        routes[`${REPO}/git/blobs/blob-AGENTS.md`] = { content: "", encoding: "none" };
+        routes[`${REPO}/git/blobs/blob-CLAUDE.md`] = { content: "%%%", encoding: "base64" };
+
+        await expect(readRepoRuleFiles(fakeHost(routes).request, ADDRESS, COMMIT, ["AGENTS.md", "CLAUDE.md"])).resolves.toStrictEqual([
+            { path: "AGENTS.md", status: "missing" },
+            { path: "CLAUDE.md", status: "missing" },
+        ]);
+    });
+
+    it("reads only what the commit's listing offers: never a file of a rules folder it passed over", async () => {
+        const { request } = fakeHost(repoAt({ ".rules/a.md": "listed", "rules/b.md": "passed over" }));
+
+        await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, [".rules/a.md", "rules/b.md"])).resolves.toStrictEqual([
+            { path: ".rules/a.md", status: "ok", text: "listed" },
+            { path: "rules/b.md", status: "missing" },
+        ]);
+    });
+
+    it("refuses a symlink to a file that is not an instruction file, and reads one to an instruction file as its target", async () => {
+        const host = fakeHost(repoAt({ ".env": "SECRET=1", "AGENTS.md": "# Rules", "CLAUDE.md": { link: "AGENTS.md" }, "GEMINI.md": { link: ".env" } }));
+
+        await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, ["GEMINI.md", "CLAUDE.md"])).resolves.toStrictEqual([
+            { path: "GEMINI.md", status: "refused" },
+            { path: "CLAUDE.md", status: "ok", text: "# Rules" },
+        ]);
+        expect(host.calls.map((call) => call.path)).not.toContain(`${REPO}/git/blobs/blob-.env`);
+    });
+
+    it("refuses a symlink climbing out of the repository", async () => {
+        const { request } = fakeHost(repoAt({ "rules/a.md": { link: "../../../etc/passwd.md" } }));
+
+        await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, ["rules/a.md"])).resolves.toStrictEqual([{ path: "rules/a.md", status: "refused" }]);
     });
 
     it("stops spending at the read budget, still taking a later file that fits", async () => {
-        const big = { content: "", encoding: "base64", size: REPO_RULE_FILE_MAX_BYTES, type: "file" };
         const paths = ["rules/a.md", "rules/b.md", "rules/c.md", "rules/d.md"];
-        const routes: Record<string, unknown> = Object.fromEntries(paths.map((path) => [`${BASE}/${path}`, big]));
+        const files: Record<string, FakeFile> = Object.fromEntries(paths.map((path) => [path, { size: REPO_RULE_FILE_MAX_BYTES }]));
 
-        routes[`${BASE}/rules/d.md`] = encoded("small");
+        files["rules/d.md"] = "small";
 
-        const reads = await readRepoRuleFiles(fakeHost(routes).request, ADDRESS, COMMIT, paths);
+        const reads = await readRepoRuleFiles(fakeHost(repoAt(files)).request, ADDRESS, COMMIT, paths);
         const fitting = Math.floor(REPO_RULE_FILES_READ_BYTES / REPO_RULE_FILE_MAX_BYTES);
 
         expect(reads.filter((read) => read.status === "ok")).toHaveLength(fitting + 1);
@@ -186,15 +365,14 @@ describe(readRepoRuleFiles, () => {
     });
 
     it("refuses a file longer than a rule file may be, spending none of the budget on it", async () => {
-        const sized = (size: number) => {
-            return { content: "", encoding: "base64", size, type: "file" };
-        };
-        const { request } = fakeHost({
-            [`${BASE}/rules/a.md`]: encoded("a".repeat(MAX_RULE_FILE_LENGTH + 1)),
-            [`${BASE}/rules/b.md`]: sized(REPO_RULE_FILE_MAX_BYTES),
-            [`${BASE}/rules/c.md`]: sized(REPO_RULE_FILE_MAX_BYTES),
-            [`${BASE}/rules/d.md`]: sized(REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES),
-        });
+        const { request } = fakeHost(
+            repoAt({
+                "rules/a.md": "a".repeat(MAX_RULE_FILE_LENGTH + 1),
+                "rules/b.md": { size: REPO_RULE_FILE_MAX_BYTES },
+                "rules/c.md": { size: REPO_RULE_FILE_MAX_BYTES },
+                "rules/d.md": { size: REPO_RULE_FILES_READ_BYTES - 2 * REPO_RULE_FILE_MAX_BYTES },
+            }),
+        );
 
         await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, ["rules/a.md", "rules/b.md", "rules/c.md", "rules/d.md"])).resolves.toStrictEqual([
             { path: "rules/a.md", status: "too_large" },
@@ -207,11 +385,13 @@ describe(readRepoRuleFiles, () => {
     it("counts a folder file's length without its byte-order mark and front matter, as the import does, and a root file's whole", async () => {
         const frontMatter = `---\ndescription: ${"d".repeat(200)}\n---\n`;
         const body = "b".repeat(MAX_RULE_FILE_LENGTH);
-        const { request } = fakeHost({
-            [`${BASE}/AGENTS.md`]: encoded(`${frontMatter}${body}`),
-            [`${BASE}/rules/long.md`]: encoded(`\u{FEFF}${frontMatter}${body}b`),
-            [`${BASE}/rules/near.md`]: encoded(`\u{FEFF}${frontMatter}${body}`),
-        });
+        const { request } = fakeHost(
+            repoAt({
+                "AGENTS.md": `${frontMatter}${body}`,
+                "rules/long.md": `\u{FEFF}${frontMatter}${body}b`,
+                "rules/near.md": `\u{FEFF}${frontMatter}${body}`,
+            }),
+        );
 
         await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, ["rules/near.md", "rules/long.md", "AGENTS.md"])).resolves.toStrictEqual([
             // The decoder drops the mark.
@@ -221,9 +401,10 @@ describe(readRepoRuleFiles, () => {
         ]);
     });
 
-    it("refuses a file the host will not send whole", async () => {
-        const { request } = fakeHost({ [`${BASE}/AGENTS.md`]: { content: "", encoding: "none", size: 2_000_000, type: "file" } });
+    it("refuses a file past the byte limit without reading it", async () => {
+        const host = fakeHost(repoAt({ "AGENTS.md": { size: REPO_RULE_FILE_MAX_BYTES + 1 } }));
 
-        await expect(readRepoRuleFiles(request, ADDRESS, COMMIT, ["AGENTS.md"])).resolves.toStrictEqual([{ path: "AGENTS.md", status: "too_large" }]);
+        await expect(readRepoRuleFiles(host.request, ADDRESS, COMMIT, ["AGENTS.md"])).resolves.toStrictEqual([{ path: "AGENTS.md", status: "too_large" }]);
+        expect(host.calls.map((call) => call.path)).not.toContain(`${REPO}/git/blobs/blob-AGENTS.md`);
     });
 });

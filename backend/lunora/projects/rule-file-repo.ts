@@ -51,7 +51,14 @@ export const listRepoRuleFiles = authAction
         v.union(
             v.object({
                 commit: v.optional(v.string()),
-                files: v.array(v.object({ path: v.string().max(MAX_LENGTH.long), size: v.number(), tooLarge: v.boolean() })),
+                files: v.array(
+                    v.object({
+                        path: v.string().max(MAX_LENGTH.long),
+                        refused: v.optional(v.literal("link")),
+                        size: v.number(),
+                        tooLarge: v.boolean(),
+                    }),
+                ),
                 status: v.literal("ok"),
                 truncated: v.boolean(),
             }),
@@ -79,8 +86,9 @@ export const listRepoRuleFiles = authAction
     });
 
 /**
- * The text of the picked files at the commit their listing read (`commit`), at most a project's worth; a file that is
- * gone or too large says so instead.
+ * The text of the picked files at the commit their listing read (`commit`), at most a project's worth, taken only from
+ * what that commit's listing holds (listed again, under this repository); a file that is gone, too large, not listed or
+ * a refused link says so instead.
  */
 export const readRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
@@ -90,7 +98,7 @@ export const readRepoRuleFiles = authAction
             v.object({
                 files: v.array(
                     v.union(
-                        v.object({ path: v.string(), status: v.union(v.literal("missing"), v.literal("too_large")) }),
+                        v.object({ path: v.string(), status: v.union(v.literal("missing"), v.literal("refused"), v.literal("too_large")) }),
                         v.object({ path: v.string(), status: v.literal("ok"), text: v.string() }),
                     ),
                 ),
