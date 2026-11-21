@@ -83,6 +83,7 @@ pub type Sink = Box<dyn Fn(Event) + Send + Sync>;
 type SharedSink = Arc<dyn Fn(Event) + Send + Sync>;
 
 /// One MCP tool the manifest offered: its server, its own name on that server, and whether it declared itself read-only.
+#[derive(Clone)]
 struct McpToolRef {
     server: String,
     tool: String,
@@ -432,11 +433,11 @@ impl DeviceState {
         self.generation.load(Ordering::SeqCst) == generation
     }
 
-    /// Whether the approval still covers the call right before it starts, under the save lock (an update in flight has
-    /// finished first; the lock is not held while the action runs). Settings untouched since planning: yes. Changed
-    /// meanwhile: the call is planned again from what is saved now and must come out as the very same action, so an
-    /// unrelated change (another folder shared) lets it run while a removed folder, a shell policy or a replaced
-    /// server does not. A call that skipped its prompt on an allow rule also needs that rule to still be there.
+    /// Whether the approval still covers the call right before it starts. Settings untouched since planning: yes.
+    /// Changed meanwhile: the call is planned again from what is saved now and must come out as the very same action,
+    /// so an unrelated change (another folder shared) lets it run while a removed folder, a shell policy or a replaced
+    /// server does not. A call that skipped its prompt on an allow rule also needs that rule to still be there. The
+    /// lock is not held while the action runs.
     fn approval_holds(
         &self,
         generation: u64,
@@ -445,22 +446,55 @@ impl DeviceState {
         rule_approved: bool,
         pairing: &Pairing,
     ) -> bool {
+        self.replanned_since(generation, pairing, |current, mcp_tools| {
+            plan(tool, input, current, mcp_tools).is_ok_and(|again| again == *action)
+                && (!rule_approved
+                    || decide(tool, tainted, action.read_only(), &current.allow_rules).0)
+        })
+        .is_some_and(|valid| self.unchanged_since(valid, pairing))
+    }
+
+    /// The generation an approval given under `generation` is still good for, or `None` when it no longer is: the
+    /// pairing is not the saved one, or `replans_same` says the settings saved since no longer plan the call to the
+    /// approved action. The settings and MCP tools are copied under the save lock, but `replans_same` runs WITHOUT it:
+    /// planning resolves paths, which a hung mount stalls, and a settings change must never wait on that. An answer
+    /// for a changed generation holds only while [`Self::unchanged_since`] it (checked by the caller under the lock).
+    fn replanned_since(
+        &self,
+        generation: u64,
+        pairing: &Pairing,
+        replans_same: impl FnOnce(&Settings, &HashMap<String, McpToolRef>) -> bool,
+    ) -> Option<u64> {
+        let (now, current, mcp_tools) = {
+            let _guard = self.save_lock.lock().unwrap();
+            let current = self.settings();
+
+            // The call was verified and approved under one pairing; another (a re-pair, even of the same device) is
+            // another secret, and nothing approved before it carries over.
+            if current.pairing.as_ref() != Some(pairing) {
+                return None;
+            }
+
+            let now = self.generation.load(Ordering::SeqCst);
+
+            if now == generation {
+                return Some(now);
+            }
+
+            (now, current, self.mcp_tools.lock().unwrap().clone())
+        };
+
+        replans_same(&current, &mcp_tools).then_some(now)
+    }
+
+    /// Whether nothing was saved since `generation` and `pairing` is still the saved one, under the save lock (an
+    /// update in flight has finished first). The pairing is compared on its own, so the check never relies on every
+    /// pairing change bumping the generation.
+    fn unchanged_since(&self, generation: u64, pairing: &Pairing) -> bool {
         let _guard = self.save_lock.lock().unwrap();
-        let current = self.settings();
 
-        // The call was verified and approved under one pairing; another (a re-pair, even of the same device) is
-        // another secret, and nothing approved before it carries over.
-        if current.pairing.as_ref() != Some(pairing) {
-            return false;
-        }
-
-        if self.generation.load(Ordering::SeqCst) == generation {
-            return true;
-        }
-
-        plan(tool, input, &current, &self.mcp_tools.lock().unwrap())
-            .is_ok_and(|again| again == *action)
-            && (!rule_approved || decide(tool, tainted, action.read_only(), &current.allow_rules).0)
+        self.settings().pairing.as_ref() == Some(pairing)
+            && self.generation.load(Ordering::SeqCst) == generation
     }
 
     pub fn settings_update(&self, update: SettingsUpdate) -> Result<SettingsView, String> {
@@ -639,26 +673,21 @@ impl DeviceState {
                 };
 
                 // The settings can change while the prompt is open (a folder unshared, shell network off, a
-                // server replaced, a rule removed). The rule is saved only if nothing changed since the call was
-                // planned, checked under the save lock, so a replaced server never inherits it; the dispatch below
-                // checks again, so the call never starts under a policy the owner has since changed.
+                // server replaced, a rule removed). The rule is saved only if the call still plans to the approved
+                // action (replanned outside the save lock) and nothing was saved since that answer, checked under the
+                // lock, so a replaced server never inherits it; the dispatch below checks again, so the call never
+                // starts under a policy the owner has since changed.
                 if answer == Answer::Always && offer_always {
+                    let valid = self.replanned_since(generation, &pairing, |current, mcp_tools| {
+                        plan(&call.tool, &call.input, current, mcp_tools)
+                            .is_ok_and(|again| again == action)
+                    });
                     let _ = self.change_settings(|next| {
                         if next.pairing.as_ref() != Some(&pairing) {
                             return Err("the pairing changed while waiting".to_owned());
                         }
 
-                        // Under the save lock, so nothing changes meanwhile: the tool must still plan to the very
-                        // action that was approved (same server config included), or the rule is not saved.
-                        if self.generation.load(Ordering::SeqCst) != generation
-                            && !plan(
-                                &call.tool,
-                                &call.input,
-                                next,
-                                &self.mcp_tools.lock().unwrap(),
-                            )
-                            .is_ok_and(|again| again == action)
-                        {
+                        if valid != Some(self.generation.load(Ordering::SeqCst)) {
                             return Err("the settings changed while waiting".to_owned());
                         }
 
@@ -1243,8 +1272,8 @@ fn read_outside_settings_lock(
     }
 
     let done = read(&roots, remaining);
-    // Only `settings_update` changes the shared folders, and it bumps the generation under the lock once saved. A
-    // pairing is saved without a bump, so it is compared on its own.
+    // Only `settings_update` changes the shared folders, and it bumps the generation under the lock once saved. The
+    // pairing is compared on its own, so this never relies on every pairing change bumping it.
     let _guard = state.save_lock.lock().unwrap();
 
     if state.settings().pairing.as_ref() != Some(pairing) {
@@ -1550,6 +1579,15 @@ mod tests {
     }
 
     fn paired_state(name: &str) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
+        paired_state_as(name, "dev1")
+    }
+
+    /// [`paired_state`] as `device_id`. The test keychain is one for every test in the process, so a test that
+    /// unpairs or replaces its pairing (which deletes the entry) needs an id no other test pairs as.
+    fn paired_state_as(
+        name: &str,
+        device_id: &str,
+    ) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
         crate::store::test_keychain::install();
         let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -1558,7 +1596,7 @@ mod tests {
             &Settings {
                 pairing: Some(Pairing {
                     account_label: "me".into(),
-                    device_id: "dev1".into(),
+                    device_id: device_id.into(),
                     secret: turn_secret(),
                 }),
                 ..Default::default()
@@ -1830,6 +1868,59 @@ mod tests {
         let _ = stdfs::remove_dir_all(&dir);
     }
 
+    /// Replanning after a settings change (which resolves paths a hung mount can stall) holds no lock a settings
+    /// change waits on, and a change saved while it ran voids its answer, so the call fails closed.
+    #[test]
+    fn a_stalled_replan_never_blocks_settings_and_loses_its_answer_to_a_change() {
+        let (state, dir, _) = paired_state("stalled-replan");
+        let state = Arc::new(state);
+        let pairing = state.settings().pairing.unwrap();
+        let planned = state.generation.load(Ordering::SeqCst);
+        let change = |state: &DeviceState| {
+            let update = json!({ "allowShellNetwork": true });
+            state
+                .settings_update(serde_json::from_value(update).unwrap())
+                .unwrap();
+        };
+        let holds = |state: &DeviceState, replans_same: &dyn Fn() -> bool| {
+            state
+                .replanned_since(planned, &pairing, |_, _| replans_same())
+                .is_some_and(|valid| state.unchanged_since(valid, &pairing))
+        };
+
+        change(&state);
+        assert!(holds(&state, &|| true));
+        assert!(!holds(&state, &|| false));
+
+        let (started_tx, started) = std::sync::mpsc::channel();
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let checker = {
+            let state = Arc::clone(&state);
+            let pairing = pairing.clone();
+
+            std::thread::spawn(move || {
+                state
+                    .replanned_since(planned, &pairing, |_, _| {
+                        started_tx.send(()).unwrap();
+                        released.recv().unwrap();
+
+                        true
+                    })
+                    .is_some_and(|valid| state.unchanged_since(valid, &pairing))
+            })
+        };
+
+        started.recv().unwrap();
+
+        // The replan is stalled: the update must finish anyway (a held lock would hang this test).
+        change(&state);
+        release.send(()).unwrap();
+
+        assert!(!checker.join().unwrap());
+
+        let _ = stdfs::remove_dir_all(&dir);
+    }
+
     /// The deadline is a point in time fixed before `approval_holds` waits for the save lock (`execute`), and the read
     /// checks it again after its own wait: a deadline that passed while the lock was held never starts the read.
     #[test]
@@ -1863,7 +1954,7 @@ mod tests {
     /// while it runs voids its result, though a pairing is saved without a generation bump.
     #[test]
     fn an_instruction_read_never_runs_for_a_pairing_that_is_gone() {
-        let (state, dir, _) = paired_state("read-after-unpair");
+        let (state, dir, _) = paired_state_as("read-after-unpair", "dev-read-after-unpair");
         let state = Arc::new(state);
         let pairing = state.settings().pairing.unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(60);
@@ -1890,7 +1981,7 @@ mod tests {
             state
                 .change_settings(|settings| {
                     settings.pairing = Some(Pairing {
-                        device_id: "dev2".into(),
+                        device_id: "dev-read-after-unpair-2".into(),
                         ..pairing.clone()
                     });
                     Ok(())

@@ -393,7 +393,7 @@ fn walk(
             Some(Component::ParentDir) => return Ok(None),
             Some(Component::Normal(name)) => {
                 // The folder's real path, in the same form as `home` and the shared roots (Windows: `\\?\`).
-                let Ok(folder) = fs::canonicalize(&resolved) else {
+                let Some(folder) = looked_up(fs::canonicalize(&resolved))? else {
                     return Ok(None);
                 };
                 let here = folder.join(name);
@@ -402,17 +402,9 @@ fn walk(
                     return Err(SHARED);
                 }
 
-                match fs::symlink_metadata(&here) {
-                    Err(error)
-                        if matches!(
-                            error.kind(),
-                            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
-                        ) =>
-                    {
-                        return Ok(None)
-                    }
-                    Err(_) => return Err(UNREADABLE),
-                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                match looked_up(fs::symlink_metadata(&here))? {
+                    None => return Ok(None),
+                    Some(metadata) if metadata.file_type().is_symlink() => {
                         links += 1;
 
                         if links > MAX_LINKS {
@@ -423,7 +415,7 @@ fn walk(
                             return Err(OUTSIDE_HOME);
                         }
 
-                        let Ok(target) = fs::read_link(&here) else {
+                        let Some(target) = looked_up(fs::read_link(&here))? else {
                             return Ok(None);
                         };
 
@@ -436,7 +428,7 @@ fn walk(
                                 .map(|part| PathBuf::from(part.as_os_str())),
                         );
                     }
-                    Ok(_) => resolved = here,
+                    Some(_) => resolved = here,
                 }
             }
             Some(Component::CurDir) | None => {}
@@ -449,6 +441,23 @@ fn walk(
     let resolved = fs::canonicalize(&resolved).unwrap_or(resolved);
 
     Ok(Some(resolved))
+}
+
+/// One lookup on the way: a name that is not there is `None`, any other failure (no permission, a read error) is
+/// refused, so the prompt never says "not there" for a file that may well be.
+fn looked_up<T>(result: io::Result<T>) -> Result<Option<T>, &'static str> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(error)
+            if matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+            ) =>
+        {
+            Ok(None)
+        }
+        Err(_) => Err(UNREADABLE),
+    }
 }
 
 /// A link outside the home folder that no one but the system can change: it and its folder belong to root, and the
@@ -1243,6 +1252,42 @@ mod tests {
         assert_eq!(got[0]["status"], json!("refused"));
         assert_eq!(got[0]["reason"], json!(UNREADABLE));
         assert_eq!(got[1]["status"], json!("missing"));
+    }
+
+    /// The folder lookup (`canonicalize`) and the link read (`read_link`) report a failure the same way: only a name
+    /// that is not there is missing. Neither fails on its own once the name's own lookup passed, short of a change in
+    /// between, so the mapping is checked directly; the link read is also checked on a real link that cannot be read.
+    #[test]
+    fn a_lookup_or_link_read_error_is_refused_not_missing() {
+        let failed = |kind| looked_up::<()>(Err(io::Error::from(kind)));
+
+        assert_eq!(failed(io::ErrorKind::NotFound), Ok(None));
+        assert_eq!(failed(io::ErrorKind::NotADirectory), Ok(None));
+        assert_eq!(failed(io::ErrorKind::PermissionDenied), Err(UNREADABLE));
+        assert_eq!(failed(io::ErrorKind::Other), Err(UNREADABLE));
+    }
+
+    /// `/proc/1/cwd` is a link root owns in a folder only root can change (so it may be followed), and only root may
+    /// read where it leads. Skipped where that is not so (root, or a container whose first process is ours).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_link_that_cannot_be_read_is_refused_not_missing() {
+        let unreadable = Path::new("/proc/1/cwd");
+
+        if !fs::read_link(unreadable)
+            .is_err_and(|error| error.kind() == io::ErrorKind::PermissionDenied)
+        {
+            return;
+        }
+
+        let (_dir, home) = home("unreadable-link");
+
+        std::os::unix::fs::symlink(unreadable, home.join(".claude")).unwrap();
+
+        let got = read(&home, &["claude"]);
+
+        assert_eq!(got[0]["status"], json!("refused"));
+        assert_eq!(got[0]["reason"], json!(UNREADABLE));
     }
 
     #[cfg(unix)]
