@@ -36,10 +36,10 @@ describe(buildPromptHistoryMarks, () => {
         expect(
             buildPromptHistoryMarks(
                 [
-                    { role: "user", text: "a colleague's prompt" },
+                    { role: "user", text: "a colleague's prompt", userId: "owner-1" },
                     marked,
-                    { role: "user", text: "a colleague's prompt" },
-                    { parts: [{ text: "mine", type: "text" }], role: "user" },
+                    { role: "user", text: "a colleague's prompt", userId: "owner-1" },
+                    { parts: [{ text: "mine", type: "text" }], role: "user", userId: "owner-1" },
                     { ...marked, role: "assistant" },
                 ],
                 "owner-1",
@@ -53,12 +53,33 @@ describe(buildPromptHistoryMarks, () => {
                 [
                     { role: "user", text: "theirs", userId: "collaborator-1" },
                     { role: "user", text: "mine", userId: "owner-1" },
-                    { role: "user", text: "just sent" },
+                    { role: "user", status: "pending", text: "just sent" },
+                    { role: "user", status: "success", text: "saved naming nobody" },
                     { role: "assistant", text: "a reply", userId: "collaborator-1" },
                 ],
                 "owner-1",
             ),
-        ).toStrictEqual(new Map([["theirs", "collaborator"]]));
+        ).toStrictEqual(
+            new Map([
+                ["saved naming nobody", "collaborator"],
+                ["theirs", "collaborator"],
+            ]),
+        );
+        // A saved mark still wins over `collaborator`, whichever comes first.
+        expect(
+            buildPromptHistoryMarks(
+                [
+                    { role: "user", text: "twice", userId: "collaborator-1" },
+                    {
+                        parts: [{ providerMetadata: { neore: { notTyped: { impersonated: true } } }, text: "twice", type: "text" }],
+                        role: "user",
+                        userId: "owner-1",
+                    },
+                    { role: "user", text: "twice", userId: "collaborator-1" },
+                ],
+                "owner-1",
+            ),
+        ).toStrictEqual(new Map([["twice", "impersonated"]]));
         // Before the session is known, any saved message counts as someone else's.
         expect(buildPromptHistoryMarks([{ role: "user", text: "mine", userId: "owner-1" }], undefined)).toStrictEqual(new Map([["mine", "collaborator"]]));
     });

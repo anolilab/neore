@@ -783,7 +783,7 @@ for a schema table that is neither policed nor listed:
   be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. A quoted reply is not marked: its `>` lines refuse the turn on the server. A bot's name and instructions, the owner's
   personalization and language and their variable values (user, organization and thread rows) an admin wrote while impersonating are
   marked on the row from the session, never from args, and the mark stays (`instructionsByImpersonator`,
-  `personalizationByImpersonator`, `variablesByImpersonator`); the run names that system-prompt text with a refused kind
+  `personalizationByImpersonator`, `variablesByImpersonator`, which names only the values the admin changed or added); the run names that system-prompt text with a refused kind
   (`chat/lib/system-context-kinds.ts`) and `getResolvedVariables` reports the values as `impersonated`, which marks the
   draft. An accepted ghost-text completion is `suggestion`; Restore to input and prompt history of another person's message
   in a shared chat are `collaborator`.

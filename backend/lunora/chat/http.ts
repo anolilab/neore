@@ -1619,6 +1619,7 @@ const runChatStartOnShard = async (
                     model: effectiveModel,
                     ...(body.parentId !== undefined && { parentId: body.parentId }),
                     threadId: validThreadId,
+                    userId,
                 });
             }
 
@@ -1632,6 +1633,8 @@ const runChatStartOnShard = async (
                 ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
                 promptMessageId: body.parentId,
                 threadId: validThreadId,
+                // The sender, not the thread's owner: a collaborator's prompt in a shared chat names them.
+                userId,
             });
         };
         const result = await savePrompt().catch(async (error: unknown) => {

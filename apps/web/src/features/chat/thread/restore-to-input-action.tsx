@@ -15,6 +15,7 @@ import type { FC } from "react";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { extractComposerRestorePayload, requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
+import { isViewersOwnMessage } from "@/features/chat/core/utils/message-author";
 import type { UIMessage } from "@/lib/agent";
 
 /** A guest's note the owner sent on: its mark rides on the text part, as the UI part's `providerMetadata`. */
@@ -27,12 +28,11 @@ const notTypedMarksOf = (message: UIMessage) =>
 
 /**
  * Back into the composer; text the viewer did not type keeps its mark there (an admin's as `impersonated`), so its next
- * send is marked. Another person's message in a shared chat (a saved row naming someone else, or anyone while the
- * viewer is not known yet) is `collaborator`: sent from here it would read as the viewer's own words.
+ * send is marked. Another person's message in a shared chat (any the viewer cannot be shown to have sent,
+ * `isViewersOwnMessage`) is `collaborator`: sent from here it would read as the viewer's own words.
  */
 const restore = (message: UIMessage, viewerId: string | undefined): void => {
-    const byOther = message.userId !== undefined && message.userId !== viewerId;
-    const draftFrom = draftFromOfMarks(notTypedMarksOf(message)) ?? (byOther ? "collaborator" : undefined);
+    const draftFrom = draftFromOfMarks(notTypedMarksOf(message)) ?? (isViewersOwnMessage(message, viewerId) ? undefined : "collaborator");
 
     requestComposerRestore({ ...extractComposerRestorePayload(message), ...(draftFrom !== undefined && { draftFrom }) });
 };

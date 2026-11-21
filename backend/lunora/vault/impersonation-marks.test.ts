@@ -210,6 +210,53 @@ describe("variable values", () => {
         await expect(sources()).resolves.toEqual({ site: "impersonated" });
     });
 
+    it("mark only the values an admin changed or added, and keep earlier marks", async () => {
+        const owned = [
+            { name: "site", value: "bank" },
+            { name: "who", value: "Ann" },
+            { name: "tone", value: "calm" },
+        ];
+
+        await owner().mutation(setUserVariableDefaults as never, { variables: owned } as never);
+
+        impersonation.by = "admin-1";
+        await owner().mutation(
+            setUserVariableDefaults as never,
+            { variables: [owned[0], { name: "who", value: "Bob" }, owned[2], { name: "extra", value: "x" }] } as never,
+        );
+        // Sent back unchanged, the owner's values stay theirs, and the admin's stay marked.
+        await owner().mutation(
+            setUserVariableDefaults as never,
+            { variables: [owned[0], { name: "who", value: "Bob" }, owned[2], { name: "extra", value: "x" }] } as never,
+        );
+        impersonation.by = undefined;
+        await owner().mutation(setUserVariableDefaults as never, { variables: owned } as never);
+
+        await expect(sources()).resolves.toEqual({ site: "user", tone: "user", who: "impersonated" });
+    });
+
+    it("mark only the one value an admin changed in a chat", async () => {
+        const threadId = (await owner().mutation(createThread as never, { model: DEFAULT_CHAT_MODEL } as never)) as string;
+
+        await owner().mutation(
+            setThreadVariables as never,
+            {
+                threadId,
+                variables: [
+                    { name: "site", value: "bank" },
+                    { name: "who", value: "Ann" },
+                ],
+            } as never,
+        );
+
+        impersonation.by = "admin-1";
+        await owner().mutation(updateThreadVariable as never, { name: "who", threadId, value: "Bob" } as never);
+        await owner().mutation(updateThreadVariable as never, { name: "site", threadId, value: "bank" } as never);
+        impersonation.by = undefined;
+
+        await expect(sources(threadId)).resolves.toEqual({ site: "thread", who: "impersonated" });
+    });
+
     it("come back as an admin's when one wrote a chat's values, one at a time or all at once", async () => {
         const threadId = (await owner().mutation(createThread as never, { model: DEFAULT_CHAT_MODEL } as never)) as string;
         const other = (await owner().mutation(createThread as never, { model: DEFAULT_CHAT_MODEL } as never)) as string;

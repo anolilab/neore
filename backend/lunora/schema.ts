@@ -3513,8 +3513,9 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
-        // Set once an admin acting as the user wrote a value, and kept: filled into a prompt, the draft is marked (`impersonated`).
-        variablesByImpersonator: v.optional(v.literal(true)),
+        // The names of the values an admin acting as the user changed or added, and kept (`prompts/functions.ts#markedNames`):
+        // filled into a prompt, such a value marks the draft (`impersonated`).
+        variablesByImpersonator: v.optional(v.array(v.string())),
     })
         .shardBy("userId")
         .index("by_thread", ["threadId"])
@@ -3975,8 +3976,9 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
-        // Set once an admin acting as a user wrote these values, and kept: filled into a prompt, the draft is marked (`impersonated`).
-        variablesByImpersonator: v.optional(v.literal(true)),
+        // The names of the values an admin acting as the user changed or added, and kept (`prompts/functions.ts#markedNames`):
+        // filled into a prompt, such a value marks the draft (`impersonated`).
+        variablesByImpersonator: v.optional(v.array(v.string())),
     })
         // `.global()`, not `.shardBy("userId")`: read across users.
         .global()

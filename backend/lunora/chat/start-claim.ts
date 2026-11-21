@@ -402,9 +402,11 @@ export const saveStartPrompt = internalMutation
         model: v.string().max(MAX_LENGTH.short),
         parentId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.string().max(MAX_LENGTH.id),
+        /** The signed-in sender, from the HTTP action's session: in a shared chat, not the thread's owner. */
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.object({ messageId: v.string() }))
-    .mutation(async ({ args: { claim, fileIds, messageContent, model, parentId, threadId }, ctx }) => {
+    .mutation(async ({ args: { claim, fileIds, messageContent, model, parentId, threadId, userId }, ctx }) => {
         await assertStartClaimHeld(ctx, claim);
 
         const messageId = await savePromptInTransaction(ctx, {
@@ -415,6 +417,7 @@ export const saveStartPrompt = internalMutation
             model,
             ...(parentId !== undefined && { parentId }),
             threadId,
+            userId,
         });
 
         await recordStartSaved(ctx, claim, { messageId, model, threadId });

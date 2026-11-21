@@ -130,7 +130,8 @@ vi.mock("../lib/http-scheduler", () => {
 
 /** The no-id path's save, writing a real row in the transaction it is handed. */
 const fakeAgent = {
-    saveMessage: async (ctx: any, args: { message: unknown; threadId: string }) => {
+    // The sender as `agent.saveMessage` passes it on (`addMessagesHandler`).
+    saveMessage: async (ctx: any, args: { message: unknown; threadId: string; userId?: string }) => {
         const messageId = await ctx.db.insert("messages", {
             message: args.message,
             order: 0,
@@ -139,6 +140,7 @@ const fakeAgent = {
             text: "",
             threadId: args.threadId,
             tool: false,
+            ...(args.userId !== undefined && { userId: args.userId }),
         });
 
         return { messageId };
@@ -151,7 +153,7 @@ vi.mock("./lib/get-agent", async (importOriginal) => {
         ...(await importOriginal<typeof import("./lib/get-agent")>()),
         default: async () => {
             return {
-                saveMessage: async (_ctx: unknown, args: { message: unknown; threadId: string }) => {
+                saveMessage: async (_ctx: unknown, args: { message: unknown; threadId: string; userId?: string }) => {
                     state.legacySaves += 1;
 
                     return await harness.run(async (ctx: any) => await fakeAgent.saveMessage(ctx, args));
@@ -351,6 +353,25 @@ describe("/chat/start with clientMessageId", () => {
         expect(state.charges).toBe(1);
     });
 
+    it("saves a collaborator's prompt in a shared chat under the collaborator, with a client id or without", async () => {
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: OWNER, ownerId: OWNER, permission: "write", threadId, userId: "collaborator" }),
+        );
+        state.userId = "collaborator";
+
+        const claimed = await send({ clientMessageId: "shared-chat", threadId });
+        const plain = await send({ prompt: "and again", threadId });
+        const senders = await run(async (ctx) => {
+            const rows = await ctx.db.query("messages").collect();
+
+            return [claimed, plain].map((response) => rows.find((row: { _id: string }) => row._id === response.json.messageId)?.userId);
+        });
+
+        expect([claimed.status, plain.status]).toStrictEqual([200, 200]);
+        expect(senders).toStrictEqual(["collaborator", "collaborator"]);
+    });
+
     it("keeps one user's id apart from another's", async () => {
         await send({ clientMessageId: "shared-id" });
         state.userId = "other-user";
@@ -371,7 +392,7 @@ describe("/chat/start with clientMessageId", () => {
 
         expect((await send({ clientMessageId: "dead", threadId })).json).not.toHaveProperty("duplicate");
         await expect(
-            run(async (ctx) => await ctx.runMutation(saveStartPrompt, { claim: dead.claim, messageContent: [], model: MODEL, threadId })),
+            run(async (ctx) => await ctx.runMutation(saveStartPrompt, { claim: dead.claim, messageContent: [], model: MODEL, threadId, userId: OWNER })),
         ).rejects.toThrow();
         expect(await countRows("messages")).toBe(1);
     });

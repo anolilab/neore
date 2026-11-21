@@ -74,11 +74,15 @@
   impersonating are marked on their row from the session, and the mark stays (no clear path yet, as
   `contentByImpersonator`): a bot's name or instructions (`instructionsByImpersonator`), personalization and language
   (`personalizationByImpersonator`, `auth/lib/personalization.ts`, also `initializeUserSettings`; a field sent unchanged
-  marks nothing), and variable values (`variablesByImpersonator`, user, organization and thread rows;
+  marks nothing), and variable values (`variablesByImpersonator`, user, organization and thread rows, per name: only a value changed or
+  added over the stored one, `prompts/functions.ts#markedNames`;
   `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
   system-prompt piece (`chat/lib/system-context-kinds.ts`, `systemContext`): a marked one is `…-impersonated`, and a
   thread's own language `thread-language`, which refuse; the fill adds `getAgent`'s pieces (skills, modes). An accepted
   ghost-text completion marks an unmarked draft `suggestion`; Restore to input and prompt history of a message another
-  person wrote (`userId` not the viewer's) mark it `collaborator`. The allowlist refuses a step holding a page's result or an approval's
+  person wrote mark it `collaborator`: a collaborator's turn saves its prompt under their own `userId`, and a saved
+  row naming nobody counts as someone else's (`features/chat/core/utils/message-author.ts`). No mark is backfilled: the
+  backend holds no data from before these marks, and past impersonation is recorded only by the client-reported
+  `user.impersonate.*` audit entries, which name no row. The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

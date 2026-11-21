@@ -28418,11 +28418,16 @@
           }
         },
         "variablesByImpersonator": {
-          "kind": "literal",
+          "kind": "array",
           "nullable": false,
           "optional": true,
           "unique": false,
-          "literal": "true"
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         }
       },
       "indexes": {
@@ -31970,11 +31975,16 @@
           }
         },
         "variablesByImpersonator": {
-          "kind": "literal",
+          "kind": "array",
           "nullable": false,
           "optional": true,
           "unique": false,
-          "literal": "true"
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
         }
       },
       "indexes": {

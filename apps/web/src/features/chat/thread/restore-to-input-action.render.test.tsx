@@ -40,9 +40,10 @@ vi.mock("@/features/auth/hooks/use-auth-session", () => {
 const { default: RestoreToInputAction } = await import("./restore-to-input-action");
 const { requestComposerRestore } = await import("@/features/chat/core/utils/composer-restore");
 
-const userMessage = (part: { providerMetadata?: { neore: Record<string, unknown> } }, userId?: string): UIMessage =>
+// A saved row names its sender; `null` leaves the name off, as on a row nobody can be shown to have sent.
+const userMessage = (part: { providerMetadata?: { neore: Record<string, unknown> } }, userId: string | null = "owner-1"): UIMessage =>
     ({
-        ...(userId !== undefined && { userId }),
+        ...(userId !== null && { userId }),
         id: "m1",
         key: "m1",
         order: 1,
@@ -100,10 +101,10 @@ describe("RestoreToInputAction", () => {
         expect(requestComposerRestore).toHaveBeenLastCalledWith({ files: [], text: "please call me back" });
     });
 
-    it("sends the owner's own message back unmarked", () => {
-        render(<RestoreToInputAction message={userMessage({})} />);
+    it("sends a saved message naming no sender back marked: the viewer cannot be shown to have sent it", () => {
+        render(<RestoreToInputAction message={userMessage({}, null)} />);
         fireEvent.click(screen.getByRole("button", { name: "Restore to input" }));
 
-        expect(requestComposerRestore).toHaveBeenLastCalledWith({ files: [], text: "please call me back" });
+        expect(requestComposerRestore).toHaveBeenLastCalledWith({ draftFrom: "collaborator", files: [], text: "please call me back" });
     });
 });
