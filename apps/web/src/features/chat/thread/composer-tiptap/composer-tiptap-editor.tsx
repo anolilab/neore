@@ -689,7 +689,7 @@ const ComposerTiptapEditor = ({
         if (
             lastPlacedPromptRef.current?.dismissed &&
             lastPlacedPromptRef.current.scope === nextPromptScope &&
-            lastPlacedPromptRef.current.text === promptAnnouncementText
+            lastPlacedPromptRef.current.text === nextPromptSuggestion
         ) {
             return undefined;
         }
@@ -698,9 +698,9 @@ const ComposerTiptapEditor = ({
 
         // The same text for another chat is already what the live region holds, so it would not be said again: it is cleared, and said
         // in a later task.
-        const sameTextForAnotherChat = lastPlacedPromptRef.current?.text === promptAnnouncementText && lastPlacedPromptRef.current.scope !== nextPromptScope;
+        const sameTextForAnotherChat = lastPlacedPromptRef.current?.text === nextPromptSuggestion && lastPlacedPromptRef.current.scope !== nextPromptScope;
 
-        lastPlacedPromptRef.current = { dismissed: false, scope: nextPromptScope, text: promptAnnouncementText };
+        lastPlacedPromptRef.current = { dismissed: false, scope: nextPromptScope, text: nextPromptSuggestion };
 
         let restoreAnnouncement: ReturnType<typeof setTimeout> | undefined;
 

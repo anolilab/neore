@@ -186,6 +186,12 @@ export const cacheFollowupSuggestions = internalMutation
     .output(v.null())
     .mutation(async ({ args: { lastMessageId, order, replyAt, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        // A deleted thread keeps no suggestions, and a hard delete marks `deletingAt` first, so that window keeps none either.
+        if (!thread || thread.deletedAt || thread.deletingAt !== undefined) {
+            return null;
+        }
 
         const existing = await context.db
             .query("followupSuggestions")

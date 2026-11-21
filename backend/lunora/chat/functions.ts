@@ -4805,12 +4805,16 @@ export const generateFollowupSuggestionsForThread = internalAction
                 // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
                 if (!(await isStillNewest())) {
                     chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+                    await giveBackPaidClaim();
 
                     return;
                 }
 
-                // A reply the model gave no suggestion for is not paid for: there is nothing to show, so the claim is given back.
-                if (output.suggestions.length === 0) {
+                // A blank suggestion shows nothing, so it is neither counted, charged nor cached.
+                const suggestions = output.suggestions.map((suggestion) => suggestion.trim()).filter((suggestion) => suggestion.length > 0);
+
+                // A reply the model gave no usable suggestion for is not paid for: there is nothing to show, so the claim is given back.
+                if (suggestions.length === 0) {
                     await giveBackPaidClaim();
 
                     return;
@@ -4837,7 +4841,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                     lastMessageId,
                     order: newest.order,
                     replyAt: newest.createdAt ?? newest._creationTime,
-                    suggestions: output.suggestions,
+                    suggestions,
                     threadId,
                 });
                 paid.cached = true;
