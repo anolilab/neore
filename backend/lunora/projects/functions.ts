@@ -1,6 +1,6 @@
 import { LunoraError, v } from "lunorash/server";
 
-import { listPinnedProjectsHandler, listProjectsHandler } from "../agent/projects";
+import { listPinnedProjectsHandler, listProjectsHandler, writeProjectSubAgentRoles } from "../agent/projects";
 import { vProjectDocFields } from "../agent/validators";
 import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
@@ -17,6 +17,9 @@ import { enqueueJob } from "../lib/job-queue";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
+import { roleConfigRefusal } from "../sub-agents/role-settings";
+import { withRole } from "../sub-agents/roles";
+import { vSubAgentRoleConfig, vSubAgentRoleName } from "../sub-agents/validators";
 import { eraseProjectRepositories, eraseProjectRuleFiles } from "./gdpr";
 import {
     DELETION_MARKER_TTL_MS,
@@ -609,6 +612,37 @@ export const createProject = authMutation
         });
 
         return project._id;
+    });
+
+/**
+ * Sets or clears one sub-agent role override on a project (`sub-agents/roles.ts`); `null` makes the role inherit the
+ * user's again. Who may: the rule of `updateProject` and the rule files ({@link projectWithEditableSettings}), its owner
+ * only, never a member, not even on a project nobody owns. The overrides apply to every member's runs in it.
+ */
+export const setProjectSubAgentRole = authMutation
+    .use(rateLimit("projects/update"))
+    .input({ config: v.union(vSubAgentRoleConfig, v.null()), projectId: v.id("projects"), role: vSubAgentRoleName })
+    .output(v.null())
+    .mutation(async ({ args: { config, projectId, role }, ctx: context }) => {
+        const { userId } = context.user;
+        // On the primary: the save writes the whole map back, so it must hold a save from a moment ago, and the owner check
+        // rests on the authoritative row.
+        const project = await projectWithEditableSettings(context, projectId, userId, { primary: true });
+
+        if (!project) {
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
+
+        const refusal = await roleConfigRefusal(context, userId, config);
+
+        if (refusal) {
+            throw new LunoraError("BAD_REQUEST", refusal);
+        }
+
+        await writeProjectSubAgentRoles(context.db, project, withRole(project.subAgentRoles ?? undefined, role, config), context.now);
+        context.log.event("projects.set_sub_agent_role", { cleared: config === null, projectId, role });
+
+        return null;
     });
 
 export const updateProject = authMutation

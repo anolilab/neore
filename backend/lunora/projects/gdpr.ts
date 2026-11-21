@@ -15,6 +15,7 @@ import { enqueueJob } from "../lib/job-queue";
 import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
+import { vSubAgentRoles } from "../sub-agents/validators";
 import { PROJECTS_PER_DETAILS_READ, PROJECTS_PER_RULE_FILES_READ } from "./export-pages";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL, isRepoRow } from "./repositories";
 import { findProjectRowsMeasured, projectRowsReadBytes } from "./project-row";
@@ -289,6 +290,7 @@ export const collectOwnedProjectsForExport = internalQuery
                     path: v.optional(v.string()),
                     projectId: v.string(),
                     sharingEnabled: v.boolean(),
+                    subAgentRoles: v.optional(vSubAgentRoles),
                     title: v.string(),
                 }),
             ),
@@ -311,6 +313,7 @@ export const collectOwnedProjectsForExport = internalQuery
                 ...(row.path !== undefined && { path: row.path }),
                 projectId: row._id,
                 sharingEnabled: row.isPublic === true,
+                ...(row.subAgentRoles !== undefined && { subAgentRoles: row.subAgentRoles }),
                 title: row.title,
             };
         });

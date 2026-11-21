@@ -121,6 +121,7 @@ export {
     TEXT_CATALOG,
     VIDEO_CATALOG,
 } from "./registry";
+export { isSelectableTextModel, type ModelCandidate } from "./selectable-text-model";
 export { isVisiblePart } from "./stream-parts";
 export type { AgentConfig, ContextOptions, ModelDefinition, ProviderKind, StorageOptions, UsageHandler } from "./types";
 export { LEGACY_WORKFLOW_MODELS, MEDIA_DEFAULT_MODELS, resolveWorkflowModel, WORKFLOW_KIND_ACCEPTS, type WorkflowModelKind } from "./workflow-defaults";
