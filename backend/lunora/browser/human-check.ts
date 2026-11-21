@@ -143,7 +143,7 @@ export const humanCheckMessages = {
     alreadyAsked: (site: string): string =>
         `${siteName(site)} still shows a check that needs a person. The person was already asked to clear it during this task, so they are not asked again. Do not try to solve or get around it: move on, or reach what you need another way.`,
     asked: (site: string): string =>
-        `${siteName(site)} shows a check that needs a person (a human verification or a sign-in you cannot pass), and it did not clear on its own. The person was asked in the chat to clear it in the live view. Do not try to solve or get around it, and do not use the browser on this site until they hand it back: tell them what you are waiting for, or carry on with other work.`,
+        `${siteName(site)} shows a check that needs a person (a human verification or a sign-in you cannot pass), and it did not clear on its own. The person was asked in the chat to clear it in the live view. Do not try to solve or get around it, and do not use the browser on this site until they hand it back: tell them what you are waiting for, or carry on with other work. The browser closes about a minute after its last action: if they ask you to try again later, the next action opens a new browser, so navigate to the page again.`,
     clearedAfterHandBack: (site: string): string => `The check on ${siteName(site)} no longer shows: the page looks clear. Look at it before you act.`,
     clearedOnItsOwn: (site: string): string =>
         `${siteName(site)} showed a check page, which cleared on its own after a short wait. This is the page now: look at it before you act.`,
@@ -318,6 +318,26 @@ const withNote = <R extends LadderResult>(result: R, note: string): R => {
 };
 
 /**
+ * What the ladder returns in place of a hand back's own result keeps what that result told the agent: its note (the
+ * person had control; an action that was not run) comes first, and an action it did not run stays `success: false`,
+ * whatever a later look shows.
+ */
+const keepHandBack = <R extends LadderResult>(handBack: R, out: R): R => {
+    if (handBack.handedBack !== true) {
+        return out;
+    }
+
+    // A result built on the hand back's own (a Stop during the wait, a reported page) already carries its note.
+    const carriesNote = handBack.error === undefined || out.error === handBack.error || out.error?.startsWith(`${handBack.error} `) === true;
+
+    return {
+        ...out,
+        ...(!carriesNote && { error: out.error === undefined ? handBack.error : `${handBack.error} ${out.error}` }),
+        ...(handBack.success === false && { success: false }),
+    };
+};
+
+/**
  * One step of the ladder over an action's `result`. A reported page is asked about at once, with no wait. A page with
  * no check passes through, with a note when it is the first look after the person cleared one.
  */
@@ -358,6 +378,17 @@ export const humanCheckLadder = async <R extends LadderResult>(
         return { ...withNote(result, humanCheckMessages.alreadyAsked(site)), humanCheck: { site, status: "already_asked" }, success: false };
     }
 
+    return keepHandBack(result, await afterWait(result, dependencies, marker, site, reported));
+};
+
+/** The wait, the fresh look and the ask for a page that shows a check (or that the agent reported). */
+const afterWait = async <R extends LadderResult>(
+    result: R,
+    dependencies: LadderDependencies<R>,
+    marker: HumanCheckMarker | undefined,
+    site: string,
+    reported: boolean,
+): Promise<R> => {
     let page = result;
 
     if (marker !== undefined) {
@@ -464,7 +495,7 @@ const afterHandBack = async <R extends LadderResult>(result: R, dependencies: La
             const own = await humanCheckLadder({ ...page, handedBack: undefined } as R, dependencies, { readContent: true });
 
             // The hand-back note comes first, also when the ladder added none (Stop during its wait).
-            return result.error === undefined ? own : { ...own, error: own.error === undefined ? result.error : `${result.error} ${own.error}` };
+            return keepHandBack(result, own);
         }
 
         return stillShowsAfterHandBack(result, site);

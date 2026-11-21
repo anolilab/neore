@@ -128,7 +128,11 @@ describe("the Needs you card", () => {
     });
 
     it.each([
-        [null, "The browser has closed."],
+        // A late reader (the browser closed a minute after the ask): told plainly, and that a retry opens a new browser.
+        [
+            null,
+            "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser",
+        ],
         [running({ control: { byYou: true, until: Date.now() + 60_000 } }), "You have control."],
         [running({ control: { byYou: false, until: Date.now() + 60_000 } }), "Someone else has control of this browser."],
         [running({ canControl: false }), "Only someone who can write in this chat"],

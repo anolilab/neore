@@ -61,7 +61,10 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     if (status.isError) {
         state = t`Whether the browser is still open could not be checked.`;
     } else if (browser === null) {
-        state = t`The browser has closed. Ask the agent to open the page again if it is still needed.`;
+        // The provider closes a browser about a minute after its last action, and an open ask does not keep it (that would
+        // be paid browser time while nobody looks): a late reader is told so, and a retry in a new reply (a steer keeps the
+        // reply's one ask per site) opens a new browser.
+        state = t`The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows.`;
     } else if (missed) {
         // No live view card answered: the browser went idle (its card is gone) though the status still lists it.
         state = t`The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed.`;

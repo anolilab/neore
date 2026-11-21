@@ -93,11 +93,13 @@ export const YouHaveControl: Story = {
     },
 };
 
-/** The browser closed since the ask: no button. */
+/** The browser closed since the ask (a minute after its last action): no button, and a retry opens a new one. */
 export const Closed: Story = {
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), lunora(api.browser.live_view.getThreadBrowser, null)) } } },
     play: async ({ canvas }) => {
-        await expect(await canvas.findByRole("status")).toHaveTextContent("The browser has closed.");
+        await expect(await canvas.findByRole("status")).toHaveTextContent(
+            "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again",
+        );
     },
 };
 

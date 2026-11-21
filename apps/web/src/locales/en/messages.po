@@ -21765,7 +21765,7 @@ msgstr "Needs my review"
 msgid "Needs review"
 msgstr "Needs review"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:89
+#: src/features/chat/browser-live-view/browser-human-check.tsx:92
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22689,7 +22689,7 @@ msgstr "No paired computer yet."
 msgid "No pending invitations"
 msgstr "No pending invitations"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:128
+#: src/features/chat/browser-live-view/browser-human-check.tsx:131
 msgid "No picture of the page could be taken. Take control to see it in the live view."
 msgstr "No picture of the page could be taken. Take control to see it in the live view."
 
@@ -23670,7 +23670,7 @@ msgstr "Only run when every filter matches the JSON body. Use dotted paths such 
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Only same-type models can be compared. Clear selection to switch types."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:73
+#: src/features/chat/browser-live-view/browser-human-check.tsx:76
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Only someone who can write in this chat can take control of the browser."
 
@@ -24055,7 +24055,7 @@ msgstr "Open the sub-agent's thread"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "Open the thread list search and focus it ({0})"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:76
+#: src/features/chat/browser-live-view/browser-human-check.tsx:79
 msgid "Open this model's chat on its own to take control of its browser."
 msgstr "Open this model's chat on its own to take control of its browser."
 
@@ -31289,7 +31289,7 @@ msgstr "Some images from this run could not be saved."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Some steps had no pricing data; the total is a minimum."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:71
+#: src/features/chat/browser-live-view/browser-human-check.tsx:74
 #: src/features/chat/browser-live-view/browser-live-view.tsx:970
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1029
 msgid "Someone else has control of this browser."
@@ -32980,12 +32980,12 @@ msgstr "Taiwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Take an input image, remove the background, then apply style transfer"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:122
+#: src/features/chat/browser-live-view/browser-human-check.tsx:125
 #: src/features/chat/browser-live-view/browser-live-view.tsx:994
 msgid "Take control"
 msgstr "Take control"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:95
+#: src/features/chat/browser-live-view/browser-human-check.tsx:98
 msgid "Take control, clear it, then hand the browser back."
 msgstr "Take control, clear it, then hand the browser back."
 
@@ -33776,11 +33776,11 @@ msgstr "The agent on your computer is reading the change…"
 msgid "The agent's browser closed while the page loaded."
 msgstr "The agent's browser closed while the page loaded."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:93
+#: src/features/chat/browser-live-view/browser-human-check.tsx:96
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:92
+#: src/features/chat/browser-live-view/browser-human-check.tsx:95
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 
@@ -33854,7 +33854,7 @@ msgstr "The bot sets the model for this chat."
 msgid "The bot's tools were saved"
 msgstr "The bot's tools were saved"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:67
+#: src/features/chat/browser-live-view/browser-human-check.tsx:70
 msgid "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
 msgstr "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
 
@@ -33866,9 +33866,9 @@ msgstr "The browser cannot read this video to capture a frame"
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:64
-msgid "The browser has closed. Ask the agent to open the page again if it is still needed."
-msgstr "The browser has closed. Ask the agent to open the page again if it is still needed."
+#: src/features/chat/browser-live-view/browser-human-check.tsx:67
+msgid "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows."
+msgstr "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows."
 
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
@@ -36226,7 +36226,7 @@ msgstr "Try adjusting your search terms."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-human-check.tsx:112
+#: src/features/chat/browser-live-view/browser-human-check.tsx:115
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1041
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1158
 #: src/features/chat/guest-links/guest-page.tsx:269
@@ -38588,11 +38588,11 @@ msgstr "What should the guide pay attention to?"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "What the agent asked your devices to do in the last 30 days."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:132
+#: src/features/chat/browser-live-view/browser-human-check.tsx:135
 msgid "What the agent's browser sees"
 msgstr "What the agent's browser sees"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:132
+#: src/features/chat/browser-live-view/browser-human-check.tsx:135
 msgid "What the agent's browser sees on {site}"
 msgstr "What the agent's browser sees on {site}"
 
@@ -39216,7 +39216,7 @@ msgstr "You get a notification when a run finishes, needs your review or fails. 
 msgid "You handed the browser back to the agent."
 msgstr "You handed the browser back to the agent."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:69
+#: src/features/chat/browser-live-view/browser-human-check.tsx:72
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "You have control. Clear the check in the live view, then hand the browser back."
 

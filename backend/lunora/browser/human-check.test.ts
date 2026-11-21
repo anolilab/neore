@@ -26,6 +26,8 @@ import {
 /** What the agent hears at each step, as far as these tests read it. */
 const CLEARED_NOTE = /cleared on its own.*look at it before you act/su;
 const ASKED_NOTE = /asked in the chat.*Do not try to solve or get around it/su;
+/** The ask keeps no browser alive: the agent hears that a later retry starts on a new one. */
+const ASKED_BROWSER_CLOSES_NOTE = /closes about a minute after its last action.*opens a new browser, so navigate to the page again/su;
 const ALREADY_ASKED_NOTE = /already asked.*move on, or reach what you need another way/su;
 const CLEAR_AFTER_HAND_BACK_NOTE = /handed it back;.*no longer shows: the page looks clear\. Look at it before you act\./su;
 /** The hand-back note, then the ask about the other site the read landed on. */
@@ -36,6 +38,10 @@ const UNKNOWN_AFTER_HAND_BACK_NOTE = /cleared is unknown.*Look at the page befor
 const UNKNOWN_LONG_PAGE_NOTE = /cleared is unknown: the page now has too much text to tell/u;
 /** Why the read of a new page failed, at the end of the note. */
 const READ_FAILED_REASON = /Navigation timeout$/u;
+/** Why the ladder's own look failed, at the end of the note. */
+const LOOK_FAILED_REASON = /Renderer down$/u;
+const HAND_BACK_THEN_CLEARED_NOTE = /^The person had control; .*cleared on its own/su;
+const SKIPPED_ACTION_NOTE = /Your click action was not run/gu;
 const NAVIGATION_UNCHECKED_NOTE = /the new page could not be read to see whether it shows a check.*Look at it before you act/su;
 
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
@@ -570,6 +576,78 @@ describe("humanCheckLadder", () => {
         const handed = { ...CLEAR_PAGE, handedBack: true };
 
         await expect(humanCheckLadder(handed, dependencies)).resolves.toBe(handed);
+    });
+
+    it("an ask tells the agent the browser it asked about closes on its own, so a retry navigates again", async () => {
+        const { dependencies } = dependenciesFor([CHECK_PAGE]);
+        const result = await humanCheckLadder(CHECK_PAGE, dependencies);
+
+        expect(result.humanCheck?.status).toBe("asked");
+        expect(result.error).toMatch(ASKED_BROWSER_CLOSES_NOTE);
+    });
+
+    describe("a hand back whose action was not run, showing a check nobody was asked about", () => {
+        /** What `browser-node.ts` returns for a click skipped after a hand back: a screenshot in its place. */
+        const SKIPPED_NOTE = "The person had control of the browser and handed it back; the page may have changed. Your click action was not run.";
+        const skipped: LadderResult = { ...CHECK_PAGE, error: SKIPPED_NOTE, handedBack: true, screenshot: "jpeg", success: false };
+
+        it.each([
+            ["the check cleared during the wait", [CLEAR_PAGE], CLEARED_NOTE, undefined],
+            ["the check still shows, so the person is asked", [{ ...CHECK_PAGE, screenshot: "jpeg" }], ASKED_NOTE, "asked"],
+            ["the look failed", [{ error: "Renderer down", success: false }], LOOK_FAILED_REASON, undefined],
+            ["the look turned into a page too long to read", [LONG_EXTRACT], UNKNOWN_LONG_PAGE_NOTE, undefined],
+        ])("keeps the hand-back note first and success: false when %s", async (_when, looks, note, status) => {
+            const { dependencies } = dependenciesFor(looks);
+            const page = looks[0] === LONG_EXTRACT ? { ...skipped, content: "Verifying you are human.", title: "shop.example.com" } : skipped;
+            const result = await humanCheckLadder(page, dependencies, { readContent: looks[0] === LONG_EXTRACT });
+
+            expect(result.success).toBe(false);
+            expect(result.error?.startsWith(SKIPPED_NOTE)).toBe(true);
+            expect(result.error).toMatch(note);
+            expect(result.humanCheck?.status).toBe(status);
+        });
+
+        it("keeps success: false when the hand back's read lands on another site's check that clears during its wait", async () => {
+            const otherCheck: LadderResult = {
+                content: "Verifying you are human.",
+                success: true,
+                title: "other.example.org",
+                url: "https://other.example.org/",
+            };
+            const otherClear: LadderResult = { content: "Welcome.", success: true, title: "Other", url: "https://other.example.org/" };
+            const { dependencies } = dependenciesFor([otherCheck, otherClear], new Set(["shop.example.com"]));
+            const result = await humanCheckLadder({ ...CLEAR_PAGE, error: SKIPPED_NOTE, handedBack: true, screenshot: "jpeg", success: false }, dependencies);
+
+            expect(result.success).toBe(false);
+            expect(result.error?.startsWith(SKIPPED_NOTE)).toBe(true);
+            expect(result.error).toMatch(CLEARED_NOTE);
+        });
+
+        it("keeps the note once when Stop ends the wait", async () => {
+            const { dependencies } = dependenciesFor([]);
+
+            dependencies.sleep.mockResolvedValueOnce(false);
+
+            await expect(humanCheckLadder(skipped, dependencies)).resolves.toStrictEqual(skipped);
+        });
+
+        it("keeps the note once on a page the agent reported after the hand back", async () => {
+            const { dependencies } = dependenciesFor([]);
+            const result = await humanCheckLadder({ ...CLEAR_PAGE, error: SKIPPED_NOTE, handedBack: true, screenshot: "jpeg", success: true }, dependencies, {
+                reported: true,
+            });
+
+            expect(result.error?.match(SKIPPED_ACTION_NOTE)).toHaveLength(1);
+            expect(result.humanCheck?.status).toBe("asked");
+        });
+
+        it("an action that ran is not marked failed when the check cleared during the wait", async () => {
+            const { dependencies } = dependenciesFor([CLEAR_PAGE]);
+            const result = await humanCheckLadder({ ...CHECK_PAGE, error: "The person had control;", handedBack: true }, dependencies);
+
+            expect(result).toMatchObject({ success: true });
+            expect(result.error).toMatch(HAND_BACK_THEN_CLEARED_NOTE);
+        });
     });
 });
 
