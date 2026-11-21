@@ -83,6 +83,9 @@ const isFetchable = (url: string): boolean => {
     }
 };
 
+/** The schemes an image download link may point at besides a `data:` raster image. */
+const LINKABLE_PROTOCOLS = new Set(["blob:", "http:", "https:"]);
+
 /** A `data:` URL of a raster image: no SVG, which can carry script when opened on its own. */
 const DATA_RASTER_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/iu;
 
@@ -92,11 +95,21 @@ const DATA_RASTER_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp)[;,]/iu;
  * a value a message could carry (`javascript:`, an HTML or SVG `data:` URL) must not be rendered at all.
  */
 export const safeImageDownloadUrl = (url: string): string | undefined => {
-    if (url.startsWith("data:")) {
-        return DATA_RASTER_IMAGE.test(url) ? url : undefined;
+    const trimmed = url.trim();
+    let protocol: string;
+
+    // The scheme as the browser reads it: `DATA:` or a leading space is still `data:` to a link.
+    try {
+        protocol = new URL(trimmed, document.baseURI).protocol;
+    } catch {
+        return undefined;
     }
 
-    return isFetchable(url) ? url : undefined;
+    if (protocol === "data:") {
+        return DATA_RASTER_IMAGE.test(trimmed) ? trimmed : undefined;
+    }
+
+    return LINKABLE_PROTOCOLS.has(protocol) ? trimmed : undefined;
 };
 
 /**

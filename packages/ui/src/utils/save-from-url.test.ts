@@ -59,12 +59,17 @@ describe(safeImageDownloadUrl, () => {
         },
     );
 
-    it.each([["javascript", ":alert(document.domain)"].join(""), "data:text/html,<b>x</b>", "data:image/svg+xml,<svg onload=alert(1)>", "file:///etc/passwd"])(
-        "links nothing for %s",
-        (url) => {
-            expect(safeImageDownloadUrl(url)).toBeUndefined();
-        },
-    );
+    it.each([
+        ["javascript", ":alert(document.domain)"].join(""),
+        "data:text/html,<b>x</b>",
+        "data:image/svg+xml,<svg onload=alert(1)>",
+        "file:///etc/passwd",
+        "DATA:text/html,<b>x</b>",
+        " data:text/html,<b>x</b>",
+        "Data:image/svg+xml,<svg>",
+    ])("links nothing for %s", (url) => {
+        expect(safeImageDownloadUrl(url)).toBeUndefined();
+    });
 });
 
 describe(saveFromUrl, () => {
