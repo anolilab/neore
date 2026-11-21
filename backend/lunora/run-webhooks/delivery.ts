@@ -1,18 +1,23 @@
 /**
  * One signed POST of a run webhook event to the user's URL.
  *
+ * The POST goes through `postCheckedHttps` (`lib/egress.ts`): the host name is
+ * resolved, every answer must be a public address, and the connection goes to
+ * that address with the certificate checked against the host name. Redirects are
+ * not followed, so a 3xx is a failed delivery, reported as one.
+ *
  * What the answer tells the user is limited on purpose: the status code and the
- * time taken. The response body is cancelled unread, so a receiver (or a host it
- * redirects to) cannot push text into the app's responses. Redirects are not
- * followed (`redirect: "manual"`), so a 3xx is a failed delivery, reported as one.
+ * time taken. The helper reads only the status line, so a receiver cannot push
+ * text into the app's responses.
  */
-import { fetchWithTimeout } from "../chat/tools/utilities";
+import { type EgressErrorCode, EgressError, type EgressRequest, type EgressResponse, postCheckedHttps } from "../lib/egress";
 import { type RunWebhookEvent, runWebhookUrlProblem, signRunWebhook } from "./payload";
+import { runWebhookConnect } from "./socket";
 
 /** How long a receiver may take to answer. Part 2's retries reuse it per attempt. */
 export const RUN_WEBHOOK_TIMEOUT_MS = 10_000;
 
-export type RunWebhookSend = (url: string, init: RequestInit) => Promise<Response>;
+export type RunWebhookSend = (request: EgressRequest) => Promise<EgressResponse>;
 
 export interface RunWebhookAttempt {
     durationMs: number;
@@ -21,7 +26,11 @@ export interface RunWebhookAttempt {
     status?: number;
 }
 
-const defaultSend: RunWebhookSend = async (url, init) => await fetchWithTimeout(url, init, RUN_WEBHOOK_TIMEOUT_MS);
+const defaultSend: RunWebhookSend = async (request) =>
+    await postCheckedHttps(request, {
+        connect: runWebhookConnect,
+        fetch: async (input, init) => await fetch(input, init),
+    });
 
 export const deliverRunWebhook = async ({
     event,
@@ -48,7 +57,7 @@ export const deliverRunWebhook = async ({
     const started = Date.now();
 
     try {
-        const response = await send(url, {
+        const response = await send({
             body,
             headers: {
                 "content-type": "application/json",
@@ -57,12 +66,9 @@ export const deliverRunWebhook = async ({
                 "x-neore-event-id": event.id,
                 ...signature,
             },
-            method: "POST",
-            redirect: "manual",
+            timeoutMs: RUN_WEBHOOK_TIMEOUT_MS,
+            url,
         });
-
-        // The body is not read; cancelling it frees the socket the answer holds.
-        await response.body?.cancel().catch(() => undefined);
 
         return {
             durationMs: Date.now() - started,
@@ -74,12 +80,24 @@ export const deliverRunWebhook = async ({
     }
 };
 
-const TIMEOUT_MESSAGE = /timeout/iu;
+/**
+ * Each refusal in words. None of them carries the URL, the host name or the
+ * secret: the messages are fixed, and a transport error's own text is never used.
+ */
+const FAILURE_WORDS: Record<EgressErrorCode, string> = {
+    bad_header: "The request could not be built.",
+    bad_response: "The receiver's answer could not be read.",
+    bad_url: "The URL must use https:// on port 443 and carry no login details.",
+    blocked_address: "The host resolves to a private, local or reserved address, so it was refused.",
+    dns_failed: "The host name could not be looked up.",
+    timeout: `The receiver did not answer within ${RUN_WEBHOOK_TIMEOUT_MS / 1000} seconds.`,
+    unsupported_target: "This host is served by Cloudflare, which Neore cannot connect to yet.",
+};
 
 /** A transport failure in words. The message itself is not shown: it can carry the URL and its query. */
 const describeFailure = (error: unknown): string => {
-    if (error instanceof Error && TIMEOUT_MESSAGE.test(error.message)) {
-        return `The receiver did not answer within ${RUN_WEBHOOK_TIMEOUT_MS / 1000} seconds.`;
+    if (error instanceof EgressError) {
+        return FAILURE_WORDS[error.code];
     }
 
     return `The request failed (${error instanceof Error ? error.name : "unknown error"}).`;

@@ -45,9 +45,10 @@ export const generateRunWebhookSecret = (): string => {
  *
  * Only https, no credentials in the URL, and no literal private, loopback,
  * link-local or reserved address (`isSafeUrl`). That check reads the host as
- * written: the Worker cannot resolve names, so a public name that resolves into
- * a private range is not caught here. Delivery never follows redirects, so a
- * redirect cannot move the request to another host.
+ * written. A name that resolves into a private range is caught at delivery, by
+ * `postCheckedHttps` (`lib/egress.ts`), which resolves it and refuses any
+ * private answer. Delivery never follows redirects, so a redirect cannot move
+ * the request to another host.
  */
 export const runWebhookUrlProblem = (value: string): string | null => {
     if (value.length > MAX_RUN_WEBHOOK_URL_LENGTH) {
