@@ -4777,31 +4777,6 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return;
                 }
 
-                // A call that cannot finish inside the claim's remaining life is not started, so nothing is charged for it.
-                if (modelBudgetMs(dispatchedAt) < MIN_MODEL_BUDGET_MS) {
-                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The claim has too little life left to start a call: ${threadId}`);
-                    await giveBackPaidClaim();
-
-                    return;
-                }
-
-                // One Text unit per reply, on whoever the background model bills, keyed per reply so a retry is not charged again.
-                // The thread's organization is passed, so a member is charged the organization's plan as on the chat routes.
-                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-                    kind: "Text",
-                    organizationId: threadData.organizationId ?? undefined,
-                    requestId: `followup:${threadId}:${lastMessageId}`,
-                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
-                    userId: actorGate.enabled ? (background.billedUserId ?? userId) : ownerUserId,
-                });
-
-                if (!charged) {
-                    // Nothing was paid for, so the reply's claim is given back and a later run can ask again.
-                    await giveBackPaidClaim();
-
-                    return;
-                }
-
                 chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
                     cachedMessageId: cached?.lastMessageId,
                     hasCached: !!cached,
@@ -4830,6 +4805,22 @@ export const generateFollowupSuggestionsForThread = internalAction
                 // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
                 if (!(await isStillNewest())) {
                     chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+
+                    return;
+                }
+
+                // The Text unit is taken only now, once the model has produced suggestions: a run that makes no call pays nothing. A refused
+                // charge gives the claim back, and the output is dropped. The charge is keyed per reply, so a retry is not charged twice.
+                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                    kind: "Text",
+                    organizationId: threadData.organizationId ?? undefined,
+                    requestId: `followup:${threadId}:${lastMessageId}`,
+                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                    userId: actorGate.enabled ? (background.billedUserId ?? userId) : ownerUserId,
+                });
+
+                if (!charged) {
+                    await giveBackPaidClaim();
 
                     return;
                 }
