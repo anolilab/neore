@@ -648,7 +648,8 @@ const ComposerTiptapEditor = ({
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
     // The prompt last placed, by chat and text: the same text for another chat is said again.
-    const lastPlacedPromptRef = useRef<{ scope: string | null; text: string } | null>(null);
+    // `dismissed` is set only when the person removes the prompt (typing or Escape): a pause hides it without dismissing it.
+    const lastPlacedPromptRef = useRef<{ dismissed: boolean; scope: string | null; text: string } | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
     // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed. A bare
     // colon, or the colon that closes a finished `:dog:`, has an empty query and is not typing one.
@@ -685,7 +686,11 @@ const ComposerTiptapEditor = ({
         }
 
         // Placed once per reply: a dismissal (typing or Escape) is not undone by a pause or a cleared draft.
-        if (lastPlacedPromptRef.current?.scope === nextPromptScope && lastPlacedPromptRef.current.text === promptAnnouncementText) {
+        if (
+            lastPlacedPromptRef.current?.dismissed &&
+            lastPlacedPromptRef.current.scope === nextPromptScope &&
+            lastPlacedPromptRef.current.text === promptAnnouncementText
+        ) {
             return undefined;
         }
 
@@ -695,7 +700,7 @@ const ComposerTiptapEditor = ({
         // in a later task.
         const sameTextForAnotherChat = lastPlacedPromptRef.current?.text === promptAnnouncementText && lastPlacedPromptRef.current.scope !== nextPromptScope;
 
-        lastPlacedPromptRef.current = { scope: nextPromptScope, text: promptAnnouncementText };
+        lastPlacedPromptRef.current = { dismissed: false, scope: nextPromptScope, text: promptAnnouncementText };
 
         let restoreAnnouncement: ReturnType<typeof setTimeout> | undefined;
 
@@ -713,6 +718,11 @@ const ComposerTiptapEditor = ({
         const onTransaction = () => {
             if (getGhostCompletion(editor.state)?.kind === "prompt") {
                 return;
+            }
+
+            // The person removed it (typing or Escape): it is dismissed for this reply, so a pause does not bring it back.
+            if (lastPlacedPromptRef.current) {
+                lastPlacedPromptRef.current.dismissed = true;
             }
 
             editor.off("transaction", onTransaction);

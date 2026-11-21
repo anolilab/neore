@@ -178,6 +178,32 @@ describe("the suggested next prompt announcement", () => {
         expect(announcedText()).toBe("Suggested next prompt: Same. Press Tab to insert.");
     });
 
+    it("a prompt only hidden by a pause, never dismissed, comes back when the composer is enabled again", () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const element = (disabled: boolean) => (
+            <ComposerTiptapEditor
+                disabled={disabled}
+                nextPromptScope="thread-1"
+                nextPromptSuggestion="Continue the thread"
+                onChange={() => {}}
+                onSubmit={() => {}}
+                ref={ref}
+                value=""
+            />
+        );
+        const view = render(element(false));
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)?.kind).toBe("prompt");
+
+        view.rerender(element(true));
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)).toBeNull();
+
+        view.rerender(element(false));
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)?.kind).toBe("prompt");
+    });
+
     it("a dismissed prompt stays dismissed through a pause in which the composer is disabled", () => {
         const ref = createRef<ComposerTiptapEditorRef>();
         const element = (disabled: boolean) => (
