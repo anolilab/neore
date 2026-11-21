@@ -70,7 +70,7 @@
   member of an ownerless organization project). A role is on only with a model. `createRun` resolves a named role
   BEFORE admission charges anything and refuses a role with no model or one `roleModelRefusal` refuses for THIS user
   (the sub-agent rule, model filters, paid plan or key, their own enabled server-side custom endpoint; saves check the
-  same): never pick another model instead. Only the user's backup model still applies on a gateway failure, as for
+  same): never pick another model instead. A worker on a computer skips the model checks: it runs on its coding agent. Only the user's backup model still applies on a gateway failure, as for
   every run. The run keeps the resolved role on its row (a worker copies its first run's), and `execute.ts` re-checks
   the model (a worker's thread model too), so a settings change never reaches a running role. A host worker gets the
   role's instructions ahead of the task (`host-runs.ts`). The lead's catalog (`buildRoleCatalog`: names, scopes,

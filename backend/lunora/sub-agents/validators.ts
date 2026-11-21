@@ -75,7 +75,8 @@ export const vSubAgentRoles = v.object({
 /** The role a run launched with, resolved at admission and kept on the row: a later settings change never reaches it. */
 export const vSubAgentRunRole = v.object({
     instructions: v.optional(v.string()),
-    model: v.string(),
+    // Unset only on a worker on a computer: it runs on its coding agent and takes just the role's instructions.
+    model: v.optional(v.string()),
     name: vSubAgentRoleName,
     reasoningEffort: v.optional(v.number()),
 });

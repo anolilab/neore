@@ -15,14 +15,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@neore/ui/components/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useCallbackRef } from "@neore/ui/hooks/use-callback-ref";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import { ModelSelect } from "@/features/settings/components/chat/default-models-settings";
 import { offerableBackupModels } from "@/features/settings/lib/backup-model-options";
+import { toCustomGatewayModels } from "@/features/settings/lib/custom-models";
 import useTaskProjects from "@/features/tasks/hooks/use-task-projects";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -284,8 +286,9 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
 };
 
 const SubAgentRolesSettings: FC = () => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
+    const { isAnonymous } = useIsAnonymous();
     const scopeLabelId = useId();
     const [scope, setScope] = useState<string>(ALL_CHATS);
     const projectId = scope === ALL_CHATS ? undefined : (scope as Id<"projects">);
@@ -304,9 +307,10 @@ const SubAgentRolesSettings: FC = () => {
             .filter(([, entry]) => entry.enabled && entry.hasKey)
             .map(([provider]) => provider),
     );
+    const { data: customProviders } = useQuery(crpc.chat.custom_providers.listCustomProviders.queryOptions(isAnonymous ? skipToken : {}));
     // The registry rule a role's save applies (`isSelectableTextModel`), so the list offers no model the server would
-    // refuse; the save still re-checks it, with the user's model filters. The gateway list has no `custom:` endpoints.
-    const models = offerableBackupModels(
+    // refuse; the save still re-checks it, with the user's model filters.
+    const platformModels = offerableBackupModels(
         flaggedModels.filter((model) => {
             const definition = MODEL_LOOKUP.get(model.id);
 
@@ -315,6 +319,14 @@ const SubAgentRolesSettings: FC = () => {
         access?.canRunPaidModels === true,
         providersWithKey,
     );
+    // The user's own endpoints too, except one only the browser can reach: sub-agents run on the server.
+    const models = [
+        ...platformModels,
+        ...toCustomGatewayModels(
+            customProviders?.filter((provider) => provider.type !== "local-browser"),
+            i18n,
+        ),
+    ];
     const projects = projectList.readableProjects.filter((project) => project.projectType !== "workflow");
     const user: Roles = rolesQuery.data?.user ?? {};
     const project = rolesQuery.data?.project;
@@ -384,11 +396,25 @@ const SubAgentRolesSettings: FC = () => {
                 </p>
             )}
 
-            {rolesQuery.isPending ? (
+            {rolesQuery.isPending && (
                 <p className="text-muted-foreground text-sm" role="status">
                     {t`Loading roles…`}
                 </p>
-            ) : (
+            )}
+
+            {/* Without a read there is nothing to edit from: a card built on empty roles would save over the real ones. */}
+            {rolesQuery.isError && (
+                <Alert variant="destructive">
+                    <AlertDescription className="flex items-center justify-between gap-4">
+                        {t`Could not load your roles.`}
+                        <Button onClick={async () => await rolesQuery.refetch()} size="sm" variant="outline">
+                            {t`Retry`}
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {rolesQuery.isSuccess && (
                 <div className="space-y-4">
                     {ROLE_NAMES.map((name) => (
                         <RoleCard

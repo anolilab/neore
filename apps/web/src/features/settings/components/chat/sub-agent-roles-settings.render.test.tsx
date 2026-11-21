@@ -9,7 +9,9 @@ const state = vi.hoisted(() => {
     return {
         project: null as null | { editable: boolean; roles: Record<string, unknown> },
         projects: [] as { _id: string; title: string }[],
+        customProviders: [] as Record<string, unknown>[],
         roles: {} as Record<string, unknown>,
+        rolesFail: false,
         setProjectSubAgentRole: vi.fn(async (_variables: unknown) => null),
         setSubAgentRole: vi.fn(async (_variables: unknown) => null),
     };
@@ -42,6 +44,8 @@ const MODELS = [
 
 const MODEL_A = /Model A/u;
 const MODEL_LABS = /Model Labs/u;
+const HOSTED_MODEL = /hosted model/u;
+const LAPTOP_MODEL = /laptop model/u;
 
 // `model-labs` sits behind a feature flag, which a sub-agent role may not run on.
 vi.mock("@neore/ai/models", async (importOriginal) => {
@@ -64,6 +68,14 @@ vi.mock("@/features/tasks/hooks/use-task-projects", () => {
     return {
         default: () => {
             return { hasMore: false, isLoadingMore: false, loadMore: vi.fn(), readableProjects: state.projects };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-is-anonymous", () => {
+    return {
+        default: () => {
+            return { isAnonymous: false };
         },
     };
 });
@@ -105,6 +117,18 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                     },
                 },
+                chat: {
+                    custom_providers: {
+                        listCustomProviders: {
+                            queryOptions: () => {
+                                return {
+                                    queryFn: async () => state.customProviders,
+                                    queryKey: ["custom-providers"],
+                                };
+                            },
+                        },
+                    },
+                },
                 projects: {
                     functions: {
                         setProjectSubAgentRole: {
@@ -120,6 +144,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: (args: { projectId?: string }) => {
                                 return {
                                     queryFn: async () => {
+                                        if (state.rolesFail) {
+                                            throw new Error("offline");
+                                        }
+
                                         return { project: args.projectId ? state.project : null, user: state.roles };
                                     },
                                     queryKey: ["roles", args.projectId ?? null],
@@ -154,7 +182,9 @@ beforeEach(() => {
     );
     state.project = null;
     state.projects = [];
+    state.customProviders = [];
     state.roles = {};
+    state.rolesFail = false;
     state.setProjectSubAgentRole.mockClear();
     state.setSubAgentRole.mockClear();
 });
@@ -279,5 +309,45 @@ describe("SubAgentRolesSettings", () => {
 
         fireEvent.blur(field);
         expect(state.setSubAgentRole).not.toHaveBeenCalled();
+    });
+
+    it("offers the user's server-side endpoints, and not one only the browser can reach", async () => {
+        const endpoint = (id: string, type: string) => {
+            return {
+                baseUrl: "https://example.test",
+                enabled: true,
+                hasApiKey: true,
+                id,
+                models: [{ id: `${id}-model`, name: `${id} model` }],
+                name: id,
+                supportsTools: true,
+                type,
+            };
+        };
+
+        state.customProviders = [endpoint("hosted", "openai"), endpoint("laptop", "local-browser")];
+        renderSettings();
+
+        const user = userEvent.setup();
+        const [picker] = await screen.findAllByRole("combobox", { name: "Model" });
+
+        await user.click(picker!);
+
+        expect(await screen.findByRole("option", { name: HOSTED_MODEL })).toBeDefined();
+        expect(screen.queryByRole("option", { name: LAPTOP_MODEL })).toBeNull();
+    });
+
+    it("shows no role to edit when the roles cannot be read, and reads them again on Retry", async () => {
+        state.rolesFail = true;
+        renderSettings();
+
+        const retry = await screen.findByRole("button", { name: "Retry" });
+
+        expect(screen.queryAllByLabelText("Extra instructions")).toHaveLength(0);
+
+        state.rolesFail = false;
+        fireEvent.click(retry);
+
+        expect(await screen.findAllByLabelText("Extra instructions")).toHaveLength(8);
     });
 });

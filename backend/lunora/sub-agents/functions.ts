@@ -123,7 +123,7 @@ import {
 import type { vWorkerPolicy } from "./validators";
 import { vDispatchSource, vHostRunnerRequest, vSubAgentRoleName, vSubAgentRunMode, vSubAgentRunRole, vSubAgentRunStatus } from "./validators";
 import type { SubAgentRoleName, SubAgentRunRole } from "./roles";
-import { isRoleModelAllowed, resolveRoleLaunch } from "./roles";
+import { isRoleModelAllowed, resolveHostRoleLaunch, resolveRoleLaunch } from "./roles";
 import { effectiveRoles, roleModelRefusal } from "./role-settings";
 
 type RunDoc = Doc<"subAgentRuns">;
@@ -970,15 +970,23 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
 
 /**
  * The role a dispatch from `parentThreadId` names, as the settings in effect there have it: the user's roles,
- * overridden by the parent thread's project. Refuses a role without a model or whose model the sub-agent rule refuses.
+ * overridden by the parent thread's project. Refuses a role without a model or whose model the sub-agent rule refuses,
+ * except for a worker on a computer (`onHost`), which runs on its coding agent and takes only the instructions.
  */
 export const resolveRunRole = async (
     ctx: MutationCtx,
     args: { parentThreadId: string; userId: string },
     roleName: SubAgentRoleName,
+    onHost = false,
 ): Promise<{ error: string } | { role: SubAgentRunRole }> => {
     const parent = await ctx.db.get("threads", args.parentThreadId as Id<"threads">);
-    const launch = resolveRoleLaunch(await effectiveRoles(ctx, args.userId, parent?.projectId ?? undefined), roleName, isRoleModelAllowed);
+    const roles = await effectiveRoles(ctx, args.userId, parent?.projectId ?? undefined);
+
+    if (onHost) {
+        return resolveHostRoleLaunch(roles, roleName);
+    }
+
+    const launch = resolveRoleLaunch(roles, roleName, isRoleModelAllowed);
 
     if ("error" in launch) {
         return launch;
@@ -1025,7 +1033,7 @@ export const createRun = internalMutation
         let args: typeof rest & { role?: SubAgentRunRole } = rest;
 
         if (roleName !== undefined) {
-            const launch = await resolveRunRole(ctx, rest, roleName);
+            const launch = await resolveRunRole(ctx, rest, roleName, host !== undefined);
 
             if ("error" in launch) {
                 return launch;

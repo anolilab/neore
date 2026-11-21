@@ -107,6 +107,15 @@ ${lines.join("\n")}
 If the user asks you to do the work yourself, do it here instead. Use only the roles listed above.`;
 };
 
+const runRoleOf = (config: SubAgentRoleConfig, name: SubAgentRoleName): SubAgentRunRole => {
+    return {
+        ...(config.instructions?.trim() && { instructions: config.instructions.slice(0, ROLE_INSTRUCTIONS_MAX) }),
+        ...(config.model && { model: config.model }),
+        name,
+        ...(config.reasoningEffort !== undefined && { reasoningEffort: config.reasoningEffort }),
+    };
+};
+
 /**
  * What a call naming `name` launches with, or why it cannot launch. A role without a model, or whose model the task
  * rule refuses, is an error for the lead to read: nothing falls back to another model quietly.
@@ -115,7 +124,7 @@ export const resolveRoleLaunch = (
     roles: SubAgentRoles,
     name: SubAgentRoleName,
     isAllowed: (modelId: string) => boolean,
-): { error: string } | { role: SubAgentRunRole } => {
+): { error: string } | { role: SubAgentRunRole & { model: string } } => {
     const config = roles[name];
 
     if (!config?.model) {
@@ -128,14 +137,15 @@ export const resolveRoleLaunch = (
         };
     }
 
-    return {
-        role: {
-            ...(config.instructions?.trim() && { instructions: config.instructions.slice(0, ROLE_INSTRUCTIONS_MAX) }),
-            model: config.model,
-            name,
-            ...(config.reasoningEffort !== undefined && { reasoningEffort: config.reasoningEffort }),
-        },
-    };
+    return { role: { ...runRoleOf(config, name), model: config.model } };
+};
+
+/**
+ * What a worker on a computer launches with: the role's instructions, whatever its model. That worker runs on its
+ * coding agent, so neither a missing model nor one this user cannot run stops it.
+ */
+export const resolveHostRoleLaunch = (roles: SubAgentRoles, name: SubAgentRoleName): { role: SubAgentRunRole } => {
+    return { role: runRoleOf(roles[name] ?? {}, name) };
 };
 
 /** The block a role adds to the sub-agent's system text: the built-in standard, then the user's own instructions. */

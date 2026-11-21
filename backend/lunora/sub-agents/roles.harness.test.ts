@@ -90,6 +90,16 @@ describe("resolveRunRole", () => {
             error: expect.stringContaining("(no-such-model) cannot run sub-agents"),
         });
     });
+
+    it("gives a worker on a computer the role's instructions, whatever its model", async () => {
+        await setUserRoles({ review: { instructions: "Check auth.", model: "no-such-model" }, security: { instructions: "Name the threat." } });
+        const parentThreadId = await insertThread();
+        const resolveOnHost = async (role: "review" | "security") =>
+            await harness.run(async (ctx: any) => await resolveRunRole(ctx, { parentThreadId, userId }, role, true));
+
+        expect(await resolveOnHost("review")).toStrictEqual({ role: { instructions: "Check auth.", model: "no-such-model", name: "review" } });
+        expect(await resolveOnHost("security")).toStrictEqual({ role: { instructions: "Name the threat.", name: "security" } });
+    });
 });
 
 describe("resolveRunRole with a custom endpoint", () => {
