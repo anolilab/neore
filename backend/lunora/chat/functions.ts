@@ -4585,7 +4585,13 @@ export const generateFollowupSuggestionsForThread = internalAction
             }
 
             // The owner's setting decides whether the owner's thread gets a suggestion; the run's own guest status decides whether this run pays.
-            const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: threadData.userId });
+            const ownerUserId = threadData.userId;
+
+            if (!ownerUserId) {
+                return;
+            }
+
+            const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: ownerUserId });
             const actorGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
 
             if (!ownerGate.enabled || actorGate.guest) {
@@ -4779,7 +4785,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                     kind: "Text",
                     organizationId: threadData.organizationId ?? undefined,
                     requestId: `followup:${threadId}:${lastMessageId}`,
-                    userId: background.billedUserId ?? userId,
+                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                    userId: actorGate.enabled ? (background.billedUserId ?? userId) : ownerUserId,
                 });
 
                 if (!charged) {
