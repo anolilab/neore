@@ -2669,7 +2669,7 @@ importers:
         version: 3.15.0
       lunorash:
         specifier: catalog:lunora
-        version: 1.0.0-alpha.479(503686f755e0e05e235c45806c14f0c5)
+        version: 1.0.0-alpha.479(961b993bd590e730b8a9d10dd30514b4)
       react:
         specifier: catalog:react
         version: 19.3.1
@@ -2694,7 +2694,7 @@ importers:
         version: 5.20261120.1
       '@lunora/cli':
         specifier: catalog:lunora
-        version: 1.0.0-alpha.505(bf59cac470de50dc85c529bee53847d8)
+        version: 1.0.0-alpha.505(7414702c2c7010c332a08d51eb47f9d6)
       '@lunora/seed':
         specifier: catalog:lunora
         version: 1.0.0-alpha.283(459d57eeb7958816fd8df1be77eca20f)
@@ -31768,13 +31768,13 @@ snapshots:
       '@lunora/errors': 1.0.0-alpha.89
       '@lunora/platform': 1.0.0-alpha.83
 
-  '@lunora/cli@1.0.0-alpha.505(bf59cac470de50dc85c529bee53847d8)':
+  '@lunora/cli@1.0.0-alpha.505(7414702c2c7010c332a08d51eb47f9d6)':
     dependencies:
       '@bomb.sh/tab': 0.0.22(cac@7.0.1)(commander@15.0.0)
       '@lunora/advisor': 1.0.0-alpha.295(@cloudflare/workers-types@5.20261120.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
       '@lunora/bindings': 1.0.0-alpha.153
-      '@lunora/codegen': 1.0.0-alpha.428(ddc21369a4c68a9ca0c74275a2185b8c)
-      '@lunora/config': 1.0.0-alpha.469(9193a1de405934225bd45406c1c7f864)
+      '@lunora/codegen': 1.0.0-alpha.428(3c88a049c6239b8ede890d60ee474b0b)
+      '@lunora/config': 1.0.0-alpha.469(5e7a923918cbe81df851ca971dbb21f5)
       '@lunora/container': 1.0.0-alpha.108
       '@lunora/d1': 1.0.0-alpha.238(@cloudflare/workers-types@5.20261120.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
       '@lunora/errors': 1.0.0-alpha.89
@@ -31985,7 +31985,7 @@ snapshots:
       - svelte
       - vue
 
-  '@lunora/codegen@1.0.0-alpha.428(ddc21369a4c68a9ca0c74275a2185b8c)':
+  '@lunora/codegen@1.0.0-alpha.428(3c88a049c6239b8ede890d60ee474b0b)':
     dependencies:
       '@lunora/advisor': 1.0.0-alpha.295(@cloudflare/workers-types@5.20261120.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
       '@lunora/agent': 1.0.0-alpha.284(@ai-sdk/provider@4.0.27)(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@5.20261120.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(asn1js@3.0.10)(dayjs@1.11.23)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(handlebars@4.7.10)(luxon@3.7.2)(moment@2.31.0)(pkijs@3.4.3)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
@@ -32003,7 +32003,7 @@ snapshots:
       quicktype-core: 26.0.0
       ts-morph: 28.0.0
     optionalDependencies:
-      '@lunora/auth': 1.0.0-alpha.268(c59cd82b1153dd69301745ff8d073ded)
+      '@lunora/auth': 1.0.0-alpha.268(cb7d3287d6e5c958bd2c0a28963a0f90)
       '@lunora/d1': 1.0.0-alpha.238(@cloudflare/workers-types@5.20261120.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
     transitivePeerDependencies:
       - '@ai-sdk/provider'
@@ -32087,9 +32087,9 @@ snapshots:
       - valibot
       - zod
 
-  '@lunora/config@1.0.0-alpha.469(9193a1de405934225bd45406c1c7f864)':
+  '@lunora/config@1.0.0-alpha.469(5e7a923918cbe81df851ca971dbb21f5)':
     dependencies:
-      '@lunora/codegen': 1.0.0-alpha.428(ddc21369a4c68a9ca0c74275a2185b8c)
+      '@lunora/codegen': 1.0.0-alpha.428(3c88a049c6239b8ede890d60ee474b0b)
       '@lunora/container': 1.0.0-alpha.108
       '@lunora/errors': 1.0.0-alpha.89
       '@lunora/seed': 1.0.0-alpha.283(459d57eeb7958816fd8df1be77eca20f)
@@ -47716,9 +47716,9 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  lunorash@1.0.0-alpha.479(503686f755e0e05e235c45806c14f0c5):
+  lunorash@1.0.0-alpha.479(961b993bd590e730b8a9d10dd30514b4):
     dependencies:
-      '@lunora/cli': 1.0.0-alpha.505(bf59cac470de50dc85c529bee53847d8)
+      '@lunora/cli': 1.0.0-alpha.505(7414702c2c7010c332a08d51eb47f9d6)
       '@lunora/client': 1.0.0-alpha.291(@lunora/runtime@1.0.0-alpha.293(7300915582213e2ff7648222004e4c82))(@tanstack/react-query@5.108.1(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)
       '@lunora/do': 1.0.0-alpha.282(@cloudflare/workers-types@5.20261120.1)(@effect/sql-d1@4.0.3(effect@4.0.5))(@effect/sql-sqlite-do@4.0.3(effect@4.0.5))(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(effect@4.0.5)(expo-sqlite@58.0.14(expo@58.0.26)(react-native@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2))(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)
       '@lunora/errors': 1.0.0-alpha.89
