@@ -187,6 +187,69 @@ describe("ThreadListDropZone", () => {
         });
     });
 
+    it("lets the latest of two overlapping drops decide, so the first one's files are not taken back", async () => {
+        const moves: { resolve: () => void }[] = [];
+
+        navigate.mockImplementation(
+            async () =>
+                await new Promise<void>((resolve) => {
+                    moves.push({ resolve });
+                }),
+        );
+        renderZone();
+        fireEvent.drop(screen.getByTestId("thread-list-drop-zone"), filesTransfer([new File(["a"], "a.txt", { type: "text/plain" })]));
+        await waitFor(() => {
+            expect(moves).toHaveLength(1);
+        });
+        fireEvent.drop(screen.getByTestId("thread-list-drop-zone"), filesTransfer([new File(["b"], "b.txt", { type: "text/plain" })]));
+        await waitFor(() => {
+            expect(moves).toHaveLength(2);
+        });
+
+        // The router drops the first move for the second: it settles while the thread is still open, then the second lands.
+        moves[0]?.resolve();
+        await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+        });
+        location.pathname = "/chat";
+        moves[1]?.resolve();
+        await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+        });
+
+        expect(withdrawComposerAttach).not.toHaveBeenCalled();
+        expect(showError).not.toHaveBeenCalled();
+    });
+
+    it("takes back every waiting drop's files when the latest move fails", async () => {
+        const first = new File(["a"], "a.txt", { type: "text/plain" });
+        const second = new File(["b"], "b.txt", { type: "text/plain" });
+        const moves: { resolve: () => void }[] = [];
+
+        navigate.mockImplementation(
+            async () =>
+                await new Promise<void>((resolve) => {
+                    moves.push({ resolve });
+                }),
+        );
+        renderZone();
+        fireEvent.drop(screen.getByTestId("thread-list-drop-zone"), filesTransfer([first]));
+        await waitFor(() => {
+            expect(moves).toHaveLength(1);
+        });
+        fireEvent.drop(screen.getByTestId("thread-list-drop-zone"), filesTransfer([second]));
+        await waitFor(() => {
+            expect(moves).toHaveLength(2);
+        });
+        moves[0]?.resolve();
+        moves[1]?.resolve();
+
+        await waitFor(() => {
+            expect(withdrawComposerAttach).toHaveBeenCalledWith([first, second]);
+        });
+        expect(showError).toHaveBeenCalledTimes(1);
+    });
+
     it("ignores files dropped on a dialog the list opens in a portal", async () => {
         render(<ThreadListDropZone>{createPortal(<div role="dialog">Project form</div>, document.body)}</ThreadListDropZone>);
         fireEvent.drop(screen.getByRole("dialog"), filesTransfer([new File(["a"], "rules.md", { type: "text/markdown" })]));

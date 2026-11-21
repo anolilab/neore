@@ -39,18 +39,35 @@ export const droppedFiles = async (event: unknown): Promise<(DataTransferItem | 
     return (event as { type?: string }).type === "drop" ? [...transfer.files] : [...transfer.items];
 };
 
+/** The drops still waiting for the new chat to open, and the latest move there, which decides for all of them. */
+const waiting = { attempt: 0, files: [] as File[] };
+
 /**
  * Opens the new chat for a drop. When the navigation does not land there (the update dialog stopped it, say), the files
- * are taken back, so they never turn up in some later new chat; the result says whether it landed.
+ * of every drop still waiting are taken back, so they never turn up in some later new chat. A move a later drop
+ * superseded decides nothing: the later one does. The result is `false` only when this move failed and took files back.
  */
 export const openNewChatFor = async (files: ReadonlyArray<File>, go: () => Promise<unknown>, currentPath: () => string): Promise<boolean> => {
+    waiting.attempt += 1;
+    waiting.files.push(...files);
+
+    const { attempt } = waiting;
+
     await go().catch(() => undefined);
+
+    if (waiting.attempt !== attempt) {
+        return true;
+    }
+
+    const all = [...waiting.files];
+
+    waiting.files.length = 0;
 
     if (isNewChatPath(currentPath())) {
         return true;
     }
 
-    withdrawComposerAttach(files);
+    withdrawComposerAttach(all);
 
     return false;
 };

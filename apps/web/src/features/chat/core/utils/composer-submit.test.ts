@@ -100,8 +100,12 @@ describe(requestComposerAttach, () => {
     it("lets go of files left for another account when a composer opens, so they never come back later", () => {
         requestComposerAttach({ accountId: "u1", files: [new File(["a"], "a.txt")] });
 
-        // Account u2's new chat opens: u1's drop from before the switch is let go.
-        onComposerAttachRequest("u2", () => {})();
+        // Account u2's new chat opens: u1's drop from before the switch is let go, and the person is told.
+        const discarded = vi.fn();
+
+        onComposerAttachRequest("u2", () => {}, discarded)();
+
+        expect(discarded).toHaveBeenCalledExactlyOnceWith(1);
 
         const back = vi.fn();
         const stop = onComposerAttachRequest("u1", back);

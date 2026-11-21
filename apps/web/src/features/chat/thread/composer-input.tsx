@@ -1408,10 +1408,16 @@ const ComposerInput = ({
             return undefined;
         }
 
-        return onComposerAttachRequest(accountId, ({ files }) => {
-            void handleFileSelect(files);
-        });
-    }, [accountId, isAutoSubmitTarget, handleFileSelect]);
+        return onComposerAttachRequest(
+            accountId,
+            ({ files }) => {
+                void handleFileSelect(files);
+            },
+            () => {
+                showError(t`Files dropped before the account changed were not attached. Drop them again.`);
+            },
+        );
+    }, [accountId, isAutoSubmitTarget, handleFileSelect, t]);
 
     useEffect(() => {
         if (autoSubmitTextRef.current === null || autoSubmitTextRef.current !== text || disabled || isStreaming) {
