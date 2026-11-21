@@ -13,7 +13,7 @@ interface Addon {
 const loadAddon = (): Addon => {
     const name = ["@neore", "device-core-node"].join("/");
 
-    // eslint-disable-next-line global-require, import/no-dynamic-require, @typescript-eslint/no-require-imports -- the addon is a native module resolved by name at runtime
+    // eslint-disable-next-line n/global-require, import/no-dynamic-require, @typescript-eslint/no-require-imports -- the addon is a native module resolved by name at runtime
     return require(name) as Addon;
 };
 
