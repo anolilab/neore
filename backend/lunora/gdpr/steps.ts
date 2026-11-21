@@ -490,6 +490,7 @@ export const collectActivityForExport = internalQuery
                     id: run._id,
                     parentThreadId: run.parentThreadId,
                     result: run.result,
+                    role: run.role,
                     skillSlug: run.skillSlug,
                     status: run.status,
                     task: run.task,

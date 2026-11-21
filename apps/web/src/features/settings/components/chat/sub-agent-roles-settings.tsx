@@ -108,8 +108,14 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
     const effectiveModelId = own.model ?? inherited?.model;
     const effectiveModel = models.find((model) => model.id === effectiveModelId);
     const effectiveMode = own.mode ?? inherited?.mode ?? "prefer";
-    const [draft, setDraft] = useState(own.instructions ?? "");
+    const [draft, setDraftState] = useState(own.instructions ?? "");
+    const draftRef = useRef(draft);
     const roleLabel = i18n._(ROLE_LABELS[name]);
+
+    const setDraft = (next: string) => {
+        draftRef.current = next;
+        setDraftState(next);
+    };
 
     const setOwn = (next: RoleConfig) => {
         const kept = compact(next) ?? {};
@@ -126,7 +132,10 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
             const shown = ownRef.current.instructions ?? "";
 
             // A draft the user has not touched takes the new instructions; one they are editing stays as typed.
-            setDraft((current) => (current === shown ? (value?.instructions ?? "") : current));
+            if (draftRef.current === shown) {
+                setDraft(value?.instructions ?? "");
+            }
+
             ownRef.current = value ?? {};
             setOwnState(value ?? {});
         }
@@ -164,8 +173,30 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
         send();
     });
 
-    // Leaving the card (another scope, the settings closed) still saves an effort the slider was just moved to.
-    useEffect(() => flushEffort, [flushEffort]);
+    /** Instructions typed since the last save, or `undefined` when there are none. */
+    const unsavedInstructions = (): { instructions: string | undefined } | undefined => {
+        const typed = draftRef.current;
+
+        return typed === (ownRef.current.instructions ?? "") ? undefined : { instructions: typed.length > 0 ? typed : undefined };
+    };
+
+    // Leaving the card (another scope, the settings closed) still saves what was typed or an effort the slider was just
+    // moved to: unmounting a focused textarea fires no blur. One save carries both.
+    const flushOnLeave = useCallbackRef(() => {
+        const typed = unsavedInstructions();
+
+        if (typed) {
+            clearTimeout(effortTimer.current);
+            effortTimer.current = undefined;
+            save(typed);
+
+            return;
+        }
+
+        flushEffort();
+    });
+
+    useEffect(() => flushOnLeave, [flushOnLeave]);
 
     const changeEffort = (reasoningEffort: number | undefined) => {
         setOwn({ ...ownRef.current, reasoningEffort });
@@ -264,8 +295,10 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
                         id={instructionsId}
                         maxLength={4000}
                         onBlur={() => {
-                            if (draft !== (own.instructions ?? "")) {
-                                save({ instructions: draft.length > 0 ? draft : undefined });
+                            const typed = unsavedInstructions();
+
+                            if (typed) {
+                                save(typed);
                             }
                         }}
                         onChange={(event) => setDraft(event.target.value)}

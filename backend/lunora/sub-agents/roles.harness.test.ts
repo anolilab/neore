@@ -151,4 +151,12 @@ describe("getRoleCatalogForRun", () => {
 
         expect(await run()).toContain("- test (prefer):");
     });
+
+    it("leaves out a role whose model this user cannot run", async () => {
+        await setUserRoles({ review: { model: "custom:gone/m" }, test: { model: DEFAULT_CHAT_MODEL } });
+        const catalog = await harness.query(async (ctx: any) => await ctx.runQuery(getRoleCatalogForRun, { userId }));
+
+        expect(catalog).toContain("- test (prefer):");
+        expect(catalog).not.toContain("- review");
+    });
 });

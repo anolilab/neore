@@ -17,8 +17,8 @@ import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid
 import { authQuery } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { readableProject } from "../projects/functions";
-import type { SubAgentRoleConfig, SubAgentRoles } from "./roles";
-import { buildRoleCatalog, isRoleModelAllowed, mergeSubAgentRoles } from "./roles";
+import type { SubAgentRoleConfig, SubAgentRoleName, SubAgentRoles } from "./roles";
+import { activeRoles, buildRoleCatalog, isRoleModelAllowed, mergeSubAgentRoles } from "./roles";
 import { vSubAgentRoles } from "./validators";
 
 const userRoles = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<SubAgentRoles | undefined> => {
@@ -121,8 +121,24 @@ export const getSubAgentRoles = authQuery
         };
     });
 
-/** The lead's role catalog for a run in `projectId` (or none), or `null` when no role has a model. */
+/**
+ * The lead's role catalog for a run in `projectId` (or none), or `null` when no role is on. A role whose model
+ * `roleModelRefusal` refuses for this user (another member's endpoint, a lapsed plan) is left out: `createRun` would
+ * refuse every call naming it.
+ */
 export const getRoleCatalogForRun = internalQuery
     .input({ projectId: v.optional(v.id("projects")), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
-    .query(async ({ args: { projectId, userId }, ctx }) => buildRoleCatalog(await effectiveRoles(ctx, userId, projectId)) ?? null);
+    .query(async ({ args: { projectId, userId }, ctx }) => {
+        const roles = await effectiveRoles(ctx, userId, projectId);
+        const refused = await Promise.all(
+            activeRoles(roles).map(async (name) => {
+                const model = roles[name]?.model;
+
+                return model && (await roleModelRefusal(ctx, userId, model)) ? name : undefined;
+            }),
+        );
+        const runnable = Object.fromEntries(Object.entries(roles).filter(([name]) => !refused.includes(name as SubAgentRoleName))) as SubAgentRoles;
+
+        return buildRoleCatalog(runnable) ?? null;
+    });

@@ -75,4 +75,5 @@
   the model (a worker's thread model too), so a settings change never reaches a running role. A host worker gets the
   role's instructions ahead of the task (`host-runs.ts`). The lead's catalog (`buildRoleCatalog`: names, scopes,
   modes, never the instructions) is added only when the run has the delegate tool (`chat/execute.ts`);
-  `loadRunContext` reads it only when asked (`roleCatalog: true`).
+  `loadRunContext` reads it only when asked (`roleCatalog: true`). It leaves out a role `roleModelRefusal` refuses for
+  the running user, since `createRun` would refuse it.

@@ -213,15 +213,19 @@ const leaf = (client: LunoraClient, path: string[]): any => {
         mutationOptions: (overrides?: object, call?: { onlineOnly?: true }) => {
             return {
                 mutationFn: async (args: Record<string, unknown>) => {
+                    const reference = resolve(path);
                     const shard = shardOptionsFor(args);
 
                     // Before a shard's first connect the client cannot queue a write, so an offline one waits here for
-                    // the network instead of failing (as `@lunora/react`'s `useMutation` does).
-                    if (call?.onlineOnly !== true && !client.canQueueOffline(shard.shardKey)) {
+                    // the network instead of failing (as `@lunora/react`'s `useMutation` does). An online-only write,
+                    // and a sensitive one (which the client never queues), goes on at once to be refused.
+                    const onlineOnly = call?.onlineOnly === true || (reference as { sensitive?: boolean }).sensitive === true;
+
+                    if (!onlineOnly && !client.canQueueOffline(shard.shardKey)) {
                         await waitForOnline();
                     }
 
-                    return await client.mutation(resolve(path) as never, withUnlockProof(args) as never, { ...shard, ...call } as never);
+                    return await client.mutation(reference as never, withUnlockProof(args) as never, { ...shard, ...call } as never);
                 },
                 ...overrides,
             };

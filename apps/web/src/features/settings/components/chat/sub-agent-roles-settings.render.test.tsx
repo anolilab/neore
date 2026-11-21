@@ -350,4 +350,18 @@ describe("SubAgentRolesSettings", () => {
 
         expect(await screen.findAllByLabelText("Extra instructions")).toHaveLength(8);
     });
+
+    it("saves instructions still being typed when the settings close", async () => {
+        const view = renderSettings();
+        const [first] = await screen.findAllByLabelText("Extra instructions");
+
+        first!.focus();
+        fireEvent.change(first!, { target: { value: "Name the trade-offs." } });
+        view.unmount();
+
+        await waitFor(() => {
+            expect(state.setSubAgentRole).toHaveBeenCalledTimes(1);
+        });
+        expect(state.setSubAgentRole.mock.calls[0]?.[0]).toStrictEqual({ config: { instructions: "Name the trade-offs." }, role: "architecture" });
+    });
 });

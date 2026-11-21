@@ -67,6 +67,18 @@ describe("a mutation sent offline", () => {
         expect(harness.client.mutation).toHaveBeenCalledTimes(1);
     });
 
+    it("does not wait for a sensitive mutation, which the client refuses offline", async () => {
+        onlineManager.setOnline(false);
+        harness.client.canQueueOffline.mockReturnValue(false);
+
+        const { result } = renderHook(() => useCRPC());
+        const options = result.current.chat.request_secret.answerSecretRequest.mutationOptions();
+
+        await (options.mutationFn as (args: object) => Promise<unknown>)({});
+
+        expect(harness.client.mutation).toHaveBeenCalledTimes(1);
+    });
+
     it("does not wait when the call asks to fail offline", async () => {
         onlineManager.setOnline(false);
         harness.client.canQueueOffline.mockReturnValue(false);
