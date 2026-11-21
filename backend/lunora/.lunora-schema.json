@@ -6260,7 +6260,7 @@
         "threadId": {
           "kind": "id",
           "nullable": false,
-          "optional": false,
+          "optional": true,
           "unique": false,
           "ref": "threads"
         },
