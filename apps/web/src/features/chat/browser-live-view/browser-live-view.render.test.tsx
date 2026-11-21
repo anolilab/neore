@@ -30,8 +30,8 @@ const { backend } = vi.hoisted(() => {
                 now?: number;
             } | null,
             handBack: vi.fn(),
-            /** The call options `handBack` was built with (`onlineOnly`). */
-            handBackCall: undefined as unknown,
+            /** Per hand back reason, whether it was sent `onlineOnly` (refused offline instead of queued). */
+            onlineOnly: {} as Record<string, boolean | undefined>,
             /** Whether an admin acts as this account. */
             impersonating: false,
             keep: vi.fn(),
@@ -64,10 +64,14 @@ vi.mock("@/lib/lunora/crpc", () => {
                 browser: {
                     live_view: {
                         handBack: {
-                            mutationOptions: (_overrides: unknown, call: unknown) => {
-                                backend.handBackCall = call;
+                            mutationOptions: (_overrides: unknown, call?: { onlineOnly?: boolean }) => {
+                                return {
+                                    mutationFn: async (args: { reason: string }) => {
+                                        backend.onlineOnly[args.reason] = call?.onlineOnly;
 
-                                return { mutationFn: backend.handBack };
+                                        return await backend.handBack(args);
+                                    },
+                                };
                             },
                         },
                         keepControl: {
@@ -149,6 +153,7 @@ beforeEach(() => {
     }
 
     backend.handBack.mockResolvedValue(true);
+    backend.onlineOnly = {};
     // As the server answers: two more minutes from now.
     backend.keep.mockImplementation(async () => {
         return { until: Date.now() + 120_000 };
@@ -717,6 +722,8 @@ describe("BrowserLiveView", () => {
 
             await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
             expect(backend.keep.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
+            // A hand back now would name the claim the renewal replaces: it waits for the renewal's answer.
+            expect(screen.getByRole("button", { name: "Hand back" })).toHaveProperty("disabled", true);
 
             await act(async () => {
                 renewal[0]?.({ claim: "claim-2", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: OTHER_URL });
@@ -801,6 +808,8 @@ describe("BrowserLiveView", () => {
             await takeControl(queryClient);
             await userEvent.click(screen.getByRole("button", { name: "Hide live view" }));
 
+            // No one waits for this answer: offline it is queued for the reconnect.
+            expect(backend.onlineOnly).toEqual({ left: undefined });
             expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
             expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
         });
@@ -1188,7 +1197,7 @@ describe("BrowserLiveView", () => {
             await takeControl(queryClient);
             await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
             // Refused offline, never queued for the reconnect.
-            expect(backend.handBackCall).toEqual({ onlineOnly: true });
+            expect(backend.onlineOnly).toEqual({ handed_back: true });
             // Still the person's until it lands.
             expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
             expect(screen.getByRole("button", { name: "Hand back" })).toHaveProperty("disabled", true);

@@ -212,13 +212,14 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const navigateInControl = useAction(api.browser.live_view.navigateInControl);
     const keepControl = useMutation(crpc.browser.live_view.keepControl.mutationOptions());
     // A hand back that does not arrive leaves the agent waiting: it is sent again, with backoff, before the card gives up.
-    // Only a request the server gave no verdict on is sent again. Offline it is refused, never queued for the reconnect
-    // (`onlineOnly`), so the card can say it did not go through.
-    const handBack = useMutation({
-        ...crpc.browser.live_view.handBack.mutationOptions(undefined, { onlineOnly: true }),
-        networkMode: "always",
-        retry: (failures: number, error: unknown) => failures < 3 && isTransient(error),
-    });
+    // Only a request the server gave no verdict on is sent again.
+    const resend = { networkMode: "always" as const, retry: (failures: number, error: unknown) => failures < 3 && isTransient(error) };
+    // The person's own: refused offline, never queued for the reconnect (`onlineOnly`), so the card can say it did not
+    // go through, and the person keeps control meanwhile.
+    const handBack = useMutation({ ...crpc.browser.live_view.handBack.mutationOptions(undefined, { onlineOnly: true }), ...resend });
+    // A view that went (or a lease nobody looks at): no one waits for the answer, so offline it is queued and ends the
+    // lease on the reconnect, if its idle timeout has not already.
+    const leaveLease = useMutation({ ...crpc.browser.live_view.handBack.mutationOptions(), ...resend });
     const [view, setView] = useState<View>(CLOSED);
     // State to render from, and a ref for answers that come back after the render that asked.
     const [lease, setLeaseState] = useState<Held | undefined>(undefined);
@@ -267,6 +268,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const otherEnded = usePassed(control?.byYou === false ? control.until - statusClock.skew : undefined);
     const controlledByOther = control?.byYou === false && !otherEnded && (lease === undefined || seen);
     const handingBack = returning !== undefined && returning === claim;
+    // A renewal of the view is being minted under a new claim: a hand back now would name the claim it replaces, and the
+    // lease would go on under the new one. Hand back waits for its answer (seconds).
+    const renewingControl = view.kind === "opening" && view.mode === "control" && claim !== undefined;
     const warn = usePassed(youControl && leaseUntil !== undefined ? leaseUntil - CONTROL_WARNING_MS : undefined);
     const showStillLoading = !usePassed(stillLoading === 0 ? undefined : stillLoading) && stillLoading !== 0;
     const forbiddenText = impersonating ? t`Taking control is not available while impersonating.` : t`You may not take control of this browser.`;
@@ -300,7 +304,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         }
 
         setClaim(undefined);
-        handBack.mutate({ claim: holding, reason: "left", threadId });
+        leaveLease.mutate({ claim: holding, reason: "left", threadId });
     };
 
     /**
@@ -308,6 +312,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
      * control request still out is no longer wanted (its lease is handed back when it answers).
      */
     const endControl = (message: string): void => {
+        // A hand back still out says nothing over this.
+        noticeTurn.current += 1;
         wantedControl.current = undefined;
         setClaim(undefined);
         setView((current) => (isControlView(current) ? CLOSED : current));
@@ -329,7 +335,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                 setClaim({ claim: result.claim, until: result.until, writtenBy: result.connectBy - CONNECT_WINDOW_MS });
             } else {
                 // Hidden (or gone) while it was asked for: the lease nobody looks at goes back at once.
-                handBack.mutate({ claim: result.claim, reason: "left", threadId });
+                leaveLease.mutate({ claim: result.claim, reason: "left", threadId });
             }
 
             return;
@@ -597,7 +603,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const handBackNow = (): void => {
         const handing = claimRef.current;
 
-        if (handing === undefined || returningRef.current === handing) {
+        if (renewingControl || handing === undefined || returningRef.current === handing) {
             return;
         }
 
@@ -738,7 +744,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                     {expanded ? t`Hide live view` : t`Watch live`}
                 </Button>
                 {youControl && (
-                    <Button className={TOUCH_TARGET} disabled={handingBack} onClick={handBackNow} size="sm" type="button">
+                    <Button className={TOUCH_TARGET} disabled={handingBack || renewingControl} onClick={handBackNow} size="sm" type="button">
                         {handingBack && <Loader2 aria-hidden="true" className="size-3 animate-spin motion-reduce:animate-none" />}
                         {t`Hand back`}
                     </Button>
