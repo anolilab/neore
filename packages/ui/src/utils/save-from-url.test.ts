@@ -7,7 +7,7 @@
 import type { MouseEvent } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { saveFromUrl, saveName, saveOnClick } from "./save-from-url";
+import { HEADERS_DEADLINE_MS, saveFromUrl, saveName, saveOnClick } from "./save-from-url";
 
 // One spy for the whole file, cleared before each test: every click's `this` is the anchor the helper made.
 const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
@@ -55,7 +55,7 @@ describe(saveFromUrl, () => {
         vi.stubGlobal("fetch", fetchMock);
         await saveFromUrl("https://api.test/agent-files/abc?sig=1", "report.pdf");
 
-        expect(fetchMock).toHaveBeenCalledWith("https://api.test/agent-files/abc?sig=1");
+        expect(fetchMock).toHaveBeenCalledWith("https://api.test/agent-files/abc?sig=1", expect.objectContaining({ referrerPolicy: "no-referrer" }));
         expect(clickedLinks()).toEqual([{ download: "report.pdf", href: "blob:https://app.test/1", target: "" }]);
     });
 
@@ -83,6 +83,89 @@ describe(saveFromUrl, () => {
         await saveFromUrl("https://api.test/x", "x.csv");
 
         expect(clickedLinks()[0]?.target).toBe("_blank");
+    });
+
+    // eslint-disable-next-line no-script-url -- the scheme under test
+    it.each(["javascript:alert(1)", "file:///etc/passwd", "ftp://files.test/a.txt"])("neither fetches nor opens %s", async (url) => {
+        const fetchMock = vi.fn();
+
+        vi.stubGlobal("fetch", fetchMock);
+        await saveFromUrl(url, "a.txt");
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(clickedLinks()).toEqual([]);
+    });
+
+    it("fetches a second click on the same file only once", async () => {
+        const fetchMock = answer("a", "text/plain");
+
+        vi.stubGlobal("fetch", fetchMock);
+        await Promise.all([saveFromUrl("https://api.test/a", "a.txt"), saveFromUrl("https://api.test/a", "a.txt")]);
+        await saveFromUrl("https://api.test/a", "a.txt");
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(clickedLinks()).toHaveLength(2);
+    });
+
+    describe("deadline", () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("opens the URL while the click still counts when the headers are late", async () => {
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(
+                    async (_url: string, init: RequestInit) =>
+                        await new Promise((_resolve, reject) => {
+                            init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+                        }),
+                ),
+            );
+
+            const saving = saveFromUrl("https://api.test/slow", "slow.pdf");
+
+            await vi.advanceTimersByTimeAsync(HEADERS_DEADLINE_MS);
+            await saving;
+
+            expect(clickedLinks()).toEqual([{ download: "slow.pdf", href: "https://api.test/slow", target: "_blank" }]);
+        });
+
+        it("lets a long body finish once the headers are in", async () => {
+            let signal: AbortSignal | undefined;
+
+            vi.stubGlobal(
+                "fetch",
+                vi.fn(async (_url: string, init: RequestInit) => {
+                    signal = init.signal ?? undefined;
+
+                    return {
+                        blob: async () => {
+                            await new Promise((resolve) => {
+                                setTimeout(resolve, HEADERS_DEADLINE_MS * 10);
+                            });
+
+                            return new Blob(["big"], { type: "video/mp4" });
+                        },
+                        body: null,
+                        ok: true,
+                        status: 200,
+                    };
+                }),
+            );
+
+            const saving = saveFromUrl("https://api.test/big", "big.mp4");
+
+            await vi.advanceTimersByTimeAsync(HEADERS_DEADLINE_MS * 10);
+            await saving;
+
+            expect(signal?.aborted).toBe(false);
+            expect(clickedLinks()).toEqual([{ download: "big.mp4", href: "blob:https://app.test/1", target: "" }]);
+        });
     });
 });
 

@@ -6,8 +6,11 @@ import type { MouseEvent } from "react";
  * A browser ignores `<a download>` on a cross-origin link, and the app's files are served from the backend's origin
  * (signed storage URLs). So a plain download link saves a file under a random name, and an image, PDF or text file
  * opens in a tab instead of saving. These helpers fetch the file into a blob first, which is same-origin, so the name
- * holds. When the fetch fails (no CORS for this origin, a network error), the URL is opened in a new tab and the
- * browser decides between showing and saving it, as the plain link did.
+ * holds. When the fetch fails (no CORS for this origin, a network error, no answer within `HEADERS_DEADLINE_MS`), the
+ * URL is opened in a new tab and the browser decides between showing and saving it, as the plain link did.
+ *
+ * Any origin is fetched, since the signed storage URLs are cross-origin by design: the fetch reaches only the URL the
+ * link itself opens, without cookies (another origin) or a referrer.
  */
 
 /** A name that already ends in an extension. */
@@ -66,9 +69,35 @@ const clickAnchor = (href: string, filename: string, newTab: boolean): void => {
     anchor.remove();
 };
 
-const fetchBlob = async (url: string): Promise<Blob | undefined> => {
+/** The schemes a file is fetched from. Anything else (`javascript:`, `file:`, …) is neither fetched nor opened. */
+const FETCHABLE_PROTOCOLS = new Set(["blob:", "data:", "http:", "https:"]);
+
+const isFetchable = (url: string): boolean => {
     try {
-        const response = await fetch(url);
+        return FETCHABLE_PROTOCOLS.has(new URL(url, document.baseURI).protocol);
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * How long the response headers may take. The fallback opens a tab, which a browser allows only while the click's user
+ * activation lasts (about a second in Safari, five in Chrome and Firefox), so a fetch that has not answered by then
+ * gives way to it. The body is not under this deadline: saving a blob needs no activation.
+ */
+export const HEADERS_DEADLINE_MS = 1000;
+
+/** URLs being saved right now: a second click on one does not start a second transfer. */
+const savesInFlight = new Set<string>();
+
+const fetchBlob = async (url: string): Promise<Blob | undefined> => {
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), HEADERS_DEADLINE_MS);
+
+    try {
+        const response = await fetch(url, { referrerPolicy: "no-referrer", signal: controller.signal });
+
+        clearTimeout(deadline);
 
         if (!response.ok) {
             await response.body?.cancel();
@@ -79,24 +108,39 @@ const fetchBlob = async (url: string): Promise<Blob | undefined> => {
         return await response.blob();
     } catch {
         return undefined;
+    } finally {
+        clearTimeout(deadline);
     }
 };
 
-/** Saves the file at `url` as `filename` (see the module comment for why it is fetched first). */
+/**
+ * Saves the file at `url` as `filename` (see the module comment for why it is fetched first). A URL of another scheme
+ * than http(s), blob or data is left alone, and so is a second save of a URL still being fetched.
+ */
 export const saveFromUrl = async (url: string, filename?: string, fallbackName?: string): Promise<void> => {
-    const blob = await fetchBlob(url);
-
-    if (!blob) {
-        clickAnchor(url, saveName(filename, undefined, fallbackName), true);
-
+    if (!isFetchable(url) || savesInFlight.has(url)) {
         return;
     }
 
-    const blobUrl = URL.createObjectURL(blob);
+    savesInFlight.add(url);
 
-    clickAnchor(blobUrl, saveName(filename, blob.type, fallbackName), false);
-    // Revoked on the next task: the click has already handed the blob to the download.
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+    try {
+        const blob = await fetchBlob(url);
+
+        if (!blob) {
+            clickAnchor(url, saveName(filename, undefined, fallbackName), true);
+
+            return;
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+
+        clickAnchor(blobUrl, saveName(filename, blob.type, fallbackName), false);
+        // Revoked on the next task: the click has already handed the blob to the download.
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+    } finally {
+        savesInFlight.delete(url);
+    }
 };
 
 /**
