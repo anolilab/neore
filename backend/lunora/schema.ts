@@ -60,7 +60,15 @@ import {
     vReviewVerdict,
 } from "./source-control/validators";
 import { vSkillConfig } from "./skills/validators";
-import { vDispatchSource, vSubAgentRunMode, vSubAgentRunner, vSubAgentRunStatus, vWorkerPolicy } from "./sub-agents/validators";
+import {
+    vDispatchSource,
+    vSubAgentRoles,
+    vSubAgentRunMode,
+    vSubAgentRunner,
+    vSubAgentRunRole,
+    vSubAgentRunStatus,
+    vWorkerPolicy,
+} from "./sub-agents/validators";
 import {
     vGoalStatus,
     vTaskRunDestination,
@@ -2257,6 +2265,8 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
+        // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
+        subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
@@ -2935,6 +2945,8 @@ export const schema = defineSchema({
         resultPostedAt: v.optional(v.number()),
         // The approval id the run last resumed with (`resumeRunForAnswer`): its continuation streams under that key.
         resumedBy: v.optional(v.string()),
+        // The role the run launched with, resolved at admission (`sub-agents/roles.ts`).
+        role: v.optional(vSubAgentRunRole),
         runner: v.optional(vSubAgentRunner),
         skillSlug: v.optional(v.string()),
         startedAt: v.optional(v.number()),
@@ -3981,6 +3993,8 @@ export const schema = defineSchema({
         sendBehavior: v.optional(v.string()),
         // First-run setup steps the user skipped (`auth/setup-steps.ts`): "pair" | "ssh" | "agent". At most 8, capped by `auth/lib/setup-step-limits.ts`. Absent = none.
         setupStepsSkipped: v.optional(v.array(v.string())),
+        // A model and instructions per kind of delegated work (`sub-agents/roles.ts`).
+        subAgentRoles: v.optional(vSubAgentRoles),
         // Opt-in email when a task or trigger run finishes with a result (`notifications/task-email.ts`). Absent = off.
         taskEmailEnabled: v.optional(v.boolean()),
         temporaryChatRetentionHours: v.optional(v.number()),

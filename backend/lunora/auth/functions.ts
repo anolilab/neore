@@ -28,10 +28,10 @@ import { KEY_ENTRY_FIELDS, type KeyEntryInput, mergeKeyEntries, redactPreference
 import { getMembersByUserId, getOrganization, getUser } from "./lib/better-auth-queries";
 import { getCurrentUserInternal } from "./lib/helper";
 import { resolveActiveMembership } from "./lib/organization-helpers";
-import { resolveUserPlan } from "./lib/plan";
+import { readUserRunPlan, resolveUserPlan } from "./lib/plan";
 import roleGuard from "./lib/role-guard";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { withoutUndefined } from "../lib/patch";
+import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { liveTrustedServers } from "../chat/lib/low-risk-trust";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
@@ -40,6 +40,9 @@ import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid
 import { normalizeModelNicknames } from "./lib/model-nicknames";
 import { changesPersonalization } from "./lib/personalization";
 import { isValidShortcut } from "./lib/shortcut";
+import { roleConfigRefusal } from "../sub-agents/role-settings";
+import { withRole } from "../sub-agents/roles";
+import { vSubAgentRoleConfig, vSubAgentRoleName } from "../sub-agents/validators";
 
 /** Any context an auth helper may be called from. */
 type AnyAuthContext = QueryContext | MutationContext | ActionContext;
@@ -990,6 +993,40 @@ export const updateUserSettings = authMutation
     });
 
 /**
+ * Sets or clears one of the user's sub-agent roles (`sub-agents/roles.ts`). One role per call, so saving one never
+ * overwrites another; `null` clears it. A model the sub-agent rule refuses is refused here, not at the first run.
+ */
+export const setSubAgentRole = authMutation
+    .use(rateLimit("settings/update"))
+    .input({ config: v.union(vSubAgentRoleConfig, v.null()), role: vSubAgentRoleName })
+    .output(v.null())
+    .mutation(async ({ args: { config, role }, ctx }) => {
+        const { userId } = ctx.user;
+
+        const refusal = await roleConfigRefusal(ctx, userId, config);
+
+        if (refusal) {
+            throw new LunoraError("BAD_REQUEST", refusal);
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+        const subAgentRoles = withRole(settings?.subAgentRoles ?? undefined, role, config);
+
+        if (settings) {
+            await patchRow(ctx.db, "userSettings", settings, { subAgentRoles });
+        } else {
+            await ctx.db.insert("userSettings", { subAgentRoles, userId });
+        }
+
+        ctx.log.event("auth.set_sub_agent_role", { cleared: config === null, role });
+
+        return null;
+    });
+
+/**
  * The user's web-search blocklist, for the search tool. Unlike `getUserPreferencesQuery`
  * it has no fallback: a failed read throws, so the tool fails closed rather than searching unfiltered.
  */
@@ -1413,17 +1450,6 @@ export const getUserAuthFlagsQuery = internalQuery
 
         return { isAnonymous: user?.isAnonymous === true, plan, role: user?.role ?? null };
     });
-
-/** The plan behind `getUserRunPlanQuery`, readable from a mutation's db too. */
-const readUserRunPlan = async (context: QueryContext, userId: string): Promise<{ isAdmin: boolean; plan: "premium" | null }> => {
-    const [user, memberships] = await Promise.all([getUser(context, userId), getMembersByUserId(context, userId)]);
-    const organizations = await Promise.all(memberships.map(async (membership) => await getOrganization(context, membership.organizationId)));
-
-    return {
-        isAdmin: user?.role === "admin",
-        plan: resolveUserPlan(user, organizations),
-    };
-};
 
 /**
  * Whether the caller's plan opens paid-plan models: the rule `settingsUpsert` enforces on a backup model,
