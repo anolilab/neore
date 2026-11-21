@@ -5,6 +5,7 @@ import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
+import { callOnShard } from "../lib/cross-shard";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -4644,7 +4645,8 @@ export const generateFollowupSuggestionsForThread = internalAction
             }
 
             const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: ownerUserId });
-            const actorGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
+            // The actor's own setting lives on the actor's shard (a row lives on its owner's shard), not on the thread's: read it there.
+            const actorGate = await callOnShard(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId }, { shardKey: userId });
 
             if (!ownerGate.enabled || actorGate.guest) {
                 return;

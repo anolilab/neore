@@ -25,14 +25,29 @@ import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
 
 const OWNER = "owner-user";
+const COLLAB = "collaborator-user";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 const getAgent = vi.hoisted(() => vi.fn());
+// Every shard-routed call the job makes: the shard key it names, and the run that answers it on the test database.
+const routed = vi.hoisted(() => {
+    return { keys: [] as string[], run: async (_ref: unknown, _args: unknown): Promise<unknown> => null };
+});
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("./lib/get-agent", () => {
     return { default: getAgent };
+});
+vi.mock("../lib/cross-shard", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/cross-shard")>()),
+        callOnShard: async (ref: unknown, args: unknown, options?: { shardKey?: string }) => {
+            routed.keys.push(options?.shardKey ?? "");
+
+            return await routed.run(ref, args);
+        },
+    };
 });
 
 const REACHED = "getAgent reached";
@@ -50,6 +65,8 @@ beforeEach(async () => {
     harness = lunoraTest(schema as never);
     getAgent.mockReset();
     getAgent.mockRejectedValue(new Error(REACHED));
+    routed.keys.length = 0;
+    routed.run = async (ref, args) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args));
     threadId = await harness.run(
         async (ctx: any) => await ctx.db.insert("threads", { createdAt: 1, status: "active", title: "T", updatedAt: 1, userId: OWNER }),
     );
@@ -59,10 +76,17 @@ afterEach(() => {
     harness.close();
 });
 
-const runJob = async (id = threadId) =>
-    await harness.action(async (context: any) => await context.runAction(generateFollowupSuggestionsForThread, { threadId: id, userId: OWNER }));
+const runJob = async (id = threadId, userId = OWNER) =>
+    await harness.action(async (context: any) => await context.runAction(generateFollowupSuggestionsForThread, { threadId: id, userId }));
 
 describe("the setting", () => {
+    // A row lives on its owner's shard: the collaborator's own setting is read on their shard, not the owner's where the job runs.
+    it("a collaborator's own setting is read on the collaborator's shard", async () => {
+        await runJob(threadId, COLLAB);
+
+        expect(routed.keys).toContain(COLLAB);
+    });
+
     it("off: the job picks no model and makes no call", async () => {
         await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { enableFollowupSuggestions: false, userId: OWNER }));
 
