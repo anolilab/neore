@@ -29,6 +29,8 @@ interface MessageLike {
     parts?: ReadonlyArray<{ providerMetadata?: unknown; text?: string; type: string }>;
     role: string;
     text?: string;
+    /** Who sent it: in a shared chat, a collaborator's message is not the viewer's own words. */
+    userId?: string;
 }
 
 const messageText = (message: MessageLike): string => {
@@ -69,10 +71,11 @@ export const buildPromptHistoryEntries = (messages: ReadonlyArray<MessageLike>):
 
 /**
  * The not-typed mark of each entry whose message the server saved marked (`@neore/backend/not-typed-text`), so a recalled
- * entry goes out marked again: a draft's source, or `impersonated` for one an admin wrote as the owner. A text sent both
- * marked and unmarked keeps the mark.
+ * entry goes out marked again: a draft's source, or `impersonated` for one an admin wrote as the owner. Another person's
+ * message in a shared chat (a saved `userId` not the viewer's, or anyone's while the viewer is not known) is
+ * `collaborator`. A text sent both marked and unmarked keeps the mark.
  */
-export const buildPromptHistoryMarks = (messages: ReadonlyArray<MessageLike>): Map<string, DraftFrom> => {
+export const buildPromptHistoryMarks = (messages: ReadonlyArray<MessageLike>, viewerId: string | undefined): Map<string, DraftFrom> => {
     const marks = new Map<string, DraftFrom>();
 
     for (const message of messages) {
@@ -84,10 +87,12 @@ export const buildPromptHistoryMarks = (messages: ReadonlyArray<MessageLike>): M
                       ),
                   )
                 : undefined;
+        const byOther = message.role === "user" && message.userId !== undefined && message.userId !== viewerId;
+        const mark = draftFrom ?? (byOther ? "collaborator" : undefined);
         const text = messageText(message).trim();
 
-        if (draftFrom !== undefined && text) {
-            marks.set(text, draftFrom);
+        if (mark !== undefined && text) {
+            marks.set(text, mark);
         }
     }
 

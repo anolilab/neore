@@ -28,6 +28,7 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, u
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
+import { composerDraftFrom, markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -368,7 +369,8 @@ const ComposerTiptapEditor = ({
                 onStateChange: setEmojiMatch,
             }),
             // Inert until `requestCompletion` is set: it only draws what it is handed.
-            GhostCompletion,
+            // An accepted completion is the model's text: the draft is marked like a clicked suggestion, unless it already holds a mark.
+            GhostCompletion.configure({ onAccept: () => composerDraftFrom() ?? markComposerDraft("suggestion") }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             VimMode.configure({
                 isEnabled: () => vimEnabledRef.current,

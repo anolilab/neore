@@ -70,9 +70,15 @@
   admin's prompt again as `draftFrom: "impersonated"`. A quoted reply (the quote chip) is refused by its
   `>` lines (`carriesQuotedLines`), not marked, so deleting the chip leaves typed text usable. A plain-text paste stays unseen. A new draft kind goes in
   `NOT_TYPED_DRAFTS` and `vNotTypedDraft` (`not-typed-text-validator.ts`; a type check fails until both agree), which the
-  stored mark, `steerRun` and `saveLocalTurn` use; the `/chat/start`, steer and verdict tests walk the list. Still unmarked, to mark
-  before the fill ships: bot instructions and personalization an impersonating admin wrote (a `systemContext` kind
-  that refuses) and the variable defaults one wrote; an accepted ghost-text completion (`composer-tiptap/extensions/ghost-completion.ts`);
-  Restore to input of a collaborator's message in a shared chat. The allowlist refuses a step holding a page's result or an approval's
+  stored mark, `steerRun` and `saveLocalTurn` use; the `/chat/start`, steer and verdict tests walk the list. Words an admin wrote while
+  impersonating are marked on their row from the session, and the mark stays (no clear path yet, as
+  `contentByImpersonator`): a bot's name or instructions (`instructionsByImpersonator`), personalization and language
+  (`personalizationByImpersonator`, `auth/lib/personalization.ts`, also `initializeUserSettings`; a field sent unchanged
+  marks nothing), and variable values (`variablesByImpersonator`, user, organization and thread rows;
+  `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
+  system-prompt piece (`chat/lib/system-context-kinds.ts`, `systemContext`): a marked one is `…-impersonated`, and a
+  thread's own language `thread-language`, which refuse; the fill adds `getAgent`'s pieces (skills, modes). An accepted
+  ghost-text completion marks an unmarked draft `suggestion`; Restore to input and prompt history of a message another
+  person wrote (`userId` not the viewer's) mark it `collaborator`. The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

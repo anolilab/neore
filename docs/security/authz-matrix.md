@@ -780,9 +780,13 @@ for a schema table that is neither policed nor listed:
   prompt improver's Apply (`improvedPrompt`), a media gallery item's stored prompt, edited or not (`galleryPrompt`), an
   organization's variable default or active name filled into a prompt, not a value the viewer typed into the fill dialog (`organizationValue`), and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
   prompt, edit, steer or local turn an admin sent while impersonating (or, on `/chat/edit`, under a sign-in that cannot
-  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. A quoted reply is not marked: its `>` lines refuse the turn on the server. Still unmarked, and to be marked
-  before the fill tool ships: bot instructions, personalization and variable defaults an impersonating admin wrote, an
-  accepted ghost-text completion, and Restore to input of a collaborator's message in a shared chat.
+  be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. A quoted reply is not marked: its `>` lines refuse the turn on the server. A bot's name and instructions, the owner's
+  personalization and language and their variable values (user, organization and thread rows) an admin wrote while impersonating are
+  marked on the row from the session, never from args, and the mark stays (`instructionsByImpersonator`,
+  `personalizationByImpersonator`, `variablesByImpersonator`); the run names that system-prompt text with a refused kind
+  (`chat/lib/system-context-kinds.ts`) and `getResolvedVariables` reports the values as `impersonated`, which marks the
+  draft. An accepted ghost-text completion is `suggestion`; Restore to input and prompt history of another person's message
+  in a shared chat are `collaborator`.
 
 ## Removed from the client surface in this audit
 

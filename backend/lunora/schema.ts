@@ -382,6 +382,9 @@ export const schema = defineSchema({
         createdAt: v.number(),
         description: v.optional(v.string()),
         instructions: v.string(),
+        // Set when an admin acting as the owner wrote the name or instructions (both reach the system prompt), and kept:
+        // they are not the owner's words, so a run as this bot gets no saved login (`vault/site-login-turn.ts`).
+        instructionsByImpersonator: v.optional(v.literal(true)),
         model: v.string(),
         name: v.string(),
         // The mode a new chat with this bot starts in (`chat/lib/thread-permission-mode.ts`); absent = the default. A run
@@ -3510,6 +3513,8 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
+        // Set once an admin acting as the user wrote a value, and kept: filled into a prompt, the draft is marked (`impersonated`).
+        variablesByImpersonator: v.optional(v.literal(true)),
     })
         .shardBy("userId")
         .index("by_thread", ["threadId"])
@@ -3919,6 +3924,9 @@ export const schema = defineSchema({
         newChatsTemporary: v.optional(v.boolean()),
         nickname: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
+        // Set when an admin acting as the user wrote a personalization field that reaches the system prompt
+        // (`auth/lib/personalization.ts`), and kept: a run with it gets no saved login. Server-written only.
+        personalizationByImpersonator: v.optional(v.literal(true)),
         profession: v.optional(v.string()),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),
@@ -3967,6 +3975,8 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
         variables: v.array(v.object({ name: v.string(), value: v.string() })),
+        // Set once an admin acting as a user wrote these values, and kept: filled into a prompt, the draft is marked (`impersonated`).
+        variablesByImpersonator: v.optional(v.literal(true)),
     })
         // `.global()`, not `.shardBy("userId")`: read across users.
         .global()

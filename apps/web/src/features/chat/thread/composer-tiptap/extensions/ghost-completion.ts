@@ -12,6 +12,9 @@
  * a trap (WCAG 2.1.2). Right Arrow at the end of a line has nothing else to
  * do. Registered above the default priority so both keys reach it before
  * SubmitOnEnter / PromptHistoryKeys.
+ *
+ * Accepted, the text is the model's, not the person's: `onAccept` runs once it is
+ * in, and the composer marks its draft (`draft-origin.ts`).
  */
 import { Extension } from "@tiptap/core";
 import type { EditorState } from "@tiptap/pm/state";
@@ -63,7 +66,16 @@ const renderGhost = (text: string): HTMLElement => {
     return span;
 };
 
-const GhostCompletion = Extension.create({
+export interface GhostCompletionOptions {
+    /** Runs after an accepted ghost is in the document. */
+    onAccept?: () => void;
+}
+
+const GhostCompletion = Extension.create<GhostCompletionOptions>({
+    addOptions() {
+        return { onAccept: undefined };
+    },
+
     addCommands() {
         return {
             setGhostCompletion:
@@ -112,6 +124,7 @@ const GhostCompletion = Extension.create({
                 tr.setSelection(TextSelection.create(tr.doc, ghost.pos + ghost.text.length));
                 tr.scrollIntoView();
                 editor.view.dispatch(tr);
+                this.options.onAccept?.();
 
                 return true;
             },

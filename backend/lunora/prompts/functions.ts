@@ -985,6 +985,10 @@ export const duplicatePrompt = authMutation
  * substituted into their prompts — and lock the owner out of their own.
  */
 
+/** A variables row an admin acting as the user writes is marked, and keeps the mark: its values are not the user's words (`getResolvedVariables`). */
+const byImpersonator = (user: { impersonatedBy?: string | null }): { variablesByImpersonator?: true } =>
+    user.impersonatedBy ? { variablesByImpersonator: true } : {};
+
 /**
  * Get variables for a specific thread
  */
@@ -1050,6 +1054,7 @@ export const setThreadVariables = authMutation
 
             // Update existing
             await ctx.db.patch("threadVariables", existing._id, {
+                ...byImpersonator(ctx.user),
                 updatedAt: now,
                 variables,
             });
@@ -1063,6 +1068,7 @@ export const setThreadVariables = authMutation
 
         // Create new
         const id = await ctx.db.insert("threadVariables", {
+            ...byImpersonator(ctx.user),
             threadId,
             updatedAt: now,
             userId,
@@ -1117,6 +1123,7 @@ export const updateThreadVariable = authMutation
             }
 
             await ctx.db.patch("threadVariables", existing._id, {
+                ...byImpersonator(ctx.user),
                 updatedAt: now,
                 variables,
             });
@@ -1130,6 +1137,7 @@ export const updateThreadVariable = authMutation
 
         // Create new with single variable
         const id = await ctx.db.insert("threadVariables", {
+            ...byImpersonator(ctx.user),
             threadId,
             updatedAt: now,
             userId,
@@ -1341,6 +1349,7 @@ export const setUserVariableDefaults = authMutation
 
         if (existing) {
             await ctx.db.patch("userVariableDefaults", existing._id, {
+                ...byImpersonator(ctx.user),
                 updatedAt: now,
                 variables,
             });
@@ -1352,6 +1361,7 @@ export const setUserVariableDefaults = authMutation
 
         // Create new
         const id = await ctx.db.insert("userVariableDefaults", {
+            ...byImpersonator(ctx.user),
             updatedAt: now,
             userId,
             variables,
@@ -1396,6 +1406,7 @@ export const setOrganizationVariableDefaults = authMutation
 
         if (existing) {
             await ctx.db.patch("userVariableDefaults", existing._id, {
+                ...byImpersonator(ctx.user),
                 updatedAt: now,
                 variables,
             });
@@ -1407,6 +1418,7 @@ export const setOrganizationVariableDefaults = authMutation
 
         // Create new
         const id = await ctx.db.insert("userVariableDefaults", {
+            ...byImpersonator(ctx.user),
             organizationId,
             updatedAt: now,
             userId,
@@ -1428,7 +1440,7 @@ export const getResolvedVariables = authQuery
     })
     .output(
         v.object({
-            sources: v.record(v.string(), v.union(v.literal("organization"), v.literal("user"), v.literal("thread"))),
+            sources: v.record(v.string(), v.union(v.literal("organization"), v.literal("user"), v.literal("thread"), v.literal("impersonated"))),
             values: v.record(v.string(), v.string()),
         }),
     )
@@ -1437,7 +1449,7 @@ export const getResolvedVariables = authQuery
         const organizationId = ctx.user.activeOrganization?.id;
 
         const values: Record<string, string> = {};
-        const sources: Record<string, "organization" | "user" | "thread"> = {};
+        const sources: Record<string, "organization" | "user" | "thread" | "impersonated"> = {};
 
         // Run all 3 independent queries in parallel
         const [orgDefaults, userDefaults, threadVariables] = await Promise.all([
@@ -1458,14 +1470,16 @@ export const getResolvedVariables = authQuery
         if (orgDefaults?.variables) {
             for (const innerV of orgDefaults.variables) {
                 values[innerV.name] = innerV.value;
-                sources[innerV.name] = "organization";
+                sources[innerV.name] = orgDefaults.variablesByImpersonator ? "impersonated" : "organization";
             }
         }
 
         if (userDefaults?.variables) {
             // An organization's row carries the `userId` of the admin who created it: its values are the organization's,
             // which the composer marks as not the person's own words (`organizationValueNames`).
-            const source = userDefaults.organizationId === undefined ? "user" : "organization";
+            // A row an admin wrote while acting as a user is `impersonated`, whoever it belongs to: the composer marks it so.
+            const owned = userDefaults.organizationId === undefined ? "user" : "organization";
+            const source = userDefaults.variablesByImpersonator ? "impersonated" : owned;
 
             for (const innerV of userDefaults.variables) {
                 values[innerV.name] = innerV.value;
@@ -1478,7 +1492,7 @@ export const getResolvedVariables = authQuery
         if (threadVariables?.variables && threadVariables.userId === userId && threadId && !(await isLockedWithoutProof(ctx, threadId, unlockProof))) {
             for (const innerV of threadVariables.variables) {
                 values[innerV.name] = innerV.value;
-                sources[innerV.name] = "thread";
+                sources[innerV.name] = threadVariables.variablesByImpersonator ? "impersonated" : "thread";
             }
         }
 

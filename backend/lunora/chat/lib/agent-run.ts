@@ -41,6 +41,7 @@ import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
+import { systemContextKinds } from "./system-context-kinds";
 import { injectsUntrustedContext } from "./low-risk-approval";
 import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
@@ -563,6 +564,10 @@ export const loadRunContext = async (
         contextParts.push(`ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}`);
     }
 
+    const personalization = toPersonalization(prefs);
+    // The thread's stored instructions win over the request's (`customSystemPrompt` above).
+    const systemPromptSource = threadSettings?.customSystemPrompt === undefined ? "request" : "thread";
+
     return {
         /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
         botId: bot?.botId,
@@ -576,13 +581,24 @@ export const loadRunContext = async (
             backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
-            personalization: toPersonalization(prefs),
+            personalization,
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
+        /** One kind per piece of the system prompt above, for the saved-login verdict (`system-context-kinds.ts`). */
+        systemContext: systemContextKinds({
+            bot,
+            knowledge: Boolean(knowledgeContext?.context),
+            memories: Boolean(memoryContext?.context),
+            personalization: personalization !== undefined || Boolean(prefs.location) || Boolean(prefs.language),
+            personalizationByImpersonator: prefs.personalizationByImpersonator,
+            project: Boolean(project),
+            systemPrompt: customSystemPrompt ? systemPromptSource : undefined,
+            threadLanguage: Boolean(args.threadLanguage),
+        }),
         threadSettings,
         /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
         untrustedContext: injectsUntrustedContext({

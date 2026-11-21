@@ -34,14 +34,33 @@ describe(buildPromptHistoryMarks, () => {
         };
 
         expect(
-            buildPromptHistoryMarks([
-                { role: "user", text: "a colleague's prompt" },
-                marked,
-                { role: "user", text: "a colleague's prompt" },
-                { parts: [{ text: "mine", type: "text" }], role: "user" },
-                { ...marked, role: "assistant" },
-            ]),
+            buildPromptHistoryMarks(
+                [
+                    { role: "user", text: "a colleague's prompt" },
+                    marked,
+                    { role: "user", text: "a colleague's prompt" },
+                    { parts: [{ text: "mine", type: "text" }], role: "user" },
+                    { ...marked, role: "assistant" },
+                ],
+                "owner-1",
+            ),
         ).toStrictEqual(new Map([["a colleague's prompt", "sharedPrompt"]]));
+    });
+
+    it("marks a collaborator's message in a shared chat, and none of the viewer's own", () => {
+        expect(
+            buildPromptHistoryMarks(
+                [
+                    { role: "user", text: "theirs", userId: "collaborator-1" },
+                    { role: "user", text: "mine", userId: "owner-1" },
+                    { role: "user", text: "just sent" },
+                    { role: "assistant", text: "a reply", userId: "collaborator-1" },
+                ],
+                "owner-1",
+            ),
+        ).toStrictEqual(new Map([["theirs", "collaborator"]]));
+        // Before the session is known, any saved message counts as someone else's.
+        expect(buildPromptHistoryMarks([{ role: "user", text: "mine", userId: "owner-1" }], undefined)).toStrictEqual(new Map([["mine", "collaborator"]]));
     });
 
     it("keeps an admin's mark on a prompt they wrote as the owner, over a draft's", () => {
@@ -50,7 +69,10 @@ describe(buildPromptHistoryMarks, () => {
         };
 
         expect(
-            buildPromptHistoryMarks([byAdmin({ impersonated: true }, "sent as you"), byAdmin({ draft: "promptLink", impersonated: true }, "a link, as you")]),
+            buildPromptHistoryMarks(
+                [byAdmin({ impersonated: true }, "sent as you"), byAdmin({ draft: "promptLink", impersonated: true }, "a link, as you")],
+                "owner-1",
+            ),
         ).toStrictEqual(
             new Map([
                 ["a link, as you", "impersonated"],
