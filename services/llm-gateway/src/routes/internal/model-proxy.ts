@@ -224,6 +224,8 @@ modelProxyRouter.openapi(
 
         const usageTracker = new UsageTracker(c.env);
         const usageReporter = new UsageReporter(c.env);
+        // Set once the provider call is started: a cancel before that bills nothing, so only a cancel after it is estimated.
+        let isProviderStarted = false;
 
         let apiKey: string;
 
@@ -253,6 +255,7 @@ modelProxyRouter.openapi(
 
                 pricingRead.catch(() => undefined);
                 // The caller's cancel (its request's signal) stops the provider call, so an abandoned call is not paid for to the end.
+                isProviderStarted = true;
                 const result = await model.doGenerate({ ...callOptions, abortSignal: c.req.raw.signal });
                 const latencyMs = Date.now() - startTime;
 
@@ -532,7 +535,7 @@ modelProxyRouter.openapi(
             });
         } catch (error) {
             // A caller that cancelled ended the call itself: the provider did not fail, so the health tracker is not told it did.
-            if (c.req.raw.signal.aborted) {
+            if (isProviderStarted && c.req.raw.signal.aborted) {
                 // The provider may already have billed the prompt before the cancel, and no usage came back: record the lower-bound estimate
                 // the stream path records for a cancelled stream, so a cancelled call is not free.
                 const estimate = estimateCancelledUsage({ emittedChars: 0, promptChars: countPromptTextChars(body.callOptions.prompt), reasoningChars: 0 });
