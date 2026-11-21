@@ -5,8 +5,8 @@ vi.stubEnv("VITE_LUNORA_URL", "https://api.example.test");
 
 const { migrateFromCookieSession, readReconnectNeeded, RECONNECT_KEY, requestGrantAccessToken, signInWithWebAuthFlow, signOutGrant, watchReconnectNeeded } =
     await import("./extension-grant");
-const { clearAccessToken, getAccessToken } = await import("./access-token");
-const { loadGrantSession } = await import("./session");
+const { clearAccessToken, getAccessToken, resumeAccessTokens } = await import("./access-token");
+const { endSession, loadGrantSession } = await import("./session");
 
 const GRANT_KEY = "neore.extensionGrant";
 const REDIRECT_URI = `https://${"a".repeat(32)}.chromiumapp.org/`;
@@ -83,6 +83,7 @@ beforeEach(() => {
     installChrome();
     installLocks();
     clearAccessToken();
+    resumeAccessTokens();
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
 });
@@ -206,6 +207,29 @@ describe("signOutGrant", () => {
         await signingOut;
 
         expect(store.get(GRANT_KEY)).toEqual(newer);
+    });
+});
+
+describe("endSession", () => {
+    it.each([
+        ["read", "get"],
+        ["removed", "remove"],
+    ] as const)("signs this panel out even when the grant cannot be %s, and rejects so the failure shows", async (_label, failing) => {
+        const grant = { token: "grant", user: USER };
+
+        store.set(GRANT_KEY, grant);
+        fetchMock.mockImplementation(async () => Response.json({ token: "jwt", user: USER }));
+        await expect(getAccessToken()).resolves.toBe("jwt");
+        vi.spyOn(chrome.storage.local, failing).mockRejectedValueOnce(new Error("storage unavailable"));
+
+        const sync = { signOut: vi.fn() };
+
+        await expect(endSession(sync)).rejects.toThrow("storage unavailable");
+
+        expect(store.get(GRANT_KEY)).toEqual(grant);
+        expect(sync.signOut).toHaveBeenCalledOnce();
+        // The grant is still stored, but nothing trades it for a bearer any more.
+        await expect(getAccessToken({ force: true })).resolves.toBeNull();
     });
 });
 

@@ -3,8 +3,9 @@ import { ModelPickerButton } from "@neore/chat-ui/model-picker/model-picker-butt
 import { ArrowLeftIcon, KeyboardIcon, LogOutIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
+import { signOut as endSession } from "@/lib/auth-session";
 import { APP_URL, LLM_GATEWAY_URL, LUNORA_URL } from "@/lib/env";
-import { signOut as endSession, useSession } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { browserLanguage, updateSettings, useSettings } from "@/lib/settings";
 import { firefoxBrowser, IS_FIREFOX } from "@/lib/target";
 import { languageName } from "@/page-context/quick-prompts";
@@ -25,6 +26,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     const models = useModels();
     const [commands, setCommands] = useState<chrome.commands.Command[]>([]);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [signOutFailed, setSignOutFailed] = useState(false);
     const modelLabelId = useId();
     const languageId = useId();
 
@@ -34,9 +36,12 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
 
     const signOut = async () => {
         setIsSigningOut(true);
+        setSignOutFailed(false);
 
         try {
             await endSession();
+        } catch {
+            setSignOutFailed(true);
         } finally {
             setIsSigningOut(false);
         }
@@ -76,6 +81,11 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                         <LogOutIcon aria-hidden="true" className="size-4" />
                         {isSigningOut ? "Signing out…" : "Sign out"}
                     </button>
+                    {signOutFailed && (
+                        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                            Sign-out did not finish: this browser could not forget the account. Try again.
+                        </p>
+                    )}
                 </section>
 
                 <section aria-labelledby="settings-chat" className="flex flex-col gap-3">

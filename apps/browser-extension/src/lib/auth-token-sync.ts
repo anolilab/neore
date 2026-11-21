@@ -86,15 +86,22 @@ export const keepAuthToken = (
  * the old bearer stays until the new grant's arrives. Another account's queries
  * must not leave with this one's, so a switch clears it before the new loop
  * starts.
+ *
+ * `signOut` also stops the running loop: a sign-out clears the bearer before
+ * the grant is gone from storage, and may fail to remove it, so the session
+ * that started the loop can outlive the click.
  */
 export const createAuthTokenSync = (
     client: Pick<LunoraClient, "setAuthToken">,
     getToken: (options: { force: boolean }) => Promise<string | null>,
 ): { signOut: () => void; start: (userId: string) => () => void } => {
     let lastUserId: string | undefined;
+    let stopRunning: (() => void) | undefined;
 
     return {
         signOut: () => {
+            stopRunning?.();
+            stopRunning = undefined;
             lastUserId = undefined;
             client.setAuthToken(null);
         },
@@ -105,7 +112,17 @@ export const createAuthTokenSync = (
 
             lastUserId = userId;
 
-            return keepAuthToken(client, userId, getToken);
+            const stop = keepAuthToken(client, userId, getToken);
+
+            stopRunning = stop;
+
+            return () => {
+                stop();
+
+                if (stopRunning === stop) {
+                    stopRunning = undefined;
+                }
+            };
         },
     };
 };

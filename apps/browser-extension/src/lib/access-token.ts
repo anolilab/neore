@@ -50,6 +50,8 @@ const readGrantOrNone = async (): Promise<StoredGrant | undefined> => {
 /** A JWT and the grant it was minted for: a token never outlives its grant. */
 let cached: { grant: string; token: string } | null = null;
 let inflight: { grant: string; promise: Promise<string | null> } | null = null;
+/** Set by a sign-out until the next session starts: no token, even for a grant storage failed to remove. */
+let held = false;
 
 /**
  * A current bearer token for the stored grant, fetched once and reused until
@@ -60,6 +62,10 @@ let inflight: { grant: string; promise: Promise<string | null> } | null = null;
  * handing out the previous one's JWT.
  */
 export const getAccessToken = async (options: { force?: boolean } = {}): Promise<string | null> => {
+    if (held) {
+        return null;
+    }
+
     const grant = await readGrantOrNone();
 
     if (!grant) {
@@ -89,6 +95,10 @@ export const getAccessToken = async (options: { force?: boolean } = {}): Promise
                 return await getAccessToken();
             }
 
+            if (held) {
+                return null;
+            }
+
             if (current) {
                 cached = token ? { grant: key, token } : null;
             }
@@ -99,10 +109,26 @@ export const getAccessToken = async (options: { force?: boolean } = {}): Promise
         inflight = { grant: key, promise };
     }
 
-    return await inflight.promise;
+    const token = await inflight.promise;
+
+    return held ? null : token;
 };
 
 /** Forget the cached token (sign-out, or a 401 that says it is no longer good). */
 export const clearAccessToken = (): void => {
     cached = null;
+};
+
+/**
+ * A sign-out began: hand out no token until `resumeAccessTokens`, even while
+ * the grant is still stored because storage failed to read or remove it.
+ */
+export const holdAccessTokens = (): void => {
+    held = true;
+    cached = null;
+};
+
+/** A session started (a new grant, or this panel's first): tokens flow again. */
+export const resumeAccessTokens = (): void => {
+    held = false;
 };

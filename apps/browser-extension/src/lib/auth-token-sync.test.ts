@@ -107,4 +107,18 @@ describe(createAuthTokenSync, () => {
         sync.signOut();
         expect(setAuthToken).toHaveBeenLastCalledWith(null);
     });
+
+    it("stops the running loop on sign-out, so a refresh never reinstalls the bearer while the grant is still stored", async () => {
+        const setAuthToken = vi.fn();
+        const getToken = vi.fn(async () => jwt(600));
+        const sync = createAuthTokenSync({ setAuthToken }, getToken);
+
+        sync.start("user-1");
+        await vi.advanceTimersByTimeAsync(0);
+        sync.signOut();
+        await vi.advanceTimersByTimeAsync(600_000);
+
+        expect(getToken).toHaveBeenCalledTimes(1);
+        expect(setAuthToken).toHaveBeenLastCalledWith(null);
+    });
 });

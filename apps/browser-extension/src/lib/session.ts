@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { clearAccessToken } from "./access-token";
+import { holdAccessTokens } from "./access-token";
 import type { GrantUser, StoredGrant } from "./extension-grant";
 import { grantKey, readGrant, signOutGrant, STORAGE_KEY } from "./extension-grant";
 
@@ -34,9 +34,16 @@ export const loadGrantSession = async (): Promise<GrantSession | null> => {
     }
 };
 
-/** Forget this panel's bearer first, then end the grant. */
-export const signOut = async (): Promise<void> => {
-    clearAccessToken();
+/**
+ * Drop this panel's bearer (`authTokenSync.signOut`, which also stops its
+ * refresh) and hold every new token first, then end the grant. So the panel is
+ * signed out even when storage cannot read or remove the grant; `signOutGrant`
+ * then rejects, and the caller shows the sign-out as failed. The hold lasts
+ * until the next session starts (`resumeAccessTokens`).
+ */
+export const endSession = async (authTokenSync: { signOut: () => void }): Promise<void> => {
+    holdAccessTokens();
+    authTokenSync.signOut();
     await signOutGrant();
 };
 
