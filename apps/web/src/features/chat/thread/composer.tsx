@@ -458,7 +458,8 @@ const Composer: FC<ComposerProps> = ({
         return mode;
     }, [isNewThread, threadId, storeNewThreadMode, storeUserChangedMode, storeThreadMode, thread?.mode]);
 
-    const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
+    // Off until the settings have loaded, as the next-prompt hook is: an unresolved query is `undefined`, not an opt-in.
+    const isEnableFollowupSuggestions = userSettings !== undefined && userSettings?.enableFollowupSuggestions !== false;
     const prefersReducedMotion = useReducedMotion();
 
     // Get model mode and default models (memoized together since they share the same data source)
