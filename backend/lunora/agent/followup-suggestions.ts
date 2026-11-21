@@ -7,7 +7,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimFence, claimOnce, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseClaim } from "../lib/claim-once";
+import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 
 /** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
@@ -70,29 +70,32 @@ export const getFollowupSuggestionGate = internalQuery
     });
 
 /**
- * The last check before the paid call: the thread is still open, and this reply's suggestion is not already claimed.
- * `false` for a locked or deleted thread, or a reply another run has already paid for.
+ * The last check before the paid call: the thread is still open, and this reply's suggestion is not already claimed. Answers the
+ * claim's `claimedAt`, the fence the run releases with, or `null` for a locked or deleted thread, or a reply another run holds.
  */
 export const admitFollowupSuggestions = internalMutation
     .input({ lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
-    .output(v.boolean())
+    .output(v.union(v.null(), v.number()))
     .mutation(async ({ args: { lastMessageId, threadId, userId }, ctx: context }) => {
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         // A hard delete marks `deletingAt` while its rows are still readable, so that window is closed too.
         if (!thread || thread.deletedAt || thread.deletingAt !== undefined || isThreadLocked(thread)) {
-            return false;
+            return null;
         }
 
-        return await claimOnce(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, FOLLOWUP_CLAIM_TTL_MS, userId);
+        return await claimFence(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, { ttlMs: FOLLOWUP_CLAIM_TTL_MS, userId });
     });
 
-/** Gives a reply's claim back when its charge was refused or its run failed before the cache: a later run may ask again. */
+/**
+ * Gives a reply's claim back, when its charge was refused or its run failed before the cache: a later run may ask again. Only the claim
+ * this run took (`claimedAt`) is freed: a run whose claim lapsed must not free the claim a later run has taken on the same key.
+ */
 export const releaseFollowupSuggestions = internalMutation
-    .input({ lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
     .output(v.null())
-    .mutation(async ({ args: { lastMessageId, threadId }, ctx: context }) => {
-        await releaseClaim(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`);
+    .mutation(async ({ args: { claimedAt, lastMessageId, threadId }, ctx: context }) => {
+        await releaseClaim(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, claimedAt);
 
         return null;
     });
