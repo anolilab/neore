@@ -98,8 +98,11 @@ apply). While you have control:
 Control goes back to the AI when you choose **Hand back**, when you close the view or leave the chat, or after two
 minutes without input the card can see. Thirty seconds before that, the card asks whether you are still there;
 **Keep control** gives you two more minutes. Typing inside the view does not count as input the card sees, so
-during a long entry choose **Keep control** when asked. If you take control in a second tab, the first tab's view
-closes. If the browser is closed or replaced, control ends and the card offers **Take control** again.
+during a long entry choose **Keep control** when asked. If you take control in a second tab, control moves to it,
+but the first tab's view stays open until that tab next renews control (on your next input there, or **Keep
+control**); close it yourself if you leave it open. If a hand back does not go through, the card says so and control
+goes back to the AI on its own after two minutes without input. If the browser is closed or replaced, control ends
+and the card offers **Take control** again.
 
 When it next uses the browser, the AI is told that you had control and on which page the browser is now. An action
 that would change the page is not run that one time: it gets a screenshot of the page instead, and looks before it

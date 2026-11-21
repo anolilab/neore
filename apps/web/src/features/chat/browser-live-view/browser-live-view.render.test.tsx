@@ -656,7 +656,7 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", reason: "handed_back", threadId: THREAD });
             expect(await screen.findByTitle(READ_ONLY_VIEW)).toBeTruthy();
             expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
-            expect(screen.getByText("You handed the browser back to the agent.")).toBeTruthy();
+            expect(await screen.findByText("You handed the browser back to the agent.")).toBeTruthy();
         });
 
         it("offers no control to a read-only viewer", async () => {
@@ -894,8 +894,15 @@ describe("BrowserLiveView", () => {
             await typeAddress();
 
             expect(backend.navigate.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD, url: "https://example.com/next" });
-            expect(await screen.findByRole("alert")).toHaveProperty("textContent", "That page could not be opened: URL is not allowed");
+            const alert = await screen.findByRole("alert");
+
+            expect(alert).toHaveProperty("textContent", "That page could not be opened: URL is not allowed");
             expect(backend.statusReads).toBeGreaterThan(reads);
+
+            const address = screen.getByRole("textbox", { name: "Page address" });
+
+            expect(address.getAttribute("aria-invalid")).toBe("true");
+            expect(address.getAttribute("aria-describedby")).toBe(alert.id);
         });
 
         it("waits for a slow page without giving up, and keeps the view while it loads", async () => {
@@ -982,25 +989,195 @@ describe("BrowserLiveView", () => {
             expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
         });
 
-        it("says so when keeping control or opening a page is refused while impersonating", async () => {
+        it("closes the interactive view and hands back when keeping control is refused while impersonating", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
             backend.impersonating = true;
             backend.keep.mockRejectedValue({ code: "FORBIDDEN" });
-            backend.navigate.mockRejectedValue({ data: { code: "FORBIDDEN" } });
             const queryClient = mountCard();
 
             await takeControl(queryClient, Date.now() + 40_000);
-            await typeAddress();
-            expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Taking control is not available while impersonating.");
-
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(11_000);
             });
             await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
+
+            expect(await screen.findByText("Taking control is not available while impersonating.")).toBeTruthy();
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it("closes the interactive view and hands back when opening a page is refused while impersonating", async () => {
+            controllable();
+            backend.impersonating = true;
+            backend.navigate.mockRejectedValue({ data: { code: "FORBIDDEN" } });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await typeAddress();
+
+            expect(await screen.findByText("Taking control is not available while impersonating.")).toBeTruthy();
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it("keeps a new lease while the status read still answers from before it was written", async () => {
+            controllable();
+            // `connectBy` names the server's clock when the lease was answered: a read before that has not seen it.
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 61_000, status: "ok", url: CONTROL_URL });
+            const queryClient = mountCard();
+
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            expect(await screen.findByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            // A late read from before the lease (the person's earlier lease, handed back) changes nothing.
+            await push(queryClient, { ...backend.browser!, control: undefined, now: Date.now() - 1000 });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+
+            // A read after the lease was written that says it is gone ends it.
+            await push(queryClient, { ...backend.browser!, control: undefined, now: Date.now() + 2000 });
             await vi.waitFor(() => {
-                expect(screen.getAllByText("Taking control is not available while impersonating.")).toHaveLength(2);
+                expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
             });
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it("closes a lease no status read ever confirmed once it would have run out unrenewed, warning first", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.browser = { ...backend.browser!, idleUntil: Date.now() + 3_600_000 };
+            // Answered after every status read the card gets: none of them has seen the lease (its push was lost).
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 600_000, status: "ok", url: CONTROL_URL });
+            mountCard();
+
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(631_000);
+            });
+            expect(screen.getByRole("button", { name: "Keep control" })).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(30_000);
+            });
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it.each([
+            [
+                "the browser was replaced",
+                async (queryClient: QueryClient): Promise<void> => {
+                    await push(queryClient, { browserId: "b-2", canControl: true, idleUntil: Date.now() + 600_000 });
+                    await screen.findByText("The agent's browser was replaced, and control went back to the agent. You can take control again.");
+                },
+            ],
+            [
+                "the person left the page",
+                async (): Promise<void> => {
+                    await act(async () => {
+                        globalThis.dispatchEvent(new Event("pagehide"));
+                    });
+                },
+            ],
+        ])("hands back a lease whose answer came after %s, and frames nothing", async (_, stopWanting) => {
+            controllable();
+            const late: ((value: unknown) => void)[] = [];
+
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        late.push(resolve);
+                    }),
+            );
+            const queryClient = mountCard();
+
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await stopWanting(queryClient);
+            await act(async () => {
+                late[0]?.({ claim: "claim-late", connectBy: Date.now() + 60_000, status: "ok", url: CONTROL_URL });
+            });
+
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-late", reason: "left", threadId: THREAD }]);
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(screen.queryByRole("button", { name: "Hand back" })).toBeNull();
+        });
+
+        it("hands back a lease whose renewed view does not connect either", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 600_000, false);
+            backend.take.mockResolvedValueOnce({ claim: "claim-2", connectBy: Date.now() + 61_000, status: "ok", url: OTHER_URL });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+            expect(frameSource()).toBe(OTHER_URL);
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+
+            expect(screen.getByRole("alert").textContent).toBe("The live view could not be opened.");
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-2", reason: "left", threadId: THREAD }]);
+            expect(screen.queryByRole("button", { name: "Hand back" })).toBeNull();
+        });
+
+        it("hands back a lease whose renewal failed", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+
+            await takeControl(queryClient, Date.now() + 600_000, false);
+            backend.take.mockRejectedValueOnce(new Error("network"));
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+
+            expect(screen.getByRole("alert").textContent).toBe("The live view could not be opened.");
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+            expect(screen.queryByRole("button", { name: "Hand back" })).toBeNull();
+        });
+
+        it("tries a failed hand back again, and says so once it keeps failing", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            backend.handBack.mockRejectedValue(new Error("network"));
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(10_000);
+            });
+
+            expect(backend.handBack).toHaveBeenCalledTimes(4);
+            expect(screen.getByText("The browser could not be handed back. The agent gets it back on its own after two minutes without input.")).toBeTruthy();
+            expect(screen.queryByText("You handed the browser back to the agent.")).toBeNull();
+        });
+
+        it("shows the controlled browser's page: the status's at first, then the one a page load answered", async () => {
+            controllable();
+            backend.browser = { ...backend.browser!, currentUrl: "https://example.com/login" };
+            backend.navigate.mockResolvedValue({ status: "ok", url: "https://example.com/welcome" });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            const address = screen.getByRole("textbox", { name: "Page address" });
+
+            expect(address).toHaveProperty("value", "https://example.com/login");
+
+            await typeAddress("https://example.com/next");
+
+            await vi.waitFor(() => {
+                expect(address).toHaveProperty("value", "https://example.com/welcome");
+            });
+            expect(screen.getByRole("region", { name: "Browser" }).textContent).toContain("https://example.com/welcome");
+            expect(screen.getByRole("region", { name: "Browser" }).textContent).not.toContain("https://example.com/login");
         });
     });
 });
