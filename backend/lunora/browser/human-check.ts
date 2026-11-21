@@ -8,6 +8,12 @@
 /** How long the agent waits for an interstitial to clear on its own before it asks the person. */
 export const HUMAN_CHECK_WAIT_MS = 8000;
 
+/**
+ * How long after an ask a hand back in a later reply still counts as the person clearing it: time to see the card,
+ * take control and come back. An older ask on the site is not about the page they hand back.
+ */
+export const HUMAN_CHECK_HAND_BACK_WINDOW_MS = 60 * 60_000;
+
 /** Extracted text longer than this is a real page that merely mentions a check, never the check itself. */
 const SHORT_PAGE_CHARS = 3000;
 
@@ -115,8 +121,11 @@ export interface LadderDependencies<R extends LadderResult> {
     look: (kind: "extract" | "screenshot") => Promise<R>;
     /** Waits `ms` between two actions (no browser hold is kept meanwhile): `false` when the run was stopped during it. */
     sleep: (ms: number) => Promise<boolean>;
-    /** Whether the person was asked about `site` in this run (`run`), or in any run of the thread (`thread`). */
-    wasAsked: (site: string, scope: "run" | "thread") => Promise<boolean>;
+    /**
+     * Whether the person was asked about `site` in this run (`run`), or in this run or one of the thread's within the
+     * last {@link HUMAN_CHECK_HAND_BACK_WINDOW_MS} (`recent`).
+     */
+    wasAsked: (site: string, scope: "recent" | "run") => Promise<boolean>;
 }
 
 /** `reported`: the agent itself said a person is needed (a sign-in wall). `readContent`: see {@link detectHumanCheck}. */
@@ -157,8 +166,8 @@ const CLEAR_EVIDENCE: Record<HumanCheckMarker, ReadonlyArray<keyof PageSignals>>
 
 /**
  * Positive evidence that the check on `site` is gone: a successful look, still on `site`, that carries every signal the
- * check was found by (the whole page's text for a check found in it) and shows no check in any of them. A failed look,
- * one missing a signal, or one on another page (a fresh blank browser after the session died, a site the person went
+ * check was found by (the whole page's text for a check found in it), the one that found it not blank, and shows no
+ * check in any of them. A failed look, one missing a signal or reading it blank, or one on another page (a fresh blank browser after the session died, a site the person went
  * on to) proves nothing.
  */
 const showsClear = (page: LadderResult, marker: HumanCheckMarker, site: string): boolean =>
@@ -166,6 +175,8 @@ const showsClear = (page: LadderResult, marker: HumanCheckMarker, site: string):
     site !== "" &&
     humanCheckSite(page.url) === site &&
     CLEAR_EVIDENCE[marker].every((signal) => page[signal] !== undefined) &&
+    // A blank read of the signal the check was found by shows nothing, so it proves nothing.
+    page[marker]?.trim() !== "" &&
     detectHumanCheck(page, marker === "content") === undefined;
 
 /** A look that threw (the action call failed) is a failed look, never an error out of the ladder after an ask is recorded. */
@@ -257,14 +268,15 @@ export const humanCheckLadder = async <R extends LadderResult>(
 };
 
 /**
- * The first look after a hand back, on a site the person was asked about in the thread (this reply, or the one before
- * the follow-up that resumed it). A screenshot, or a failed action, shows no page text, so the whole page's text is read:
+ * The first look after a hand back, on a site the person was asked about in this reply or in a recent one (the reply
+ * before the follow-up that resumed it, within {@link HUMAN_CHECK_HAND_BACK_WINDOW_MS}): an older ask is not what the
+ * person cleared, so a later hand back on that site hears no note about it. A screenshot, or a failed action, shows no page text, so the whole page's text is read:
  * the page is clear only when that read shows no check, still blocked when it shows one, and unknown when it failed.
  */
 const afterHandBack = async <R extends LadderResult>(result: R, dependencies: LadderDependencies<R>, readContent: boolean): Promise<R> => {
     const site = humanCheckSite(result.url);
 
-    if (!(await dependencies.wasAsked(site, "thread"))) {
+    if (!(await dependencies.wasAsked(site, "recent"))) {
         return result;
     }
 

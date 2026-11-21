@@ -441,11 +441,14 @@ export const schema = defineSchema({
         /** The page's host, `""` when it had no readable URL. */
         site: v.string(),
         threadId: v.id("threads"),
+        /** The thread's owner, whose shard holds the row, whoever's turn asked. */
         userId: v.string(),
     })
         .shardBy("userId")
         // Unique: two actions of one reply that claim the same site at once insert one row, so the person is asked once.
         .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
+        // An earlier reply's recent ask, for the first look after a hand back (`browser/human-check.ts#afterHandBack`).
+        .index("by_threadId_site_askedAt", ["threadId", "site", "askedAt"])
         .index("by_userId", ["userId"]),
 
     browserSessions: defineTable({

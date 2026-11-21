@@ -15,7 +15,7 @@ import { internal } from "../../_generated/internal";
  */
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
-import { humanCheckLadder, waitUnlessStopped } from "../../browser/human-check";
+import { HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckLadder, waitUnlessStopped } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
 import toonEncodeOutput from "./toon-encode";
 
@@ -110,13 +110,14 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                           first,
                           {
                               claimAsk: async (site) =>
-                                  await context.runMutation(internal.browser.functions.claimHumanCheckAsk, { run: runKey, site, threadId, userId }),
+                                  await context.runMutation(internal.browser.functions.claimHumanCheckAsk, { run: runKey, site, threadId }),
                               look: async (kind) => await run({ action: kind }),
                               // Between two actions, so no browser hold is kept and a person can take control; Stop ends it.
                               sleep: async (ms) => await waitUnlessStopped(ms, options.abortSignal),
                               wasAsked: async (site, scope) =>
                                   await context.runQuery(internal.browser.functions.wasHumanCheckAsked, {
-                                      ...(scope === "run" && { run: runKey }),
+                                      ...(scope === "recent" && { askedSince: Date.now() - HUMAN_CHECK_HAND_BACK_WINDOW_MS }),
+                                      run: runKey,
                                       site,
                                       threadId,
                                   }),

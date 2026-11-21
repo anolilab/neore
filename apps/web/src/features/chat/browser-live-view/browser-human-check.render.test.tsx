@@ -106,12 +106,13 @@ describe("the Needs you card", () => {
         stop();
     });
 
-    it("says the browser closed when no live view card took the request", async () => {
+    it("says the browser cannot be taken over, never that it closed, when no live view card took the request", async () => {
         backend.browser = running();
         show();
 
         await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
-        expect(screen.getByRole("status").textContent).toContain("The browser has closed.");
+        expect(screen.getByRole("status").textContent).toContain("The browser cannot be taken over right now.");
+        expect(screen.getByRole("status").textContent).not.toContain("closed");
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
     });
 

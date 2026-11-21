@@ -347,33 +347,45 @@ export const closeSession = internalMutation
 
 // ── Human checks (`human-check.ts`) ──────────────────────────────────────
 
-/** The row recording that the person was asked about `site` in the thread: during the run `run`, or any run when absent. */
-const humanCheckAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, site: string, run?: string): Promise<Doc<"browserHumanChecks"> | null> =>
-    await db
-        .query("browserHumanChecks")
-        .withIndex("by_threadId_site_run", (q) => {
-            const bySite = q.eq("threadId", threadId).eq("site", site);
-
-            return run === undefined ? bySite : bySite.eq("run", run);
-        })
-        .first();
-
 export const wasHumanCheckAsked = internalQuery
-    .input({ run: v.optional(v.string()), site: v.string(), threadId: v.id("threads") })
+    .input({ askedSince: v.optional(v.number()), run: v.string(), site: v.string(), threadId: v.id("threads") })
     .output(v.boolean())
-    .query(async ({ args: { run, site, threadId }, ctx }) => (await humanCheckAsk(ctx.db, threadId, site, run)) !== null);
+    .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
+        const inRun = await ctx.db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
+            .first();
+
+        if (inRun !== null || askedSince === undefined) {
+            return inRun !== null;
+        }
+
+        const recent = await ctx.db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", site).gte("askedAt", askedSince))
+            .first();
+
+        return recent !== null;
+    });
 
 /**
  * The person is asked about `site` once per run: `true` for the first ask, which records it, `false` when another
  * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
- * insert that loses answers `false`.
+ * insert that loses answers `false`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
+ * collaborator's id there would outlive their account and escape the owner's erasure). A thread that is gone asks nobody.
  */
 export const claimHumanCheckAsk = internalMutation
-    .input({ run: v.string(), site: v.string(), threadId: v.id("threads"), userId: v.string() })
+    .input({ run: v.string(), site: v.string(), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args: { run, site, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { run, site, threadId }, ctx }) => {
+        const thread = await ctx.db.get("threads", threadId);
+
+        if (!thread) {
+            return false;
+        }
+
         try {
-            await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, run, site, threadId, userId });
+            await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, run, site, threadId, userId: thread.userId });
         } catch (error) {
             if (isUniqueViolation(error)) {
                 return false;

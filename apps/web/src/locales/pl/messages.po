@@ -5406,8 +5406,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Przeglądaj, rozwidlaj i remiksuj przepływy pracy udostępnione przez społeczność"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:748
-#: src/features/chat/browser-live-view/browser-live-view.tsx:986
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1173
+#: src/features/chat/browser-live-view/browser-live-view.tsx:988
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1175
 msgid "Browser"
 msgstr "Przeglądarka"
 
@@ -15794,7 +15794,7 @@ msgstr "Daj innym dostęp do tej strony lub opublikuj link tylko do odczytu."
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "Globalne analizy analityków, analizy rynku i dane inwestycyjne"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1086
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1088
 msgid "Go"
 msgstr "Przejdź"
 
@@ -16373,7 +16373,7 @@ msgstr "W"
 msgid "Hand (pan)"
 msgstr "Rączka (przesuwanie)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1009
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1011
 msgid "Hand back"
 msgstr "Oddaj"
 
@@ -16532,7 +16532,7 @@ msgstr "Ukryj kolumnę"
 msgid "Hide follow-up suggestions"
 msgstr "Ukryj sugestie kolejnych pytań"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1006
 msgid "Hide live view"
 msgstr "Ukryj podgląd na żywo"
 
@@ -18239,7 +18239,7 @@ msgstr "Kazachstan"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "Akceptuj stary sekret jeszcze przez 24 godziny"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1029
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1031
 msgid "Keep control"
 msgstr "Zachowaj sterowanie"
 
@@ -19206,11 +19206,11 @@ msgstr "Podgląd na żywo — wyrenderuje się, gdy komponent skończy się prze
 msgid "Live preview — updating as the artifact streams"
 msgstr "Podgląd na żywo — aktualizuje się w trakcie przesyłania artefaktu"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1120
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1122
 msgid "Live view of the agent's browser (read-only)"
 msgstr "Podgląd na żywo przeglądarki agenta (tylko do odczytu)"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1120
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1122
 msgid "Live view of the agent's browser (you have control)"
 msgstr "Podgląd na żywo przeglądarki agenta (sterujesz)"
 
@@ -21666,7 +21666,7 @@ msgstr "Wymaga mojej recenzji"
 msgid "Needs review"
 msgstr "Do przejrzenia"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:80
+#: src/features/chat/browser-live-view/browser-human-check.tsx:83
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22445,7 +22445,7 @@ msgstr "Nie ma jeszcze obrazów"
 msgid "No indexed files available. Files are still being processed."
 msgstr "Brak zindeksowanych plików. Pliki są jeszcze przetwarzane."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1026
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "Od dłuższej chwili brak działań: sterowanie wróci do agenta za mniej niż minutę."
 
@@ -22586,7 +22586,7 @@ msgstr "Brak sparowanego komputera."
 msgid "No pending invitations"
 msgstr "Brak oczekujących zaproszeń"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:119
+#: src/features/chat/browser-live-view/browser-human-check.tsx:122
 msgid "No picture of the page could be taken. Take control to see it in the live view."
 msgstr "Nie udało się zrobić zdjęcia strony. Przejmij sterowanie, aby zobaczyć ją w podglądzie na żywo."
 
@@ -23562,7 +23562,7 @@ msgstr "Uruchamiaj tylko wtedy, gdy każdy filtr pasuje do treści JSON. Używaj
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Można porównywać tylko modele tego samego typu. Wyczyść wybór, aby zmienić typ."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:64
+#: src/features/chat/browser-live-view/browser-human-check.tsx:67
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Tylko osoba, która może pisać w tym czacie, może przejąć sterowanie przeglądarką."
 
@@ -23943,7 +23943,7 @@ msgstr "Otwórz wątek podagenta"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "Otwórz wyszukiwanie na liście wątków i przenieś na nie fokus ({0})"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:67
+#: src/features/chat/browser-live-view/browser-human-check.tsx:70
 msgid "Open this model's chat on its own to take control of its browser."
 msgstr "Otwórz osobno czat tego modelu, aby przejąć kontrolę nad jego przeglądarką."
 
@@ -24246,11 +24246,11 @@ msgstr "Otwieranie pull requesta…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Otwarcie asystenta bez rozmowy przenosi do najnowszej zamiast do pustego czatu."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1037
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
 msgid "Opening the live view…"
 msgstr "Otwieranie podglądu na żywo…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1092
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1094
 msgid "Opening the page. This can take up to a minute."
 msgstr "Otwieranie strony. Może to potrwać do minuty."
 
@@ -24688,7 +24688,7 @@ msgstr "Strona {currentPage} z {totalPages}"
 msgid "Page added. It is being fetched and indexed."
 msgstr "Dodano stronę. Trwa jej pobieranie i indeksowanie."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1071
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1073
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "Adres strony"
@@ -31162,9 +31162,9 @@ msgstr "Niektóre kroki nie miały danych o cenach; suma jest wartością minima
 #~ msgid "Someone else has control of the browser."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:62
-#: src/features/chat/browser-live-view/browser-live-view.tsx:990
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1049
+#: src/features/chat/browser-live-view/browser-human-check.tsx:65
+#: src/features/chat/browser-live-view/browser-live-view.tsx:992
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1051
 msgid "Someone else has control of this browser."
 msgstr "Ktoś inny steruje tą przeglądarką."
 
@@ -32844,12 +32844,12 @@ msgstr "Tajwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Weź obraz wejściowy, usuń tło, a następnie zastosuj transfer stylu"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:113
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1014
+#: src/features/chat/browser-live-view/browser-human-check.tsx:116
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1016
 msgid "Take control"
 msgstr "Przejmij sterowanie"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:86
+#: src/features/chat/browser-live-view/browser-human-check.tsx:89
 msgid "Take control, clear it, then hand the browser back."
 msgstr "Przejmij sterowanie, przejdź weryfikację, a potem oddaj przeglądarkę."
 
@@ -33596,7 +33596,7 @@ msgstr "agent nie oferuje tego wyboru"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "Agent zakończył pracę bez dostarczenia przewodnika. Napisz go ponownie."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1048
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1050
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "Agent kończy działanie w przeglądarce, co może potrwać ponad minutę. Spróbuj ponownie za chwilę."
 
@@ -33608,7 +33608,7 @@ msgstr "Agent nadal otwiera swoją sesję. Spróbuj ponownie za chwilę."
 msgid "The agent is still working on the last message."
 msgstr "Agent nadal pracuje nad ostatnią wiadomością."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:987
+#: src/features/chat/browser-live-view/browser-live-view.tsx:989
 msgid "The agent is using a browser"
 msgstr "Agent używa przeglądarki"
 
@@ -33636,11 +33636,11 @@ msgstr "Agent na Twoim komputerze czyta zmianę…"
 msgid "The agent's browser closed while the page loaded."
 msgstr "Przeglądarka agenta została zamknięta podczas ładowania strony."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:84
+#: src/features/chat/browser-live-view/browser-human-check.tsx:87
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "Przeglądarka agenta trafiła na stronę w {site}, którą może przejść tylko człowiek. Agent czeka i nie będzie próbował jej obejść."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:83
+#: src/features/chat/browser-live-view/browser-human-check.tsx:86
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "Przeglądarka agenta trafiła na stronę, którą może przejść tylko człowiek. Agent czeka i nie będzie próbował jej obejść."
 
@@ -33713,6 +33713,10 @@ msgstr "Bot ustawia model dla tego czatu."
 #: src/features/settings/components/chat/bots-settings.tsx:351
 msgid "The bot's tools were saved"
 msgstr "Zapisano narzędzia bota"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:61
+msgid "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
+msgstr "Nie można teraz przejąć przeglądarki. Poproś agenta, aby ponownie zajrzał na stronę, jeśli jest jeszcze potrzebna."
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
@@ -34095,7 +34099,7 @@ msgstr "Link może być błędny albo właściciel ustawił rozmowę jako prywat
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Link może być błędny albo właściciel wycofał publikację strony lub ją usunął."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1057
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1059
 msgid "The live view could not be opened."
 msgstr "Nie udało się otworzyć podglądu na żywo."
 
@@ -34103,7 +34107,7 @@ msgstr "Nie udało się otworzyć podglądu na żywo."
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1044
 msgid "The live view is not available right now."
 msgstr "Podgląd na żywo jest teraz niedostępny."
 
@@ -34234,7 +34238,7 @@ msgstr "Agent strony nie mógł edytować tej strony"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "Strona pokazuje teraz drugą wersję. Skopiuj ze swojej wszystko, co chcesz zachować."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1097
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1099
 msgid "The page you opened is still loading."
 msgstr "Otwarta przez Ciebie strona nadal się ładuje."
 
@@ -35675,7 +35679,7 @@ msgstr "Zbyt wiele prób. Poczekaj kilka sekund i spróbuj ponownie."
 msgid "too many files"
 msgstr "zbyt wiele plików"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1058
 msgid "Too many live views were opened. Try again later."
 msgstr "Otwarto zbyt wiele podglądów na żywo. Spróbuj ponownie później."
 
@@ -36078,9 +36082,9 @@ msgstr "Spróbuj zmienić wyszukiwane hasła."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-human-check.tsx:103
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1188
+#: src/features/chat/browser-live-view/browser-human-check.tsx:106
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1190
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -38155,7 +38159,7 @@ msgstr "Chcesz kontynuować od tego miejsca?"
 msgid "Watch"
 msgstr "Obserwuj"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1004
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1006
 msgid "Watch live"
 msgstr "Oglądaj na żywo"
 
@@ -38436,11 +38440,11 @@ msgstr "Na co przewodnik powinien zwrócić uwagę?"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Co agent zlecał twoim urządzeniom w ciągu ostatnich 30 dni."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:123
+#: src/features/chat/browser-live-view/browser-human-check.tsx:126
 msgid "What the agent's browser sees"
 msgstr "Co widzi przeglądarka agenta"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:123
+#: src/features/chat/browser-live-view/browser-human-check.tsx:126
 msgid "What the agent's browser sees on {site}"
 msgstr "Co widzi przeglądarka agenta w {site}"
 
@@ -38576,7 +38580,7 @@ msgstr "Gdzie myśli<0/><1>stają się działaniami.</1>"
 msgid "Where you stay in control"
 msgstr "Gdzie zachowujesz kontrolę"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1175
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1177
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Nie udało się sprawdzić, czy agent używa przeglądarki."
 
@@ -39052,7 +39056,7 @@ msgstr "Otrzymasz powiadomienie, gdy uruchomienie się zakończy, wymaga przegl�
 msgid "You handed the browser back to the agent."
 msgstr "Oddano przeglądarkę agentowi."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:60
+#: src/features/chat/browser-live-view/browser-human-check.tsx:63
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "Masz sterowanie. Przejdź weryfikację w podglądzie na żywo, a potem oddaj przeglądarkę."
 
@@ -39275,7 +39279,7 @@ msgstr "Twoje czaty i {0}"
 msgid "Your chats and the bots you chose"
 msgstr "Twoje czaty i wybrane boty"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1106
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1108
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "Twoje kliknięcia, wpisywanie i przewijanie w podglądzie trafiają do przeglądarki. Agent czeka, aż ją oddasz."
 

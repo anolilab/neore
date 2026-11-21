@@ -54,8 +54,11 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     // that it closed.
     if (status.isError) {
         state = t`Whether the browser is still open could not be checked.`;
-    } else if (browser === null || missed) {
+    } else if (browser === null) {
         state = t`The browser has closed. Ask the agent to open the page again if it is still needed.`;
+    } else if (missed) {
+        // No live view card answered: the browser went idle (its card is gone) though the status still lists it.
+        state = t`The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed.`;
     } else if (browser?.control?.byYou === true) {
         state = t`You have control. Clear the check in the live view, then hand the browser back.`;
     } else if (browser?.control !== undefined) {

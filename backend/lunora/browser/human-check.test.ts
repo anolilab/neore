@@ -6,9 +6,12 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
+import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { claimHumanCheckAsk, wasHumanCheckAsked } from "./functions";
+import { eraseBrowserDataForUser } from "./gdpr";
 import {
     detectHumanCheck,
+    HUMAN_CHECK_HAND_BACK_WINDOW_MS,
     HUMAN_CHECK_WAIT_MS,
     humanCheckLadder,
     humanCheckSite,
@@ -33,8 +36,8 @@ const CLEAR_EXTRACT: LadderResult = { ...CLEAR_PAGE, content: "Item 42. Add to c
 const TEXT_CHECK: LadderResult = { content: "Verifying you are human.", success: true, title: "shop.example.com", url: "https://shop.example.com/" };
 
 /**
- * Dependencies over in-memory sets of sites asked about in this run (`asked`) and in the thread's earlier runs
- * (`earlier`); `looks` are the pages the fresh looks return, in order.
+ * Dependencies over in-memory sets of sites asked about in this run (`asked`) and in the thread's recent earlier
+ * runs (`earlier`); `looks` are the pages the fresh looks return, in order.
  */
 const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earlier = new Set<string>()) => {
     const dependencies = {
@@ -49,7 +52,7 @@ const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earli
         }),
         look: vi.fn(async (_kind: "extract" | "screenshot") => looks.shift() ?? CLEAR_PAGE),
         sleep: vi.fn(async (_ms: number) => true),
-        wasAsked: vi.fn(async (site: string, scope: "run" | "thread") => asked.has(site) || (scope === "thread" && earlier.has(site))),
+        wasAsked: vi.fn(async (site: string, scope: "recent" | "run") => asked.has(site) || (scope === "recent" && earlier.has(site))),
     } satisfies LadderDependencies<LadderResult>;
 
     return { asked, dependencies };
@@ -280,9 +283,11 @@ describe("humanCheckLadder", () => {
         }
     });
 
-    it("step 1: a person who took control during the wait and handed back an empty browser or another site is not asked", async () => {
+    it("step 1: a person who took control during the wait and handed back an empty browser, a blank read or another site is not asked", async () => {
         for (const look of [
             { content: "", success: true, title: "", url: "about:blank" },
+            // Still on the site, but the text read came back blank: that proves nothing.
+            { content: "  ", success: true, title: "", url: "https://shop.example.com/" },
             { content: "Welcome back.", success: true, title: "Account", url: "https://login.example.net/" },
         ]) {
             const handed = { ...look, error: "The person had control of the browser and handed it back;", handedBack: true };
@@ -445,7 +450,7 @@ describe("the ask record", () => {
 
     it("asks once per site per run, and a new run asks again", async () => {
         const claim = async (run: string, site: string) =>
-            await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run, site, threadId, userId: "u-1" }));
+            await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run, site, threadId }));
         const wasAsked = async (run: string, site: string) =>
             await harness.action(async (ctx: any) => await ctx.runQuery(wasHumanCheckAsked, { run, site, threadId }));
 
@@ -459,12 +464,54 @@ describe("the ask record", () => {
 
     it("lets one of two claims made at once for a site win, and records one row", async () => {
         const claim = async () =>
-            await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId, userId: "u-1" }));
+            await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId }));
 
         const claims = await Promise.all([claim(), claim(), claim()]);
         const rows = await harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect());
 
         expect(claims.filter(Boolean)).toHaveLength(1);
         expect(rows).toHaveLength(1);
+    });
+
+    it("counts an earlier reply's ask after a hand back only while it is recent", async () => {
+        const now = Date.now();
+        const askedAt = async (run: string, at: number) =>
+            await harness.run(async (ctx: any) => await ctx.db.insert("browserHumanChecks", { askedAt: at, run, site: "a.example", threadId, userId: "u-1" }));
+        const wasAskedRecently = async () =>
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runQuery(wasHumanCheckAsked, { askedSince: now - HUMAN_CHECK_HAND_BACK_WINDOW_MS, run: "r3", site: "a.example", threadId }),
+            );
+
+        await askedAt("r1", now - HUMAN_CHECK_HAND_BACK_WINDOW_MS - 1);
+
+        // An older reply's ask is not what the person handed back, so there is no extra read and no note.
+        await expect(wasAskedRecently()).resolves.toBe(false);
+
+        await askedAt("r2", now - 60_000);
+
+        await expect(wasAskedRecently()).resolves.toBe(true);
+    });
+
+    it("stores the thread owner as the row's user whoever asked, so the owner's erasure removes it", async () => {
+        // A collaborator's turn runs on the owner's shard; the claim takes no caller id.
+        await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "collaborator-turn", site: "a.example", threadId }));
+
+        const rows = async () => await harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect());
+
+        const asked = await rows();
+
+        expect(asked.map((row: { userId: string }) => row.userId)).toEqual(["u-1"]);
+
+        await harness.run(async (ctx: any) => await eraseBrowserDataForUser(ctx, "u-1"));
+
+        await expect(rows()).resolves.toHaveLength(0);
+    });
+
+    it("goes with the thread when it is deleted", async () => {
+        await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }));
+
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect())).resolves.toHaveLength(0);
     });
 });

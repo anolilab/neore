@@ -4514,6 +4514,14 @@
         }
       },
       "indexes": {
+        "by_threadId_site_askedAt": {
+          "fields": [
+            "threadId",
+            "site",
+            "askedAt"
+          ],
+          "unique": false
+        },
         "by_threadId_site_run": {
           "fields": [
             "threadId",

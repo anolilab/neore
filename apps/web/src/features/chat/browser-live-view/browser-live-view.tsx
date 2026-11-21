@@ -957,7 +957,9 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         }
 
         // The card is there, so the request is answered, whether or not control can be taken now: the card says why not.
-        section.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        const reduceMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+        section.current?.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "nearest" });
 
         if (mayTakeControl && !takingControl) {
             startControl();
