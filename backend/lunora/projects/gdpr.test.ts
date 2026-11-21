@@ -170,7 +170,7 @@ describe("owned projects in the GDPR export", () => {
     it("exports every project the user owns, with or without a repository, its machine and folder, and never another user's", async () => {
         await harness.run((async (ctx: any) => {
             await ctx.db.insert("projects", { createdAt: 1, path: "/home/a/app", title: "with folder", userId: A });
-            await ctx.db.insert("projects", { createdAt: 2, title: "no folder", userId: A });
+            await ctx.db.insert("projects", { createdAt: 2, subAgentRoles: { review: { model: "m" } }, title: "no folder", userId: A });
             await ctx.db.insert("projects", { createdAt: 3, title: "not mine", userId: B });
         }) as never);
 
@@ -181,7 +181,7 @@ describe("owned projects in the GDPR export", () => {
         expect(projects).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ path: "/home/a/app", sharingEnabled: false, title: "with folder" }),
-                expect.objectContaining({ sharingEnabled: false, title: "no folder" }),
+                expect.objectContaining({ sharingEnabled: false, subAgentRoles: { review: { model: "m" } }, title: "no folder" }),
             ]),
         );
     });
