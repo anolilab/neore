@@ -17,19 +17,21 @@ export const MIN_REFRESH_DELAY_MS = 30_000;
  * A `null` subject means nobody signed in to Lunora, so a token with no `sub`
  * (the backend mints none) is never given one: the bearer is cleared first,
  * which drops the sticky subject, and the token then goes in bare, keyed on its
- * own hash.
+ * own hash. Returns the subject it installed, `undefined` for a bare token.
  */
-const installBearer = (client: Pick<LunoraClient, "setAuthToken">, token: string): void => {
+const installBearer = (client: Pick<LunoraClient, "setAuthToken">, token: string): string | undefined => {
     const sub = tokenSubject(token);
 
     if (sub === null || sub === token) {
         client.setAuthToken(null);
         client.setAuthToken(token);
 
-        return;
+        return undefined;
     }
 
     client.setAuthToken(token, sub);
+
+    return sub;
 };
 
 /**
@@ -53,9 +55,14 @@ const installBearer = (client: Pick<LunoraClient, "setAuthToken">, token: string
  * the queue. A grant that is really gone ends the session, and with it this loop.
  *
  * The stop leaves the bearer installed: whether it goes is the next session's
- * call (`createAuthTokenSync`).
+ * call (`createAuthTokenSync`). `onInstall` hears the subject of each bearer
+ * installed under one.
  */
-export const keepAuthToken = (client: Pick<LunoraClient, "setAuthToken">, getToken: (options: { force: boolean }) => Promise<string | null>): (() => void) => {
+export const keepAuthToken = (
+    client: Pick<LunoraClient, "setAuthToken">,
+    getToken: (options: { force: boolean }) => Promise<string | null>,
+    onInstall?: (sub: string) => void,
+): (() => void) => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -74,7 +81,11 @@ export const keepAuthToken = (client: Pick<LunoraClient, "setAuthToken">, getTok
             return;
         }
 
-        installBearer(client, token);
+        const sub = installBearer(client, token);
+
+        if (sub !== undefined) {
+            onInstall?.(sub);
+        }
 
         const expiresAt = tokenExpiresAt(token);
 
@@ -117,6 +128,10 @@ export interface SuspendedSession {
  * queue stay until the grant is really gone (`finish`). If storage keeps the
  * grant, `restore` restarts the loop for it. Either is a no-op once another
  * session has started, so a sign-in from another panel is never undone.
+ *
+ * The account on record is the one whose bearer is installed: a loop handed
+ * another account's token (a sign-in from another panel) records that account,
+ * so its own `start` that follows keeps the bearer and its queue.
  */
 export const createAuthTokenSync = (
     client: Pick<LunoraClient, "setAuthToken">,
@@ -129,7 +144,9 @@ export const createAuthTokenSync = (
 
     const run = () => {
         stopLoop?.();
-        stopLoop = keepAuthToken(client, getToken);
+        stopLoop = keepAuthToken(client, getToken, (sub) => {
+            lastUserId = sub;
+        });
     };
 
     const stop = () => {

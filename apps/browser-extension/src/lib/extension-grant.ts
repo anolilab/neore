@@ -1,5 +1,6 @@
 import { hasCookieBuildReads } from "./cookie-build-trace";
 import { APP_URL, LUNORA_URL } from "./env";
+import { GrantRemovalError } from "./grant-removal-error";
 
 /*
  * Sign-in for both builds. Neither uses the web app's session cookie: the
@@ -361,23 +362,38 @@ export const requestGrantAccessToken = async (grant: StoredGrant | undefined): P
 };
 
 /**
- * Revoke the session server-side, then forget it. Forgets it even if the revoke
- * fails, but not a grant a sign-in stored while the revoke was out.
+ * Revoke the session of the grant `key` names (`grantKey`), then forget it.
+ * Forgets it even if the revoke fails, but not a grant a sign-in stored while
+ * the revoke was out. `"replaced"` when another grant is stored now: it is left
+ * alone, unrevoked. A failed removal rejects with `GrantRemovalError`.
  */
-export const signOutGrant = async (): Promise<void> => {
+export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> => {
     const grant = await readGrant();
 
     if (!grant) {
-        return;
+        return "signed-out";
     }
+
+    if (grantKey(grant) !== key) {
+        return "replaced";
+    }
+
+    let revoked = false;
 
     try {
         const response = await postBackend("/extension/auth/revoke", { token: grant.token });
 
+        revoked = response.ok;
         await response.body?.cancel();
     } catch {
         // Offline: the session expires on its own; the local copy goes regardless.
-    } finally {
-        await clearGrant(grant.token);
     }
+
+    try {
+        await clearGrant(grant.token);
+    } catch (error) {
+        throw new GrantRemovalError(error, revoked);
+    }
+
+    return "signed-out";
 };

@@ -6,7 +6,7 @@ import { endSession } from "./session";
 /** The one bearer sync for this panel's Lunora client (`createAuthTokenSync`). */
 export const authTokenSync = createAuthTokenSync(lunora, getAccessToken);
 
-/** Sign this panel out (`endSession`); rejects when the grant stays stored. */
-export const signOut = async (): Promise<void> => {
-    await endSession(authTokenSync);
+/** Sign out the grant `key` names, the session shown (`endSession`); rejects when the grant stays stored. */
+export const signOut = async (key: string): Promise<void> => {
+    await endSession(authTokenSync, key);
 };

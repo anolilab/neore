@@ -178,7 +178,7 @@ describe("signOutGrant", () => {
         store.set(GRANT_KEY, { token: "grant", user: USER });
         fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
-        await signOutGrant();
+        await signOutGrant(USER.id);
 
         expect(sentTo(0)).toMatchObject({ body: { token: "grant" }, credentials: "omit", url: "https://api.example.test/extension/auth/revoke" });
         expect(store.get(GRANT_KEY)).toBeUndefined();
@@ -188,9 +188,20 @@ describe("signOutGrant", () => {
         store.set(GRANT_KEY, { token: "grant", user: USER });
         fetchMock.mockRejectedValueOnce(new TypeError("offline"));
 
-        await signOutGrant();
+        await signOutGrant(USER.id);
 
         expect(store.get(GRANT_KEY)).toBeUndefined();
+    });
+
+    it("revokes nothing when the grant stored is not the one shown, even for the same user", async () => {
+        const newer = { id: "g2", token: "new-grant", user: USER };
+
+        store.set(GRANT_KEY, newer);
+
+        await expect(signOutGrant("g1")).resolves.toBe("replaced");
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(store.get(GRANT_KEY)).toEqual(newer);
     });
 
     it("keeps a grant signed in while the revoke was out", async () => {
@@ -200,7 +211,7 @@ describe("signOutGrant", () => {
         store.set(GRANT_KEY, { token: "old-grant", user: USER });
         fetchMock.mockReturnValueOnce(answer.promise);
 
-        const signingOut = signOutGrant();
+        const signingOut = signOutGrant(USER.id);
 
         await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         store.set(GRANT_KEY, newer);
@@ -253,7 +264,7 @@ describe("endSession", () => {
         stopSync = sync.signOut;
         fetchMock.mockReturnValueOnce(revoke.promise);
 
-        const signingOut = endSession(sync);
+        const signingOut = endSession(sync, USER.id);
 
         await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
         // Pending: no new token, and the bearer (with its offline queue) stays.
@@ -269,21 +280,71 @@ describe("endSession", () => {
     });
 
     it.each([
-        ["read", "get"],
-        ["removed", "remove"],
-    ] as const)("brings the session back when the grant cannot be %s, keeping the bearer, and rejects so the failure shows", async (_label, failing) => {
+        ["cannot be read", "get", undefined],
+        ["cannot be removed while offline", "remove", new TypeError("offline")],
+    ] as const)("brings the session back when the grant %s, keeping the bearer, and rejects so the failure shows", async (_label, failing, revokeError) => {
         const { setAuthToken, sync } = await signedIn();
 
         stopSync = sync.signOut;
         vi.spyOn(chrome.storage.local, failing).mockRejectedValueOnce(new Error("storage unavailable"));
 
-        await expect(endSession(sync)).rejects.toThrow("storage unavailable");
+        if (revokeError) {
+            fetchMock.mockRejectedValueOnce(revokeError);
+        }
+
+        await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
 
         expect(store.get(GRANT_KEY)).toEqual(grant);
         // The loop restarted for the grant still stored, and the bearer was never cleared.
         await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith(bearerFor(USER.id), USER.id));
         expect(setAuthToken).not.toHaveBeenCalledWith(null);
         await expect(getAccessToken({ force: true })).resolves.toBe(bearerFor(USER.id));
+    });
+
+    it("does not bring back a grant the server revoked when only its removal failed", async () => {
+        const { setAuthToken, sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+
+        await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+
+        expect(setAuthToken.mock.calls).toEqual([[null]]);
+        await expect(getAccessToken({ force: true })).resolves.toBeNull();
+    });
+
+    it("runs one sign-out per grant: a second call joins the first", async () => {
+        const { setAuthToken, sync } = await signedIn();
+        const revoke = deferred();
+
+        stopSync = sync.signOut;
+        fetchMock.mockReturnValueOnce(revoke.promise);
+
+        const first = endSession(sync, USER.id);
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
+
+        const second = endSession(sync, USER.id);
+
+        revoke.resolve(new Response(null, { status: 204 }));
+        await Promise.all([first, second]);
+
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(1);
+        expect(setAuthToken.mock.calls).toEqual([[null]]);
+    });
+
+    it("leaves another grant stored since the page was shown signed in, and resolves", async () => {
+        const { setAuthToken, sync } = await signedIn();
+        const newer = { id: "g2", token: "newer", user: { ...USER, id: "u2" } };
+
+        stopSync = sync.signOut;
+        store.set(GRANT_KEY, newer);
+
+        await expect(endSession(sync, USER.id)).resolves.toBeUndefined();
+
+        expect(store.get(GRANT_KEY)).toEqual(newer);
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(0);
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenLastCalledWith(bearerFor("u2"), "u2"));
     });
 
     it("leaves a sign-in from another panel alone when its sign-out finishes after it", async () => {
@@ -293,7 +354,7 @@ describe("endSession", () => {
 
         fetchMock.mockReturnValueOnce(revoke.promise);
 
-        const signingOut = endSession(sync);
+        const signingOut = endSession(sync, USER.id);
 
         await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
         // Another panel signs in; this panel's provider starts the new session.
@@ -332,7 +393,7 @@ describe("a refresh against a sign-out", () => {
 
         await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
 
-        const signingOut = signOutGrant();
+        const signingOut = signOutGrant(USER.id);
 
         await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
         held.resolve(new Response(null));

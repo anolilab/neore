@@ -35,12 +35,15 @@ describe(hasCookieBuildReads, () => {
 
     it("creates no database when it is gone by the time it is opened", async () => {
         const idb = new IDBFactory();
+        const listDatabases = idb.databases.bind(idb);
 
         // Listed, then deleted before the open: what a concurrent delete looks like.
         idb.databases = async () => [{ name: "lunora-query-cache", version: 1 }];
 
         await expect(hasCookieBuildReads(idb)).resolves.toBe(false);
+        await expect(listDatabases()).resolves.toEqual([]);
 
+        // And the client can still create its own cache there.
         const cache = createIndexedDbQueryCache({ indexedDB: idb });
 
         await cache.put("k", { identity: "user-1", ts: 1, value: 1 });

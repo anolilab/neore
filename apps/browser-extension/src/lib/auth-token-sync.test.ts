@@ -173,6 +173,20 @@ describe(createAuthTokenSync, () => {
         expect(setAuthToken).toHaveBeenLastCalledWith(null);
     });
 
+    it("keeps the bearer a loop installed for another account when that account's own session starts", async () => {
+        const setAuthToken = vi.fn();
+        const sync = createAuthTokenSync({ setAuthToken }, async () => jwt(600, "user-2"));
+
+        // Another panel signed user-2 in before this panel's session for user-1 was torn down.
+        const stop = sync.start("user-1");
+
+        await vi.advanceTimersByTimeAsync(0);
+        stop();
+        sync.start("user-2");
+
+        expect(setAuthToken).not.toHaveBeenCalledWith(null);
+    });
+
     it("stops the running loop on sign-out, so a refresh never reinstalls the bearer while the grant is still stored", async () => {
         const setAuthToken = vi.fn();
         const getToken = vi.fn(async () => jwt(600));

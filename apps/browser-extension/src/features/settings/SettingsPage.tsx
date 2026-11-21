@@ -34,12 +34,12 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         void chrome.commands.getAll().then(setCommands);
     }, []);
 
-    const signOut = async () => {
+    const signOut = async (key: string) => {
         setIsSigningOut(true);
         setSignOutFailed(false);
 
         try {
-            await endSession();
+            await endSession(key);
         } catch {
             setSignOutFailed(true);
         } finally {
@@ -72,9 +72,11 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                     <p className="truncate">{session?.user.email}</p>
                     <button
                         className="flex w-fit items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                        disabled={isSigningOut}
+                        disabled={isSigningOut || !session}
                         onClick={() => {
-                            void signOut();
+                            if (session) {
+                                void signOut(session.sessionId);
+                            }
                         }}
                         type="button"
                     >

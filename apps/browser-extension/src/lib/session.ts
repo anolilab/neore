@@ -4,6 +4,7 @@ import { holdAccessTokens, resumeAccessTokens } from "./access-token";
 import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
 import { grantKey, readGrant, signOutGrant, STORAGE_KEY } from "./extension-grant";
+import { GrantRemovalError } from "./grant-removal-error";
 
 /**
  * The signed-in user: the app grant this extension holds itself
@@ -35,30 +36,69 @@ export const loadGrantSession = async (): Promise<GrantSession | null> => {
     }
 };
 
-/**
- * End the grant, and this panel's session with it. While the grant is being
- * revoked and removed, no new token goes out (`holdAccessTokens`) and the
- * refresh loop stops; the bearer and the writes queued offline under it stay.
- * Once the grant is gone the bearer is cleared. When storage fails to read or
- * remove the grant, the session comes back for the grant still stored (its
- * tokens flow and the loop restarts, the queue intact) and this rejects, so
- * the caller shows the sign-out as failed and it can be tried again.
- */
-export const endSession = async (authTokenSync: { suspend: () => SuspendedSession }): Promise<void> => {
+/** The sign-out running for each grant key: a second one for the same grant joins it. */
+const signingOut = new Map<string, Promise<void>>();
+
+const runEndSession = async (authTokenSync: { suspend: () => SuspendedSession }, key: string): Promise<void> => {
     holdAccessTokens();
 
     const suspended = authTokenSync.suspend();
+    let outcome: "replaced" | "signed-out";
 
     try {
-        await signOutGrant();
+        outcome = await signOutGrant(key);
     } catch (error) {
-        resumeAccessTokens();
-        suspended.restore();
+        // Revoked: the grant is dead server side, so nothing comes back for it.
+        if (error instanceof GrantRemovalError && error.revoked) {
+            suspended.finish();
+        } else {
+            resumeAccessTokens();
+            suspended.restore();
+        }
 
         throw error;
     }
 
+    if (outcome === "replaced") {
+        resumeAccessTokens();
+        suspended.restore();
+
+        return;
+    }
+
     suspended.finish();
+};
+
+/**
+ * End the grant `key` names (the session shown), and this panel's session with
+ * it. While the grant is being revoked and removed, no new token goes out
+ * (`holdAccessTokens`) and the refresh loop stops; the bearer and the writes
+ * queued offline under it stay. Once the grant is gone the bearer is cleared.
+ *
+ * When storage fails to read or remove the grant this rejects, so the caller
+ * shows the sign-out as failed and it can be tried again. If the server still
+ * accepts the grant, the session comes back for it (its tokens flow and the
+ * loop restarts, the queue intact); once the revoke was confirmed it does not:
+ * the bearer is cleared and tokens stay held. When another grant is stored by
+ * now, it is left signed in and this resolves.
+ *
+ * One sign-out per grant: a second call for the same key, from a reopened
+ * Settings, joins the one running.
+ */
+export const endSession = async (authTokenSync: { suspend: () => SuspendedSession }, key: string): Promise<void> => {
+    const running = signingOut.get(key);
+
+    if (running) {
+        return await running;
+    }
+
+    const run = runEndSession(authTokenSync, key).finally(() => {
+        signingOut.delete(key);
+    });
+
+    signingOut.set(key, run);
+
+    return await run;
 };
 
 /** The stored grant's session, kept in step with `storage.local`. `undefined` while loading. */
