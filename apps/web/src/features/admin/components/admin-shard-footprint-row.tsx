@@ -3,35 +3,13 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useState } from "react";
 
 import { useShardFootprint } from "../hooks/use-admin";
-
-interface FootprintTotals {
-    /** Shards given up for this census: their counts are not in the totals. Each is reported once, so pages add up. */
-    abandonedShards: number;
-    approxBytes: number;
-    messageRows: number;
-    shards: number;
-    threads: number;
-}
-
-const NO_TOTALS: FootprintTotals = { abandonedShards: 0, approxBytes: 0, messageRows: 0, shards: 0, threads: 0 };
-
-const sumTotals = (pages: FootprintTotals[]): FootprintTotals => {
-    const sum = { ...NO_TOTALS };
-
-    for (const page of pages) {
-        sum.abandonedShards += page.abandonedShards;
-        sum.approxBytes += page.approxBytes;
-        sum.messageRows += page.messageRows;
-        sum.shards += page.shards;
-        sum.threads += page.threads;
-    }
-
-    return sum;
-};
+import type { FootprintTotals } from "../lib/shard-footprint";
+import { COMPACT_AFTER_DAYS, readingsOf, sumTotals } from "../lib/shard-footprint";
 
 const formatBytes = (bytes: number, locale: string): string => {
     const units = ["B", "KB", "MB", "GB", "TB"];
@@ -46,10 +24,14 @@ const formatBytes = (bytes: number, locale: string): string => {
     return `${formatNumber(value, locale, { maximumFractionDigits: 1 })} ${units[unit]}`;
 };
 
+const formatShare = (part: number, whole: number, locale: string): string =>
+    whole === 0 ? "—" : formatNumber(part / whole, locale, { maximumFractionDigits: 1, style: "percent" });
+
 /**
  * Totals of the user shards' stored conversation data. Shows the shards measured so far; each
  * "Measure more shards" press measures the next page of the census and adds it to the totals.
- * Totals only: no thread ids are shown.
+ * Totals only: no thread ids are shown. Below the totals, the readings the retention decisions need: archived threads by
+ * how long they have been archived, active threads by how long they have been idle, and tool output's share.
  */
 const AdminShardFootprintRow = () => {
     const { i18n, t } = useLingui();
@@ -58,6 +40,8 @@ const AdminShardFootprintRow = () => {
     const [cursor, setCursor] = useState<string | undefined>(undefined);
     const page = useShardFootprint(cursor);
     const totals = sumTotals(page.data ? [...measured, page.data] : measured);
+    const readings = readingsOf(totals.breakdown);
+    const { locale } = i18n;
     const finished = page.data !== undefined && page.data.isDone;
 
     const measureNext = () => {
@@ -81,7 +65,7 @@ const AdminShardFootprintRow = () => {
             <CardHeader>
                 <CardTitle>{t`Shard footprint`}</CardTitle>
                 <CardDescription>
-                    {t`Stored conversation data across user shards: threads, message rows and an estimate of their size. Counts only; no thread is listed.`}
+                    {t`Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed.`}
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -106,6 +90,82 @@ const AdminShardFootprintRow = () => {
                     <div>
                         <dt className="text-muted-foreground text-sm">{t`Approximate size`}</dt>
                         <dd className="text-2xl font-semibold">{formatBytes(totals.approxBytes, i18n.locale)}</dd>
+                    </div>
+                </dl>
+                <Table>
+                    <TableCaption>{t`Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted.`}</TableCaption>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>{t`Archived for at least`}</TableHead>
+                            <TableHead className="text-right">{t`Threads`}</TableHead>
+                            <TableHead className="text-right">{t`Message rows`}</TableHead>
+                            <TableHead className="text-right">{t`Approximate size`}</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {readings.archived.map((row) => (
+                            <TableRow key={row.sinceDays}>
+                                <TableHead scope="row">{row.sinceDays === 0 ? t`Any time` : t`${formatNumber(row.sinceDays, locale)} days`}</TableHead>
+                                <TableCell className="text-right tabular-nums">{formatNumber(row.threads, locale)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{formatNumber(row.messageRows, locale)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{formatBytes(row.approxBytes, locale)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                <Table>
+                    <TableCaption>{t`Active threads, by days since their last activity. Threads waiting on a person are included.`}</TableCaption>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>{t`Idle for at least`}</TableHead>
+                            <TableHead className="text-right">{t`Threads`}</TableHead>
+                            <TableHead className="text-right">{t`Approximate size`}</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {readings.idle.map((row) => (
+                            <TableRow key={row.sinceDays}>
+                                <TableHead scope="row">{t`${formatNumber(row.sinceDays, locale)} days`}</TableHead>
+                                <TableCell className="text-right tabular-nums">{formatNumber(row.threads, locale)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{formatBytes(row.approxBytes, locale)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                    <div>
+                        <dt className="text-muted-foreground">{t`Tool output's share of the stored size`}</dt>
+                        <dd className="font-semibold">{formatShare(readings.kept.toolBytes + readings.other.toolBytes, totals.approxBytes, locale)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">{t`Tool rows of 64 KB or more, in threads idle at least ${formatNumber(COMPACT_AFTER_DAYS, locale)} days`}</dt>
+                        <dd className="font-semibold">
+                            {t`${formatNumber(readings.compactable.largeToolRows, locale)} rows, ${formatBytes(readings.compactable.largeToolBytes, locale)}`}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">{t`Pinned threads`}</dt>
+                        <dd className="font-semibold">
+                            {t`${formatNumber(readings.pinned.threads, locale)} threads, ${formatBytes(readings.pinned.approxBytes, locale)}`}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">{t`Trashed, temporary or orphaned`}</dt>
+                        <dd className="font-semibold">
+                            {t`${formatNumber(readings.other.threads, locale)} threads, ${formatBytes(readings.other.approxBytes, locale)}`}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">{t`Message rows of the largest threads`}</dt>
+                        <dd className="font-semibold tabular-nums">
+                            {totals.largestThreadRows.length === 0 ? "—" : totals.largestThreadRows.map((rows) => formatNumber(rows, locale)).join(", ")}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt className="text-muted-foreground">{t`Sizes of the largest shards`}</dt>
+                        <dd className="font-semibold tabular-nums">
+                            {totals.largestShardBytes.length === 0 ? "—" : totals.largestShardBytes.map((bytes) => formatBytes(bytes, locale)).join(", ")}
+                        </dd>
                     </div>
                 </dl>
                 {page.data !== undefined && page.data.pendingShards > 0 ? (

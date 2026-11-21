@@ -11,10 +11,16 @@ import { decodeCensusCursor, encodeCensusCursor, measureShardPage } from "./clea
 import {
     addMessageRow,
     approxRowBytes,
+    type BreakdownEntry,
     type CensusCursor,
+    classifyThread,
     FOOTPRINT_PAGE_SIZE,
     forCursor,
+    keepTop,
+    LARGE_TOOL_ROW_BYTES,
+    largestRowsOf,
     LARGEST_THREAD_COUNT,
+    mergeBreakdowns,
     MAX_SHARD_CALLS_PER_ACTION,
     MAX_SHARD_FAILURES,
     rootOnlyCensus,
@@ -22,6 +28,7 @@ import {
     type ScanEntry,
     startCensus,
     startFootprint,
+    type ThreadClass,
     willRetry,
     withRootShard,
 } from "./shard-footprint-logic";
@@ -29,6 +36,9 @@ import {
 type Harness = ReturnType<typeof lunoraTest>;
 
 const OWNER = "user-owner";
+/** The clock every measurement in this file runs at. */
+const NOW = Date.UTC(2026, 10, 21);
+const DAY_MS = 24 * 60 * 60 * 1000;
 const BIG_THREAD_ROWS = 10_000;
 const SMALL_THREAD_COUNT = 30;
 const SMALL_THREAD_ROWS = 3;
@@ -76,7 +86,7 @@ const measureShard = (harness: Harness) =>
         let state: unknown;
 
         for (let calls = 0; calls < 10_000; calls += 1) {
-            const result: any = await ctx.runQuery(measureShardPage, state ? { state } : {});
+            const result: any = await ctx.runQuery(measureShardPage, state ? { now: NOW, state } : { now: NOW });
 
             pageRows.push(result.pageRows);
             state = result.state;
@@ -162,6 +172,114 @@ describe("measureShardPage on small shards", () => {
     });
 });
 
+const ACTIVE_NEW: ThreadClass = { group: "active", sinceDays: 0 };
+
+/** The breakdown entry of one group and age band, or `undefined` when nothing fell in it. */
+const entryOf = (breakdown: BreakdownEntry[], group: ThreadClass["group"], sinceDays: number) =>
+    breakdown.find((entry) => entry.group === group && entry.sinceDays === sinceDays);
+
+describe("measureShardPage breakdown by thread group and age band", () => {
+    let harness: Harness;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    it("counts each thread and row in its group and age band, with tool and large tool rows apart", async () => {
+        await harness.run(async (ctx: any) => {
+            const thread = (fields: Record<string, unknown>) =>
+                ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "t", userId: OWNER, ...fields });
+            const message = (threadId: string, order: number, fields: Record<string, unknown>) =>
+                ctx.db.insert("messages", { order, status: "success", stepOrder: 0, text: "hello", threadId, tool: false, userId: OWNER, ...fields });
+
+            const recent = await thread({ updatedAt: NOW - DAY_MS });
+
+            await message(recent, 0, {});
+            await message(recent, 1, {});
+
+            const idle = await thread({ updatedAt: NOW - 10 * DAY_MS });
+
+            await message(idle, 0, {});
+
+            const archived = await thread({ status: "archived", updatedAt: NOW - 100 * DAY_MS });
+
+            await message(archived, 0, {});
+            await message(archived, 1, { text: "small tool output", tool: true });
+            await message(archived, 2, { text: "x".repeat(LARGE_TOOL_ROW_BYTES), tool: true });
+
+            await thread({ pinnedAt: NOW, status: "archived", updatedAt: NOW - 400 * DAY_MS });
+            await thread({ deleted: true, deletedAt: NOW, updatedAt: NOW - 5 * DAY_MS });
+
+            // A message whose thread is gone counts as `other`, in the newest band.
+            const gone = await thread({ updatedAt: NOW });
+
+            await ctx.db.delete("threads", gone);
+            await message(gone, 0, {});
+        });
+
+        const { state } = await measureShard(harness);
+        const { breakdown } = state as { breakdown: BreakdownEntry[] };
+
+        expect(entryOf(breakdown, "active", 0)).toMatchObject({ messageRows: 2, threads: 1, toolBytes: 0 });
+        expect(entryOf(breakdown, "active", 7)).toMatchObject({ messageRows: 1, threads: 1 });
+        expect(entryOf(breakdown, "archived", 90)).toMatchObject({ largeToolRows: 1, messageRows: 3, threads: 1 });
+        expect(entryOf(breakdown, "archived", 90)?.largeToolBytes).toBeGreaterThanOrEqual(LARGE_TOOL_ROW_BYTES);
+        expect(entryOf(breakdown, "archived", 90)?.toolBytes).toBeGreaterThan(entryOf(breakdown, "archived", 90)?.largeToolBytes ?? 0);
+        expect(entryOf(breakdown, "pinned", 365)).toMatchObject({ messageRows: 0, threads: 1 });
+        expect(entryOf(breakdown, "other", 3)).toMatchObject({ threads: 1 });
+        expect(entryOf(breakdown, "other", 0)).toMatchObject({ messageRows: 1, threads: 0 });
+
+        const summed = { approxBytes: 0, messageRows: 0, threads: 0 };
+
+        for (const entry of breakdown) {
+            summed.approxBytes += entry.approxBytes;
+            summed.messageRows += entry.messageRows;
+            summed.threads += entry.threads;
+        }
+
+        expect(summed).toEqual({ approxBytes: state.approxBytes, messageRows: state.messageRows, threads: state.threads });
+    });
+});
+
+describe("thread classes and merges", () => {
+    const base = { _creationTime: NOW - 50 * DAY_MS, status: "active" };
+
+    it("bands a thread by the days since updatedAt, falling back to creation time", () => {
+        expect(classifyThread({ ...base, updatedAt: NOW }, NOW)).toEqual({ group: "active", sinceDays: 0 });
+        expect(classifyThread({ ...base, updatedAt: NOW - 3 * DAY_MS }, NOW)).toEqual({ group: "active", sinceDays: 3 });
+        expect(classifyThread({ ...base, updatedAt: NOW - 29 * DAY_MS }, NOW)).toEqual({ group: "active", sinceDays: 14 });
+        expect(classifyThread({ ...base, updatedAt: NOW - 365 * DAY_MS }, NOW)).toEqual({ group: "active", sinceDays: 365 });
+        expect(classifyThread(base, NOW)).toEqual({ group: "active", sinceDays: 30 });
+        // A clock behind the row's time is the newest band, never a negative one.
+        expect(classifyThread({ ...base, updatedAt: NOW + DAY_MS }, NOW)).toEqual({ group: "active", sinceDays: 0 });
+    });
+
+    it("puts trashed and temporary threads in other, and pinned before archived", () => {
+        expect(classifyThread({ ...base, deleted: true, pinnedAt: NOW, updatedAt: NOW }, NOW).group).toBe("other");
+        expect(classifyThread({ ...base, isTemporary: true, updatedAt: NOW }, NOW).group).toBe("other");
+        expect(classifyThread({ ...base, pinnedAt: NOW, status: "archived", updatedAt: NOW }, NOW).group).toBe("pinned");
+        expect(classifyThread({ ...base, status: "archived", updatedAt: NOW }, NOW).group).toBe("archived");
+        expect(classifyThread(null, NOW)).toEqual({ group: "other", sinceDays: 0 });
+    });
+
+    it("sums breakdowns by group and age band, and keeps the largest numbers", () => {
+        const entry = (group: ThreadClass["group"], sinceDays: number, threads: number): BreakdownEntry => {
+            return { approxBytes: threads * 10, group, largeToolBytes: 0, largeToolRows: 0, messageRows: threads, sinceDays, threads, toolBytes: 0 };
+        };
+
+        expect(mergeBreakdowns([entry("archived", 30, 1), entry("active", 0, 2)], [entry("active", 0, 3), entry("pinned", 7, 1)])).toEqual([
+            entry("active", 0, 5),
+            entry("archived", 30, 1),
+            entry("pinned", 7, 1),
+        ]);
+        expect(keepTop([3, 9, 1, 7], 3)).toEqual([9, 7, 3]);
+    });
+});
+
 describe("scan state", () => {
     it("drops thread ids from the cursor but keeps the counts", () => {
         const state = {
@@ -175,15 +293,16 @@ describe("scan state", () => {
         const carried = forCursor(state);
 
         expect(JSON.stringify(carried)).not.toContain("thread-");
-        expect(carried).toMatchObject({ messageRows: 13, threads: 2 });
+        expect(carried).toMatchObject({ carriedLargestRows: [9], messageRows: 13, threads: 2 });
+        expect(largestRowsOf({ ...carried, largest: [{ rows: 12, threadId: "thread-z" }] })).toEqual([12, 9]);
     });
 
     it("carries a thread's row count across pages", () => {
         let state = startFootprint();
 
-        state = addMessageRow(state, "thread-a", 10);
-        state = addMessageRow(state, "thread-a", 10);
-        state = addMessageRow(state, "thread-b", 5);
+        state = addMessageRow(state, { bytes: 10, threadClass: ACTIVE_NEW, threadId: "thread-a", tool: false });
+        state = addMessageRow(state, { bytes: 10, threadClass: ACTIVE_NEW, threadId: "thread-a", tool: false });
+        state = addMessageRow(state, { bytes: 5, threadClass: ACTIVE_NEW, threadId: "thread-b", tool: false });
 
         expect(state.messageRows).toBe(3);
         expect(state.approxBytes).toBe(25);
