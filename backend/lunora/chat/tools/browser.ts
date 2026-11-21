@@ -28,6 +28,8 @@ export interface BrowserResult {
     handedBack?: boolean;
     /** The page needs a person (`browser/human-check.ts`): `asked` shows the "Needs you" card in the chat. */
     humanCheck?: { site: string; status: "already_asked" | "asked" };
+    /** An interactive action left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
+    navigated?: boolean;
     result?: string;
     screenshot?: string;
     screenshotFormat?: string;
@@ -109,23 +111,35 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     ? await humanCheckLadder(
                           first,
                           {
-                              claimAsk: async (site) =>
-                                  await context.runMutation(internal.browser.functions.claimHumanCheckAsk, { run: runKey, site, threadId }),
-                              look: async (kind) => await run({ action: kind }),
-                              // Between two actions, so no browser hold is kept and a person can take control; Stop ends it.
-                              sleep: async (ms) => await waitUnlessStopped(ms, options.abortSignal),
-                              wasAsked: async (site, scope) =>
-                                  await context.runQuery(internal.browser.functions.wasHumanCheckAsked, {
-                                      ...(scope === "recent" && { askedSince: Date.now() - HUMAN_CHECK_HAND_BACK_WINDOW_MS }),
+                              claimAsk: async (site, kind) =>
+                                  await context.runMutation(internal.browser.functions.claimHumanCheckAsk, {
+                                      ...(kind === "reported" && { reported: true }),
                                       run: runKey,
                                       site,
                                       threadId,
                                   }),
+                              look: async (kind) => await run({ action: kind }),
+                              // Between two actions, so no browser hold is kept and a person can take control; Stop ends it.
+                              sleep: async (ms) => await waitUnlessStopped(ms, options.abortSignal),
+                              wasAsked: async (site, scope) =>
+                                  (await context.runQuery(internal.browser.functions.wasHumanCheckAsked, {
+                                      ...(scope === "recent" && { askedSince: Date.now() - HUMAN_CHECK_HAND_BACK_WINDOW_MS }),
+                                      run: runKey,
+                                      site,
+                                      threadId,
+                                  })) ?? undefined,
                           },
                           // Only a whole page's text is read for a check: a selected element's is always short.
-                          { readContent: action === "extract" && input.selector === undefined, reported: reported && first.success === true },
+                          {
+                              // A click, a typed entry or a scroll that moved the page on carries no title or text: one read looks for a check.
+                              navigated: first.navigated === true,
+                              readContent: action === "extract" && input.selector === undefined,
+                              reported: reported && first.success === true,
+                          },
                       )
                     : first;
+
+            delete result.navigated;
 
             toolsLogger.debug(`[BROWSER] ${action} ${result.success ? "succeeded" : "failed"}${result.error ? `: ${result.error}` : ""}`);
 

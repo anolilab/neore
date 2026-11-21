@@ -194,7 +194,16 @@ export const executeBrowserAction = internalAction
                 }
 
                 if (returned === undefined) {
-                    return result;
+                    // A click, a typed entry or a scroll that left the page on another URL: the human-check ladder reads
+                    // that page's text once (`browser/human-check.ts`), as these results carry none.
+                    const navigated =
+                        INTERACTIVE_ACTIONS.has(action) &&
+                        result.success === true &&
+                        result.url !== undefined &&
+                        sessionDocument.currentUrl !== undefined &&
+                        withoutHash(result.url) !== withoutHash(sessionDocument.currentUrl);
+
+                    return navigated ? { ...result, navigated: true } : result;
                 }
 
                 return handedBackResult(result, returned, looksFirst ? action : undefined);
@@ -228,6 +237,12 @@ export const executeBrowserAction = internalAction
             success: false,
         };
     });
+
+/** A `#fragment` change is the same page: it is no navigation to read again. */
+const withoutHash = (url: string): string => url.split("#", 1)[0] ?? url;
+
+/** The actions whose result carries the page's URL but neither its title nor its text. */
+const INTERACTIVE_ACTIONS: ReadonlySet<string> = new Set(["click", "scroll", "type"]);
 
 type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 

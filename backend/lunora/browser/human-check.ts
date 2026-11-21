@@ -33,15 +33,25 @@ const TITLE_MARKERS: ReadonlyArray<RegExp> = [
 /** URLs only a challenge page has: its own path, or the token it adds to the address. */
 const URL_MARKERS: ReadonlyArray<RegExp> = [/\/cdn-cgi\/challenge-platform\//iu, /[?&]__cf_chl_[a-z_]*=/iu];
 
-/** Phrases a short whole page shows when it asks a person to prove they are one. */
+/** Phrases only a challenge shows: one on a short whole page is enough. */
 const CONTENT_MARKERS: ReadonlyArray<RegExp> = [
     /verify(?:ing)? (?:that )?you are (?:a )?human/iu,
     /checking (?:if the site connection is secure|your browser before accessing)/iu,
     /enable javascript and cookies to continue/iu,
-    /press (?:and|&) hold/iu,
     /complete the security check/iu,
-    /i['’]?m not a robot/iu,
 ];
+
+/**
+ * Phrases a challenge shows that an ordinary short page can too ("press and hold the power button", a FAQ quoting
+ * "I'm not a robot"): they count only beside a word of {@link CHALLENGE_WORDS} that the phrase itself does not carry.
+ */
+const GENERIC_CONTENT_MARKERS: ReadonlyArray<RegExp> = [/press (?:and|&) hold/iu, /i['’]?m not a robot/iu];
+
+/** The second signal a generic phrase needs (not "robot", which one of them names). */
+const CHALLENGE_WORDS = /\b(?:captcha|recaptcha|hcaptcha|human|bots?|verification)\b/iu;
+
+const showsChallengeText = (content: string): boolean =>
+    CONTENT_MARKERS.some((marker) => marker.test(content)) || (GENERIC_CONTENT_MARKERS.some((marker) => marker.test(content)) && CHALLENGE_WORDS.test(content));
 
 /** What a renderer result carries that detection reads. */
 export interface PageSignals {
@@ -68,7 +78,7 @@ export const detectHumanCheck = ({ content, title, url }: PageSignals, readConte
         return "url";
     }
 
-    if (readContent && content !== undefined && content.length <= SHORT_PAGE_CHARS && CONTENT_MARKERS.some((marker) => marker.test(content))) {
+    if (readContent && content !== undefined && content.length <= SHORT_PAGE_CHARS && showsChallengeText(content)) {
         return "content";
     }
 
@@ -90,6 +100,8 @@ export const humanCheckSite = (url: string | undefined): string => {
 
 /** What the browser tool tells the agent at each step; never to solve or bypass the check itself. */
 export const humanCheckMessages = {
+    afterReportedHandBack: (site: string): string =>
+        `The person handed the browser back after you asked them about ${siteName(site)}. Check whether what you asked them for is done before you act.`,
     alreadyAsked: (site: string): string =>
         `${siteName(site)} still shows a check that needs a person. The person was already asked to clear it during this task, so they are not asked again. Do not try to solve or get around it: move on, or reach what you need another way.`,
     asked: (site: string): string =>
@@ -114,22 +126,33 @@ export interface LadderResult extends PageSignals {
     success?: boolean;
 }
 
+/**
+ * How an ask arose: the page showed a check (`detected`), or the agent said a person is needed (`reported`, e.g. a
+ * sign-in wall), which no marker shows, so its absence after a hand back proves nothing.
+ */
+export type HumanCheckAskKind = "detected" | "reported";
+
 export interface LadderDependencies<R extends LadderResult> {
-    /** Records that the person is asked about `site` in this run: `false` when they already were. */
-    claimAsk: (site: string) => Promise<boolean>;
+    /** Records that the person is asked about `site` in this run, and how: `false` when they already were. */
+    claimAsk: (site: string, kind: HumanCheckAskKind) => Promise<boolean>;
     /** A fresh look at the page through the usual action path: the whole page's text for a check found in it. */
     look: (kind: "extract" | "screenshot") => Promise<R>;
     /** Waits `ms` between two actions (no browser hold is kept meanwhile): `false` when the run was stopped during it. */
     sleep: (ms: number) => Promise<boolean>;
     /**
-     * Whether the person was asked about `site` in this run (`run`), or in this run or one of the thread's within the
-     * last {@link HUMAN_CHECK_HAND_BACK_WINDOW_MS} (`recent`).
+     * How the person was asked about `site` in this run (`run`), or in this run or one of the thread's within the last
+     * {@link HUMAN_CHECK_HAND_BACK_WINDOW_MS} (`recent`, the latest ask); `undefined` when they were not.
      */
-    wasAsked: (site: string, scope: "recent" | "run") => Promise<boolean>;
+    wasAsked: (site: string, scope: "recent" | "run") => Promise<HumanCheckAskKind | undefined>;
 }
 
-/** `reported`: the agent itself said a person is needed (a sign-in wall). `readContent`: see {@link detectHumanCheck}. */
+/**
+ * `reported`: the agent itself said a person is needed (a sign-in wall). `readContent`: see {@link detectHumanCheck}.
+ * `navigated`: an interactive action (click, type, scroll) left the page on another URL; its result carries no title
+ * or text, so one whole-page text read looks for a check there before the page counts as having none.
+ */
 export interface LadderOptions {
+    navigated?: boolean;
     readContent?: boolean;
     reported?: boolean;
 }
@@ -199,19 +222,30 @@ const withNote = <R extends LadderResult>(result: R, note: string): R => {
 export const humanCheckLadder = async <R extends LadderResult>(
     result: R,
     dependencies: LadderDependencies<R>,
-    { readContent = false, reported = false }: LadderOptions = {},
+    { navigated = false, readContent = false, reported = false }: LadderOptions = {},
 ): Promise<R> => {
     const marker = reported ? undefined : detectHumanCheck(result, readContent);
 
     if (!reported && marker === undefined) {
-        return result.handedBack === true ? await afterHandBack(result, dependencies, readContent) : result;
+        if (result.handedBack === true) {
+            return await afterHandBack(result, dependencies, readContent);
+        }
+
+        return navigated && result.success === true && !readContent ? await afterNavigation(result, dependencies) : result;
     }
 
     // The site the check was found on: what is asked about, whatever page a later look lands on.
     const site = humanCheckSite(result.url);
 
-    // One ask per site per reply: a second block is not waited out nor asked about again.
-    if (await dependencies.wasAsked(site, "run")) {
+    // One ask per site per reply: a second block is not waited out nor asked about again. A report on a site asked
+    // about for a check is still recorded as one, so its hand back is not read as cleared.
+    const askedInRun = await dependencies.wasAsked(site, "run");
+
+    if (askedInRun !== undefined) {
+        if (reported && askedInRun === "detected") {
+            await dependencies.claimAsk(site, "reported");
+        }
+
         return { ...withNote(result, humanCheckMessages.alreadyAsked(site)), humanCheck: { site, status: "already_asked" }, success: false };
     }
 
@@ -243,7 +277,7 @@ export const humanCheckLadder = async <R extends LadderResult>(
         }
     }
 
-    const first = await dependencies.claimAsk(site);
+    const first = await dependencies.claimAsk(site, reported ? "reported" : "detected");
 
     // The card shows the person the page: a check re-read from the text has no image yet, so one screenshot is taken.
     // A failed one leaves the card to say it has none.
@@ -275,9 +309,15 @@ export const humanCheckLadder = async <R extends LadderResult>(
  */
 const afterHandBack = async <R extends LadderResult>(result: R, dependencies: LadderDependencies<R>, readContent: boolean): Promise<R> => {
     const site = humanCheckSite(result.url);
+    const asked = await dependencies.wasAsked(site, "recent");
 
-    if (!(await dependencies.wasAsked(site, "recent"))) {
+    if (asked === undefined) {
         return result;
+    }
+
+    // What the agent asked for (a sign-in) shows no marker either way: only the agent can tell whether it is done.
+    if (asked === "reported") {
+        return withNote(result, humanCheckMessages.afterReportedHandBack(site));
     }
 
     const page = readContent && result.success === true ? result : await safeLook(dependencies, "extract");
@@ -301,4 +341,20 @@ const afterHandBack = async <R extends LadderResult>(result: R, dependencies: La
     }
 
     return withNote(result, humanCheckMessages.unknownAfterHandBack(site));
+};
+
+/**
+ * After an action that left the page on another URL: one whole-page text read, and a check it shows goes up the
+ * ladder as that read (the action's own fields kept), and so does a read that came back after a hand back. A read that
+ * fails or shows no check changes nothing: the action's result goes back as it was, and its text is not added.
+ */
+const afterNavigation = async <R extends LadderResult>(result: R, dependencies: LadderDependencies<R>): Promise<R> => {
+    const page = await safeLook(dependencies, "extract");
+
+    // The person took control meanwhile: their hand back is what the agent hears about, through the ladder.
+    if (page.handedBack !== true && (page.success !== true || detectHumanCheck(page, true) === undefined)) {
+        return result;
+    }
+
+    return { ...result, ...(await humanCheckLadder(page as R, dependencies, { readContent: true })) };
 };

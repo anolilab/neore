@@ -347,9 +347,18 @@ export const closeSession = internalMutation
 
 // ── Human checks (`human-check.ts`) ──────────────────────────────────────
 
+const askKind = (row: { reported?: boolean } | null): "detected" | "reported" | null => {
+    if (row === null) {
+        return null;
+    }
+
+    return row.reported === true ? "reported" : "detected";
+};
+
+/** How the person was asked about `site` in this run, else (with `askedSince`) the thread's latest ask since then; `null` for none. */
 export const wasHumanCheckAsked = internalQuery
     .input({ askedSince: v.optional(v.number()), run: v.string(), site: v.string(), threadId: v.id("threads") })
-    .output(v.boolean())
+    .output(v.union(v.literal("detected"), v.literal("reported"), v.null()))
     .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
         const inRun = await ctx.db
             .query("browserHumanChecks")
@@ -357,15 +366,16 @@ export const wasHumanCheckAsked = internalQuery
             .first();
 
         if (inRun !== null || askedSince === undefined) {
-            return inRun !== null;
+            return askKind(inRun);
         }
 
         const recent = await ctx.db
             .query("browserHumanChecks")
             .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", site).gte("askedAt", askedSince))
+            .order("desc")
             .first();
 
-        return recent !== null;
+        return askKind(recent);
     });
 
 /**
@@ -373,19 +383,36 @@ export const wasHumanCheckAsked = internalQuery
  * action of the run asked already. Insert-if-absent on the unique key, with no read first: of two claims at once, the
  * insert that loses answers `false`. The row names the thread's owner, whose shard holds it, whoever's turn asked (a
  * collaborator's id there would outlive their account and escape the owner's erasure). A thread that is gone asks nobody.
+ * A report on a site the run already asked about (a sign-in wall after a check) marks that ask `reported`: what the
+ * person handed back then shows no marker either way.
  */
 export const claimHumanCheckAsk = internalMutation
-    .input({ run: v.string(), site: v.string(), threadId: v.id("threads") })
+    .input({ reported: v.optional(v.boolean()), run: v.string(), site: v.string(), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args: { run, site, threadId }, ctx }) => {
+    .mutation(async ({ args: { reported, run, site, threadId }, ctx }) => {
         const thread = await ctx.db.get("threads", threadId);
 
         if (!thread) {
             return false;
         }
 
+        if (reported === true) {
+            const asked = await ctx.db
+                .query("browserHumanChecks")
+                .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
+                .first();
+
+            if (asked !== null) {
+                if (asked.reported !== true) {
+                    await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
+                }
+
+                return false;
+            }
+        }
+
         try {
-            await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, run, site, threadId, userId: thread.userId });
+            await ctx.db.insert("browserHumanChecks", { askedAt: ctx.now, ...(reported === true && { reported }), run, site, threadId, userId: thread.userId });
         } catch (error) {
             if (isUniqueViolation(error)) {
                 return false;

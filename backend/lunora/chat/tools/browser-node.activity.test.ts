@@ -577,7 +577,8 @@ describe("a browser a person took control of", () => {
 
         expect(after.control).toBeUndefined();
         renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/next" }));
-        await expect(act("click")).resolves.toEqual({ sessionId: "s-1", success: true, url: "https://example.com/next" });
+        // The click moved the page on, so the human-check ladder reads it once (`browser/human-check.ts`).
+        await expect(act("click")).resolves.toEqual({ navigated: true, sessionId: "s-1", success: true, url: "https://example.com/next" });
     });
 
     it("tells of a hand back on a rate-limited action, and again on the next action", async () => {

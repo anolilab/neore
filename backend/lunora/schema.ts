@@ -437,6 +437,8 @@ export const schema = defineSchema({
      */
     browserHumanChecks: defineTable({
         askedAt: v.number(),
+        /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
+        reported: v.optional(v.boolean()),
         run: v.string(),
         /** The page's host, `""` when it had no readable URL. */
         site: v.string(),

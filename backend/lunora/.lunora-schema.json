@@ -4487,6 +4487,12 @@
           "optional": false,
           "unique": false
         },
+        "reported": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "run": {
           "kind": "string",
           "nullable": false,

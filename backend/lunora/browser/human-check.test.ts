@@ -8,12 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { claimHumanCheckAsk, wasHumanCheckAsked } from "./functions";
+import { BATCH } from "../gdpr/batch";
 import { eraseBrowserDataForUser } from "./gdpr";
 import {
     detectHumanCheck,
     HUMAN_CHECK_HAND_BACK_WINDOW_MS,
     HUMAN_CHECK_WAIT_MS,
     humanCheckLadder,
+    type HumanCheckAskKind,
     humanCheckSite,
     type LadderDependencies,
     type LadderResult,
@@ -27,6 +29,7 @@ const ALREADY_ASKED_NOTE = /already asked.*move on, or reach what you need anoth
 const CLEAR_AFTER_HAND_BACK_NOTE = /handed it back;.*no longer shows: the page looks clear\. Look at it before you act\./su;
 /** The hand-back note, then the ask about the other site the read landed on. */
 const HAND_BACK_THEN_OTHER_ASK_NOTE = /^The person had control.*other\.example\.org shows a check/su;
+const REPORTED_HAND_BACK_NOTE = /handed the browser back after you asked them about portal\.example\.com.*before you act/su;
 const UNKNOWN_AFTER_HAND_BACK_NOTE = /cleared is unknown.*Look at the page before you act/su;
 
 const CHECK_PAGE: LadderResult = { success: true, title: "Just a moment...", url: "https://shop.example.com/item" };
@@ -37,11 +40,12 @@ const TEXT_CHECK: LadderResult = { content: "Verifying you are human.", success:
 
 /**
  * Dependencies over in-memory sets of sites asked about in this run (`asked`) and in the thread's recent earlier
- * runs (`earlier`); `looks` are the pages the fresh looks return, in order.
+ * runs (`earlier`), of which `reported` were the agent's own reports; `looks` are the pages the fresh looks return, in order.
  */
-const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earlier = new Set<string>()) => {
+const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earlier = new Set<string>(), reported = new Set<string>()) => {
+    const kindOf = (site: string): HumanCheckAskKind => (reported.has(site) ? "reported" : "detected");
     const dependencies = {
-        claimAsk: vi.fn(async (site: string) => {
+        claimAsk: vi.fn(async (site: string, _kind: HumanCheckAskKind) => {
             if (asked.has(site)) {
                 return false;
             }
@@ -52,7 +56,9 @@ const dependenciesFor = (looks: LadderResult[], asked = new Set<string>(), earli
         }),
         look: vi.fn(async (_kind: "extract" | "screenshot") => looks.shift() ?? CLEAR_PAGE),
         sleep: vi.fn(async (_ms: number) => true),
-        wasAsked: vi.fn(async (site: string, scope: "recent" | "run") => asked.has(site) || (scope === "recent" && earlier.has(site))),
+        wasAsked: vi.fn(async (site: string, scope: "recent" | "run") =>
+            asked.has(site) || (scope === "recent" && earlier.has(site)) ? kindOf(site) : undefined,
+        ),
     } satisfies LadderDependencies<LadderResult>;
 
     return { asked, dependencies };
@@ -86,6 +92,9 @@ describe("detectHumanCheck", () => {
         { title: "Just a moment of your time: our survey" },
         { url: "https://developers.example.com/recaptcha/docs" },
         { url: "https://example.com/blog/captcha-alternatives" },
+        // Short help pages with a phrase a challenge also uses, and no second sign of one.
+        { content: "To restart the phone, press and hold the power button for ten seconds.", title: "Restart your phone" },
+        { content: "Why does the form ask me to tick “I'm not a robot”? It keeps spam out.", title: "FAQ" },
         // A long article that mentions the phrase is a real page.
         { content: `${"An article about bots. ".repeat(200)}Verify you are human, it says.` },
         {},
@@ -208,13 +217,61 @@ describe("humanCheckLadder", () => {
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
     });
 
-    it("the agent's own report asks at once, with no wait", async () => {
+    it("a report on a site the run asked about for a check records it as reported, with no second ask", async () => {
+        const { dependencies } = dependenciesFor([], new Set(["shop.example.com"]));
+        const result = await humanCheckLadder(CLEAR_PAGE, dependencies, { reported: true });
+
+        expect(dependencies.claimAsk).toHaveBeenCalledExactlyOnceWith("shop.example.com", "reported");
+        expect(result.humanCheck).toEqual({ site: "shop.example.com", status: "already_asked" });
+    });
+
+    it("the agent's own report asks at once, with no wait, and is recorded as reported", async () => {
         const signIn: LadderResult = { success: true, title: "Sign in", url: "https://portal.example.com/login" };
         const { dependencies } = dependenciesFor([]);
         const result = await humanCheckLadder(signIn, dependencies, { reported: true });
 
         expect(dependencies.sleep).not.toHaveBeenCalled();
+        expect(dependencies.claimAsk).toHaveBeenCalledExactlyOnceWith("portal.example.com", "reported");
         expect(result.humanCheck).toEqual({ site: "portal.example.com", status: "asked" });
+    });
+
+    it("step 3: after a hand back on a page the agent reported (a sign-in wall), it is told to check, never that it looks clear", async () => {
+        const signIn = "portal.example.com";
+        const { dependencies } = dependenciesFor([], new Set(), new Set([signIn]), new Set([signIn]));
+        const result = await humanCheckLadder(
+            {
+                error: "The person had control of the browser and handed it back;",
+                handedBack: true,
+                success: true,
+                title: "Sign in",
+                url: "https://portal.example.com/login",
+            },
+            dependencies,
+        );
+
+        expect(dependencies.look).not.toHaveBeenCalled();
+        expect(result.error).not.toMatch(CLEAR_AFTER_HAND_BACK_NOTE);
+        expect(result.error).toMatch(REPORTED_HAND_BACK_NOTE);
+    });
+
+    it("a click that lands on a check at an ordinary URL is caught by one text read", async () => {
+        const clicked: LadderResult & { clickedSelector: string } = { clickedSelector: "#buy", success: true, url: "https://shop.example.com/checkout" };
+        const challenge: LadderResult = { content: "", success: true, title: "Just a moment...", url: "https://shop.example.com/checkout" };
+        const { dependencies } = dependenciesFor([challenge, { ...challenge, screenshot: "jpeg" }]);
+        const result = await humanCheckLadder<LadderResult>(clicked, dependencies, { navigated: true });
+
+        expect(dependencies.look.mock.calls).toStrictEqual([["extract"], ["screenshot"]]);
+        expect(result).toMatchObject({ clickedSelector: "#buy", humanCheck: { site: "shop.example.com", status: "asked" }, success: false });
+    });
+
+    it("a click that moved on to a page with no check costs one read and returns as it was", async () => {
+        const clicked = { clickedSelector: "#next", success: true, url: "https://shop.example.com/page-2" };
+        const { dependencies } = dependenciesFor([{ ...CLEAR_EXTRACT, url: clicked.url }]);
+
+        await expect(humanCheckLadder<LadderResult>(clicked, dependencies, { navigated: true })).resolves.toBe(clicked);
+        expect(dependencies.look).toHaveBeenCalledExactlyOnceWith("extract");
+        // A click that stayed on its page reads nothing more.
+        await expect(humanCheckLadder<LadderResult>(clicked, dependenciesFor([]).dependencies)).resolves.toBe(clicked);
     });
 
     it("step 3: after the hand back, a page whose text shows no check is clear, also in the next run", async () => {
@@ -454,12 +511,22 @@ describe("the ask record", () => {
         const wasAsked = async (run: string, site: string) =>
             await harness.action(async (ctx: any) => await ctx.runQuery(wasHumanCheckAsked, { run, site, threadId }));
 
-        await expect(wasAsked("r1", "a.example")).resolves.toBe(false);
+        await expect(wasAsked("r1", "a.example")).resolves.toBeNull();
         await expect(claim("r1", "a.example")).resolves.toBe(true);
         await expect(claim("r1", "a.example")).resolves.toBe(false);
-        await expect(wasAsked("r1", "a.example")).resolves.toBe(true);
+        await expect(wasAsked("r1", "a.example")).resolves.toBe("detected");
         await expect(claim("r1", "b.example")).resolves.toBe(true);
         await expect(claim("r2", "a.example")).resolves.toBe(true);
+
+        // An ask the agent reported is told apart, so a hand back on it is not read as cleared.
+        await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { reported: true, run: "r3", site: "c.example", threadId }));
+        await expect(wasAsked("r3", "c.example")).resolves.toBe("reported");
+
+        // A report on a site the run already asked about for a check marks that ask, and asks nobody again.
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { reported: true, run: "r1", site: "a.example", threadId })),
+        ).resolves.toBe(false);
+        await expect(wasAsked("r1", "a.example")).resolves.toBe("reported");
     });
 
     it("lets one of two claims made at once for a site win, and records one row", async () => {
@@ -486,11 +553,16 @@ describe("the ask record", () => {
         await askedAt("r1", now - HUMAN_CHECK_HAND_BACK_WINDOW_MS - 1);
 
         // An older reply's ask is not what the person handed back, so there is no extra read and no note.
-        await expect(wasAskedRecently()).resolves.toBe(false);
+        await expect(wasAskedRecently()).resolves.toBeNull();
 
-        await askedAt("r2", now - 60_000);
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("browserHumanChecks", { askedAt: now - 120_000, reported: true, run: "r2", site: "a.example", threadId, userId: "u-1" }),
+        );
+        await askedAt("r2b", now - 60_000);
 
-        await expect(wasAskedRecently()).resolves.toBe(true);
+        // The latest recent ask is what the person handed back: here a detected check after an earlier report.
+        await expect(wasAskedRecently()).resolves.toBe("detected");
     });
 
     it("stores the thread owner as the row's user whoever asked, so the owner's erasure removes it", async () => {
@@ -508,10 +580,48 @@ describe("the ask record", () => {
         await expect(rows()).resolves.toHaveLength(0);
     });
 
-    it("goes with the thread when it is deleted", async () => {
-        await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId }));
-        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }));
+    const insertAsks = async (count: number, userId = "u-1") =>
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < count; index += 1) {
+                await ctx.db.insert("browserHumanChecks", { askedAt: index, run: `${userId}-r${String(index)}`, site: "a.example", threadId, userId });
+            }
+        });
+    const askRows = async () => (await harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect())) as { userId: string }[];
 
-        await expect(harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect())).resolves.toHaveLength(0);
+    it("erases more than one batch of asks across calls, then the rest, and leaves another user's", async () => {
+        await insertAsks(BATCH * 2 + 5);
+        await insertAsks(1, "u-2");
+
+        const rounds: boolean[] = [];
+
+        for (let round = 0; round < 10; round += 1) {
+            const { hasMore } = (await harness.run(async (ctx: any) => await eraseBrowserDataForUser(ctx, "u-1"))) as { hasMore: boolean };
+
+            rounds.push(hasMore);
+
+            if (!hasMore) {
+                break;
+            }
+        }
+
+        expect(rounds).toStrictEqual([true, true, false]);
+        const left = await askRows();
+
+        expect(left.map((row) => row.userId)).toStrictEqual(["u-2"]);
+    });
+
+    it("goes with the thread when it is deleted, a batch per call", async () => {
+        await insertAsks(BATCH + 5);
+
+        let rounds = 0;
+
+        for (let done = false; !done && rounds < 10; rounds += 1) {
+            const page = (await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }))) as { isDone: boolean };
+
+            done = page.isDone;
+        }
+
+        expect(rounds).toBe(2);
+        await expect(askRows()).resolves.toHaveLength(0);
     });
 });
