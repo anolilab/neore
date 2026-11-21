@@ -134,6 +134,8 @@ describe(imageKeyOf, () => {
         // Another host's image: its host counts, even when that host signs its links too.
         expect(imageKeyOf("https://cdn.one/a.png")).not.toBe(imageKeyOf("https://cdn.two/a.png"));
         expect(imageKeyOf("https://cdn.example/agent-files/abc?sig=1")).not.toBe(key);
+        // One path serving pictures by query: each query its own picture.
+        expect(imageKeyOf("https://img.example/render?id=1")).not.toBe(imageKeyOf("https://img.example/render?id=2"));
 
         // After the app's domain moved, our storage serves the same file from the new backend: the same key.
         vi.stubEnv("VITE_LUNORA_URL", "https://new.example");

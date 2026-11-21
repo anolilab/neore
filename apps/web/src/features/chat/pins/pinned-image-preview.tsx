@@ -56,8 +56,8 @@ const STORAGE_ORIGINS = originsOf(import.meta.env.VITE_LUNORA_URL as string | un
 /**
  * An image's key, kept with its pin to find it again: a hash, so no address of the file is stored. A signed link
  * (`sig`) served by our backend is keyed by its path alone, which stays the same when it is signed again or the app's
- * domain moves; any other image, a signed one from another host included, by its host and path, so two hosts serving
- * one path stay apart. `undefined` for an image with no web link (a `data:` URL).
+ * domain moves; any other image, a signed one from another host included, by its whole address but the fragment, so
+ * two hosts serving one path, or one path serving pictures by query, stay apart. `undefined` for an image with no web link (a `data:` URL).
  */
 export const imageKeyOf = (source: string): string | undefined => {
     try {
@@ -69,7 +69,7 @@ export const imageKeyOf = (source: string): string | undefined => {
 
         const ours = url.searchParams.has("sig") && STORAGE_ORIGINS.includes(url.origin);
 
-        return hashOf(ours ? `storage ${url.pathname}` : `${url.host} ${url.pathname}`);
+        return hashOf(ours ? `storage ${url.pathname}` : `${url.origin}${url.pathname}${url.search}`);
     } catch {
         return undefined;
     }
