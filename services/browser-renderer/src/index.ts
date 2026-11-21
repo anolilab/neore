@@ -278,6 +278,35 @@ const guardPage = async (page: import("@cloudflare/playwright").Page) => {
     await installed;
 };
 
+/**
+ * Connect to an existing session or launch a new browser. keepAlive keeps the browser alive between requests so
+ * multi-step workflows (navigate → click → screenshot) can reuse the same page; an expired or invalid session falls back
+ * to a new launch. The session id is the caller's to persist.
+ */
+const openBrowser = async (env: Env, sessionId: string | undefined): Promise<{ browser: import("@cloudflare/playwright").Browser; sessionId: string }> => {
+    if (sessionId) {
+        try {
+            return { browser: await env.BROWSER.connect(sessionId), sessionId };
+        } catch {
+            // Session expired or invalid — fall back to new launch
+        }
+    }
+
+    const browser = await env.BROWSER.launch({ keepAlive: KEEP_ALIVE_MS });
+
+    return { browser, sessionId: browser.sessionId() };
+};
+
+/** The session's page (a reconnected session keeps its page), guarded and with the default timeout. */
+const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promise<import("@cloudflare/playwright").Page> => {
+    const page = browser.contexts()[0]?.pages()[0] ?? (await browser.newPage());
+
+    page.setDefaultTimeout(PAGE_TIMEOUT);
+    await guardPage(page);
+
+    return page;
+};
+
 app.post("/action", async (c) => {
     // Parse request — catch malformed JSON
     let body: unknown;
@@ -305,29 +334,11 @@ app.post("/action", async (c) => {
         }
     }
 
-    // Connect to existing session or launch a new browser.
-    // keepAlive keeps the browser alive between requests so multi-step
-    // workflows (navigate → click → screenshot) can reuse the same page.
-    let browser;
+    let browser: import("@cloudflare/playwright").Browser | undefined;
     let activeSessionId: string | undefined;
 
     try {
-        if (sessionId) {
-            try {
-                browser = await c.env.BROWSER.connect(sessionId);
-                activeSessionId = sessionId;
-            } catch {
-                // Session expired or invalid — fall back to new launch
-                browser = await c.env.BROWSER.launch({ keepAlive: KEEP_ALIVE_MS });
-            }
-        } else {
-            browser = await c.env.BROWSER.launch({ keepAlive: KEEP_ALIVE_MS });
-        }
-
-        // Capture the session ID for the caller to persist
-        if (!activeSessionId) {
-            activeSessionId = browser.sessionId();
-        }
+        ({ browser, sessionId: activeSessionId } = await openBrowser(c.env, sessionId));
     } catch (error) {
         return c.json(
             {
@@ -339,13 +350,7 @@ app.post("/action", async (c) => {
     }
 
     try {
-        // Reuse existing page if reconnecting to a session, otherwise create new
-        const contexts = browser.contexts();
-        const existingPage = contexts[0]?.pages()[0];
-        const page = existingPage ?? (await browser.newPage());
-
-        page.setDefaultTimeout(PAGE_TIMEOUT);
-        await guardPage(page);
+        const page = await pageOf(browser);
 
         let result: ActionResult;
 
@@ -499,6 +504,235 @@ app.post("/action", async (c) => {
     } finally {
         // Don't close the browser — keepAlive will handle cleanup after idle timeout.
         // For reconnectable sessions we must leave the browser running.
+        if (browser && !activeSessionId) {
+            await browser.close().catch(() => {});
+        }
+    }
+});
+
+// ─── Saved-login fill ────────────────────────────────────────────────────────────
+
+const loginSchema = z.object({
+    /** The time the caller gives the whole call; nothing is typed once too little of it is left. */
+    budgetMs: z.int().min(1000).max(120_000).optional(),
+    origin: z.string().max(2048),
+    password: z.string().min(1).max(1024),
+    sessionId: z.string().optional(),
+    url: z.string().max(8192),
+    username: z.string().min(1).max(320),
+});
+
+/** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
+const originOf = (url: string): string | null => {
+    try {
+        const { origin } = new URL(url);
+
+        return origin === "null" ? null : origin;
+    } catch {
+        return null;
+    }
+};
+
+/** Time a fill needs once it starts typing: the two fields, the submit and the wait for the next page. */
+const TYPE_RESERVE_MS = 10_000;
+
+/** `text` with the password, and the forms a URL or a form body encodes it in, replaced. */
+const withoutSecret = (text: string, secret: string): string => {
+    let scrubbed = text;
+
+    for (const form of [secret, encodeURIComponent(secret), new URLSearchParams({ p: secret }).toString().slice(2)]) {
+        scrubbed = scrubbed.replaceAll(form, "[password]");
+    }
+
+    return scrubbed;
+};
+
+/**
+ * Sign in with a saved login, in one call so nothing a page shows in between can steer it: open `url`, check the page is
+ * on `origin` (after redirects, and again right before each field is typed), type the username into the text field
+ * before the first visible password field of the main frame and the password into that password field only, and send
+ * the form, only by POST and only to `origin`. Nothing read back carries the password: the URL, title and any error are
+ * scrubbed of it, every field still holding it is emptied as typing would, and a page that had one is reloaded, so a
+ * later screenshot or extract cannot show it. Every step fits in `budgetMs`, the caller's hold.
+ */
+/** Whether an input holds `secret`, and whether it is a password field. */
+const inputState = (element: HTMLInputElement, secret: string) => {
+    return { holds: element.value === secret, isPassword: element.type === "password" };
+};
+
+/**
+ * Empties every field of the page that holds `password`, as typing would (a script-driven field keeps what it was told,
+ * not what its `value` was set to), and reloads a page that had one, so no state of the page brings it back. Whether a
+ * password field is still there: the sign-in may have failed.
+ */
+const emptyPasswordFields = async (page: import("@cloudflare/playwright").Page, password: string, timeout: number): Promise<boolean> => {
+    let hasPasswordField = false;
+    let wasEmptied = false;
+    const inputs = await page.$$("input").catch(() => []);
+
+    for (const input of inputs) {
+        const state = await input.evaluate(inputState, password).catch(() => {
+            return { holds: false, isPassword: false };
+        });
+
+        hasPasswordField ||= state.isPassword;
+
+        if (state.holds) {
+            wasEmptied = true;
+            await input.fill("", { timeout: 5000 }).catch(() => undefined);
+        }
+    }
+
+    if (wasEmptied) {
+        await page.reload({ timeout, waitUntil: "domcontentloaded" }).catch(() => undefined);
+    }
+
+    return hasPasswordField;
+};
+
+app.post("/login", async (c) => {
+    let body: unknown;
+
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: "Invalid JSON body", success: false }, 400);
+    }
+
+    const parsed = loginSchema.safeParse(body);
+
+    // Never the validation message: it may quote what was sent.
+    if (!parsed.success) {
+        return c.json({ error: "Invalid login request", success: false }, 400);
+    }
+
+    const { budgetMs, origin, password, sessionId, url, username } = parsed.data;
+
+    if (!origin.startsWith("https://") || originOf(url) !== origin || validateUrl(url) !== null) {
+        return c.json({ error: "The login page is not on the site the login was saved for", success: false }, 400);
+    }
+
+    const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - 2000;
+    const left = (cap: number): number => Math.max(1, Math.min(cap, deadline - Date.now()));
+
+    const scrub = (text: string): string => withoutSecret(text, password);
+
+    let browser: import("@cloudflare/playwright").Browser | undefined;
+    let activeSessionId: string | undefined;
+
+    try {
+        ({ browser, sessionId: activeSessionId } = await openBrowser(c.env, sessionId));
+    } catch (error) {
+        return c.json({ error: `Failed to launch browser: ${scrub(error instanceof Error ? error.message : String(error))}`, success: false }, 500);
+    }
+
+    try {
+        const page = await pageOf(browser);
+        const offSite = (): string | null => {
+            const at = originOf(page.url());
+
+            return at === origin ? null : `The page left ${origin} (it is on ${at ?? "no site"}), so nothing was typed`;
+        };
+
+        await page.goto(url, { timeout: left(NAV_TIMEOUT), waitUntil: "domcontentloaded" });
+
+        const landed = offSite();
+
+        if (landed) {
+            return c.json({ error: landed, sessionId: activeSessionId, success: false, url: scrub(page.url()) });
+        }
+
+        // The main frame only: a frame of another site is never typed into.
+        const field = await page
+            .locator('input[type="password"]:visible')
+            .first()
+            .elementHandle({ timeout: left(PAGE_TIMEOUT) })
+            .catch(() => null);
+
+        if (!field) {
+            return c.json({ error: "No password field is on the page", sessionId: activeSessionId, success: false, url: scrub(page.url()) });
+        }
+
+        // Where Enter sends the form: its default button's `formaction`/`formmethod`, else the form's own. No method is GET,
+        // which would put the password in the address: such a form is sent by POST; one that names another method is refused.
+        const sends = await field.evaluate((input) => {
+            const { form } = input as HTMLInputElement;
+
+            if (!form) {
+                return { action: document.location.href, method: "post" };
+            }
+
+            const button = form.querySelector('button:not([type]), button[type="submit" i], input[type="submit" i]');
+            const named = button?.getAttribute("formmethod") ?? form.getAttribute("method");
+            const action = new URL(button?.getAttribute("formaction") ?? form.getAttribute("action") ?? "", document.baseURI).href;
+
+            if (named === null) {
+                form.setAttribute("method", "post");
+            }
+
+            return { action, method: (named ?? "post").toLowerCase() };
+        });
+
+        if (sends.method !== "post" || originOf(sends.action) !== origin) {
+            return c.json({
+                error: `The login form would not send the password to ${origin} by POST, so nothing was typed`,
+                sessionId: activeSessionId,
+                success: false,
+            });
+        }
+
+        if (deadline - Date.now() < TYPE_RESERVE_MS) {
+            return c.json({ error: "Too little time was left to sign in, so nothing was typed. Try it again.", sessionId: activeSessionId, success: false });
+        }
+
+        const userCandidate = await field.evaluateHandle((input) => {
+            const scope = (input as HTMLInputElement).form ?? document;
+            const before = [...scope.querySelectorAll("input")].filter(
+                (candidate) =>
+                    ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
+                    candidate.getClientRects().length > 0 &&
+                    Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
+            );
+
+            return before.at(-1) ?? null;
+        });
+        const user = userCandidate.asElement();
+
+        let moved = offSite();
+
+        if (!moved && user) {
+            await user.fill(username, { timeout: left(PAGE_TIMEOUT) });
+            moved = offSite();
+        }
+
+        if (moved || !(await field.evaluate((input) => input.isConnected && (input as HTMLInputElement).type === "password"))) {
+            return c.json({
+                error: moved ?? "The password field changed before it was typed into, so it was left empty",
+                sessionId: activeSessionId,
+                success: false,
+            });
+        }
+
+        await field.fill(password, { timeout: left(PAGE_TIMEOUT) });
+        // A page with an unload listener is never kept in the back/forward cache, where the filled form would wait.
+        await page.evaluate(() => window.addEventListener("unload", () => undefined)).catch(() => undefined);
+        await field.press("Enter", { timeout: left(PAGE_TIMEOUT) });
+        await page.waitForTimeout(left(1500));
+        await page.waitForLoadState("domcontentloaded", { timeout: left(NAV_TIMEOUT) }).catch(() => undefined);
+
+        const passwordFieldRemains = await emptyPasswordFields(page, password, left(NAV_TIMEOUT));
+
+        return c.json({
+            passwordFieldRemains,
+            sessionId: activeSessionId,
+            submitted: true,
+            success: true,
+            title: scrub(await page.title()),
+            url: scrub(page.url()),
+        });
+    } catch (error) {
+        return c.json({ error: scrub(error instanceof Error ? error.message : String(error)), sessionId: activeSessionId, success: false }, 500);
+    } finally {
         if (browser && !activeSessionId) {
             await browser.close().catch(() => {});
         }

@@ -60,6 +60,47 @@
                 }
             }
         },
+        "/login": {
+            "post": {
+                "operationId": "browserLogin",
+                "summary": "Sign in with a saved login: open the login page and type the username and password in one call",
+                "tags": ["Browser"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/BrowserLoginRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login result; never carries the password",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "operationId": "getHealth",
@@ -82,6 +123,36 @@
     },
     "components": {
         "schemas": {
+            "BrowserLoginRequest": {
+                "type": "object",
+                "required": ["url", "origin", "username", "password"],
+                "properties": {
+                    "budgetMs": {
+                        "type": "integer",
+                        "description": "The time the caller gives the whole call; nothing is typed once too little of it is left"
+                    },
+                    "url": { "type": "string", "description": "The login page; must be on `origin`" },
+                    "origin": { "type": "string", "description": "The exact origin the login was saved for; nothing is typed on any other" },
+                    "username": { "type": "string" },
+                    "password": { "type": "string", "description": "Typed into a password field only; never returned" },
+                    "sessionId": { "type": "string", "description": "Reconnect to an existing browser session" }
+                }
+            },
+            "BrowserLoginResponse": {
+                "type": "object",
+                "properties": {
+                    "success": { "type": "boolean" },
+                    "sessionId": { "type": "string" },
+                    "url": { "type": "string" },
+                    "title": { "type": "string" },
+                    "submitted": { "type": "boolean", "description": "The form was filled and sent" },
+                    "passwordFieldRemains": {
+                        "type": "boolean",
+                        "description": "A password field is still on the page after sending: the sign-in may have failed"
+                    },
+                    "error": { "type": "string" }
+                }
+            },
             "BrowserActionRequest": {
                 "type": "object",
                 "required": ["action"],

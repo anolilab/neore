@@ -4,6 +4,46 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type BrowserLoginRequest = {
+    /**
+     * The time the caller gives the whole call; nothing is typed once too little of it is left
+     */
+    budgetMs?: number;
+    /**
+     * The login page; must be on `origin`
+     */
+    url: string;
+    /**
+     * The exact origin the login was saved for; nothing is typed on any other
+     */
+    origin: string;
+    username: string;
+    /**
+     * Typed into a password field only; never returned
+     */
+    password: string;
+    /**
+     * Reconnect to an existing browser session
+     */
+    sessionId?: string;
+};
+
+export type BrowserLoginResponse = {
+    success?: boolean;
+    sessionId?: string;
+    url?: string;
+    title?: string;
+    /**
+     * The form was filled and sent
+     */
+    submitted?: boolean;
+    /**
+     * A password field is still on the page after sending: the sign-in may have failed
+     */
+    passwordFieldRemains?: boolean;
+    error?: string;
+};
+
 export type BrowserActionRequest = {
     /**
      * The browser action to execute
@@ -112,6 +152,35 @@ export type BrowserActionResponses = {
 };
 
 export type BrowserActionResponse2 = BrowserActionResponses[keyof BrowserActionResponses];
+
+export type BrowserLoginData = {
+    body: BrowserLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/login';
+};
+
+export type BrowserLoginErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorResponse;
+    /**
+     * Internal server error
+     */
+    500: ErrorResponse;
+};
+
+export type BrowserLoginError = BrowserLoginErrors[keyof BrowserLoginErrors];
+
+export type BrowserLoginResponses = {
+    /**
+     * Login result; never carries the password
+     */
+    200: BrowserLoginResponse;
+};
+
+export type BrowserLoginResponse2 = BrowserLoginResponses[keyof BrowserLoginResponses];
 
 export type GetHealthData = {
     body?: never;
