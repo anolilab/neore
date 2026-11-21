@@ -538,7 +538,7 @@ describe("taking control of the browser", () => {
     it("gives the owner an interactive view and refuses the agent's turn to anyone else meanwhile", async () => {
         await addSession();
 
-        await expect(take(OWNER)).resolves.toMatchObject({ status: "ok", url: VIEW_URL });
+        await expect(take(OWNER)).resolves.toMatchObject({ status: "ok", until: NOW + CONTROL_IDLE_MS, url: VIEW_URL });
 
         const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
 
@@ -598,10 +598,12 @@ describe("taking control of the browser", () => {
 
         await expect(keep(OWNER)).resolves.toEqual({ until: NOW + 60_000 + CONTROL_IDLE_MS });
         await expect(keep(WRITER)).resolves.toBeNull();
-        await giveBack(WRITER, "handed_back");
+        await expect(giveBack(WRITER, "handed_back")).resolves.toBe(false);
         await expect(control()).resolves.toMatchObject({ by: OWNER, until: NOW + 60_000 + CONTROL_IDLE_MS });
 
-        await giveBack(OWNER, "left");
+        await expect(giveBack(OWNER, "left")).resolves.toBe(true);
+        // Sent again (its answer was lost): it says so again, and changes nothing.
+        await expect(giveBack(OWNER, "left")).resolves.toBe(true);
 
         await expect(control()).resolves.toMatchObject({ ended: "left", until: NOW + 60_000 });
         await expect(statusFor(READER)).resolves.not.toHaveProperty("control");
@@ -626,8 +628,8 @@ describe("taking control of the browser", () => {
             status: "refused",
         });
         expect(renderer).not.toHaveBeenCalled();
-        // The older tab closes: the newer tab's lease goes on, and the agent is still refused.
-        await giveBack(OWNER, "left", older);
+        // The older tab closes: the newer tab's lease goes on, and the agent is still refused. It is told so.
+        await expect(giveBack(OWNER, "handed_back", older)).resolves.toBe(false);
         await expect(control()).resolves.not.toHaveProperty("ended");
         await expect(statusFor(READER)).resolves.toMatchObject({ control: { byYou: false } });
 

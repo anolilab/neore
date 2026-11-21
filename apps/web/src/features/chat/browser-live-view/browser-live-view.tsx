@@ -29,9 +29,6 @@ const CONNECT_WINDOW_MS = 60_000;
 /** The backend's `CONTROL_WARNING_MS`: how long before an idle hand back the card warns and offers to keep control. */
 const CONTROL_WARNING_MS = 30_000;
 
-/** The backend's `CONTROL_IDLE_MS`: a lease nobody renews ends this long after it was written. */
-const CONTROL_IDLE_MS = 120_000;
-
 /** Input renews control at most this often; the idle timeout (two minutes) is far longer. */
 const RENEW_EVERY_MS = 30_000;
 
@@ -69,6 +66,17 @@ const errorCodeOf = (error: unknown): unknown => {
     const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
 
     return code ?? data?.code;
+};
+
+/**
+ * A failure the server gave no verdict on, worth sending again: no code (the request never got through), or a 5xx-class
+ * status, which is also what Lunora gives an unreadable gateway answer (`INTERNAL`) and an offline write it refused to
+ * queue (`OFFLINE_NOT_QUEUED`). A refusal (4xx) never changes by asking again.
+ */
+const isTransient = (error: unknown): boolean => {
+    const { status } = (typeof error === "object" && error !== null ? error : {}) as { status?: unknown };
+
+    return errorCodeOf(error) === undefined || (typeof status === "number" && status >= 500);
 };
 
 const failureReasonOf = (error: unknown): FailureReason => {
@@ -110,14 +118,16 @@ type Asked = { attempt: number; browserId: string; connectBy: number; mode: Mode
 
 type NavigationAnswer = { error: string; status: "refused" } | { status: "closed" } | { status: "ok"; url?: string };
 
-type Answer = { status: "busy" | "controlled" | "ended" | "taken" | "unavailable" } | { claim?: string; connectBy: number; status: "ok"; url: string };
+type Answer =
+    | { status: "busy" | "controlled" | "ended" | "taken" | "unavailable" }
+    | { claim?: string; connectBy: number; status: "ok"; until?: number; url: string };
 
 /**
- * The claim this tab holds, and the window on the server's clock in which its lease was written: after `sentAt` (when
- * `takeControl` was sent) and before `writtenBy` (when it answered). A status read older than the claim says nothing
- * about it: the card trusts the claim it received until a read that can have seen the lease says otherwise.
+ * The claim this tab holds, on the server's clock. Its lease was written before `writtenBy` (when `takeControl`
+ * answered), so only a status read from then on can have seen it: an older one says nothing about this claim. `until`:
+ * when the lease ends unrenewed, as `takeControl` answered it, moved on by every `keepControl` that answered for it.
  */
-type Held = { claim: string; sentAt: number; writtenBy: number };
+type Held = { claim: string; until: number; writtenBy: number };
 
 /**
  * What the view becomes after the person asked for it. `ended` reads as unavailable too: the browser may be gone before the
@@ -167,7 +177,7 @@ const isForOtherBrowser = (view: View, browserId: string): boolean => (view.kind
 
 const isControlView = (view: View): boolean => (view.kind === "open" || view.kind === "opening") && view.mode === "control";
 
-/** A person's lease, on this device's clock, while it has not run out; `byYou`: the caller holds it (from any of their tabs). */
+/** A person's lease as the status names it, on the server's clock; `byYou`: the caller holds it (from any of their tabs). */
 type Control = { byYou: boolean; until: number };
 
 type CardProps = {
@@ -202,17 +212,21 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const navigateInControl = useAction(api.browser.live_view.navigateInControl);
     const keepControl = useMutation(crpc.browser.live_view.keepControl.mutationOptions());
     // A hand back that does not arrive leaves the agent waiting: it is sent again, with backoff, before the card gives up.
-    // Only a request that did not get through is sent again; offline it fails instead of waiting, so the card can say so.
+    // Only a request the server gave no verdict on is sent again. Offline it is refused, never queued for the reconnect
+    // (`onlineOnly`), so the card can say it did not go through.
     const handBack = useMutation({
-        ...crpc.browser.live_view.handBack.mutationOptions(),
+        ...crpc.browser.live_view.handBack.mutationOptions(undefined, { onlineOnly: true }),
         networkMode: "always",
-        retry: (failures: number, error: unknown) => failures < 3 && errorCodeOf(error) === undefined,
+        retry: (failures: number, error: unknown) => failures < 3 && isTransient(error),
     });
     const [view, setView] = useState<View>(CLOSED);
     // State to render from, and a ref for answers that come back after the render that asked.
     const [lease, setLeaseState] = useState<Held | undefined>(undefined);
     const claimRef = useRef<string | undefined>(undefined);
     const claim = lease?.claim;
+    /** The claim whose hand back the person asked for: it stays this tab's (and the view interactive) until it lands. */
+    const [returning, setReturningState] = useState<string | undefined>(undefined);
+    const returningRef = useRef<string | undefined>(undefined);
     /** The control request whose answer the card still wants; a lease answered to any other one is handed back at once. */
     const wantedControl = useRef<number | undefined>(undefined);
 
@@ -237,28 +251,30 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const frame = useRef<HTMLIFrameElement>(null);
     const leaving = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const expanded = view.kind !== "closed";
-    // The claim is confirmed by the first status read that saw its lease: one after `takeControl` answered, or one after
-    // it was sent that names the caller's lease. Until then the status may still be about the time before (another
-    // person's lease, or this tab's last one, handed back), and the claim this tab received is what counts.
-    const [confirmed, setConfirmed] = useState<string | undefined>(undefined);
-    const speaksForClaim = lease !== undefined && (statusClock.now >= lease.writtenBy || (statusClock.now >= lease.sentAt && control?.byYou === true));
-
-    if (lease !== undefined && confirmed !== lease.claim && speaksForClaim) {
-        setConfirmed(lease.claim);
-    }
-
-    // Not for longer than the lease can last unrenewed: a confirming read that never comes (a lost push) must not keep
-    // an interactive view open after the server ended the lease.
-    const unconfirmed = lease !== undefined && confirmed !== lease.claim && !speaksForClaim;
-    const trustUntil = unconfirmed ? lease.writtenBy + CONTROL_IDLE_MS - statusClock.skew : undefined;
-    const trustEnded = usePassed(trustUntil);
-    const trusted = unconfirmed && !trustEnded;
-    const controlledByOther = control?.byYou === false && !trusted;
-    const youControl = claim !== undefined && (trusted || (canControl && control?.byYou === true));
-    const leaseUntil = trusted ? trustUntil : control?.until;
+    // Whether this tab's lease is still live, judged on the server's clock and moved onto this device's once per status
+    // answer (`statusClock.skew`). Only a status read that can have seen the lease speaks for it: an older one may name
+    // another person's lease, or this person's last one with its earlier end. Such a read that says the lease is not the
+    // caller's ends it. Otherwise it lasts until the latest end anything has told the card of: the one `takeControl`
+    // answered (so a status push that never comes does not hold the view open past the server's lease), a `keepControl`
+    // answer, or a read that saw the lease.
+    const seen = lease !== undefined && statusClock.now >= lease.writtenBy;
+    const refused = seen && (!canControl || control?.byYou !== true);
+    const statusUntil = seen && control?.byYou === true ? control.until : 0;
+    const leaseUntil = lease === undefined ? undefined : Math.max(lease.until, statusUntil) - statusClock.skew;
+    const leaseEnded = usePassed(leaseUntil);
+    const youControl = lease !== undefined && !refused && !leaseEnded;
+    // Another person's lease ends on the server's clock too; while this tab's claim is unseen, the status may be older.
+    const otherEnded = usePassed(control?.byYou === false ? control.until - statusClock.skew : undefined);
+    const controlledByOther = control?.byYou === false && !otherEnded && (lease === undefined || seen);
+    const handingBack = returning !== undefined && returning === claim;
     const warn = usePassed(youControl && leaseUntil !== undefined ? leaseUntil - CONTROL_WARNING_MS : undefined);
     const showStillLoading = !usePassed(stillLoading === 0 ? undefined : stillLoading) && stillLoading !== 0;
     const forbiddenText = impersonating ? t`Taking control is not available while impersonating.` : t`You may not take control of this browser.`;
+
+    const setReturning = (next: string | undefined): void => {
+        returningRef.current = next;
+        setReturningState(next);
+    };
 
     const setClaim = (next: Held | undefined): void => {
         // A page still loading under a lease that ended answers into nothing.
@@ -269,13 +285,14 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         claimRef.current = next?.claim;
         setLeaseState(next);
+        setReturning(undefined);
     };
 
     /**
-     * Hands back the lease this tab holds, if any. The server ends only the lease that claim names. A hand back the
-     * person chose says whether it went through: one that did not leaves the agent waiting until the lease runs out.
+     * The tab is leaving the lease it holds, if any (its view is gone or going): the claim goes at once, and the server
+     * ends only the lease that claim names. A hand back that does not arrive leaves the lease to its idle timeout.
      */
-    const giveBack = (reason: "handed_back" | "left"): void => {
+    const giveBack = (): void => {
         const holding = claimRef.current;
 
         if (holding === undefined) {
@@ -283,26 +300,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         }
 
         setClaim(undefined);
-
-        const sent = handBack.mutateAsync({ claim: holding, reason, threadId });
-
-        if (reason === "left") {
-            sent.catch(() => undefined);
-
-            return;
-        }
-
-        noticeTurn.current += 1;
-        const turn = noticeTurn.current;
-        const say = (message: string): void => {
-            if (mounted.current && noticeTurn.current === turn) {
-                setNotice(message);
-            }
-        };
-
-        sent.then(() => say(t`You handed the browser back to the agent.`)).catch(() =>
-            say(t`The browser could not be handed back. The agent gets it back on its own after two minutes without input.`),
-        );
+        handBack.mutate({ claim: holding, reason: "left", threadId });
     };
 
     /**
@@ -318,17 +316,17 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
     /** The server refused this tab's control (an admin acting as the person): the view closes and the lease goes back. */
     const controlForbidden = (): void => {
-        giveBack("left");
+        giveBack();
         endControl(forbiddenText);
     };
 
     /** `takeControl` answered: a renewal switches to the new claim only now; any other answer means control is not ours. */
-    const tookControl = (attempt: number, sentAt: number, result: Answer): void => {
+    const tookControl = (attempt: number, result: Answer): void => {
         const current = mounted.current && attempts.current === attempt && wantedControl.current === attempt;
 
-        if (result.status === "ok" && result.claim !== undefined) {
+        if (result.status === "ok" && result.claim !== undefined && result.until !== undefined) {
             if (current) {
-                setClaim({ claim: result.claim, sentAt, writtenBy: result.connectBy - CONNECT_WINDOW_MS });
+                setClaim({ claim: result.claim, until: result.until, writtenBy: result.connectBy - CONNECT_WINDOW_MS });
             } else {
                 // Hidden (or gone) while it was asked for: the lease nobody looks at goes back at once.
                 handBack.mutate({ claim: result.claim, reason: "left", threadId });
@@ -339,7 +337,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
         // Also a renewal's: its URL never connected, so the lease it renews serves no view any more.
         if (current) {
-            giveBack("left");
+            giveBack();
         }
     };
 
@@ -347,8 +345,6 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         attempts.current += 1;
         const asked: Asked = { attempt: attempts.current, browserId, connectBy: Date.now() + CONNECT_WINDOW_MS, mode, renewed };
         const answered = (result: Answer): ((current: View) => View) => answerFor(asked.attempt, viewFrom(asked, result, Date.now()));
-        // On the server's clock, as the status read's `now` is.
-        const sentAt = Date.now() + statusClock.skew;
 
         wantedControl.current = mode === "control" ? asked.attempt : undefined;
         setView({ attempt: asked.attempt, browserId, kind: "opening", mode, renewed });
@@ -357,7 +353,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         void (mode === "control" ? takeControl({ threadId }) : openLiveView({ threadId }))
             .then((result: Answer) => {
                 if (mode === "control") {
-                    tookControl(asked.attempt, sentAt, result);
+                    tookControl(asked.attempt, result);
                 }
 
                 return answered(result);
@@ -366,11 +362,22 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             .catch((error: unknown) => setView(answerFor(asked.attempt, { kind: "failed", reason: failureReasonOf(error) })));
     };
 
+    /** The hand back the person asked for landed (or the lease ended while it was out): the view turns read-only. */
+    const returnedControl = (holding: string): void => {
+        if (!mounted.current || claimRef.current !== holding) {
+            return;
+        }
+
+        wantedControl.current = undefined;
+        setClaim(undefined);
+        ask(false);
+    };
+
     /** Input the card can see (a pointer on or focus into the view, typing a page address) starts the idle timeout again. */
     const renew = (force = false): void => {
         const held = claimRef.current;
 
-        if (!youControl || held === undefined || (!force && Date.now() - lastRenewal.current < RENEW_EVERY_MS)) {
+        if (!youControl || held === undefined || returningRef.current === held || (!force && Date.now() - lastRenewal.current < RENEW_EVERY_MS)) {
             return;
         }
 
@@ -384,10 +391,21 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                     }
                 },
                 onSuccess: (result: { until: number } | null) => {
-                    // Another of the person's tabs took control since, or control ended.
-                    if (result === null && claimRef.current === held) {
-                        endControl(t`You no longer have control of the browser.`);
+                    if (claimRef.current !== held || returningRef.current === held) {
+                        return;
                     }
+
+                    // Another of the person's tabs took control since, or control ended.
+                    if (result === null) {
+                        endControl(t`You no longer have control of the browser.`);
+
+                        return;
+                    }
+
+                    // The lease runs on from here, whether or not the status push of this write arrives.
+                    setLeaseState((current: Held | undefined) =>
+                        current?.claim === held ? { ...current, until: Math.max(current.until, result.until) } : current,
+                    );
                 },
             },
         );
@@ -395,16 +413,25 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
     // The lease ended on the server (idle, or the person may no longer write) while this tab still held its claim.
     const controlEnded = useEffectEvent((): void => {
-        if (claimRef.current === undefined || isForOtherBrowser(view, browserId)) {
+        const holding = claimRef.current;
+
+        if (holding === undefined || isForOtherBrowser(view, browserId)) {
             return;
         }
 
-        giveBack("left");
+        // The hand back the person asked for is what ended it.
+        if (returningRef.current === holding) {
+            returnedControl(holding);
+
+            return;
+        }
+
+        giveBack();
         endControl(t`Control of the browser is back with the agent.`);
     });
 
     const leave = useEffectEvent((): void => {
-        giveBack("left");
+        giveBack();
     });
 
     // The view closes too: a page restored from the back/forward cache must not wait on a view whose lease is gone. A
@@ -413,7 +440,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     // cut it off: the lease then ends on its idle timeout.
     const pageLeft = useEffectEvent((): void => {
         wantedControl.current = undefined;
-        giveBack("left");
+        giveBack();
         setView((current) => (isControlView(current) ? CLOSED : current));
     });
 
@@ -465,7 +492,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     // the tab is shown, and a tab left hidden gives no input, so the idle timeout ends the lease.
     const withoutView = holding && !isControlView(view);
     const leaseWithoutView = useEffectEvent((): void => {
-        giveBack("left");
+        giveBack();
     });
 
     useEffect(() => {
@@ -555,7 +582,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             // Hiding drops any answer still out, and the lease with the interactive view.
             attempts.current += 1;
             setView(CLOSED);
-            giveBack("left");
+            giveBack();
 
             return;
         }
@@ -563,10 +590,51 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         ask(false);
     };
 
+    /**
+     * The person hands back: the claim stays this tab's, and the view interactive, until the hand back lands, as the
+     * server's lease does. One that did not land leaves the person in control, and says so.
+     */
     const handBackNow = (): void => {
+        const handing = claimRef.current;
+
+        if (handing === undefined || returningRef.current === handing) {
+            return;
+        }
+
+        noticeTurn.current += 1;
+        const turn = noticeTurn.current;
+        const say = (message: string): void => {
+            if (mounted.current && noticeTurn.current === turn) {
+                setNotice(message);
+            }
+        };
+
+        // `false`: the lease was no longer this claim's (another of the person's tabs took over, or it ran out).
+        const handedBack = (claimed: string, ended: boolean): void => {
+            returnedControl(claimed);
+            say(ended ? t`You handed the browser back to the agent.` : t`You no longer have control of the browser.`);
+        };
+
         setNotice(undefined);
-        giveBack("handed_back");
-        ask(false);
+        setReturning(handing);
+        handBack
+            .mutateAsync({ claim: handing, reason: "handed_back", threadId })
+            .then((ended: boolean) => handedBack(handing, ended))
+            .catch((error: unknown) => {
+                // The lease ended (or this tab moved on) while the hand back was out.
+                if (claimRef.current !== handing) {
+                    return;
+                }
+
+                if (failureReasonOf(error) === "forbidden") {
+                    endControl(forbiddenText);
+
+                    return;
+                }
+
+                setReturning(undefined);
+                say(t`The browser could not be handed back. The agent gets it back on its own after two minutes without input.`);
+            });
     };
 
     /** What opening a page answered. A load grants a fresh idle window, so the status (and `control.until`) is read again. */
@@ -579,6 +647,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         onNavigated();
 
         if (result.status === "ok") {
+            // The load counts as input: renewing now learns the lease's new end, whether or not the status read says it.
+            renew(true);
             // What the browser shows now (a redirect may have moved it on), in the header and the address field.
             const url = result.url ?? submitted;
 
@@ -616,12 +686,14 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
         event.preventDefault();
         const held = claimRef.current;
 
-        if (held === undefined || navigating) {
+        if (held === undefined || navigating || returningRef.current === held) {
             return;
         }
 
         renew();
         setAddressError(undefined);
+        // A page an earlier load left loading says so again only if this load answers the same.
+        setStillLoading(0);
         setNavigating(true);
         navigations.current += 1;
         const navigation = navigations.current;
@@ -666,7 +738,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                     {expanded ? t`Hide live view` : t`Watch live`}
                 </Button>
                 {youControl && (
-                    <Button className={TOUCH_TARGET} onClick={handBackNow} size="sm" type="button">
+                    <Button className={TOUCH_TARGET} disabled={handingBack} onClick={handBackNow} size="sm" type="button">
+                        {handingBack && <Loader2 aria-hidden="true" className="size-3 animate-spin motion-reduce:animate-none" />}
                         {t`Hand back`}
                     </Button>
                 )}
@@ -694,7 +767,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                     {notice}
                 </p>
             )}
-            {youControl && warn && (
+            {youControl && warn && !handingBack && (
                 <div className="mt-2 flex items-center gap-2">
                     <p className="flex-1 text-xs" role="status">
                         {t`No input for a while: control goes back to the agent in under a minute.`}
@@ -743,7 +816,8 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                             aria-describedby={addressError === undefined ? undefined : addressErrorId}
                             aria-invalid={addressError !== undefined}
                             aria-label={t`Page address`}
-                            className="h-8 flex-1 text-xs any-pointer-coarse:h-11"
+                            // `className` sizes the wrapper: the field itself fills it, so all of a 44 px touch target focuses it.
+                            className="h-8 flex-1 text-xs *:data-[slot=input]:h-full any-pointer-coarse:h-11"
                             inputMode="url"
                             onChange={(event: ChangeEvent<HTMLInputElement>) => {
                                 renew();
@@ -754,7 +828,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
                             type="url"
                             value={address}
                         />
-                        <Button className={TOUCH_TARGET} disabled={navigating} size="sm" type="submit" variant="outline">
+                        <Button className={TOUCH_TARGET} disabled={navigating || handingBack} size="sm" type="submit" variant="outline">
                             {navigating && <Loader2 aria-hidden="true" className="size-3 animate-spin motion-reduce:animate-none" />}
                             {t`Go`}
                         </Button>
@@ -821,10 +895,6 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     // A grantee's grant ended: nothing re-runs the live query when only the clock moves, so the card goes at once and the
     // status is asked again; the server answers nothing after the grant's end.
     const accessEnded = usePassed(local(browser?.accessUntil));
-    // A lease that runs out writes nothing, so no new answer comes when it ends, and asking again would not help: a live
-    // query's refetch answers from its subscription's last push. The lease is over once its `until` passes on the server's
-    // clock; a renewal is a write, and its push moves `until`.
-    const controlEnded = usePassed(local(browser?.control?.until));
     const refetchStatus = useEffectEvent((): void => {
         status.refetch().catch(() => undefined);
     });
@@ -875,7 +945,7 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         <BrowserCard
             browserId={browser.browserId}
             canControl={browser.canControl}
-            control={browser.control === undefined || controlEnded ? undefined : { byYou: browser.control.byYou, until: browser.control.until - skew }}
+            control={browser.control}
             currentUrl={browser.currentUrl}
             key={threadId}
             onNavigated={() => {

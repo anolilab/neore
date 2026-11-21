@@ -30,6 +30,8 @@ const { backend } = vi.hoisted(() => {
                 now?: number;
             } | null,
             handBack: vi.fn(),
+            /** The call options `handBack` was built with (`onlineOnly`). */
+            handBackCall: undefined as unknown,
             /** Whether an admin acts as this account. */
             impersonating: false,
             keep: vi.fn(),
@@ -62,7 +64,9 @@ vi.mock("@/lib/lunora/crpc", () => {
                 browser: {
                     live_view: {
                         handBack: {
-                            mutationOptions: () => {
+                            mutationOptions: (_overrides: unknown, call: unknown) => {
+                                backend.handBackCall = call;
+
                                 return { mutationFn: backend.handBack };
                             },
                         },
@@ -98,13 +102,18 @@ const THREAD = "thread-1" as never;
 const URL = "https://live.browser.run/ui/view?mode=tab";
 const LIVE_VIEW = /Live view/u;
 
+/** Unmounts the card the test rendered. */
+const rendered: { unmount?: () => void } = {};
+
 /** Renders the card; the query client is returned so a test can make the status read run again. */
 const mountCard = (): QueryClient => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    render(<BrowserLiveView threadId={THREAD} />, {
+    const { unmount } = render(<BrowserLiveView threadId={THREAD} />, {
         wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
     });
+
+    rendered.unmount = unmount;
 
     return queryClient;
 };
@@ -118,7 +127,12 @@ const setVisibility = (state: DocumentVisibilityState): void => {
     document.dispatchEvent(new Event("visibilitychange"));
 };
 
-afterEach(() => {
+afterEach(async () => {
+    // The card unmounts under fake timers, and hands back a tick later: that call runs here, not in the next test.
+    vi.useFakeTimers();
+    rendered.unmount?.();
+    rendered.unmount = undefined;
+    await vi.runAllTimersAsync();
     // Spies on the clock first (a test's `setTimeout` wraps the fake one), then the real clock back.
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -129,15 +143,16 @@ afterEach(() => {
     backend.impersonating = false;
 });
 
-// The last test's card unmounts after it, and hands back a tick later: that call must not count in this test.
-beforeEach(async () => {
-    await new Promise((resolve) => {
-        setTimeout(resolve, 5);
-    });
-
+beforeEach(() => {
     for (const mock of [backend.open, backend.handBack, backend.keep, backend.navigate, backend.take]) {
         mock.mockReset();
     }
+
+    backend.handBack.mockResolvedValue(true);
+    // As the server answers: two more minutes from now.
+    backend.keep.mockImplementation(async () => {
+        return { until: Date.now() + 120_000 };
+    });
 });
 
 describe("BrowserLiveView", () => {
@@ -626,7 +641,7 @@ describe("BrowserLiveView", () => {
          * connects, unless `connect` is false (its URL is then renewed past the connect deadline).
          */
         const takeControl = async (queryClient: QueryClient, until = Date.now() + 120_000, connect = true): Promise<void> => {
-            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 60_000, status: "ok", url: CONTROL_URL });
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 60_000, status: "ok", until, url: CONTROL_URL });
             await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
             await push(queryClient, { ...backend.browser!, control: { byYou: true, until } });
 
@@ -704,7 +719,7 @@ describe("BrowserLiveView", () => {
             expect(backend.keep.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
 
             await act(async () => {
-                renewal[0]?.({ claim: "claim-2", connectBy: Date.now() + 60_000, status: "ok", url: OTHER_URL });
+                renewal[0]?.({ claim: "claim-2", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: OTHER_URL });
             });
             expect(frameSource()).toBe(OTHER_URL);
 
@@ -771,14 +786,12 @@ describe("BrowserLiveView", () => {
             await act(async () => {
                 await queryClient.invalidateQueries();
             });
-            await act(async () => {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 10);
-                });
-            });
 
-            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
-            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+            // The card hands back a tick after it unmounts (a remount at once is not leaving).
+            await vi.waitFor(() => {
+                expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+                expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+            });
         });
 
         it("hands back when the person hides the view", async () => {
@@ -787,11 +800,6 @@ describe("BrowserLiveView", () => {
 
             await takeControl(queryClient);
             await userEvent.click(screen.getByRole("button", { name: "Hide live view" }));
-            await act(async () => {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 10);
-                });
-            });
 
             expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
             expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
@@ -852,14 +860,14 @@ describe("BrowserLiveView", () => {
             await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
             await userEvent.click(screen.getByRole("button", { name: "Hide live view" }));
             await act(async () => {
-                late[0]?.({ claim: "claim-late", connectBy: Date.now() + 60_000, status: "ok", url: CONTROL_URL });
+                late[0]?.({ claim: "claim-late", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: CONTROL_URL });
             });
 
             expect(backend.handBack.mock.calls[0]?.[0]).toEqual({ claim: "claim-late", reason: "left", threadId: THREAD });
             expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
         });
 
-        it("warns before an idle hand back, keeps control on request, and closes the view once control lapsed", async () => {
+        it("warns before an idle hand back, keeps control on request until the end it answers, and closes the view then", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
             backend.keep.mockResolvedValue({ until: Date.now() + 120_000 });
@@ -874,8 +882,16 @@ describe("BrowserLiveView", () => {
             await userEvent.click(screen.getByRole("button", { name: "Keep control" }));
             expect(backend.keep.mock.calls[0]?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
 
+            // Past the status's end, and no push of the renewal came: the end Keep control answered counts.
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(30_000);
+            });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.queryByRole("button", { name: "Keep control" })).toBeNull();
+            expect(backend.handBack).not.toHaveBeenCalled();
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(80_000);
             });
 
             expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
@@ -1024,7 +1040,13 @@ describe("BrowserLiveView", () => {
         it("keeps a new lease while the status read still answers from before it was written", async () => {
             controllable();
             // `connectBy` names the server's clock when the lease was answered: a read before that has not seen it.
-            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 61_000, status: "ok", url: CONTROL_URL });
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                connectBy: Date.now() + 61_000,
+                status: "ok",
+                until: Date.now() + 120_000,
+                url: CONTROL_URL,
+            });
             const queryClient = mountCard();
 
             await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
@@ -1043,19 +1065,29 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
         });
 
-        it("closes a lease no status read ever confirmed once it would have run out unrenewed, warning first", async () => {
+        it("closes a lease no status read ever confirmed at the end the server gave it, warning first, on the server's clock", async () => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
-            backend.browser = { ...backend.browser!, idleUntil: Date.now() + 3_600_000 };
-            // Answered after every status read the card gets: none of them has seen the lease (its push was lost).
-            backend.take.mockResolvedValueOnce({ claim: "claim-1", connectBy: Date.now() + 600_000, status: "ok", url: CONTROL_URL });
+            // The server's clock is 5 s behind this device's.
+            const serverNow = Date.now() - 5000;
+
+            backend.browser = { ...backend.browser!, idleUntil: serverNow + 3_600_000, now: serverNow };
+            // A slow mint: answered long after the lease was written, and after every status read the card gets, so none
+            // of them has seen the lease (its push was lost). The lease still ends 120 s after it was written.
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                connectBy: serverNow + 600_000,
+                status: "ok",
+                until: serverNow + 120_000,
+                url: CONTROL_URL,
+            });
             mountCard();
 
             await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
             fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
 
             await act(async () => {
-                await vi.advanceTimersByTimeAsync(631_000);
+                await vi.advanceTimersByTimeAsync(91_000);
             });
             expect(screen.getByRole("button", { name: "Keep control" })).toBeTruthy();
             expect(backend.handBack).not.toHaveBeenCalled();
@@ -1098,7 +1130,7 @@ describe("BrowserLiveView", () => {
             await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
             await stopWanting(queryClient);
             await act(async () => {
-                late[0]?.({ claim: "claim-late", connectBy: Date.now() + 60_000, status: "ok", url: CONTROL_URL });
+                late[0]?.({ claim: "claim-late", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: CONTROL_URL });
             });
 
             expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-late", reason: "left", threadId: THREAD }]);
@@ -1112,7 +1144,7 @@ describe("BrowserLiveView", () => {
             const queryClient = mountCard();
 
             await takeControl(queryClient, Date.now() + 600_000, false);
-            backend.take.mockResolvedValueOnce({ claim: "claim-2", connectBy: Date.now() + 61_000, status: "ok", url: OTHER_URL });
+            backend.take.mockResolvedValueOnce({ claim: "claim-2", connectBy: Date.now() + 61_000, status: "ok", until: Date.now() + 600_000, url: OTHER_URL });
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(61_000);
             });
@@ -1143,14 +1175,24 @@ describe("BrowserLiveView", () => {
             expect(screen.queryByRole("button", { name: "Hand back" })).toBeNull();
         });
 
-        it("tries a failed hand back again, and says so once it keeps failing", async () => {
+        it.each([
+            ["a request that never got through", new Error("network")],
+            ["an unreadable gateway answer", { code: "INTERNAL", status: 500 }],
+            ["offline", { code: "OFFLINE_NOT_QUEUED", status: 503 }],
+        ])("tries a hand back that failed on %s again, keeps control meanwhile, and says so once it keeps failing", async (_, error) => {
             vi.useFakeTimers({ shouldAdvanceTime: true });
             controllable();
-            backend.handBack.mockRejectedValue(new Error("network"));
+            backend.handBack.mockRejectedValue(error);
             const queryClient = mountCard();
 
             await takeControl(queryClient);
             await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+            // Refused offline, never queued for the reconnect.
+            expect(backend.handBackCall).toEqual({ onlineOnly: true });
+            // Still the person's until it lands.
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Hand back" })).toHaveProperty("disabled", true);
+
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(10_000);
             });
@@ -1158,6 +1200,95 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack).toHaveBeenCalledTimes(4);
             expect(screen.getByText("The browser could not be handed back. The agent gets it back on its own after two minutes without input.")).toBeTruthy();
             expect(screen.queryByText("You handed the browser back to the agent.")).toBeNull();
+            // The lease is still theirs: the view stays, and they can hand back again.
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+            expect(screen.getByRole("button", { name: "Hand back" })).toHaveProperty("disabled", false);
+        });
+
+        it("sends a hand back the server refused only once", async () => {
+            controllable();
+            backend.handBack.mockRejectedValue({ code: "BAD_REQUEST", status: 400 });
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+
+            expect(
+                await screen.findByText("The browser could not be handed back. The agent gets it back on its own after two minutes without input."),
+            ).toBeTruthy();
+            expect(backend.handBack).toHaveBeenCalledTimes(1);
+        });
+
+        it("does not say it handed back a lease that another of the person's tabs had taken over", async () => {
+            controllable();
+            backend.handBack.mockResolvedValue(false);
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+
+            expect(await screen.findByText("You no longer have control of the browser.")).toBeTruthy();
+            expect(screen.queryByText("You handed the browser back to the agent.")).toBeNull();
+            expect(await screen.findByTitle(READ_ONLY_VIEW)).toBeTruthy();
+        });
+
+        it("keeps a renewed lease that a status read from before its write names by the old lease's end", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const renewal: ((value: unknown) => void)[] = [];
+
+            await takeControl(queryClient, Date.now() + 90_000, false);
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        renewal.push(resolve);
+                    }),
+            );
+            // The interactive URL never connected: its one renewal is asked for.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+            // Answered 5 s after the renewal's lease was written, which runs 120 s from now.
+            await act(async () => {
+                renewal[0]?.({ claim: "claim-2", connectBy: Date.now() + 65_000, status: "ok", until: Date.now() + 120_000, url: OTHER_URL });
+            });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+
+            // A read made before that write arrives late: it names the person's old lease, ending in 10 s.
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, until: Date.now() + 10_000 }, now: Date.now() });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(15_000);
+            });
+
+            expect(frameSource()).toBe(OTHER_URL);
+            expect(screen.getByRole("button", { name: "Hand back" })).toBeTruthy();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("drops a page's still-loading notice once a new page is asked for", async () => {
+            controllable();
+            backend.navigate.mockResolvedValueOnce({ error: "The page you opened is still loading.", status: "refused" });
+            const answers: ((value: unknown) => void)[] = [];
+
+            backend.navigate.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        answers.push(resolve);
+                    }),
+            );
+            const queryClient = mountCard();
+
+            await takeControl(queryClient);
+            await typeAddress();
+            expect(await screen.findByText("The page you opened is still loading.")).toBeTruthy();
+
+            await typeAddress("https://example.com/other");
+            expect(screen.queryByText("The page you opened is still loading.")).toBeNull();
+            await act(async () => {
+                answers[0]?.({ status: "ok" });
+            });
+            expect(screen.queryByText("The page you opened is still loading.")).toBeNull();
         });
 
         it("shows the controlled browser's page: the status's at first, then the one a page load answered", async () => {
@@ -1176,6 +1307,8 @@ describe("BrowserLiveView", () => {
             await vi.waitFor(() => {
                 expect(address).toHaveProperty("value", "https://example.com/welcome");
             });
+            // The load counts as input: the card renews, and so learns the lease's new end.
+            expect(backend.keep.mock.calls.at(-1)?.[0]).toEqual({ claim: "claim-1", threadId: THREAD });
             expect(screen.getByRole("region", { name: "Browser" }).textContent).toContain("https://example.com/welcome");
             expect(screen.getByRole("region", { name: "Browser" }).textContent).not.toContain("https://example.com/login");
         });

@@ -153,14 +153,18 @@ const controlledBy = (byYou: boolean, until = STORY_NOW + 120_000) =>
         now: STORY_NOW,
     });
 
+/** `takeControl` gives the lease until `until` (story time). */
+const tookControl = (until = STORY_NOW + 120_000) =>
+    lunora(api.browser.live_view.takeControl, { claim: "claim-1", connectBy: STORY_NOW + 60_000, status: "ok" as const, until, url: CONTROL_VIEW });
+
 const controlHandlers = (status: ReturnType<typeof controlledBy>, ...overrides: ReturnType<typeof lunora>[]) =>
     lunoraHandlers(
         ...userFixtures(),
         status,
-        lunora(api.browser.live_view.takeControl, { claim: "claim-1", connectBy: STORY_NOW + 60_000, status: "ok" as const, url: CONTROL_VIEW }),
+        tookControl(),
         lunora(api.browser.live_view.openLiveView, { connectBy: STORY_NOW + 60_000, status: "ok" as const, url: STAND_IN_VIEW }),
         lunora(api.browser.live_view.keepControl, { until: STORY_NOW + 120_000 }),
-        lunora(api.browser.live_view.handBack, null),
+        lunora(api.browser.live_view.handBack, true),
         lunora(api.browser.live_view.navigateInControl, { status: "ok" as const }),
         ...overrides,
     );
@@ -179,7 +183,7 @@ export const InControl: Story = {
 
 /** Control is about to return for lack of input: a warning, with a button that keeps it. */
 export const IdleWarning: Story = {
-    parameters: { msw: { handlers: { lunora: controlHandlers(controlledBy(true, STORY_NOW + 20_000)) } } },
+    parameters: { msw: { handlers: { lunora: controlHandlers(controlledBy(true, STORY_NOW + 20_000), tookControl(STORY_NOW + 20_000)) } } },
     play: async ({ canvas }) => {
         await userEvent.click(await canvas.findByRole("button", { name: "Take control" }));
         await expect(await canvas.findByText("No input for a while: control goes back to the agent in under a minute.")).toBeVisible();
@@ -221,7 +225,11 @@ export const ControlForbidden: Story = {
 /** Opens a page from the address field of a story that holds control. */
 const openPage = async (canvas: { findByRole: (role: string, options: { name: string }) => Promise<HTMLElement> }): Promise<void> => {
     await userEvent.click(await canvas.findByRole("button", { name: "Take control" }));
-    await userEvent.type(await canvas.findByRole("textbox", { name: "Page address" }), "https://example.com/next");
+    const address = await canvas.findByRole("textbox", { name: "Page address" });
+
+    // The field starts with the browser's page: the new address replaces it.
+    await userEvent.clear(address);
+    await userEvent.type(address, "https://example.com/next");
     await userEvent.click(await canvas.findByRole("button", { name: "Go" }));
 };
 
