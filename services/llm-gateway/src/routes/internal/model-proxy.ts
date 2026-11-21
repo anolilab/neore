@@ -252,7 +252,8 @@ modelProxyRouter.openapi(
                 const pricingRead = policy.pricing();
 
                 pricingRead.catch(() => undefined);
-                const result = await model.doGenerate(callOptions);
+                // The caller's cancel (its request's signal) stops the provider call, so an abandoned call is not paid for to the end.
+                const result = await model.doGenerate({ ...callOptions, abortSignal: c.req.raw.signal });
                 const latencyMs = Date.now() - startTime;
 
                 // Extract usage and calculate cost
