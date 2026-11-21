@@ -5,10 +5,11 @@
  * or generates new ones if needed.
  */
 import { useLingui } from "@lingui/react/macro";
-import { api } from "@neore/backend/api";
+import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChevronDown, PlusIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -21,17 +22,19 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import usePromptImprovementStore from "@/features/chat/prompt-improvement/stores/prompt-improvement-store";
-import { useLunoraActionOptions } from "@/lib/lunora/crpc";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useIsAtBottom } from "./at-bottom-context";
 
 ("use client");
 
-const FETCH_TIMEOUT_MS = 30_000;
-
 const ComposerFollowupSuggestions: FC = () => {
     const { t } = useLingui();
-    const { threadId } = useChatThread();
+    const { thread, threadId } = useChatThread();
+    // A locked chat's cache is read only with its unlock proof, as the next-prompt read is.
+    const unlockProof = useUnlockProof(threadId);
+    // A locked chat without its proof is not read, and nothing that was read before it locked is shown.
+    const lockedWithoutProof = Boolean(thread?.lockedAt) && !unlockProof;
     const { messages } = useChatMessages();
     const isRunning = useChatIsRunning();
     // Booleans, so typing does not re-render the suggestions on every keystroke.
@@ -43,10 +46,11 @@ const ComposerFollowupSuggestions: FC = () => {
 
     const validThreadId = getValidThreadId(threadId);
 
-    // Use action to fetch suggestions - handles caching internally
-    const { mutateAsync: getFollowupSuggestions } = useMutation(useLunoraActionOptions(api.chat.functions.getFollowupSuggestions));
+    const crpc = useCRPC();
 
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    // The reply the loaded suggestions are for: when the reply on screen changes, the chips wait for the effect below and do not show.
+    const [suggestionsReplyId, setSuggestionsReplyId] = useState<string | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const isFirstLoadRef = useRef(true);
@@ -54,7 +58,6 @@ const ComposerFollowupSuggestions: FC = () => {
     const userManuallyClosedRef = useRef(false);
     const userManuallyOpenedRef = useRef(false);
     const previousThreadIdRef = useRef<string | undefined>(undefined);
-    const isFetchingRef = useRef(false);
 
     // Only the messages after the last `/clear` divider: a reply from before it is no longer what the chat continues from.
     const inContext = useMemo(() => afterLastContextReset(messages), [messages]);
@@ -71,7 +74,7 @@ const ComposerFollowupSuggestions: FC = () => {
     );
 
     // Determine if we should show the suggestions
-    const shouldShow = shouldFetchConditions && suggestions.length > 0;
+    const shouldShow = shouldFetchConditions && suggestions.length > 0 && !lockedWithoutProof && suggestionsReplyId === lastMessage?.id;
 
     // The newest `/clear` divider: suggestions loaded before it are for the context it ended, so they go with it.
     const lastResetId = useMemo(() => messages.findLast((message) => isClearDivider(message))?.id, [messages]);
@@ -90,57 +93,30 @@ const ComposerFollowupSuggestions: FC = () => {
         userManuallyOpenedRef.current = false;
         previousSuggestionsRef.current = [];
         setSuggestions([]);
+        setSuggestionsReplyId(undefined);
         setIsOpen(false);
     }, [threadId, lastResetId]);
 
-    // Fetch suggestions via action when conditions are met
+    // Read the suggestions the backend cached after the reply. Reactive, so they appear when the generator writes them. Nothing here calls a model.
+    const { data: cachedFollowups, isFetching: isFetchingCached } = useQuery({
+        ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions({ threadId: validThreadId as Id<"threads">, unlockProof }),
+        // A locked chat without its proof is not read (see `use-next-prompt-suggestion.ts`).
+        enabled: Boolean(shouldFetchConditions) && !lockedWithoutProof,
+    });
+
     useEffect(() => {
-        if (!shouldFetchConditions || !validThreadId) {
+        if (!shouldFetchConditions) {
             return;
         }
 
-        // If we already have suggestions, don't fetch
-        if (suggestions.length > 0) {
-            return;
-        }
+        setIsLoading(isFetchingCached && cachedFollowups === undefined);
 
-        // If already fetching, skip
-        if (isFetchingRef.current) {
-            return;
-        }
+        // Only the suggestions for the reply on screen: a cache entry for an older reply, or none, shows nothing.
+        const cachedForReply = cachedFollowups && cachedFollowups.lastMessageId === lastMessage?.id ? cachedFollowups : null;
 
-        isFetchingRef.current = true;
-        setIsLoading(true);
-
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-        const timeoutPromise = new Promise<never>((_resolve, reject) => {
-            timeoutId = setTimeout(() => {
-                reject(new Error("Request timeout: suggestions took too long to generate"));
-            }, FETCH_TIMEOUT_MS);
-        });
-
-        const fetchPromise = getFollowupSuggestions({ threadId: validThreadId });
-
-        Promise.race([fetchPromise, timeoutPromise])
-            .then((result) => {
-                const newSuggestions = result?.suggestions || [];
-
-                clearTimeout(timeoutId);
-                setSuggestions(newSuggestions);
-                setIsLoading(false);
-                isFetchingRef.current = false;
-
-                return undefined;
-            })
-            .catch((error) => {
-                clearTimeout(timeoutId);
-                console.error("[ComposerFollowupSuggestions] Error fetching suggestions:", error);
-                setSuggestions([]);
-                setIsLoading(false);
-                isFetchingRef.current = false;
-            });
-    }, [shouldFetchConditions, validThreadId, suggestions.length, getFollowupSuggestions]);
+        setSuggestions(cachedForReply ? cachedForReply.suggestions : []);
+        setSuggestionsReplyId(cachedForReply ? lastMessage?.id : undefined);
+    }, [shouldFetchConditions, cachedFollowups, isFetchingCached, lastMessage?.id]);
 
     // Handle new suggestions arriving
     useEffect(() => {

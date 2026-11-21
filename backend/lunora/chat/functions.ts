@@ -4,6 +4,7 @@ import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
+import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -176,6 +177,7 @@ const generateFollowupSuggestionsInternal = async (
     language?: string,
     timezone?: string,
     location?: string,
+    timeoutMs = FOLLOWUP_DISPATCH_TTL_MS / 2,
 ): Promise<{
     suggestions: string[];
 }> => {
@@ -197,17 +199,21 @@ const generateFollowupSuggestionsInternal = async (
         model: model as LanguageModelV3,
     });
 
-    const result = await generateText({
-        model: wrappedModel,
-        output: Output.object({
-            schema: z
-                .object({
-                    suggestions: z.array(z.string()).max(MAX_SUGGESTION_COUNT),
-                })
-                .strict(),
+    // The call is cut off before the dispatch claim lapses, so a lock that waited for it cannot commit while the request is still live (`agent/thread-lock.ts`).
+    const result = await withDeadline(timeoutMs, (abortSignal) =>
+        generateText({
+            abortSignal,
+            model: wrappedModel,
+            output: Output.object({
+                schema: z
+                    .object({
+                        suggestions: z.array(z.string()).max(MAX_SUGGESTION_COUNT),
+                    })
+                    .strict(),
+            }),
+            prompt,
         }),
-        prompt,
-    });
+    );
 
     // Handle case where model doesn't generate valid output
     if (!result.output) {
@@ -2813,6 +2819,11 @@ export const deleteThread = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot delete another user's thread");
         }
 
+        // A suggestion for this chat is being sent to a model: the delete waits for it, as a lock does (`agent/thread-lock.ts`).
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
 
         const result = await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
@@ -2868,6 +2879,14 @@ export const deleteThreads = authMutation
                 const thread = threads[i];
 
                 if (!thread || thread.userId !== userId) {
+                    return null;
+                }
+
+                // A suggestion for this chat is being sent to a model: the chat is left out of this batch, as a single delete waits for it
+                // (`deleteThread`). The rest of the batch is deleted and the count says so.
+                if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+                    chatLogger.debug(`[deleteThreads] Left out, a suggestion is being generated: ${threadId}`);
+
                     return null;
                 }
 
@@ -3902,6 +3921,11 @@ export const softDeleteThread = authMutation
             throwForbidden("Not allowed");
         }
 
+        // A suggestion for this chat is being sent to a model: the delete waits for it, as a lock does (`agent/thread-lock.ts`).
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         await context.runMutation(internal.agent.threads.softDeleteThread, {
             threadId: threadId as Id<"threads">,
         });
@@ -4517,96 +4541,32 @@ export const getCachedFollowupSuggestions = authQuery
     });
 
 /**
- * Action to generate follow-up suggestions for a thread.
- * Can be called from the frontend to get suggestions after a message.
+ * The generator is the only thing that pays for a follow-up suggestion: the run that finished a reply schedules it once, and the
+ * composer reads the cache (`getCachedFollowupSuggestions`) live. There is no client-triggered generation to race it.
  */
-export const getFollowupSuggestions = authAction
-    // An LLM call per invocation; it had no limit at all.
-    .use(rateLimit("chat/followups"))
+/** Pages of messages read for one reply's turn, so a very long tool turn cannot make the job read without end. */
+const MAX_TURN_PAGES = 20;
+
+/** The model call's deadline is the claim's life left at its start, measured from when the claim was taken. */
+const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPATCH_TTL_MS / 2 - Date.now();
+
+/** A call with less budget than this cannot finish, so it is not started. */
+const MIN_MODEL_BUDGET_MS = 10 * 1000;
+
+/**
+ * The cache write of a paid reply whose first write failed. One write per dispatch: a write that throws is retried by the scheduler's own
+ * policy (with backoff), and a refused write (a newer reply) returns quietly. No model call and no charge is made here.
+ */
+export const retryFollowupCache = internalAction
     .input({
-        threadId: v.id("threads"),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        lastMessageId: v.string().max(MAX_LENGTH.id),
+        order: v.number(),
+        replyAt: v.number(),
+        suggestions: v.array(v.string().max(MAX_LENGTH.long)),
+        threadId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.object({ suggestions: v.array(v.string()) }))
-    .action(async ({ args: { threadId, unlockProof }, ctx: context }) => {
-        const { userId } = context.user;
-
-        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "read", threadId, unlockProof, userId });
-
-        throwUnlessGranted(gateResult.outcome, "Access denied to this thread");
-
-        // The suggestions come from a cloud model, which a host-run thread's messages must never reach. The
-        // client asks after every reply, so this answers with none instead of an error.
-        if (gateResult.hostRun) {
-            return { suggestions: [] };
-        }
-
-        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-        const threadLanguage = threadData?.language;
-
-        const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
-        const language = threadLanguage || userLanguage;
-
-        // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
-        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
-
-        // The model filters allow no background model: no suggestions, as for a host-run thread.
-        if (!background) {
-            return { suggestions: [] };
-        }
-
-        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
-
-        const messagesResult = await agent.listMessages(context, {
-            paginationOpts: { cursor: null, numItems: 10 },
-            threadId,
-            // The gate above admitted this proof: without it a locked chat has no turns to suggest from.
-            unlockProof,
-        });
-
-        // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
-        const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
-        const filteredMessageDocuments = rowsAfterContextReset(messagesResult.page || [], contextReset).filter((messageDocument) => {
-            const role = messageDocument.message?.role;
-
-            return role === "user" || role === "assistant";
-        });
-
-        // Messages are returned in descending order (newest first), so the first element is the latest
-        const lastMessageId = filteredMessageDocuments.length > 0 ? (filteredMessageDocuments[0]?._id ?? null) : null;
-
-        if (lastMessageId) {
-            const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
-                threadId,
-            });
-
-            if (cached && cached.lastMessageId === lastMessageId) {
-                context.log.event("chat.get_followup_suggestions", { cacheHit: true, suggestionCount: cached.suggestions.length });
-
-                return {
-                    suggestions: cached.suggestions,
-                };
-            }
-        }
-
-        const modelMessages = docsToModelMessages(filteredMessageDocuments);
-
-        const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
-
-        if (lastMessageId) {
-            await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
-                lastMessageId,
-                suggestions: output.suggestions,
-                threadId,
-            });
-        }
-
-        context.log.event("chat.get_followup_suggestions", { cacheHit: false, suggestionCount: output.suggestions.length });
-
-        return {
-            suggestions: output.suggestions,
-        };
+    .action(async ({ args, ctx }) => {
+        await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, args);
     });
 
 export const generateFollowupSuggestionsForThread = internalAction
@@ -4616,6 +4576,21 @@ export const generateFollowupSuggestionsForThread = internalAction
     })
     .action(async ({ args: { threadId, userId }, ctx: context }) => {
         chatLogger.debug(`[generateFollowupSuggestionsForThread] Starting`, { threadId, userId });
+
+        // The reply's paid claim, once taken. A failure before its cache lands gives the claim back (see the catch).
+        let paid: { cached: boolean; claimedAt: number; lastMessageId: string } | null = null;
+
+        // Gives the reply's paid claim back, at most once per run: a run that cached, or that already gave it back, does not again.
+        const giveBackPaidClaim = async (): Promise<void> => {
+            if (paid === null || paid.cached) {
+                return;
+            }
+
+            const { claimedAt, lastMessageId } = paid;
+
+            paid = null;
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { claimedAt, lastMessageId, threadId, userId });
+        };
 
         try {
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
@@ -4628,8 +4603,34 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // Follow-ups are generated from the messages, so a locked chat gets none.
-            if (isThreadLocked(threadData)) {
+            // Follow-ups are generated from the messages, so a locked chat gets none. A host-run thread's messages must never
+            // reach a cloud model, and a guest or a user who turned the setting off costs no call.
+            if (isThreadLocked(threadData) || isHostRunThread(threadData)) {
+                return;
+            }
+
+            // Media threads keep their prompts out of the chat, so there is no next prompt to suggest and nothing to charge for one.
+            if (threadData.mode !== undefined && threadData.mode !== "text") {
+                return;
+            }
+
+            // A branched thread (a regenerate or an edit) lists only its active path, and this job reads raw rows, where replies share
+            // an `order`. It could key a reply the composer does not show, and charge for it. Until it reads the path, it gets none.
+            if (threadData.activeLeafMessageId) {
+                return;
+            }
+
+            // The owner's setting decides whether the owner's thread gets a suggestion; the run's own guest status decides whether this run pays.
+            const ownerUserId = threadData.userId;
+
+            if (!ownerUserId) {
+                return;
+            }
+
+            const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: ownerUserId });
+            const actorGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
+
+            if (!ownerGate.enabled || actorGate.guest) {
                 return;
             }
 
@@ -4641,7 +4642,15 @@ export const generateFollowupSuggestionsForThread = internalAction
             const language = threadLanguage || userLanguage;
 
             // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
-            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
+            // The paid fallback, if any, is metered to the paying user: the collaborator who keeps suggestions on, else the owner. Passing
+            // the collaborator when they opted out would bill their plan for a call the owner's quota is charged for.
+            const background = await resolveBackgroundModel(
+                context,
+                threadData.userId,
+                DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string,
+                actorGate.enabled ? userId : ownerUserId,
+                true,
+            );
 
             if (!background) {
                 return;
@@ -4662,14 +4671,76 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return role === "user" || role === "assistant";
             });
 
-            // Messages are returned in descending order (newest first), so the first element is the latest
-            const lastMessageId = filteredMessageDocuments.length > 0 ? (filteredMessageDocuments[0]?._id ?? null) : null;
+            // Messages are returned in descending order (newest first), so the first element is the latest.
+            const newest = filteredMessageDocuments[0];
 
-            if (!lastMessageId) {
+            if (!newest) {
                 chatLogger.warn(`[generateFollowupSuggestionsForThread] No messages found for thread: ${threadId}`);
 
                 return;
             }
+
+            // Only the reply that is still the newest message gets suggestions. A newer user message has its own run, which schedules its own.
+            if (newest.message?.role !== "assistant") {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] Newest message is not a reply, skipping: ${threadId}`);
+
+                return;
+            }
+
+            // In a shared thread the newest reply may be another member's: that member's own run pays for it, so this run must not
+            // charge the member who scheduled it. Rows that hide their user id are not compared.
+            if (newest.userId !== undefined && newest.userId !== userId) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] The newest reply is another member's, skipping: ${threadId}`);
+
+                return;
+            }
+
+            // The composer keys a reply by the first row of its last group (ui-messages closes a group at a user or system row), so cache under that id.
+            // A long tool turn can run past one page, so the turn's pages are read until the rows of an older turn appear.
+            const turnRows: (typeof newest)[] = [];
+            let turnPage = messagesResult;
+            let turnComplete = false;
+
+            for (let pages = 0; pages < MAX_TURN_PAGES; pages += 1) {
+                let reachedOlderTurn = false;
+
+                const pageRows = turnPage.page || [];
+
+                for (const messageDocument of pageRows) {
+                    if (messageDocument.order < newest.order) {
+                        reachedOlderTurn = true;
+
+                        break;
+                    }
+
+                    turnRows.push(messageDocument);
+                }
+
+                if (reachedOlderTurn || turnPage.isDone) {
+                    turnComplete = true;
+
+                    break;
+                }
+
+                if (!turnPage.continueCursor || pages === MAX_TURN_PAGES - 1) {
+                    break;
+                }
+
+                turnPage = await agent.listMessages(context, {
+                    paginationOpts: { cursor: turnPage.continueCursor, numItems: 10 },
+                    threadId,
+                });
+            }
+
+            // A turn longer than the pages read has no known first row, so the reply the composer shows cannot be keyed. Nothing is paid.
+            if (!turnComplete) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] The turn is longer than the rows read, not suggesting: ${threadId}`);
+
+                return;
+            }
+
+            const firstRow = replyAnchorRow(turnRows, newest);
+            const lastMessageId = firstRow._id;
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Last message found`, {
                 lastMessageId,
@@ -4688,26 +4759,202 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
-                cachedMessageId: cached?.lastMessageId,
-                hasCached: !!cached,
-                threadId,
-            });
+            // The reply is still the newest of the thread. A newer message has its own run, which pays for its own reply. Checked before
+            // the claim, so a superseded reply never takes its paid claim.
+            const isStillNewest = async (): Promise<boolean> => {
+                // A `/clear` since the job began ends the context this reply belongs to: its prompt is no longer shown, so nothing is paid for it.
+                const currentReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
 
-            const modelMessages = docsToModelMessages(filteredMessageDocuments);
+                if (currentReset?.order !== contextReset?.order) {
+                    return false;
+                }
 
-            const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
+                const page = await agent.listMessages(context, {
+                    paginationOpts: { cursor: null, numItems: 10 },
+                    threadId,
+                });
+                // Filtered by the reset read just now, which equals the one read at the start (the check above returns otherwise).
+                // System rows are skipped on purpose: an agent-switch divider does not hide the reply the composer shows.
+                const latest = rowsAfterContextReset(page.page || [], currentReset).find((messageDocument) => {
+                    const role = messageDocument.message?.role;
 
-            // Cache the suggestions
-            await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
+                    return role === "user" || role === "assistant";
+                });
+
+                return latest?._id === newest._id;
+            };
+
+            if (!(await isStillNewest())) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived before the claim, not suggesting: ${threadId}`);
+
+                return;
+            }
+
+            // One paid call per reply: a second run of this reply, or one on a thread locked since the check above, stops here.
+            const admittedAt = await context.runMutation(internal.agent.followup_suggestions.admitFollowupSuggestions, {
                 lastMessageId,
-                suggestions: output.suggestions,
                 threadId,
+                userId,
             });
 
-            chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
+            if (admittedAt === null) {
+                return;
+            }
+
+            paid = { cached: false, claimedAt: admittedAt, lastMessageId };
+
+            // The chat's dispatch claim is taken after the lock check and held until this request settles, so a lock waits for it.
+            const dispatchedAt = await context.runMutation(internal.agent.followup_suggestions.beginFollowupDispatch, { requestId: lastMessageId, threadId });
+
+            if (dispatchedAt === null) {
+                // The chat was locked since admission: nothing was sent, so the reply's claim is given back.
+                await giveBackPaidClaim();
+
+                return;
+            }
+
+            try {
+                // A newer message landed since the check above: nothing is paid for this reply.
+                if (!(await isStillNewest())) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
+                    cachedMessageId: cached?.lastMessageId,
+                    hasCached: !!cached,
+                    threadId,
+                });
+
+                // The charge and the freshness read took part of the claim's life: a call that cannot finish inside what is left is not started.
+                if (modelBudgetMs(dispatchedAt) < MIN_MODEL_BUDGET_MS) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The claim is too close to lapsing to call the model: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The unit the reply would be charged to, found before the model is called: a spent quota does not buy a model call.
+                const chargedUserId = actorGate.enabled ? (background.billedUserId ?? userId) : ownerUserId;
+                // Keys the reply's one Text unit: a retry of a reply already charged finds the unit taken, and is not refused for it.
+                const replyChargeKey = `followup:${threadId}:${lastMessageId}`;
+
+                if (
+                    !(await context.runMutation(internal.chat.daily_charge.dailyUnitAvailable, {
+                        kind: "Text",
+                        organizationId: threadData.organizationId ?? undefined,
+                        requestId: replyChargeKey,
+                        userId: chargedUserId,
+                    }))
+                ) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The model reads the reply's whole turn, its user prompt included, however many pages it spans; the first page's older rows follow.
+                const modelMessages = docsToModelMessages(
+                    followupModelRows(
+                        rowsAfterContextReset(turnRows, contextReset).filter(
+                            (messageDocument) => messageDocument.message?.role === "user" || messageDocument.message?.role === "assistant",
+                        ),
+                        filteredMessageDocuments,
+                    ),
+                );
+
+                // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
+                // Narrows the window to this read; deletion does not yet wait for an in-flight suggestion (see the PR thread).
+                const liveThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+                if (!liveThread || liveThread.deletedAt !== undefined || liveThread.deletingAt !== undefined) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                const output = await generateFollowupSuggestionsInternal(
+                    modelMessages,
+                    agent.options.languageModel as LanguageModel,
+                    language,
+                    timezone,
+                    location,
+                    modelBudgetMs(dispatchedAt),
+                );
+
+                // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
+                if (!(await isStillNewest())) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // A blank suggestion shows nothing, so it is neither counted, charged nor cached.
+                const suggestions = output.suggestions.map((suggestion) => suggestion.trim()).filter((suggestion) => suggestion.length > 0);
+
+                // A reply the model gave no usable suggestion for is not paid for: there is nothing to show, so the claim is given back.
+                if (suggestions.length === 0) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The Text unit is taken only now, once the model has produced suggestions: a run that makes no call pays nothing. A refused
+                // charge gives the claim back, and the output is dropped. The charge is keyed per reply, so a retry is not charged twice.
+                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                    kind: "Text",
+                    organizationId: threadData.organizationId ?? undefined,
+                    requestId: replyChargeKey,
+                    // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                    userId: chargedUserId,
+                });
+
+                if (!charged) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached.
+                const cacheWrite = {
+                    lastMessageId,
+                    order: newest.order,
+                    replyAt: newest.createdAt ?? newest._creationTime,
+                    suggestions,
+                    threadId,
+                };
+
+                try {
+                    await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, cacheWrite);
+                } catch (cacheError) {
+                    // The charge is taken and the suggestions are in hand: the write is retried with them, no model call and no second charge.
+                    // The claim stays held for the retries, so a run does not call the model again for this reply meanwhile.
+                    chatLogger.error(`[generateFollowupSuggestionsForThread] Cache write failed, retrying it: ${threadId}`, cacheError);
+                    await context.scheduler.runAfter(0, internal.chat.functions.retryFollowupCache, cacheWrite);
+                }
+
+                paid.cached = true;
+
+                chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
+            } finally {
+                // The request has settled, so the chat may be locked again.
+                await context.runMutation(internal.agent.followup_suggestions.endFollowupDispatch, {
+                    claimedAt: dispatchedAt,
+                    requestId: lastMessageId,
+                    threadId,
+                });
+            }
         } catch (error) {
             chatLogger.error(`[generateFollowupSuggestionsForThread] Error generating suggestions:`, error);
+
+            // A paid reply whose cache never landed gives its claim back, so a later run can finish it. The charge is keyed per reply,
+            // so that run is not charged twice.
+            try {
+                await giveBackPaidClaim();
+            } catch (releaseError) {
+                chatLogger.error(`[generateFollowupSuggestionsForThread] Could not give the reply's claim back:`, releaseError);
+            }
         }
     });
 
@@ -4865,6 +5112,13 @@ export const streamAsync = internalAction
 
         // Consume the stream to ensure it completes
         await result.consumeStream();
+
+        // The edit's reply gets its follow-up suggestions here, as any finished reply does: the composer offers the next prompt for it.
+        // The job's own claim and charge are per reply, so a second schedule for the same reply does no second work.
+        // A failed hand-off is logged, not thrown: the edit is saved and its job is already complete, so the job must not fail for it.
+        await context.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId }).catch((error: unknown) => {
+            streamLogger.warn(`[StreamAsync] Could not queue the follow-up suggestions of ${threadId}:`, error);
+        });
 
         context.log.event("chat.stream_async", { model, statelessMode: threadStatelessMode ?? false });
 

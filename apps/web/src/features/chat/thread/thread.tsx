@@ -21,7 +21,6 @@ import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -130,9 +129,8 @@ const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; o
 const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, initialMessage, maxWidth = "65ch", onActivateComposer, splitPane = false }) => {
     const { t } = useLingui();
     const viewportRef = useRef<ThreadViewportRef>(null);
-    const userSettings = useUserSettings();
     const isEmpty = useChatIsEmpty();
-    const { activeStreamId, isStreaming } = useChatIsStreaming();
+    const { isStreaming } = useChatIsStreaming();
     const { isNewThread, thread, threadId } = useChatThread();
     const { data: sessionData } = useAuthSession();
     // Only the owner may archive or delete from the keyboard; a shared thread's viewer gets the server's refusal otherwise.
@@ -289,8 +287,6 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
         );
     }
 
-    const isEnableFollowupSuggestions = userSettings?.data?.enableFollowupSuggestions !== false;
-
     // Show message list when we have messages OR when streaming is active.
     // isStreaming covers the brief transition after activeStreamId clears.
     const showMessageList = !isEmpty || isStreaming;
@@ -334,11 +330,7 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                         {composerMode === "text" && showMessageList && (
                             <div className="flex w-full flex-1">
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <MessageList
-                                        className={isEnableFollowupSuggestions && !activeStreamId ? "pb-[190px]" : "pb-6"}
-                                        editComposerComponent={EditComposer}
-                                        maxWidth={maxWidth}
-                                    />
+                                    <MessageList className="pb-6" editComposerComponent={EditComposer} maxWidth={maxWidth} />
                                     <div className="flex-1" />
                                     {hasWorkers && <WorkerList className="mb-4 w-full" threadId={threadId} />}
                                 </div>

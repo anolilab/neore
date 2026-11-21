@@ -39814,3 +39814,7 @@ msgstr "苏黎世"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ 分数"
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:654
+msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
+msgstr "建议的下一条提示：{nextPromptSuggestion}。按 Tab 键插入。"

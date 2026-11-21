@@ -194,12 +194,6 @@ export const RATE_LIMIT_CONFIGS = {
 
     "chat/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "chat/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
-    // Follow-up suggestions: an LLM call per invocation. Its own family, so the
-    // suggestions a client fetches after every reply cannot eat the budget of
-    // real thread edits (`chat/update`), and vice versa.
-    "chat/followups:free": Ratelimit.fixedWindow(30, MINUTE),
-    "chat/followups:premium": Ratelimit.fixedWindow(100, MINUTE),
-
     "chat/globalPromptImprovement": Ratelimit.tokenBucket(1000, MINUTE, 1500),
     // Link preview cards (`chat/link-preview.ts`): charged only on a cache miss,
     // each one outbound fetch of at most 5s. A thread scrolled into view can ask

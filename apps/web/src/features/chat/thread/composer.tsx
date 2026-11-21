@@ -303,7 +303,9 @@ const ComposerInputWrapper: FC<{
     onSubmit: () => void;
     onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
-}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder }) => {
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
+}> = ({ compact, disabled, inputRef, onOpenDraw, onSubmit, onSubmitOverride, placeholder, suggestPrompt = true }) => {
     const cyclingPlaceholder = useCyclingPlaceholder();
 
     return (
@@ -318,6 +320,7 @@ const ComposerInputWrapper: FC<{
             onSubmitOverride={onSubmitOverride}
             placeholder={placeholder ?? cyclingPlaceholder}
             ref={inputRef}
+            suggestPrompt={suggestPrompt}
         />
     );
 };
@@ -455,7 +458,8 @@ const Composer: FC<ComposerProps> = ({
         return mode;
     }, [isNewThread, threadId, storeNewThreadMode, storeUserChangedMode, storeThreadMode, thread?.mode]);
 
-    const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
+    // Off until the settings have loaded, as the next-prompt hook is: an unresolved query is `undefined`, not an opt-in.
+    const isEnableFollowupSuggestions = userSettings !== undefined && userSettings?.enableFollowupSuggestions !== false;
     const prefersReducedMotion = useReducedMotion();
 
     // Get model mode and default models (memoized together since they share the same data source)
@@ -859,6 +863,7 @@ const Composer: FC<ComposerProps> = ({
                         onSubmit={() => {}}
                         onSubmitOverride={onSubmitOverride}
                         placeholder={placeholder}
+                        suggestPrompt={composerMode === "text" && !minimal}
                     />
                 </ComposerBase>
             </div>

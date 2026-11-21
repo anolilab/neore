@@ -100,6 +100,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         useChatActions: () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
+        useChatIsRunning: () => harness.isStreaming,
         useChatIsStreaming: () => {
             return { isStreaming: harness.isStreaming, sseStreamState: harness.sseStreamState };
         },
@@ -111,6 +112,14 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         },
         useChatThread: () => {
             return { isNewThread: harness.threadId === undefined, threadId: harness.threadId };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: null };
         },
     };
 });

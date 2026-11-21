@@ -92,6 +92,7 @@ import TurnStepAnnouncement from "./turn-step-announcement";
 import type { UploadWait } from "./upload-send-wait";
 import { settleUploadWait, startUploadWait } from "./upload-send-wait";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
+import useNextPromptSuggestion from "./use-next-prompt-suggestion";
 import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
@@ -238,6 +239,8 @@ interface ComposerInputProps {
      */
     onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
 }
 
 export interface ComposerInputRef {
@@ -478,6 +481,7 @@ const ComposerInput = ({
     autoFocus = true,
     className,
     compact = false,
+    suggestPrompt = true,
     disabled = false,
     maxRows = 5,
     onOpenDraw,
@@ -530,6 +534,7 @@ const ComposerInput = ({
 
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
+    const nextPromptSuggestion = useNextPromptSuggestion();
 
     // Comparison mode
     const comparisonMode = useModelStore((state) => state.comparisonMode);
@@ -1943,6 +1948,9 @@ const ComposerInput = ({
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
+                nextPromptHeld={hasAttachments || hasAttachedReferences}
+                nextPromptScope={threadId}
+                nextPromptSuggestion={compact || !suggestPrompt ? null : nextPromptSuggestion}
                 onAddAttachment={compact ? undefined : handleAddAttachment}
                 onAttachDraftAsFile={draftFitsFile ? handleAttachDraftAsFile : undefined}
                 onCancel={handleCancel}

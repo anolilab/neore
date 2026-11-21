@@ -465,6 +465,11 @@ export const removeThreadAccess = authMutation
             throw new LunoraError("BAD_REQUEST", "Cannot remove thread owner");
         }
 
+        // A suggestion for this chat is being sent to a model under the run's own access: the removal waits for it, as a delete does.
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
             threadId,
             userId: targetUserId,
