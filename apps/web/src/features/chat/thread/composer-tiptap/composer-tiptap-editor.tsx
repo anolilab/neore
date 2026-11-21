@@ -682,7 +682,8 @@ const ComposerTiptapEditor = ({
         if (!nextPromptSuggestion || disabled || nextPromptHeld || readComposerText(editor) !== "") {
             editor.commands.setSuggestedPrompt(null);
             // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
-            setGhostAnnouncement("");
+            // A completion's announcement is kept: the as-you-type completion it describes is still on screen.
+            setGhostAnnouncement((current) => (current === ghostAnnouncementText ? current : ""));
 
             // A reply without a suggestion starts over. A pause or a draft does not: a prompt dismissed in this reply stays dismissed.
             if (!nextPromptSuggestion) {
@@ -745,7 +746,7 @@ const ComposerTiptapEditor = ({
             clearTimeout(clearAnnouncement);
             clearTimeout(restoreAnnouncement);
         };
-    }, [disabled, editor, nextPromptHeld, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
+    }, [disabled, editor, ghostAnnouncementText, nextPromptHeld, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
         if (!editor || !hasCompletionSource) {
