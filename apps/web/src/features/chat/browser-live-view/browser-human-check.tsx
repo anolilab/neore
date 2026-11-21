@@ -61,9 +61,11 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     const skew = useStatusSkew(browser?.now, status.dataUpdatedAt);
     const controlEnded = usePassed(browser?.control === undefined ? undefined : browser.control.until - skew);
     const control = controlEnded ? undefined : browser?.control;
-    // The browser no live view card answered for: once it changes, the button comes back.
-    const [missedBrowser, setMissedBrowser] = useState<string | undefined>(undefined);
-    const missed = browser !== undefined && browser !== null && missedBrowser === browser.browserId;
+    // The status answer no live view card answered on (its browser and server time): once a new one arrives, as when the
+    // agent acts on that browser again and its live view card comes back, the button does too.
+    const answerKey = browser === undefined || browser === null ? undefined : `${browser.browserId}@${String(browser.now)}`;
+    const [missedAnswer, setMissedAnswer] = useState<string | undefined>(undefined);
+    const missed = answerKey !== undefined && missedAnswer === answerKey;
     // The thread's browser now is not the one asked about (a later reply opened another), or it moved on to another site
     // while nobody has control: taking it over from this card would hand the agent's current work to the person.
     const earlierBrowser = browser !== undefined && browser !== null && output.humanCheck?.browserId !== browser.browserId;
@@ -140,7 +142,7 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
                 {canAsk && (
                     <Button
                         className="any-pointer-coarse:min-h-11"
-                        onClick={() => setMissedBrowser(requestBrowserControl(threadId) ? undefined : browser?.browserId)}
+                        onClick={() => setMissedAnswer(requestBrowserControl(threadId) ? undefined : answerKey)}
                         size="sm"
                         type="button"
                     >

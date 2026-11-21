@@ -116,6 +116,25 @@ describe("the Needs you card", () => {
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
     });
 
+    it("offers Take control again once a new status arrives for that browser, as when the agent acts on it again", async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        backend.browser = running({ now: 1000 });
+        render(
+            <QueryClientProvider client={client}>
+                <HumanCheckCard liveViewHere part={PART} threadId="thread-1" />
+            </QueryClientProvider>,
+        );
+
+        await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+        expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+
+        backend.browser = running({ now: 2000 });
+        await client.invalidateQueries({ queryKey: ["getThreadBrowser"] });
+
+        expect(await screen.findByRole("button", { name: "Take control" })).toBeTruthy();
+    });
+
     it("in a comparison column, which has no live view card, points to the model's own chat instead of saying the browser closed", async () => {
         backend.browser = running();
         show(PART, false);
