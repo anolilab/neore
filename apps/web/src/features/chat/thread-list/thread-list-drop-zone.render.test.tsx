@@ -53,7 +53,7 @@ vi.mock("@/lib/toast", () => {
     return { showError };
 });
 
-const { default: ThreadListDropZone, isNewChatPath } = await import("./thread-list-drop-zone");
+const { default: ThreadListDropZone, droppedFiles, isNewChatPath } = await import("./thread-list-drop-zone");
 
 const DROP_HINT = "Drop files to start a new chat";
 
@@ -78,6 +78,18 @@ const renderZone = () =>
             </ul>
         </ThreadListDropZone>,
     );
+
+describe(droppedFiles, () => {
+    it("takes a drop's files as they are, a folder staying one entry, and a drag's items", async () => {
+        const folder = new File([], "photos");
+        const item = { kind: "file", type: "" };
+        const transfer = { files: [folder], items: [item] };
+
+        expect(await droppedFiles({ dataTransfer: transfer, type: "drop" })).toEqual([folder]);
+        expect(await droppedFiles({ dataTransfer: transfer, type: "dragenter" })).toEqual([item]);
+        expect(await droppedFiles({ type: "drop" })).toEqual([]);
+    });
+});
 
 describe(isNewChatPath, () => {
     it.each([

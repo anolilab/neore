@@ -108,7 +108,19 @@ export const onNativeFiles = (
             const accountId = accountAtStart();
             const files = await takePendingFiles();
 
-            return files.length > 0 ? { accountId, files } : undefined;
+            if (files.length === 0) {
+                return undefined;
+            }
+
+            // The shell joins the drops it holds: across an account switch while it answered, the batch can hold drops of
+            // both accounts, so it goes to neither. A drop made before the session was known (no account) is not a switch.
+            if (accountId !== undefined && accountAtStart() !== accountId) {
+                console.warn("[native] Dropped files arrived across an account switch and were not attached.");
+
+                return undefined;
+            }
+
+            return { accountId, files };
         },
         ({ accountId, files }) => handler(files, accountId),
     );

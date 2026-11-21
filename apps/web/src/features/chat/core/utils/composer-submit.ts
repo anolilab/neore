@@ -47,8 +47,10 @@ const isForAccount = (requestAccountId: string | undefined, accountId: string | 
 export const requestComposerAttach = (request: ComposerAttachRequest): void => {
     const held = composerAttachChannel.store.getState().pending?.payload;
 
-    if (held && isForAccount(held.accountId, request.accountId)) {
-        composerAttachChannel.request({ accountId: held.accountId ?? request.accountId, files: [...held.files, ...request.files] });
+    // Joined for one account, or when the held drop was made before the session was known (it takes the new account). A
+    // later drop with no account never joins a held one for an account: it might be for the account that is loading.
+    if (held && (held.accountId === request.accountId || held.accountId === undefined)) {
+        composerAttachChannel.request({ accountId: request.accountId, files: [...held.files, ...request.files] });
 
         return;
     }

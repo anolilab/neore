@@ -26,6 +26,20 @@ import { showError } from "@/lib/toast";
 export const isNewChatPath = (pathname: string): boolean => pathname === "/chat" || pathname === "/chat/";
 
 /**
+ * The files of a drag, as the composer's own drop reads them: a dropped folder stays one entry rather than every file
+ * inside it, which react-dropzone's default would upload all at once. While dragging, the items say a drag carries files.
+ */
+export const droppedFiles = async (event: unknown): Promise<(DataTransferItem | File)[]> => {
+    const transfer = (event as { dataTransfer?: DataTransfer | null }).dataTransfer;
+
+    if (!transfer) {
+        return [];
+    }
+
+    return (event as { type?: string }).type === "drop" ? [...transfer.files] : [...transfer.items];
+};
+
+/**
  * Opens the new chat for a drop. When the navigation does not land there (the update dialog stopped it, say), the files
  * are taken back, so they never turn up in some later new chat; the result says whether it landed.
  */
@@ -78,7 +92,7 @@ const ThreadListDropZone: FC<{ children: ReactNode }> = ({ children }) => {
         [accountId, navigate, router, t],
     );
 
-    const { getRootProps, isDragActive } = useDropzone({ multiple: true, noClick: true, noKeyboard: true, onDrop });
+    const { getRootProps, isDragActive } = useDropzone({ getFilesFromEvent: droppedFiles, multiple: true, noClick: true, noKeyboard: true, onDrop });
 
     // React drag events bubble through portals: a file dropped on a dialog the list opens (a project form, which imports
     // its own files) must not reach the zone. `currentTarget` is the zone's own element; stopped here, react-dropzone's

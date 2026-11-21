@@ -130,6 +130,22 @@ describe(requestComposerAttach, () => {
         stop();
     });
 
+    it("never folds a later drop with no account into a held drop for an account", () => {
+        const old = new File(["a"], "a.txt");
+        const later = new File(["b"], "b.txt");
+
+        requestComposerAttach({ accountId: "u1", files: [old] });
+        // The session reloads during a switch: this drop may be for the account that is loading.
+        requestComposerAttach({ files: [later] });
+
+        const handler = vi.fn();
+        const stop = onComposerAttachRequest("u2", handler);
+
+        expect(handler).toHaveBeenCalledExactlyOnceWith({ accountId: undefined, files: [later] });
+
+        stop();
+    });
+
     it("hands a drop made before the session was known to whichever account takes it", () => {
         const file = new File(["a"], "a.txt");
 
