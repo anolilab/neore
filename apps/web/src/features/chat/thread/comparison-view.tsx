@@ -176,7 +176,7 @@ const ModelColumn: FC<{
                                         {/* No live view card in a column: a "Needs you" card points to the model's own chat. The page's gallery holds its own chat's images, not the column's: here they stay plain. */}
                                         <BrowserLiveViewHereContext value={false}>
                                             <ImageOpenContext value={null}>
-                                                <MessageContent message={assistant} />
+                                                <MessageContent message={assistant} pinImages={false} />
                                             </ImageOpenContext>
                                         </BrowserLiveViewHereContext>
                                     </ChatThreadIdentityContext>

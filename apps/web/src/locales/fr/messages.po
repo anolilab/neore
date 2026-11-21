@@ -939,7 +939,7 @@ msgstr "{date} : aucune réponse"
 msgid "{days} days"
 msgstr "{days} jours"
 
-#: src/features/chat/pins/pin-item.tsx:51
+#: src/features/chat/pins/pin-item.tsx:53
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "il y a {days} j"
@@ -1118,7 +1118,7 @@ msgstr "{hours} h {minutes} min"
 msgid "{hours}h {minutes}m remaining"
 msgstr "{hours} h {minutes} min restantes"
 
-#: src/features/chat/pins/pin-item.tsx:47
+#: src/features/chat/pins/pin-item.tsx:49
 #: src/features/settings/components/chat/api-keys-settings.tsx:286
 msgid "{hours}h ago"
 msgstr "il y a {hours} h"
@@ -1223,7 +1223,7 @@ msgstr "{mins} min {secs} s"
 msgid "{minutes}m"
 msgstr "{minutes} min"
 
-#: src/features/chat/pins/pin-item.tsx:43
+#: src/features/chat/pins/pin-item.tsx:45
 #: src/features/settings/components/chat/api-keys-settings.tsx:282
 msgid "{minutes}m ago"
 msgstr "il y a {minutes} min"
@@ -2418,7 +2418,7 @@ msgstr "Ajouter une note (facultatif)…"
 msgid "Add a note..."
 msgstr "Ajouter une note..."
 
-#: src/features/chat/pins/pin-item.tsx:215
+#: src/features/chat/pins/pin-item.tsx:226
 msgid "Add a note…"
 msgstr "Ajouter une note…"
 
@@ -2517,7 +2517,7 @@ msgstr "Ajouter un point de terminaison"
 msgid "Add error handling"
 msgstr "Ajouter la gestion des erreurs"
 
-#: src/features/chat/pins/pin-item.tsx:269
+#: src/features/chat/pins/pin-item.tsx:280
 msgid "Add excerpt"
 msgstr "Ajouter un extrait"
 
@@ -3108,7 +3108,7 @@ msgstr "Les agents traitent vos tâches en autonomie. Un vérificateur contrôle
 msgid "Aggregate scores of both runs"
 msgstr "Scores agrégés des deux exécutions"
 
-#: src/features/chat/pins/pin-item.tsx:229
+#: src/features/chat/pins/pin-item.tsx:240
 #: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "IA"
@@ -3192,7 +3192,7 @@ msgstr "Génération vidéo par IA"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "Tri des bugs assisté par IA avec le contexte d’enregistrement complet"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:390
+#: ../../packages/chat-ui/src/chat/message-content.tsx:417
 msgid "AI-generated"
 msgstr "Généré par IA"
 
@@ -3681,7 +3681,7 @@ msgstr "Une erreur s’est produite"
 msgid "An error occurred during One Tap sign in"
 msgstr "Une erreur s’est produite lors de la connexion One Tap"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1254
 msgid "An error occurred while generating the response."
 msgstr "Une erreur s’est produite lors de la génération de la réponse."
 
@@ -4362,7 +4362,7 @@ msgid "ask"
 msgstr "demander"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:354
+#: src/features/chat/sidebar/thread-sidebar.tsx:355
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Ask"
 msgstr "Demander"
@@ -5472,13 +5472,13 @@ msgstr "Parcourez et restaurez les versions précédentes de votre workflow."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Parcourez, dupliquez et remixez les workflows partagés par la communauté"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:780
+#: ../../packages/chat-ui/src/chat/message-content.tsx:807
 #: src/features/chat/browser-live-view/browser-live-view.tsx:966
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1143
 msgid "Browser"
 msgstr "Navigateur"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:803
+#: ../../packages/chat-ui/src/chat/message-content.tsx:830
 msgid "Browser action failed"
 msgstr "Échec de l’action du navigateur"
 
@@ -5486,7 +5486,7 @@ msgstr "Échec de l’action du navigateur"
 msgid "Browser Automation"
 msgstr "Automatisation du navigateur"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:801
+#: ../../packages/chat-ui/src/chat/message-content.tsx:828
 msgid "Browser error"
 msgstr "Erreur du navigateur"
 
@@ -5495,7 +5495,7 @@ msgid "Browser notes"
 msgstr "Remarques sur les navigateurs"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:758
+#: ../../packages/chat-ui/src/chat/message-content.tsx:785
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:72
 msgid "Browser screenshot"
 msgstr "Capture d’écran du navigateur"
@@ -5504,7 +5504,7 @@ msgstr "Capture d’écran du navigateur"
 msgid "Browser Session"
 msgstr "Session de navigateur"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:734
 msgid "Browser working..."
 msgstr "Le navigateur travaille..."
 
@@ -5837,7 +5837,7 @@ msgstr "Canada"
 #: src/features/chat/host/host-composer.tsx:972
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
-#: src/features/chat/pins/pin-item.tsx:283
+#: src/features/chat/pins/pin-item.tsx:294
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
@@ -6397,7 +6397,7 @@ msgstr "Vérification"
 msgid "Checking code, a draft or a plan for mistakes."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:407
+#: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "Checking image safety..."
 msgstr "Vérification de la sécurité de l’image..."
 
@@ -6816,7 +6816,7 @@ msgstr "Cliquer pour modifier"
 msgid "Click to edit..."
 msgstr "Cliquez pour modifier..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:699
+#: ../../packages/chat-ui/src/chat/message-content.tsx:726
 msgid "Clicking element..."
 msgstr "Clic sur l’élément..."
 
@@ -6976,7 +6976,7 @@ msgstr "Les modèles Cloudflare Workers AI s'exécutent là où Cloudflare dispo
 msgid "Code"
 msgstr "Code"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:137
+#: ../../packages/chat-ui/src/chat/message-content.tsx:150
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "Bloc de code"
@@ -6989,7 +6989,7 @@ msgstr "Exécution de code"
 msgid "Code execution and sandbox files"
 msgstr "Exécution de code et fichiers du sandbox"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:675
+#: ../../packages/chat-ui/src/chat/message-content.tsx:702
 msgid "Code execution failed"
 msgstr "Échec de l’exécution du code"
 
@@ -7013,7 +7013,7 @@ msgstr "Le mode Code n’est pas encore disponible pour votre compte."
 msgid "Code navigation"
 msgstr "Navigation dans le code"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:627
+#: ../../packages/chat-ui/src/chat/message-content.tsx:654
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:76
 msgid "Code output"
 msgstr "Sortie du code"
@@ -9423,7 +9423,7 @@ msgstr "Création du bot…"
 msgid "Creating branch..."
 msgstr "Création de la branche..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:331
+#: ../../packages/chat-ui/src/chat/message-content.tsx:344
 msgid "Creating slides..."
 msgstr "Création des diapositives..."
 
@@ -10365,7 +10365,7 @@ msgstr "Supprimer la conversation ouverte (demande confirmation)"
 msgid "Delete Organization"
 msgstr "Supprimer l’organisation"
 
-#: src/features/chat/pins/pin-item.tsx:256
+#: src/features/chat/pins/pin-item.tsx:267
 msgid "Delete pin"
 msgstr "Supprimer l’épingle"
 
@@ -11143,7 +11143,7 @@ msgid "Do you want to add more rows?"
 msgstr "Voulez-vous ajouter des lignes ?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:306
+#: ../../packages/chat-ui/src/chat/message-content.tsx:319
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11257,7 +11257,7 @@ msgid "Download — Neore Desktop"
 msgstr "Télécharger — Neore Desktop"
 
 #. placeholder {0}: part.filename
-#: ../../packages/chat-ui/src/chat/message-content.tsx:448
+#: ../../packages/chat-ui/src/chat/message-content.tsx:475
 msgid "Download {0}"
 msgstr ""
 
@@ -11310,7 +11310,7 @@ msgstr "Télécharger le document"
 msgid "Download Export"
 msgstr "Télécharger l’export"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:487
+#: ../../packages/chat-ui/src/chat/message-content.tsx:514
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:88
 msgid "Download file"
 msgstr "Télécharger le fichier"
@@ -11320,8 +11320,8 @@ msgstr "Télécharger le fichier"
 msgid "Download for {0}"
 msgstr "Télécharger pour {0}"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:448
-#: ../../packages/chat-ui/src/chat/message-content.tsx:455
+#: ../../packages/chat-ui/src/chat/message-content.tsx:475
+#: ../../packages/chat-ui/src/chat/message-content.tsx:482
 msgid "Download image"
 msgstr ""
 
@@ -11778,8 +11778,8 @@ msgstr "Modifier le jeu de données"
 msgid "Edit Endpoint"
 msgstr "Modifier le point de terminaison"
 
-#: src/features/chat/pins/pin-item.tsx:248
-#: src/features/chat/pins/pin-item.tsx:269
+#: src/features/chat/pins/pin-item.tsx:259
+#: src/features/chat/pins/pin-item.tsx:280
 msgid "Edit excerpt"
 msgstr "Modifier l’extrait"
 
@@ -12745,7 +12745,7 @@ msgstr "Taux d’erreur"
 msgid "Error trace:"
 msgstr "Trace de l’erreur :"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:267
+#: ../../packages/chat-ui/src/chat/message-content.tsx:280
 msgid "Error:"
 msgstr "Erreur :"
 
@@ -13025,7 +13025,7 @@ msgstr "Exécution des outils..."
 msgid "Execution"
 msgstr "Exécution"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:665
+#: ../../packages/chat-ui/src/chat/message-content.tsx:692
 msgid "Execution failed"
 msgstr "Échec de l’exécution"
 
@@ -13373,11 +13373,11 @@ msgstr "Extraire la page"
 msgid "Extract subject"
 msgstr "Extraire le sujet"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:771
+#: ../../packages/chat-ui/src/chat/message-content.tsx:798
 msgid "Extracted"
 msgstr "Extrait"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:700
+#: ../../packages/chat-ui/src/chat/message-content.tsx:727
 msgid "Extracting content..."
 msgstr "Extraction du contenu..."
 
@@ -15509,7 +15509,7 @@ msgstr "Accès complet"
 msgid "Full chain-of-thought reasoning visibility"
 msgstr "Visibilité complète du raisonnement en chaîne de pensée"
 
-#: src/features/chat/pins/pin-item.tsx:168
+#: src/features/chat/pins/pin-item.tsx:179
 msgid "Full message pinned"
 msgstr "Message entier épinglé"
 
@@ -15759,7 +15759,7 @@ msgstr "Vidéo générée"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "Les vidéos générées apparaîtront ici. Commencez par décrire ce que vous voulez créer dans la zone de saisie ci-dessous."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:502
+#: ../../packages/chat-ui/src/chat/message-content.tsx:529
 msgid "Generating audio..."
 msgstr "Génération de l’audio..."
 
@@ -15767,12 +15767,12 @@ msgstr "Génération de l’audio..."
 msgid "Generating draft…"
 msgstr "Génération du brouillon…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:503
+#: ../../packages/chat-ui/src/chat/message-content.tsx:530
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "Génération de l’image..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:328
+#: ../../packages/chat-ui/src/chat/message-content.tsx:341
 msgid "Generating presentation..."
 msgstr "Génération de la présentation..."
 
@@ -15780,7 +15780,7 @@ msgstr "Génération de la présentation..."
 msgid "Generating response"
 msgstr "Génération de la réponse"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:504
+#: ../../packages/chat-ui/src/chat/message-content.tsx:531
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "Génération de la vidéo..."
@@ -15986,8 +15986,8 @@ msgid "Go to last item"
 msgstr "Aller au dernier élément"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:225
-#: src/features/chat/pins/pin-item.tsx:237
-#: src/features/chat/pins/pin-item.tsx:240
+#: src/features/chat/pins/pin-item.tsx:248
+#: src/features/chat/pins/pin-item.tsx:251
 msgid "Go to message"
 msgstr "Aller au message"
 
@@ -17181,7 +17181,7 @@ msgid "illustration"
 msgstr "illustration"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:439
+#: ../../packages/chat-ui/src/chat/message-content.tsx:466
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -17279,6 +17279,10 @@ msgstr "Génération d’images"
 #: src/features/marketing/components/model-detail-page.tsx:89
 msgid "Image generation model"
 msgstr "Modèle de génération d’images"
+
+#: src/features/chat/pins/pinned-image-preview.tsx:122
+msgid "Image pinned"
+msgstr ""
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
@@ -17842,7 +17846,7 @@ msgstr "Modèle d’entrée"
 msgid "Input tokens"
 msgstr "Tokens d’entrée"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:244
+#: ../../packages/chat-ui/src/chat/message-content.tsx:257
 msgid "Input:"
 msgstr "Entrée :"
 
@@ -18261,7 +18265,7 @@ msgstr "Il a ouvert une autre session que la sienne, la conversation a donc ét�
 msgid "It was not saved. Paste it again and save."
 msgstr "Il n’a pas été enregistré. Collez-le à nouveau et enregistrez."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:413
+#: ../../packages/chat-ui/src/chat/message-content.tsx:440
 msgid "It will be visible once approved by a moderator"
 msgstr "Il sera visible une fois approuvé par un modérateur"
 
@@ -18382,7 +18386,7 @@ msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr "Aller au prompt {promptNumber} : {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
-#: src/features/chat/pins/pin-item.tsx:40
+#: src/features/chat/pins/pin-item.tsx:42
 #: src/features/settings/components/chat/api-keys-settings.tsx:279
 msgid "just now"
 msgstr "à l’instant"
@@ -19521,7 +19525,7 @@ msgstr "Chargement de l’éditeur…"
 msgid "Loading feedback"
 msgstr "Chargement des retours"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:350
+#: ../../packages/chat-ui/src/chat/message-content.tsx:363
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:67
 msgid "Loading file…"
 msgstr "Chargement du fichier…"
@@ -19737,7 +19741,7 @@ msgstr "Chargement de vos serveurs, connecteurs et ordinateurs…"
 msgid "Loading..."
 msgstr "Chargement..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:353
+#: ../../packages/chat-ui/src/chat/message-content.tsx:366
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21837,11 +21841,11 @@ msgstr "Parcourir les conversations"
 msgid "navigate within each column"
 msgstr "naviguer dans chaque colonne"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:772
+#: ../../packages/chat-ui/src/chat/message-content.tsx:799
 msgid "Navigated"
 msgstr "Navigation effectuée"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:734
 msgid "Navigating to {target}..."
 msgstr "Navigation vers {target}..."
 
@@ -23867,7 +23871,7 @@ msgstr "Oups ! Une erreur s’est produite"
 msgid "Opacity"
 msgstr "Opacité"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:752
+#: ../../packages/chat-ui/src/chat/message-content.tsx:779
 #: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -24789,7 +24793,7 @@ msgstr "Obsolète"
 msgid "Outpaint"
 msgstr "Outpainting"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:602
+#: ../../packages/chat-ui/src/chat/message-content.tsx:629
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -24849,8 +24853,8 @@ msgstr "Type de sortie"
 msgid "Output-format focused"
 msgstr "Axé sur le format de sortie"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:252
-#: ../../packages/chat-ui/src/chat/message-content.tsx:260
+#: ../../packages/chat-ui/src/chat/message-content.tsx:265
+#: ../../packages/chat-ui/src/chat/message-content.tsx:273
 msgid "Output:"
 msgstr "Sortie :"
 
@@ -24894,7 +24898,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "Heure du Pacifique (États-Unis et Canada)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:706
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "page"
 msgstr "page"
 
@@ -25579,6 +25583,11 @@ msgstr "Épingler"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Épinglez un souvenir pour l’empêcher de s’estomper, d’être fusionné ou promu. Seuls les souvenirs d’activité s’estompent d’eux-mêmes."
 
+#: src/features/chat/pins/pinnable-image.tsx:74
+#: src/features/chat/pins/pinnable-image.tsx:80
+msgid "Pin image"
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
 msgstr "Épingler le souvenir"
@@ -25615,6 +25624,10 @@ msgstr "épinglé"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:638
 msgid "Pinned"
 msgstr "Épinglées"
+
+#: src/features/chat/pins/pinned-image-preview.tsx:129
+msgid "Pinned image"
+msgstr ""
 
 #: src/features/chat/thread-list/group-header.tsx:103
 msgid "Pinned project"
@@ -26678,7 +26691,7 @@ msgstr "Prompt mis à jour avec le contenu optimisé"
 msgid "Prompt Variables"
 msgstr "Variables du prompt"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:339
+#: src/features/chat/sidebar/thread-sidebar.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
@@ -29073,7 +29086,7 @@ msgstr "Exécutez votre workflow pour voir l’historique d’exécution ici."
 msgid "Running"
 msgstr "En cours"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:563
+#: ../../packages/chat-ui/src/chat/message-content.tsx:590
 msgid "Running code..."
 msgstr "Exécution du code..."
 
@@ -29081,7 +29094,7 @@ msgstr "Exécution du code..."
 msgid "Running on {device}…"
 msgstr "En cours sur {device}…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:221
+#: ../../packages/chat-ui/src/chat/message-content.tsx:234
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -29220,7 +29233,7 @@ msgstr "Arabie saoudite"
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/host/host-composer.tsx:961
-#: src/features/chat/pins/pin-item.tsx:284
+#: src/features/chat/pins/pin-item.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
 #: src/features/chat/thread/edit-composer.tsx:166
@@ -29483,7 +29496,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "La capture d’écran a échoué. Veuillez réessayer."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:748
+#: ../../packages/chat-ui/src/chat/message-content.tsx:775
 msgid "Screenshot"
 msgstr "Capture d’écran"
 
@@ -30697,12 +30710,12 @@ msgid "Show Labels"
 msgstr "Afficher les libellés"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
-#: src/features/chat/pins/pin-item.tsx:196
+#: src/features/chat/pins/pin-item.tsx:207
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show less"
 msgstr "Afficher moins"
 
-#: src/features/chat/pins/pin-item.tsx:196
+#: src/features/chat/pins/pin-item.tsx:207
 msgid "Show more"
 msgstr "Afficher plus"
 
@@ -31242,7 +31255,7 @@ msgstr "Diapositive {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Titre de la diapositive"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1139
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1187
 msgid "Slide updated"
 msgstr "Diapositive mise à jour"
 
@@ -31400,7 +31413,7 @@ msgstr "Solides capacités polyvalentes"
 msgid "Solid performance across most task types"
 msgstr "Performances solides sur la plupart des types de tâches"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:684
 msgid "Some images from this run could not be saved."
 msgstr "Certaines images de cette exécution n'ont pas pu être enregistrées."
 
@@ -31499,8 +31512,8 @@ msgstr "Effets sonores activés"
 msgid "Source"
 msgstr "Source"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1276
-#: src/features/chat/thread/message-content.tsx:154
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1324
+#: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "Source {index}"
 
@@ -31879,7 +31892,7 @@ msgstr "Démarrez votre propre conversation avec les derniers modèles d’IA."
 msgid "Start a conversation to ask a side question."
 msgstr "Démarrez une conversation pour poser une question annexe."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:386
+#: src/features/chat/sidebar/thread-sidebar.tsx:385
 msgid "Start a conversation to configure variables."
 msgstr "Démarrez une conversation pour configurer les variables."
 
@@ -33120,7 +33133,7 @@ msgstr "À tour de rôle"
 msgid "Taking control is not available while impersonating."
 msgstr "La prise de contrôle n'est pas disponible pendant une usurpation d'identité."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:701
+#: ../../packages/chat-ui/src/chat/message-content.tsx:728
 msgid "Taking screenshot..."
 msgstr "Capture d’écran en cours..."
 
@@ -34618,7 +34631,7 @@ msgstr "Les fichiers de règles n’ont pas pu être chargés."
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "L’exécution va là où vous l’avez choisi : une nouvelle conversation à chaque fois, la même conversation qu’auparavant, ou la même conversation avec un contexte neuf."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:783
+#: ../../packages/chat-ui/src/chat/message-content.tsx:810
 msgid "The screenshot could not be saved."
 msgstr "La capture d'écran n'a pas pu être enregistrée."
 
@@ -34850,7 +34863,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Modèle vision-langage doté de la réflexion"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1202
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1250
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -35174,7 +35187,7 @@ msgstr "Cet hôte est utilisé par une règle Match dans ~/.ssh/config, que Neor
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "Cet hôte utilise {key} dans ~/.ssh/config, ce que Neore ne prend pas en charge."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:412
+#: ../../packages/chat-ui/src/chat/message-content.tsx:439
 msgid "This image has been flagged for review"
 msgstr "Cette image a été signalée pour vérification"
 
@@ -35592,7 +35605,7 @@ msgstr "A réfléchi quelques secondes"
 msgid "thread"
 msgstr "fil"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:332
+#: src/features/chat/sidebar/thread-sidebar.tsx:333
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
@@ -36596,7 +36609,7 @@ msgstr "Saisissez votre message..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "Police de toute l’interface. Les blocs de code restent toujours en chasse fixe."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:702
+#: ../../packages/chat-ui/src/chat/message-content.tsx:729
 msgid "Typing text..."
 msgstr "Saisie du texte..."
 
@@ -37102,11 +37115,11 @@ msgstr "Performances de pointe d’OpenAI mises à jour"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Capacités de raisonnement mises à jour par rapport au R1 d’origine"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1137
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
 msgid "Updated slide"
 msgstr "Diapositive mise à jour"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1137
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
 msgid "Updated slide {slideNumber}"
 msgstr "Diapositive {slideNumber} mise à jour"
 
@@ -37680,7 +37693,7 @@ msgstr "Focale variable"
 msgid "Variable name..."
 msgstr "Nom de la variable..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:346
+#: src/features/chat/sidebar/thread-sidebar.tsx:347
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -39256,7 +39269,7 @@ msgid "Yesterday"
 msgstr "Hier"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:54
-#: src/features/chat/pins/pin-item.tsx:229
+#: src/features/chat/pins/pin-item.tsx:240
 msgid "You"
 msgstr "Vous"
 

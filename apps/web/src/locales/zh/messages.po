@@ -939,7 +939,7 @@ msgstr "{date}：无回复"
 msgid "{days} days"
 msgstr "{days} 天"
 
-#: src/features/chat/pins/pin-item.tsx:51
+#: src/features/chat/pins/pin-item.tsx:53
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "{days} 天前"
@@ -1118,7 +1118,7 @@ msgstr "{hours} 小时 {minutes} 分钟"
 msgid "{hours}h {minutes}m remaining"
 msgstr "剩余 {hours} 小时 {minutes} 分钟"
 
-#: src/features/chat/pins/pin-item.tsx:47
+#: src/features/chat/pins/pin-item.tsx:49
 #: src/features/settings/components/chat/api-keys-settings.tsx:286
 msgid "{hours}h ago"
 msgstr "{hours} 小时前"
@@ -1223,7 +1223,7 @@ msgstr "{mins} 分 {secs} 秒"
 msgid "{minutes}m"
 msgstr "{minutes} 分钟"
 
-#: src/features/chat/pins/pin-item.tsx:43
+#: src/features/chat/pins/pin-item.tsx:45
 #: src/features/settings/components/chat/api-keys-settings.tsx:282
 msgid "{minutes}m ago"
 msgstr "{minutes} 分钟前"
@@ -2418,7 +2418,7 @@ msgstr "添加备注（可选）…"
 msgid "Add a note..."
 msgstr "添加备注..."
 
-#: src/features/chat/pins/pin-item.tsx:215
+#: src/features/chat/pins/pin-item.tsx:226
 msgid "Add a note…"
 msgstr "添加备注…"
 
@@ -2517,7 +2517,7 @@ msgstr "添加端点"
 msgid "Add error handling"
 msgstr "添加错误处理"
 
-#: src/features/chat/pins/pin-item.tsx:269
+#: src/features/chat/pins/pin-item.tsx:280
 msgid "Add excerpt"
 msgstr "添加摘录"
 
@@ -3108,7 +3108,7 @@ msgstr "智能体会自主处理你的任务。验证器会根据成功标准检
 msgid "Aggregate scores of both runs"
 msgstr "两次运行的汇总得分"
 
-#: src/features/chat/pins/pin-item.tsx:229
+#: src/features/chat/pins/pin-item.tsx:240
 #: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "AI"
@@ -3192,7 +3192,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:390
+#: ../../packages/chat-ui/src/chat/message-content.tsx:417
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3681,7 +3681,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1206
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1254
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -4362,7 +4362,7 @@ msgid "ask"
 msgstr "询问"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:354
+#: src/features/chat/sidebar/thread-sidebar.tsx:355
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Ask"
 msgstr "询问"
@@ -5472,13 +5472,13 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:780
+#: ../../packages/chat-ui/src/chat/message-content.tsx:807
 #: src/features/chat/browser-live-view/browser-live-view.tsx:966
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1143
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:803
+#: ../../packages/chat-ui/src/chat/message-content.tsx:830
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -5486,7 +5486,7 @@ msgstr "浏览器操作失败"
 msgid "Browser Automation"
 msgstr "浏览器自动化"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:801
+#: ../../packages/chat-ui/src/chat/message-content.tsx:828
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -5495,7 +5495,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:758
+#: ../../packages/chat-ui/src/chat/message-content.tsx:785
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:72
 msgid "Browser screenshot"
 msgstr "浏览器截图"
@@ -5504,7 +5504,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:734
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -5837,7 +5837,7 @@ msgstr "加拿大"
 #: src/features/chat/host/host-composer.tsx:972
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
-#: src/features/chat/pins/pin-item.tsx:283
+#: src/features/chat/pins/pin-item.tsx:294
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
@@ -6397,7 +6397,7 @@ msgstr "检查中"
 msgid "Checking code, a draft or a plan for mistakes."
 msgstr ""
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:407
+#: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -6816,7 +6816,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:699
+#: ../../packages/chat-ui/src/chat/message-content.tsx:726
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -6976,7 +6976,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 msgid "Code"
 msgstr "代码"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:137
+#: ../../packages/chat-ui/src/chat/message-content.tsx:150
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 msgid "Code block"
 msgstr "代码块"
@@ -6989,7 +6989,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:675
+#: ../../packages/chat-ui/src/chat/message-content.tsx:702
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -7013,7 +7013,7 @@ msgstr "你的账号暂时无法使用代码模式。"
 msgid "Code navigation"
 msgstr "代码导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:627
+#: ../../packages/chat-ui/src/chat/message-content.tsx:654
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:76
 msgid "Code output"
 msgstr "代码输出"
@@ -9423,7 +9423,7 @@ msgstr "正在创建机器人…"
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:331
+#: ../../packages/chat-ui/src/chat/message-content.tsx:344
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -10365,7 +10365,7 @@ msgstr "删除当前对话（会先确认）"
 msgid "Delete Organization"
 msgstr "删除组织"
 
-#: src/features/chat/pins/pin-item.tsx:256
+#: src/features/chat/pins/pin-item.tsx:267
 msgid "Delete pin"
 msgstr "删除置顶"
 
@@ -11143,7 +11143,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:306
+#: ../../packages/chat-ui/src/chat/message-content.tsx:319
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11257,7 +11257,7 @@ msgid "Download — Neore Desktop"
 msgstr "下载 — Neore Desktop"
 
 #. placeholder {0}: part.filename
-#: ../../packages/chat-ui/src/chat/message-content.tsx:448
+#: ../../packages/chat-ui/src/chat/message-content.tsx:475
 msgid "Download {0}"
 msgstr ""
 
@@ -11310,7 +11310,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:487
+#: ../../packages/chat-ui/src/chat/message-content.tsx:514
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:88
 msgid "Download file"
 msgstr "下载文件"
@@ -11320,8 +11320,8 @@ msgstr "下载文件"
 msgid "Download for {0}"
 msgstr "下载 {0} 版"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:448
-#: ../../packages/chat-ui/src/chat/message-content.tsx:455
+#: ../../packages/chat-ui/src/chat/message-content.tsx:475
+#: ../../packages/chat-ui/src/chat/message-content.tsx:482
 msgid "Download image"
 msgstr ""
 
@@ -11778,8 +11778,8 @@ msgstr "编辑数据集"
 msgid "Edit Endpoint"
 msgstr "编辑端点"
 
-#: src/features/chat/pins/pin-item.tsx:248
-#: src/features/chat/pins/pin-item.tsx:269
+#: src/features/chat/pins/pin-item.tsx:259
+#: src/features/chat/pins/pin-item.tsx:280
 msgid "Edit excerpt"
 msgstr "编辑摘录"
 
@@ -12745,7 +12745,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:267
+#: ../../packages/chat-ui/src/chat/message-content.tsx:280
 msgid "Error:"
 msgstr "错误："
 
@@ -13025,7 +13025,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:665
+#: ../../packages/chat-ui/src/chat/message-content.tsx:692
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -13373,11 +13373,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:771
+#: ../../packages/chat-ui/src/chat/message-content.tsx:798
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:700
+#: ../../packages/chat-ui/src/chat/message-content.tsx:727
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -15509,7 +15509,7 @@ msgstr "完全访问"
 msgid "Full chain-of-thought reasoning visibility"
 msgstr "思维链推理完全可见"
 
-#: src/features/chat/pins/pin-item.tsx:168
+#: src/features/chat/pins/pin-item.tsx:179
 msgid "Full message pinned"
 msgstr "已置顶整条消息"
 
@@ -15759,7 +15759,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:502
+#: ../../packages/chat-ui/src/chat/message-content.tsx:529
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -15767,12 +15767,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:503
+#: ../../packages/chat-ui/src/chat/message-content.tsx:530
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:328
+#: ../../packages/chat-ui/src/chat/message-content.tsx:341
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -15780,7 +15780,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:504
+#: ../../packages/chat-ui/src/chat/message-content.tsx:531
 #: src/features/chat/thread/media-gallery-view.tsx:403
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -15986,8 +15986,8 @@ msgid "Go to last item"
 msgstr "转到最后一项"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:225
-#: src/features/chat/pins/pin-item.tsx:237
-#: src/features/chat/pins/pin-item.tsx:240
+#: src/features/chat/pins/pin-item.tsx:248
+#: src/features/chat/pins/pin-item.tsx:251
 msgid "Go to message"
 msgstr "跳转到消息"
 
@@ -17181,7 +17181,7 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:439
+#: ../../packages/chat-ui/src/chat/message-content.tsx:466
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
@@ -17279,6 +17279,10 @@ msgstr "图像生成"
 #: src/features/marketing/components/model-detail-page.tsx:89
 msgid "Image generation model"
 msgstr "图像生成模型"
+
+#: src/features/chat/pins/pinned-image-preview.tsx:122
+msgid "Image pinned"
+msgstr ""
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
@@ -17842,7 +17846,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:244
+#: ../../packages/chat-ui/src/chat/message-content.tsx:257
 msgid "Input:"
 msgstr "输入："
 
@@ -18261,7 +18265,7 @@ msgstr "它打开的会话与自己的不同，因此已移交对话"
 msgid "It was not saved. Paste it again and save."
 msgstr "未保存。请再次粘贴并保存。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:413
+#: ../../packages/chat-ui/src/chat/message-content.tsx:440
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -18382,7 +18386,7 @@ msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr "跳转到提示 {promptNumber}：{preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
-#: src/features/chat/pins/pin-item.tsx:40
+#: src/features/chat/pins/pin-item.tsx:42
 #: src/features/settings/components/chat/api-keys-settings.tsx:279
 msgid "just now"
 msgstr "刚刚"
@@ -19521,7 +19525,7 @@ msgstr "正在加载编辑器…"
 msgid "Loading feedback"
 msgstr "正在加载反馈"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:350
+#: ../../packages/chat-ui/src/chat/message-content.tsx:363
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:67
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -19737,7 +19741,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:353
+#: ../../packages/chat-ui/src/chat/message-content.tsx:366
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21837,11 +21841,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:772
+#: ../../packages/chat-ui/src/chat/message-content.tsx:799
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:707
+#: ../../packages/chat-ui/src/chat/message-content.tsx:734
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -23867,7 +23871,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:752
+#: ../../packages/chat-ui/src/chat/message-content.tsx:779
 #: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -24789,7 +24793,7 @@ msgstr "已过时"
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:602
+#: ../../packages/chat-ui/src/chat/message-content.tsx:629
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
@@ -24849,8 +24853,8 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:252
-#: ../../packages/chat-ui/src/chat/message-content.tsx:260
+#: ../../packages/chat-ui/src/chat/message-content.tsx:265
+#: ../../packages/chat-ui/src/chat/message-content.tsx:273
 msgid "Output:"
 msgstr "输出："
 
@@ -24894,7 +24898,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:706
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "page"
 msgstr "页面"
 
@@ -25579,6 +25583,11 @@ msgstr "置顶"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "固定记忆可防止其被淡化、合并或提升。只有活动类记忆会自行淡化。"
 
+#: src/features/chat/pins/pinnable-image.tsx:74
+#: src/features/chat/pins/pinnable-image.tsx:80
+msgid "Pin image"
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
 msgstr "置顶记忆"
@@ -25615,6 +25624,10 @@ msgstr "已固定"
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:638
 msgid "Pinned"
 msgstr "已置顶"
+
+#: src/features/chat/pins/pinned-image-preview.tsx:129
+msgid "Pinned image"
+msgstr ""
 
 #: src/features/chat/thread-list/group-header.tsx:103
 msgid "Pinned project"
@@ -26678,7 +26691,7 @@ msgstr "已用优化后的内容更新提示词"
 msgid "Prompt Variables"
 msgstr "提示词变量"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:339
+#: src/features/chat/sidebar/thread-sidebar.tsx:340
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
@@ -29073,7 +29086,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:563
+#: ../../packages/chat-ui/src/chat/message-content.tsx:590
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -29081,7 +29094,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:221
+#: ../../packages/chat-ui/src/chat/message-content.tsx:234
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -29220,7 +29233,7 @@ msgstr "沙特阿拉伯"
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/host/host-composer.tsx:961
-#: src/features/chat/pins/pin-item.tsx:284
+#: src/features/chat/pins/pin-item.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
 #: src/features/chat/thread/edit-composer.tsx:166
@@ -29483,7 +29496,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:748
+#: ../../packages/chat-ui/src/chat/message-content.tsx:775
 msgid "Screenshot"
 msgstr "截图"
 
@@ -30697,12 +30710,12 @@ msgid "Show Labels"
 msgstr "显示标签"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
-#: src/features/chat/pins/pin-item.tsx:196
+#: src/features/chat/pins/pin-item.tsx:207
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show less"
 msgstr "收起"
 
-#: src/features/chat/pins/pin-item.tsx:196
+#: src/features/chat/pins/pin-item.tsx:207
 msgid "Show more"
 msgstr "展开"
 
@@ -31242,7 +31255,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1139
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1187
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -31400,7 +31413,7 @@ msgstr "扎实的通用能力"
 msgid "Solid performance across most task types"
 msgstr "在大多数任务类型上表现扎实"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:657
+#: ../../packages/chat-ui/src/chat/message-content.tsx:684
 msgid "Some images from this run could not be saved."
 msgstr "此次运行中的部分图像无法保存。"
 
@@ -31499,8 +31512,8 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1276
-#: src/features/chat/thread/message-content.tsx:154
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1324
+#: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "来源 {index}"
 
@@ -31879,7 +31892,7 @@ msgstr "用最新的 AI 模型开始你自己的对话。"
 msgid "Start a conversation to ask a side question."
 msgstr "开始一段对话后才能提出旁支问题。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:386
+#: src/features/chat/sidebar/thread-sidebar.tsx:385
 msgid "Start a conversation to configure variables."
 msgstr "开始对话以配置变量。"
 
@@ -33120,7 +33133,7 @@ msgstr "轮流发言"
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:701
+#: ../../packages/chat-ui/src/chat/message-content.tsx:728
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -34618,7 +34631,7 @@ msgstr "无法加载规则文件。"
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "运行将按你的选择进行：每次新建聊天、沿用之前的聊天，或沿用同一聊天但使用全新上下文。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:783
+#: ../../packages/chat-ui/src/chat/message-content.tsx:810
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
@@ -34850,7 +34863,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1202
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1250
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -35174,7 +35187,7 @@ msgstr "此主机被 ~/.ssh/config 中的 Match 规则使用，Neore 不会对�
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "此主机在 ~/.ssh/config 中使用了 {key}，Neore 不支持该设置。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:412
+#: ../../packages/chat-ui/src/chat/message-content.tsx:439
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -35592,7 +35605,7 @@ msgstr "思考了几秒钟"
 msgid "thread"
 msgstr "对话"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:332
+#: src/features/chat/sidebar/thread-sidebar.tsx:333
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1010
 msgid "Thread"
@@ -36596,7 +36609,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "整个界面的字体。代码块始终保持等宽。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:702
+#: ../../packages/chat-ui/src/chat/message-content.tsx:729
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -37102,11 +37115,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1137
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1137
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -37680,7 +37693,7 @@ msgstr "可变焦距"
 msgid "Variable name..."
 msgstr "变量名..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:346
+#: src/features/chat/sidebar/thread-sidebar.tsx:347
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -39256,7 +39269,7 @@ msgid "Yesterday"
 msgstr "昨天"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:54
-#: src/features/chat/pins/pin-item.tsx:229
+#: src/features/chat/pins/pin-item.tsx:240
 msgid "You"
 msgstr "你"
 
