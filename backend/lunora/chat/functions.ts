@@ -4,7 +4,7 @@ import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
-import { FOLLOWUP_DISPATCH_TTL_MS, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
+import { FOLLOWUP_DISPATCH_TTL_MS, FOLLOWUP_PATH_LIMIT, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
 import { callOnShard } from "../lib/cross-shard";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { signDocsForDisplay } from "../agent/display-media";
@@ -4699,11 +4699,12 @@ export const generateFollowupSuggestionsForThread = internalAction
             // plain thread reads its raw rows, which are one branch. Either way the turn below is keyed on the reply the composer shows.
             const messagesResult = (
                 threadData.activeLeafMessageId
-                    ? {
-                          continueCursor: null,
-                          isDone: true,
-                          page: await readFollowupPath(context, threadId, threadData.activeLeafMessageId),
-                      }
+                    ? await (async () => {
+                          // A path read at its cap is not the whole path: the turn may run past it, so it is not complete.
+                          const page = await readFollowupPath(context, threadId, threadData.activeLeafMessageId as string);
+
+                          return { continueCursor: null, isDone: page.length < FOLLOWUP_PATH_LIMIT, page };
+                      })()
                     : await agent.listMessages(context, {
                           paginationOpts: { cursor: null, numItems: 10 },
                           threadId,
@@ -4816,13 +4817,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                     return false;
                 }
 
-                const page = await agent.listMessages(context, {
-                    paginationOpts: { cursor: null, numItems: 10 },
-                    threadId,
-                });
+                // A branched thread's newest reply is on its active path: a row on another branch, stored later, does not supersede it.
+                const listing = threadData.activeLeafMessageId
+                    ? undefined
+                    : await agent.listMessages(context, { paginationOpts: { cursor: null, numItems: 10 }, threadId });
+                const rows = threadData.activeLeafMessageId ? await readFollowupPath(context, threadId, threadData.activeLeafMessageId) : (listing?.page ?? []);
                 // Filtered by the reset read just now, which equals the one read at the start (the check above returns otherwise).
                 // System rows are skipped on purpose: an agent-switch divider does not hide the reply the composer shows.
-                const latest = rowsAfterContextReset(page.page || [], currentReset).find((messageDocument) => {
+                const latest = rowsAfterContextReset(rows, currentReset).find((messageDocument) => {
                     const role = messageDocument.message?.role;
 
                     return role === "user" || role === "assistant";
