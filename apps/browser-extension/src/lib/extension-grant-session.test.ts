@@ -213,6 +213,8 @@ describe("signOutGrant", () => {
 
 describe("endSession", () => {
     const grant = { token: "grant", user: USER };
+    /** The bearer the token endpoint mints for `sub`; only its payload is read. */
+    const bearerFor = (sub: string): string => `h.${btoa(JSON.stringify({ sub })).replaceAll("=", "")}.s`;
 
     /** A panel signed in with `grant`: a real bearer sync over a fake Lunora client. */
     const signedIn = async () => {
@@ -226,10 +228,12 @@ describe("endSession", () => {
                 return new Response(null, { status: 204 });
             }
 
-            return Response.json({ token: "jwt", user: (store.get(GRANT_KEY) as typeof grant).user });
+            const { user } = store.get(GRANT_KEY) as typeof grant;
+
+            return Response.json({ token: bearerFor(user.id), user });
         });
         sync.start(USER.id);
-        await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith("jwt"));
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith(bearerFor(USER.id), USER.id));
         setAuthToken.mockClear();
 
         return { setAuthToken, sync };
@@ -277,9 +281,9 @@ describe("endSession", () => {
 
         expect(store.get(GRANT_KEY)).toEqual(grant);
         // The loop restarted for the grant still stored, and the bearer was never cleared.
-        await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith("jwt"));
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith(bearerFor(USER.id), USER.id));
         expect(setAuthToken).not.toHaveBeenCalledWith(null);
-        await expect(getAccessToken({ force: true })).resolves.toBe("jwt");
+        await expect(getAccessToken({ force: true })).resolves.toBe(bearerFor(USER.id));
     });
 
     it("leaves a sign-in from another panel alone when its sign-out finishes after it", async () => {
@@ -302,8 +306,8 @@ describe("endSession", () => {
         expect(store.get(GRANT_KEY)).toEqual(newer);
         // Only the account switch cleared the bearer; the finished sign-out did not.
         expect(setAuthToken.mock.calls.filter(([token]) => token === null)).toHaveLength(1);
-        await vi.waitFor(() => expect(setAuthToken).toHaveBeenLastCalledWith("jwt"));
-        await expect(getAccessToken()).resolves.toBe("jwt");
+        await vi.waitFor(() => expect(setAuthToken).toHaveBeenLastCalledWith(bearerFor("u2"), "u2"));
+        await expect(getAccessToken()).resolves.toBe(bearerFor("u2"));
     });
 });
 
