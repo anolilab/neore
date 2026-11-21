@@ -33,6 +33,8 @@ const ComposerFollowupSuggestions: FC = () => {
     const { thread, threadId } = useChatThread();
     // A locked chat's cache is read only with its unlock proof, as the next-prompt read is.
     const unlockProof = useUnlockProof(threadId);
+    // A locked chat without its proof is not read, and nothing that was read before it locked is shown.
+    const lockedWithoutProof = Boolean(thread?.lockedAt) && !unlockProof;
     const { messages } = useChatMessages();
     const isRunning = useChatIsRunning();
     // Booleans, so typing does not re-render the suggestions on every keystroke.
@@ -70,7 +72,7 @@ const ComposerFollowupSuggestions: FC = () => {
     );
 
     // Determine if we should show the suggestions
-    const shouldShow = shouldFetchConditions && suggestions.length > 0;
+    const shouldShow = shouldFetchConditions && suggestions.length > 0 && !lockedWithoutProof;
 
     // The newest `/clear` divider: suggestions loaded before it are for the context it ended, so they go with it.
     const lastResetId = useMemo(() => messages.findLast((message) => isClearDivider(message))?.id, [messages]);
@@ -96,7 +98,7 @@ const ComposerFollowupSuggestions: FC = () => {
     const { data: cachedFollowups, isFetching: isFetchingCached } = useQuery({
         ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions({ threadId: validThreadId as Id<"threads">, unlockProof }),
         // A locked chat without its proof is not read (see `use-next-prompt-suggestion.ts`).
-        enabled: Boolean(shouldFetchConditions) && !(Boolean(thread?.lockedAt) && !unlockProof),
+        enabled: Boolean(shouldFetchConditions) && !lockedWithoutProof,
     });
 
     useEffect(() => {
