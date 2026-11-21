@@ -16,5 +16,10 @@ export const THREADS_VIEW: View = { type: "threads" };
  * instead. A new grant for the same user keeps it all, and an open chat stays
  * mounted.
  */
-export const panelFor = (panel: AccountPanel, userId: string | undefined): AccountPanel =>
-    panel.userId === userId ? panel : { activeOrgId: null, userId, view: THREADS_VIEW };
+export const panelFor = (panel: AccountPanel, userId: string | undefined): AccountPanel => {
+    if (panel.userId === userId) {
+        return panel;
+    }
+
+    return { activeOrgId: null, userId, view: THREADS_VIEW };
+};
