@@ -13,7 +13,7 @@ import { v } from "lunorash/server";
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import { getMembersByUserId, getOrganization, getUser } from "../auth/lib/better-auth-queries";
 import { resolveUserPlan } from "../auth/lib/plan";
-import { claimOnce, releaseClaim } from "../lib/claim-once";
+import { claimOnce, hasClaim, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
 import { applyLimit } from "../lib/rate-limiter-mutations";
 import { MAX_LENGTH } from "../lib/validators";
@@ -64,15 +64,18 @@ const dailyLimitFor = async (
 /**
  * Whether one unit of `kind` is left for the user, read without taking it. The model is not called for a reply the quota cannot pay
  * for; the charge after the call still settles it, so a race can still refuse, but a spent quota no longer buys a model call.
+ * With a `requestId` whose unit is already taken, the answer is `true`: a retry of a charged reply (after its cache write failed)
+ * is not refused for want of a unit it has already paid for.
  */
 export const dailyUnitAvailable = internalMutation
     .input({
         kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Text"), v.literal("Video")),
         organizationId: v.optional(v.string()),
+        requestId: v.optional(v.string().max(MAX_LENGTH.long)),
         userId: v.string(),
     })
     .output(v.boolean())
-    .mutation(async ({ args: { kind, organizationId, userId }, ctx }) => {
+    .mutation(async ({ args: { kind, organizationId, requestId, userId }, ctx }) => {
         const limit = await dailyLimitFor(ctx, { kind, organizationId, userId });
 
         if (!limit) {
@@ -80,6 +83,10 @@ export const dailyUnitAvailable = internalMutation
         }
 
         if (limit.exempt) {
+            return true;
+        }
+
+        if (requestId !== undefined && (await hasClaim(ctx, DAILY_CHARGE_SCOPE, requestId))) {
             return true;
         }
 

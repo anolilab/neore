@@ -202,6 +202,25 @@ describe("the suggested next prompt announcement", () => {
         expect(getGhostCompletion(ref.current!.getEditor()!.state)).toBeNull();
     });
 
+    it("no suggested prompt is placed while the composer holds attachments", () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+
+        render(
+            <ComposerTiptapEditor
+                nextPromptHeld
+                nextPromptScope="thread-1"
+                nextPromptSuggestion="Continue the thread"
+                onChange={() => {}}
+                onSubmit={() => {}}
+                ref={ref}
+                value=""
+            />,
+        );
+
+        expect(getGhostCompletion(ref.current!.getEditor()!.state)).toBeNull();
+        expect(announcedText()).toBeNull();
+    });
+
     it("a prompt only hidden by a pause, never dismissed, comes back when the composer is enabled again", () => {
         const ref = createRef<ComposerTiptapEditorRef>();
         const element = (disabled: boolean) => (

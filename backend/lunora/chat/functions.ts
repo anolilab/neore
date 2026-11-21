@@ -4793,11 +4793,14 @@ export const generateFollowupSuggestionsForThread = internalAction
 
                 // The unit the reply would be charged to, found before the model is called: a spent quota does not buy a model call.
                 const chargedUserId = actorGate.enabled ? (background.billedUserId ?? userId) : ownerUserId;
+                // Keys the reply's one Text unit: a retry of a reply already charged finds the unit taken, and is not refused for it.
+                const replyChargeKey = `followup:${threadId}:${lastMessageId}`;
 
                 if (
                     !(await context.runMutation(internal.chat.daily_charge.dailyUnitAvailable, {
                         kind: "Text",
                         organizationId: threadData.organizationId ?? undefined,
+                        requestId: replyChargeKey,
                         userId: chargedUserId,
                     }))
                 ) {
@@ -4840,7 +4843,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                 const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
                     kind: "Text",
                     organizationId: threadData.organizationId ?? undefined,
-                    requestId: `followup:${threadId}:${lastMessageId}`,
+                    requestId: replyChargeKey,
                     // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
                     userId: chargedUserId,
                 });
