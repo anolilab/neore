@@ -5041,6 +5041,10 @@ export const streamAsync = internalAction
         // Consume the stream to ensure it completes
         await result.consumeStream();
 
+        // The edit's reply gets its follow-up suggestions here, as any finished reply does: the composer offers the next prompt for it.
+        // The job's own claim and charge are per reply, so a second schedule for the same reply does no second work.
+        await context.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId });
+
         context.log.event("chat.stream_async", { model, statelessMode: threadStatelessMode ?? false });
 
         streamLogger.debug(`[ASYNC] Stream consumed, action complete`, {
