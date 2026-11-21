@@ -289,12 +289,14 @@ const guardPage = async (page: import("@cloudflare/playwright").Page) => {
 const openBrowser = async (
     env: Env,
     sessionId: string | undefined,
+    onSessionGone?: () => void,
 ): Promise<{ browser: import("@cloudflare/playwright").Browser; isLaunched: boolean; sessionId: string }> => {
     if (sessionId) {
         try {
             return { browser: await env.BROWSER.connect(sessionId), isLaunched: false, sessionId };
         } catch {
-            // Session expired or invalid — fall back to new launch
+            // Session expired or invalid — fall back to new launch. Said at once: the launch may never finish.
+            onSessionGone?.();
         }
     }
 
@@ -607,12 +609,16 @@ const settledWithin = async <T>(promise: Promise<T>, ms: number): Promise<T | nu
 const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: number) => {
     let isLate = false;
     let opened: { browser: Browser; isLaunched: boolean; sessionId: string } | undefined;
+    // The caller's session could not be reconnected: it is gone, whether or not a new browser opens in time.
+    let isSessionGone = false;
     const close = ({ browser, isLaunched }: { browser: Browser; isLaunched: boolean }): void => {
         if (isLaunched) {
             browser.close().catch(() => undefined);
         }
     };
-    const opening = openBrowser(env, sessionId).then((result) => {
+    const opening = openBrowser(env, sessionId, () => {
+        isSessionGone = true;
+    }).then((result) => {
         opened = result;
 
         if (isLate) {
@@ -621,7 +627,7 @@ const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: nu
 
         return result;
     });
-    const isSessionClosed = (): boolean => Boolean(sessionId && opened?.isLaunched);
+    const isSessionClosed = (): boolean => Boolean(sessionId && (isSessionGone || opened?.isLaunched));
     const ready = await settledWithin(
         opening.then(async (result) => {
             try {

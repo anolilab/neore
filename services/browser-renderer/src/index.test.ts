@@ -87,6 +87,44 @@ describe("POST /login", () => {
         expect(close).toHaveBeenCalledOnce();
     });
 
+    it("says the caller's session is closed when its reconnect failed and the new browser does not start in time", async () => {
+        const env = {
+            BROWSER: {
+                connect: async () => {
+                    throw new Error("session gone");
+                },
+                launch: async () => await new Promise(() => {}),
+            },
+            NODE_ENV: "test",
+        };
+        const response = post(env as never, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "gone" });
+
+        await vi.advanceTimersByTimeAsync(18_000);
+
+        const answer = await response;
+
+        expect(answer.status).toBe(504);
+        await expect(answer.json()).resolves.toMatchObject({ sessionClosed: true });
+    });
+
+    it("says the caller's session is closed when its reconnect failed and launching a new browser fails", async () => {
+        const env = {
+            BROWSER: {
+                connect: async () => {
+                    throw new Error("session gone");
+                },
+                launch: async () => {
+                    throw new Error("no browsers left");
+                },
+            },
+            NODE_ENV: "test",
+        };
+        const answer = await post(env as never, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "gone" });
+
+        expect(answer.status).toBe(500);
+        await expect(answer.json()).resolves.toMatchObject({ sessionClosed: true });
+    });
+
     it("leaves the caller's session open when its reconnect is late, and says nothing of it closing", async () => {
         const { env, pending, started } = binding();
         const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "kept" });
