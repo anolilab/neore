@@ -178,9 +178,24 @@ export const holdSession = async (
 
     if (!taken) {
         // Never rejects; not awaited, so the refusal is not held up by a lock that does not answer. The lock keeps the
-        // token as released, so the take, should it arrive after this, holds nothing. Kept past the answer: a release
-        // cut off with the request would leave a late take to lapse, and an exclusive one to retire the session.
-        const releasing = ask(namespace, sessionId, { op: "release", token }).catch(() => undefined);
+        // token as released, so the take, should it arrive after this, holds nothing. Kept past the answer, and sent
+        // again until the lock answers one, while the take's lease could still run: a release given up on would leave a
+        // late take to lapse, and an exclusive one to retire the session.
+        const releasing = (async () => {
+            const until = sentAt + LEASE_MS;
+            let wait = RESEND_FIRST_MS;
+
+            while (now() < until) {
+                if ((await ask(namespace, sessionId, { op: "release", token }, Math.min(LOCK_CALL_MS, until - now()))) !== null) {
+                    return;
+                }
+
+                await new Promise((resolve) => {
+                    setTimeout(resolve, Math.max(0, Math.min(wait, until - now())));
+                });
+                wait *= 2;
+            }
+        })().catch(() => undefined);
 
         keep?.(releasing);
 

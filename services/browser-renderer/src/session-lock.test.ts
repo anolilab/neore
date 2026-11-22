@@ -286,6 +286,25 @@ describe(holdSession, () => {
         await vi.advanceTimersByTimeAsync(1000);
         await expect(taking).resolves.toBe("unreachable");
         expect(kept).toHaveLength(1);
+
+        // The lock answers only after the first release's own call ran out: the release is sent again until one lands.
+        let isKept = false;
+
+        kept[0]
+            ?.finally(() => {
+                isKept = true;
+            })
+            .catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(isKept).toBe(false);
+
+        const before = control.calls.length;
+
+        control.reachable = true;
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(isKept).toBe(true);
+        expect(control.calls.slice(before)).toContainEqual({ op: "release", token: expect.any(String) });
     });
 
     it("renews its hold while it runs, so another call stays refused past one lease", async () => {

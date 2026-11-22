@@ -82,6 +82,14 @@ describe(servedForms, () => {
 
         expect(canParse.mock.calls.filter(([address]) => address === "/session")).toHaveLength(1);
         canParse.mockRestore();
+
+        // Nor is its address cut at the fragment again for each button.
+        const split = vi.spyOn(String.prototype, "split");
+
+        servedForms(`<form method="post" action="/session#f">${FIELDS}${buttons}</form>`, URL_OF_PAGE);
+
+        expect(split.mock.contexts.filter((text) => String(text).endsWith("/session#f"))).toHaveLength(1);
+        split.mockRestore();
     });
 
     it("resolves against the first base address and takes the first base target", () => {

@@ -271,13 +271,20 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
         }
     }
 
-    // Each action address resolved once: a form's own one is shared by every submit button that does not override it.
+    // Each action address resolved once, to where it sends the form without its fragment: a form's own one is shared by
+    // every submit button that does not override it. An empty action is the document's own address, whatever its base.
     const resolvedActions = new Map<string, string>();
     const resolve = (action: string): string => {
         let resolved = resolvedActions.get(action);
 
         if (resolved === undefined) {
-            resolved = URL.canParse(action, base) ? new URL(action, base).href : `unparsable:${action}`;
+            let address = url;
+
+            if (action !== "") {
+                address = URL.canParse(action, base) ? new URL(action, base).href : `unparsable:${action}`;
+            }
+
+            resolved = address.split("#", 1)[0] ?? address;
             resolvedActions.set(action, resolved);
         }
 
@@ -287,13 +294,9 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
     /** Where `form` goes when `button` (the first enabled submit button, or none) sends it. */
     const destinationOf = (form: Element, button: Element | undefined): Omit<FormTarget, "name"> => {
         const override = (name: string): string | null => (button ? attribute(button, name) : null);
-        const action = override("formaction") ?? attribute(form, "action") ?? "";
-        const resolved = resolve(action);
-        // An empty action is the document's own address, whatever its base.
-        const address = action === "" ? url : resolved;
 
         return {
-            action: address.split("#", 1)[0] ?? address,
+            action: resolve(override("formaction") ?? attribute(form, "action") ?? ""),
             charset: attribute(form, "accept-charset") ?? "",
             enctype: enctypeOf(override("formenctype") ?? attribute(form, "enctype")),
             method: (override("formmethod") ?? attribute(form, "method") ?? "post").toLowerCase(),
