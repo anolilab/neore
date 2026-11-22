@@ -1808,7 +1808,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         if (blocked === UNCHECKED_ADDRESS) {
             return failed(
-                "The site's answer led to an address longer than the agent's browser can check for the password (too much to check), so it was stopped; the form was sent",
+                "The site's answer led to an address the agent's browser could not check for the password (too much to check: too long, too many layers of encoding, or past what this sign-in may check), so it was stopped; the form was sent",
             );
         }
 
