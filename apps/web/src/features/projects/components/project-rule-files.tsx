@@ -497,13 +497,15 @@ const ProjectRuleFiles: FC<{
         setImportNote("");
     };
 
-    const applyImport = (read: RepoImportResult) => {
+    /** Adds what was read and says what was left out; gives back the paths of those added. */
+    const applyImport = (read: RepoImportResult): string[] => {
         // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
         // room left now is taken. A file a save would refuse for its length, or for the list's size with those before
         // it, is left out and said, as the save would measure it.
         const now = latest.current;
         const base = now.draft ?? now.savedFiles;
         const added: RuleFileDraft[] = [];
+        const addedPaths: string[] = [];
         const skipped = [...read.skipped];
         const tooLarge: string[] = [];
         let bytes = ruleFilesStoredBytes(
@@ -532,6 +534,7 @@ const ProjectRuleFiles: FC<{
                 tooLarge.push(path);
             } else {
                 added.push(draftFile);
+                addedPaths.push(path);
                 titles.add(title);
                 shortened += title === unreserved ? 0 : 1;
                 renamed += unreserved === file.title ? 0 : 1;
@@ -597,13 +600,16 @@ const ProjectRuleFiles: FC<{
                 ...(read.notRead > 0 ? [notRead] : []),
             ].join(" "),
         );
+
+        return addedPaths;
     };
 
     /**
      * Adds what `read` imports as unsaved drafts, up to the project's limit; the person saves them like any edit. One
-     * import at a time: one asked for while another reads is dropped.
+     * import at a time: one asked for while another reads is dropped. `onApplied` hears the paths added, so a panel
+     * keeps those the project had no room for picked.
      */
-    const runImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>) => {
+    const runImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>, onApplied?: (added: ReadonlyArray<string>) => void) => {
         if (importing) {
             return;
         }
@@ -615,7 +621,18 @@ const ProjectRuleFiles: FC<{
         setImporting(true);
         read(isCurrent)
             // An import a Discard overtook adds nothing.
-            .then((result) => (result && isCurrent() ? applyImport(result) : undefined))
+            .then((result) => {
+                if (!result || !isCurrent()) {
+                    return undefined;
+                }
+
+                // Applied first: an optional call skips its arguments when there is no one to hear.
+                const added = applyImport(result);
+
+                onApplied?.(added);
+
+                return undefined;
+            })
             .catch(() => {
                 // One a Discard overtook says nothing either.
                 if (!isCurrent()) {

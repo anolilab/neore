@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectRuleFiles from "./project-rule-files";
 
@@ -33,6 +33,11 @@ const backend = vi.hoisted(() => {
     return {
         calls: new Map<string, Row>(),
         devices: [] as Record<string, unknown>[],
+        // Calls whose status cannot be read, as a query failing after its retries.
+        lost: new Set<string>(),
+        // Queries answered once, not again every few milliseconds.
+        unpolled: new Set<string>(),
+        ruleFiles: [] as Record<string, unknown>[],
         listDevices: vi.fn(),
         start: vi.fn(),
     };
@@ -45,7 +50,11 @@ vi.mock("@/lib/lunora/crpc", () => {
             queryOptions: (args: unknown) =>
                 args === skipToken
                     ? { queryFn: skipToken, queryKey: [key] }
-                    : { queryFn: async () => structuredClone(read(args as never)) ?? null, queryKey: [key, args], refetchInterval: 10 },
+                    : {
+                          queryFn: async () => structuredClone(read(args as never)) ?? null,
+                          queryKey: [key, args],
+                          refetchInterval: backend.unpolled.has(key) ? false : 10,
+                      },
         };
     };
 
@@ -57,7 +66,13 @@ vi.mock("@/lib/lunora/crpc", () => {
                 devices: {
                     functions: { listDevices: polled("listDevices", () => backend.listDevices()) },
                     global_instructions: {
-                        getGlobalInstructionsCall: polled("getGlobalInstructionsCall", ({ callId }: { callId: string }) => backend.calls.get(callId)),
+                        getGlobalInstructionsCall: polled("getGlobalInstructionsCall", ({ callId }: { callId: string }) => {
+                            if (backend.lost.has(callId)) {
+                                throw new Error("lost");
+                            }
+
+                            return backend.calls.get(callId);
+                        }),
                         startGlobalInstructionsCall: {
                             mutationOptions: () => {
                                 return { mutationFn: backend.start };
@@ -71,7 +86,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: (args: unknown) => {
                                 return {
                                     queryFn: async () => {
-                                        return { canEdit: true, files: [], revision: "r1" };
+                                        return { canEdit: true, files: backend.ruleFiles, revision: "r1" };
                                     },
                                     queryKey: ["listProjectRuleFiles", args],
                                 };
@@ -103,6 +118,14 @@ const LISTED = [
     { id: "windsurf", name: "global_rules.md", path: "~/.codeium/windsurf/memories/global_rules.md", size: 90_000, status: "too_large" },
 ];
 
+const isDisabled = (element: HTMLElement): boolean => element.hasAttribute("disabled") || element.getAttribute("aria-disabled") === "true";
+
+const openAndList = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+    await user.click(await screen.findByRole("button", { name: "Find files" }));
+    await screen.findByRole("list", { name: "Instruction files" });
+};
+
 const renderEditor = () =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -110,8 +133,32 @@ const renderEditor = () =>
         </QueryClientProvider>,
     );
 
+const ruleFiles = (count: number) =>
+    Array.from({ length: count }, (_, index) => {
+        return { content: `Rule ${String(index)}`, id: `saved-${String(index)}`, mode: "always", title: `Saved ${String(index)}` };
+    });
+
+/** The read's answer: each file asked for, as read with its text. */
+const readAll = (files: string[], listed = LISTED): Row => {
+    return {
+        files: listed
+            .filter((file) => files.includes(file.id))
+            .map((file) => {
+                return { ...file, status: "read", text: `${file.name} text` };
+            }),
+        status: "completed",
+    };
+};
+
+afterEach(() => {
+    vi.useRealTimers();
+});
+
 beforeEach(() => {
     backend.calls.clear();
+    backend.lost.clear();
+    backend.unpolled.clear();
+    backend.ruleFiles = [];
     backend.devices = [
         { _id: "desk", createdAt: 0, lastSeenAt: Date.now(), name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
         // A server reached over SSH is never offered.
@@ -136,17 +183,7 @@ beforeEach(() => {
 
         backend.calls.set(callId, { phase: "prompting", status: "claimed" });
         setTimeout(() => {
-            backend.calls.set(
-                callId,
-                files
-                    ? {
-                          files: LISTED.filter((file) => files.includes(file.id)).map((file) => {
-                              return { ...file, status: "read", text: `${file.name} text` };
-                          }),
-                          status: "completed",
-                      }
-                    : { files: LISTED, status: "completed" },
-            );
+            backend.calls.set(callId, files ? readAll(files) : { files: LISTED, status: "completed" });
         }, 50);
 
         return { callId };
@@ -364,5 +401,177 @@ describe("import from this computer", () => {
 
         expect(await screen.findByText("Pair the desktop app in Settings → Devices to import from a computer.")).toBeDefined();
         expect(screen.queryByRole("button", { name: "Find files" })).toBeNull();
+    });
+    it("frees the editor when the panel is closed while the read is still being sent", async () => {
+        const user = userEvent.setup();
+        const answer = backend.start.getMockImplementation()!;
+
+        // The read's start never answers.
+        const never = new Promise<never>(() => {
+            // Never settled.
+        });
+
+        backend.start.mockImplementation(async (args: { files?: string[] }) => (args.files ? await never : await answer(args)));
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+        await screen.findByText("Waiting for Studio…");
+        expect(isDisabled(screen.getByRole("button", { name: "Import files" }))).toBe(true);
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await waitFor(() => expect(isDisabled(screen.getByRole("button", { name: "Import files" }))).toBe(false));
+    });
+
+    it("says so when the read's status cannot be read any more, and frees the editor", async () => {
+        const user = userEvent.setup();
+        const answer = backend.start.getMockImplementation()!;
+
+        backend.start.mockImplementation(async (args: { files?: string[] }) => {
+            if (!args.files) {
+                return await answer(args);
+            }
+
+            // Waiting on the person at first, then no longer readable.
+            backend.calls.set("vanished", { phase: "prompting", status: "claimed" });
+            setTimeout(() => backend.lost.add("vanished"), 50);
+
+            return { callId: "vanished" };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        await screen.findByText("Approve the request in the desktop app on Studio.");
+
+        const lost = await screen.findByRole("alert");
+
+        expect(lost.textContent).toBe("Lost track of the request to Studio. Try again.");
+        expect(screen.queryByText("Approve the request in the desktop app on Studio.")).toBeNull();
+        await waitFor(() => expect(isDisabled(screen.getByRole("button", { name: "Import files" }))).toBe(false));
+        expect(isDisabled(screen.getByRole("button", { name: "Import selected" }))).toBe(false);
+        expect(screen.queryByRole("listitem", { name: "CLAUDE.md" })).toBeNull();
+    });
+
+    it("says so when the computers could not be loaded, with a way to try again", async () => {
+        const user = userEvent.setup();
+        let down = true;
+
+        // Loaded again only when asked.
+        backend.unpolled.add("listDevices");
+
+        backend.listDevices.mockImplementation(() => {
+            if (down) {
+                throw new Error("down");
+            }
+
+            return backend.devices;
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Your computers could not be loaded.");
+        expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+        down = false;
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByText(LOOKS_FOR)).toBeDefined();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("drops what one computer found when it goes, so nothing it listed is read from another", async () => {
+        const user = userEvent.setup();
+
+        backend.devices = [
+            { _id: "desk", createdAt: 0, lastSeenAt: Date.now(), name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
+            { _id: "lap", createdAt: 0, lastSeenAt: Date.now(), name: "Laptop", platform: "darwin", toolNames: [], updateRequired: false },
+        ];
+        renderEditor();
+        await openAndList(user);
+        expect(backend.start).toHaveBeenLastCalledWith({ deviceId: "desk" }, expect.anything());
+
+        // Unpaired elsewhere: the other computer takes its place, with nothing found yet.
+        backend.devices = backend.devices.filter((device) => device._id !== "desk");
+
+        await waitFor(() => expect(screen.queryByRole("list", { name: "Instruction files" })).toBeNull());
+        expect(screen.queryByRole("button", { name: "Import selected" })).toBeNull();
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+        expect(backend.start).toHaveBeenLastCalledWith({ deviceId: "lap" }, expect.anything());
+    });
+
+    it("keeps the files the project had no room for ticked, and the panel open", async () => {
+        const user = userEvent.setup();
+
+        backend.ruleFiles = ruleFiles(19);
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        // In name order: AGENTS.md takes the last place.
+        expect(await screen.findByRole("listitem", { name: "AGENTS.md" })).toBeDefined();
+        expect(screen.queryByRole("listitem", { name: "CLAUDE.md" })).toBeNull();
+        expect(screen.getByText((text) => text.includes("Left out: CLAUDE.md."))).toBeDefined();
+
+        const boxes = within(screen.getByRole("list", { name: "Instruction files" })).getAllByRole("checkbox");
+
+        await waitFor(() => expect(boxes.map((box) => box.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]));
+        expect(screen.getByTestId("computer-rule-file-import")).toBeDefined();
+        // Full now: nothing more is read until a file is removed.
+        expect(isDisabled(screen.getByRole("button", { name: "Import selected" }))).toBe(true);
+    });
+
+    it("asks the computer for nothing once the project is full, even with the panel open", async () => {
+        const user = userEvent.setup();
+
+        backend.ruleFiles = ruleFiles(19);
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+
+        const find = await screen.findByRole("button", { name: "Find files" });
+
+        await user.click(screen.getByRole("button", { name: "Add rule file" }));
+        await waitFor(() => expect(isDisabled(find)).toBe(true));
+        await user.click(find);
+        expect(backend.start).not.toHaveBeenCalled();
+    });
+
+    it("adds Windsurf's global rules whole and always applied, as the other tools' files", async () => {
+        const user = userEvent.setup();
+        const windsurf = [{ ...LISTED[3]!, size: 90, status: "found" }];
+
+        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+            const callId = `windsurf-${String(backend.start.mock.calls.length)}`;
+
+            backend.calls.set(callId, files ? readAll(files, windsurf) : { files: windsurf, status: "completed" });
+
+            return { callId };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        const imported = await screen.findByRole("listitem", { name: "global_rules.md" });
+
+        expect(within(imported).getByRole("radio", { name: "Always" }).getAttribute("aria-checked")).toBe("true");
+        expect((within(imported).getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value).toBe("global_rules.md text");
+    });
+
+    it("shows a computer that stops checking in as offline while the panel is open", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date", "setInterval", "clearInterval"] });
+
+        const user = userEvent.setup();
+
+        // Seen 70 s ago: online for 5 s more.
+        backend.devices = [
+            { _id: "desk", createdAt: 0, lastSeenAt: Date.now() - 70_000, name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
+        ];
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+
+        const find = await screen.findByRole("button", { name: "Find files" });
+
+        expect(isDisabled(find)).toBe(false);
+        vi.advanceTimersByTime(10_000);
+        await waitFor(() => expect(isDisabled(find)).toBe(true));
     });
 });

@@ -17,7 +17,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { isDeviceOnline } from "@/features/devices/lib/device-relay";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { importRuleFiles } from "../lib/rule-file-import";
+import { importRuleTexts } from "../lib/rule-file-import";
 import type { RepoImportResult } from "./repo-rule-file-import";
 
 type FileId = "claude" | "codex" | "gemini" | "windsurf";
@@ -32,9 +32,15 @@ type FileEntry = {
     text?: string;
 };
 
-type Failure = "busy" | "denied" | "expired" | "failed" | "gone" | "limited" | "offline" | "outdated" | "unknown" | "unreadable";
+type Failure = "busy" | "denied" | "expired" | "failed" | "gone" | "limited" | "lost" | "offline" | "outdated" | "unknown" | "unreadable";
 
-type RunImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>) => void;
+type RunImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>, onApplied?: (added: ReadonlyArray<string>) => void) => void;
+
+/** A call and the computer it went to: what it found or read is that computer's, never another's. */
+type CallOn = { callId: string; deviceId: string };
+
+/** How often whether a computer is online is read again, so one that stops checking in shows offline. */
+const PRESENCE_CHECK_MS = 10_000;
 
 /** A refusal by its code (`devices/global-instructions.ts`): the backend's own (`data.code`) before the general one. */
 const REFUSALS: Readonly<Record<string, Failure>> = {
@@ -55,19 +61,33 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
-    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const deviceList = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const devices = deviceList.data;
     const start = useMutation(crpc.devices.global_instructions.startGlobalInstructionsCall.mutationOptions());
     const [chosenId, setChosenId] = useState<string | undefined>(undefined);
-    const [listCallId, setListCallId] = useState<string | undefined>(undefined);
-    const [readCallId, setReadCallId] = useState<string | undefined>(undefined);
+    const [listing, setListing] = useState<CallOn | undefined>(undefined);
+    const [reading, setReading] = useState<CallOn | undefined>(undefined);
     const [picked, setPicked] = useState<ReadonlySet<FileId>>(new Set());
     const [startFailure, setStartFailure] = useState<Failure | undefined>(undefined);
-    // When the panel opened: whether a computer is online is read against it (the backend checks again on send).
-    const [now] = useState(Date.now);
-    const activeCallId = readCallId ?? listCallId;
-    const { data: call } = useQuery(
+    // Whether a computer is online is read against it, again every few seconds (the backend checks again on send).
+    const [now, setNow] = useState(Date.now);
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), PRESENCE_CHECK_MS);
+
+        return () => clearInterval(timer);
+    }, []);
+
+    const desktops = (devices ?? []).filter((device) => device.viaDeviceId === undefined && device.transport === undefined);
+    const chosen = desktops.find((device) => device._id === chosenId) ?? desktops.find((device) => isDeviceOnline(device.lastSeenAt, now)) ?? desktops[0];
+    // What another computer found is not this one's: once the one listed is gone, the person lists again.
+    const listCallId = listing?.deviceId === chosen?._id ? listing?.callId : undefined;
+    const active = reading ?? (listCallId === undefined ? undefined : listing);
+    const activeCallId = active?.callId;
+    const { data: call, isError: callLost } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(activeCallId ? { callId: activeCallId as Id<"deviceCalls"> } : skipToken),
     );
+    const readCallId = reading?.callId;
     const { data: listed } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(listCallId ? { callId: listCallId as Id<"deviceCalls"> } : skipToken),
     );
@@ -89,7 +109,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const readFiles: FileEntry[] | undefined = readCallId && call?.status === "completed" ? call.files : undefined;
     const notRead = readFiles?.filter((file) => file.status !== "read") ?? [];
 
-    const readEnded = readCallId !== undefined && call !== undefined && call?.status !== "pending" && call?.status !== "claimed";
+    // Answered, or no longer to be heard of (its status could not be read): either way the import waits no more.
+    const readEnded = readCallId !== undefined && (callLost || (call !== undefined && call?.status !== "pending" && call?.status !== "claimed"));
 
     useEffect(() => {
         if (!readEnded) {
@@ -111,11 +132,14 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         [],
     );
 
-    const desktops = (devices ?? []).filter((device) => device.viaDeviceId === undefined && device.transport === undefined);
-    const chosen = desktops.find((device) => device._id === chosenId) ?? desktops.find((device) => isDeviceOnline(device.lastSeenAt, now)) ?? desktops[0];
     const online = chosen !== undefined && isDeviceOnline(chosen.lastSeenAt, now);
-    const name = chosen?.name ?? "";
+    // The computer asked, by its own name, even once another takes its place in the list.
+    const name = (desktops.find((device) => device._id === active?.deviceId) ?? chosen)?.name ?? "";
     const callFailure: Failure | undefined = (() => {
+        if (callLost) {
+            return "lost";
+        }
+
         if (!call || call.status === "completed" || call.status === "pending" || call.status === "claimed") {
             return undefined;
         }
@@ -124,7 +148,9 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     })();
     const failure = startFailure ?? callFailure;
     // A call just started has no answer yet (`call` is still undefined for its new key): it waits too, so a second click starts nothing.
-    const waiting = start.isPending || (activeCallId !== undefined && call === undefined) || call?.status === "pending" || call?.status === "claimed";
+    // A status no longer read waits for nothing, whatever it said before.
+    const waiting =
+        start.isPending || (!callLost && ((activeCallId !== undefined && call === undefined) || call?.status === "pending" || call?.status === "claimed"));
 
     const failureText: Record<Failure, string> = {
         busy: t`${name} is busy with other requests. Try again in a moment.`,
@@ -133,6 +159,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         failed: t`${name} could not read the files.`,
         gone: t`This computer is no longer paired. Pair it again in Settings → Devices.`,
         limited: t`Too many requests. Please try again in a moment.`,
+        lost: t`Lost track of the request to ${name}. Try again.`,
         offline: t`${name} is offline. Open the desktop app on it and try again.`,
         outdated: t`Update the desktop app on ${name} first.`,
         unknown: t`The request could not be sent.`,
@@ -140,77 +167,96 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     };
 
     const look = () => {
-        if (!chosen) {
+        if (!chosen || disabled) {
             return;
         }
 
-        setListCallId(undefined);
-        setReadCallId(undefined);
+        const deviceId = chosen._id;
+
+        // Kept to this computer, so another coming online does not take its place under the files it found.
+        setChosenId(deviceId);
+        setListing(undefined);
+        setReading(undefined);
         setStartFailure(undefined);
         start
-            .mutateAsync({ deviceId: chosen._id as Id<"devices"> })
-            .then(({ callId }) => setListCallId(callId))
+            .mutateAsync({ deviceId: deviceId as Id<"devices"> })
+            .then(({ callId }) => setListing({ callId, deviceId }))
             .catch((error: unknown) => setStartFailure(failureOf(error)));
     };
 
     /** Reads the ticked files inside the editor's import, so it is one import at a time and a Discard drops what comes. */
     const read = (files: FileId[]) => {
-        if (!chosen) {
+        if (!listing || listCallId === undefined || disabled) {
             return;
         }
 
-        const deviceId = chosen._id as Id<"devices">;
+        // The computer that found them, whatever is chosen by the time it answers.
+        const { deviceId } = listing;
+        let came: FileEntry[] = [];
+        let allRead = false;
 
         // The previous read's ended row must not answer this one.
-        setReadCallId(undefined);
+        setReading(undefined);
         setStartFailure(undefined);
-        runImport(async (isCurrent) => {
-            const answered = new Promise<FileEntry[] | null>((resolve) => {
-                pendingRead.current = resolve;
-            });
-            const started = await start.mutateAsync({ deviceId, files }).catch((error: unknown) => {
-                setStartFailure(failureOf(error));
+        runImport(
+            async (isCurrent) => {
+                const answered = new Promise<FileEntry[] | null>((resolve) => {
+                    pendingRead.current = resolve;
+                });
+                // A close settles `answered` with nothing: the import ends then, even while the start still waits.
+                const started = await Promise.race([
+                    start.mutateAsync({ deviceId: deviceId as Id<"devices">, files }).catch((error: unknown) => {
+                        setStartFailure(failureOf(error));
 
-                return undefined;
-            });
+                        return undefined;
+                    }),
+                    answered.then(() => undefined),
+                ]);
 
-            if (!started) {
-                pendingRead.current = undefined;
+                if (!started) {
+                    pendingRead.current = undefined;
 
-                return null;
-            }
+                    return null;
+                }
 
-            setReadCallId(started.callId);
+                setReading({ callId: started.callId, deviceId });
 
-            const answer = await answered;
+                const answer = await answered;
 
-            // Failed, closed or discarded meanwhile: nothing is added (a failure is said by the panel from the call).
-            if (!answer || !isCurrent()) {
-                return null;
-            }
+                // Failed, closed or discarded meanwhile: nothing is added (a failure is said by the panel from the call).
+                if (!answer || !isCurrent()) {
+                    return null;
+                }
 
-            const came = answer.flatMap((file) => (file.status === "read" && file.text !== undefined ? [file] : []));
-            const comeIds = new Set(came.map((file) => file.id));
+                came = answer.flatMap((file) => (file.status === "read" && file.text !== undefined ? [file] : []));
+                allRead = answer.every((file) => file.status === "read");
 
-            // Unticked once imported, so trying again for the rest does not add them twice.
-            setPicked((current) => new Set([...current].filter((id) => !comeIds.has(id))));
+                if (came.length === 0) {
+                    return null;
+                }
 
-            // Every ticked file came: the panel's work is done. Otherwise it stays to say which did not.
-            if (answer.every((file) => file.status === "read")) {
-                onClose();
-            }
+                // Each a tool's global instructions, so applied always and whole, Windsurf's `global_rules.md` too.
+                const imported = await importRuleTexts(
+                    came.map((file) => {
+                        return { path: file.name, text: () => file.text ?? "", whole: true };
+                    }),
+                    MAX_RULE_FILES,
+                );
 
-            if (came.length === 0) {
-                return null;
-            }
+                return { ...imported, duplicates: 0, notRead: 0, unreadable: [] };
+            },
+            (added) => {
+                const addedIds = new Set(came.flatMap((file) => (added.includes(file.name) ? [file.id] : [])));
 
-            const imported = await importRuleFiles(
-                came.map((file) => new File([file.text ?? ""], file.name)),
-                MAX_RULE_FILES,
-            );
+                // Those added are unticked, so trying again does not add them twice; those the project had no room for stay.
+                setPicked((current) => new Set([...current].filter((id) => !addedIds.has(id))));
 
-            return { ...imported, duplicates: 0, notRead: 0, unreadable: [] };
-        });
+                // Every ticked file came and was added: the panel's work is done. Otherwise it stays to say which did not.
+                if (allRead && addedIds.size === came.length) {
+                    onClose();
+                }
+            },
+        );
     };
 
     const sizeOf = (bytes: number): string => t`${formatNumber(Math.max(1, Math.ceil(bytes / 1024)), i18n.locale)} KB`;
@@ -237,6 +283,16 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             <h4 className="text-sm font-medium" id={headingId} tabIndex={-1}>
                 {t`Import from this computer`}
             </h4>
+            {deviceList.isError && !devices && (
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-destructive text-sm" role="alert">
+                        {t`Your computers could not be loaded.`}
+                    </p>
+                    <Button onClick={() => deviceList.refetch().catch(() => undefined)} size="sm" type="button" variant="outline">
+                        {t`Try again`}
+                    </Button>
+                </div>
+            )}
             {devices && desktops.length === 0 && <p className="text-sm">{t`Pair the desktop app in Settings → Devices to import from a computer.`}</p>}
             {desktops.length > 1 && (
                 <RadioGroup
@@ -244,8 +300,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     disabled={waiting}
                     onValueChange={(value) => {
                         setChosenId(String(value));
-                        setListCallId(undefined);
-                        setReadCallId(undefined);
+                        setListing(undefined);
+                        setReading(undefined);
                         setStartFailure(undefined);
                     }}
                     value={chosen?._id}
@@ -327,7 +383,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     </Button>
                 ) : (
                     chosen && (
-                        <Button disabled={waiting || !online} focusableWhenDisabled onClick={look} size="sm" type="button">
+                        <Button disabled={disabled || waiting || !online} focusableWhenDisabled onClick={look} size="sm" type="button">
                             {t`Find files`}
                         </Button>
                     )

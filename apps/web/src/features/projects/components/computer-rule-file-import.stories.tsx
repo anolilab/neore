@@ -168,6 +168,50 @@ export const AnswerUnreadable: Story = {
     },
 };
 
+/** The list of computers could not be loaded: said, with a way to try again. */
+export const DevicesFailed: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...userFixtures(), lunoraError(api.devices.functions.listDevices, "INTERNAL", "The database is unavailable.", 500)),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(canvas.getByRole("button", { name: "Import from this computer" }));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("Your computers could not be loaded.");
+        await expect(canvas.getByRole("button", { name: "Try again" })).toBeEnabled();
+    },
+};
+
+/** The request's status could not be read: it waits no more, says so, and can be sent again. */
+export const RequestLost: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    devices([desktop]),
+                    started,
+                    lunoraError(api.devices.global_instructions.getGlobalInstructionsCall, "INTERNAL", "The database is unavailable.", 500),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(canvas.getByRole("button", { name: "Import from this computer" }));
+        await userEvent.click(await canvas.findByRole("button", { name: "Find files" }));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("Lost track of the request to Studio. Try again.");
+        await expect(canvas.getByRole("button", { name: "Find files" })).toBeEnabled();
+    },
+};
+
 /** No desktop is paired: the panel says how to pair one. */
 export const NoComputer: Story = {
     parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), devices([])) } } },

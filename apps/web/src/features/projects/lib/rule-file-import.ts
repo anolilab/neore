@@ -326,15 +326,16 @@ export const isWholeInstructionFile = (path: string): boolean => !path.replaceAl
 
 /**
  * One imported file as a rule file, or `null` for one that is not Markdown. `path` is its path from the top of what was
- * imported: only a root instruction file there is `always` whole; in a folder it is read like any rule file.
+ * imported: only a root instruction file there is `always` whole; in a folder it is read like any rule file. `whole`
+ * says so for a file known by where it came from (a tool's global instructions, such as Windsurf's `global_rules.md`).
  */
-export const toImportedRuleFile = (path: string, raw: string): ImportedRuleFile | null => {
+export const toImportedRuleFile = (path: string, raw: string, whole: boolean = isWholeInstructionFile(path)): ImportedRuleFile | null => {
     const slash = path.replaceAll("\\", "/").lastIndexOf("/");
     const name = path.slice(slash + 1);
     // A byte-order mark would hide the front matter.
     const text = raw.startsWith("\u{FEFF}") ? raw.slice(1) : raw;
 
-    if (isWholeInstructionFile(path)) {
+    if (whole) {
         return { content: text, description: "", mode: "always", patterns: "", title: name };
     }
 
@@ -420,7 +421,7 @@ export interface ImportedRuleTexts {
  * share it.
  */
 export const importRuleTexts = async (
-    entries: ReadonlyArray<{ path: string; text: () => Promise<string> | string }>,
+    entries: ReadonlyArray<{ path: string; text: () => Promise<string> | string; whole?: boolean }>,
     room: number,
 ): Promise<ImportedRuleTexts> => {
     const sorted = entries.toSorted((left, right) => left.path.localeCompare(right.path));
@@ -429,7 +430,7 @@ export const importRuleTexts = async (
 
     for (const entry of sorted) {
         // A name alone decides whether it is taken, before its text is read.
-        if (toImportedRuleFile(entry.path, "") === null) {
+        if (toImportedRuleFile(entry.path, "", entry.whole) === null) {
             continue;
         }
 
@@ -438,7 +439,7 @@ export const importRuleTexts = async (
             continue;
         }
 
-        const ruleFile = toImportedRuleFile(entry.path, await entry.text());
+        const ruleFile = toImportedRuleFile(entry.path, await entry.text(), entry.whole);
 
         if (ruleFile) {
             imported.push({ ...ruleFile, path: entry.path });
