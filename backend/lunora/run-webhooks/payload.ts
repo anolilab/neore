@@ -6,6 +6,8 @@
  * The signature is the inbound trigger scheme (`triggers/http.ts`) turned
  * around, so a receiver verifies it with the code it already has for trigger
  * webhooks:
+ *   X-Neore-Event:     the event's type, e.g. "webhook.test"
+ *   X-Neore-Event-Id:  the event's id, the same on every redelivery
  *   X-Neore-Timestamp: <unix seconds>
  *   X-Signature-256:   sha256=<hex HMAC-SHA256(secret, "<timestamp>.<raw body>")>
  *
