@@ -409,6 +409,37 @@ describe("data export workflow: browser data", () => {
         expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([firstKey.slice(0, -"0.json".length)]);
     });
 
+    it("ends the export ready with its file when the page cleanup fails for good, and leaves the pages to the sweep", async () => {
+        stubs["browser_gdpr:deleteBrowserExportPages"] = () => {
+            throw new Error("storage unavailable");
+        };
+
+        await execute();
+
+        expect(progressWith("completed").map((call) => call.args["storageId"])).toEqual(["storage-1"]);
+        expect(progressWith("failed")).toHaveLength(0);
+        expect(ran("notifications_functions:createNotification").map((call) => call.args["outcome"])).toEqual(["success"]);
+        expect(ran("gdpr_steps:sendExportReadyEmail")).toHaveLength(1);
+        // The run's record stays, with its pieces, so the sweep finds the pages through it; the usage object goes all the same.
+        expect(ran("usage_gdpr:clearUsageExportPieces")).toHaveLength(0);
+        expect(ran("gdpr_steps:deleteUsageJson")).toHaveLength(1);
+    });
+
+    it("still marks a failed export failed and tells the user when the page cleanup fails for good", async () => {
+        stubs["browser_gdpr:deleteBrowserExportPages"] = () => {
+            throw new Error("storage unavailable");
+        };
+        generate = () => {
+            throw new Error("boom");
+        };
+
+        await execute();
+
+        expect(progressWith("failed")).toHaveLength(1);
+        expect(ran("notifications_functions:createNotification").map((call) => call.args["outcome"])).toEqual(["failure"]);
+        expect(ran("usage_gdpr:clearUsageExportPieces")).toHaveLength(0);
+    });
+
     it.each([
         { exported: true, name: "the ready notice after the file is stored" },
         { exported: false, name: "the failure notice after the file failed" },

@@ -741,6 +741,18 @@ describe("the sweep and the clear", () => {
         expect(await countOf("usageExportRuns", A)).toBe(0);
     });
 
+    it("keeps the run's record for a discarded pass, so the sweep still finds the run's browser pages", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportPieces", piece("clr:discard", A));
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "clr:discard", userId: A });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(clearUsageExportPieces, { keepRun: true, requestId: "clr:discard", userId: A }));
+
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(await countOf("usageExportRuns", A)).toBe(1);
+    });
+
     it("keeps a run's record when it holds a stored object, since that record is the object's only one", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "clr:keyed", usageKey: "gdpr-exports/clr.json", userId: A });

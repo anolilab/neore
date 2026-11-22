@@ -381,12 +381,13 @@ export const sweepUsageExportPieces = internalMutation
 
 /**
  * Deletes one batch of a run's pieces and index rows, and the run's row once none is left. The caller runs this only after the run's
- * usage object is deleted. `hasMore` while a batch came back full.
+ * usage object is deleted. `hasMore` while a batch came back full. `keepRun` keeps the record all the same: a discarded pass's run goes
+ * on, and its browser pages are found by the sweep through that record.
  */
 export const clearUsageExportPieces = internalMutation
-    .input({ requestId: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ keepRun: v.optional(v.boolean()), requestId: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ hasMore: v.boolean() }))
-    .mutation(async ({ args: { requestId, userId }, ctx }) => {
+    .mutation(async ({ args: { keepRun, requestId, userId }, ctx }) => {
         const { page } = await ctx.db.usageExportPieces.findMany({
             consistency: "primary",
             limit: EXPORT_PIECE_BATCH,
@@ -399,7 +400,7 @@ export const clearUsageExportPieces = internalMutation
 
         await Promise.all(projects.page.map(async (row) => await ctx.db.delete("usageExportProjects", row._id)));
 
-        if (!fullPieces(page) && !fullPieces(projects.page)) {
+        if (keepRun !== true && !fullPieces(page) && !fullPieces(projects.page)) {
             const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { requestId, userId } });
 
             // A run with a stored object keeps its record: it is the object's only record, and the purge releases it.

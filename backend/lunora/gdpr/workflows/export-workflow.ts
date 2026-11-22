@@ -20,6 +20,7 @@ import { LunoraError } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
+import { gdprLogger } from "../../lib/logger";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
 import type { BrowserExportCursor } from "../../browser/gdpr";
@@ -223,18 +224,35 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             );
         };
 
-        // The run's stored browser pages. Deleted once the export file's step has ended, either way, before any step that can fail for
-        // good, so no later failure leaves them; a run killed before then is left to the sweep (`usage/gdpr.ts`).
+        // Set when the run's browser pages could not be deleted: the run's record then stays, with its pieces, so the sweep removes the
+        // pages through it (`usage/gdpr.ts`), as account erasure does under the user's prefix.
+        let browserPagesLeft = false;
+
+        // The run's stored browser pages, deleted once the export file's step has ended, either way. Best-effort: a cleanup that fails for
+        // good is logged and left to the sweep, and never decides the export's outcome, so a finished file is still recorded and announced.
         const deleteBrowserPages = async (): Promise<void> => {
-            await context.step.do(
-                "delete-browser-pages",
-                async () =>
-                    await context.run(
-                        internal.browser.gdpr.deleteBrowserExportPages,
-                        { prefix: browserPrefix },
-                        { dedupId: stepDedupId(scope, "delete-browser-pages") },
-                    ),
-            );
+            try {
+                await context.step.do(
+                    "delete-browser-pages",
+                    async () =>
+                        await context.run(
+                            internal.browser.gdpr.deleteBrowserExportPages,
+                            { prefix: browserPrefix },
+                            { dedupId: stepDedupId(scope, "delete-browser-pages") },
+                        ),
+                );
+            } catch (error) {
+                browserPagesLeft = true;
+                gdprLogger.error(`Browser pages of export ${requestId} were not deleted; the sweep removes them`, error);
+            }
+        };
+
+        // Clears the run's pieces, and with the last of them its record. Skipped while browser pages are left: the record is what the
+        // sweep finds them by, and the sweep clears the pieces too.
+        const clearRunPieces = async (): Promise<void> => {
+            if (!browserPagesLeft) {
+                await clearUsagePieces(usageIo);
+            }
         };
 
         const failExport = async (message: string): Promise<void> => {
@@ -243,7 +261,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // Refused once the export was cancelled: nothing is announced, and the usage is cleared all the same.
             if (failed === false) {
                 await deleteUsageObject();
-                await clearUsagePieces(usageIo);
+                await clearRunPieces();
 
                 return;
             }
@@ -269,7 +287,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // A failed export keeps nothing: its usage object and its pieces hold the user's usage, and no file was stored from them.
             // The object goes first, so a failed clear cannot leave it behind.
             await deleteUsageObject();
-            await clearUsagePieces(usageIo);
+            await clearRunPieces();
         };
 
         let storageId: Id<"_storage"> | undefined;
@@ -280,8 +298,12 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // durable checkpoint, so a retry resumes at the first step that did not finish. The pieces are keyed by the run, not
         // the request, so two runs of one request never share them.
         const usageIo: UsageExportIo = {
-            clear: async (name) =>
-                (await context.run(internal.usage.gdpr.clearUsageExportPieces, { requestId: scope, userId }, { dedupId: stepDedupId(scope, name) })) as {
+            clear: async (name, keepRun) =>
+                (await context.run(
+                    internal.usage.gdpr.clearUsageExportPieces,
+                    { keepRun, requestId: scope, userId },
+                    { dedupId: stepDedupId(scope, name) },
+                )) as {
                     hasMore: boolean;
                 },
             clearVerified: async (name, pass) =>
@@ -427,7 +449,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // Refused once the export was cancelled: nothing is announced, and the usage is cleared as a failed export's is.
         if ((await progress({ progress: 100, status: "completed", storageId })) === false) {
             await deleteUsageObject();
-            await clearUsagePieces(usageIo);
+            await clearRunPieces();
 
             return;
         }
@@ -472,7 +494,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // The usage object it was read from, and the run's pieces, are no longer needed. They go after the audit: a cleanup that fails
         // permanently leaves the sweep to remove them, and must not hide the export's record.
         await deleteUsageObject();
-        await clearUsagePieces(usageIo);
+        await clearRunPieces();
     },
 };
 
