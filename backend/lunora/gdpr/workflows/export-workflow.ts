@@ -362,7 +362,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                     async () =>
                         await context.run(
                             internal.browser.gdpr.storeBrowserExportPage,
-                            { cursor, key: browserExportPageKey(browserPrefix, page), userId },
+                            { cursor, key: browserExportPageKey(browserPrefix, page), runKey: scope, userId },
                             { dedupId: stepDedupId(scope, name) },
                         ),
                 )) as { next?: BrowserExportCursor };

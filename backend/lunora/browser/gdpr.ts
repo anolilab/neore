@@ -531,26 +531,28 @@ export const collectBrowserForExport = internalQuery
 
 /**
  * One page of the export, read in this action's own request and stored at `key`; only its `next` cursor goes back to the workflow.
- * Nothing is stored once the account's deletion has begun, and a page whose write ends after it began is deleted again: erasure
- * lists the user's prefix only after its deletion began, so it finds every page written before then, and this removes the rest.
+ * Nothing is stored once the run has stopped (`usage/gdpr.ts#exportRunStopped`: the account's deletion has begun, or the run's request
+ * is no longer in flight), and a page whose write ends after it stopped is deleted again. Erasure lists the user's prefix only after its
+ * deletion began, and the sweep lists the run's prefix only after it found the request ended, so each finds every page written before
+ * then, and this removes the rest: a page written as the sweep releases the run's record is never left with no record to find it.
  */
 export const storeBrowserExportPage = internalAction
-    .input({ cursor: v.optional(vBrowserExportCursor), key: v.string(), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ cursor: v.optional(vBrowserExportCursor), key: v.string(), runKey: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ next: v.optional(vBrowserExportCursor) }))
-    .action(async ({ args: { cursor, key, userId }, ctx }) => {
-        const stopIfDeleting = async (written: boolean): Promise<void> => {
-            if ((await ctx.runQuery(internal.usage.gdpr.exportDeletionBegun, { userId })) !== true) {
+    .action(async ({ args: { cursor, key, runKey, userId }, ctx }) => {
+        // The page's object is deleted whenever the run has stopped, before the write too: a retried step whose earlier attempt
+        // stored the page but failed its check after the write would otherwise leave that object behind.
+        const stopIfRunStopped = async (): Promise<void> => {
+            if ((await ctx.runQuery(internal.usage.gdpr.exportRunStopped, { runKey, userId })) !== true) {
                 return;
             }
 
-            if (written) {
-                await withDependency("file storage", () => ctx.storage.delete(key));
-            }
+            await withDependency("file storage", () => ctx.storage.delete(key));
 
-            throw new LunoraError("CONFLICT", "Account deletion is underway; the export stops");
+            throw new LunoraError("CONFLICT", "The export has stopped: its request ended or the account's deletion is underway");
         };
 
-        await stopIfDeleting(false);
+        await stopIfRunStopped();
 
         const read = async (cautious: boolean): Promise<BrowserExportPage> =>
             (await ctx.runQuery(internal.browser.gdpr.collectBrowserForExport, { cautious, cursor, userId })) as BrowserExportPage;
@@ -567,7 +569,7 @@ export const storeBrowserExportPage = internalAction
             ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: PAGE_MAX_BYTES }),
         );
 
-        await stopIfDeleting(true);
+        await stopIfRunStopped();
 
         return next === undefined ? {} : { next };
     });

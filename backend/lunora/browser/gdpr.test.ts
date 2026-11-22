@@ -6,6 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { exportRunStopped } from "../usage/gdpr";
 import { browserExportPageKey, browserExportPrefix, type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
 import { collectBrowserForExport, deleteBrowserExportPages, deleteUserBrowserExportPages, EXPORT_FIELD_BYTES, storeBrowserExportPage } from "./gdpr";
 
@@ -295,17 +296,18 @@ describe("browser export page stored", () => {
             storage: { store: async () => "key" },
         };
 
-        await (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", userId: A });
+        await (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", runKey: "request-1:instance-1", userId: A });
 
         expect(reads).toEqual([false, true]);
     });
 
     it.each([
-        { begun: [true], name: "stores nothing once the account's deletion has begun", stored: [] },
-        { begun: [false, true], name: "deletes its page again when the deletion began during the write", stored: [] },
-        { begun: [false, false], name: "keeps its page when no deletion began", stored: ["k"] },
+        { begun: [true], name: "stores nothing once the run has stopped, and deletes a page an earlier attempt stored", stored: [] },
+        { begun: [false, true], name: "deletes its page again when the run stopped during the write", stored: [] },
+        { begun: [false, false], name: "keeps its page while the run goes on", stored: ["k"] },
     ])("$name", async ({ begun, stored }) => {
-        const objects = new Set<string>();
+        // The page an earlier attempt of the step stored before its check after the write failed.
+        const objects = new Set<string>(["k"]);
         const checks = [...begun];
         const ctx = {
             runQuery: async (_reference: unknown, args: { cautious?: boolean }) =>
@@ -315,10 +317,40 @@ describe("browser export page stored", () => {
                 store: async (key: string) => objects.add(key),
             },
         };
-        const run = (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", userId: A });
+        const run = (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", runKey: "request-1:instance-1", userId: A });
 
-        await (stored.length > 0 ? expect(run).resolves.toEqual({}) : expect(run).rejects.toThrow("Account deletion is underway"));
+        await (stored.length > 0 ? expect(run).resolves.toEqual({}) : expect(run).rejects.toThrow("The export has stopped"));
         expect([...objects]).toEqual(stored);
+    });
+
+    it("deletes a page written while a cancelled run's sweep deleted its pages and released its record", async () => {
+        const request = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "export", status: "processing", userEmail: "a@example.com", userId: A }),
+        );
+        const runKey = `${String(request)}:instance-1`;
+        const prefix = browserExportPrefix(A, runKey);
+        const { storage, stored } = storageOf([browserExportPageKey(prefix, 0)]);
+        const key = browserExportPageKey(prefix, 1);
+        const ctx = {
+            runQuery: async (_reference: unknown, args: Record<string, unknown>) =>
+                "cursor" in args || "cautious" in args
+                    ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
+                    : await harness.run(async (inner: any) => await inner.runQuery(exportRunStopped, args)),
+            storage: {
+                ...storage,
+                // The request is cancelled and the sweep's deletion runs while this page is being written: it lists the run's prefix
+                // before this page lands, and releases the run's record, so no later sweep would find this page.
+                store: async (written: string) => {
+                    await harness.run(async (inner: any) => await inner.db.patch("gdprRequests", request, { status: "cancelled" }));
+                    await (deleteBrowserExportPages as unknown as StoreHandler).handler({ runMutation: async () => null, storage }, { prefix, runId: "run-1" });
+                    stored.add(written);
+                },
+            },
+        };
+
+        await expect((storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key, runKey, userId: A })).rejects.toThrow("The export has stopped");
+        expect([...stored]).toStrictEqual([]);
     });
 });
 

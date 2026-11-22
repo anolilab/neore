@@ -533,11 +533,15 @@ export const deletionUnderwayOnPrimary = async (ctx: MutationCtx | QueryCtx, use
     return Boolean(request);
 };
 
-/** {@link deletionUnderwayOnPrimary} for an action of the export run, which checks it before and after each browser page it stores. */
-export const exportDeletionBegun = internalQuery
-    .input({ userId: v.string().max(MAX_LENGTH.id) })
+/**
+ * Whether an export run may no longer store anything: the account's deletion has begun ({@link deletionUnderwayOnPrimary}), or the run's
+ * request is no longer in flight (cancelled, failed, done or gone), which is how the sweep finds the run dead and deletes its pages. Checked
+ * before and after each browser page the run stores, so a page written as the sweep released the run is deleted by its writer.
+ */
+export const exportRunStopped = internalQuery
+    .input({ runKey: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.boolean())
-    .query(async ({ args: { userId }, ctx }) => await deletionUnderwayOnPrimary(ctx, userId));
+    .query(async ({ args: { runKey, userId }, ctx }) => (await deletionUnderwayOnPrimary(ctx, userId)) || !(await isRunLive(ctx, runKey, userId)));
 
 /** The user's backfill row as the export compares it: a change to any of these during the export is history written meanwhile. */
 const backfillFingerprint = async (ctx: MutationCtx | QueryCtx, userId: string): Promise<string> => {
