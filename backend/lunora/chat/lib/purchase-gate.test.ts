@@ -177,3 +177,13 @@ describe("the approval an approved tool call runs with", () => {
         expect([...approvedToolCallIds(approvalMessagesFor("approval-7", "call-7"))]).toEqual(["call-7"]);
     });
 });
+
+describe("isPurchaseText for ordinary link text", () => {
+    it.each(["Check out our new arrivals", "Zahlen & Fakten", "Zahlen", "Read the payroll report"])("does not read %j as a purchase", (text) => {
+        expect(isPurchaseText(text)).toBe(false);
+    });
+
+    it.each(["Jetzt zahlen", "Jetzt bezahlen", "Checkout", "Pay now"])("still reads %j as a purchase", (text) => {
+        expect(isPurchaseText(text)).toBe(true);
+    });
+});

@@ -13,12 +13,12 @@
  * break or a non-breaking space inside a phrase does not hide it.
  */
 const PURCHASE_PATTERNS: ReadonlyArray<RegExp> = [
-    /\b(?:pay|buy|purchase|checkout|check out)\b/iu,
+    /\b(?:pay|buy|purchase|checkout)\b/iu,
     /\b(?:place|complete|confirm|submit) (?:your )?(?:order|purchase)\b/iu,
     /\border now\b/iu,
     /\b(?:confirm|submit|complete|make|proceed to|continue to) (?:the )?payment\b/iu,
     /\b(?:bezahlen|bezahle|kaufen|kaufe|bestellen|bestelle)\b/iu,
-    /\b(?:zahlen|zahle)\b/iu,
+    /\bjetzt (?:zahlen|zahle|bezahlen)\b/iu,
     /\bbestellung (?:aufgeben|abschicken|absenden|abschließen)\b/iu,
     /\bkauf abschließen\b/iu,
     /\bzur kasse\b/iu,

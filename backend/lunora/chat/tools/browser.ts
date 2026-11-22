@@ -65,6 +65,21 @@ export interface BrowserResult {
 }
 
 /**
+ * Whether the user has a browser action left this hour, charged and given back at once. A click with none left reads
+ * nothing: its target looks are not charged, so without this check each attempt would still open a renderer call.
+ */
+const hasBrowserActionLeft = async (context: ToolContext, userId: string): Promise<boolean> => {
+    const key = `browser/action:${context.userTier ?? "free"}`;
+    const probe = await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key });
+
+    if (probe.ok) {
+        await context.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key });
+    }
+
+    return probe.ok;
+};
+
+/**
  * Browser Automation Tool
  */
 const browserTool = createTool<
@@ -148,6 +163,11 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
 
             // An empty selector is no selector: the renderer refuses that click, so no look runs for it.
             if (action === "click" && input.selector) {
+                // Out of browser actions this hour: refused before any look, as the renderer would refuse the click.
+                if (!(await hasBrowserActionLeft(context, userId))) {
+                    return { error: "Browser automation rate limit exceeded.", success: false };
+                }
+
                 if (approvedToolCallIds(options.messages).has(options.toolCallId)) {
                     step = { ...step, approvedCallId: options.toolCallId };
                 } else {
@@ -254,6 +274,12 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
         }
 
         const { threadId, userId } = context;
+
+        // A click the hour's budget cannot run asks nothing: `execute` refuses it before any look, so no card is shown for it.
+        if (input.action === "click" && input.selector && !(await hasBrowserActionLeft(context, userId))) {
+            return false;
+        }
+
         // In `ask` mode (`looksBeforeAsk`) the call asks whatever the read says, but the read still keeps its target for the click.
         const asking = (options as { asking?: boolean }).asking === true;
 

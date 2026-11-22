@@ -376,7 +376,11 @@ const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse):
     }
 
     return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
-        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
+        // A call made after the lapse asks, so the tool's own check is asked as an ask is (`asking`): its decision keeps the
+        // target it reads, and the approved click is checked against it. A call inside the grant is looked at as before.
+        const isLapsed = Date.now() >= expiresAt;
+        const ownOptions = isLapsed ? ({ ...(options as NeedsApprovalOptions), asking: true } as never) : options;
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, ownOptions);
         const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
 
         return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);

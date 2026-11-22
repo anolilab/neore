@@ -281,36 +281,41 @@ export function readTarget(
         }
     }
 
-    let destinations = "";
-
-    for (const node of nodes) {
-        // The resolved address (the `href` and `formAction` properties), not the raw attribute: a `<base>` change or a relative
-        // path moves the same attribute to another site.
-        const link = node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement ? node.href : "";
-        const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
-        // A button's type decides whether its click submits the form ("submit" by default, "button" does not): a change to it
-        // is a change of what the click does.
-        // What a submit sends with the form: a submit control's name and value (an order intent is often a value), and how it
-        // submits (its method). A text field's value is never read: a person may have typed into it.
-        const submitter = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node : null;
-        const isSubmitValued =
-            submitter instanceof HTMLButtonElement ||
-            (submitter instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(submitter.type));
-        const kind = submitter === null ? "" : [submitter.type, submitter.name, isSubmitValued ? submitter.value : "", submitter.formMethod].join("#");
-
-        destinations += `${link}|${formTarget}|${kind}|`;
-    }
-
-    // The form's destination is the browser's own resolved `action` (its native getter, through the prototype): a field named
-    // "action" (or "querySelector") in the form would otherwise shadow the form's own property, and a `<base>` change moves
-    // the destination the browser submits to, which resolving the raw attribute against the page address would miss.
+    // The form the getter reads (a field named "action" would shadow the form's own property, so the prototype's getter is used).
     const formActionGetter = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "action")?.get;
+    // The click's destinations, as the page holds them. A function, inside an array so the bundler does not name it: it runs for
+    // the fingerprint, and again after the page's own click handlers, which can move a destination during the click.
+    const [destinationsOf] = [
+        (): string => {
+            let destinations = "";
+
+            for (const node of nodes) {
+                // The resolved address (the `href` and `formAction` properties), not the raw attribute: a `<base>` change or a relative
+                // path moves the same attribute to another site.
+                const link = node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement ? node.href : "";
+                const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
+                // A button's type decides whether its click submits the form ("submit" by default, "button" does not): a change to it
+                // is a change of what the click does.
+                // What a submit sends with the form: a submit control's name and value (an order intent is often a value), and how it
+                // submits (its method). A text field's value is never read: a person may have typed into it.
+                const submitter = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node : null;
+                const isSubmitValued =
+                    submitter instanceof HTMLButtonElement ||
+                    (submitter instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(submitter.type));
+                const kind = submitter === null ? "" : [submitter.type, submitter.name, isSubmitValued ? submitter.value : "", submitter.formMethod].join("#");
+
+                destinations += `${link}|${formTarget}|${kind}|`;
+            }
+
+            // The form's method is part of what a submit does (a GET form puts its fields in the address).
+            destinations += enclosingForm === null ? "" : `|${Element.prototype.getAttribute.call(enclosingForm, "method") ?? ""}`;
+
+            // The form's destination: the browser's own resolved `action`, read through the native getter. A `<base>` change moves it.
+            return destinations + (enclosingForm === null || formActionGetter === undefined ? "" : String(formActionGetter.call(enclosingForm)));
+        },
+    ];
+    const destinations = destinationsOf();
     const formAction = enclosingForm === null || formActionGetter === undefined ? "" : String(formActionGetter.call(enclosingForm));
-
-    // The form's method is part of what a submit does (a GET form puts its fields in the address).
-    destinations += enclosingForm === null ? "" : `|${Element.prototype.getAttribute.call(enclosingForm, "method") ?? ""}`;
-
-    destinations += formAction;
 
     // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
@@ -418,8 +423,34 @@ export function readTarget(
         } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden") {
             refused = "hidden";
         } else {
+            // The page's own click handlers run during this click, before the browser submits or follows the element's destination. A
+            // destination one of them moved is refused: a canceled click activates nothing. The listener is on the window, the last of
+            // the bubble phase, so it sees the handlers that ran before it; the abort ends it once the click is done.
+            const stop = new AbortController();
+            let isMoved = false;
+
+            const clickScope = globalThis;
+
+            clickScope.addEventListener(
+                "click",
+                (event) => {
+                    if (destinationsOf() === destinations) {
+                        return;
+                    }
+
+                    isMoved = true;
+                    event.preventDefault();
+                },
+                { signal: stop.signal },
+            );
             control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
-            isClicked = true;
+            stop.abort();
+
+            isClicked = !isMoved;
+
+            if (isMoved) {
+                refused = "changed";
+            }
         }
     }
 

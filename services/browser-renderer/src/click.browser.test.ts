@@ -146,4 +146,46 @@ describe("readTarget in a page", () => {
 
         expect(after.target).not.toBe(before.target);
     });
+
+    it("a click whose page moves the form destination in its own click handler is refused, and nothing is submitted", async () => {
+        await pageWith(page, `<form id="order" action="/cart/confirm"><button id="pay" type="submit">Pay now</button></form>`);
+        await page.evaluate(() => {
+            document.querySelector("form")!.addEventListener("submit", (event) => {
+                document.body.dataset.submitted = "true";
+                event.preventDefault();
+            });
+        });
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        // The page moves its form's destination on the click, after the check and before the browser would submit.
+        await page.evaluate(() => {
+            document.addEventListener("click", () => {
+                document.querySelector("form")!.setAttribute("action", "/elsewhere");
+            });
+        });
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("changed");
+        expect(read.clicked).toBe(false);
+        expect(await page.evaluate(() => document.body.dataset.submitted === "true")).toBe(false);
+    });
+
+    it("a click whose destination does not move submits as it always did", async () => {
+        await pageWith(page, `<form id="order" action="/cart/confirm"><button id="pay" type="submit">Pay now</button></form>`);
+        await page.evaluate(() => {
+            document.querySelector("form")!.addEventListener("submit", (event) => {
+                document.body.dataset.submitted = "true";
+                event.preventDefault();
+            });
+        });
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        expect(read.clicked).toBe(true);
+        expect(await page.evaluate(() => document.body.dataset.submitted === "true")).toBe(true);
+    });
 });
