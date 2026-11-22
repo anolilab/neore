@@ -46,6 +46,28 @@ describe("provider cache rollups", () => {
         ]);
     });
 
+    it("starts an hour shortened or repeated by a half-hour clock change where it really begins", () => {
+        // Lord Howe moves from 01:59 (UTC+10:30) to 02:30 (UTC+11:00) on 2026-10-04: 15:30Z is 02:30, and 02:00 never happens.
+        const springForward = [
+            quarter("2026-10-03T15:15:00.000Z", 100, 10),
+            quarter("2026-10-03T15:30:00.000Z", 100, 20),
+            quarter("2026-10-03T15:45:00.000Z", 100, 30),
+        ];
+
+        expect(byHour(springForward, "Australia/Lord_Howe")).toEqual([
+            { cachedTokens: 10, promptTokens: 100, requests: 1, start: "2026-10-03T14:30:00.000Z" },
+            { cachedTokens: 50, promptTokens: 200, requests: 2, start: "2026-10-03T15:30:00.000Z" },
+        ]);
+
+        // On 2026-04-05, 01:30–02:00 repeats: 14:45Z is 01:45 at UTC+11:00, 15:15Z is 01:45 again at UTC+10:30.
+        const fallBack = [quarter("2026-04-04T14:45:00.000Z", 100, 10), quarter("2026-04-04T15:15:00.000Z", 100, 20)];
+
+        expect(byHour(fallBack, "Australia/Lord_Howe")).toEqual([
+            { cachedTokens: 10, promptTokens: 100, requests: 1, start: "2026-04-04T14:00:00.000Z" },
+            { cachedTokens: 20, promptTokens: 100, requests: 1, start: "2026-04-04T15:00:00.000Z" },
+        ]);
+    });
+
     it("uses the configured time zone when Intl knows it, else the fallback, else UTC", () => {
         expect(resolveTimeZone("Europe/Berlin", "Asia/Tokyo")).toBe("Europe/Berlin");
         expect(resolveTimeZone("Not/AZone", "Asia/Tokyo")).toBe("Asia/Tokyo");

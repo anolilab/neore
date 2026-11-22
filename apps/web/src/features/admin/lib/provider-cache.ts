@@ -60,6 +60,7 @@ const partsIn = (iso: string, timeZone: string): Partial<Record<Intl.DateTimeFor
         minute: "2-digit",
         month: "2-digit",
         timeZone,
+        timeZoneName: "longOffset",
         year: "numeric",
     }).formatToParts(new Date(iso));
 
@@ -75,23 +76,46 @@ export const dayKeyIn = (iso: string, timeZone: string): string => {
 
 const MINUTE_MS = 60_000;
 
+const QUARTER_MS = 15 * MINUTE_MS;
+
+/** The local hour `iso` falls in, with its UTC offset: `YYYY-MM-DD HH GMT+hh:mm`. An hour that repeats has two offsets. */
+const hourKeyIn = (iso: string, timeZone: string): string => {
+    const parts = partsIn(iso, timeZone);
+
+    return `${parts.year ?? ""}-${parts.month ?? ""}-${parts.day ?? ""} ${parts.hour ?? ""} ${parts.timeZoneName ?? ""}`;
+};
+
+/**
+ * The first quarter hour of the local hour `startMs` falls in. Going back by its local minutes finds it, unless that
+ * crosses a clock change (Australia/Lord_Howe moves by 30 minutes): then it lands in another hour or offset, and the
+ * first quarter after it that is still in this hour is the hour's real start, as 02:30 is when 02:00–02:30 is skipped.
+ */
+const localHourStart = (startMs: number, timeZone: string): number => {
+    const iso = new Date(startMs).toISOString();
+    const key = hourKeyIn(iso, timeZone);
+    let candidate = startMs - Number(partsIn(iso, timeZone).minute ?? 0) * MINUTE_MS;
+
+    while (candidate < startMs && hourKeyIn(new Date(candidate).toISOString(), timeZone) !== key) {
+        candidate += QUARTER_MS;
+    }
+
+    return candidate;
+};
+
 const sumInto = <Key>(groups: Map<Key, CacheCounts>, key: Key, counts: CacheCounts): void => {
     groups.set(key, sumCounts([groups.get(key) ?? { cachedTokens: 0, promptTokens: 0, requests: 0 }, counts]));
 };
 
 /**
- * Quarter hours summed into the hours of `timeZone`, oldest first; `start` is the local hour's start as an ISO string.
- * Every zone's offset is a whole number of quarter hours, so a quarter never straddles two local hours, and an hour
- * that repeats when clocks go back stays two hours, since each has its own UTC start.
+ * Quarter hours summed into the hours of `timeZone`, oldest first; `start` is the local hour's first instant as an ISO
+ * string. Every zone's offset is a whole number of quarter hours, so a quarter never straddles two local hours. An hour
+ * that repeats when clocks go back stays two hours, and one shortened by a clock change starts where it really begins.
  */
 export const byHour = (quarters: QuarterReading[], timeZone: string): (CacheCounts & { start: string })[] => {
     const hours = new Map<number, CacheCounts>();
 
     for (const quarter of quarters) {
-        const startMs = Date.parse(quarter.start);
-        const localMinute = Number(partsIn(quarter.start, timeZone).minute ?? 0);
-
-        sumInto(hours, startMs - localMinute * MINUTE_MS, quarter);
+        sumInto(hours, localHourStart(Date.parse(quarter.start), timeZone), quarter);
     }
 
     return [...hours]
