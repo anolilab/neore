@@ -94,7 +94,23 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
     const scope = control.matches(actionableSelector) ? control : (nodes[1] ?? control);
     const names: string[] = [];
 
-    for (const node of nodes) {
+    // The elements between the control and the scope (a span with an aria-label around an icon inside a button): their names
+    // count, so an icon named that way does not read as unnamed. Their text does not, as the scope's is what the click reads.
+    const between: Element[] = [];
+    let climbing: Element | null = control;
+
+    while (climbing !== null && climbing !== scope) {
+        const root = climbing.getRootNode();
+        const parent: Element | null = climbing.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+
+        if (parent !== null && parent !== scope) {
+            between.push(parent);
+        }
+
+        climbing = parent;
+    }
+
+    for (const node of [...nodes, ...between]) {
         names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
 
         // Ids are separated by any ASCII whitespace, not only a space.
