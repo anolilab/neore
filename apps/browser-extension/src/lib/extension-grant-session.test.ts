@@ -1,3 +1,6 @@
+import type { ReactElement } from "react";
+import { act, createElement, Fragment } from "react";
+import { createRoot } from "react-dom/client";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `env.ts` reads the build's env once, at import: set it first, then load the module.
@@ -16,8 +19,11 @@ const {
     watchReconnectNeeded,
 } = await import("./extension-grant");
 const { clearAccessToken, getAccessToken, resumeAccessTokens } = await import("./access-token");
-const { endSession, loadGrantSession } = await import("./session");
+const { endSession, loadGrantSession, useSession } = await import("./session");
 const { createAuthTokenSync } = await import("./auth-token-sync");
+const { AuthPage } = await import("@/features/auth/AuthPage");
+
+Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
 
 const GRANT_KEY = "neore.extensionGrant";
 const REDIRECT_URI = `https://${"a".repeat(32)}.chromiumapp.org/`;
@@ -68,14 +74,27 @@ const installChrome = () => {
     });
 };
 
+/** Steps holding the grant lock right now. */
+let lockHolders = 0;
+
 /** The Web Locks API, as browsers run it: one holder per name at a time, the rest queued in order. */
 const installLocks = () => {
     const tails = new Map<string, Promise<unknown>>();
 
+    lockHolders = 0;
     vi.stubGlobal("navigator", {
         locks: {
             request: async (name: string, step: () => Promise<unknown>) => {
-                const run = (tails.get(name) ?? Promise.resolve()).then(step);
+                const hold = async () => {
+                    lockHolders += 1;
+
+                    try {
+                        return await step();
+                    } finally {
+                        lockHolders -= 1;
+                    }
+                };
+                const run = (tails.get(name) ?? Promise.resolve()).then(hold);
 
                 tails.set(
                     name,
@@ -117,6 +136,37 @@ const deferred = () => {
 
     return { promise, resolve: (response: Response) => settle?.(response) };
 };
+
+/** Render `element` the way the panel does; `unmount` ends the session watch it started. */
+const mount = async (element: ReactElement) => {
+    const container = document.createElement("div");
+    const root = createRoot(container);
+
+    await act(async () => {
+        root.render(element);
+    });
+
+    return {
+        container,
+        unmount: async () => {
+            await act(async () => {
+                root.unmount();
+            });
+        },
+    };
+};
+
+/** Let storage events and the reads they start settle, inside `act`. */
+const settle = async () => {
+    await act(async () => {
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+    });
+};
+
+/** The answer `launchWebAuthFlow` gives for the request it was handed: a code, with its `state`. */
+const approve = async ({ url }: { url: string }) => `${REDIRECT_URI}?code=c&state=${new URL(url).searchParams.get("state")}`;
 
 const sentTo = (call: number) => {
     const [url, init] = fetchMock.mock.calls[call] ?? [];
@@ -229,6 +279,55 @@ describe("signOutGrant", () => {
         await signingOut;
 
         expect(store.get(GRANT_KEY)).toEqual(newer);
+    });
+
+    it("never overwrites the mark of a grant signed in and out while it read its own", async () => {
+        const newerRevoke = deferred();
+        const { get } = chrome.storage.local;
+        let newerSignOut: Promise<unknown> | undefined;
+
+        const signInAndOutAgain = async () => {
+            await signInWithWebAuthFlow();
+
+            const newerKey = (store.get(GRANT_KEY) as { id: string }).id;
+
+            newerSignOut = signOutGrant(newerKey);
+            await vi.waitFor(() => expect(store.get(SIGNED_OUT_KEY)).toBe(newerKey));
+        };
+
+        store.set(GRANT_KEY, { id: "g1", token: "grant-1", user: USER });
+        launchWebAuthFlow.mockImplementation(approve);
+        fetchMock.mockImplementation(async (input, init) => {
+            if (String(input).endsWith("/exchange")) {
+                return Response.json({ token: "grant-2", user: USER });
+            }
+
+            return (JSON.parse(String(init?.body)) as { token: string }).token === "grant-2" ? await newerRevoke.promise : new Response(null, { status: 204 });
+        });
+        // Whatever can land between the older sign-out's read of its grant and its mark lands there.
+        chrome.storage.local.get = vi.fn(async (keys: string[]) => {
+            chrome.storage.local.get = get;
+
+            const read = await get(keys);
+
+            if (lockHolders === 0) {
+                await signInAndOutAgain();
+            }
+
+            return read;
+        }) as unknown as typeof get;
+
+        await signOutGrant("g1");
+
+        if (!newerSignOut) {
+            await signInAndOutAgain();
+        }
+
+        // The newer grant is still being signed out: nothing reads it.
+        await expect(loadGrantSession()).resolves.toBeNull();
+
+        newerRevoke.resolve(new Response(null, { status: 204 }));
+        await newerSignOut;
     });
 });
 
@@ -374,6 +473,20 @@ describe("endSession", () => {
 
         expect(setAuthToken.mock.calls).toEqual([[null]]);
         await expect(getAccessToken({ force: true })).resolves.toBeNull();
+    });
+
+    it("tells the sign-in page, which replaces Settings, when storage kept the grant", async () => {
+        const { sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+
+        await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+
+        const page = await mount(createElement(AuthPage));
+
+        expect(page.container.querySelector("[role=alert]")?.textContent).toMatch(/^Sign-out did not finish/u);
+        await page.unmount();
     });
 
     it("runs one sign-out per grant: a second call joins the first", async () => {
@@ -567,6 +680,61 @@ describe("loadGrantSession", () => {
     });
 });
 
+describe("useSession", () => {
+    /** What each render of `useSession` showed: the session key, `null` signed out, `undefined` loading. */
+    let seen: (string | null | undefined)[];
+
+    const Probe = () => {
+        const { data, isPending } = useSession();
+
+        seen.push(isPending ? undefined : (data?.sessionId ?? null));
+
+        return null;
+    };
+
+    beforeEach(() => {
+        seen = [];
+    });
+
+    it("keeps the session through a storage read that fails after a change, and still ends on a mark", async () => {
+        const grant = { id: "g1", token: "grant", user: USER };
+
+        store.set(GRANT_KEY, grant);
+
+        const panel = await mount(createElement(Probe));
+
+        await vi.waitFor(() => expect(seen.at(-1)).toBe("g1"));
+        vi.spyOn(chrome.storage.local, "get").mockRejectedValueOnce(new Error("storage unavailable"));
+        await act(async () => {
+            await chrome.storage.local.set({ [GRANT_KEY]: grant });
+        });
+        await settle();
+
+        expect(seen).not.toContain(null);
+
+        await act(async () => {
+            await chrome.storage.local.set({ [SIGNED_OUT_KEY]: "g1" });
+        });
+        await vi.waitFor(() => expect(seen.at(-1)).toBeNull());
+        await panel.unmount();
+    });
+
+    it("finishes a pending sign-out once per panel, however many components read the session", async () => {
+        store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
+        store.set(SIGNED_OUT_KEY, "g1");
+        fetchMock.mockImplementation(async () => new Response(null, { status: 204 }));
+
+        const panel = await mount(createElement(Fragment, null, createElement(Probe), createElement(Probe), createElement(Probe)));
+
+        await vi.waitFor(() => expect(store.has(GRANT_KEY)).toBe(false));
+        await settle();
+
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(1);
+        expect(seen.at(-1)).toBeNull();
+        await panel.unmount();
+    });
+});
+
 describe("migrateFromCookieSession", () => {
     const signedIn = async () => true;
 
@@ -670,6 +838,16 @@ describe("signInWithWebAuthFlow", () => {
         await signInWithWebAuthFlow();
 
         expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        await expect(loadGrantSession()).resolves.toMatchObject({ user: USER });
+    });
+
+    it("signs in when storage fails to drop an older grant's mark, which hides nothing", async () => {
+        store.set(SIGNED_OUT_KEY, "an-older-grant");
+        launchWebAuthFlow.mockImplementationOnce(approve);
+        fetchMock.mockResolvedValueOnce(Response.json({ token: "fresh", user: USER }));
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+
+        await expect(signInWithWebAuthFlow()).resolves.toEqual(USER);
         await expect(loadGrantSession()).resolves.toMatchObject({ user: USER });
     });
 

@@ -192,10 +192,16 @@ const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => {
     return locks ? await locks.request(GRANT_LOCK, step) : await step();
 };
 
+/**
+ * Store a new grant and drop the old sign-out mark. The mark names an older
+ * grant's key, never this one's (minted per sign-in), so a mark storage fails to
+ * remove hides nothing: the sign-in still succeeded, and the next sign-out
+ * overwrites the mark.
+ */
 const writeGrant = async (grant: StoredGrant): Promise<void> => {
     await withGrantLock(async () => {
         await chrome.storage.local.set({ [STORAGE_KEY]: grant });
-        await chrome.storage.local.remove(SIGNED_OUT_KEY);
+        await chrome.storage.local.remove(SIGNED_OUT_KEY).catch(() => undefined);
     });
 };
 
@@ -445,8 +451,18 @@ export const requestGrantAccessToken = async (grant: StoredGrant | undefined): P
  * changed, and the session may come back.
  */
 export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> => {
-    // Raw: a grant already marked by a sign-out whose removal failed is retried.
-    const { grant } = await readStored();
+    // Checked and marked under one lock: a sign-in and another grant's sign-out
+    // landing in between would otherwise have their mark overwritten by this one.
+    const grant = await withGrantLock(async () => {
+        // Raw: a grant already marked by a sign-out whose removal failed is retried.
+        const { grant: stored } = await readStored();
+
+        if (stored && grantKey(stored) === key) {
+            await chrome.storage.local.set({ [SIGNED_OUT_KEY]: key });
+        }
+
+        return stored;
+    });
 
     if (!grant) {
         return "signed-out";
@@ -456,17 +472,13 @@ export const signOutGrant = async (key: string): Promise<"replaced" | "signed-ou
         return "replaced";
     }
 
-    await withGrantLock(async () => {
-        await chrome.storage.local.set({ [SIGNED_OUT_KEY]: key });
-    });
-
     // Offline or out of time: the session expires on its own; the local copy goes regardless.
-    const revoked = await revokeGrant(grant.token);
+    await revokeGrant(grant.token);
 
     try {
         await forgetSignedOutGrant(grant.token, key);
     } catch (error) {
-        throw new GrantRemovalError(error, revoked);
+        throw new GrantRemovalError(error);
     }
 
     return "signed-out";
