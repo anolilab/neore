@@ -109,6 +109,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", async () => {
     return {
         useUpdateUserSettings: () => {
             return {
+                isPending: false,
                 updateLatest: (build: () => { threadTitleInstructions?: string }) => {
                     const patch = build();
                     // The cache update (`land`) is held back here, so a blur can run before the cache shows the last save.

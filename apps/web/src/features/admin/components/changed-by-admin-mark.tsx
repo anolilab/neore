@@ -24,6 +24,8 @@ const runKeep = async (keep: () => Promise<unknown>): Promise<boolean> => {
 interface ChangedByAdminMarkProps {
     /** Marked text the field's own form does not show, so the person sees everything they keep. */
     children?: ReactNode;
+    /** Held off while the field's own save is in flight: the keep sends the stored text, which that save is changing. */
+    disabled?: boolean;
     /** What was changed, read after the button's text by a screen reader ("Keep as mine: Helper"). */
     fieldLabel: string;
     /** Clears this one field's mark on the server. */
@@ -35,7 +37,7 @@ interface ChangedByAdminMarkProps {
  * "Keep as mine" clears that one mark; the server refuses it to an impersonated session, so the button shows only once
  * the session reads as the person's own.
  */
-const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, fieldLabel, onKeep }) => {
+const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, disabled = false, fieldLabel, onKeep }) => {
     const { t } = useLingui();
     const own = useImpersonationState() === "self";
     const [pending, setPending] = useState(false);
@@ -62,7 +64,7 @@ const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, fieldLabel,
             </Badge>
             <span className="text-muted-foreground text-xs">{t`Saved logins stay off for it until you keep it as yours.`}</span>
             {own && (
-                <Button disabled={pending} onClick={handleKeep} size="sm" type="button" variant="outline">
+                <Button disabled={disabled || pending} onClick={handleKeep} size="sm" type="button" variant="outline">
                     {t`Keep as mine`}
                     <span className="sr-only">: {fieldLabel}</span>
                 </Button>

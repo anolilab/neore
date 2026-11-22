@@ -222,6 +222,7 @@ const PersonalizationSettings: FC = () => {
                         // One mark for every field the system prompt carries (`auth/lib/personalization.ts`): language and location
                         // are set elsewhere, so they are shown here. The keep sends the stored text, refused if it changed since.
                         <ChangedByAdminMark
+                            disabled={updateSettingsMutation.isPending}
                             fieldLabel={t`Your personalization`}
                             onKeep={async () =>
                                 await keepMutation.mutateAsync({
