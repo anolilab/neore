@@ -773,6 +773,36 @@ describe("a browser a person took control of", () => {
         expect(next).toMatchObject({ handedBack: true, success: false });
     });
 
+    it("the approval read asks for the rendered text only, and an ordinary extract keeps the raw text", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValue(answered({ content: "Pay now", success: true, title: "Cart", truncated: false, url: "https://example.com/cart" }));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "extract", selector: "#pay", visibleOnly: true } });
+        expect((renderer.mock.calls[1]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("visibleOnly");
+    });
+
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
         await addSession(NOW - 1000);
         await giveControl({ until: NOW + CONTROL_IDLE_MS });

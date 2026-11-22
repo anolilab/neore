@@ -287,6 +287,10 @@
                         "type": "boolean",
                         "description": "Whether to capture full page screenshot"
                     },
+                    "visibleOnly": {
+                        "type": "boolean",
+                        "description": "Extract with a selector: return the rendered text, leaving out hidden descendants"
+                    },
                     "script": {
                         "type": "string",
                         "description": "JavaScript to evaluate (max 5000 chars)"

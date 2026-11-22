@@ -170,6 +170,7 @@ export const executeBrowserAction = internalAction
                           sessionId: cfSessionId,
                           text: args.text,
                           url: args.url,
+                          ...(args.approvalLook === true && { visibleOnly: true }),
                       };
                 let { data, error, response } = await browserAction({ body: sent, client, signal: callSignal });
                 // The row's browser when the result below is logged: none, once a retired one is dropped.

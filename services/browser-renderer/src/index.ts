@@ -48,6 +48,7 @@ const actionSchema = z.object({
     sessionId: z.string().optional(), // Reconnect to an existing browser session
     text: z.string().optional(),
     url: z.string().optional(),
+    visibleOnly: z.boolean().optional(), // extract with a selector: the rendered text a person sees, not the raw textContent
 });
 
 /** Hoisted so they are compiled once, not on every request. */
@@ -446,7 +447,7 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, direction, fullPage, selector, sessionId, text, url }: z.infer<typeof actionSchema>,
+    { action, direction, fullPage, selector, sessionId, text, url, visibleOnly }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
@@ -538,7 +539,10 @@ const actHeld = async (
                         break;
                     }
 
-                    extractedText = (await element.textContent()) ?? "";
+                    // `innerText` leaves out hidden descendants (display: none, visibility: hidden), so a purchase word
+                    // the person cannot see does not count. An ordinary extract keeps the raw text it always returned.
+                    // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
+                    extractedText = visibleOnly === true ? await element.innerText() : ((await element.textContent()) ?? "");
                 } else {
                     extractedText = await page.evaluate(() => {
                         const clone = document.body.cloneNode(true) as HTMLElement;

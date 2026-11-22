@@ -27,7 +27,10 @@ export const isPurchaseText = (text: string): boolean => {
     return PURCHASE_PATTERNS.some((pattern) => pattern.test(collapsed));
 };
 
-/** What the renderer reports for a read of one element (`extract` with a selector): its text as `content`. */
+/**
+ * What the renderer reports for a read of one element (`extract` with a selector, `visibleOnly`): the text a person sees,
+ * as `content`.
+ */
 export interface ClickTargetLook {
     content?: string;
     success: boolean;

@@ -95,6 +95,10 @@ export type BrowserActionRequest = {
      */
     fullPage?: boolean;
     /**
+     * Extract with a selector: return the rendered text, leaving out hidden descendants
+     */
+    visibleOnly?: boolean;
+    /**
      * JavaScript to evaluate (max 5000 chars)
      */
     script?: string;
