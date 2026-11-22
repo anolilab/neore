@@ -16,6 +16,7 @@ import {
     browserAliveUntil,
     browserIdOf,
     CONTROL_IDLE_MS,
+    NO_PROVIDER_SESSION,
     RENDERER_CALL_SETTLE_MS,
     rendererCallHold,
     watchableSessionId,
@@ -23,7 +24,14 @@ import {
 import { getActiveSession, logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { applyLimit } from "../../lib/rate-limiter-mutations";
-import { BROWSER_CLOSED_BEFORE_ACTION, BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
+import {
+    BROWSER_BUSY_SIGNING_IN,
+    BROWSER_CLOSED_BEFORE_ACTION,
+    BROWSER_CLOSED_DURING_ACTION,
+    BROWSER_SESSION_RETIRED,
+    executeBrowserAction,
+    PERSON_HAS_CONTROL,
+} from "./browser-node";
 
 const { registry, renderer, rendererStart } = vi.hoisted(() => {
     // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
@@ -267,6 +275,181 @@ describe("a browser action on a running browser", () => {
 
         expect(after).toMatchObject({ lastActivityAt });
         expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it("tells the agent to try again when a sign-in holds the browser, and ends the hold", async () => {
+        const lastActivityAt = NOW - 1000;
+
+        await addSession(lastActivityAt);
+        renderer.mockResolvedValueOnce({ data: undefined, error: { error: "signing in", success: false }, response: { ok: false, status: 409 } });
+
+        await expect(act()).resolves.toStrictEqual({ error: BROWSER_BUSY_SIGNING_IN, success: false });
+
+        const after = await row();
+
+        expect(after).toMatchObject({ lastActivityAt });
+        expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it.each([
+        ["a sign-in holds the browser", { data: undefined, error: { error: "signing in", success: false }, response: { ok: false, status: 409 } }],
+        [
+            "its session lock did not answer",
+            {
+                data: undefined,
+                error: { error: "lock", success: false },
+                response: { headers: new Headers({ "x-browser-action": "not-run" }), ok: false, status: 503 },
+            },
+        ],
+    ])("gives back the rate-limit charge of an action the renderer ran none of because %s", async (_why, refused) => {
+        await addSession(NOW - 1000);
+        // One unit left of the hour's 200.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 199, identifier: OWNER, key: "browser/action:premium" }));
+        renderer.mockResolvedValueOnce(refused);
+
+        await act().catch(() => undefined);
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/" }));
+
+        await expect(act()).resolves.toMatchObject({ success: true });
+        // That unit is now spent: the next one is refused before the renderer is called.
+        await expect(act()).resolves.toMatchObject({ error: "Browser automation rate limit exceeded.", success: false });
+        expect(renderer).toHaveBeenCalledTimes(2);
+    });
+
+    it("ends the hold of an action the renderer ran none of, even when its answer came past the call's deadline", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockImplementationOnce(async () => {
+            // The lock's refusal answers only once the call's whole budget is spent.
+            vi.setSystemTime(Date.now() + FETCH_TIMEOUT_LONG_MS * 2);
+
+            return {
+                data: undefined,
+                error: { error: "lock", success: false },
+                response: { headers: new Headers({ "x-browser-action": "not-run" }), ok: false, status: 503 },
+            };
+        });
+
+        await expect(act("extract")).resolves.toMatchObject({ success: false });
+        await expect(row()).resolves.not.toHaveProperty("inUseHolds");
+    });
+
+    it("keeps the new browser of an action whose hold the renderer lost, and tells the agent it may have run", async () => {
+        await addSession(NOW - 1000);
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { providerSessionId: NO_PROVIDER_SESSION }));
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-2", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(act()).resolves.toStrictEqual({ error: lost, success: false });
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe("s-2");
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+        await act("extract");
+
+        expect(renderer.mock.lastCall?.[0]).toMatchObject({ body: { sessionId: "s-2" } });
+    });
+
+    it("drops a session the renderer retired, so the next action opens a new browser, and tells the agent to navigate first", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { code: "SESSION_RETIRED", error: "retired", success: false },
+            response: { ok: false, status: 410 },
+        });
+
+        await expect(act("extract")).resolves.toStrictEqual({ error: BROWSER_SESSION_RETIRED, success: false });
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe(NO_PROVIDER_SESSION);
+        expect(after.currentUrl).toBeUndefined();
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+        await act();
+
+        expect(renderer.mock.lastCall?.[0]).toMatchObject({ body: { action: "navigate", sessionId: undefined } });
+    });
+
+    it("runs a navigate on a new browser at once when the renderer retired the session", async () => {
+        await addSession(NOW - 1000);
+        renderer
+            .mockResolvedValueOnce({
+                data: undefined,
+                error: { code: "SESSION_RETIRED", error: "retired", success: false },
+                response: { ok: false, status: 410 },
+            })
+            .mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+
+        await expect(act()).resolves.toMatchObject({ sessionId: "s-2", success: true });
+        expect(renderer.mock.calls.map(([options]) => (options as { body: { sessionId?: string } }).body.sessionId)).toStrictEqual(["s-1", undefined]);
+        await expect(row()).resolves.toMatchObject({ providerSessionId: "s-2" });
+    });
+
+    it("sends no retry, and gives back the hold and the charge, when the navigate's time ran out before the retired session was dropped", async () => {
+        await addSession(NOW - 1000);
+        // One unit left of the hour's 200.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 199, identifier: OWNER, key: "browser/action:premium" }));
+        renderer.mockImplementationOnce(async () => {
+            // The renderer's 410 answers only once the call's whole budget is spent.
+            vi.setSystemTime(Date.now() + FETCH_TIMEOUT_LONG_MS * 2);
+
+            return { data: undefined, error: { code: "SESSION_RETIRED", error: "retired", success: false }, response: { ok: false, status: 410 } };
+        });
+
+        await expect(act()).resolves.toStrictEqual({ error: BROWSER_SESSION_RETIRED, success: false });
+        expect(renderer).toHaveBeenCalledTimes(1);
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe(NO_PROVIDER_SESSION);
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+
+        // The unit given back is the one this navigate spends.
+        await expect(act()).resolves.toMatchObject({ success: true });
+    });
+
+    it.each([
+        ["throws", () => Promise.reject(new Error("network down"))],
+        [
+            "fails",
+            async () => {
+                return { data: undefined, error: { error: "boom", success: false }, response: { ok: false, status: 500 } };
+            },
+        ],
+    ])("drops the retired session before the navigate's retry, so a retry that %s leaves no retired id on the row", async (_how, retry) => {
+        await addSession(NOW - 1000);
+        renderer
+            .mockResolvedValueOnce({
+                data: undefined,
+                error: { code: "SESSION_RETIRED", error: "retired", success: false },
+                response: { ok: false, status: 410 },
+            })
+            .mockImplementationOnce(retry);
+
+        await expect(act()).resolves.toMatchObject({ success: false });
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe(NO_PROVIDER_SESSION);
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+        await act("extract");
+
+        expect(renderer.mock.lastCall?.[0]).toMatchObject({ body: { sessionId: undefined } });
     });
 
     it("stops offering the browser the renderer closed after a blocked redirect, and forgets its page", async () => {

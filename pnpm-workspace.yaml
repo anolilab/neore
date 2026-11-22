@@ -537,6 +537,7 @@ catalogs:
     mediabunny: 1.66.2
     my-ua-parser: ^2.0.4
     nanoid: 6.0.2
+    parse5: 8.1.0
     pptxgenjs: 4.0.1
     react-hotkeys-hook: 5.4.0
     react-qr-code: 2.2.0

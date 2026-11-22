@@ -80,6 +80,21 @@ export const applyRateLimit = internalMutation
     })
     .mutation(async ({ args, ctx }) => await applyLimit(ctx, args));
 
+/** Gives back the units a charge took for work refused before it ran (a browser action the renderer did not run). */
+export const refundRateLimit = internalMutation
+    .input({
+        count: v.optional(v.number()),
+        identifier: v.string(),
+        key: v.string(),
+    })
+    .mutation(async ({ args: { count, identifier, key }, ctx }) => {
+        if (!Object.hasOwn(RATE_LIMIT_CONFIGS, key)) {
+            return;
+        }
+
+        await createRatelimit(key, ctx.db).refund(identifier, count);
+    });
+
 export const resetRateLimit = internalMutation
     .input({
         identifier: v.string(),

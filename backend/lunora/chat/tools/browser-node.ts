@@ -7,7 +7,7 @@
  *
  * Supports: navigate, screenshot, click, type, extract, scroll.
  */
-import { browserAction, type BrowserActionResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
+import { browserAction, type BrowserActionRequest, type BrowserActionResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
@@ -110,14 +110,12 @@ export const executeBrowserAction = internalAction
                 const { inspecting } = use;
 
                 // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser,
-                // nor one of the human-check ladder's own reads.
+                // nor one of the human-check ladder's own reads, nor one the renderer refused unrun (`refund`).
+                const rateKey = `browser/action:${args.userTier ?? "free"}`;
                 const rlResult =
                     args.ladderLook === true
                         ? { ok: true }
-                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
-                              identifier: userId,
-                              key: `browser/action:${args.userTier ?? "free"}`,
-                          });
+                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: rateKey });
 
                 if (!rlResult.ok) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
@@ -132,6 +130,13 @@ export const executeBrowserAction = internalAction
                         success: false,
                     };
                 }
+
+                /** Gives back the charge of an action the renderer ran none of (a sign-in held it, it was retired, its lock did not answer). */
+                const refund = async (): Promise<void> => {
+                    if (args.ladderLook !== true) {
+                        await ctx.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key: rateKey });
+                    }
+                };
 
                 // After a hand back the page is not the one the agent planned against: it looks before it acts. A
                 // navigate to a browser that was closed runs as asked: there is no page left to look at.
@@ -149,23 +154,137 @@ export const executeBrowserAction = internalAction
                 callSignal = AbortSignal.timeout(budget);
                 callEndsBy = Date.now() + budget;
 
-                const { data, error, response } = await browserAction({
-                    body: looksFirst
-                        ? { action: "screenshot", sessionId: cfSessionId }
-                        : {
-                              action,
-                              direction: args.direction as "up" | "down" | undefined,
-                              fullPage: args.fullPage,
-                              selector: args.selector,
-                              sessionId: cfSessionId,
-                              text: args.text,
-                              url: args.url,
-                          },
-                    client,
-                    signal: callSignal,
-                });
+                const sent: BrowserActionRequest = looksFirst
+                    ? { action: "screenshot", sessionId: cfSessionId }
+                    : {
+                          action,
+                          direction: args.direction as "up" | "down" | undefined,
+                          fullPage: args.fullPage,
+                          selector: args.selector,
+                          sessionId: cfSessionId,
+                          text: args.text,
+                          url: args.url,
+                      };
+                let { data, error, response } = await browserAction({ body: sent, client, signal: callSignal });
+                // The row's browser when the result below is logged: none, once a retired one is dropped.
+                let startedWith = startedWithProviderSessionId;
+
+                // The renderer retired the session for good (a sign-in on it could not confirm its page clean): its id is
+                // dropped from the row first, so a retry that fails or throws leaves it there no more, and is never sent
+                // again. A navigate runs at once on a new browser; any other action needs a page first.
+                if (response?.status === 410 && sent.action === "navigate" && sent.sessionId !== undefined) {
+                    // This action's hold is kept for the retry: no `heldUntil`.
+                    const dropped = await ctx.runMutation(internal.browser.functions.logAction, {
+                        action: sent.action,
+                        durationMs: Date.now() - startTime,
+                        errorMessage: BROWSER_SESSION_RETIRED,
+                        providerSessionId: NO_PROVIDER_SESSION,
+                        sessionId,
+                        startedAt: startTime,
+                        startedWithProviderSessionId,
+                        success: false,
+                    });
+
+                    // Another action moved the row on meanwhile: its browser is the thread's, and this one opens none beside it.
+                    if (dropped.closed === true || dropped.replaced) {
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                        await refund();
+
+                        const discarded =
+                            dropped.closed === true ? { error: BROWSER_CLOSED_DURING_ACTION, success: false } : browserReplacedResult(dropped.currentUrl);
+
+                        return returned === undefined ? discarded : handedBackResult(discarded, returned);
+                    }
+
+                    startedWith = NO_PROVIDER_SESSION;
+
+                    // The call's time ran out while the retired id was dropped: the retry is not sent, so nothing runs in the
+                    // renderer, and the hold and the charge are given back here (a retry sent with a spent signal would throw
+                    // and read as a call that may still act).
+                    if (callSignal.aborted || Date.now() >= callEndsBy) {
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                        await refund();
+
+                        const retired = { error: BROWSER_SESSION_RETIRED, success: false };
+
+                        return returned === undefined ? retired : handedBackResult(retired, returned);
+                    }
+
+                    ({ data, error, response } = await browserAction({ body: { ...sent, sessionId: undefined }, client, signal: callSignal }));
+                }
+
+                if (response?.status === 410) {
+                    await ctx.runMutation(internal.browser.functions.logAction, {
+                        action: sent.action,
+                        durationMs: Date.now() - startTime,
+                        errorMessage: BROWSER_SESSION_RETIRED,
+                        heldReaped: held.reaped,
+                        heldUntil: held.until,
+                        // No reusable browser: the next action opens a new one.
+                        providerSessionId: NO_PROVIDER_SESSION,
+                        sessionId,
+                        startedAt: startTime,
+                        startedWithProviderSessionId: startedWith,
+                        success: false,
+                    });
+
+                    await refund();
+
+                    const retired = { error: BROWSER_SESSION_RETIRED, success: false };
+
+                    return returned === undefined ? retired : handedBackResult(retired, returned);
+                }
+
+                // A sign-in with a saved login holds the browser: the renderer ran nothing, so the hold ends here.
+                if (response?.status === 409) {
+                    await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                    await refund();
+
+                    const busy = { error: BROWSER_BUSY_SIGNING_IN, success: false };
+
+                    return returned === undefined ? busy : handedBackResult(busy, returned);
+                }
+
+                // The renderer lost the session's hold during the action: it may have run, so its charge is kept, the browser
+                // it names (a new one, for a first action) stays the thread's, and the agent is told to look before repeating it.
+                if (response?.status === 503 && response.headers?.get?.("x-browser-action") !== "not-run") {
+                    const lapsed = (error ?? {}) as { error?: unknown; sessionId?: unknown };
+                    const message = typeof lapsed.error === "string" ? lapsed.error : "The action may have run: look at the page before you repeat it.";
+                    const logged = await ctx.runMutation(internal.browser.functions.logAction, {
+                        action: sent.action,
+                        durationMs: Date.now() - startTime,
+                        errorMessage: message,
+                        heldReaped: held.reaped,
+                        heldUntil: held.until,
+                        // No id: the lost hold closed the browser it ran on, or none was named; the row keeps what it has.
+                        ...(typeof lapsed.sessionId === "string" && { providerSessionId: lapsed.sessionId }),
+                        sessionId,
+                        startedAt: startTime,
+                        startedWithProviderSessionId: startedWith,
+                        success: false,
+                    });
+                    let lapsedResult: { error: string; success: false; url?: string } = { error: message, success: false };
+
+                    if (logged.closed === true) {
+                        lapsedResult = { error: BROWSER_CLOSED_DURING_ACTION, success: false };
+                    } else if (logged.replaced) {
+                        lapsedResult = browserReplacedResult(logged.currentUrl);
+                    }
+
+                    return returned === undefined ? lapsedResult : handedBackResult(lapsedResult, returned);
+                }
 
                 if (error || !response?.ok || !data) {
+                    // The renderer says it ran nothing (its session lock did not answer): the charge is given back, and
+                    // the hold ends here, however late the answer came: no call of this action can still be acting.
+                    if (response?.headers?.get?.("x-browser-action") === "not-run") {
+                        const ended = held;
+
+                        held = undefined;
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, ended).catch(() => undefined);
+                        await refund();
+                    }
+
                     throw new LunoraError("INTERNAL", `Browser renderer returned ${response?.status ?? "no response"}: ${JSON.stringify(error)}`);
                 }
 
@@ -188,7 +307,7 @@ export const executeBrowserAction = internalAction
                     providerSessionId: returnedSessionId,
                     sessionId,
                     startedAt: startTime,
-                    startedWithProviderSessionId,
+                    startedWithProviderSessionId: startedWith,
                     success: result.success ?? false,
                     target: looksFirst ? undefined : (args.url ?? args.selector),
                     value: looksFirst ? undefined : args.text,
@@ -273,6 +392,13 @@ export const PERSON_HAS_CONTROL =
 /** The session was closed just before the action reached it: nothing was sent, and the next action starts a new browser. */
 export const BROWSER_CLOSED_BEFORE_ACTION =
     "The browser session was closed just before this action, so it was not run. Run it again if it is still needed: the next action opens a new, empty browser, so navigate to the page you need first.";
+
+/** The renderer refused the action: a sign-in with a saved login holds the browser for now. */
+export const BROWSER_BUSY_SIGNING_IN = "The browser is busy signing in with a saved login, so this action was not run. Try it again in a moment.";
+
+/** The renderer retired the session for good: its browser is never used again, and the next action opens a new one. */
+export const BROWSER_SESSION_RETIRED =
+    "The browser session was retired and cannot be used again, so this action was not run. The next action opens a new, empty browser: navigate to the page you need first.";
 
 /** The session was closed while the action ran: a later action starts from a new, empty browser. */
 export const BROWSER_CLOSED_DURING_ACTION =

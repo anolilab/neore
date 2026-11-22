@@ -19,6 +19,7 @@ import { authAction, authMutation, authQuery, internalMutation, internalQuery, r
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
+import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
@@ -826,17 +827,28 @@ export const navigateInControl = authAction
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
         const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
         const signal = budget === 0 ? undefined : AbortSignal.timeout(budget);
-        const { data } =
+        const { data, error, response } =
             signal === undefined
-                ? { data: undefined }
+                ? { data: undefined, error: undefined, response: undefined }
                 : await browserAction({
                       body: { action: "navigate", sessionId: navigation.providerSessionId, url },
                       client,
                       signal,
                   }).catch(() => {
-                      return { data: undefined };
+                      return { data: undefined, error: undefined, response: undefined };
                   });
         const result = data as BrowserActionResponse | undefined;
+        // The renderer retired the browser for good: the row forgets it, so the next action opens a new one.
+        const isRetired = response?.status === 410;
+        // The renderer lost the call's hold while the page loaded (a 503 that ran something): the page may have opened,
+        // and the browser it names (a new one, when the row's could not be reconnected) stays the row's.
+        const withheld =
+            response?.status === 503 && response.headers?.get?.("x-browser-action") !== "not-run"
+                ? ((error ?? {}) as { error?: unknown; sessionId?: unknown })
+                : undefined;
+        const withheldSessionId = typeof withheld?.sessionId === "string" ? withheld.sessionId : undefined;
+        const withheldError = typeof withheld?.error === "string" ? withheld.error : undefined;
+
         // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
         // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
         const mayStillLoad = signal !== undefined && result === undefined && (signal.aborted || Date.now() >= startedAt + budget);
@@ -849,37 +861,58 @@ export const navigateInControl = authAction
         let logged: { replaced: boolean } | undefined;
 
         try {
-            logged = await ctx.runMutation(internal.browser.functions.logAction, {
-                action: "navigate",
-                actor: navigation.byOwner ? "owner" : "collaborator",
-                durationMs: Date.now() - startedAt,
-                ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
-                ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
-                sessionId: navigation.sessionId,
-                startedAt,
-                startedWithProviderSessionId: navigation.providerSessionId,
-                success: result?.success === true,
-                target: url,
-            });
-        } finally {
-            if (!mayStillLoad) {
-                await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
-                    at: Date.now(),
-                    navigatingUntil: navigation.navigatingUntil,
+            try {
+                logged = await ctx.runMutation(internal.browser.functions.logAction, {
+                    action: "navigate",
+                    actor: navigation.byOwner ? "owner" : "collaborator",
+                    durationMs: Date.now() - startedAt,
+                    ...(result?.success !== true && { errorMessage: result?.error ?? withheldError ?? "The page could not be opened." }),
+                    ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
+                    ...(withheldSessionId !== undefined && { providerSessionId: withheldSessionId }),
                     sessionId: navigation.sessionId,
-                    userId,
+                    startedAt,
+                    startedWithProviderSessionId: navigation.providerSessionId,
+                    success: result?.success === true,
+                    target: url,
                 });
+            } finally {
+                if (!mayStillLoad) {
+                    await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
+                        at: Date.now(),
+                        navigatingUntil: navigation.navigatingUntil,
+                        sessionId: navigation.sessionId,
+                        userId,
+                    });
+                }
+            }
+        } finally {
+            // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for
+            // this navigation is given back, as the agent's is (`chat/tools/browser-node.ts`). After the row is logged and
+            // the hold ended, whether or not those writes succeed, and a refund that fails is let go: it never keeps a
+            // hold or a retired browser on the row, nor hides their error.
+            if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
+                await ctx
+                    .runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
+                        identifier: userId,
+                        key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
+                    })
+                    .catch(() => undefined);
             }
         }
 
         // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened
         // the page in a new browser (the old one expired), which ended the lease: the person's view shows a browser gone.
-        if (logged?.replaced === true || (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)) {
+        if (
+            logged?.replaced === true ||
+            isRetired ||
+            (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId) ||
+            (withheldSessionId !== undefined && withheldSessionId !== navigation.providerSessionId)
+        ) {
             return { status: "closed" as const };
         }
 
         if (result?.success !== true) {
-            return { error: result?.error ?? "The page could not be opened.", status: "refused" as const };
+            return { error: result?.error ?? withheldError ?? "The page could not be opened.", status: "refused" as const };
         }
 
         return { status: "ok" as const, ...(result.url !== undefined && { url: result.url }) };

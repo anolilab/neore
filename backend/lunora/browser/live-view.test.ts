@@ -8,7 +8,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { internalQuery } from "../lib/crpc";
+import { applyLimit } from "../lib/rate-limiter-mutations";
+import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
@@ -192,6 +193,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "browser_functions", await import("./functions"));
     registerModule(registry, "browser_live_view", await import("./live-view"));
+    registerModule(registry, "lib_rate_limiter_mutations", await import("../lib/rate-limiter-mutations"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -1035,6 +1037,89 @@ describe("opening a page while in control", () => {
 
         expect(after.currentUrl).toBe("https://example.com/login");
         expect(after.control).not.toHaveProperty("navigatingUntil");
+    });
+
+    it("forgets a browser the renderer retired for good, and tells the person it is gone", async () => {
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
+    });
+
+    it("gives back the charge of a navigation the renderer ran none of even when logging it fails", async () => {
+        const key = "browser_functions:logAction";
+        const logging = registry.get(key);
+
+        await addSession();
+        await take(OWNER);
+        // The hour's 240 spent, this navigation's unit with them (the guard that takes it is stubbed here).
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 240, identifier: OWNER, key: "browser/control:free" }));
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+        registry.set(
+            key,
+            internalMutation.input({ sessionId: v.string() }).mutation(async () => {
+                throw new Error("log failed");
+            }),
+        );
+
+        try {
+            await expect(navigate(OWNER)).rejects.toThrow("log failed");
+        } finally {
+            registry.set(key, logging);
+        }
+
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/control:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
+    });
+
+    it("keeps the browser a navigation whose hold the renderer lost names, and tells the person the page may have opened", async () => {
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        await addSession();
+        await take(OWNER);
+        // The row's browser could not be reconnected: the renderer opened the page in a new one, then lost the hold.
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-2", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-2" });
+    });
+
+    it("tells the person a page may have opened when the renderer lost the hold of a navigation on the row's own browser", async () => {
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-1", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: lost, status: "refused" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-1" });
+    });
+
+    it("gives back the person's charge for a navigation the renderer ran none of because it retired the browser", async () => {
+        await addSession();
+        await take(OWNER);
+        // The hour's 240 spent, this navigation's unit with them (the guard that takes it is stubbed here).
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 240, identifier: OWNER, key: "browser/control:free" }));
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        // That unit was given back.
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/control:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
     });
 
     it("refuses someone who does not hold control, and a page the owner's lists or the address guard block", async () => {
