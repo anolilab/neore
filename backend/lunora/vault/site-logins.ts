@@ -17,8 +17,8 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { currentShard, ROOT_SHARD_KEY, servesUser } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
-import { SITE_LOGIN_CHANGED } from "./lib/site-login-shape";
-import { normalizeSiteOrigin, SITE_ORIGIN_MAX } from "./lib/site-origin";
+import { SIGN_IN_URL_MAX, SITE_LOGIN_CHANGED, SITE_LOGIN_SIGN_IN_PAGE_REFUSED } from "./lib/site-login-shape";
+import { normalizeSignInUrl, normalizeSiteOrigin, SITE_ORIGIN_MAX } from "./lib/site-origin";
 import { type SiteLoginTurn, siteLoginTurnVerdict } from "./site-login-turn";
 
 /** Logins one user may keep, and the most any read returns. Bounded so every read is complete. */
@@ -36,6 +36,8 @@ const vSiteLogin = v.object({
     hasPassword: v.literal(true),
     id: v.id("savedSiteLogins"),
     label: v.optional(v.string()),
+    // The page with the login form, on `site`; none: the fill starts at the site's front page.
+    signInUrl: v.optional(v.string()),
     site: v.string(),
     teammateIds: v.array(v.id("bots")),
     updatedAt: v.number(),
@@ -156,6 +158,7 @@ export const listSiteLogins = authQuery.output(v.object({ logins: v.array(vSiteL
                 hasPassword: true as const,
                 id: row._id,
                 label: row.label,
+                signInUrl: row.signInUrl,
                 site: row.origin,
                 teammateIds: row.teammateIds ?? [],
                 updatedAt: row.updatedAt,
@@ -171,7 +174,8 @@ export const listSiteLogins = authQuery.output(v.object({ logins: v.array(vSiteL
  * saved password. The site of a saved login does not change: a password typed for one site never moves to another. One
  * login per site. A change carries the `updatedAt` of the login as it was read (`expectedUpdatedAt`) and is refused with
  * `CONFLICT` (`SITE_LOGIN_CHANGED`) when the login moved since: an edit opened before a bot was removed elsewhere would
- * otherwise write that bot back.
+ * otherwise write that bot back. The sign-in page (`signInUrl`) must be an https:// page of the login's own origin, and
+ * is stored without its fragment; an empty one means none, and on an edit an absent one keeps the saved page.
  */
 export const saveSiteLogin = authMutation
     .use(rateLimit("vault/site-logins"))
@@ -182,6 +186,8 @@ export const saveSiteLogin = authMutation
         loginId: v.optional(v.id("savedSiteLogins")),
         // Sensitive: the runtime keeps it out of request logs and validation errors.
         password: v.optional(v.sensitive(v.string().check((value) => value.length > 0 && value.length <= PASSWORD_MAX, { message: "Invalid password" }))),
+        // The page with the login form; empty clears it. Checked below against the login's origin.
+        signInUrl: v.optional(v.string().max(SIGN_IN_URL_MAX)),
         site: v.string().max(SITE_ORIGIN_MAX * 4),
         // Twice the limit: the form sends a login's saved ids unfiltered (it cannot tell a deleted bot from one its cached
         // list has not seen yet) plus the ones ticked, which it caps at the limit. What is kept is checked below.
@@ -199,6 +205,14 @@ export const saveSiteLogin = authMutation
 
         if (origin === null) {
             throw new LunoraError("BAD_REQUEST", "The site must be an https:// address, such as https://example.com");
+        }
+
+        const signInUrl = args.signInUrl === undefined ? undefined : normalizeSignInUrl(args.signInUrl, origin, SIGN_IN_URL_MAX);
+
+        if (signInUrl === null) {
+            throw new LunoraError("BAD_REQUEST", "The sign-in page must be an https:// page of the same site, with no username or password in it", {
+                data: { code: SITE_LOGIN_SIGN_IN_PAGE_REFUSED },
+            });
         }
 
         const username = args.username.trim();
@@ -222,7 +236,10 @@ export const saveSiteLogin = authMutation
             // later than the one read, so two saves in one millisecond still tell apart.
             const updatedAt = Math.max(ctx.now, row.updatedAt + 1);
 
-            await patchRow(ctx.db, "savedSiteLogins", row, { ...fields, updatedAt, ...withoutUndefined({ encryptedPassword }) });
+            // A sign-in page sent empty is removed; one not sent at all keeps the saved page.
+            const signInPage = args.signInUrl === undefined ? {} : { signInUrl };
+
+            await patchRow(ctx.db, "savedSiteLogins", row, { ...fields, ...signInPage, updatedAt, ...withoutUndefined({ encryptedPassword }) });
             ctx.log.event("vault.site_login_saved", { created: false, passwordChanged: encryptedPassword !== undefined });
 
             return { id: row._id, updatedAt };
@@ -247,7 +264,7 @@ export const saveSiteLogin = authMutation
             throw new LunoraError("BAD_REQUEST", `You can save at most ${MAX_SITE_LOGINS} site logins`);
         }
 
-        const id = await ctx.db.insert("savedSiteLogins", withoutUndefined({ createdAt: ctx.now, encryptedPassword, origin, userId, ...fields }));
+        const id = await ctx.db.insert("savedSiteLogins", withoutUndefined({ createdAt: ctx.now, encryptedPassword, origin, signInUrl, userId, ...fields }));
 
         ctx.log.event("vault.site_login_saved", { created: true, passwordChanged: true });
 
@@ -365,11 +382,12 @@ export const listUsableSiteLogins = internalQuery
  * The one login a run of `threadId` may use for `site`, still encrypted, for the server-side fill. `null` when there is
  * none: the site is not saved, or the run may not use it. `site` is the origin of the page the browser is on, read by
  * the server, never a site the model names. The caller decrypts it in the action that types it, and never returns it
- * from a workflow step or puts it in a queue payload, where it would be kept.
+ * from a workflow step or puts it in a queue payload, where it would be kept. `signInUrl` is the saved sign-in page, the
+ * only page the fill opens (the site's front page when none is saved).
  */
 export const siteLoginForFill = internalQuery
     .input({ site: v.string().max(SITE_ORIGIN_MAX * 4), threadId: v.id("threads"), turn: v.object({ ...siteLoginTurnFields }), userId: v.string() })
-    .output(v.union(v.null(), v.object({ encryptedPassword: v.string(), site: v.string(), username: v.string() })))
+    .output(v.union(v.null(), v.object({ encryptedPassword: v.string(), signInUrl: v.optional(v.string()), site: v.string(), username: v.string() })))
     .query(async ({ args, ctx }) => {
         const origin = normalizeSiteOrigin(args.site);
 
@@ -380,5 +398,5 @@ export const siteLoginForFill = internalQuery
         const rows = await usableSiteLogins(ctx, args);
         const row = rows.find((login) => login.origin === origin);
 
-        return row ? { encryptedPassword: row.encryptedPassword, site: row.origin, username: row.username } : null;
+        return row ? { encryptedPassword: row.encryptedPassword, signInUrl: row.signInUrl, site: row.origin, username: row.username } : null;
     });

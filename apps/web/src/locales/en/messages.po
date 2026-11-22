@@ -24,11 +24,11 @@ msgstr " · model: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:859
 msgid "-- INSERT --"
 msgstr "-- INSERT --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:757
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:859
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -60,27 +60,27 @@ msgstr "\"{0}\" will start once its dependencies are done"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 
-#: src/features/chat/thread/composer-input.tsx:641
+#: src/features/chat/thread/composer-input.tsx:646
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "\"{fileName}\" cannot be attached: this file type is not supported."
 
-#: src/features/chat/thread/composer-input.tsx:634
+#: src/features/chat/thread/composer-input.tsx:639
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "\"{fileName}\" could not be attached: its contents do not match its file type."
 
-#: src/features/chat/thread/composer-input.tsx:1162
+#: src/features/chat/thread/composer-input.tsx:1167
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "\"{fileName}\" could not be uploaded, so the message was not sent."
 
-#: src/features/chat/thread/composer-input.tsx:636
+#: src/features/chat/thread/composer-input.tsx:641
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "\"{fileName}\" could not be uploaded. Check your connection and try again."
 
-#: src/features/chat/thread/composer-input.tsx:639
+#: src/features/chat/thread/composer-input.tsx:644
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:645
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 
@@ -138,7 +138,7 @@ msgstr "(deleted case)"
 msgid "(deleted task)"
 msgstr "(deleted task)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:436
+#: src/features/projects/components/computer-rule-file-import.tsx:467
 msgid "(did not fit in one read: import it on its own)"
 msgstr "(did not fit in one read: import it on its own)"
 
@@ -186,15 +186,15 @@ msgstr "(microdollars; 1,000,000 = $1)"
 msgid "(none)"
 msgstr "(none)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:441
+#: src/features/projects/components/computer-rule-file-import.tsx:472
 msgid "(not in the computer's answer: try again)"
 msgstr "(not in the computer's answer: try again)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:437
+#: src/features/projects/components/computer-rule-file-import.tsx:468
 msgid "(not on this computer)"
 msgstr "(not on this computer)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:485
+#: src/features/projects/components/computer-rule-file-import.tsx:516
 msgid "(offline)"
 msgstr "(offline)"
 
@@ -218,7 +218,7 @@ msgstr "(opens in new tab)"
 msgid "(optional)"
 msgstr "(optional)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:439
+#: src/features/projects/components/computer-rule-file-import.tsx:470
 msgid "(refused: it links outside your home folder or is not a text file)"
 msgstr "(refused: it links outside your home folder or is not a text file)"
 
@@ -226,7 +226,7 @@ msgstr "(refused: it links outside your home folder or is not a text file)"
 msgid "(required)"
 msgstr "(required)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:430
+#: src/features/projects/components/computer-rule-file-import.tsx:461
 #: src/features/projects/components/repo-rule-file-import.tsx:245
 msgid "(same file as {path})"
 msgstr "(same file as {path})"
@@ -235,7 +235,7 @@ msgstr "(same file as {path})"
 msgid "(shared)"
 msgstr "(shared)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:440
+#: src/features/projects/components/computer-rule-file-import.tsx:471
 #: src/features/projects/components/repo-rule-file-import.tsx:434
 msgid "(too large)"
 msgstr "(too large)"
@@ -655,7 +655,7 @@ msgid "{0} input, {1} output per 1M tokens"
 msgstr "{0} input, {1} output per 1M tokens"
 
 #. placeholder {0}: chosen.name
-#: src/features/projects/components/computer-rule-file-import.tsx:553
+#: src/features/projects/components/computer-rule-file-import.tsx:584
 msgid "{0} is offline. Open the desktop app on it to continue."
 msgstr "{0} is offline. Open the desktop app on it to continue."
 
@@ -675,7 +675,7 @@ msgid "{0} items were created. Skills, schedules and webhooks are switched off; 
 msgstr "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 
 #. placeholder {0}: formatNumber(Math.max(1, Math.ceil(bytes / 1024)), i18n.locale)
-#: src/features/projects/components/computer-rule-file-import.tsx:432
+#: src/features/projects/components/computer-rule-file-import.tsx:463
 msgid "{0} KB"
 msgstr "{0} KB"
 
@@ -1117,7 +1117,7 @@ msgstr "{handoff} credits"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 
-#: src/features/chat/thread/composer-input-area.tsx:187
+#: src/features/chat/thread/composer-input-area.tsx:197
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 
@@ -1304,11 +1304,11 @@ msgstr "{minutes}m ago"
 msgid "{minutes}m remaining"
 msgstr "{minutes}m remaining"
 
-#: src/features/chat/thread/composer.tsx:237
+#: src/features/chat/thread/composer.tsx:236
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel} mode — click to change"
 
-#: src/features/chat/thread/thread.tsx:266
+#: src/features/chat/thread/thread.tsx:264
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 
@@ -1372,11 +1372,11 @@ msgstr "{name} connected."
 msgid "{name} connection activated"
 msgstr "{name} connection activated"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:283
+#: src/features/projects/components/computer-rule-file-import.tsx:294
 msgid "{name} could not read the files."
 msgstr "{name} could not read the files."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:282
+#: src/features/projects/components/computer-rule-file-import.tsx:293
 msgid "{name} did not answer in time. Open the desktop app on it and try again."
 msgstr "{name} did not answer in time. Open the desktop app on it and try again."
 
@@ -1388,7 +1388,7 @@ msgstr "{name} disconnected"
 msgid "{name} hidden from the model picker"
 msgstr "{name} hidden from the model picker"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:279
+#: src/features/projects/components/computer-rule-file-import.tsx:290
 msgid "{name} is busy with other requests. Try again in a moment."
 msgstr "{name} is busy with other requests. Try again in a moment."
 
@@ -1396,7 +1396,7 @@ msgstr "{name} is busy with other requests. Try again in a moment."
 msgid "{name} is installed"
 msgstr "{name} is installed"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:287
+#: src/features/projects/components/computer-rule-file-import.tsx:298
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} is offline. Open the desktop app on it and try again."
 
@@ -2064,7 +2064,7 @@ msgstr "A listed built-in tool no longer exists. Remove it before saving."
 msgid "A locked chat cannot have a guest link."
 msgstr "A locked chat cannot have a guest link."
 
-#: src/features/vault/components/site-logins.tsx:542
+#: src/features/vault/components/site-logins.tsx:593
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "A login can name at most {MAX_TEAMMATES} bots."
 
@@ -2575,10 +2575,10 @@ msgstr "Add at least one model — use \"Fetch models\" or type the ids"
 msgid "Add at least one model id"
 msgstr "Add at least one model id"
 
-#: src/features/chat/thread/composer-input-area.tsx:232
-#: src/features/chat/thread/composer-input-area.tsx:266
-#: src/features/chat/thread/composer-input-area.tsx:273
-#: src/features/chat/thread/composer-input-area.tsx:287
+#: src/features/chat/thread/composer-input-area.tsx:242
+#: src/features/chat/thread/composer-input-area.tsx:276
+#: src/features/chat/thread/composer-input-area.tsx:283
+#: src/features/chat/thread/composer-input-area.tsx:297
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "Add attachment"
@@ -4218,7 +4218,7 @@ msgstr "Approve a code"
 msgid "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
 msgstr "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:449
+#: src/features/projects/components/computer-rule-file-import.tsx:480
 msgid "Approve the request in the desktop app on {name}."
 msgstr "Approve the request in the desktop app on {name}."
 
@@ -4495,7 +4495,7 @@ msgstr "Ask a Side Question"
 msgid "Ask a side question without interrupting the reply"
 msgstr "Ask a side question without interrupting the reply"
 
-#: src/features/chat/thread/thread.tsx:266
+#: src/features/chat/thread/thread.tsx:264
 msgid "Ask all models anything..."
 msgstr "Ask all models anything..."
 
@@ -4507,7 +4507,7 @@ msgstr "Ask anything to start a new chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:272
 msgid "Ask me anything..."
 msgstr "Ask me anything..."
 
@@ -4645,7 +4645,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:134
+#: src/features/chat/thread/composer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -5451,7 +5451,7 @@ msgstr "Bot token from the Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:588
 msgid "Bots that may use it"
 msgstr "Bots that may use it"
 
@@ -5974,7 +5974,7 @@ msgstr "Canada"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/add-project-dialog.tsx:682
-#: src/features/projects/components/computer-rule-file-import.tsx:582
+#: src/features/projects/components/computer-rule-file-import.tsx:613
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
 #: src/features/projects/components/repo-rule-file-import.tsx:461
@@ -6005,7 +6005,7 @@ msgstr "Canada"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:566
+#: src/features/vault/components/site-logins.tsx:617
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -6132,7 +6132,7 @@ msgstr "Caption"
 msgid "Caption text"
 msgstr "Caption text"
 
-#: src/features/chat/thread/composer-input-area.tsx:261
+#: src/features/chat/thread/composer-input-area.tsx:271
 msgid "Capture screen"
 msgstr "Capture screen"
 
@@ -6922,7 +6922,7 @@ msgstr "Click the pin icon on any message to save it here."
 msgid "Click the star on any model in All models to add it here."
 msgstr "Click the star on any model in All models to add it here."
 
-#: src/features/chat/thread/composer-input.tsx:322
+#: src/features/chat/thread/composer-input.tsx:325
 msgid "Click to edit"
 msgstr "Click to edit"
 
@@ -7733,7 +7733,7 @@ msgid "Compressing context..."
 msgstr "Compressing context..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/projects/components/computer-rule-file-import.tsx:471
+#: src/features/projects/components/computer-rule-file-import.tsx:502
 #: src/features/settings/components/chat/bots-settings.tsx:435
 msgid "Computer"
 msgstr "Computer"
@@ -8399,8 +8399,8 @@ msgstr "Conversations and pending comments on files this list does not show"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
-#: src/features/chat/thread/composer-input.tsx:825
-#: src/features/chat/thread/composer-input.tsx:1743
+#: src/features/chat/thread/composer-input.tsx:830
+#: src/features/chat/thread/composer-input.tsx:1748
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -8730,7 +8730,7 @@ msgstr "Could not attach {0}. The other files were attached; try those again."
 msgid "Could not attach {0}. Try those again."
 msgstr "Could not attach {0}. Try those again."
 
-#: src/features/chat/thread/composer-input.tsx:1773
+#: src/features/chat/thread/composer-input.tsx:1778
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -8864,7 +8864,7 @@ msgstr "Could not delete the bot."
 msgid "Could not delete the comment"
 msgstr "Could not delete the comment"
 
-#: src/features/vault/components/site-logins.tsx:388
+#: src/features/vault/components/site-logins.tsx:419
 msgid "Could not delete the login."
 msgstr "Could not delete the login."
 
@@ -8946,7 +8946,7 @@ msgid "Could not load this"
 msgstr "Could not load this"
 
 #: src/features/chat/split/chat-split-view.tsx:239
-#: src/features/chat/thread/thread.tsx:371
+#: src/features/chat/thread/thread.tsx:365
 msgid "Could not load this chat's details."
 msgstr "Could not load this chat's details."
 
@@ -9038,11 +9038,11 @@ msgstr "Could not reach the server to start generating. Check your connection an
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1776
+#: src/features/chat/thread/composer-input.tsx:1781
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1777
+#: src/features/chat/thread/composer-input.tsx:1782
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -9108,7 +9108,7 @@ msgstr "Could not save the Daily Brief setting."
 msgid "Could not save the email setting."
 msgstr "Could not save the email setting."
 
-#: src/features/vault/components/site-logins.tsx:341
+#: src/features/vault/components/site-logins.tsx:368
 msgid "Could not save the login."
 msgstr "Could not save the login."
 
@@ -10036,7 +10036,7 @@ msgstr "Debate rounds"
 msgid "Debates for {0} rounds."
 msgstr "Debates for {0} rounds."
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:278
 msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
@@ -10328,7 +10328,7 @@ msgstr "Delegated {0} work runs on this model."
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:574
+#: src/features/vault/components/site-logins.tsx:625
 msgid "Delete"
 msgstr "Delete"
 
@@ -10447,7 +10447,7 @@ msgid "Delete group and children"
 msgstr "Delete group and children"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:459
+#: src/features/vault/components/site-logins.tsx:495
 msgid "Delete login for {0}"
 msgstr "Delete login for {0}"
 
@@ -10581,7 +10581,7 @@ msgstr "Delete the open thread after you confirm ({0})"
 msgid "Delete this case?"
 msgstr "Delete this case?"
 
-#: src/features/vault/components/site-logins.tsx:584
+#: src/features/vault/components/site-logins.tsx:635
 msgid "Delete this login?"
 msgstr "Delete this login?"
 
@@ -11507,7 +11507,7 @@ msgstr "Draft"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Draft a cover letter for a software engineering position"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:276
 msgid "Draft an email, report, or essay..."
 msgstr "Draft an email, report, or essay..."
 
@@ -11539,7 +11539,7 @@ msgstr "Drag files here"
 msgid "Draw an image"
 msgstr "Draw an image"
 
-#: src/features/chat/thread/composer-input-area.tsx:255
+#: src/features/chat/thread/composer-input-area.tsx:265
 msgid "Draw image"
 msgstr "Draw image"
 
@@ -11561,7 +11561,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1967
+#: src/features/chat/thread/composer-input.tsx:1975
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -11879,8 +11879,8 @@ msgstr "Edit collection"
 msgid "Edit comment"
 msgstr "Edit comment"
 
-#: src/features/chat/thread/composer-input.tsx:329
-#: src/features/chat/thread/composer-input.tsx:341
+#: src/features/chat/thread/composer-input.tsx:332
+#: src/features/chat/thread/composer-input.tsx:344
 msgid "Edit content"
 msgstr "Edit content"
 
@@ -11918,12 +11918,12 @@ msgstr "edit image"
 msgid "Edit Image"
 msgstr "Edit Image"
 
-#: src/features/vault/components/site-logins.tsx:476
+#: src/features/vault/components/site-logins.tsx:512
 msgid "Edit login"
 msgstr "Edit login"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:449
+#: src/features/vault/components/site-logins.tsx:485
 msgid "Edit login for {0}"
 msgstr "Edit login for {0}"
 
@@ -13338,7 +13338,7 @@ msgstr "Expires: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Expiring soon"
 
-#: src/features/chat/thread/composer.tsx:280
+#: src/features/chat/thread/composer.tsx:279
 msgid "Explain a concept in simple terms..."
 msgstr "Explain a concept in simple terms..."
 
@@ -13601,7 +13601,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1584
+#: src/features/chat/thread/composer-input.tsx:1589
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -14011,7 +14011,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:1616
+#: src/features/chat/thread/composer-input.tsx:1621
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -14865,7 +14865,7 @@ msgstr "Files dropped earlier for another account were not attached. Drop them a
 msgid "Files found"
 msgstr "Files found"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:536
+#: src/features/projects/components/computer-rule-file-import.tsx:567
 msgid "Files not imported"
 msgstr "Files not imported"
 
@@ -14999,7 +14999,7 @@ msgstr "Finalizing..."
 msgid "Financial data and bank connection APIs"
 msgstr "Financial data and bank connection APIs"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:577
+#: src/features/projects/components/computer-rule-file-import.tsx:608
 #: src/features/projects/components/repo-rule-file-import.tsx:457
 msgid "Find files"
 msgstr "Find files"
@@ -15344,7 +15344,7 @@ msgstr "Forward to a new chat"
 
 #. placeholder {0}: found.filter((file) => file.status === "found").length
 #. placeholder {0}: found.length
-#: src/features/projects/components/computer-rule-file-import.tsx:498
+#: src/features/projects/components/computer-rule-file-import.tsx:529
 #: src/features/projects/components/repo-rule-file-import.tsx:403
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "Found {0, plural, one {# file} other {# files}}."
@@ -15810,7 +15810,7 @@ msgstr "Generate an image from a text prompt and upscale it to 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Generate an image of a cozy reading nook with warm lighting and plants."
 
-#: src/features/chat/thread/composer.tsx:282
+#: src/features/chat/thread/composer.tsx:281
 msgid "Generate an image or video..."
 msgstr "Generate an image or video..."
 
@@ -16158,7 +16158,7 @@ msgstr "Go to previous page"
 msgid "Go to Prompts"
 msgstr "Go to Prompts"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:353
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:372
 msgid "Go to reply"
 msgstr "Go to reply"
 
@@ -16819,8 +16819,8 @@ msgstr "Hide attached content"
 msgid "Hide column"
 msgstr "Hide column"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:253
-#: src/features/chat/thread/composer-followup-suggestions.tsx:269
+#: src/features/chat/thread/composer-followup-suggestions.tsx:233
+#: src/features/chat/thread/composer-followup-suggestions.tsx:249
 msgid "Hide follow-up suggestions"
 msgstr "Hide follow-up suggestions"
 
@@ -17338,7 +17338,7 @@ msgstr "illustration"
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:132
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -17633,8 +17633,8 @@ msgstr "Import files"
 msgid "Import from repository"
 msgstr "Import from repository"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:455
-#: src/features/projects/components/computer-rule-file-import.tsx:612
+#: src/features/projects/components/computer-rule-file-import.tsx:486
+#: src/features/projects/components/computer-rule-file-import.tsx:643
 msgid "Import from this computer"
 msgstr "Import from this computer"
 
@@ -17654,7 +17654,7 @@ msgstr "Import one kind of export at a time."
 msgid "Import rule folder"
 msgstr "Import rule folder"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:565
+#: src/features/projects/components/computer-rule-file-import.tsx:596
 #: src/features/projects/components/repo-rule-file-import.tsx:453
 msgid "Import selected"
 msgstr "Import selected"
@@ -18084,7 +18084,7 @@ msgstr "Installed models"
 msgid "instruct"
 msgstr "instruct"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:501
+#: src/features/projects/components/computer-rule-file-import.tsx:532
 msgid "Instruction files"
 msgstr "Instruction files"
 
@@ -18156,11 +18156,11 @@ msgstr "Intensity"
 msgid "Interface, user experience and visual design."
 msgstr "Interface, user experience and visual design."
 
-#: src/features/chat/thread/composer-input-area.tsx:348
+#: src/features/chat/thread/composer-input-area.tsx:361
 msgid "Interrupt and restart"
 msgstr "Interrupt and restart"
 
-#: src/features/chat/thread/composer-input-area.tsx:364
+#: src/features/chat/thread/composer-input-area.tsx:377
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Interrupt and restart — stops the current reply and sends this"
 
@@ -18538,7 +18538,7 @@ msgstr "Judge score"
 msgid "Judge: {0}"
 msgstr "Judge: {0}"
 
-#: src/features/chat/thread/thread.tsx:115
+#: src/features/chat/thread/thread.tsx:114
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:84
 msgid "Jump to my last message"
 msgstr "Jump to my last message"
@@ -18792,7 +18792,7 @@ msgstr "Kyrgyzstan"
 msgid "Label"
 msgstr "Label"
 
-#: src/features/vault/components/site-logins.tsx:514
+#: src/features/vault/components/site-logins.tsx:565
 msgid "Label (optional)"
 msgstr "Label (optional)"
 
@@ -19209,7 +19209,7 @@ msgstr "Leave empty for \"any model\"."
 msgid "Leave empty for transparent background"
 msgstr "Leave empty for transparent background"
 
-#: src/features/vault/components/site-logins.tsx:507
+#: src/features/vault/components/site-logins.tsx:558
 msgid "Leave empty to keep the saved password"
 msgstr "Leave empty to keep the saved password"
 
@@ -20007,7 +20007,7 @@ msgstr "Log out"
 msgid "Login"
 msgstr "Login"
 
-#: src/features/vault/components/site-logins.tsx:384
+#: src/features/vault/components/site-logins.tsx:415
 msgid "Login deleted"
 msgstr "Login deleted"
 
@@ -20015,11 +20015,11 @@ msgstr "Login deleted"
 msgid "login refused"
 msgstr "login refused"
 
-#: src/features/vault/components/site-logins.tsx:340
+#: src/features/vault/components/site-logins.tsx:367
 msgid "Login saved"
 msgstr "Login saved"
 
-#: src/features/vault/components/site-logins.tsx:340
+#: src/features/vault/components/site-logins.tsx:367
 msgid "Login updated"
 msgstr "Login updated"
 
@@ -20027,7 +20027,7 @@ msgstr "Login updated"
 msgid "Logins"
 msgstr "Logins"
 
-#: src/features/vault/components/site-logins.tsx:400
+#: src/features/vault/components/site-logins.tsx:431
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 
@@ -20091,7 +20091,7 @@ msgstr "Long text detected"
 msgid "Long text generation in images"
 msgstr "Long text generation in images"
 
-#: src/features/chat/thread/composer-input.tsx:901
+#: src/features/chat/thread/composer-input.tsx:906
 msgid "Long text was attached as a file."
 msgstr "Long text was attached as a file."
 
@@ -20152,7 +20152,7 @@ msgstr "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, a
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:492
+#: src/features/projects/components/computer-rule-file-import.tsx:523
 msgid "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md in your home folder on {name}, and nothing else. You approve each request in the desktop app."
 msgstr "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md in your home folder on {name}, and nothing else. You approve each request in the desktop app."
 
@@ -20161,7 +20161,7 @@ msgstr "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md
 msgid "LoRA"
 msgstr "LoRA"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:286
+#: src/features/projects/components/computer-rule-file-import.tsx:297
 msgid "Lost track of the request to {name}. Try again."
 msgstr "Lost track of the request to {name}. Try again."
 
@@ -20890,8 +20890,8 @@ msgstr "Merged on {hostLabel}."
 msgid "Merging…"
 msgstr "Merging…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:303
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:624
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:322
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
 msgid "Message"
 msgstr "Message"
 
@@ -21241,7 +21241,7 @@ msgid "Mobile app icon"
 msgstr "Mobile app icon"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:226
+#: src/features/chat/thread/composer.tsx:225
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -22349,7 +22349,7 @@ msgstr "New high quality model for photorealism and text rendering"
 msgid "New line in message"
 msgstr "New line in message"
 
-#: src/features/vault/components/site-logins.tsx:476
+#: src/features/vault/components/site-logins.tsx:512
 msgid "New login"
 msgstr "New login"
 
@@ -22492,7 +22492,7 @@ msgstr "Next match"
 msgid "Next option"
 msgstr "Next option"
 
-#: src/features/chat/thread/composer.tsx:243
+#: src/features/chat/thread/composer.tsx:242
 msgid "Next output mode"
 msgstr "Next output mode"
 
@@ -25031,7 +25031,7 @@ msgstr "Output Format"
 msgid "Output is not loaded in this view."
 msgstr "Output is not loaded in this view."
 
-#: src/features/chat/thread/composer.tsx:254
+#: src/features/chat/thread/composer.tsx:253
 msgid "Output Mode"
 msgstr "Output Mode"
 
@@ -25177,7 +25177,7 @@ msgstr "Pair a computer in the Neore desktop app so agents can work on your file
 msgid "Pair one in Settings"
 msgstr "Pair one in Settings"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:468
+#: src/features/projects/components/computer-rule-file-import.tsx:499
 msgid "Pair the desktop app in Settings → Devices to import from a computer."
 msgstr "Pair the desktop app in Settings → Devices to import from a computer."
 
@@ -25334,7 +25334,7 @@ msgstr "Passkeys allow you to sign in securely using your device's biometric aut
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:501
+#: src/features/vault/components/site-logins.tsx:552
 msgid "Password"
 msgstr "Password"
 
@@ -25381,7 +25381,7 @@ msgstr "Password reset email sent"
 msgid "Password reset successful"
 msgstr "Password reset successful"
 
-#: src/features/vault/components/site-logins.tsx:443
+#: src/features/vault/components/site-logins.tsx:474
 msgid "Password set"
 msgstr "Password set"
 
@@ -25872,7 +25872,7 @@ msgstr "plan"
 msgid "Plan"
 msgstr "Plan"
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:275
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Plan a project or brainstorm ideas..."
 
@@ -26428,7 +26428,7 @@ msgstr "Previous match"
 msgid "Previous option"
 msgstr "Previous option"
 
-#: src/features/chat/thread/composer.tsx:209
+#: src/features/chat/thread/composer.tsx:208
 msgid "Previous output mode"
 msgstr "Previous output mode"
 
@@ -27129,11 +27129,11 @@ msgstr "Question"
 msgid "Queue"
 msgstr "Queue"
 
-#: src/features/chat/thread/composer-input-area.tsx:375
+#: src/features/chat/thread/composer-input-area.tsx:388
 msgid "Queue message"
 msgstr "Queue message"
 
-#: src/features/chat/thread/composer-input-area.tsx:394
+#: src/features/chat/thread/composer-input-area.tsx:407
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Queue message — sends when the current reply finishes"
 
@@ -27419,7 +27419,7 @@ msgstr "Read-only preview - Fork to edit"
 msgid "Read-only shared conversation"
 msgstr "Read-only shared conversation"
 
-#: src/features/chat/thread/composer-input.tsx:286
+#: src/features/chat/thread/composer-input.tsx:289
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Reading \"{attachmentName}\"…"
 
@@ -28050,10 +28050,10 @@ msgstr "Remember me"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:348
-#: src/features/chat/thread/composer-input.tsx:360
-#: src/features/chat/thread/composer-input.tsx:414
-#: src/features/chat/thread/composer-input.tsx:423
+#: src/features/chat/thread/composer-input.tsx:351
+#: src/features/chat/thread/composer-input.tsx:363
+#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:426
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:323
@@ -28563,7 +28563,7 @@ msgstr "Research"
 msgid "Research a topic"
 msgstr "Research a topic"
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:277
 msgid "Research a topic in depth..."
 msgstr "Research a topic in depth..."
 
@@ -28839,11 +28839,11 @@ msgstr "Retry now"
 msgid "Retry the device check"
 msgstr "Retry the device check"
 
-#: src/features/chat/thread/composer-input.tsx:437
+#: src/features/chat/thread/composer-input.tsx:440
 msgid "Retry upload"
 msgstr "Retry upload"
 
-#: src/features/chat/thread/composer-input.tsx:432
+#: src/features/chat/thread/composer-input.tsx:435
 msgid "Retry upload of {attachmentName}"
 msgstr "Retry upload of {attachmentName}"
 
@@ -29493,7 +29493,7 @@ msgstr "Save case"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:562
+#: src/features/vault/components/site-logins.tsx:613
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Save changes"
@@ -29510,7 +29510,7 @@ msgstr "Save failed"
 msgid "Save Image"
 msgstr "Save Image"
 
-#: src/features/vault/components/site-logins.tsx:562
+#: src/features/vault/components/site-logins.tsx:613
 msgid "Save login"
 msgstr "Save login"
 
@@ -29695,7 +29695,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:1543
+#: src/features/chat/thread/composer-input.tsx:1548
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -29720,7 +29720,7 @@ msgstr "Scroll left one page of columns"
 msgid "Scroll right one page of columns"
 msgstr "Scroll right one page of columns"
 
-#: src/features/chat/thread/thread.tsx:121
+#: src/features/chat/thread/thread.tsx:120
 msgid "Scroll to bottom"
 msgstr "Scroll to bottom"
 
@@ -30395,13 +30395,13 @@ msgid "Send Magic Link"
 msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:182
-#: src/features/chat/thread/composer-input-area.tsx:429
+#: src/features/chat/thread/composer-input-area.tsx:192
+#: src/features/chat/thread/composer-input-area.tsx:442
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:104
 msgid "Send message"
 msgstr "Send message"
 
-#: src/features/chat/thread/composer-input-area.tsx:182
+#: src/features/chat/thread/composer-input-area.tsx:192
 msgid "Send message ({sendShortcut})"
 msgstr "Send message ({sendShortcut})"
 
@@ -30456,7 +30456,7 @@ msgstr "Send verification code"
 msgid "Send Verification Code"
 msgstr "Send Verification Code"
 
-#: src/features/chat/thread/composer-input-area.tsx:204
+#: src/features/chat/thread/composer-input-area.tsx:214
 msgid "Send when uploads finish"
 msgstr "Send when uploads finish"
 
@@ -30464,9 +30464,9 @@ msgstr "Send when uploads finish"
 msgid "Send: {snippet}"
 msgstr "Send: {snippet}"
 
-#: src/features/chat/thread/composer-input-area.tsx:204
-#: src/features/chat/thread/composer-input-area.tsx:206
-#: src/features/chat/thread/composer-input-area.tsx:459
+#: src/features/chat/thread/composer-input-area.tsx:214
+#: src/features/chat/thread/composer-input-area.tsx:216
+#: src/features/chat/thread/composer-input-area.tsx:472
 msgid "Sending once uploads finish…"
 msgstr "Sending once uploads finish…"
 
@@ -30881,8 +30881,8 @@ msgstr "Show all tasks"
 msgid "Show attached content"
 msgstr "Show attached content"
 
-#: src/features/chat/thread/composer-followup-suggestions.tsx:253
-#: src/features/chat/thread/composer-followup-suggestions.tsx:269
+#: src/features/chat/thread/composer-followup-suggestions.tsx:233
+#: src/features/chat/thread/composer-followup-suggestions.tsx:249
 msgid "Show follow-up suggestions"
 msgstr "Show follow-up suggestions"
 
@@ -31176,6 +31176,15 @@ msgstr "Sign up to unlock all models"
 msgid "Sign-in expired"
 msgstr "Sign-in expired"
 
+#: src/features/vault/components/site-logins.tsx:526
+msgid "Sign-in page (optional)"
+msgstr "Sign-in page (optional)"
+
+#. placeholder {0}: login.signInUrl
+#: src/features/vault/components/site-logins.tsx:478
+msgid "Sign-in page: {0}"
+msgstr "Sign-in page: {0}"
+
 #: src/features/auth/components/device-code-parts.tsx:73
 msgid "Sign-in request"
 msgstr "Sign-in request"
@@ -31258,15 +31267,15 @@ msgstr "Sinhala"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Sinhala (Sri Lanka)"
 
-#: src/features/vault/components/site-logins.tsx:478
+#: src/features/vault/components/site-logins.tsx:514
 msgid "Site"
 msgstr "Site"
 
-#: src/features/vault/components/site-logins.tsx:398
+#: src/features/vault/components/site-logins.tsx:429
 msgid "Site logins"
 msgstr "Site logins"
 
-#: src/features/vault/components/site-logins.tsx:421
+#: src/features/vault/components/site-logins.tsx:452
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "Site logins can't be saved, changed or deleted while impersonating."
 
@@ -32340,11 +32349,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Status Page"
 
-#: src/features/chat/thread/composer-input-area.tsx:365
+#: src/features/chat/thread/composer-input-area.tsx:378
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Steer — the current reply reads this at its next step"
 
-#: src/features/chat/thread/composer-input-area.tsx:348
+#: src/features/chat/thread/composer-input-area.tsx:361
 msgid "Steer the reply"
 msgstr "Steer the reply"
 
@@ -32425,8 +32434,8 @@ msgstr "Stop browser session"
 
 #: src/features/chat/thread-list/thread-node.tsx:633
 #: src/features/chat/thread-list/thread-node.tsx:655
-#: src/features/chat/thread/composer-input-area.tsx:402
 #: src/features/chat/thread/composer-input-area.tsx:415
+#: src/features/chat/thread/composer-input-area.tsx:428
 msgid "Stop generating"
 msgstr "Stop generating"
 
@@ -32980,7 +32989,11 @@ msgstr "Suggested"
 msgid "Suggested answers"
 msgstr "Suggested answers"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:674
+msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
+msgstr "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:665
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion available, press Right Arrow to accept"
 
@@ -33013,7 +33026,7 @@ msgstr "Summarise my notes from today"
 msgid "Summarise my notes in three bullets."
 msgstr "Summarise my notes in three bullets."
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:274
 msgid "Summarize a document or URL..."
 msgstr "Summarize a document or URL..."
 
@@ -33714,7 +33727,7 @@ msgstr "text"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33771,7 +33784,7 @@ msgstr "Text direction set to LTR"
 msgid "Text direction set to RTL"
 msgstr "Text direction set to RTL"
 
-#: src/features/chat/thread/composer-input.tsx:322
+#: src/features/chat/thread/composer-input.tsx:325
 msgid "Text document"
 msgstr "Text document"
 
@@ -34129,7 +34142,7 @@ msgid "The agent's browser was replaced, and control went back to the agent. You
 msgstr "The agent's browser was replaced, and control went back to the agent. You can take control again."
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:575
+#: src/features/vault/components/site-logins.tsx:626
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "The agent's browser won't be able to use it to sign in to {0}."
 
@@ -34250,7 +34263,7 @@ msgstr "the change was refused"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "The chat agent works the task with its tools, optionally following a skill."
 
-#: src/features/chat/thread/composer-input.tsx:1001
+#: src/features/chat/thread/composer-input.tsx:1006
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "The chat changed before the paste was ready, so it was not inserted."
 
@@ -34286,12 +34299,12 @@ msgstr "The command line was not signed in. You can close this tab."
 msgid "The comparison could not be loaded."
 msgstr "The comparison could not be loaded."
 
-#: src/features/chat/thread/composer-input.tsx:1009
-#: src/features/chat/thread/composer-input.tsx:1031
+#: src/features/chat/thread/composer-input.tsx:1014
+#: src/features/chat/thread/composer-input.tsx:1036
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "The composer was locked before the paste was ready, so it was not inserted."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:290
+#: src/features/projects/components/computer-rule-file-import.tsx:301
 msgid "The computer's answer could not be read. Try again, or update the desktop app on {name}."
 msgstr "The computer's answer could not be read. Try again, or update the desktop app on {name}."
 
@@ -34665,7 +34678,7 @@ msgstr "The model in the link is not available. The chat keeps its model."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "The model picker now lists {0} models from {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1478
+#: src/features/chat/thread/composer-input.tsx:1483
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 
@@ -34730,6 +34743,10 @@ msgstr "The page agent could not edit this page"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "The page now shows the other version. Copy anything you want to keep from yours."
 
+#: src/features/vault/components/site-logins.tsx:537
+msgid "The page with the login form. Leave empty to start at the site's front page."
+msgstr "The page with the login form. Leave empty to start at the site's front page."
+
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1077
 msgid "The page you opened is still loading."
 msgstr "The page you opened is still loading."
@@ -34738,7 +34755,7 @@ msgstr "The page you opened is still loading."
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 
-#: src/features/chat/thread/composer-input.tsx:1057
+#: src/features/chat/thread/composer-input.tsx:1062
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "The pasted text could not be attached and was not inserted."
 
@@ -34815,7 +34832,7 @@ msgstr "The repository could not be read."
 msgid "The repository or its branch was not found."
 msgstr "The repository or its branch was not found."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:289
+#: src/features/projects/components/computer-rule-file-import.tsx:300
 msgid "The request could not be sent."
 msgstr "The request could not be sent."
 
@@ -34831,7 +34848,7 @@ msgstr "The request timed out but may still complete. Check the conversation bef
 msgid "The request timed out. Please try again."
 msgstr "The request timed out. Please try again."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:280
+#: src/features/projects/components/computer-rule-file-import.tsx:291
 msgid "The request was denied on {name}."
 msgstr "The request was denied on {name}."
 
@@ -34875,6 +34892,10 @@ msgstr "The server lists no models yet — pull or load one first"
 #: src/features/admin/components/admin-shard-footprint-row.tsx:116
 msgid "The shard footprint could not be measured."
 msgstr "The shard footprint could not be measured."
+
+#: src/features/vault/components/site-logins.tsx:394
+msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
+msgstr "The sign-in page must be an https:// address on the same site, with no username or password in it."
 
 #: src/features/skills/components/skill-import-dialog.tsx:151
 msgid "The skill could not be imported."
@@ -34933,11 +34954,11 @@ msgstr "The two passcodes do not match."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "The unified LLM gateway for modern AI applications."
 
-#: src/features/chat/thread/composer-input.tsx:635
+#: src/features/chat/thread/composer-input.tsx:640
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "The upload of \"{fileName}\" expired. Please attach it again."
 
-#: src/features/chat/thread/composer-input.tsx:1491
+#: src/features/chat/thread/composer-input.tsx:1496
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "The uploads finished, but the message was not sent. Press send to send it."
 
@@ -35275,7 +35296,7 @@ msgstr "This computer did not resume its own session, so the conversation was ha
 msgid "This computer is no longer paired."
 msgstr "This computer is no longer paired."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:284
+#: src/features/projects/components/computer-rule-file-import.tsx:295
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "This computer is no longer paired. Pair it again in Settings → Devices."
 
@@ -35496,10 +35517,14 @@ msgid "This list is full: remove a tool before adding another."
 msgstr "This list is full: remove a tool before adding another."
 
 #: src/features/vault/components/site-logins.tsx:307
-msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
-msgstr "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
+#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
+#~ msgstr "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 
-#: src/features/vault/components/site-logins.tsx:317
+#: src/features/vault/components/site-logins.tsx:334
+msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
+msgstr "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
+
+#: src/features/vault/components/site-logins.tsx:344
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "This login was changed elsewhere. Reload the page to see it before saving again."
 
@@ -36244,7 +36269,7 @@ msgid "Too many requests right now. Try again in a moment."
 msgstr "Too many requests right now. Try again in a moment."
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:164
-#: src/features/projects/components/computer-rule-file-import.tsx:285
+#: src/features/projects/components/computer-rule-file-import.tsx:296
 msgid "Too many requests. Please try again in a moment."
 msgstr "Too many requests. Please try again in a moment."
 
@@ -36475,7 +36500,7 @@ msgstr "Transformed Image"
 msgid "Translate"
 msgstr "Translate"
 
-#: src/features/chat/thread/composer.tsx:281
+#: src/features/chat/thread/composer.tsx:280
 msgid "Translate text to another language..."
 msgstr "Translate text to another language..."
 
@@ -36651,14 +36676,14 @@ msgstr "Try adjusting your search terms."
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:154
-#: src/features/projects/components/computer-rule-file-import.tsx:464
+#: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:415
-#: src/features/vault/components/site-logins.tsx:531
+#: src/features/vault/components/site-logins.tsx:446
+#: src/features/vault/components/site-logins.tsx:582
 msgid "Try again"
 msgstr "Try again"
 
@@ -36844,8 +36869,8 @@ msgid "Type your answer…"
 msgstr "Type your answer…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:1957
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:203
+#: src/features/chat/thread/composer-input.tsx:1965
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
 msgid "Type your message..."
 msgstr "Type your message..."
 
@@ -37014,7 +37039,7 @@ msgstr "Underline"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:903
+#: src/features/chat/thread/composer-input.tsx:908
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Undo"
@@ -37266,7 +37291,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1812
+#: src/features/chat/thread/composer-input.tsx:1817
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -37292,7 +37317,7 @@ msgstr "Update Role"
 msgid "Update Server"
 msgstr "Update Server"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:288
+#: src/features/projects/components/computer-rule-file-import.tsx:299
 msgid "Update the desktop app on {name} first."
 msgstr "Update the desktop app on {name} first."
 
@@ -37464,18 +37489,18 @@ msgstr "Upload CSVs, run Python analysis, and export charts — no Jupyter setup
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 
-#: src/features/chat/thread/composer-input.tsx:429
-#: src/features/chat/thread/composer-input.tsx:680
-#: src/features/chat/thread/composer-input.tsx:1718
+#: src/features/chat/thread/composer-input.tsx:432
+#: src/features/chat/thread/composer-input.tsx:685
+#: src/features/chat/thread/composer-input.tsx:1723
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1711
+#: src/features/chat/thread/composer-input.tsx:1716
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:250
+#: src/features/chat/thread/composer-input-area.tsx:260
 msgid "Upload file"
 msgstr "Upload file"
 
@@ -37521,7 +37546,7 @@ msgstr "Uploaded"
 msgid "Uploaded {fileName}"
 msgstr "Uploaded {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:366
+#: src/features/chat/thread/composer-input.tsx:369
 msgid "Uploading {attachmentName}"
 msgstr "Uploading {attachmentName}"
 
@@ -37841,7 +37866,7 @@ msgstr "Username"
 msgid "Username is required"
 msgstr "Username is required"
 
-#: src/features/vault/components/site-logins.tsx:490
+#: src/features/vault/components/site-logins.tsx:541
 msgid "Username or email"
 msgstr "Username or email"
 
@@ -38187,7 +38212,7 @@ msgstr "video"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:133
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -38651,7 +38676,7 @@ msgstr "Waiting for {0}."
 msgid "Waiting for {device} to pick this up…"
 msgstr "Waiting for {device} to pick this up…"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:449
+#: src/features/projects/components/computer-rule-file-import.tsx:480
 msgid "Waiting for {name}…"
 msgstr "Waiting for {name}…"
 
@@ -38688,8 +38713,8 @@ msgstr "Waiting for the owner to answer"
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
-#: src/features/chat/thread/composer-input-area.tsx:206
-#: src/features/chat/thread/composer-input-area.tsx:375
+#: src/features/chat/thread/composer-input-area.tsx:216
+#: src/features/chat/thread/composer-input-area.tsx:388
 msgid "Waiting for uploads to complete…"
 msgstr "Waiting for uploads to complete…"
 
@@ -39370,7 +39395,7 @@ msgstr "Write long-form content alongside chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:273
 msgid "Write some code for me..."
 msgstr "Write some code for me..."
 
@@ -39571,12 +39596,12 @@ msgstr "You are not watching any repository."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "You are offline. Neore will reconnect when the network is back."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:281
+#: src/features/projects/components/computer-rule-file-import.tsx:292
 msgid "You are offline. Reconnect and try again."
 msgstr "You are offline. Reconnect and try again."
 
-#: src/features/chat/thread/composer-input.tsx:1116
-#: src/features/chat/thread/composer-input.tsx:1241
+#: src/features/chat/thread/composer-input.tsx:1121
+#: src/features/chat/thread/composer-input.tsx:1246
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "You are offline. Your message stays here; send it once you are back online."
@@ -39841,7 +39866,7 @@ msgstr "Your background, preferences, or location to help the AI understand you 
 msgid "Your bots"
 msgstr "Your bots"
 
-#: src/features/vault/components/site-logins.tsx:520
+#: src/features/vault/components/site-logins.tsx:571
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 
@@ -39862,11 +39887,11 @@ msgid "Your changes to this project's rule files are not saved. Closing drops th
 msgstr "Your changes to this project's rule files are not saved. Closing drops them."
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:432
+#: src/features/vault/components/site-logins.tsx:463
 msgid "Your chats and {0}"
 msgstr "Your chats and {0}"
 
-#: src/features/vault/components/site-logins.tsx:434
+#: src/features/vault/components/site-logins.tsx:465
 msgid "Your chats and the bots you chose"
 msgstr "Your chats and the bots you chose"
 
@@ -39894,7 +39919,7 @@ msgstr "Your computer is busy. Try again in a moment."
 msgid "Your computer is offline. Open Neore on it and try again."
 msgstr "Your computer is offline. Open Neore on it and try again."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:461
+#: src/features/projects/components/computer-rule-file-import.tsx:492
 msgid "Your computers could not be loaded."
 msgstr "Your computers could not be loaded."
 
@@ -39964,12 +39989,12 @@ msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Con
 msgstr "Your GitHub sign-in has expired. Connect GitHub again in Settings → Connectors."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:745
+#: src/features/chat/thread/composer-input.tsx:750
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:738
+#: src/features/chat/thread/composer-input.tsx:743
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 
@@ -40002,7 +40027,7 @@ msgstr "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgid "Your message"
 msgstr "Your message"
 
-#: src/features/chat/thread/composer-input.tsx:1463
+#: src/features/chat/thread/composer-input.tsx:1468
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 
@@ -40056,11 +40081,11 @@ msgstr "Your overview could not be loaded."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Your own Anthropic key. Required to delegate work to Claude Code."
 
-#: src/features/vault/components/site-logins.tsx:539
+#: src/features/vault/components/site-logins.tsx:590
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:460
 msgid "Your own chats only"
 msgstr "Your own chats only"
 
@@ -40119,7 +40144,7 @@ msgstr "Your review was requested"
 msgid "Your rule files are still saving."
 msgstr "Your rule files are still saving."
 
-#: src/features/vault/components/site-logins.tsx:406
+#: src/features/vault/components/site-logins.tsx:437
 msgid "Your saved logins could not be loaded."
 msgstr "Your saved logins could not be loaded."
 
@@ -40308,7 +40333,3 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
-
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:654
-msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
-msgstr "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."

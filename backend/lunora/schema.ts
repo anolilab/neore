@@ -2652,6 +2652,9 @@ export const schema = defineSchema({
         label: v.optional(v.string().max(80)),
         // The exact origin (`https://example.com`); a fill types only into a page of this origin.
         origin: v.string().max(255),
+        // The page with the login form, an https:// URL on `origin` without its fragment (`vault/lib/site-origin.ts#normalizeSignInUrl`).
+        // The fill opens only this page, or the site's front page when unset, never one the model picks.
+        signInUrl: v.optional(v.string().max(2048)),
         // Teammates whose threads may use the login. None: only the user's own chats (threads without a teammate).
         teammateIds: v.optional(v.array(v.id("bots"))),
         updatedAt: v.number(),

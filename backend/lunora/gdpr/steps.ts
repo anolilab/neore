@@ -385,6 +385,7 @@ export const collectFiles = internalQuery
                 v.object({
                     createdAt: v.number(),
                     label: v.optional(v.string()),
+                    signInUrl: v.optional(v.string()),
                     site: v.string(),
                     teammateIds: v.array(v.id("bots")),
                     updatedAt: v.number(),
@@ -433,6 +434,7 @@ export const collectFiles = internalQuery
                 return {
                     createdAt: login.createdAt,
                     label: login.label,
+                    signInUrl: login.signInUrl,
                     site: login.origin,
                     teammateIds: login.teammateIds ?? [],
                     updatedAt: login.updatedAt,

@@ -2,7 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
-import { SITE_LOGIN_CHANGED } from "@neore/backend/vault/site-login-shape";
+import { SIGN_IN_URL_MAX, SITE_LOGIN_CHANGED, SITE_LOGIN_SIGN_IN_PAGE_REFUSED } from "@neore/backend/vault/site-login-shape";
 import { normalizeSiteOrigin } from "@neore/backend/vault/site-origin";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
@@ -26,6 +26,7 @@ const MAX_TEAMMATES = 20;
 /** A saved login as this form last knew it: what an edit was opened from, or what its last save wrote. */
 interface OpenedLogin {
     label: string;
+    signInUrl: string;
     teammateIds: Id<"bots">[];
     /** The server's version of the login; a save of an older one is refused (`SITE_LOGIN_CHANGED`). */
     updatedAt: number;
@@ -39,6 +40,8 @@ interface LoginDraft {
     /** Set with `id`. */
     opened?: OpenedLogin;
     password: string;
+    /** The page with the login form; empty for none. */
+    signInUrl: string;
     site: string;
     teammateIds: Id<"bots">[];
     username: string;
@@ -47,6 +50,7 @@ interface LoginDraft {
 interface ListedLogin {
     id: Id<"savedSiteLogins">;
     label?: string;
+    signInUrl?: string;
     site: string;
     teammateIds: Id<"bots">[];
     updatedAt: number;
@@ -54,7 +58,7 @@ interface ListedLogin {
 }
 
 const emptyDraft = (): LoginDraft => {
-    return { label: "", password: "", site: "", teammateIds: [], username: "" };
+    return { label: "", password: "", signInUrl: "", site: "", teammateIds: [], username: "" };
 };
 
 /**
@@ -63,9 +67,18 @@ const emptyDraft = (): LoginDraft => {
  */
 const editDraft = (login: ListedLogin, savedHere?: number): LoginDraft => {
     const updatedAt = Math.max(login.updatedAt, savedHere ?? 0);
-    const opened = { label: login.label ?? "", teammateIds: login.teammateIds, updatedAt, username: login.username };
+    const opened = { label: login.label ?? "", signInUrl: login.signInUrl ?? "", teammateIds: login.teammateIds, updatedAt, username: login.username };
 
-    return { id: login.id, label: opened.label, opened, password: "", site: login.site, teammateIds: opened.teammateIds, username: opened.username };
+    return {
+        id: login.id,
+        label: opened.label,
+        opened,
+        password: "",
+        signInUrl: opened.signInUrl,
+        site: login.site,
+        teammateIds: opened.teammateIds,
+        username: opened.username,
+    };
 };
 
 /**
@@ -79,6 +92,8 @@ const saveArgs = (draft: LoginDraft) => {
         label: draft.label.trim() || undefined,
         loginId: draft.id,
         password: draft.password === "" ? undefined : draft.password,
+        // Always sent, empty for none, so clearing the field removes the saved page.
+        signInUrl: draft.signInUrl.trim(),
         site: draft.site.trim(),
         teammateIds: draft.teammateIds,
         username: draft.username.trim(),
@@ -117,21 +132,30 @@ const afterSave =
             return current.id !== undefined || password === current.password ? current : { ...current, password };
         }
 
-        const opened = { label: submitted.label.trim(), teammateIds: submitted.teammateIds, updatedAt: saved.updatedAt, username: submitted.username.trim() };
+        const opened = {
+            label: submitted.label.trim(),
+            signInUrl: submitted.signInUrl.trim(),
+            teammateIds: submitted.teammateIds,
+            updatedAt: saved.updatedAt,
+            username: submitted.username.trim(),
+        };
 
         return { ...current, id: saved.id, opened, password };
     };
 
-/** Whether a save was refused because the login changed after this form read it. */
-const changedElsewhere = (error: unknown): boolean => {
+/** The `data.code` a refused save carries, if any. */
+const refusalCode = (error: unknown): unknown => {
     const { data } = (typeof error === "object" && error !== null ? error : {}) as { data?: { code?: unknown } };
 
-    return data?.code === SITE_LOGIN_CHANGED;
+    return data?.code;
 };
+
+/** Whether a save was refused because the login changed after this form read it. */
+const changedElsewhere = (error: unknown): boolean => refusalCode(error) === SITE_LOGIN_CHANGED;
 
 /**
  * After a save of `submitted` was refused as stale: the edit, if the form still holds it, moved onto `fresh`, the login as
- * the server now has it (gone: the form empties). Username and label keep what the person changed since opening it, and
+ * the server now has it (gone: the form empties). Username, label and sign-in page keep what the person changed since opening it, and
  * otherwise take the saved one. The bots are the saved ones, less any the person unticked: a bot removed elsewhere is
  * never written back, and none ticked here is added without being seen again. The password is never kept.
  */
@@ -153,6 +177,7 @@ const reloadAfterConflict =
         return {
             ...reloaded,
             label: opened !== undefined && current.label !== opened.label ? current.label : reloaded.label,
+            signInUrl: opened !== undefined && current.signInUrl !== opened.signInUrl ? current.signInUrl : reloaded.signInUrl,
             teammateIds: reloaded.teammateIds.filter((id) => !unticked.has(id)),
             username: opened !== undefined && current.username !== opened.username ? current.username : reloaded.username,
         };
@@ -189,6 +214,8 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const queryClient = useQueryClient();
     const headingId = useId();
     const siteId = useId();
+    const signInUrlId = useId();
+    const signInUrlHintId = useId();
     const usernameId = useId();
     const passwordId = useId();
     const labelId = useId();
@@ -304,7 +331,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     // The login changed elsewhere since this edit opened it: read it again from the server and move the edit onto it. A
     // one-shot read: the live list answers from its subscription, which may not have the other tab's change yet.
     const reloadLogin = async (submitted: LoginDraft) => {
-        const changed = t`This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again.`;
+        const changed = t`This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again.`;
         const read = await readLoginsNow(queryClient, crpc.vault.site_logins.listSiteLogins.queryOptions({}, { live: false }));
 
         if (!mounted.current) {
@@ -362,7 +389,11 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             }
 
             if (mounted.current) {
-                toast.error(errorText(error, fallback));
+                toast.error(
+                    refusalCode(error) === SITE_LOGIN_SIGN_IN_PAGE_REFUSED
+                        ? t`The sign-in page must be an https:// address on the same site, with no username or password in it.`
+                        : errorText(error, fallback),
+                );
             }
         }
     };
@@ -442,6 +473,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                                     <p className="text-muted-foreground truncate text-xs">
                                         {login.username} · {t`Password set`} · {access}
                                     </p>
+                                    {login.signInUrl && <p className="text-muted-foreground truncate text-xs">{t`Sign-in page: ${login.signInUrl}`}</p>}
                                 </div>
                                 {canWrite && (
                                     <>
@@ -485,6 +517,21 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                             required
                             value={draft.site}
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor={signInUrlId}>{t`Sign-in page (optional)`}</Label>
+                        <Input
+                            aria-describedby={signInUrlHintId}
+                            id={signInUrlId}
+                            inputMode="url"
+                            maxLength={SIGN_IN_URL_MAX}
+                            onChange={(event) => setDraft({ ...draft, signInUrl: event.target.value })}
+                            placeholder="https://example.com/login"
+                            value={draft.signInUrl}
+                        />
+                        <p className="text-muted-foreground text-xs" id={signInUrlHintId}>
+                            {t`The page with the login form. Leave empty to start at the site's front page.`}
+                        </p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor={usernameId}>{t`Username or email`}</Label>

@@ -7,8 +7,9 @@
   The one exception is the internal `siteLoginForFill`, which returns the ciphertext for the server-side fill action (the next part);
   keep it internal and keep the ciphertext inside the action that decrypts it.
 - A login belongs to one exact origin (`lib/site-origin.ts#normalizeSiteOrigin`: HTTPS only, punycode host, default
-  port dropped, a trailing-dot host refused since the browser keeps the dot). Compare origins as plain strings; never match a subdomain, port or suffix. The origin of a saved login
-  never changes on edit.
+  port dropped, a trailing-dot host refused since the browser keeps the dot). Compare origins as plain strings; never match a subdomain, port or suffix; the origin never changes on edit.
+  Its optional sign-in page (`signInUrl`, `normalizeSignInUrl`): a full `https://` URL, no credentials, origin exactly the login's, no fragment (else `SITE_LOGIN_SIGN_IN_PAGE_REFUSED`);
+  empty clears it, absent on an edit keeps it. The fill opens only this page (or the front page), never one the model names.
 - Which run may use a login is decided from its THREAD, TURN and the text in front of the model, never from client
   input, by ONE function: `site-login-turn.ts#siteLoginTurnVerdict`, an ALLOWLIST. Both queries use it, and the fill
   tool of the next part must call it too (through `usableSiteLogins`), never a check of its own. Safe, and only this:
