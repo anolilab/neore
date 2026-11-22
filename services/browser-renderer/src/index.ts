@@ -136,19 +136,41 @@ function readTarget(
         }
     }
 
-    // Names that come from inside the scope: an image's alt, a child's aria-label or title, an SVG title.
-    for (const node of scope.querySelectorAll("img[alt], [aria-label], [title]")) {
-        names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+    // The elements inside the scope, including those in an open shadow root (a shadow tree is part of the button it draws).
+    // querySelectorAll stops at a shadow root, so each root found is walked too.
+    const roots: (Element | ShadowRoot)[] = [scope];
+    const inside: Element[] = [];
+
+    for (let index = 0; index < roots.length; index++) {
+        const root = roots[index];
+        const found = root.querySelectorAll("*");
+
+        for (const element of found) {
+            inside.push(element);
+
+            if (element.shadowRoot !== null) {
+                roots.push(element.shadowRoot);
+            }
+        }
     }
 
-    for (const node of scope.querySelectorAll(":scope svg title")) {
-        names.push(node.textContent ?? "");
+    // Names that come from inside the scope: an image's alt, a child's aria-label or title, an SVG title.
+    const scanned = [scope, ...inside];
+
+    for (const node of scanned) {
+        if (node.matches("img[alt], [aria-label], [title]")) {
+            names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+        }
+
+        if (node.localName === "title" && node.parentElement?.localName === "svg") {
+            names.push(node.textContent ?? "");
+        }
     }
 
     // Generated text (CSS `content`) drawn by the control, the scope, and the elements inside the scope: it is on screen but in
     // neither innerText nor textContent. An element nothing is drawn for shows none of its own. Stops once past the cap.
     let generatedLength = 0;
-    const drawn = new Set<Element>([control, scope, ...scope.querySelectorAll("*")]);
+    const drawn = new Set<Element>([control, scope, ...inside]);
 
     for (const node of drawn) {
         if (node.getClientRects().length === 0 || getComputedStyle(node).visibility === "hidden") {
