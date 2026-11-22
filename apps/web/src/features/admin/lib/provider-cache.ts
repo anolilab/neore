@@ -1,0 +1,143 @@
+/**
+ * The gateway's provider prompt-cache readings rolled up for the admin card: the share of prompt tokens a provider
+ * served from its own cache, per day in the admin's time zone and for the whole window.
+ */
+
+export interface CacheCounts {
+    cachedTokens: number;
+    promptTokens: number;
+    requests: number;
+}
+
+export interface QuarterReading extends CacheCounts {
+    /** The quarter hour's UTC start, as an ISO string. */
+    start: string;
+}
+
+/** The share of prompt tokens served from the provider's cache, or `null` when no prompt tokens were sent. */
+export const cachedShare = (counts: CacheCounts): number | null => (counts.promptTokens === 0 ? null : counts.cachedTokens / counts.promptTokens);
+
+/** The counts of `readings` summed. */
+export const sumCounts = (readings: CacheCounts[]): CacheCounts => {
+    const sum: CacheCounts = { cachedTokens: 0, promptTokens: 0, requests: 0 };
+
+    for (const reading of readings) {
+        sum.cachedTokens += reading.cachedTokens;
+        sum.promptTokens += reading.promptTokens;
+        sum.requests += reading.requests;
+    }
+
+    return sum;
+};
+
+const isTimeZone = (zone: string): boolean => {
+    try {
+        // Throws a RangeError for a zone `Intl` does not know.
+        new Intl.DateTimeFormat("en-US", { timeZone: zone }).format(0);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** The browser's time zone. Read it only after hydration: the server's zone is not the browser's. */
+export const browserTimeZone = (): string => new Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/** `configured` (the user's time zone setting) when `Intl` knows it, else `fallback` (the browser's zone once hydrated), else UTC. */
+export const resolveTimeZone = (configured: string | null | undefined, fallback?: string): string => {
+    if (configured && isTimeZone(configured)) {
+        return configured;
+    }
+
+    return fallback && isTimeZone(fallback) ? fallback : "UTC";
+};
+
+const partsIn = (iso: string, timeZone: string): Partial<Record<Intl.DateTimeFormatPartTypes, string>> => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        day: "2-digit",
+        // `hourCycle` alone asks for no hour: without `hour`, the parts carry none.
+        hour: "2-digit",
+        hourCycle: "h23",
+        minute: "2-digit",
+        month: "2-digit",
+        timeZone,
+        timeZoneName: "longOffset",
+        year: "numeric",
+    }).formatToParts(new Date(iso));
+
+    return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+};
+
+/** `YYYY-MM-DD` of `iso` in `timeZone`, from its parts, whatever order a locale would print them in. */
+export const dayKeyIn = (iso: string, timeZone: string): string => {
+    const parts = partsIn(iso, timeZone);
+
+    return `${parts.year ?? ""}-${parts.month ?? ""}-${parts.day ?? ""}`;
+};
+
+const MINUTE_MS = 60_000;
+
+const QUARTER_MS = 15 * MINUTE_MS;
+
+/** The local hour `iso` falls in, with its UTC offset: `YYYY-MM-DD HH GMT+hh:mm`. An hour that repeats has two offsets. */
+export const hourKeyIn = (iso: string, timeZone: string): string => {
+    const parts = partsIn(iso, timeZone);
+
+    return `${parts.year ?? ""}-${parts.month ?? ""}-${parts.day ?? ""} ${parts.hour ?? ""} ${parts.timeZoneName ?? ""}`;
+};
+
+/**
+ * The first quarter hour of the local hour `startMs` falls in. Going back by its local minutes finds it, unless that
+ * crosses a clock change (Australia/Lord_Howe moves by 30 minutes): then it lands in another hour or offset, and the
+ * first quarter after it that is still in this hour is the hour's real start, as 02:30 is when 02:00–02:30 is skipped.
+ */
+const localHourStart = (startMs: number, timeZone: string): number => {
+    const iso = new Date(startMs).toISOString();
+    const key = hourKeyIn(iso, timeZone);
+    let candidate = startMs - Number(partsIn(iso, timeZone).minute ?? 0) * MINUTE_MS;
+
+    while (candidate < startMs && hourKeyIn(new Date(candidate).toISOString(), timeZone) !== key) {
+        candidate += QUARTER_MS;
+    }
+
+    return candidate;
+};
+
+const sumInto = <Key>(groups: Map<Key, CacheCounts>, key: Key, counts: CacheCounts): void => {
+    groups.set(key, sumCounts([groups.get(key) ?? { cachedTokens: 0, promptTokens: 0, requests: 0 }, counts]));
+};
+
+/**
+ * Quarter hours summed into the hours of `timeZone`, oldest first; `start` is the local hour's first instant as an ISO
+ * string. Every zone's offset is a whole number of quarter hours, so a quarter never straddles two local hours. An hour
+ * that repeats when clocks go back stays two hours, and one shortened by a clock change starts where it really begins.
+ */
+export const byHour = (quarters: QuarterReading[], timeZone: string): (CacheCounts & { start: string })[] => {
+    const hours = new Map<number, CacheCounts>();
+
+    for (const quarter of quarters) {
+        sumInto(hours, localHourStart(Date.parse(quarter.start), timeZone), quarter);
+    }
+
+    return [...hours]
+        .toSorted(([a], [b]) => a - b)
+        .map(([startMs, counts]) => {
+            return { ...counts, start: new Date(startMs).toISOString() };
+        });
+};
+
+/** Quarter hours summed by calendar day (`YYYY-MM-DD`) in `timeZone`, newest day first. */
+export const byDay = (quarters: QuarterReading[], timeZone: string): (CacheCounts & { day: string })[] => {
+    const days = new Map<string, CacheCounts>();
+
+    for (const quarter of quarters) {
+        sumInto(days, dayKeyIn(quarter.start, timeZone), quarter);
+    }
+
+    return [...days]
+        .map(([day, counts]) => {
+            return { ...counts, day };
+        })
+        .toSorted((a, b) => b.day.localeCompare(a.day));
+};

@@ -26,7 +26,11 @@ export interface UsageLogEntry {
     latencyMs: number;
     modelApiId: string;
     modelId: string;
-    /** What the call was, as OpenTelemetry's GenAI conventions name it. Set it and the call also exports as a GenAI span. */
+
+    /**
+     * What the call was, as OpenTelemetry's GenAI conventions name it. Set it and the call also exports as a GenAI span.
+     * Stored in `usage_log.operation`, where the provider cache readings use it to tell chat rows apart.
+     */
     operation?: "chat" | "embeddings";
     orgId?: string;
     promptTokens: number;
@@ -153,8 +157,8 @@ export class UsageTracker {
                         prompt_tokens, completion_tokens, cached_tokens, reasoning_tokens,
                         cost_microdollars, latency_ms, ttft_ms,
                         is_streaming, finish_reason, error_code, source, api_key_id,
-                        guardrail_violations, fallback_reason, healed
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        guardrail_violations, fallback_reason, healed, operation
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 )
                 .bind(
                     id,
@@ -182,6 +186,7 @@ export class UsageTracker {
                     entry.guardrailViolations ?? null,
                     entry.fallbackReason ?? null,
                     entry.healed ? 1 : 0,
+                    entry.operation ?? null,
                 )
                 .run();
         } catch (error) {

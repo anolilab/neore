@@ -103,7 +103,7 @@ msgstr "\"{truncatedName}\" ha sido rechazado"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
-msgstr ""
+msgstr "«Siempre» es una indicación para el asistente, no una regla estricta. Si le pides que haga algo él mismo, lo hará. Los chats mantienen el modelo que elegiste para ellos; solo los subagentes usan estos modelos."
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:567
 msgid "\"v1\" for the current Azure OpenAI API. A dated version such as 2024-10-21 uses the older per-deployment URLs."
@@ -606,6 +606,8 @@ msgid "{0} custom headers"
 msgstr "{0} encabezados personalizados"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
+#. placeholder {0}: formatNumber(window, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:80
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1818,6 +1820,7 @@ msgstr "21:9 (ultrapanorámico)"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "Arquitectura Mixture-of-Experts de 235B parámetros"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:80
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 horas"
@@ -2032,11 +2035,11 @@ msgstr "Un objetivo agrupa tareas. Su progreso depende de cuántas estén hechas
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "Un chat grupal. Una pregunta del propietario la responden tres agentes por turnos: un revisor de seguridad, un revisor de rendimiento y un líder que resume."
 
-#: src/features/chat/core/context/chat-context.tsx:721
+#: src/features/chat/core/context/chat-context.tsx:725
 msgid "A guest's message cannot be sent as a goal."
 msgstr "El mensaje de un invitado no se puede enviar como objetivo."
 
-#: src/features/chat/core/context/chat-context.tsx:724
+#: src/features/chat/core/context/chat-context.tsx:728
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "El mensaje de un invitado solo se envía a través de un modelo alojado. Elige uno y vuelve a enviarlo."
 
@@ -2065,7 +2068,7 @@ msgstr "Una herramienta integrada de la lista ya no existe. Quítala antes de gu
 msgid "A locked chat cannot have a guest link."
 msgstr "Un chat bloqueado no puede tener un enlace de invitado."
 
-#: src/features/vault/components/site-logins.tsx:593
+#: src/features/vault/components/site-logins.tsx:623
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "Un inicio de sesión puede indicar como máximo {MAX_TEAMMATES} bots."
 
@@ -2857,7 +2860,7 @@ msgstr "Se añadieron {added} documento(s)."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
 msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
-msgstr ""
+msgstr "Se añade después de las instrucciones integradas de este rol, p. ej. «Revisa cada cambio según nuestra guía de estilo»."
 
 #: src/features/settings/components/personalization/memory-item.tsx:72
 msgid "Added by you · {learnedOn}"
@@ -3562,6 +3565,13 @@ msgstr "Toda la organización"
 msgid "All Prompts"
 msgstr "Todos los prompts"
 
+#. placeholder {0}: formatNumber(data.all.requests, locale)
+#. placeholder {1}: formatNumber(data.all.promptTokens, locale)
+#. placeholder {2}: shareText(data.all, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:111
+msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
+msgstr "Todo el tráfico de los proveedores en el periodo, con caché o sin ella. Solicitudes: {0}. Tokens de prompt: {1}. Servido desde la caché: {2}."
+
 #: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "All providers"
 msgstr "Todos los proveedores"
@@ -3573,7 +3583,7 @@ msgstr "Todos los proveedores + BYOK"
 #. placeholder {0}: roleLabel.toLowerCase()
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:292
 msgid "All real {0} work goes to this model, even quick work."
-msgstr ""
+msgstr "Todo el trabajo real de {0} va a este modelo, incluso el rápido."
 
 #: src/features/develop/components/checks-tab.tsx:96
 msgid "All required checks passed."
@@ -4009,7 +4019,7 @@ msgstr "Cualquiera de mis chats"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:63
 msgid "Any other self-contained task."
-msgstr ""
+msgstr "Cualquier otra tarea independiente."
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:162
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
@@ -4126,7 +4136,7 @@ msgstr "Se aplica"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:443
 msgid "Applies to"
-msgstr ""
+msgstr "Se aplica a"
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
@@ -4290,7 +4300,7 @@ msgstr "El LLM pequeño de razonamiento de Arcee"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:50
 msgid "Architecture"
-msgstr ""
+msgstr "Arquitectura"
 
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
@@ -5279,7 +5289,7 @@ msgstr "El modelo FLUX profesional de BFL vía API directa"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:293
 msgid "Bigger pieces go to this model; quick questions stay in the chat."
-msgstr ""
+msgstr "Las tareas más grandes van a este modelo; las preguntas rápidas se quedan en el chat."
 
 #: src/features/chat/thread/message-cost-badge.tsx:79
 msgid "Billed to your own API key, not your credits."
@@ -5452,7 +5462,7 @@ msgstr "Token del bot del Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
-#: src/features/vault/components/site-logins.tsx:588
+#: src/features/vault/components/site-logins.tsx:618
 msgid "Bots that may use it"
 msgstr "Bots que pueden usarlo"
 
@@ -5759,6 +5769,28 @@ msgstr "de <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "por un colaborador"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:115
+msgid "By day, newest first."
+msgstr "Por día, los más recientes primero."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:137
+msgid "By hour"
+msgstr "Por hora"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:139
+msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
+msgstr "Por hora, los más antiguos primero. Una caída que empieza a la misma hora en todos los modelos apunta a un cambio en lo que se envía."
+
+#. placeholder {0}: formatNumber(models.length, locale)
+#. placeholder {1}: formatNumber(data.pairs, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:174
+msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
+msgstr "Por modelo, los de más tokens de prompt primero: los {0} primeros de {1} pares de proveedor y modelo."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:175
+msgid "By model, most prompt tokens first."
+msgstr "Por modelo, los de más tokens de prompt primero."
+
 #: src/features/pages/components/page-version-panel.tsx:140
 msgid "by you"
 msgstr "por ti"
@@ -6006,7 +6038,7 @@ msgstr "Canadá"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:617
+#: src/features/vault/components/site-logins.tsx:647
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -6248,7 +6280,7 @@ msgid "Change Password"
 msgstr "Cambiar contraseña"
 
 #. placeholder {0}: pinned.text
-#: src/features/chat/goal/pinned-goal.tsx:79
+#: src/features/chat/goal/pinned-goal.tsx:96
 msgid "Change the pinned goal: {0}"
 msgstr "Cambiar el objetivo fijado: {0}"
 
@@ -6515,7 +6547,7 @@ msgstr "Comprobando"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:66
 msgid "Checking code, a draft or a plan for mistakes."
-msgstr ""
+msgstr "Revisar código, un borrador o un plan en busca de errores."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "Checking image safety..."
@@ -6584,7 +6616,7 @@ msgstr "Elegir .md o .zip"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:429
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
-msgstr ""
+msgstr "Elige un modelo para cada tipo de trabajo que el asistente pasa a un subagente. Un rol con modelo se ofrece al asistente; uno sin modelo queda desactivado."
 
 #: src/features/workflow/components/template-picker.tsx:111
 msgid "Choose a template to get started quickly. Templates provide pre-configured workflows for common tasks."
@@ -6853,7 +6885,7 @@ msgstr "Borrar máscara"
 msgid "Clear model"
 msgstr "Quitar modelo"
 
-#: src/features/chat/goal/pinned-goal.tsx:125
+#: src/features/chat/goal/pinned-goal.tsx:142
 msgid "Clear pinned goal"
 msgstr "Quitar el objetivo fijado"
 
@@ -7144,7 +7176,7 @@ msgstr "Salida del código"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "code review"
-msgstr ""
+msgstr "revisión de código"
 
 #: src/features/chat/group/group-mode.ts:50
 #: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:16
@@ -8874,7 +8906,7 @@ msgstr "No se pudo eliminar el bot."
 msgid "Could not delete the comment"
 msgstr "No se pudo eliminar el comentario"
 
-#: src/features/vault/components/site-logins.tsx:419
+#: src/features/vault/components/site-logins.tsx:453
 msgid "Could not delete the login."
 msgstr "No se pudo eliminar el inicio de sesión."
 
@@ -8991,7 +9023,7 @@ msgstr "No se pudieron cargar los datos de facturación de tu organización. Int
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:488
 msgid "Could not load your roles."
-msgstr ""
+msgstr "No se pudieron cargar tus roles."
 
 #: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
@@ -9040,7 +9072,7 @@ msgstr "No se pudo previsualizar · Haz clic para descargar"
 msgid "Could not pull {0}: {1}"
 msgstr "No se pudo descargar {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:671
+#: src/features/chat/core/context/chat-context.tsx:672
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "No se pudo contactar con el servidor para empezar a generar. Revisa tu conexión e inténtalo de nuevo."
 
@@ -9101,6 +9133,7 @@ msgstr "No pudo reanudar su propia sesión, así que se transfirió la conversac
 msgid "Could not retry. Please try again."
 msgstr "No se pudo reintentar. Inténtalo de nuevo."
 
+#: src/features/chat/goal/pinned-goal.tsx:155
 #: src/features/onboarding/components/setup-checklist.tsx:99
 #: src/features/onboarding/components/setup-checklist.tsx:180
 msgid "Could not save that choice. Try again."
@@ -9118,7 +9151,7 @@ msgstr "No se pudo guardar el ajuste del Daily Brief."
 msgid "Could not save the email setting."
 msgstr "No se pudo guardar la configuración del correo."
 
-#: src/features/vault/components/site-logins.tsx:368
+#: src/features/vault/components/site-logins.tsx:396
 msgid "Could not save the login."
 msgstr "No se pudo guardar el inicio de sesión."
 
@@ -9137,7 +9170,7 @@ msgstr "No se pudo guardar la página"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
 msgid "Could not save the role"
-msgstr ""
+msgstr "No se pudo guardar el rol"
 
 #: src/features/develop/components/review-panel.tsx:185
 msgid "Could not save the summary, so nothing was submitted. Try again."
@@ -9246,7 +9279,7 @@ msgstr "No se pudieron actualizar los participantes"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
-msgstr ""
+msgstr "No se pudo cargar el estado de seguimiento"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -10025,6 +10058,7 @@ msgstr "Fecha"
 msgid "Date and time"
 msgstr "Fecha y hora"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "Día"
@@ -10302,7 +10336,7 @@ msgstr "Retrasado"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "delegate"
-msgstr ""
+msgstr "delegar"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:226
 msgid "Delegate tasks to Devin, the AI software engineer"
@@ -10311,7 +10345,7 @@ msgstr "Delega tareas en Devin, el ingeniero de software con IA"
 #. placeholder {0}: roleLabel.toLowerCase()
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
 msgid "Delegated {0} work runs on this model."
-msgstr ""
+msgstr "El trabajo de {0} delegado se ejecuta en este modelo."
 
 #: src/components/delete-confirmation-dialog.tsx:45
 #: src/components/delete-confirmation-dialog.tsx:71
@@ -10338,7 +10372,7 @@ msgstr ""
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:625
+#: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "Eliminar"
 
@@ -10457,7 +10491,7 @@ msgid "Delete group and children"
 msgstr "Eliminar grupo y su contenido"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:495
+#: src/features/vault/components/site-logins.tsx:525
 msgid "Delete login for {0}"
 msgstr "Eliminar el inicio de sesión de {0}"
 
@@ -10591,7 +10625,7 @@ msgstr "Elimina la conversación abierta tras confirmarlo ({0})"
 msgid "Delete this case?"
 msgstr "¿Eliminar este caso?"
 
-#: src/features/vault/components/site-logins.tsx:635
+#: src/features/vault/components/site-logins.tsx:665
 msgid "Delete this login?"
 msgstr "¿Eliminar este inicio de sesión?"
 
@@ -10910,7 +10944,7 @@ msgstr "Diseñadores que crean logotipos, iconos y recursos de marca en los que 
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:61
 msgid "Designing a system or a change that spans several parts."
-msgstr ""
+msgstr "Diseñar un sistema o un cambio que abarca varias partes."
 
 #: src/features/download/components/download-page.tsx:65
 msgid "Desktop"
@@ -11319,7 +11353,7 @@ msgstr "¿No tienes una cuenta?"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:352
 msgid "Don't use your default instructions in this project"
-msgstr ""
+msgstr "No usar tus instrucciones predeterminadas en este proyecto"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
@@ -11388,7 +11422,7 @@ msgstr "Descargar — Neore Desktop"
 #. placeholder {0}: part.filename
 #: ../../packages/chat-ui/src/chat/message-content.tsx:475
 msgid "Download {0}"
-msgstr ""
+msgstr "Descargar {0}"
 
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:43
 msgid "Download {displayName}"
@@ -11452,7 +11486,7 @@ msgstr "Descargar para {0}"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:475
 #: ../../packages/chat-ui/src/chat/message-content.tsx:482
 msgid "Download image"
-msgstr ""
+msgstr "Descargar imagen"
 
 #: src/features/chat/header/thread-download-button.tsx:134
 msgid "Download JSON"
@@ -11582,7 +11616,7 @@ msgstr "Suelta los archivos aquí..."
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:166
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:172
 msgid "Drop files to start a new chat"
-msgstr ""
+msgstr "Suelta archivos para empezar un chat nuevo"
 
 #: src/features/chat/thread-list/components/thread-group-renderer.tsx:108
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:342
@@ -11928,12 +11962,12 @@ msgstr "editar imagen"
 msgid "Edit Image"
 msgstr "Editar imagen"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "Edit login"
 msgstr "Editar inicio de sesión"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:485
+#: src/features/vault/components/site-logins.tsx:515
 msgid "Edit login for {0}"
 msgstr "Editar el inicio de sesión de {0}"
 
@@ -12965,7 +12999,7 @@ msgstr "Cada chat y ejecución programada de este bot recibe solo estas herramie
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
-msgstr ""
+msgstr "Todos los chats, salvo que su proyecto defina el rol."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -13480,7 +13514,7 @@ msgstr "Razonamiento extendido en el Opus más capaz de Anthropic"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:322
 msgid "Extra instructions"
-msgstr ""
+msgstr "Instrucciones adicionales"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:29
 msgid "Extra Tall"
@@ -14864,12 +14898,12 @@ msgstr "Archivos modificados en este turno"
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:98
 msgid "Files dropped before the account changed were not attached. Drop them again."
-msgstr ""
+msgstr "Los archivos soltados antes de cambiar de cuenta no se adjuntaron. Suéltalos de nuevo."
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:110
 #: src/lib/native/native-bridge.tsx:84
 msgid "Files dropped earlier for another account were not attached. Drop them again."
-msgstr ""
+msgstr "Los archivos soltados antes para otra cuenta no se adjuntaron. Suéltalos de nuevo."
 
 #: src/features/projects/components/repo-rule-file-import.tsx:414
 msgid "Files found"
@@ -15039,7 +15073,7 @@ msgstr "Encuentra tutoriales para aprender a programar en Python"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:65
 msgid "Finding, reading and comparing sources."
-msgstr ""
+msgstr "Buscar, leer y comparar fuentes."
 
 #: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
@@ -15192,7 +15226,7 @@ msgstr "Sigue estos pasos para conectar tu cuenta de {platform}."
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:105
 msgid "Follow thread"
-msgstr ""
+msgstr "Seguir conversación"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -16220,7 +16254,7 @@ msgstr "Subir a {parent}"
 msgid "Goal"
 msgstr "Objetivo"
 
-#: src/features/chat/goal/pinned-goal.tsx:103
+#: src/features/chat/goal/pinned-goal.tsx:120
 msgid "Goal for this chat"
 msgstr "Objetivo para este chat"
 
@@ -17136,6 +17170,7 @@ msgstr "Hosts"
 msgid "hotkey"
 msgstr "atajo de teclado"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "Hora"
@@ -17374,13 +17409,13 @@ msgstr "Imagen"
 #. placeholder {1}: images.length
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:176
 msgid "Image {0} of {1}"
-msgstr ""
+msgstr "Imagen {0} de {1}"
 
 #. placeholder {0}: position + 1
 #. placeholder {1}: labelOf(image)
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:210
 msgid "Image {0}: {1}"
-msgstr ""
+msgstr "Imagen {0}: {1}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:84
 msgid "Image {position} could not be loaded"
@@ -17443,7 +17478,7 @@ msgstr "Modelo de generación de imágenes"
 
 #: src/features/chat/pins/pinned-image-preview.tsx:122
 msgid "Image pinned"
-msgstr ""
+msgstr "Imagen fijada"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
@@ -17523,12 +17558,12 @@ msgstr "imágenes y vídeo"
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:172
 #: src/features/chat/image-gallery/thread-images-button.tsx:42
 msgid "Images in this chat"
-msgstr ""
+msgstr "Imágenes en este chat"
 
 #. placeholder {0}: images.length
 #: src/features/chat/image-gallery/thread-images-button.tsx:33
 msgid "Images in this chat ({0})"
-msgstr ""
+msgstr "Imágenes en este chat ({0})"
 
 #: src/features/marketing/data/models-data.ts:193
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
@@ -17586,7 +17621,7 @@ msgstr "Suplantación detenida"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:53
 msgid "Implementation"
-msgstr ""
+msgstr "Implementación"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
@@ -18168,7 +18203,7 @@ msgstr "Intensidad"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:62
 msgid "Interface, user experience and visual design."
-msgstr ""
+msgstr "Interfaz, experiencia de usuario y diseño visual."
 
 #: src/features/chat/thread/composer-input-area.tsx:361
 msgid "Interrupt and restart"
@@ -18806,7 +18841,7 @@ msgstr "Kirguistán"
 msgid "Label"
 msgstr "Etiqueta"
 
-#: src/features/vault/components/site-logins.tsx:565
+#: src/features/vault/components/site-logins.tsx:595
 msgid "Label (optional)"
 msgstr "Etiqueta (opcional)"
 
@@ -19223,7 +19258,7 @@ msgstr "Déjalo vacío para \"cualquier modelo\"."
 msgid "Leave empty for transparent background"
 msgstr "Déjalo vacío para un fondo transparente"
 
-#: src/features/vault/components/site-logins.tsx:558
+#: src/features/vault/components/site-logins.tsx:588
 msgid "Leave empty to keep the saved password"
 msgstr "Déjalo vacío para conservar la contraseña guardada"
 
@@ -19792,7 +19827,7 @@ msgstr "Cargando vista previa…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 msgid "Loading projects…"
-msgstr ""
+msgstr "Cargando proyectos…"
 
 #: src/features/projects/components/project-repo-picker.tsx:241
 #: src/features/projects/components/project-repositories.tsx:304
@@ -19801,7 +19836,7 @@ msgstr "Cargando repositorios…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:480
 msgid "Loading roles…"
-msgstr ""
+msgstr "Cargando roles…"
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -19922,6 +19957,7 @@ msgid "Loading..."
 msgstr "Cargando..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
+#: src/features/admin/components/admin-provider-cache-row.tsx:85
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -19937,7 +19973,7 @@ msgstr "Cargando…"
 msgid "local"
 msgstr "local"
 
-#: src/features/chat/core/context/chat-context.tsx:728
+#: src/features/chat/core/context/chat-context.tsx:732
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Los modelos locales solo admiten texto. Quita los adjuntos para enviar."
 
@@ -20021,7 +20057,7 @@ msgstr "Cerrar sesión"
 msgid "Login"
 msgstr "Iniciar sesión"
 
-#: src/features/vault/components/site-logins.tsx:415
+#: src/features/vault/components/site-logins.tsx:449
 msgid "Login deleted"
 msgstr "Inicio de sesión eliminado"
 
@@ -20029,11 +20065,11 @@ msgstr "Inicio de sesión eliminado"
 msgid "login refused"
 msgstr "inicio de sesión rechazado"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login saved"
 msgstr "Inicio de sesión guardado"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login updated"
 msgstr "Inicio de sesión actualizado"
 
@@ -20041,7 +20077,7 @@ msgstr "Inicio de sesión actualizado"
 msgid "Logins"
 msgstr "Nombres de usuario"
 
-#: src/features/vault/components/site-logins.tsx:431
+#: src/features/vault/components/site-logins.tsx:465
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "Inicios de sesión guardados para el navegador del agente. La posibilidad de iniciar sesión con ellos llegará en una próxima actualización: el servidor escribirá la contraseña en el sitio y la IA nunca la verá."
 
@@ -21273,6 +21309,7 @@ msgstr "Modo {0}, en {1}. No se inicia nada al crearlo."
 msgid "Mode:"
 msgstr "Modo:"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:179
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -21338,7 +21375,7 @@ msgstr "Información del modelo"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "Model per kind of work"
-msgstr ""
+msgstr "Modelo por tipo de trabajo"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:74
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
@@ -21835,7 +21872,7 @@ msgstr "Silenciar"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:115
 msgid "Mute thread"
-msgstr ""
+msgstr "Silenciar conversación"
 
 #: src/features/settings/lib/settings-keywords.ts:106
 msgid "my data"
@@ -22363,7 +22400,7 @@ msgstr "Nuevo modelo de alta calidad para fotorrealismo y renderizado de texto"
 msgid "New line in message"
 msgstr "Nueva línea en el mensaje"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "New login"
 msgstr "Nuevo inicio de sesión"
 
@@ -22490,7 +22527,7 @@ msgstr "nueva generación"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:193
 msgid "Next image"
-msgstr ""
+msgstr "Imagen siguiente"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Next item"
@@ -22791,7 +22828,7 @@ msgstr "Sin caducidad"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:243
 msgid "No extra instructions in this project. Reset to use your default again."
-msgstr ""
+msgstr "Sin instrucciones adicionales en este proyecto. Restablece para volver a usar tu valor predeterminado."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:276
 msgid "No facts found in the pasted text."
@@ -23676,7 +23713,7 @@ msgstr "Desactivado por defecto. Mientras un chat largo está inactivo, condensa
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
 msgid "Off until you pick a model."
-msgstr ""
+msgstr "Desactivado hasta que elijas un modelo."
 
 #: src/features/settings/components/account/account-settings.tsx:561
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
@@ -24037,7 +24074,7 @@ msgstr "Solo el propietario del proyecto puede cambiar sus repositorios."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:474
 msgid "Only the project's owner can change its roles."
-msgstr ""
+msgstr "Solo el propietario del proyecto puede cambiar sus roles."
 
 #: src/features/devices/components/device-scope.tsx:73
 msgid "Only these projects"
@@ -24105,7 +24142,7 @@ msgstr "Apertura"
 
 #: ../../packages/chat-ui/src/chat/gallery-image.tsx:27
 msgid "Open {alt} in the image gallery"
-msgstr ""
+msgstr "Abrir {alt} en la galería de imágenes"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open {filename}"
@@ -25348,7 +25385,7 @@ msgstr "Las passkeys te permiten iniciar sesión de forma segura con la autentic
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:552
+#: src/features/vault/components/site-logins.tsx:582
 msgid "Password"
 msgstr "Contraseña"
 
@@ -25395,7 +25432,7 @@ msgstr "Correo de restablecimiento de contraseña enviado"
 msgid "Password reset successful"
 msgstr "Contraseña restablecida correctamente"
 
-#: src/features/vault/components/site-logins.tsx:474
+#: src/features/vault/components/site-logins.tsx:508
 msgid "Password set"
 msgstr "Contraseña guardada"
 
@@ -25800,15 +25837,15 @@ msgstr "Fijar"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Fija un recuerdo para evitar que se desvanezca, se fusione o se promueva. Solo los recuerdos de actividad se desvanecen por sí solos."
 
-#: src/features/chat/goal/pinned-goal.tsx:89
-#: src/features/chat/goal/pinned-goal.tsx:95
+#: src/features/chat/goal/pinned-goal.tsx:106
+#: src/features/chat/goal/pinned-goal.tsx:112
 msgid "Pin goal"
 msgstr "Fijar objetivo"
 
 #: src/features/chat/pins/pinnable-image.tsx:74
 #: src/features/chat/pins/pinnable-image.tsx:80
 msgid "Pin image"
-msgstr ""
+msgstr "Fijar imagen"
 
 #: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
@@ -25849,7 +25886,7 @@ msgstr "Fijadas"
 
 #: src/features/chat/pins/pinned-image-preview.tsx:129
 msgid "Pinned image"
-msgstr ""
+msgstr "Imagen fijada"
 
 #: src/features/chat/thread-list/group-header.tsx:103
 msgid "Pinned project"
@@ -26142,7 +26179,7 @@ msgstr "Descripción precisa, cuantificada y específica."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:310
 msgid "Prefer"
-msgstr ""
+msgstr "Preferir"
 
 #: src/features/settings/components/personalization/memory-types.ts:29
 msgid "Preferences"
@@ -26431,7 +26468,7 @@ msgstr "Modelo de alta calidad de la generación anterior para escenas complejas
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:181
 msgid "Previous image"
-msgstr ""
+msgstr "Imagen anterior"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Previous item"
@@ -26892,6 +26929,13 @@ msgstr "Prompt optimizado correctamente"
 msgid "Prompt to run on all models..."
 msgstr "Prompt que se ejecutará en todos los modelos..."
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:101
+#: src/features/admin/components/admin-provider-cache-row.tsx:120
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
+#: src/features/admin/components/admin-provider-cache-row.tsx:182
+msgid "Prompt tokens"
+msgstr "Tokens de prompt"
+
 #: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "Tokens de prompt"
@@ -26957,6 +27001,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Fiabilidad probada de la generación anterior"
 
 #: src/components/model-picker/model-picker.tsx:283
+#: src/features/admin/components/admin-provider-cache-row.tsx:180
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -26977,6 +27022,10 @@ msgstr "Proveedor añadido: sus modelos ya están en el selector de modelos"
 #: src/routes/admin/gateway/index.tsx:326
 msgid "Provider Health"
 msgstr "Estado de los proveedores"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:60
+msgid "Provider prompt cache"
+msgstr "Caché de prompts de los proveedores"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:323
 msgid "Provider removed"
@@ -28461,7 +28510,7 @@ msgstr "Responder"
 msgid "Reply complete"
 msgstr "Respuesta completa"
 
-#: src/features/chat/core/context/chat-context.tsx:635
+#: src/features/chat/core/context/chat-context.tsx:636
 msgid "Reply ready"
 msgstr "Respuesta lista"
 
@@ -28533,6 +28582,10 @@ msgstr "Solicitando..."
 msgid "Requesting…"
 msgstr "Solicitando…"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:105
+#: src/features/admin/components/admin-provider-cache-row.tsx:119
+#: src/features/admin/components/admin-provider-cache-row.tsx:143
+#: src/features/admin/components/admin-provider-cache-row.tsx:181
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -28622,7 +28675,7 @@ msgstr "Restablecer {0} al valor predeterminado"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 msgid "Reset {roleLabel} to your default"
-msgstr ""
+msgstr "Restablecer {roleLabel} a tu valor predeterminado"
 
 #: src/features/workflow/components/canvas/workflow-controls.tsx:664
 #: src/features/workflow/components/canvas/workflow-controls.tsx:671
@@ -29077,7 +29130,7 @@ msgstr "Cambios de rol"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "roles"
-msgstr ""
+msgstr "roles"
 
 #: src/features/chat/core/utils/language-utilities.ts:393
 msgid "Romania"
@@ -29329,7 +29382,7 @@ msgstr "Ejecutando..."
 msgid "Runs ({0})"
 msgstr "Ejecuciones ({0})"
 
-#: src/features/chat/goal/pinned-goal.tsx:114
+#: src/features/chat/goal/pinned-goal.tsx:131
 msgid "Runs for every message you send here, up to {maxRounds} review rounds each, until you clear it."
 msgstr "Se ejecuta con cada mensaje que envíes aquí, con hasta {maxRounds} rondas de revisión cada uno, hasta que lo quites."
 
@@ -29459,7 +29512,7 @@ msgstr "Arabia Saudí"
 #: src/features/auth/components/settings/security/change-email-card.tsx:135
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/goal/pinned-goal.tsx:117
+#: src/features/chat/goal/pinned-goal.tsx:134
 #: src/features/chat/host/host-composer.tsx:961
 #: src/features/chat/pins/pin-item.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
@@ -29517,7 +29570,7 @@ msgstr "Guardar caso"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Guardar cambios"
@@ -29534,7 +29587,7 @@ msgstr "No se pudo guardar"
 msgid "Save Image"
 msgstr "Guardar imagen"
 
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 msgid "Save login"
 msgstr "Guardar inicio de sesión"
 
@@ -30568,6 +30621,13 @@ msgstr "Serbio (Serbia)"
 msgid "Serif"
 msgstr "Serif"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:97
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
+#: src/features/admin/components/admin-provider-cache-row.tsx:145
+#: src/features/admin/components/admin-provider-cache-row.tsx:183
+msgid "Served from cache"
+msgstr "Servido desde la caché"
+
 #: src/features/devices/components/devices-settings.tsx:459
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Servidor añadido. Elige cuáles de sus carpetas compartir en la aplicación de escritorio."
@@ -31200,12 +31260,12 @@ msgstr "Regístrate para desbloquear todos los modelos"
 msgid "Sign-in expired"
 msgstr "La sesión ha caducado"
 
-#: src/features/vault/components/site-logins.tsx:526
+#: src/features/vault/components/site-logins.tsx:556
 msgid "Sign-in page (optional)"
 msgstr "Página de inicio de sesión (opcional)"
 
 #. placeholder {0}: login.signInUrl
-#: src/features/vault/components/site-logins.tsx:478
+#: src/features/vault/components/site-logins.tsx:510
 msgid "Sign-in page: {0}"
 msgstr "Página de inicio de sesión: {0}"
 
@@ -31291,15 +31351,15 @@ msgstr "Cingalés"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Cingalés (Sri Lanka)"
 
-#: src/features/vault/components/site-logins.tsx:514
+#: src/features/vault/components/site-logins.tsx:544
 msgid "Site"
 msgstr "Sitio"
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:463
 msgid "Site logins"
 msgstr "Inicios de sesión en sitios"
 
-#: src/features/vault/components/site-logins.tsx:452
+#: src/features/vault/components/site-logins.tsx:486
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "No se pueden guardar, cambiar ni eliminar inicios de sesión en sitios mientras suplantas a un usuario."
 
@@ -32925,7 +32985,7 @@ msgstr "animación estilizada"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "sub-agent"
-msgstr ""
+msgstr "subagente"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 msgid "Sub-agent"
@@ -32942,7 +33002,7 @@ msgstr "Subagente completado"
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:427
 #: src/features/settings/lib/settings-navigation.ts:97
 msgid "Sub-agent roles"
-msgstr ""
+msgstr "Roles de subagentes"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:71
 msgid "Sub-agent was not approved."
@@ -33200,7 +33260,7 @@ msgstr "Cambiar a {label}"
 msgid "Switch to {name}?"
 msgstr "¿Cambiar a {name}?"
 
-#: src/features/chat/core/context/chat-context.tsx:723
+#: src/features/chat/core/context/chat-context.tsx:727
 msgid "Switch to a text model to send this message."
 msgstr "Cambia a un modelo de texto para enviar este mensaje."
 
@@ -33740,7 +33800,7 @@ msgstr "pruebas"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:57
 msgid "Testing"
-msgstr ""
+msgstr "Pruebas"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:105
 msgid "text"
@@ -33963,7 +34023,7 @@ msgstr "Esa carpeta es la carpeta personal del servidor o una carpeta superior. 
 msgid "That folder was not found."
 msgstr "No se encontró esa carpeta."
 
-#: src/features/chat/core/context/chat-context.tsx:719
+#: src/features/chat/core/context/chat-context.tsx:723
 msgid "That guest link has ended."
 msgstr "Ese enlace de invitado ha caducado."
 
@@ -33983,7 +34043,7 @@ msgstr "No se pudo leer ese enlace."
 msgid "That message could not be found in this conversation."
 msgstr "No se encontró ese mensaje en esta conversación."
 
-#: src/features/chat/core/context/chat-context.tsx:722
+#: src/features/chat/core/context/chat-context.tsx:726
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "Ese mensaje se está enviando."
@@ -33996,7 +34056,7 @@ msgstr "Ese mensaje ya no está en espera."
 msgid "That message is too long to send from here."
 msgstr "Ese mensaje es demasiado largo para enviarlo desde aquí."
 
-#: src/features/chat/core/context/chat-context.tsx:720
+#: src/features/chat/core/context/chat-context.tsx:724
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -34166,7 +34226,7 @@ msgid "The agent's browser was replaced, and control went back to the agent. You
 msgstr "El navegador del agente se ha sustituido y el control ha vuelto al agente. Puedes volver a tomar el control."
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:626
+#: src/features/vault/components/site-logins.tsx:656
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "El navegador del agente no podrá usarlo para iniciar sesión en {0}."
 
@@ -34453,7 +34513,7 @@ msgstr "El archivo no se importó:"
 
 #: src/lib/native/native-bridge.tsx:77
 msgid "The files arrived while the account changed, so they were not attached. Drop them again."
-msgstr ""
+msgstr "Los archivos llegaron mientras cambiaba la cuenta, así que no se adjuntaron. Suéltalos de nuevo."
 
 #: src/features/projects/components/project-rule-files.tsx:650
 msgid "The files could not be read."
@@ -34745,7 +34805,7 @@ msgstr "La app de Neore en este dispositivo iniciará sesión como {0}. Continú
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:123
 msgid "The new chat could not open, so the files were not attached. Drop them again."
-msgstr ""
+msgstr "No se pudo abrir el chat nuevo, así que los archivos no se adjuntaron. Suéltalos de nuevo."
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:117
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
@@ -34767,7 +34827,7 @@ msgstr "El agente de página no pudo editar esta página"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "La página muestra ahora la otra versión. Copia lo que quieras conservar de la tuya."
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:567
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "La página con el formulario de inicio de sesión. Déjala vacía para empezar en la página principal del sitio."
 
@@ -34811,6 +34871,15 @@ msgstr "El prompt pasa a ser la entrada del caso y esta respuesta, la respuesta 
 #: src/features/settings/components/chat/native-providers-settings.tsx:719
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "El proveedor te factura directamente estas solicitudes. Cuando conocemos el precio del modelo, se cobra en créditos la tarifa habitual de la plataforma para tus propias claves."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
+msgid "The provider cache readings could not be loaded."
+msgstr "No se pudieron cargar las lecturas de la caché de los proveedores."
+
+#. placeholder {0}: formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })
+#: src/features/admin/components/admin-provider-cache-row.tsx:92
+msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
+msgstr "No se pudieron actualizar las lecturas de la caché de los proveedores. Las cifras de abajo son de {0}."
 
 #: src/features/chat/host/host-composer.tsx:1054
 msgid "The queue is paused. Send next to go on with the queued messages."
@@ -34917,7 +34986,11 @@ msgstr "El servidor aún no muestra ningún modelo: descarga o carga uno primero
 msgid "The shard footprint could not be measured."
 msgstr "No se pudo medir la huella de shards."
 
-#: src/features/vault/components/site-logins.tsx:394
+#: src/features/admin/components/admin-provider-cache-row.tsx:62
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
+msgstr "La parte de los tokens de prompt que los proveedores sirvieron desde su propia caché. Los días y las horas cuentan los pares de proveedor y modelo que usaron la caché en los últimos 30 días; la tabla de modelos muestra los 50 modelos con más tokens de prompt. Solo cuentan las llamadas de chat, y las respuestas de la caché de respuestas del gateway no se incluyen. Días y horas en {timeZone}."
+
+#: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
 msgstr "La página de inicio de sesión debe ser una dirección https:// del mismo sitio, sin usuario ni contraseña."
 
@@ -35080,7 +35153,7 @@ msgstr "Estas herramientas se ejecutan sin preguntar hasta la hora indicada. Rev
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:167
 msgid "They are attached; nothing is sent until you send it."
-msgstr ""
+msgstr "Se adjuntan; no se envía nada hasta que lo envíes."
 
 #: src/features/chat/thread/composer-draw-dialog.tsx:35
 msgid "Thick"
@@ -35544,11 +35617,11 @@ msgstr "Esta lista está llena: quita una herramienta antes de añadir otra."
 #~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 #~ msgstr "Este inicio de sesión se cambió en otro lugar y se ha recargado. Se conservan tus cambios en el usuario y la etiqueta; revisa sus bots, vuelve a escribir la contraseña si la estabas cambiando y guarda de nuevo."
 
-#: src/features/vault/components/site-logins.tsx:334
+#: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "Este inicio de sesión se cambió en otro lugar y se ha recargado. Se conservan tus cambios en el usuario, la etiqueta y la página de inicio de sesión; revisa sus bots, vuelve a escribir la contraseña si la estabas cambiando y guarda de nuevo."
 
-#: src/features/vault/components/site-logins.tsx:344
+#: src/features/vault/components/site-logins.tsx:372
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "Este inicio de sesión se cambió en otro lugar. Recarga la página para verlo antes de volver a guardar."
 
@@ -35570,7 +35643,7 @@ msgstr "Esto fusiona el commit {0} en la rama base con «{1}» en {hostLabel}. S
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "No se puede dejar este mensaje. Sé breve, no lo empieces con / ni menciones a nadie, o inténtalo más tarde."
 
-#: src/features/chat/core/context/chat-context.tsx:725
+#: src/features/chat/core/context/chat-context.tsx:729
 msgid "This message cannot be sent in this chat."
 msgstr "Este mensaje no se puede enviar en este chat."
 
@@ -35600,7 +35673,7 @@ msgstr "Este mensaje se cerrará en {value, plural, one {# segundo} other {# seg
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:235
 msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
-msgstr ""
+msgstr "Este modelo no está disponible para ti, así que el rol no se ofrece al asistente. Elige otro."
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
@@ -35668,7 +35741,7 @@ msgstr "No se pudo cargar esta vista previa."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "This project's chats. Anything it does not set uses your default."
-msgstr ""
+msgstr "Los chats de este proyecto. Lo que no defina usa tu valor predeterminado."
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
@@ -36034,7 +36107,7 @@ msgstr "jue"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:205
 msgid "Thumbnails"
-msgstr ""
+msgstr "Miniaturas"
 
 #: src/features/evals/components/dataset-panel.tsx:219
 msgid "Tick two runs to compare them."
@@ -36706,8 +36779,8 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:446
-#: src/features/vault/components/site-logins.tsx:582
+#: src/features/vault/components/site-logins.tsx:480
+#: src/features/vault/components/site-logins.tsx:612
 msgid "Try again"
 msgstr "Reintentar"
 
@@ -37075,7 +37148,7 @@ msgstr "Deshacer (Ctrl+Z)"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:110
 msgid "Unfollow thread"
-msgstr ""
+msgstr "Dejar de seguir conversación"
 
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
@@ -37890,7 +37963,7 @@ msgstr "Nombre de usuario"
 msgid "Username is required"
 msgstr "El nombre de usuario es obligatorio"
 
-#: src/features/vault/components/site-logins.tsx:541
+#: src/features/vault/components/site-logins.tsx:571
 msgid "Username or email"
 msgstr "Nombre de usuario o correo electrónico"
 
@@ -38666,7 +38739,7 @@ msgstr "Volumen (24 h)"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:67
 msgid "Vulnerabilities, secrets, access control, threat models."
-msgstr ""
+msgstr "Vulnerabilidades, secretos, control de acceso, modelos de amenazas."
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:258
 msgctxt "width abbreviation"
@@ -38800,11 +38873,11 @@ msgstr "Repositorios vigilados"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "No pudimos comprobar que has iniciado sesión. Inténtalo de nuevo en unos instantes."
 
-#: src/features/chat/core/context/chat-context.tsx:727
+#: src/features/chat/core/context/chat-context.tsx:731
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "No pudimos confirmar tu sesión a tiempo. El mensaje del invitado no se envió; vuelve a enviarlo desde la pestaña Invitados."
 
-#: src/features/chat/core/context/chat-context.tsx:730
+#: src/features/chat/core/context/chat-context.tsx:734
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "No pudimos confirmar tu sesión a tiempo. Tu mensaje sigue en el editor. Intenta enviarlo de nuevo."
 
@@ -39178,7 +39251,7 @@ msgstr "¿Cuándo debe usar el asistente esta habilidad?"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:288
 msgid "When to delegate"
-msgstr ""
+msgstr "Cuándo delegar"
 
 #: src/features/projects/components/project-rule-files.tsx:307
 msgid "When to read it"
@@ -39274,6 +39347,10 @@ msgstr "Ancho"
 #: src/features/chat/thread/request-secret-prompt.tsx:173
 msgid "Will be saved as your {provider} API key"
 msgstr "Se guardará como tu clave de API de {provider}"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:67
+msgid "Window"
+msgstr "Periodo"
 
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "Windows"
@@ -39443,11 +39520,11 @@ msgstr "Escritura"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:64
 msgid "Writing or changing code, configuration or scripts."
-msgstr ""
+msgstr "Escribir o cambiar código, configuración o scripts."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:68
 msgid "Writing tests and checking that a change works."
-msgstr ""
+msgstr "Escribir pruebas y comprobar que un cambio funciona."
 
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "Writing the guide…"
@@ -39865,7 +39942,7 @@ msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 msgid "Your answer"
 msgstr "Tu respuesta"
 
-#: src/features/chat/core/context/chat-context.tsx:635
+#: src/features/chat/core/context/chat-context.tsx:636
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
@@ -39890,7 +39967,7 @@ msgstr "Tu formación, preferencias o ubicación, para que la IA te entienda mej
 msgid "Your bots"
 msgstr "Tus bots"
 
-#: src/features/vault/components/site-logins.tsx:571
+#: src/features/vault/components/site-logins.tsx:601
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "No se pudieron cargar tus bots. Los cambios en un inicio de sesión guardado se podrán guardar cuando carguen, para que se conserven sus bots."
 
@@ -39911,11 +39988,11 @@ msgid "Your changes to this project's rule files are not saved. Closing drops th
 msgstr "Tus cambios en los archivos de reglas de este proyecto no están guardados. Si cierras, se perderán."
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:463
+#: src/features/vault/components/site-logins.tsx:497
 msgid "Your chats and {0}"
 msgstr "Tus chats y {0}"
 
-#: src/features/vault/components/site-logins.tsx:465
+#: src/features/vault/components/site-logins.tsx:499
 msgid "Your chats and the bots you chose"
 msgstr "Tus chats y los bots que elegiste"
 
@@ -39974,11 +40051,11 @@ msgstr "Tu exportación de datos está lista"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default ({inheritedModelName})"
-msgstr ""
+msgstr "Tu valor predeterminado ({inheritedModelName})"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default (off)"
-msgstr ""
+msgstr "Tu valor predeterminado (desactivado)"
 
 #: src/features/auth/components/settings/account/update-name-card.tsx:21
 msgid "Your display name for your account"
@@ -40055,7 +40132,7 @@ msgstr "Tu mensaje"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Tu mensaje cambió mientras se subían los archivos, así que no se envió. Pulsa enviar para enviarlo."
 
-#: src/features/chat/core/context/chat-context.tsx:718
+#: src/features/chat/core/context/chat-context.tsx:722
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Tu mensaje contiene contenido inapropiado y no se puede enviar."
 
@@ -40105,11 +40182,11 @@ msgstr "No se pudo cargar tu resumen."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Tu propia clave de Anthropic. Necesaria para delegar trabajo en Claude Code."
 
-#: src/features/vault/components/site-logins.tsx:590
+#: src/features/vault/components/site-logins.tsx:620
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "Tus propios chats siempre pueden usarlo. Los chats de un bot solo pueden usarlo si marcas ese bot aquí. Los chats compartidos, públicos, de grupo y de mensajería nunca pueden."
 
-#: src/features/vault/components/site-logins.tsx:460
+#: src/features/vault/components/site-logins.tsx:494
 msgid "Your own chats only"
 msgstr "Solo tus propios chats"
 
@@ -40168,7 +40245,7 @@ msgstr "Se solicitó tu revisión"
 msgid "Your rule files are still saving."
 msgstr "Tus archivos de reglas aún se están guardando."
 
-#: src/features/vault/components/site-logins.tsx:437
+#: src/features/vault/components/site-logins.tsx:471
 msgid "Your saved logins could not be loaded."
 msgstr "No se pudieron cargar tus inicios de sesión guardados."
 

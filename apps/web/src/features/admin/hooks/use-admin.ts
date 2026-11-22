@@ -301,6 +301,22 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
 export const SHARD_FOOTPRINT_QUERY_KEY = ["admin", "shardFootprint"] as const;
 
 /**
+ * The provider prompt-cache readings for the last `days`: prompt tokens and the share each provider served from its
+ * own cache, by hour and by model. Fetched on a visit only; the readings change by the hour.
+ */
+export const useProviderCacheReadings = (days: 1 | 7 | 30) => {
+    const fetchReadings = useAction(api.admin.gateway_analytics.getProviderCacheReadingsForAdmin);
+
+    return useQuery({
+        queryFn: () => fetchReadings({ days }),
+        queryKey: ["admin", "providerCacheReadings", days],
+        refetchOnWindowFocus: false,
+        retry: 1,
+        staleTime: 5 * 60_000,
+    });
+};
+
+/**
  * One page of the shard footprint census (`getShardFootprint`): totals for the shards on that page.
  * Pass the previous page's `continueCursor` to measure the next shards.
  */
