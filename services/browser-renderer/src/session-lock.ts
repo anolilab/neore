@@ -20,7 +20,14 @@ export type { HoldKind } from "./session-holds";
 const STATE_KEY = "state";
 
 const isHoldRequest = (value: unknown): value is HoldRequest => {
-    const { kind, leaseMs, notAfter, op, token } = (value ?? {}) as { kind?: unknown; leaseMs?: unknown; notAfter?: unknown; op?: unknown; token?: unknown };
+    const { arm, kind, leaseMs, notAfter, op, token } = (value ?? {}) as {
+        arm?: unknown;
+        kind?: unknown;
+        leaseMs?: unknown;
+        notAfter?: unknown;
+        op?: unknown;
+        token?: unknown;
+    };
 
     if (typeof token !== "string" || token === "") {
         return false;
@@ -34,7 +41,9 @@ const isHoldRequest = (value: unknown): value is HoldRequest => {
 
     const isDeadline = notAfter === undefined || (typeof notAfter === "number" && Number.isFinite(notAfter));
 
-    return op === "renew" ? isLease : op === "take" && isLease && isDeadline && (kind === "exclusive" || kind === "shared");
+    return op === "renew"
+        ? isLease && (arm === undefined || arm === true)
+        : op === "take" && isLease && isDeadline && (kind === "exclusive" || kind === "shared");
 };
 
 /**
@@ -89,7 +98,7 @@ export class SessionLock {
             }
 
             case "renew": {
-                answer = holds.renew(asked.token, asked.leaseMs, now);
+                answer = holds.renew(asked.token, asked.leaseMs, now, asked.arm === true);
                 break;
             }
 
@@ -140,6 +149,11 @@ const within = async <T>(promise: Promise<T>, ms: number, fallback: T): Promise<
 
 /** What a call holds a session by. */
 export interface SessionHold {
+    /**
+     * Marks it as one whose call starts on the session's page now, renewing it: whether the lock answered so. Only an
+     * armed sign-in's hold retires its session when it lapses, so the call starts on the page only once this is true.
+     */
+    arm: () => Promise<boolean>;
     /** Whether it may have lapsed: it is then no proof that no other call used the session. */
     isLost: () => boolean;
     /** Stops renewing it and keeps it for `ms` from now (a session whose close is not confirmed); `release` may still end it sooner. */
@@ -298,6 +312,20 @@ export const holdSession = async (
     }, RENEW_EVERY_MS);
 
     return {
+        arm: async () => {
+            if (isLost) {
+                return false;
+            }
+
+            const armedAt = now();
+            const answer = await ask(namespace, sessionId, { arm: true, leaseMs: LEASE_MS, op: "renew", token });
+
+            if (answer?.held) {
+                confirmedUntil = Math.max(confirmedUntil, armedAt + LEASE_MS);
+            }
+
+            return answer?.held === true && !isLost;
+        },
         isLost: () => isLost,
         linger: async (ms) => {
             clearInterval(timer);

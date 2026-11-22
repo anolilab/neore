@@ -353,6 +353,12 @@ const holdsOf = (env: Env, kind: HoldKind, keep?: (work: Promise<unknown>) => vo
     const held: SessionHold[] = [];
 
     return {
+        /** Arms every hold (`SessionHold.arm`): whether the lock answered each. */
+        arm: async (): Promise<boolean> => {
+            const armed = await Promise.all(held.map(async (hold) => hold.arm()));
+
+            return armed.every(Boolean);
+        },
         held,
         /** Ends every hold, within `ms`: whether each was in force all along. */
         release: async (ms?: number): Promise<boolean> => {
@@ -1045,6 +1051,25 @@ const logIn = async (
     // Lost while the browser was set up: nothing is typed into a session another call may already be on.
     if (isHoldLost) {
         return lostAnswer(false);
+    }
+
+    // Armed before anything is done on the page: from here a lapse of the hold retires the session. One the lock did
+    // not answer starts nothing; should it have landed, a lapse of it still retires the session, the safe side.
+    if (!(await holds.arm())) {
+        isAnswered = true;
+        await settledWithin(
+            browser.close().catch(() => undefined),
+            deadline - Date.now(),
+        );
+
+        return {
+            body: {
+                error: "The browser session's lock did not answer in time, so nothing was typed; try it again in a moment",
+                success: false,
+                ...(isSessionClosed && { sessionClosed: true }),
+            },
+            status: 503,
+        } as const;
     }
 
     // A loss during the sign-in stops its next step (`isStopped`), the send included, without waiting for the close.

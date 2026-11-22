@@ -324,6 +324,28 @@ describe("POST /login", () => {
         expect(disconnect).toHaveBeenCalled();
     });
 
+    it("types nothing, and answers 503, when the lock does not answer the arm a sign-in needs before it starts on the page", async () => {
+        const { env, lock, pending } = binding();
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "unarmed" });
+        const close = vi.fn(async () => undefined);
+        const browser = stallingBrowser(close, "unarmed");
+        const pages = vi.spyOn(browser, "contexts");
+
+        await vi.advanceTimersByTimeAsync(0);
+        // The session's take was answered; the lock is out of reach from here.
+        lock.control.reachable = false;
+        pending[0]?.(browser);
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        const answer = await response;
+
+        expect(answer.status).toBe(503);
+        await expect(answer.json()).resolves.toMatchObject({ error: expect.stringContaining("nothing was typed"), success: false });
+        // The page was set up, but nothing was typed: the sign-in never started on it.
+        expect(pages).toHaveBeenCalled();
+        expect(close).not.toHaveBeenCalled();
+    });
+
     it("keeps a session whose close ends after the answer held until it ends", async () => {
         const closed = Promise.withResolvers<undefined>();
         const signedIn = await mustClose(async () => closed.promise, "late");

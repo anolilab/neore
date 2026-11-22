@@ -3,6 +3,8 @@
 export type HoldKind = "exclusive" | "shared";
 
 export interface Hold {
+    /** Set by a renewal that arms it (`SessionHold.arm`): its call may have started on the session's page. */
+    armed?: true;
     expiresAt: number;
     kind: HoldKind;
 }
@@ -11,7 +13,8 @@ export interface Hold {
 export type HoldRequest =
     /** `notAfter`: the lock's clock past which the take is refused, holding nothing (its caller has given up on it). */
     | { kind: HoldKind; leaseMs: number; notAfter?: number; op: "take"; token: string }
-    | { leaseMs: number; op: "renew"; token: string }
+    /** `arm`: the caller is about to start on the session's page, so a lapse of this hold from now on retires it. */
+    | { arm?: true; leaseMs: number; op: "renew"; token: string }
     | { op: "release"; token: string };
 
 /**
@@ -100,6 +103,12 @@ export class SessionHolds {
             this.#holds.delete(token);
 
             if (hold.kind === "exclusive") {
+                // Never armed: its call never started on the page (it starts only once an arm was answered), so the page
+                // holds nothing of it. An armed one may have typed the password: the session is refused from now on.
+                if (!hold.armed) {
+                    continue;
+                }
+
                 this.#isRetired = true;
                 this.#retiredUntil = Math.max(this.#retiredUntil, hold.expiresAt + RETIRED_KEEP_MS);
             } else {
@@ -191,14 +200,18 @@ export class SessionHolds {
      * A hold in force runs on for `leaseMs` from `now`, or keeps the later end it already has: a renewal that arrives
      * late, after a longer one, never shortens the hold. A lapsed one is not brought back.
      */
-    public renew(token: string, leaseMs: number, now: number): HoldAnswer {
+    public renew(token: string, leaseMs: number, now: number, isArming = false): HoldAnswer {
         const hold = new Map(this.entries(now)).get(token);
 
         if (!hold) {
             return { held: false };
         }
 
-        this.#holds.set(token, { ...hold, expiresAt: Math.max(hold.expiresAt, now + Math.min(leaseMs, MAX_LEASE_MS)) });
+        this.#holds.set(token, {
+            ...hold,
+            ...(isArming && { armed: true as const }),
+            expiresAt: Math.max(hold.expiresAt, now + Math.min(leaseMs, MAX_LEASE_MS)),
+        });
 
         return { held: true };
     }

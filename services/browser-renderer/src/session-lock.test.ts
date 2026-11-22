@@ -38,11 +38,22 @@ describe(SessionHolds, () => {
         const holds = new SessionHolds();
 
         holds.take("login", "exclusive", 1000, 0);
+        // Armed: the sign-in started on the page.
+        holds.renew("login", 1000, 0, true);
 
         expect(holds.take("a", "shared", 1000, 1000)).toStrictEqual({ held: false, retired: true });
         expect(holds.isRetired).toBe(true);
         expect(holds.take("other-login", "exclusive", 1000, 1_000_000)).toStrictEqual({ held: false, retired: true });
         expect(new SessionHolds([], true).take("a", "shared", 1000, 0)).toStrictEqual({ held: false, retired: true });
+    });
+
+    it("does not retire a session when a sign-in's hold lapses before it was armed: its call never started on the page", () => {
+        const holds = new SessionHolds();
+
+        holds.take("login", "exclusive", 1000, 0);
+
+        expect(holds.take("a", "shared", 1000, 1000)).toStrictEqual({ held: true });
+        expect(holds.isRetired).toBe(false);
     });
 
     it("refuses a sign-in until a lapsed action's lease is waited out, while other actions still go on", () => {
@@ -117,6 +128,11 @@ describe(SessionHolds, () => {
 });
 
 /** A `SESSION_LOCK` namespace of one lock on memory storage; `reachable` false has its calls never answer. */
+/** An answer that never comes. */
+const NEVER_ANSWERED = new Promise<Response>(() => {
+    // Never settles.
+});
+
 const namespaceOf = () => {
     const stored = new Map<string, unknown>();
     const writes: string[] = [];
@@ -138,12 +154,20 @@ const namespaceOf = () => {
             },
         },
     } as never);
-    const control = { calls: [] as unknown[], reachable: true };
+    // `answersLost`: so many calls next reach the lock, but their answers never come back.
+    const control = { answersLost: 0, calls: [] as unknown[], reachable: true };
     const namespace = {
         get: () => {
             return {
                 fetch: async (url: string, init: RequestInit) => {
                     control.calls.push(JSON.parse(init.body as string));
+
+                    if (control.answersLost > 0) {
+                        control.answersLost -= 1;
+                        await lock.fetch(new Request(url, init));
+
+                        return NEVER_ANSWERED;
+                    }
 
                     return control.reachable
                         ? lock.fetch(new Request(url, init))
@@ -181,6 +205,8 @@ describe(SessionLock, () => {
         const { namespace } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
 
+        await (hold as Taken<typeof hold>).arm();
+
         // A linger only ever lengthens the hold: it lapses once the lease it already has runs out.
         await (hold as Taken<typeof hold>).linger(1000);
         await vi.advanceTimersByTimeAsync(LEASE_MS + 1000);
@@ -206,10 +232,11 @@ describe(SessionLock, () => {
                 setAlarm: async () => undefined,
             },
         } as never);
-        const send = async (body: Record<string, number | string>) =>
+        const send = async (body: Record<string, boolean | number | string>) =>
             lock.fetch(new Request("https://session-lock/", { body: JSON.stringify(body), method: "POST" })).then(async (response) => response.json());
 
         await expect(send({ kind: "exclusive", leaseMs: 1000, op: "take", token: "login" })).resolves.toStrictEqual({ held: true });
+        await expect(send({ arm: true, leaseMs: 1000, op: "renew", token: "login" })).resolves.toStrictEqual({ held: true });
 
         // The release is sent inside the lease; its read of storage ends past it.
         vi.setSystemTime(Date.now() + 900);
@@ -222,6 +249,8 @@ describe(SessionLock, () => {
     it("drops a lapsed sign-in's hold and retires the session in one write, so no crash between two loses both", async () => {
         const { namespace, stored, writes } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
+
+        await (hold as Taken<typeof hold>).arm();
 
         // A linger only ever lengthens the hold: it lapses once the lease it already has runs out.
         await (hold as Taken<typeof hold>).linger(1000);
@@ -263,6 +292,8 @@ describe(SessionLock, () => {
     it("keeps a retired session refused for RETIRED_KEEP_MS, then lets the record go", async () => {
         const { alarms, lock, namespace, stored } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
+
+        await (hold as Taken<typeof hold>).arm();
 
         await (hold as Taken<typeof hold>).linger(1000);
         await vi.advanceTimersByTimeAsync(LEASE_MS + 1000);
@@ -386,6 +417,24 @@ describe(holdSession, () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(isKept).toBe(true);
+    });
+
+    it("does not retire the session when the lock took a sign-in's hold whose answer was lost, and is out of reach until the hold lapses", async () => {
+        const { control, namespace } = namespaceOf();
+
+        // The take lands, its answer and every release after it are lost, and the lock comes back only once the
+        // lease has run out: the sign-in never started on the page, so the session goes on.
+        control.answersLost = 1;
+        control.reachable = false;
+
+        const taking = holdSession(namespace, "s", "exclusive");
+
+        await vi.advanceTimersByTimeAsync(3000);
+        await expect(taking).resolves.toBe("unreachable");
+        await vi.advanceTimersByTimeAsync(LEASE_MS + 5000);
+        control.reachable = true;
+
+        await expect(held(namespace, "shared")).resolves.toHaveProperty("release");
     });
 
     it("renews its hold while it runs, so another call stays refused past one lease", async () => {
