@@ -651,6 +651,11 @@ const ProjectRuleFiles: FC<{
             })
             // One a Discard overtook was freed by it: another may be running by now.
             .then(() => {
+                // Ended: a later Discard has nothing of it to abort.
+                if (importDiscard.current === discard) {
+                    importDiscard.current = undefined;
+                }
+
                 if (isCurrent()) {
                     setImporting(false);
                 }

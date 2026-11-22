@@ -9,7 +9,7 @@ import { Checkbox } from "@neore/ui/components/checkbox";
 import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { formatNumber } from "@neore/ui/utils/locale-format";
-import { onlineManager, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { onlineManager, skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Laptop } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -57,7 +57,8 @@ const STATUS_CHECK_MS = 15_000;
 
 /**
  * The backend's deadline for a call, approval and run (`DEVICE_CALL_DEADLINE_MS`, `devices/lib/constants.ts`), and a
- * margin for the sweep that marks it expired: a call still waiting after both is one this panel lost track of.
+ * margin for the clocks: past it the desktop refuses the call, so one still shown waiting is one this panel lost track
+ * of. The backend's sweep may count it as open a while longer.
  */
 const CALL_DEADLINE_MS = 5 * 60_000 + 30_000;
 
@@ -85,7 +86,6 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const offlineId = useId();
     const deviceList = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const devices = deviceList.data;
-    const queryClient = useQueryClient();
     // Each call prompts the desktop: refused offline, never queued, paused or retried, so none is sent after the person
     // left the panel.
     const start = useMutation(
@@ -111,17 +111,22 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const listCallId = listing?.deviceId === chosen?._id ? listing?.callId : undefined;
     const active = reading ?? (listCallId === undefined ? undefined : listing);
     const activeCallId = active?.callId;
-    const { data: call, isError: callUnreadable } = useQuery(
+    const { data: liveCall, isError: callUnreadable } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(activeCallId ? { callId: activeCallId as Id<"deviceCalls"> } : skipToken),
     );
+    // Ends the status check read outside the live query, by call. Kept here, not written into the live query's cache:
+    // that query's next refetch answers from its subscription's last push, and would put the call back to waiting.
+    const [checkedEnds, setCheckedEnds] = useState<Readonly<Record<string, NonNullable<typeof liveCall>>>>({});
+    const call = (activeCallId === undefined ? undefined : checkedEnds[activeCallId]) ?? liveCall;
     // Past its deadline and still not ended: the backend has given up on it, so this panel does too.
     const overdue =
         active !== undefined && now > active.startedAt + CALL_DEADLINE_MS && (call === undefined || call?.status === "pending" || call?.status === "claimed");
     const callLost = callUnreadable || overdue;
     const readCallId = reading?.callId;
-    const { data: listed } = useQuery(
+    const { data: liveListed } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(listCallId ? { callId: listCallId as Id<"deviceCalls"> } : skipToken),
     );
+    const listed = (listCallId === undefined ? undefined : checkedEnds[listCallId]) ?? liveListed;
     // The import waiting for the read's answer: handed it once, however often its row is pushed again, and `null` on close.
     const pendingRead = useRef<((files: FileEntry[] | null) => void) | undefined>(undefined);
 
@@ -168,9 +173,10 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             return undefined;
         }
 
-        const args = { callId: waitingCallId as Id<"deviceCalls"> };
-        const liveKey = crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(args).queryKey;
-        const statusRead = crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(args, { live: false });
+        const statusRead = crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(
+            { callId: waitingCallId as Id<"deviceCalls"> },
+            { live: false },
+        );
         const timer = setInterval(() => {
             if (typeof statusRead.queryFn !== "function") {
                 return;
@@ -180,7 +186,9 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                 .then((fresh) => {
                     // Only an end is taken: a waiting status says nothing the live query does not.
                     if (fresh && fresh.status !== "pending" && fresh.status !== "claimed") {
-                        queryClient.setQueryData(liveKey, fresh);
+                        setCheckedEnds((current) => {
+                            return { ...current, [waitingCallId]: fresh };
+                        });
                     }
 
                     return undefined;
@@ -190,7 +198,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         }, STATUS_CHECK_MS);
 
         return () => clearInterval(timer);
-    }, [crpc, queryClient, stillWaiting, waitingCallId]);
+    }, [crpc, stillWaiting, waitingCallId]);
 
     // Answered, or no longer to be heard of (its status could not be read): either way the import waits no more.
     const readEnded = readCallId !== undefined && (callLost || (call !== undefined && call?.status !== "pending" && call?.status !== "claimed"));
@@ -234,6 +242,10 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     // A status no longer read waits for nothing, whatever it said before.
     const waiting =
         start.isPending || (!callLost && ((activeCallId !== undefined && call === undefined) || call?.status === "pending" || call?.status === "claimed"));
+    // Import selected takes Find files' place once files were found.
+    const canRead = found?.some((file) => file.status === "found") ?? false;
+    // Find files cannot be clicked for this reason, and no alert says it already.
+    const offlineNote = chosen !== undefined && !online && !waiting && !canRead && failure !== "offline";
 
     const failureText: Record<Failure, string> = {
         busy: t`${name} is busy with other requests. Try again in a moment.`,
@@ -318,7 +330,10 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                 // A close settles `answered` with nothing: the import ends then, even while the start still waits.
                 const started = await Promise.race([
                     start.mutateAsync({ deviceId: deviceId as Id<"devices">, files }).catch((error: unknown) => {
-                        setStartFailure(failureOf(error));
+                        // A start that fails after a Discard is not this panel's to say.
+                        if (!discarded.aborted) {
+                            setStartFailure(failureOf(error));
+                        }
 
                         return undefined;
                     }),
@@ -491,13 +506,13 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                 </p>
             )}
             {/* Why Find files cannot be clicked, with one computer too, where no list says it is offline. */}
-            {chosen && !online && !waiting && (
+            {chosen && offlineNote && (
                 <p className="text-muted-foreground text-sm" id={offlineId}>
                     {t`${chosen.name} is offline. Open the desktop app on it to continue.`}
                 </p>
             )}
             <div className="flex flex-wrap gap-2">
-                {found && found.some((file) => file.status === "found") ? (
+                {found && canRead ? (
                     <Button
                         disabled={disabled || waiting || picked.size === 0}
                         focusableWhenDisabled
@@ -510,7 +525,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                 ) : (
                     chosen && (
                         <Button
-                            aria-describedby={!online && !waiting ? offlineId : undefined}
+                            aria-describedby={offlineNote ? offlineId : undefined}
                             disabled={disabled || waiting || !online}
                             focusableWhenDisabled
                             onClick={look}

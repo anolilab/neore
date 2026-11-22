@@ -37,6 +37,10 @@ const backend = vi.hoisted(() => {
         lost: new Set<string>(),
         // Queries answered once, not again every few milliseconds.
         unpolled: new Set<string>(),
+        // Live queries whose subscription went quiet: each refetch answers from its first push, as Lunora's does;
+        // only a read with `{ live: false }` reaches the backend.
+        quiet: new Set<string>(),
+        pushed: new Map<string, unknown>(),
         ruleFiles: [] as Record<string, unknown>[],
         listDevices: vi.fn(),
         // The options each start was built with: online-only, never paused or retried.
@@ -48,12 +52,27 @@ const backend = vi.hoisted(() => {
 vi.mock("@/lib/lunora/crpc", () => {
     // Answered again every few milliseconds, as a live query is pushed every change.
     const polled = (key: string, read: (args: never) => unknown) => {
+        const answer = (args: unknown, live: boolean) => {
+            const fresh = structuredClone(read(args as never)) ?? null;
+            const pushKey = JSON.stringify([key, args]);
+
+            if (!live || !backend.quiet.has(key)) {
+                return fresh;
+            }
+
+            if (!backend.pushed.has(pushKey)) {
+                backend.pushed.set(pushKey, fresh);
+            }
+
+            return structuredClone(backend.pushed.get(pushKey));
+        };
+
         return {
-            queryOptions: (args: unknown) =>
+            queryOptions: (args: unknown, options?: { live?: boolean }) =>
                 args === skipToken
                     ? { queryFn: skipToken, queryKey: [key] }
                     : {
-                          queryFn: async () => structuredClone(read(args as never)) ?? null,
+                          queryFn: async () => answer(args, options?.live !== false),
                           queryKey: [key, args],
                           refetchInterval: backend.unpolled.has(key) ? false : 10,
                       },
@@ -163,6 +182,8 @@ beforeEach(() => {
     backend.calls.clear();
     backend.lost.clear();
     backend.unpolled.clear();
+    backend.quiet.clear();
+    backend.pushed.clear();
     backend.ruleFiles = [];
     backend.devices = [
         { _id: "desk", createdAt: 0, lastSeenAt: Date.now(), name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
@@ -639,6 +660,11 @@ describe("import from this computer", () => {
 
         await waitFor(() => expect(boxes.map((box) => box.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]));
         expect(screen.getByTestId("computer-rule-file-import")).toBeDefined();
+
+        // A Discard after the read ended takes the draft, not what the panel says about that read.
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+        await waitFor(() => expect(screen.queryByRole("listitem", { name: "CLAUDE.md" })).toBeNull());
+        expect(screen.getByRole("list", { name: "Files not imported" })).toBeDefined();
     });
 
     it("names the computer a read went to, even once it is unpaired and another is chosen", async () => {
@@ -711,17 +737,31 @@ describe("import from this computer", () => {
 
         const user = userEvent.setup();
 
-        // The live status is pushed once, and never again.
-        backend.unpolled.add("getGlobalInstructionsCall");
-        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+        // The live status stays on its first push, however often it is refetched.
+        backend.quiet.add("getGlobalInstructionsCall");
+        backend.start.mockImplementation(async () => {
             const callId = `quiet-${String(backend.start.mock.calls.length)}`;
 
-            backend.calls.set(callId, files ? { phase: "prompting", status: "claimed" } : { files: LISTED, status: "completed" });
+            backend.calls.set(callId, { phase: "prompting", status: "claimed" });
 
             return { callId };
         });
         renderEditor();
-        await openAndList(user);
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+        await user.click(await screen.findByRole("button", { name: "Find files" }));
+        await screen.findByText("Approve the request in the desktop app on Studio.");
+        backend.calls.set("quiet-1", { files: LISTED, status: "completed" });
+        vi.advanceTimersByTime(15_000);
+
+        expect(await screen.findByRole("list", { name: "Instruction files" })).toBeDefined();
+
+        // The live query's refetches, still answering "claimed", do not put the call back to waiting.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 100);
+        });
+        expect(screen.getByRole("list", { name: "Instruction files" })).toBeDefined();
+        expect(screen.queryByText("Approve the request in the desktop app on Studio.")).toBeNull();
+
         await user.click(screen.getByRole("button", { name: "Import selected" }));
         await screen.findByText("Approve the request in the desktop app on Studio.");
         backend.calls.set("quiet-2", readAll(["claude", "codex"]));
