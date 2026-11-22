@@ -111,6 +111,14 @@ describe("the purchase gate on browser actions", () => {
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#menu" }, look)).toBe(true);
     });
 
+    it("asks for a bare submit-like label on a checkout, and not elsewhere", async () => {
+        const onCheckout = vi.fn(() => Promise.resolve({ checkout: true, content: "Confirm", success: true }));
+        const elsewhere = vi.fn(() => Promise.resolve({ content: "Confirm", success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, onCheckout)).toBe(true);
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, elsewhere)).toBe(false);
+    });
+
     it("does not ask for an ordinary control with no text but an ordinary name", async () => {
         const look = vi.fn(() => Promise.resolve({ content: "", label: "Next", success: true }));
 

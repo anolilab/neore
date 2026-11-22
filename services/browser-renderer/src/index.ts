@@ -68,7 +68,10 @@ const TARGET_CHANGED = "The target changed since it was checked, so nothing was 
  * and `target`, a fingerprint of the element (its place in the page, its name and its shown text). A click given that
  * `target` runs only on the element that still has it. The read is one function, so the check and the read agree.
  */
-function readTarget(control: Element, options: { max: number; splitter: RegExp }): { label: string; labelTruncated: boolean; target: string } {
+function readTarget(
+    control: Element,
+    options: { max: number; splitter: RegExp },
+): { checkout: boolean; label: string; labelTruncated: boolean; target: string } {
     // This function is serialized into the page by Playwright (`element.evaluate`). A bundler wraps a named inner function in a
     // helper the page does not have, so this function declares none: every step is written out in its body.
     // The elements the click lands in: the control, then each actionable ancestor. A visible child (an icon in a button, a
@@ -216,7 +219,19 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
         hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 0x01_00_01_93);
     }
 
-    return { label, labelTruncated: joined.length > options.max, target: `${(hash >>> 0).toString(16)}-${fingerprintOf.length}` };
+    // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
+    // there pays, so the gate reads a submit-like label on a checkout as a purchase.
+    const form = control.closest("form");
+    const isCardFields = form !== null && form.querySelector("input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i]") !== null;
+    const address = document.URL.toLowerCase();
+    const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
+
+    return {
+        checkout: isCardFields || isCheckoutPage,
+        label,
+        labelTruncated: joined.length > options.max,
+        target: `${(hash >>> 0).toString(16)}-${fingerprintOf.length}`,
+    };
 }
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
@@ -405,6 +420,8 @@ const validateUrl = (url: string): string | null => {
 /** Default timeout for page operations (ms) */
 /** The per-action payload merged into the response next to `sessionId`. */
 interface ActionResult {
+    /** The element is on a checkout: a form with card or bank fields, or a page whose address says so (`visibleOnly` reads only). */
+    checkout?: boolean;
     clickedSelector?: string;
     content?: string;
     direction?: string;
@@ -724,6 +741,7 @@ const actHeld = async (
                 let label: string | undefined;
                 let isLabelTruncated = false;
                 let target: string | undefined;
+                let isCheckout = false;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -744,6 +762,7 @@ const actHeld = async (
                         label = read.label;
                         isLabelTruncated = read.labelTruncated;
                         target = read.target;
+                        isCheckout = read.checkout;
                     }
                 } else {
                     extractedText = await page.evaluate(() => {
@@ -772,6 +791,7 @@ const actHeld = async (
                     ...(label !== undefined && { label }),
                     ...(isLabelTruncated && { labelTruncated: true }),
                     ...(target !== undefined && { target }),
+                    ...(isCheckout && { checkout: true }),
                 };
                 break;
             }

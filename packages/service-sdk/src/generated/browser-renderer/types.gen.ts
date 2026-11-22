@@ -138,6 +138,10 @@ export type BrowserActionResponse = {
      * Fingerprint of the extracted element (visibleOnly reads only)
      */
     target?: string;
+    /**
+     * The element is on a checkout (visibleOnly reads only)
+     */
+    checkout?: boolean;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;

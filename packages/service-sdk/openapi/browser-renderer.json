@@ -318,6 +318,7 @@
                     "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
                     "labelTruncated": { "type": "boolean", "description": "The accessible name was cut short" },
                     "target": { "type": "string", "description": "Fingerprint of the extracted element (visibleOnly reads only)" },
+                    "checkout": { "type": "boolean", "description": "The element is on a checkout (visibleOnly reads only)" },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },
