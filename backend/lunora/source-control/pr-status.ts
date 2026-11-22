@@ -11,7 +11,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { DEVELOP_DRIVER } from "./develop-driver";
 import { readFromHost } from "./read-host";
-import type { PullRequestReview } from "./types";
+import type { CheckRun, PullRequestReview } from "./types";
 import { vFailed } from "./validators";
 
 /** Failing checks named in the answer; the rest are counted. */
@@ -56,6 +56,10 @@ export const changeRequestsOf = (reviews: ReadonlyArray<PullRequestReview>): Cha
     return requests;
 };
 
+/** The names of the checks that failed or were cancelled: the same two states the checks rollup counts as not passing. */
+export const failingCheckNamesOf = (checks: ReadonlyArray<CheckRun>): string[] =>
+    checks.filter((check) => check.state === "failure" || check.state === "cancelled").map((check) => check.name);
+
 const vOpen = v.object({
     baseBranch: v.string(),
     changeRequests: v.array(v.object({ authorLogin: v.string(), body: v.string(), bodyTruncated: v.boolean() })),
@@ -96,7 +100,7 @@ export const getPullRequestStatus = authAction
                 DEVELOP_DRIVER.getMergeStatus(request, ref),
                 DEVELOP_DRIVER.listReviews(request, ref),
             ]);
-            const failing = checks.checks.filter((check) => check.state === "failure").map((check) => check.name);
+            const failing = failingCheckNamesOf(checks.checks);
             const changeRequests = changeRequestsOf(reviews.items);
 
             return {

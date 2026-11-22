@@ -4,7 +4,7 @@
  * nothing is sent, the draft stays, and the sign-in prompt opens.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import type { ReactNode, Ref } from "react";
@@ -16,6 +16,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
+import { prefillComposer } from "@/features/chat/thread/composer-prefill";
 
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
@@ -437,5 +438,50 @@ describe("ComposerInput while the connection is down", () => {
 
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["a follow-up"]);
+    });
+});
+
+describe("ComposerInput fix prompts from the pull request chip", () => {
+    beforeEach(() => {
+        harness.mustSignIn = false;
+        harness.threadId = "thread-1";
+        useChatUIStore.getState().setComposerText("");
+    });
+
+    afterEach(() => {
+        useChatUIStore.getState().clearComposer();
+        harness.threadId = undefined;
+        vi.clearAllMocks();
+    });
+
+    it("puts a prompt for its thread into the thread composer, not sent", () => {
+        renderComposer();
+        act(() => {
+            prefillComposer("thread-1", "Fix checks on octo/hello#7");
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Fix checks on octo/hello#7");
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("puts a prompt for its thread into a comparison parent's shared composer, not sent", () => {
+        const onSubmitOverride = vi.fn(async () => undefined);
+
+        renderComposer({ onSubmitOverride });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Resolve conflicts with main");
+        expect(onSubmitOverride).not.toHaveBeenCalled();
+    });
+
+    it("leaves a prompt for another thread alone", () => {
+        renderComposer({ onSubmitOverride: vi.fn(async () => undefined) });
+        act(() => {
+            prefillComposer("thread-2", "Address review");
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("");
     });
 });

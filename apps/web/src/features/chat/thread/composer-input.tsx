@@ -1623,8 +1623,9 @@ const ComposerInput = ({
     );
 
     // A prompt another part of the thread's UI wrote for this thread (`composer-prefill.ts`): added after what is typed,
-    // never sent. The same prompt twice is not added twice.
-    useComposerPrefill(isThreadComposer ? threadId : undefined, (prefill) => {
+    // never sent. The same prompt twice is not added twice. A comparison parent's shared composer takes one too: its send
+    // fans out through `onSubmitOverride`, but the text belongs to this thread.
+    useComposerPrefill(!compact && Boolean(threadId) ? threadId : undefined, (prefill) => {
         const current = getComposerText();
 
         promptHistory.reset();
