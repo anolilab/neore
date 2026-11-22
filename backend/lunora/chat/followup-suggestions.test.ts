@@ -199,9 +199,18 @@ describe("a late run cannot free a later run's claim", () => {
 
 describe("a late run cannot replace a newer cache", () => {
     // `replyAt` defaults to the turn's order: a plain turn's replies are told apart by their turn alone.
-    const cache = async (lastMessageId: string, order: number, suggestions: string[], replyAt = order) =>
+    // `pathIds` is a branched thread's active path: without it every stored reply counts (one branch).
+    const cache = async (lastMessageId: string, order: number, suggestions: string[], replyAt = order, pathIds?: string[]) =>
         await harness.action(
-            async (context: any) => await context.runMutation(cacheFollowupSuggestions, { lastMessageId, order, replyAt, suggestions, threadId }),
+            async (context: any) =>
+                await context.runMutation(cacheFollowupSuggestions, {
+                    lastMessageId,
+                    order,
+                    replyAt,
+                    suggestions,
+                    threadId,
+                    ...(pathIds && { pathIds }),
+                }),
         );
 
     const cached = async () => await harness.run(async (ctx: any) => await getCachedFollowupSuggestionsHandler(ctx, { threadId }));
@@ -273,6 +282,28 @@ describe("a late run cannot replace a newer cache", () => {
                     }),
             ),
         ).resolves.toBe(false);
+    });
+
+    // A branched thread's composer shows its active path. A stored reply on another branch is not a newer reply on this one.
+    it("a stored reply on an inactive branch does not block a reply on the selected branch", async () => {
+        await cache("reply-inactive", 5, ["inactive?"]);
+        await cache("reply-selected", 3, ["selected?"], 3, ["root", "reply-selected"]);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-selected", suggestions: ["selected?"] });
+    });
+
+    it("an earlier sibling on an inactive branch does not block the selected branch's sibling", async () => {
+        await cache("sibling-later", 5, ["later?"], 2000);
+        await cache("sibling-earlier", 5, ["earlier?"], 1000, ["root", "sibling-earlier"]);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-earlier", suggestions: ["earlier?"] });
+    });
+
+    it("a newer reply on the selected branch still refuses an older one on it", async () => {
+        await cache("reply-new", 5, ["newer?"], 5, ["root", "reply-new", "reply-old"]);
+        await cache("reply-old", 3, ["older?"], 3, ["root", "reply-new", "reply-old"]);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
     });
 });
 

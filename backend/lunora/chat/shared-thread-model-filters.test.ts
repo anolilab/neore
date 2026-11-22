@@ -130,6 +130,16 @@ describe("generateFollowupSuggestionsForThread, whose prompt carries the caller'
             expect.objectContaining({ modelFilterRules: { denyDataCollection: true, requireZDR: true } }),
         );
     });
+
+    // The owner pays when the collaborator turned suggestions off, but the prompt still carries the collaborator's messages.
+    it("still applies the collaborator's rules when they turned suggestions off and the owner pays", async () => {
+        state.rules = { [COLLABORATOR]: { allowedModels: ["some/other-model"] }, [OWNER]: {} };
+        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { enableFollowupSuggestions: false, userId: COLLABORATOR }));
+
+        await followups();
+
+        expect(getAgent).not.toHaveBeenCalled();
+    });
 });
 
 describe("createSummarizeChat, which never shows the caller's profile", () => {

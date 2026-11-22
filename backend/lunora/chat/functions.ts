@@ -4586,6 +4586,7 @@ export const retryFollowupCache = internalAction
         lastMessageId: v.string().max(MAX_LENGTH.id),
         order: v.number(),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        pathIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         replyAt: v.number(),
         requestId: v.string().max(MAX_LENGTH.long),
         suggestions: v.array(v.string().max(MAX_LENGTH.long)),
@@ -4696,12 +4697,13 @@ export const generateFollowupSuggestionsForThread = internalAction
             // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
             // The paid fallback, if any, is metered to the paying user: the collaborator who keeps suggestions on, else the owner. Passing
             // the collaborator when they opted out would bill their plan for a call the owner's quota is charged for.
+            // The prompt carries the collaborator's messages whoever pays, so their own model filters apply to the model too (with the owner's).
             const background = await resolveBackgroundModel(
                 context,
-                threadData.userId,
+                ownerUserId,
                 DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string,
                 actorGate.enabled ? userId : ownerUserId,
-                true,
+                userId,
             );
 
             if (!background) {
@@ -5002,6 +5004,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                 const cacheWrite = {
                     lastMessageId,
                     order: newest.order,
+                    // On a branched thread the rows read are the active path: only a stored reply on it can refuse this write.
+                    ...(threadData.activeLeafMessageId && { pathIds: (messagesResult.page || []).map((row) => row._id) }),
                     replyAt: newest.createdAt ?? newest._creationTime,
                     suggestions,
                     threadId,

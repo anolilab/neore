@@ -263,17 +263,22 @@ export const getCachedFollowupSuggestionsHandler = async (context: QueryContext,
  * Stores the suggestions for one reply. The check and the write run in one mutation, so a run for an older reply that
  * finishes late is refused when a newer reply's suggestions are already stored. A reply is older than the stored one when
  * its turn is older, or when it is a sibling of the same turn that was created earlier (siblings share `order`).
+ *
+ * `pathIds` is the active path of a branched thread, the rows the composer shows. A stored reply counts only when it is on that
+ * path: a reply on an inactive branch never blocks the branch being written. Without it the thread has one branch, and every
+ * stored reply counts.
  */
 export const cacheFollowupSuggestions = internalMutation
     .input({
         lastMessageId: v.string(),
         order: v.number(),
+        pathIds: v.optional(v.array(v.string())),
         replyAt: v.number(),
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
     .output(v.boolean())
-    .mutation(async ({ args: { lastMessageId, order, replyAt, suggestions, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { lastMessageId, order, pathIds, replyAt, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
@@ -288,8 +293,9 @@ export const cacheFollowupSuggestions = internalMutation
             .first();
 
         if (existing) {
-            const olderTurn = existing.order !== undefined && existing.order > order;
-            const olderSibling = existing.order === order && existing.replyAt !== undefined && existing.replyAt > replyAt;
+            const onBranch = pathIds === undefined || pathIds.includes(existing.lastMessageId);
+            const olderTurn = onBranch && existing.order !== undefined && existing.order > order;
+            const olderSibling = onBranch && existing.order === order && existing.replyAt !== undefined && existing.replyAt > replyAt;
 
             // A newer reply's suggestions are already stored: this older run must not replace them.
             if (olderTurn || olderSibling) {

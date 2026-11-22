@@ -11,25 +11,25 @@ import { loadModelFilterRules, loadSharedModelFilterRules } from "./model-filter
  * rules' owner is not the one paying.
  *
  * `billedUserId` is set only when the model chosen is outside the free tier (a paid fallback): the platform's own
- * default stays unmetered, as before, while a model the user's plan unlocked is metered to that user.
+ * default stays unmetered, as before, while a model the user's plan unlocked is metered to `planUserId` (the payer, else `userId`).
  *
- * `sharedWithCaller` is for a call whose prompt also carries the caller's own profile (`getAgentForUser`): the
- * model must then satisfy the caller's rules as well as the owner's (`planUserId` is the caller).
+ * `sharedWithCaller` is for a call whose prompt also carries the caller's own input (`getAgentForUser`, a collaborator's
+ * follow-up): the model must then satisfy the caller's rules as well as `userId`'s, whoever pays (`planUserId`).
  */
 export const resolveBackgroundModel = async (
     ctx: Pick<ActionCtx, "runQuery">,
     userId: string | undefined,
     preferred: string,
     planUserId?: string,
-    sharedWithCaller = false,
+    sharedWithCaller?: string,
 ): Promise<{ billedUserId?: string; model: string; modelFilterRules: ModelFilterRules } | undefined> => {
     // Unreadable rules skip the step: picking a model without them could send the content to one the user forbade.
     let load: Promise<ModelFilterRules>;
 
     if (!userId) {
         load = Promise.resolve({});
-    } else if (sharedWithCaller && planUserId) {
-        load = loadSharedModelFilterRules(ctx, planUserId, userId);
+    } else if (sharedWithCaller) {
+        load = loadSharedModelFilterRules(ctx, sharedWithCaller, userId, planUserId);
     } else {
         load = loadModelFilterRules(ctx, userId, planUserId);
     }
