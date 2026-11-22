@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { d1FromSqlite, migratedDatabase } from "../__tests__/helpers/sqlite-d1.js";
 import { sqliteTime } from "../lib/sqlite-time.js";
-import { hourStart, readProviderCacheReadings } from "./provider-cache-readings.js";
+import { hourStart, PROVIDER_CACHE_MODEL_LIMIT, readProviderCacheReadings } from "./provider-cache-readings.js";
 
 const NOW = Date.UTC(2026, 10, 21, 12, 30);
 const HOUR_MS = 3_600_000;
@@ -80,6 +80,35 @@ describe("readProviderCacheReadings", () => {
             { cachedTokens: 0, modelId: "workers-ai", promptTokens: 5000, provider: "openrouter", requests: 1 },
             { cachedTokens: 1700, modelId: "claude", promptTokens: 3000, provider: "openrouter", requests: 3 },
         ]);
+        expect(readings.all).toEqual({ cachedTokens: 1700, promptTokens: 8000, requests: 4 });
+        expect(readings.pairs).toBe(2);
+    });
+
+    it("keeps the window's traffic when no pair cached in the last 30 days", async () => {
+        const { db, insert } = usageLog();
+
+        insert({ cached: 0, hoursAgo: 2, model: "claude", prompt: 1000 });
+        insert({ cached: 0, hoursAgo: 1, model: "gpt", prompt: 3000 });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.hours).toEqual([]);
+        expect(readings.all).toEqual({ cachedTokens: 0, promptTokens: 4000, requests: 2 });
+        expect(readings.pairs).toBe(2);
+    });
+
+    it("counts every pair when the model list is cut at its limit", async () => {
+        const { db, insert } = usageLog();
+
+        for (let index = 0; index <= PROVIDER_CACHE_MODEL_LIMIT; index += 1) {
+            insert({ cached: 10, hoursAgo: 1, model: `model-${String(index)}`, prompt: 100 + index });
+        }
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.models).toHaveLength(PROVIDER_CACHE_MODEL_LIMIT);
+        expect(readings.pairs).toBe(PROVIDER_CACHE_MODEL_LIMIT + 1);
+        expect(readings.all.requests).toBe(PROVIDER_CACHE_MODEL_LIMIT + 1);
     });
 
     it("returns empty lists when nothing was answered in the window", async () => {
@@ -89,7 +118,7 @@ describe("readProviderCacheReadings", () => {
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 7, NOW);
 
-        expect(readings).toMatchObject({ hours: [], models: [] });
+        expect(readings).toMatchObject({ all: { cachedTokens: 0, promptTokens: 0, requests: 0 }, hours: [], models: [], pairs: 0 });
     });
 
     it("keeps a pair that stopped caching inside the window, so its drop shows", async () => {

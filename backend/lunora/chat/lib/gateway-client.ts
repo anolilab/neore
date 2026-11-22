@@ -349,9 +349,13 @@ export interface ProviderCacheCounts {
 
 /** The gateway's provider prompt-cache readings (`services/llm-gateway/src/usage/provider-cache-readings.ts`). */
 export interface ProviderCacheReadings {
+    /** Every answered row in the window, caching pair or not. */
+    all: ProviderCacheCounts;
     days: 1 | 7 | 30;
     hours: (ProviderCacheCounts & { hour: string })[];
     models: (ProviderCacheCounts & { modelId: string; provider: string })[];
+    /** Provider/model pairs with traffic in the window; more than `models.length` when the list was cut. */
+    pairs: number;
     since: string;
 }
 

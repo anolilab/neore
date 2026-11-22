@@ -7,9 +7,11 @@ import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group"
 import { formatDate, formatDateTime, formatNumber } from "@neore/ui/utils/locale-format";
 import { useState } from "react";
 
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
+
 import { useProviderCacheReadings } from "../hooks/use-admin";
 import type { CacheCounts } from "../lib/provider-cache";
-import { byDay, cachedShare, sumCounts } from "../lib/provider-cache";
+import { byDay, cachedShare, resolveTimeZone, sumCounts } from "../lib/provider-cache";
 
 type WindowDays = 1 | 7 | 30;
 
@@ -19,8 +21,11 @@ const WINDOW_VALUES: ReadonlySet<string> = new Set(["1", "7", "30"]);
 
 const isWindow = (value: string | undefined): value is `${WindowDays}` => value !== undefined && WINDOW_VALUES.has(value);
 
-const shareText = (counts: CacheCounts, locale: string): string => {
-    const share = cachedShare(counts);
+/** Shown for a figure before any readings arrived, so a failed or pending load never reads as zero traffic. */
+const NO_READING = "—";
+
+const shareText = (counts: CacheCounts | undefined, locale: string): string => {
+    const share = counts === undefined ? null : cachedShare(counts);
 
     return share === null ? "—" : formatNumber(share, locale, { maximumFractionDigits: 1, style: "percent" });
 };
@@ -34,18 +39,23 @@ const AdminProviderCacheRow = () => {
     const { i18n, t } = useLingui();
     const [days, setDays] = useState<WindowDays>(7);
     const readings = useProviderCacheReadings(days);
+    const userSettings = useUserSettings();
     const { locale } = i18n;
-    const hours = readings.data?.hours ?? [];
-    const models = readings.data?.models ?? [];
-    const total = sumCounts(hours);
-    const dailyRows = byDay(hours);
+    const timeZone = resolveTimeZone(userSettings.data?.timezone);
+    // `undefined` until a response arrived (or after a failed first one); `[]` is a loaded window with no traffic.
+    const { data } = readings;
+    const hours = data?.hours ?? [];
+    const models = data?.models ?? [];
+    const total = data === undefined ? undefined : sumCounts(hours);
+    const dailyRows = byDay(hours, timeZone);
+    const countText = (value: number | undefined): string => (value === undefined ? NO_READING : formatNumber(value, locale));
 
     return (
         <Card>
             <CardHeader>
                 <CardTitle>{t`Provider prompt cache`}</CardTitle>
                 <CardDescription>
-                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC.`}
+                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Days and hours are in ${timeZone}.`}
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -82,13 +92,18 @@ const AdminProviderCacheRow = () => {
                     </div>
                     <div>
                         <dt className="text-muted-foreground text-sm">{t`Prompt tokens`}</dt>
-                        <dd className="text-2xl font-semibold">{formatNumber(total.promptTokens, locale)}</dd>
+                        <dd className="text-2xl font-semibold">{countText(total?.promptTokens)}</dd>
                     </div>
                     <div>
                         <dt className="text-muted-foreground text-sm">{t`Requests`}</dt>
-                        <dd className="text-2xl font-semibold">{formatNumber(total.requests, locale)}</dd>
+                        <dd className="text-2xl font-semibold">{countText(total?.requests)}</dd>
                     </div>
                 </dl>
+                {data === undefined ? null : (
+                    <p className="text-muted-foreground text-sm">
+                        {t`All provider traffic in the window, caching or not. Requests: ${formatNumber(data.all.requests, locale)}. Prompt tokens: ${formatNumber(data.all.promptTokens, locale)}. Served from cache: ${shareText(data.all, locale)}.`}
+                    </p>
+                )}
                 <Table>
                     <TableCaption>{t`By day, newest first.`}</TableCaption>
                     <TableHeader>
@@ -102,6 +117,7 @@ const AdminProviderCacheRow = () => {
                     <TableBody>
                         {dailyRows.map((row) => (
                             <TableRow key={row.day}>
+                                {/* `row.day` is already the date in `timeZone`; read at UTC midnight it prints as that same date. */}
                                 <TableHead scope="row">{formatDate(`${row.day}T00:00:00.000Z`, locale, { timeZone: "UTC" })}</TableHead>
                                 <TableCell className="text-right tabular-nums">{formatNumber(row.requests, locale)}</TableCell>
                                 <TableCell className="text-right tabular-nums">{formatNumber(row.promptTokens, locale)}</TableCell>
@@ -125,9 +141,7 @@ const AdminProviderCacheRow = () => {
                         <TableBody>
                             {hours.map((row) => (
                                 <TableRow key={row.hour}>
-                                    <TableHead scope="row">
-                                        {formatDateTime(row.hour, locale, { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })}
-                                    </TableHead>
+                                    <TableHead scope="row">{formatDateTime(row.hour, locale, { dateStyle: "short", timeStyle: "short", timeZone })}</TableHead>
                                     <TableCell className="text-right tabular-nums">{formatNumber(row.requests, locale)}</TableCell>
                                     <TableCell className="text-right tabular-nums">{formatNumber(row.promptTokens, locale)}</TableCell>
                                     <TableCell className="text-right tabular-nums">{shareText(row, locale)}</TableCell>
@@ -137,7 +151,11 @@ const AdminProviderCacheRow = () => {
                     </Table>
                 </details>
                 <Table>
-                    <TableCaption>{t`By model, most prompt tokens first.`}</TableCaption>
+                    <TableCaption>
+                        {data !== undefined && data.pairs > models.length
+                            ? t`By model, most prompt tokens first: the top ${formatNumber(models.length, locale)} of ${formatNumber(data.pairs, locale)} provider and model pairs.`
+                            : t`By model, most prompt tokens first.`}
+                    </TableCaption>
                     <TableHeader>
                         <TableRow>
                             <TableHead>{t`Model`}</TableHead>

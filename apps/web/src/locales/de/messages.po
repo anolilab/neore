@@ -607,7 +607,7 @@ msgstr "{0} benutzerdefinierte Header"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:66
+#: src/features/admin/components/admin-provider-cache-row.tsx:76
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1820,7 +1820,7 @@ msgstr "21:9 (Ultrawide)"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "Mixture-of-Experts-Architektur mit 235 Mrd. Parametern"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:66
+#: src/features/admin/components/admin-provider-cache-row.tsx:76
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 Stunden"
@@ -3564,6 +3564,13 @@ msgstr "Gesamte Organisation"
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:783
 msgid "All Prompts"
 msgstr "Alle Prompts"
+
+#. placeholder {0}: formatNumber(data.all.requests, locale)
+#. placeholder {1}: formatNumber(data.all.promptTokens, locale)
+#. placeholder {2}: shareText(data.all, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:104
+msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
+msgstr "Gesamter Anbieter-Traffic im Zeitraum, mit oder ohne Cache. Anfragen: {0}. Prompt-Tokens: {1}. Aus dem Cache: {2}."
 
 #: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "All providers"
@@ -5762,19 +5769,25 @@ msgstr "von <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "von einer mitwirkenden Person"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:93
+#: src/features/admin/components/admin-provider-cache-row.tsx:108
 msgid "By day, newest first."
 msgstr "Nach Tag, neueste zuerst."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:114
+#: src/features/admin/components/admin-provider-cache-row.tsx:130
 msgid "By hour"
 msgstr "Nach Stunde"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:116
+#: src/features/admin/components/admin-provider-cache-row.tsx:132
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "Nach Stunde, älteste zuerst. Ein Rückgang, der bei allen Modellen zur selben Stunde beginnt, deutet auf eine Änderung an dem hin, was gesendet wird."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:140
+#. placeholder {0}: formatNumber(models.length, locale)
+#. placeholder {1}: formatNumber(data.pairs, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:158
+msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
+msgstr "Nach Modell, die meisten Prompt-Tokens zuerst: die ersten {0} von {1} Paaren aus Anbieter und Modell."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:159
 msgid "By model, most prompt tokens first."
 msgstr "Nach Modell, die meisten Prompt-Tokens zuerst."
 
@@ -10044,7 +10057,7 @@ msgstr "Datum"
 msgid "Date and time"
 msgstr "Datum und Uhrzeit"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:96
+#: src/features/admin/components/admin-provider-cache-row.tsx:111
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "Tag"
@@ -17156,7 +17169,7 @@ msgstr "Hosts"
 msgid "hotkey"
 msgstr "Hotkey"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
+#: src/features/admin/components/admin-provider-cache-row.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "Stunde"
@@ -19943,7 +19956,7 @@ msgid "Loading..."
 msgstr "Wird geladen..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
-#: src/features/admin/components/admin-provider-cache-row.tsx:71
+#: src/features/admin/components/admin-provider-cache-row.tsx:81
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21295,7 +21308,7 @@ msgstr "Modus {0}, auf {1}. Beim Erstellen startet nichts."
 msgid "Mode:"
 msgstr "Modus:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
+#: src/features/admin/components/admin-provider-cache-row.tsx:163
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26915,10 +26928,10 @@ msgstr "Prompt erfolgreich optimiert"
 msgid "Prompt to run on all models..."
 msgstr "Prompt für alle Modelle..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:84
-#: src/features/admin/components/admin-provider-cache-row.tsx:98
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:146
+#: src/features/admin/components/admin-provider-cache-row.tsx:94
+#: src/features/admin/components/admin-provider-cache-row.tsx:113
+#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:166
 msgid "Prompt tokens"
 msgstr "Prompt-Tokens"
 
@@ -26987,7 +27000,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Bewährte Zuverlässigkeit der Vorgängergeneration"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
+#: src/features/admin/components/admin-provider-cache-row.tsx:164
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27009,7 +27022,7 @@ msgstr "Anbieter hinzugefügt – seine Modelle stehen jetzt in der Modellauswah
 msgid "Provider Health"
 msgstr "Anbieterstatus"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:46
+#: src/features/admin/components/admin-provider-cache-row.tsx:56
 msgid "Provider prompt cache"
 msgstr "Prompt-Cache der Anbieter"
 
@@ -28568,10 +28581,10 @@ msgstr "Wird angefordert..."
 msgid "Requesting…"
 msgstr "Wird angefragt…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:88
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
+#: src/features/admin/components/admin-provider-cache-row.tsx:136
+#: src/features/admin/components/admin-provider-cache-row.tsx:165
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30607,10 +30620,10 @@ msgstr "Serbisch (Serbien)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-provider-cache-row.tsx:99
-#: src/features/admin/components/admin-provider-cache-row.tsx:122
-#: src/features/admin/components/admin-provider-cache-row.tsx:147
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+#: src/features/admin/components/admin-provider-cache-row.tsx:138
+#: src/features/admin/components/admin-provider-cache-row.tsx:167
 msgid "Served from cache"
 msgstr "Aus dem Cache"
 
@@ -34858,7 +34871,7 @@ msgstr "Der Prompt wird zur Eingabe des Testfalls und diese Antwort zur erwartet
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "Der Anbieter stellt dir diese Anfragen direkt in Rechnung. Wenn wir den Preis des Modells kennen, wird die übliche Plattformgebühr für eigene Schlüssel in Credits berechnet."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:75
+#: src/features/admin/components/admin-provider-cache-row.tsx:85
 msgid "The provider cache readings could not be loaded."
 msgstr "Die Cache-Werte der Anbieter konnten nicht geladen werden."
 
@@ -34967,9 +34980,9 @@ msgstr "Der Server listet noch keine Modelle – lade zuerst eines herunter oder
 msgid "The shard footprint could not be measured."
 msgstr "Die Shard-Belegung konnte nicht gemessen werden."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:48
-msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
-msgstr "Der Anteil der Prompt-Tokens, den die Anbieter aus ihrem eigenen Cache bedient haben. Tage und Stunden zählen die Paare aus Anbieter und Modell, die in den letzten 30 Tagen gecacht haben; die Modelltabelle listet die 50 Modelle mit den meisten Prompt-Tokens. Antworten aus dem Antwort-Cache des Gateways sind nicht enthalten. Zeiten in UTC."
+#: src/features/admin/components/admin-provider-cache-row.tsx:58
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
+msgstr "Der Anteil der Prompt-Tokens, den die Anbieter aus ihrem eigenen Cache bedient haben. Tage und Stunden zählen die Paare aus Anbieter und Modell, die in den letzten 30 Tagen gecacht haben; die Modelltabelle listet die 50 Modelle mit den meisten Prompt-Tokens. Antworten aus dem Antwort-Cache des Gateways sind nicht enthalten. Tage und Stunden in {timeZone}."
 
 #: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
@@ -39329,7 +39342,7 @@ msgstr "Breite"
 msgid "Will be saved as your {provider} API key"
 msgstr "Wird als dein {provider}-API-Schlüssel gespeichert"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:53
+#: src/features/admin/components/admin-provider-cache-row.tsx:63
 msgid "Window"
 msgstr "Zeitraum"
 

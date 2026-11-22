@@ -607,7 +607,7 @@ msgstr "{0} 个自定义请求头"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:66
+#: src/features/admin/components/admin-provider-cache-row.tsx:76
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1820,7 +1820,7 @@ msgstr "21:9（超宽屏）"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "2350 亿参数混合专家（MoE）架构"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:66
+#: src/features/admin/components/admin-provider-cache-row.tsx:76
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 小时"
@@ -3564,6 +3564,13 @@ msgstr "整个组织"
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:783
 msgid "All Prompts"
 msgstr "所有提示词"
+
+#. placeholder {0}: formatNumber(data.all.requests, locale)
+#. placeholder {1}: formatNumber(data.all.promptTokens, locale)
+#. placeholder {2}: shareText(data.all, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:104
+msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
+msgstr "时间范围内所有提供商流量（无论是否使用缓存）。请求：{0}。提示词 token：{1}。来自缓存：{2}。"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "All providers"
@@ -5762,19 +5769,25 @@ msgstr "来自 <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "由协作者"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:93
+#: src/features/admin/components/admin-provider-cache-row.tsx:108
 msgid "By day, newest first."
 msgstr "按天，最新的在前。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:114
+#: src/features/admin/components/admin-provider-cache-row.tsx:130
 msgid "By hour"
 msgstr "按小时"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:116
+#: src/features/admin/components/admin-provider-cache-row.tsx:132
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "按小时，最早的在前。如果各模型在同一小时开始下降，说明发送的内容发生了变化。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:140
+#. placeholder {0}: formatNumber(models.length, locale)
+#. placeholder {1}: formatNumber(data.pairs, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:158
+msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
+msgstr "按模型，提示词 token 最多的在前：{1} 个提供商与模型组合中的前 {0} 个。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:159
 msgid "By model, most prompt tokens first."
 msgstr "按模型，提示词 token 最多的在前。"
 
@@ -10044,7 +10057,7 @@ msgstr "日期"
 msgid "Date and time"
 msgstr "日期和时间"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:96
+#: src/features/admin/components/admin-provider-cache-row.tsx:111
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "日期"
@@ -17156,7 +17169,7 @@ msgstr "托管方"
 msgid "hotkey"
 msgstr "热键"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
+#: src/features/admin/components/admin-provider-cache-row.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "小时"
@@ -19943,7 +19956,7 @@ msgid "Loading..."
 msgstr "正在加载..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
-#: src/features/admin/components/admin-provider-cache-row.tsx:71
+#: src/features/admin/components/admin-provider-cache-row.tsx:81
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21295,7 +21308,7 @@ msgstr "模式 {0}，使用 {1}。创建时不会启动任何内容。"
 msgid "Mode:"
 msgstr "模式："
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
+#: src/features/admin/components/admin-provider-cache-row.tsx:163
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26915,10 +26928,10 @@ msgstr "提示词优化成功"
 msgid "Prompt to run on all models..."
 msgstr "要在所有模型上运行的提示词..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:84
-#: src/features/admin/components/admin-provider-cache-row.tsx:98
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:146
+#: src/features/admin/components/admin-provider-cache-row.tsx:94
+#: src/features/admin/components/admin-provider-cache-row.tsx:113
+#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:166
 msgid "Prompt tokens"
 msgstr "提示词 token"
 
@@ -26987,7 +27000,7 @@ msgid "Proven reliability from previous generation"
 msgstr "上一代久经验证的可靠性"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
+#: src/features/admin/components/admin-provider-cache-row.tsx:164
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27009,7 +27022,7 @@ msgstr "已添加提供商，其模型现已出现在模型选择器中"
 msgid "Provider Health"
 msgstr "提供商健康状况"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:46
+#: src/features/admin/components/admin-provider-cache-row.tsx:56
 msgid "Provider prompt cache"
 msgstr "提供商提示词缓存"
 
@@ -28568,10 +28581,10 @@ msgstr "正在请求..."
 msgid "Requesting…"
 msgstr "正在请求…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:88
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
+#: src/features/admin/components/admin-provider-cache-row.tsx:136
+#: src/features/admin/components/admin-provider-cache-row.tsx:165
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30607,10 +30620,10 @@ msgstr "塞尔维亚语（塞尔维亚）"
 msgid "Serif"
 msgstr "衬线"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-provider-cache-row.tsx:99
-#: src/features/admin/components/admin-provider-cache-row.tsx:122
-#: src/features/admin/components/admin-provider-cache-row.tsx:147
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+#: src/features/admin/components/admin-provider-cache-row.tsx:138
+#: src/features/admin/components/admin-provider-cache-row.tsx:167
 msgid "Served from cache"
 msgstr "来自缓存"
 
@@ -34858,7 +34871,7 @@ msgstr "提示词将作为用例输入，此回答将作为预期答案。保存
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "这些请求由提供商直接向你计费。如果我们知道模型的价格，将以积分收取自有密钥的常规平台费用。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:75
+#: src/features/admin/components/admin-provider-cache-row.tsx:85
 msgid "The provider cache readings could not be loaded."
 msgstr "无法加载提供商缓存读数。"
 
@@ -34967,9 +34980,9 @@ msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 msgid "The shard footprint could not be measured."
 msgstr "无法测量分片占用。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:48
-msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
-msgstr "提供商从自身缓存中提供的提示词 token 所占比例。按天和按小时统计过去 30 天内使用过缓存的提供商与模型组合；模型表列出提示词 token 最多的前 50 个模型。不包括来自网关响应缓存的回答。时间为 UTC。"
+#: src/features/admin/components/admin-provider-cache-row.tsx:58
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
+msgstr "提供商从自身缓存中提供的提示词 token 所占比例。按天和按小时统计过去 30 天内使用过缓存的提供商与模型组合；模型表列出提示词 token 最多的前 50 个模型。不包括来自网关响应缓存的回答。日期和时间采用 {timeZone}。"
 
 #: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
@@ -39329,7 +39342,7 @@ msgstr "宽度"
 msgid "Will be saved as your {provider} API key"
 msgstr "将保存为你的 {provider} API 密钥"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:53
+#: src/features/admin/components/admin-provider-cache-row.tsx:63
 msgid "Window"
 msgstr "时间范围"
 

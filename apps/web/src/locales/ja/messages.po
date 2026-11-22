@@ -607,7 +607,7 @@ msgstr "カスタムヘッダー {0} 件"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:66
+#: src/features/admin/components/admin-provider-cache-row.tsx:76
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1820,7 +1820,7 @@ msgstr "21:9（ウルトラワイド）"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "235B パラメータの Mixture-of-Experts アーキテクチャ"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:66
+#: src/features/admin/components/admin-provider-cache-row.tsx:76
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 時間"
@@ -3564,6 +3564,13 @@ msgstr "組織全体"
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:783
 msgid "All Prompts"
 msgstr "すべてのプロンプト"
+
+#. placeholder {0}: formatNumber(data.all.requests, locale)
+#. placeholder {1}: formatNumber(data.all.promptTokens, locale)
+#. placeholder {2}: shareText(data.all, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:104
+msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
+msgstr "期間内のすべてのプロバイダートラフィック（キャッシュの有無を問わず）。リクエスト：{0}。プロンプトトークン：{1}。キャッシュから提供：{2}。"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:109
 msgid "All providers"
@@ -5762,19 +5769,25 @@ msgstr "提供元：<0>{0}</0>"
 msgid "by a collaborator"
 msgstr "共同編集者による編集"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:93
+#: src/features/admin/components/admin-provider-cache-row.tsx:108
 msgid "By day, newest first."
 msgstr "日別（新しい順）。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:114
+#: src/features/admin/components/admin-provider-cache-row.tsx:130
 msgid "By hour"
 msgstr "時間別"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:116
+#: src/features/admin/components/admin-provider-cache-row.tsx:132
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "時間別（古い順）。複数のモデルで同じ時刻から下がっている場合は、送信内容が変わったことを示しています。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:140
+#. placeholder {0}: formatNumber(models.length, locale)
+#. placeholder {1}: formatNumber(data.pairs, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:158
+msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
+msgstr "モデル別（プロンプトトークンの多い順）：プロバイダーとモデルの組み合わせ {1} 件のうち上位 {0} 件。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:159
 msgid "By model, most prompt tokens first."
 msgstr "モデル別（プロンプトトークンの多い順）。"
 
@@ -10044,7 +10057,7 @@ msgstr "日付"
 msgid "Date and time"
 msgstr "日付と時刻"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:96
+#: src/features/admin/components/admin-provider-cache-row.tsx:111
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "日"
@@ -17156,7 +17169,7 @@ msgstr "ホスト"
 msgid "hotkey"
 msgstr "ホットキー"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
+#: src/features/admin/components/admin-provider-cache-row.tsx:135
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "時間"
@@ -19943,7 +19956,7 @@ msgid "Loading..."
 msgstr "読み込んでいます..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
-#: src/features/admin/components/admin-provider-cache-row.tsx:71
+#: src/features/admin/components/admin-provider-cache-row.tsx:81
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -21295,7 +21308,7 @@ msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 msgid "Mode:"
 msgstr "モード:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
+#: src/features/admin/components/admin-provider-cache-row.tsx:163
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26915,10 +26928,10 @@ msgstr "プロンプトを最適化しました"
 msgid "Prompt to run on all models..."
 msgstr "すべてのモデルで実行するプロンプト..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:84
-#: src/features/admin/components/admin-provider-cache-row.tsx:98
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:146
+#: src/features/admin/components/admin-provider-cache-row.tsx:94
+#: src/features/admin/components/admin-provider-cache-row.tsx:113
+#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:166
 msgid "Prompt tokens"
 msgstr "プロンプトトークン"
 
@@ -26987,7 +27000,7 @@ msgid "Proven reliability from previous generation"
 msgstr "前世代で実証された信頼性"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
+#: src/features/admin/components/admin-provider-cache-row.tsx:164
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27009,7 +27022,7 @@ msgstr "プロバイダーを追加しました。モデルがモデル選択に
 msgid "Provider Health"
 msgstr "プロバイダーのヘルス"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:46
+#: src/features/admin/components/admin-provider-cache-row.tsx:56
 msgid "Provider prompt cache"
 msgstr "プロバイダーのプロンプトキャッシュ"
 
@@ -28568,10 +28581,10 @@ msgstr "リクエストしています..."
 msgid "Requesting…"
 msgstr "リクエスト中…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:88
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
+#: src/features/admin/components/admin-provider-cache-row.tsx:136
+#: src/features/admin/components/admin-provider-cache-row.tsx:165
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30607,10 +30620,10 @@ msgstr "セルビア語（セルビア）"
 msgid "Serif"
 msgstr "セリフ"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-provider-cache-row.tsx:99
-#: src/features/admin/components/admin-provider-cache-row.tsx:122
-#: src/features/admin/components/admin-provider-cache-row.tsx:147
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+#: src/features/admin/components/admin-provider-cache-row.tsx:138
+#: src/features/admin/components/admin-provider-cache-row.tsx:167
 msgid "Served from cache"
 msgstr "キャッシュから提供"
 
@@ -34858,7 +34871,7 @@ msgstr "プロンプトがケースの入力に、この回答が期待される
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "これらのリクエストはプロバイダーから直接請求されます。モデルの価格がわかる場合は、独自キー利用時の通常のプラットフォーム手数料がクレジットで請求されます。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:75
+#: src/features/admin/components/admin-provider-cache-row.tsx:85
 msgid "The provider cache readings could not be loaded."
 msgstr "プロバイダーのキャッシュ計測値を読み込めませんでした。"
 
@@ -34967,9 +34980,9 @@ msgstr "サーバーにはまだモデルがありません — 先にモデル�
 msgid "The shard footprint could not be measured."
 msgstr "シャードの使用量を測定できませんでした。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:48
-msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
-msgstr "プロバイダーが自社のキャッシュから提供したプロンプトトークンの割合です。日別と時間別は、過去 30 日間にキャッシュを使ったプロバイダーとモデルの組み合わせを集計します。モデル表には、プロンプトトークンの多い上位 50 モデルを表示します。ゲートウェイのレスポンスキャッシュからの応答は含みません。時刻は UTC です。"
+#: src/features/admin/components/admin-provider-cache-row.tsx:58
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
+msgstr "プロバイダーが自社のキャッシュから提供したプロンプトトークンの割合です。日別と時間別は、過去 30 日間にキャッシュを使ったプロバイダーとモデルの組み合わせを集計します。モデル表には、プロンプトトークンの多い上位 50 モデルを表示します。ゲートウェイのレスポンスキャッシュからの応答は含みません。日付と時刻は {timeZone} です。"
 
 #: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
@@ -39329,7 +39342,7 @@ msgstr "幅"
 msgid "Will be saved as your {provider} API key"
 msgstr "{provider} の API キーとして保存されます"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:53
+#: src/features/admin/components/admin-provider-cache-row.tsx:63
 msgid "Window"
 msgstr "期間"
 

@@ -17,7 +17,14 @@ class FakeBinding {
 
         this.calls.push(new Request(input).url);
 
-        return Response.json({ days: 7, hours: [], models: [], since: "2026-11-15T00:00:00.000Z" });
+        return Response.json({
+            all: { cachedTokens: 0, promptTokens: 0, requests: 0 },
+            days: 7,
+            hours: [],
+            models: [],
+            pairs: 0,
+            since: "2026-11-15T00:00:00.000Z",
+        });
     }
 }
 
