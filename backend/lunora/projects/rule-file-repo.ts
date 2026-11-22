@@ -34,6 +34,12 @@ const vRepoArgs = { projectId: v.id("projects"), repoId: v.id("projectRepositori
 /** A repository the host this app reads does not hold: nothing to read it with. */
 const vUnsupported = v.object({ status: v.literal("unsupported_host") });
 
+/**
+ * A listing whose own walk ran out of the action's host requests (redirect hops and a 401's repeat spent them): a retry
+ * meets the same redirects, so it is told apart from the host's error.
+ */
+const vBudgetSpent = v.object({ status: v.literal("budget_spent") });
+
 /** The repository's address on the host, or `null` for one elsewhere; a project or repository the caller may not import from is NOT_FOUND. */
 const addressFor = async (
     ctx: Pick<ActionCtx, "runQuery">,
@@ -54,7 +60,8 @@ const addressFor = async (
 /**
  * The instruction files the repository holds at one commit, by path, size and the blob a read takes (a link followed
  * with the path it leads to, one not followed with why), whether a tree was cut, and how many of the rules folder's
- * files are past the listing's cap; none read yet. At most `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included.
+ * files are past the listing's cap; none read yet. At most `HOST_FETCHES_PER_IMPORT` host requests, a 401's repeat included:
+ * a walk they cut short is `budget_spent`.
  */
 export const listRepoRuleFiles = authAction
     .use(rateLimit("sourceControl/read"))
@@ -79,6 +86,7 @@ export const listRepoRuleFiles = authAction
                 status: v.literal("ok"),
                 truncated: v.boolean(),
             }),
+            vBudgetSpent,
             vFailed,
             vUnsupported,
         ),
@@ -94,10 +102,11 @@ export const listRepoRuleFiles = authAction
         // One budget for both tries: a 401's repeat spends what the first left.
         const budgeted = fetchBudget();
         // Links past the budget are listed `budget`; a walk the budget cuts short (redirect hops spent it) lists nothing
-        // it can stand by, so it is the host's error, never a thrown one.
+        // it can stand by, so it is `budget_spent`, never a thrown error. Trying again meets the same redirects, but a
+        // 401's repeat (a refreshed token) can pass on the next try, so the client's note says to try again first.
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(budgeted(request), address)).catch((error: unknown) => {
             if (error instanceof FetchBudgetSpent) {
-                return { status: "host_error" as const };
+                return { status: "budget_spent" as const };
             }
 
             throw error;
