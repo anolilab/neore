@@ -15,6 +15,7 @@ import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
 import { browserIdOf, NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
 import { isServiceBound, serviceFetch } from "../../lib/services";
+import { type ClickTargetLook, purchaseTargetNeedsApproval } from "../lib/purchase-gate";
 import { validateDomain } from "./utilities";
 
 ("use node");
@@ -79,6 +80,8 @@ export const executeBrowserAction = internalAction
             let returned: BrowserReturn | undefined;
             // The renderer call's deadline, and when it falls: a call that ran until then may still be acting in the renderer.
             let callSignal: AbortSignal | undefined;
+            // The session this call acts on, once it is known: a decision look that fails records its empty target there.
+            let decisionSession: Id<"browserSessions"> | undefined;
             let callEndsBy: number | undefined;
 
             try {
@@ -100,6 +103,8 @@ export const executeBrowserAction = internalAction
                 const startedWithProviderSessionId = sessionDocument.providerSessionId ?? null;
                 const cfSessionId = sessionDocument.providerSessionId === NO_PROVIDER_SESSION ? undefined : sessionDocument.providerSessionId;
                 const sessionId = sessionDocument._id;
+
+                decisionSession = sessionId;
 
                 // A click the person approved is checked against the target its decision read recorded, taken here, before the
                 // hold. A decision whose target was pushed out, or that could not read one, is refused: nothing is clicked unseen.
@@ -139,13 +144,14 @@ export const executeBrowserAction = internalAction
                 // The ended lease this action looks at the page for: once a look came back, the next actions act again.
                 const { inspecting } = use;
 
-                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser,
-                // nor one of the human-check ladder's own reads, nor one the renderer refused unrun (`refund`).
+                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser, nor one the
+                // renderer refused unrun (`refund`). Not counted either: the human-check ladder's own reads, and a click's approval
+                // read (the click itself is counted once), so a click that needs no approval is not charged for its reads.
+                const isUncounted = args.ladderLook === true || args.approvalLook === true;
                 const rateKey = `browser/action:${args.userTier ?? "free"}`;
-                const rlResult =
-                    args.ladderLook === true
-                        ? { ok: true }
-                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: rateKey });
+                const rlResult = isUncounted
+                    ? { ok: true }
+                    : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: rateKey });
 
                 if (!rlResult.ok) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
@@ -163,7 +169,7 @@ export const executeBrowserAction = internalAction
 
                 /** Gives back the charge of an action the renderer ran none of (a sign-in held it, it was retired, its lock did not answer). */
                 const refund = async (): Promise<void> => {
-                    if (args.ladderLook !== true) {
+                    if (!isUncounted) {
                         await ctx.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key: rateKey });
                     }
                 };
@@ -331,9 +337,10 @@ export const executeBrowserAction = internalAction
                 const result = data as BrowserActionResponse;
                 const durationMs = Date.now() - startTime;
 
-                // The decision look of a tool call: its target is kept, so the click the person approves is checked against it. A
-                // look that read no target keeps an empty one, so the approved click is refused rather than run unchecked.
-                if (args.decisionCallId !== undefined) {
+                // The decision look of a tool call: a look that reads as a purchase (or cannot be read) keeps its target, so the click
+                // the person approves is checked against it. A look that read no target keeps an empty one, so that click is refused.
+                // An ordinary look keeps nothing: its click is not approved, so there is no record to clear later.
+                if (args.decisionCallId !== undefined && purchaseTargetNeedsApproval(result as ClickTargetLook)) {
                     await ctx.runMutation(internal.browser.functions.recordPurchaseLook, {
                         sessionId,
                         target: result.success === true && result.target !== undefined ? result.target : "",
@@ -403,6 +410,14 @@ export const executeBrowserAction = internalAction
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held).catch(() => undefined);
                 }
 
+                // A decision look that failed read no target: its record is kept empty, so the click the person approves is refused
+                // rather than run unchecked. (The check fails closed; the record is replaced by the next decision's look.)
+                if (args.decisionCallId !== undefined && decisionSession !== undefined) {
+                    await ctx
+                        .runMutation(internal.browser.functions.recordPurchaseLook, { sessionId: decisionSession, target: "", toolCallId: args.decisionCallId })
+                        .catch(() => undefined);
+                }
+
                 const failed = { error: `CF Browser Rendering error: ${sanitizeBrowserError(error)}`, success: false };
 
                 return returned === undefined ? failed : handedBackResult(failed, returned);
@@ -435,11 +450,11 @@ const INTERACTIVE_ACTIONS: ReadonlySet<string> = new Set(["click", "scroll", "ty
 
 export type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 
-/** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
 /** An approved click whose target is no longer known (pushed out of its decision's record, or never read): nothing is clicked. */
 export const APPROVED_TARGET_UNKNOWN =
     "The target the person approved is no longer known, so nothing was clicked. Look at the page again, and ask for approval before you click.";
 
+/** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
 export const PERSON_HAS_CONTROL =
     "The person watching this chat has taken control of the browser and is using it now, so this action was not run. Do not use the browser until they hand it back: tell them what you are waiting for, or ask them, and try again later.";
 

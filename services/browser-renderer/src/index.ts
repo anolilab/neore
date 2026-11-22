@@ -63,10 +63,16 @@ const WHITESPACE_RE = /\s+/u;
 /** A label that is only a submit word (with optional punctuation): "Confirm", "Weiter.", never "Continue shopping". */
 const SUBMIT_WORD_RE = /^(?:confirm|submit|continue|complete|place|weiter|bestätigen|absenden)[.!]?$/iu;
 
-/** The click found another element, or this one with other text: the person's yes was for what they were shown. */
+/** A host of a payment provider: a card form whose frame or post goes there is a checkout. A captcha or a contact form's host is not. */
+const PAYMENT_HOST_RE = /pay|stripe|adyen|braintree|checkout|klarna|mollie|sumup|worldpay|saferpay|sofort|wirecard/iu;
+
+/** Splits a URL path into its words, so "cart" is a word of its own and not part of "cartoon". */
+const PATH_SPLIT_RE = /\P{L}+/u;
+
 /** A disabled control is not clicked on an approved target: it is not clicked until it is enabled, on a fresh look. */
 const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at the page again before you click.";
 
+/** The click found another element, or this one with other text: the person's yes was for what they were shown. */
 const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
 
 /**
@@ -76,8 +82,8 @@ const TARGET_CHANGED = "The target changed since it was checked, so nothing was 
  */
 function readTarget(
     control: Element,
-    options: { max: number; splitter: RegExp; submit: RegExp },
-): { canonical: string; checkout: boolean; label: string; labelTruncated: boolean; submitLike: boolean } {
+    options: { max: number; pathSplitter: RegExp; payment: RegExp; splitter: RegExp; submit: RegExp },
+): { canonical: string; checkout: boolean; label: string; labelTruncated: boolean; shown: string; submitLike: boolean } {
     // This function is serialized into the page by Playwright (`element.evaluate`). A bundler wraps a named inner function in a
     // helper the page does not have, so this function declares none: every step is written out in its body.
     // The elements the click lands in: the control, then each actionable ancestor. A visible child (an icon in a button, a
@@ -176,14 +182,16 @@ function readTarget(
     let isScanCapped = false;
 
     for (let index = 0; index < roots.length; index++) {
-        const root = roots[index];
-        const found = root.querySelectorAll("*");
+        // A walk, not querySelectorAll: that lists every descendant before the cap is checked, so a huge control would be listed whole.
+        const walker = document.createTreeWalker(roots[index], NodeFilter.SHOW_ELEMENT);
 
-        for (const element of found) {
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
             if (inside.length >= 2000) {
                 isScanCapped = true;
                 break;
             }
+
+            const element = node as Element;
 
             inside.push(element);
 
@@ -337,20 +345,27 @@ function readTarget(
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
     // there pays, so the gate reads a submit-like label on a checkout as a purchase.
     // A card form is also one whose fields sit in a frame the page cannot read (a hosted card element), or one that posts to
-    // another site: its fields are not in the DOM, so the field check alone misses it.
+    // another site: its fields are not in the DOM, so the field check alone misses it. Only a payment provider's frame or
+    // host counts: a login or contact form with a captcha frame, or one that posts to another site, is not a checkout.
     // Card fields are read in the form when there is one, and on the page when there is not (a card form built from divs).
     // A frame or a cross-origin action only counts inside a form, since those are what a hosted card form is.
     const cardSelector =
         "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i]";
     const hasCardFields =
         (enclosingForm === null ? document.querySelector(cardSelector) : Element.prototype.querySelector.call(enclosingForm, cardSelector)) !== null;
-    const isCardFields =
-        hasCardFields ||
-        (enclosingForm !== null &&
-            (Element.prototype.querySelector.call(enclosingForm, "iframe") !== null ||
-                new URL(formAction, document.URL).origin !== new URL(document.URL).origin));
-    const address = document.URL.toLowerCase();
-    const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
+    const frameSources =
+        enclosingForm === null
+            ? []
+            : [...Element.prototype.querySelectorAll.call(enclosingForm, "iframe")].map((frame) => Element.prototype.getAttribute.call(frame, "src") ?? "");
+    const isPaymentFrame = frameSources.some((source) => source !== "" && options.payment.test(new URL(source, document.URL).hostname));
+    const formUrl = new URL(formAction, document.URL);
+    const isPaymentPost = formUrl.origin !== new URL(document.URL).origin && options.payment.test(formUrl.hostname);
+    const isCardFields = hasCardFields || isPaymentFrame || isPaymentPost;
+    // The address's path words, not the whole address: "cart" is a page's word, "cartoon" or a host name containing it is not.
+    const pathWords = new URL(document.URL).pathname.toLowerCase().split(options.pathSplitter);
+    const isCheckoutPage = pathWords.some(
+        (word) => ["basket", "cart", "checkout", "kasse", "payment", "warenkorb"].includes(word) || word.startsWith("bestell"),
+    );
 
     // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
     // different targets share a fingerprint. `targetOf` digests it outside the page.
@@ -362,6 +377,7 @@ function readTarget(
         checkout: isCheckout,
         label,
         labelTruncated: joined.length > options.max || isScanCapped,
+        shown,
         submitLike: isSubmitLike,
     };
 }
@@ -864,7 +880,13 @@ const actHeld = async (
                         break;
                     }
 
-                    const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE, submit: SUBMIT_WORD_RE });
+                    const read = await element.evaluate(readTarget, {
+                        max: LABEL_MAX_LENGTH,
+                        pathSplitter: PATH_SPLIT_RE,
+                        payment: PAYMENT_HOST_RE,
+                        splitter: WHITESPACE_RE,
+                        submit: SUBMIT_WORD_RE,
+                    });
 
                     if ((await targetOf(read.canonical)) !== expectTarget) {
                         result = { error: TARGET_CHANGED, success: false, targetChanged: true };
@@ -901,24 +923,28 @@ const actHeld = async (
                         break;
                     }
 
-                    // `innerText` leaves out hidden descendants (display: none, visibility: hidden), so a purchase word
-                    // the person cannot see does not count. An ordinary extract keeps the raw text it always returned.
-                    // An SVG element has no innerText (a handle's `innerText()` fails on one), so its text is read from the element.
-                    // The rendered text is read on purpose: textContent keeps hidden descendants.
-                    extractedText =
-                        visibleOnly === true
-                            ? // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose, see above
-                              await element.evaluate((node) => (node instanceof HTMLElement ? node.innerText : (node.textContent ?? "")))
-                            : ((await element.textContent()) ?? "");
-
                     if (visibleOnly === true) {
-                        const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE, submit: SUBMIT_WORD_RE });
+                        // The rendered text and the fingerprint come from one read of the element, so they describe the same state of
+                        // the page: two reads could pair a purchase's text with an ordinary fingerprint when the page changes between them.
+                        // The text is `innerText` (hidden descendants left out, so a purchase word the person cannot see does not count),
+                        // or the element's own text for an SVG, which has no innerText. The rendered text is read on purpose.
+                        const read = await element.evaluate(readTarget, {
+                            max: LABEL_MAX_LENGTH,
+                            pathSplitter: PATH_SPLIT_RE,
+                            payment: PAYMENT_HOST_RE,
+                            splitter: WHITESPACE_RE,
+                            submit: SUBMIT_WORD_RE,
+                        });
 
+                        extractedText = read.shown;
                         label = read.label;
                         isLabelTruncated = read.labelTruncated;
                         target = await targetOf(read.canonical);
                         isCheckout = read.checkout;
                         isSubmitLike = read.submitLike;
+                    } else {
+                        // An ordinary extract keeps the raw text it always returned.
+                        extractedText = (await element.textContent()) ?? "";
                     }
                 } else {
                     extractedText = await page.evaluate(() => {

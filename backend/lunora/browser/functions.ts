@@ -66,10 +66,6 @@ export const getBrowserDomainSettings = internalQuery
  */
 const PURCHASE_LOOKS_KEPT = 50;
 
-/**
- * The target a purchase decision looked at for one tool call. Written by the decision's own look, before the person is asked;
- * a click the person approves is checked against it.
- */
 /** How many evicted tool calls a session remembers, so their approved clicks are refused rather than run unchecked. */
 const PURCHASE_LOST_KEPT = 200;
 

@@ -838,9 +838,43 @@ describe("a browser a person took control of", () => {
         expect(renderer).toHaveBeenCalledTimes(1);
     });
 
+    it("an approved click whose decision look failed outright is refused, and nothing is clicked", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockRejectedValueOnce(new Error("renderer unreachable"));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    decisionCallId: "call-thrown",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        const refused = await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-thrown",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(refused).toEqual({ error: APPROVED_TARGET_UNKNOWN, success: false });
+        expect(renderer).toHaveBeenCalledTimes(1);
+    });
+
     it("an approved click whose decision target was pushed out of the record is refused, and nothing is clicked", async () => {
         await addSession(NOW - 1000);
-        renderer.mockResolvedValue(answered({ content: "Next", label: "Next", success: true, target: "T-old", url: "https://example.com/a" }));
+        // A purchase target: only a decision that asks keeps a record, so only those can be pushed out of it.
+        renderer.mockResolvedValue(answered({ content: "Pay now", label: "Pay now", success: true, target: "T-old", url: "https://example.com/a" }));
 
         // Fifty-one decisions: the first one's target is pushed out of the session's record.
         for (let index = 0; index <= 50; index += 1) {
