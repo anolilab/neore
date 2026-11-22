@@ -207,10 +207,17 @@ function readTarget(
     let destinations = "";
 
     for (const node of nodes) {
-        destinations += `${node.getAttribute("href") ?? ""}|${node.getAttribute("formaction") ?? ""}|`;
+        // The resolved address (the `href` and `formAction` properties), not the raw attribute: a `<base>` change or a relative
+        // path moves the same attribute to another site.
+        const link = node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement ? node.href : "";
+        const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
+
+        destinations += `${link}|${formTarget}|`;
     }
 
-    destinations += control.closest("form")?.getAttribute("action") ?? "";
+    const enclosingForm = control.closest("form");
+
+    destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
 
     const fingerprintOf = [steps.join(">"), joined, shown, destinations].join("\u{0}");
     let hash = 0x81_1c_9d_c5;
