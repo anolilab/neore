@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { browserActionNeedsPurchaseApproval, isPurchaseText } from "./purchase-gate";
+import { approvedToolCallIds, browserActionNeedsPurchaseApproval, isPurchaseText } from "./purchase-gate";
 
 describe("isPurchaseText", () => {
     it.each([
@@ -44,6 +44,33 @@ describe("isPurchaseText", () => {
         "Zahlungsarten",
     ])("does not read %s as a purchase", (text) => {
         expect(isPurchaseText(text)).toBe(false);
+    });
+});
+
+describe("approvedToolCallIds", () => {
+    const request = (approvalId: string, toolCallId: string) => {
+        return {
+            content: [{ approvalId, toolCallId, type: "tool-approval-request" }],
+            role: "assistant",
+        };
+    };
+    const response = (approvalId: string, approved: boolean) => {
+        return {
+            content: [{ approvalId, approved, type: "tool-approval-response" }],
+            role: "tool",
+        };
+    };
+
+    it("names the calls whose approval was answered yes", () => {
+        const messages = [{ content: "hi", role: "user" }, request("a-1", "call-1"), request("a-2", "call-2"), response("a-1", true), response("a-2", false)];
+
+        expect([...approvedToolCallIds(messages)]).toEqual(["call-1"]);
+    });
+
+    it("names nothing for an approval that was never answered, or whose request is not in the messages", () => {
+        expect(approvedToolCallIds([request("a-1", "call-1")])).toEqual(new Set());
+        expect(approvedToolCallIds([response("a-9", true)])).toEqual(new Set());
+        expect(approvedToolCallIds([{ content: "text", role: "user" }, null, 3])).toEqual(new Set());
     });
 });
 

@@ -59,20 +59,60 @@ export const browserActionNeedsPurchaseApproval = async (
     }
 
     try {
-        const target = await look(input.selector);
-
-        if (target.success !== true || target.truncated === true || target.labelTruncated === true) {
-            return true;
-        }
-
-        // A control with neither text nor a name (an icon button with no aria-label, title or value) has nothing the gate can
-        // read, so it asks: the selector says nothing about what the click does. A control with an ordinary name asks only
-        // when a purchase word is in its text or its name: an arrow icon with aria-label "Buy now" asks.
-        const text = target.content?.trim() ?? "";
-        const name = target.label?.trim() ?? "";
-
-        return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name);
+        return purchaseTargetNeedsApproval(await look(input.selector));
     } catch {
         return true;
     }
+};
+
+/** Whether one read of a click's target asks the person first. A read that failed, or was cut short, asks. */
+export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean => {
+    if (target.success !== true || target.truncated === true || target.labelTruncated === true) {
+        return true;
+    }
+
+    // A control with neither text nor a name (an icon button with no aria-label, title or value) has nothing the gate can
+    // read, so it asks: the selector says nothing about what the click does. A control with an ordinary name asks only
+    // when a purchase word is in its text or its name: an arrow icon with aria-label "Buy now" asks.
+    const text = target.content?.trim() ?? "";
+    const name = target.label?.trim() ?? "";
+
+    return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name);
+};
+
+/**
+ * The tool calls the person approved in a conversation: an approval request names its tool call, and an approval response
+ * with `approved: true` answers it. The SDK runs an approved call with the messages that hold both, so a tool's `execute`
+ * reads its own call's answer here.
+ */
+export const approvedToolCallIds = (messages: ReadonlyArray<unknown> = []): Set<string> => {
+    const partsOf = (message: unknown): ReadonlyArray<Record<string, unknown>> => {
+        const content = typeof message === "object" && message !== null ? (message as { content?: unknown }).content : undefined;
+
+        return Array.isArray(content) ? content.filter((part): part is Record<string, unknown> => typeof part === "object" && part !== null) : [];
+    };
+    const parts = messages.flatMap((message) => partsOf(message));
+    const callByApproval = new Map<string, string>();
+
+    for (const part of parts) {
+        if (part.type === "tool-approval-request" && typeof part.approvalId === "string" && typeof part.toolCallId === "string") {
+            callByApproval.set(part.approvalId, part.toolCallId);
+        }
+    }
+
+    const approved = new Set<string>();
+
+    for (const part of parts) {
+        if (!(part.type === "tool-approval-response" && part.approved === true && typeof part.approvalId === "string")) {
+            continue;
+        }
+
+        const toolCallId = callByApproval.get(part.approvalId);
+
+        if (toolCallId !== undefined) {
+            approved.add(toolCallId);
+        }
+    }
+
+    return approved;
 };

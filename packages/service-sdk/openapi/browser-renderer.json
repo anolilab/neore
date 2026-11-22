@@ -287,6 +287,10 @@
                         "type": "boolean",
                         "description": "Whether to capture full page screenshot"
                     },
+                    "expectTarget": {
+                        "type": "string",
+                        "description": "Click: the target fingerprint of the element the person was shown; the click is refused when the element differs"
+                    },
                     "visibleOnly": {
                         "type": "boolean",
                         "description": "Extract with a selector: return the rendered text, leaving out hidden descendants"
@@ -313,6 +317,7 @@
                     "content": { "type": "string", "description": "Extracted text content" },
                     "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
                     "labelTruncated": { "type": "boolean", "description": "The accessible name was cut short" },
+                    "target": { "type": "string", "description": "Fingerprint of the extracted element (visibleOnly reads only)" },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },

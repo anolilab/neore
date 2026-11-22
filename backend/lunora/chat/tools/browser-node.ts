@@ -31,8 +31,17 @@ export const executeBrowserAction = internalAction
          * looks first. Only `chat/tools/browser.ts` sets it, as `ladderLook` is set.
          */
         approvalLook: v.optional(v.boolean()),
+        /**
+         * A click the person approved (`chat/tools/browser.ts`): it is checked against the target its decision look recorded
+         * for this tool call (`decisionCallId`), so a page that changed since they were shown it is refused.
+         */
+        approvedCallId: v.optional(v.string()),
         browserSettings: v.optional(v.any()),
+        /** The approval look of this tool call: its target is recorded for the decision, so the approved click can be checked against it. */
+        decisionCallId: v.optional(v.string()),
         direction: v.optional(v.string()),
+        /** A click the tool checked itself (a look before it was not asked to ask): the target that look read. */
+        expectTarget: v.optional(v.string()),
         fullPage: v.optional(v.boolean()),
         /**
          * One of the human-check ladder's own reads (`browser/human-check.ts`), which the agent never asked for: not
@@ -160,11 +169,23 @@ export const executeBrowserAction = internalAction
                 callSignal = AbortSignal.timeout(budget);
                 callEndsBy = Date.now() + budget;
 
+                // A click the person approved is checked against the target they were shown (its decision look recorded it).
+                // With no record (ask mode asks without a look) it is not checked; a click the tool checked itself carries its
+                // own `expectTarget`.
+                let expectTarget: string | undefined;
+
+                if (action === "click" && args.approvedCallId !== undefined) {
+                    expectTarget = (await ctx.runQuery(internal.browser.functions.purchaseLookOf, { sessionId, toolCallId: args.approvedCallId })) ?? undefined;
+                } else if (action === "click") {
+                    expectTarget = args.expectTarget;
+                }
+
                 const sent: BrowserActionRequest = looksFirst
                     ? { action: "screenshot", sessionId: cfSessionId }
                     : {
                           action,
                           direction: args.direction as "up" | "down" | undefined,
+                          ...(expectTarget !== undefined && { expectTarget }),
                           fullPage: args.fullPage,
                           selector: args.selector,
                           sessionId: cfSessionId,
@@ -297,6 +318,15 @@ export const executeBrowserAction = internalAction
 
                 const result = data as BrowserActionResponse;
                 const durationMs = Date.now() - startTime;
+
+                // The decision look of a tool call: its target is kept, so the click the person approves is checked against it.
+                if (args.decisionCallId !== undefined && result.success === true && result.target !== undefined) {
+                    await ctx.runMutation(internal.browser.functions.recordPurchaseLook, {
+                        sessionId,
+                        target: result.target,
+                        toolCallId: args.decisionCallId,
+                    });
+                }
 
                 // Store the CF session ID so subsequent actions reuse the same browser. No id: the renderer kept no
                 // browser (it closed it after a blocked redirect), so there is nothing to reuse or watch.

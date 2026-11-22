@@ -516,6 +516,11 @@ export const schema = defineSchema({
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
         /**
+         * The target a purchase decision looked at, per tool call (`browser/functions.ts#recordPurchaseLook`): the approved
+         * click is checked against it, so a page that changed in between is refused. The newest few are kept.
+         */
+        purchaseLooks: v.optional(v.array(v.object({ target: v.string(), toolCallId: v.string() }))),
+        /**
          * The deadlines of the browser actions in flight that began while the row read the browser as reaped (or before it
          * named one): they keep a person from taking control until they end, but keep no browser alive, so a reaped one
          * is not offered while the renderer replaces it.

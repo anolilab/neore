@@ -17,8 +17,12 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { budgetedLook, HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckLadder, humanCheckMessages, waitUnlessStopped } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
-import { browserActionNeedsPurchaseApproval } from "../lib/purchase-gate";
+import { approvedToolCallIds, browserActionNeedsPurchaseApproval, type ClickTargetLook, purchaseTargetNeedsApproval } from "../lib/purchase-gate";
 import toonEncodeOutput from "./toon-encode";
+
+/** A click that reads as a purchase, or whose target cannot be read, runs only once the person has said yes to it. */
+const CLICK_NEEDS_APPROVAL =
+    "This click reads as a purchase, or its target cannot be read, so it needs the person's approval. Look at the page again before you click.";
 
 export interface BrowserResult {
     /** The browser the page is on (`browser-node.ts`); for the ladder's ask only, never the model. */
@@ -35,6 +39,9 @@ export interface BrowserResult {
      * action that ran on it) and on `site`.
      */
     humanCheck?: { browserId?: string; site: string; status: "already_asked" | "asked" };
+    /** The accessible name of the element a look read (`visibleOnly`). */
+    label?: string;
+    labelTruncated?: boolean;
     /** A navigate, or an interactive action that left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
     navigated?: boolean;
     result?: string;
@@ -42,6 +49,8 @@ export interface BrowserResult {
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
     success: boolean;
+    /** The fingerprint of the element a look read: a click is checked against it (`expectTarget`). */
+    target?: string;
     title?: string;
     truncated?: boolean;
     typedSelector?: string;
@@ -94,12 +103,23 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
         const { userId } = context;
         // `ladderLook`: one of the human-check ladder's own reads, set here only, never from the model's input.
         const run = async (
-            step: Omit<typeof input, "action"> & { action: Exclude<typeof input.action, "needs_person">; ladderLook?: true },
+            step: Omit<typeof input, "action"> & {
+                action: Exclude<typeof input.action, "needs_person">;
+                approvalLook?: true;
+                approvedCallId?: string;
+                decisionCallId?: string;
+                expectTarget?: string;
+                ladderLook?: true;
+            },
         ): Promise<BrowserResult> =>
             (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
                 action: step.action,
                 browserSettings: (context as { browserSettings?: unknown }).browserSettings,
                 direction: step.direction,
+                ...(step.approvalLook === true && { approvalLook: true }),
+                ...(step.approvedCallId !== undefined && { approvedCallId: step.approvedCallId }),
+                ...(step.decisionCallId !== undefined && { decisionCallId: step.decisionCallId }),
+                ...(step.expectTarget !== undefined && { expectTarget: step.expectTarget }),
                 fullPage: step.fullPage,
                 ...(step.ladderLook === true && { ladderLook: true }),
                 selector: step.selector,
@@ -115,7 +135,26 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
 
         try {
             const reported = action === "needs_person";
-            const first = await run(action === "needs_person" ? { action: "screenshot" } : { ...input, action });
+            // A click is checked against the target the person was shown. One they approved is checked against the target its
+            // decision recorded (`approvedCallId`). Any other click is looked at now, and refused when that look reads as a
+            // purchase: a purchase needs the person's yes, which this call was not given (its decision read was not one).
+            let step: Parameters<typeof run>[0] = action === "needs_person" ? { action: "screenshot" } : { ...input, action };
+
+            if (action === "click" && input.selector !== undefined) {
+                if (approvedToolCallIds(options.messages).has(options.toolCallId)) {
+                    step = { ...step, approvedCallId: options.toolCallId };
+                } else {
+                    const look = await run({ action: "extract", approvalLook: true, selector: input.selector });
+
+                    if (purchaseTargetNeedsApproval(look as ClickTargetLook)) {
+                        return { error: CLICK_NEEDS_APPROVAL, success: false };
+                    }
+
+                    step = { ...step, expectTarget: look.target };
+                }
+            }
+
+            const first = await run(step);
             // A refused or failed action (a person in control, the browser closed) is not a page to judge.
             const result =
                 first.success === true || first.handedBack === true
@@ -187,7 +226,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
     // A click on something that reads as a purchase asks first (`lib/purchase-gate.ts`). This is the tool's own answer,
     // so the `auto` default and a time-boxed allow do not lift it. Nothing runs without a person and a thread: `execute`
     // refuses the call then, so no look is made.
-    needsApproval: async (context, input) => {
+    needsApproval: async (context, input, options) => {
         if (!context.userId || !context.threadId) {
             return false;
         }
@@ -201,6 +240,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     action: "extract",
                     approvalLook: true,
                     browserSettings: (context as { browserSettings?: unknown }).browserSettings,
+                    decisionCallId: options.toolCallId,
                     selector,
                     threadId: threadId as Id<"threads">,
                     userId,

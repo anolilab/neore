@@ -43,6 +43,7 @@ const KEEP_ALIVE_MS = 60_000;
 const actionSchema = z.object({
     action: z.enum(["navigate", "screenshot", "click", "type", "extract", "scroll"]),
     direction: z.enum(["up", "down"]).optional(),
+    expectTarget: z.string().optional(), // click: the `target` of the element the person was shown; refused when it differs
     fullPage: z.boolean().optional(),
     selector: z.string().optional(),
     sessionId: z.string().optional(), // Reconnect to an existing browser session
@@ -58,6 +59,97 @@ const DIGITS_RE = /^\d+$/;
 const LABEL_MAX_LENGTH = 15_000;
 
 const WHITESPACE_RE = /\s+/u;
+
+/** The click found another element, or this one with other text: the person's yes was for what they were shown. */
+const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
+
+/**
+ * Reads a control the way a click reaches it, in the page: `label`, its accessible name (capped; `labelTruncated` when cut),
+ * and `target`, a fingerprint of the element (its place in the page, its name and its shown text). A click given that
+ * `target` runs only on the element that still has it. The read is one function, so the check and the read agree.
+ */
+function readTarget(control: Element, options: { max: number; splitter: RegExp }): { label: string; labelTruncated: boolean; target: string } {
+    // The elements the click lands in: the control, then each actionable ancestor up to the outermost. A visible child (an
+    // icon in a button, a span in a clickable div) is clicked as those ancestors too.
+    const actionableSelector =
+        "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
+    const nodes: Element[] = [control];
+    let ancestor = control.closest(actionableSelector);
+
+    while (ancestor) {
+        if (!nodes.includes(ancestor)) {
+            nodes.push(ancestor);
+        }
+
+        ancestor = ancestor.parentElement?.closest(actionableSelector) ?? null;
+    }
+
+    const outermost = nodes.at(-1) ?? control;
+    const names: string[] = [];
+
+    for (const node of nodes) {
+        names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+
+        // Ids are separated by any ASCII whitespace, not only a space.
+        const ids = (node.getAttribute("aria-labelledby") ?? "").split(options.splitter).filter(Boolean);
+
+        for (const id of ids) {
+            names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
+        }
+
+        // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
+        if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
+            names.push(node.value);
+        }
+
+        // Text the stylesheet draws (CSS `content`) is on screen but in neither innerText nor textContent.
+        for (const pseudo of ["::before", "::after"]) {
+            names.push(getComputedStyle(node, pseudo).content);
+        }
+
+        // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
+        if (node instanceof HTMLElement) {
+            // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
+            names.push(node.innerText);
+        }
+    }
+
+    // Names that come from inside the outermost element: an image's alt, a child's aria-label or title, an SVG title.
+    for (const node of outermost.querySelectorAll("img[alt], [aria-label], [title]")) {
+        names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+    }
+
+    for (const node of outermost.querySelectorAll(":scope svg title")) {
+        names.push(node.textContent ?? "");
+    }
+
+    const joined = names.filter(Boolean).join(" ");
+    const label = joined.slice(0, options.max);
+    // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
+    const shown = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
+
+    // The element's place: the tag and position of each ancestor, from the root down.
+    const steps: string[] = [];
+    let current: Element | null = control;
+
+    while (current !== null && current !== document.documentElement) {
+        const parent: Element | null = current.parentElement;
+        const index = parent === null ? 0 : [...parent.children].indexOf(current);
+
+        steps.unshift(`${current.localName}.${index}`);
+        current = parent;
+    }
+
+    // FNV-1a over the three parts: a click compares the same string the read built.
+    const fingerprintOf = [steps.join(">"), label, shown].join("\u{0}");
+    let hash = 0x81_1c_9d_c5;
+
+    for (const character of fingerprintOf) {
+        hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 0x01_00_01_93);
+    }
+
+    return { label, labelTruncated: joined.length > options.max, target: `${(hash >>> 0).toString(16)}-${fingerprintOf.length}` };
+}
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
 
@@ -256,6 +348,8 @@ interface ActionResult {
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
     success: boolean;
+    /** The fingerprint of the extracted element (`visibleOnly` reads only), which a click can be checked against. */
+    target?: string;
     title?: string;
     truncated?: boolean;
     typedSelector?: string;
@@ -455,7 +549,7 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, direction, fullPage, selector, sessionId, text, url, visibleOnly }: z.infer<typeof actionSchema>,
+    { action, direction, expectTarget, fullPage, selector, sessionId, text, url, visibleOnly }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
@@ -530,7 +624,28 @@ const actHeld = async (
                     break;
                 }
 
-                await page.click(selector, { timeout: PAGE_TIMEOUT });
+                if (expectTarget === undefined) {
+                    await page.click(selector, { timeout: PAGE_TIMEOUT });
+                } else {
+                    // The element is held as a handle from the check to the click: a page change after the check moves
+                    // nothing under it, and a different element (or the same one with other text) is refused.
+                    const element = await page.$(selector);
+
+                    if (!element) {
+                        result = { error: `Element not found: ${selector}`, success: false };
+                        break;
+                    }
+
+                    const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
+
+                    if (read.target !== expectTarget) {
+                        result = { error: TARGET_CHANGED, success: false };
+                        break;
+                    }
+
+                    await element.click({ timeout: PAGE_TIMEOUT });
+                }
+
                 await page.waitForTimeout(500);
                 result = { clickedSelector: selector, success: true, url: page.url() };
                 break;
@@ -540,6 +655,7 @@ const actHeld = async (
                 let extractedText: string;
                 let label: string | undefined;
                 let isLabelTruncated = false;
+                let target: string | undefined;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -555,75 +671,11 @@ const actHeld = async (
                     extractedText = visibleOnly === true ? await element.innerText() : ((await element.textContent()) ?? "");
 
                     if (visibleOnly === true) {
-                        // The name a control is announced by, when it is not its text. A text field's value is never read:
-                        // a person may have typed into it.
-                        const labelled = await element.evaluate(
-                            (control, { max, splitter }) => {
-                                // The elements the click lands in: the control, then each actionable ancestor up to the outermost. A visible
-                                // child (an icon in a button, a span in a clickable div) is clicked as those ancestors too.
-                                const actionableSelector =
-                                    "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
-                                const nodes: Element[] = [control];
-                                let ancestor = control.closest(actionableSelector);
+                        const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
 
-                                while (ancestor) {
-                                    if (!nodes.includes(ancestor)) {
-                                        nodes.push(ancestor);
-                                    }
-
-                                    ancestor = ancestor.parentElement?.closest(actionableSelector) ?? null;
-                                }
-
-                                const outermost = nodes.at(-1) ?? control;
-                                const names: string[] = [];
-
-                                for (const node of nodes) {
-                                    names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
-
-                                    // Ids are separated by any ASCII whitespace, not only a space.
-                                    const ids = (node.getAttribute("aria-labelledby") ?? "").split(splitter).filter(Boolean);
-
-                                    for (const id of ids) {
-                                        names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
-                                    }
-
-                                    // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
-                                    if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
-                                        names.push(node.value);
-                                    }
-
-                                    // Text the stylesheet draws (CSS `content`) is on screen but in neither innerText nor textContent.
-                                    for (const pseudo of ["::before", "::after"]) {
-                                        names.push(getComputedStyle(node, pseudo).content);
-                                    }
-
-                                    // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
-                                    if (node instanceof HTMLElement) {
-                                        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
-                                        names.push(node.innerText);
-                                    }
-                                }
-
-                                // Names that come from inside the outermost element: an image's alt, a child's aria-label or title, an SVG title.
-                                for (const node of outermost.querySelectorAll("img[alt], [aria-label], [title]")) {
-                                    names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
-                                }
-
-                                for (const node of outermost.querySelectorAll(":scope svg title")) {
-                                    names.push(node.textContent ?? "");
-                                }
-
-                                // Capped in the page, so an oversized name is not sent whole; one cut short asks (`labelTruncated`).
-                                return names
-                                    .filter(Boolean)
-                                    .join(" ")
-                                    .slice(0, max + 1);
-                            },
-                            { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE },
-                        );
-
-                        isLabelTruncated = labelled.length > LABEL_MAX_LENGTH;
-                        label = isLabelTruncated ? labelled.slice(0, LABEL_MAX_LENGTH) : labelled;
+                        label = read.label;
+                        isLabelTruncated = read.labelTruncated;
+                        target = read.target;
                     }
                 } else {
                     extractedText = await page.evaluate(() => {
@@ -651,6 +703,7 @@ const actHeld = async (
                     url: page.url(),
                     ...(label !== undefined && { label }),
                     ...(isLabelTruncated && { labelTruncated: true }),
+                    ...(target !== undefined && { target }),
                 };
                 break;
             }

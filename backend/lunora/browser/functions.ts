@@ -60,6 +60,37 @@ export const getBrowserDomainSettings = internalQuery
         return preferences?.browserSettings ?? {};
     });
 
+/** How many purchase decision looks a session keeps: the newest, one per tool call. */
+const PURCHASE_LOOKS_KEPT = 20;
+
+/**
+ * The target a purchase decision looked at for one tool call. Written by the decision's own look, before the person is asked;
+ * a click the person approves is checked against it.
+ */
+export const recordPurchaseLook = internalMutation
+    .input({ sessionId: v.id("browserSessions"), target: v.string(), toolCallId: v.string() })
+    .mutation(async ({ args: { sessionId, target, toolCallId }, ctx }) => {
+        const session = await ctx.db.get("browserSessions", sessionId);
+
+        if (session) {
+            const kept = (session.purchaseLooks ?? []).filter((look) => look.toolCallId !== toolCallId);
+
+            await patchRow(ctx.db, "browserSessions", session, {
+                purchaseLooks: [...kept, { target, toolCallId }].slice(-PURCHASE_LOOKS_KEPT),
+            });
+        }
+    });
+
+/** The target the decision of one tool call looked at, or nothing when no decision recorded one (ask mode asks without a look). */
+export const purchaseLookOf = internalQuery
+    .input({ sessionId: v.id("browserSessions"), toolCallId: v.string() })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args: { sessionId, toolCallId }, ctx }) => {
+        const session = await ctx.db.get("browserSessions", sessionId);
+
+        return session?.purchaseLooks?.find((look) => look.toolCallId === toolCallId)?.target ?? null;
+    });
+
 export const createSession = internalMutation
     .input({
         connectUrl: v.optional(v.string()),

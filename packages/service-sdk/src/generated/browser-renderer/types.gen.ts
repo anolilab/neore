@@ -95,6 +95,10 @@ export type BrowserActionRequest = {
      */
     fullPage?: boolean;
     /**
+     * Click: the target fingerprint of the element the person was shown; the click is refused when the element differs
+     */
+    expectTarget?: string;
+    /**
      * Extract with a selector: return the rendered text, leaving out hidden descendants
      */
     visibleOnly?: boolean;
@@ -130,6 +134,10 @@ export type BrowserActionResponse = {
      * The accessible name was cut short
      */
     labelTruncated?: boolean;
+    /**
+     * Fingerprint of the extracted element (visibleOnly reads only)
+     */
+    target?: string;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;

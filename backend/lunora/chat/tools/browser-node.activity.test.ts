@@ -803,6 +803,54 @@ describe("a browser a person took control of", () => {
         expect((renderer.mock.calls[1]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("visibleOnly");
     });
 
+    it("an approved click is checked against the target its decision look recorded, and one with no record is not", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce(answered({ content: "Pay now", label: "Pay now", success: true, target: "T-1", url: "https://example.com/cart" }));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    decisionCallId: "call-1",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        renderer.mockResolvedValueOnce(answered({ clickedSelector: "#pay", success: true, url: "https://example.com/paid" }));
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-1",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(renderer.mock.calls[1]?.[0]).toMatchObject({ body: { action: "click", expectTarget: "T-1", selector: "#pay" } });
+
+        renderer.mockResolvedValueOnce(answered({ clickedSelector: "#pay", success: true, url: "https://example.com/paid" }));
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-without-a-look",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect((renderer.mock.calls[2]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("expectTarget");
+    });
+
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
         await addSession(NOW - 1000);
         await giveControl({ until: NOW + CONTROL_IDLE_MS });
