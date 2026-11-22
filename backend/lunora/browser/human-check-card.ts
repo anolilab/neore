@@ -58,11 +58,11 @@ const readableCheck = async (
 
 /**
  * The ask's state for its card: `canResolve` when the caller may answer it now, `expiresAt` when an unanswered one
- * expires. `null`: no such ask they can read.
+ * expires, on the server's clock (`now`, this answer's time). `null`: no such ask they can read.
  */
 export const getHumanCheck = authQuery
     .input({ checkId: v.id("browserHumanChecks"), threadId: v.id("threads") })
-    .output(v.union(v.null(), v.object({ canResolve: v.boolean(), expiresAt: v.number(), site: v.string(), status: vCheckStatus })))
+    .output(v.union(v.null(), v.object({ canResolve: v.boolean(), expiresAt: v.number(), now: v.number(), site: v.string(), status: vCheckStatus })))
     .query(async ({ args: { checkId, threadId }, ctx }) => {
         const check = await readableCheck(ctx, threadId, checkId, ctx.user.userId);
 
@@ -76,6 +76,7 @@ export const getHumanCheck = authQuery
         return {
             canResolve: status === "open" && check.canWrite && !ctx.user.impersonatedBy,
             expiresAt: check.row.askedAt + HUMAN_CHECK_HAND_BACK_WINDOW_MS,
+            now: ctx.now,
             site: check.row.site,
             status,
         };

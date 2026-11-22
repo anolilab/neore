@@ -90,9 +90,9 @@ describe("the card's read", () => {
 
         const expiresAt = NOW + HUMAN_CHECK_HAND_BACK_WINDOW_MS;
 
-        await expect(read(OWNER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, site: "shop.example", status: "open" });
-        await expect(read(WRITER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, site: "shop.example", status: "open" });
-        await expect(read(READER, checkId)).resolves.toStrictEqual({ canResolve: false, expiresAt, site: "shop.example", status: "open" });
+        await expect(read(OWNER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, now: NOW, site: "shop.example", status: "open" });
+        await expect(read(WRITER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, now: NOW, site: "shop.example", status: "open" });
+        await expect(read(READER, checkId)).resolves.toStrictEqual({ canResolve: false, expiresAt, now: NOW, site: "shop.example", status: "open" });
         await expect(read(STRANGER, checkId)).resolves.toBeNull();
 
         impersonation.by = "admin-1";
