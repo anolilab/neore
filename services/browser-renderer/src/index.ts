@@ -61,6 +61,9 @@ const LABEL_MAX_LENGTH = 15_000;
 const WHITESPACE_RE = /\s+/u;
 
 /** The click found another element, or this one with other text: the person's yes was for what they were shown. */
+/** A disabled control is not clicked on an approved target: it is not clicked until it is enabled, on a fresh look. */
+const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at the page again before you click.";
+
 const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
 
 /**
@@ -139,6 +142,11 @@ function readTarget(
     // The elements inside the scope, including those in an open shadow root (a shadow tree is part of the button it draws).
     // querySelectorAll stops at a shadow root, so each root found is walked too.
     const roots: (Element | ShadowRoot)[] = [scope];
+
+    if (scope.shadowRoot !== null) {
+        roots.push(scope.shadowRoot);
+    }
+
     const inside: Element[] = [];
 
     for (let index = 0; index < roots.length; index++) {
@@ -164,6 +172,13 @@ function readTarget(
 
         if (node.localName === "title" && node.parentElement?.localName === "svg") {
             names.push(node.textContent ?? "");
+        }
+
+        // A descendant's aria-labelledby names its text from elsewhere in the page (or its shadow tree): that text is its name.
+        const referenced = (node.getAttribute("aria-labelledby") ?? "").split(options.splitter).filter(Boolean);
+
+        for (const id of referenced) {
+            names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
         }
     }
 
@@ -249,9 +264,6 @@ function readTarget(
     destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
 
     // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
-    // The whole canonical string: `targetOf` digests it outside the page, so no two different targets share a fingerprint.
-    const canonical = [document.URL, steps.join(">"), joined, shown, destinations].join("\u{0}");
-
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
     // there pays, so the gate reads a submit-like label on a checkout as a purchase.
     // A card form is also one whose fields sit in a frame the page cannot read (a hosted card element), or one that posts to
@@ -263,9 +275,14 @@ function readTarget(
     const address = document.URL.toLowerCase();
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
 
+    // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
+    // different targets share a fingerprint. `targetOf` digests it outside the page.
+    const isCheckout = isCardFields || isCheckoutPage;
+    const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout)].join("\u{0}");
+
     return {
         canonical,
-        checkout: isCardFields || isCheckoutPage,
+        checkout: isCheckout,
         label,
         labelTruncated: joined.length > options.max,
     };
@@ -769,6 +786,12 @@ const actHeld = async (
 
                     if ((await targetOf(read.canonical)) !== expectTarget) {
                         result = { error: TARGET_CHANGED, success: false };
+                        break;
+                    }
+
+                    // A disabled control is not clicked: its wait for enabling would let the page change under the check.
+                    if (await element.isDisabled()) {
+                        result = { error: DISABLED_TARGET, success: false };
                         break;
                     }
 
