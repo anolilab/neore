@@ -9,6 +9,8 @@ import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 const SEARCH_DEBOUNCE_MS = 200;
+/** The keys the search answers itself; they do not also reach a global shortcut. */
+const SEARCH_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape"]);
 
 export interface ComposerPromptSearchProps {
     onClose: () => void;
@@ -30,7 +32,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const searched = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
-    const { data, isFetching } = useQuery(
+    const { data, isError, isFetching } = useQuery(
         crpc.chat.functions.searchSentPrompts.queryOptions(searched === "" ? skipToken : { searchQuery: searched }, { live: false }),
     );
     const prompts = data?.prompts ?? [];
@@ -46,6 +48,12 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.nativeEvent.isComposing) {
             return;
+        }
+
+        // A key the search handles stops here: a global shortcut on the same key (Escape blurs the focused input) must not
+        // run as well. Radix still closes the dialog on Escape: it listens in the capture phase.
+        if (SEARCH_KEYS.has(event.key)) {
+            event.stopPropagation();
         }
 
         switch (event.key) {
@@ -78,7 +86,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     let status = t`Type to search the prompts you have sent.`;
 
     if (searched !== "") {
-        if (isFetching && prompts.length === 0) {
+        if (isError) {
+            status = t`The search failed. Try again.`;
+        } else if (isFetching && prompts.length === 0) {
             status = t`Searching`;
         } else if (prompts.length === 0) {
             status = t`No sent prompts match "${searched}".`;
@@ -142,6 +152,11 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                 <p aria-live="polite" className="text-muted-foreground mt-2 text-xs" role="status">
                     {status}
                 </p>
+                {data?.truncated === true && (
+                    <p className="text-muted-foreground mt-1 text-xs">
+                        {t`Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search.`}
+                    </p>
+                )}
             </DialogContent>
         </Dialog>
     );

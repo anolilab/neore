@@ -66,6 +66,7 @@ import { insertTemporaryThread, publicThread, threadForViewer } from "../agent/t
 import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { readChildThreads } from "./lib/child-threads";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
@@ -3484,25 +3485,32 @@ const SENT_PROMPT_LOOKUP_BATCH = 16;
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the message text index
  * through `textSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt never lists.
- * Word match only: the index has no prefix match. Trashed threads and other people's threads are dropped too.
+ * Word match only: the index has no prefix match. Trashed threads, temporary chats, other people's threads and goal
+ * continuation rounds (typed by nobody) are dropped too. A query longer than the search reads is cut to its first
+ * characters, not refused. `truncated` says the index window was full, so a matching prompt may sit past it.
  */
 export const searchSentPrompts = authQuery
-    .input({ searchQuery: v.string().max(MAX_LENGTH.short) })
-    .output(v.object({ prompts: v.array(vSentPrompt) }))
+    .input({ searchQuery: v.string() })
+    .output(v.object({ prompts: v.array(vSentPrompt), truncated: v.boolean() }))
     .query(async ({ args: { searchQuery }, ctx: context }) => {
         const { userId } = context.user;
-        const text = searchQuery.trim();
+        const text = searchQuery.trim().slice(0, MAX_LENGTH.short).trim();
 
         if (!text) {
-            return { prompts: [] };
+            return { prompts: [], truncated: false };
         }
 
-        const { messages: hits } = await context.runQuery(internal.agent.messages.textSearch, {
+        const { filled, messages: hits } = await context.runQuery(internal.agent.messages.textSearch, {
             limit: SENT_PROMPT_WINDOW,
             searchAllMessagesForUserId: userId,
             text,
         });
-        const sent = hits.filter((message) => (message.message as { role?: string } | undefined)?.role === "user" && (message.text ?? "").trim() !== "");
+        const sent = hits.filter(
+            (message) =>
+                (message.message as { role?: string } | undefined)?.role === "user" &&
+                (message.text ?? "").trim() !== "" &&
+                message.agentName !== GOAL_CONTINUATION_AGENT,
+        );
         const threadIds = [...new Set(sent.map((message) => message.threadId))];
         const titles = new Map<string, string>();
 
@@ -3523,6 +3531,23 @@ export const searchSentPrompts = authQuery
             }
         }
 
+        // A temporary chat is a thread with an expiry marker (`temporaryThreads`, not policed by row-level security).
+        const candidates = [...titles.keys()] as Id<"threads">[];
+        const markers = await Promise.all(
+            candidates.map((threadId) =>
+                context.db
+                    .query("temporaryThreads")
+                    .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+                    .take(1),
+            ),
+        );
+
+        for (const [index, threadId] of candidates.entries()) {
+            if ((markers[index]?.length ?? 0) > 0) {
+                titles.delete(threadId);
+            }
+        }
+
         const prompts = sent
             .filter((message) => titles.has(message.threadId))
             .toSorted((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || b.order - a.order || b.stepOrder - a.stepOrder)
@@ -3537,7 +3562,7 @@ export const searchSentPrompts = authQuery
                 };
             });
 
-        return { prompts };
+        return { prompts, truncated: filled };
     });
 
 /**

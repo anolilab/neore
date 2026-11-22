@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { searchSentPrompts } from "./functions";
+import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -47,7 +48,10 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
 const OWNER = "user-owner";
 const OTHER = "user-other";
 
-const insertMessage = (context: any, fields: { createdAt: number; order: number; role: string; text: string; threadId: string; userId: string }) =>
+const insertMessage = (
+    context: any,
+    fields: { agentName?: string; createdAt: number; order: number; role: string; text: string; threadId: string; userId: string },
+) =>
     context.db.insert("messages", {
         createdAt: fields.createdAt,
         message: { content: fields.text, role: fields.role },
@@ -58,6 +62,7 @@ const insertMessage = (context: any, fields: { createdAt: number; order: number;
         threadId: fields.threadId,
         tool: false,
         userId: fields.userId,
+        ...(fields.agentName !== undefined && { agentName: fields.agentName }),
     });
 
 const insertThread = (context: any, fields: { lockedAt?: number; title: string; userId: string }) =>
@@ -217,6 +222,139 @@ describe("searchSentPrompts", () => {
 
             expect(prompts).toHaveLength(threadCount);
             expect(new Set(prompts.map((prompt) => prompt.threadId)).size).toBe(threadCount);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves out a temporary chat's prompt", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const kept = await insertThread(context, { title: "Kept", userId: OWNER });
+                const temporary = await insertThread(context, { title: "Temporary", userId: OWNER });
+
+                await context.db.insert("temporaryThreads", { expiresAt: Date.now() + 60_000, threadId: temporary, userId: OWNER });
+
+                const shown = await insertMessage(context, {
+                    createdAt: 100,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the kept chat",
+                    threadId: kept,
+                    userId: OWNER,
+                });
+                const hidden = await insertMessage(context, {
+                    createdAt: 200,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the temporary chat",
+                    threadId: temporary,
+                    userId: OWNER,
+                });
+
+                return { hidden, shown };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.shown]);
+            expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.hidden);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves out a goal's continuation round, which nobody typed", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Goal chat", userId: OWNER });
+
+                const typed = await insertMessage(context, {
+                    createdAt: 100,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the staging build",
+                    threadId: thread,
+                    userId: OWNER,
+                });
+                const continuation = await insertMessage(context, {
+                    agentName: GOAL_CONTINUATION_AGENT,
+                    createdAt: 200,
+                    order: 1,
+                    role: "user",
+                    text: "deploy the staging build again, toward the goal",
+                    threadId: thread,
+                    userId: OWNER,
+                });
+
+                return { continuation, typed };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.typed]);
+            expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.continuation);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("searches a query longer than the input limit by its first words, not refusing it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const shown = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Long", userId: OWNER });
+
+                return insertMessage(context, {
+                    createdAt: 100,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the staging build",
+                    threadId: thread,
+                    userId: OWNER,
+                });
+            });
+
+            const prompts = await search(harness, `deploy build ${"build ".repeat(120)}`);
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([shown]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("says so when the search reached its window, so a newer prompt cut off by it is not lost silently", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Busy", userId: OWNER });
+
+                for (let index = 0; index < 405; index += 1) {
+                    await insertMessage(context, {
+                        createdAt: index,
+                        order: index,
+                        role: "user",
+                        text: `deploy number ${index}`,
+                        threadId: thread,
+                        userId: OWNER,
+                    });
+                }
+            });
+
+            const result: any = await harness.withIdentity({ userId: OWNER } as never).query(
+                searchSentPrompts as never,
+                {
+                    searchQuery: "deploy",
+                } as never,
+            );
+
+            expect(result.truncated).toBe(true);
         } finally {
             harness.close();
         }

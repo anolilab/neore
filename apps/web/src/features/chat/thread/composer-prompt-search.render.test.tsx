@@ -3,7 +3,7 @@
  * pick a row; Enter hands that prompt back as a draft and never sends. Each search is a one-shot read, never live.
  */
 import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -40,8 +40,13 @@ vi.mock("@/lib/lunora/crpc", () => {
                         : async () => {
                               const needle = (args as { searchQuery: string }).searchQuery.toLowerCase();
 
+                              if (needle === "boom") {
+                                  throw new Error("the search could not run");
+                              }
+
                               return {
                                   prompts: prompts.filter((prompt) => prompt.text.split(" ").some((word) => word.startsWith(needle))),
+                                  truncated: needle === "many",
                               };
                           },
                 queryKey: ["searchSentPrompts", args],
@@ -61,7 +66,12 @@ const { default: ComposerPromptSearch } = await import("./composer-prompt-search
 // jsdom has no layout or scrolling; the search asks the highlighted row to scroll into view.
 Element.prototype.scrollIntoView = () => {};
 
-const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
+// A failed search answers at once: the production client would retry it first.
+const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
+);
+
+const searchedTexts = () => calls.filter((call) => call.args !== skipToken).map((call) => (call.args as { searchQuery: string }).searchQuery);
 
 describe("ComposerPromptSearch", () => {
     it("lists the matching prompts from two threads, newest first", async () => {
@@ -149,6 +159,85 @@ describe("ComposerPromptSearch", () => {
         expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
 
         Element.prototype.scrollIntoView = () => {};
+    });
+
+    it("waits out the debounce before it searches what was typed", async () => {
+        vi.useFakeTimers();
+        calls.length = 0;
+
+        try {
+            render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+            fireEvent.change(screen.getByRole("combobox"), { target: { value: "deploy" } });
+
+            // The production debounce is 200 ms: just short of it, nothing has been searched for the new text yet.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(199);
+            });
+
+            expect(searchedTexts()).not.toContain("deploy");
+
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(1);
+            });
+
+            expect(searchedTexts()).toContain("deploy");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("says the search failed, not that nothing matched", async () => {
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "boom" } });
+
+        await waitFor(() => {
+            expect(screen.getByText("The search failed. Try again.")).toBeTruthy();
+        });
+
+        expect(screen.queryByText("No sent prompts match", { exact: false })).toBeNull();
+    });
+
+    it("says when only the best matches were searched", async () => {
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "many" } });
+
+        await waitFor(() => {
+            expect(screen.getByText("Only the best matches are searched", { exact: false })).toBeTruthy();
+        });
+    });
+
+    it("keeps the keys it answers from also reaching a global shortcut", async () => {
+        const reached: string[] = [];
+        const listener = (event: KeyboardEvent) => {
+            reached.push(event.key);
+        };
+
+        document.addEventListener("keydown", listener);
+
+        try {
+            const onPick = vi.fn();
+
+            render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
+
+            const input = screen.getByRole("combobox");
+
+            fireEvent.change(input, { target: { value: "deploy" } });
+
+            await waitFor(() => {
+                expect(screen.getAllByRole("option")).toHaveLength(2);
+            });
+
+            fireEvent.keyDown(input, { key: "ArrowDown" });
+            fireEvent.keyDown(input, { key: "Enter" });
+
+            expect(onPick).toHaveBeenCalledTimes(1);
+            expect(reached).toEqual([]);
+        } finally {
+            document.removeEventListener("keydown", listener);
+        }
     });
 
     it("picks a row on click", async () => {
