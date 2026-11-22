@@ -2,7 +2,7 @@
  * Saved-login fill: the browser half of `/login`. Kept apart from the Worker so a test can drive it against a local
  * Chromium (`login.browser.test.ts`).
  */
-import type { BrowserContext, CDPSession, Page, Request, Response, Route, WebSocketRoute } from "@cloudflare/playwright";
+import type { BrowserContext, CDPSession, Frame, Page, Request, Response, Route, WebSocketRoute } from "@cloudflare/playwright";
 
 import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
@@ -694,8 +694,8 @@ const armGuard = async (
         scripted: () => isScripted,
         /** Turns the tab's scripts off until the guard is taken down; false when that cannot be confirmed. */
         shield,
-        /** Whether the form's own POST was handed on with the password: it may have reached the site, so it is never resent. */
-        submitted: () => sent !== null,
+        /** Whether the form's own POST was or is being handed on with the password: it may have reached the site, so it is never resent. */
+        submitted: () => sent !== null || forwarding !== null,
         /** Whether the form's own POST could not be handed on: it was not sent. */
         unsent: () => isUnsent,
         /** Whether the form's own POST was held because the tab's scripts could not be turned off for its answer. */
@@ -984,7 +984,10 @@ const loadServed = async (page: Page, { now, origin, timeout, url }: { now: () =
 
             const { base64Encoded, body } = await session.send("Network.getResponseBody", { requestId: answer.requestId });
 
-            return base64Encoded || body.length > MAX_SERVED_BYTES ? null : { text: body, url: answer.response.url };
+            // In bytes, not characters: one takes up to three in UTF-8, and none fewer than one, so a long string is not encoded.
+            return base64Encoded || body.length > MAX_SERVED_BYTES || new TextEncoder().encode(body).byteLength > MAX_SERVED_BYTES
+                ? null
+                : { text: body, url: answer.response.url };
         } catch {
             return null;
         }
@@ -1004,13 +1007,91 @@ const hasPasswordField = async (page: Page): Promise<boolean> => {
     return false;
 };
 
+/** A frame Playwright reaches only through its parent's DevTools session: that session's document holds it. */
+const IN_PARENT_SESSION = "part of the parent frame's session";
+
+/** How deep one read of a document's tree goes: Chromium cannot send a tree nested much more than 120 deep whole. */
+const READ_DEPTH = 64;
+
 /**
- * Whether no frame of the page shows `password` in any spelling: in a field, the markup or text (open shadow roots
+ * The text and attribute values of every node of `frame`'s documents as DevTools reads them, every shadow root included:
+ * a closed one is out of a script's reach, `isClean`'s too, but not of a later read of the page. Frames in the same
+ * process are read with their parent's (`[]`). Throws when it cannot read them.
+ */
+const nodeTexts = async (page: Page, frame: Frame): Promise<string[]> => {
+    let session: CDPSession;
+
+    try {
+        session = await page.context().newCDPSession(frame);
+    } catch (error) {
+        if (frame !== page.mainFrame() && error instanceof Error && error.message.includes(IN_PARENT_SESSION)) {
+            return [];
+        }
+
+        throw error;
+    }
+
+    try {
+        const { root } = await session.send("DOM.getDocument", { depth: READ_DEPTH, pierce: true });
+        const found: string[] = [];
+        // A stack, not recursion or a spread: a page can nest deeper, or hold more children, than the call stack takes.
+        const nodes = [root];
+        /** Nodes where a read stopped: read on from them together once the stack is empty, not one round trip each. */
+        const cut: typeof nodes = [];
+        const readOn = (node: (typeof nodes)[number]): void => {
+            for (const inner of [...(node.children ?? []), ...(node.shadowRoots ?? []), node.contentDocument, node.templateContent]) {
+                if (inner) {
+                    nodes.push(inner);
+                }
+            }
+        };
+
+        while (nodes.length > 0 || cut.length > 0) {
+            const node = nodes.pop();
+
+            if (!node) {
+                const reading = cut.map(async ({ backendNodeId }) => session.send("DOM.describeNode", { backendNodeId, depth: READ_DEPTH, pierce: true }));
+
+                cut.length = 0;
+
+                const reads = await Promise.all(reading);
+
+                for (const read of reads) {
+                    readOn(read.node);
+                }
+
+                continue;
+            }
+
+            found.push(node.nodeValue, ...(node.attributes ?? []));
+
+            if ((node.childNodeCount ?? 0) > (node.children?.length ?? 0)) {
+                cut.push(node);
+            } else {
+                readOn(node);
+            }
+        }
+
+        return found;
+    } finally {
+        await session.detach().catch(() => undefined);
+    }
+};
+
+/**
+ * Whether no frame of the page shows `password` in any spelling: in a field, the markup or text (closed shadow roots
  * included), the address, or the frame's storage and script-readable cookies, where a later read of the page or a
  * script could find it. Throws when it cannot look.
  */
 const isClean = async (page: Page, password: string): Promise<boolean> => {
     for (const frame of page.frames()) {
+        const nodes = await nodeTexts(page, frame);
+
+        // One text, as the markup below is.
+        if (hasSecret(nodes.join("\n"), password)) {
+            return false;
+        }
+
         const texts = await frame.evaluate(() => {
             const found = [document.location.href, document.documentElement.outerHTML];
             // A stack, not a named inner function: a bundler that keeps names wraps one in a helper the page lacks.
