@@ -17,6 +17,7 @@ import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { budgetedLook, HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckLadder, humanCheckMessages, waitUnlessStopped } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
+import { browserActionNeedsPurchaseApproval } from "../lib/purchase-gate";
 import toonEncodeOutput from "./toon-encode";
 
 export interface BrowserResult {
@@ -183,6 +184,29 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             url: z.string().optional().meta({ description: "Target URL (required for navigate)" }),
         })
         .strict(),
+    // A click on something that reads as a purchase asks first (`lib/purchase-gate.ts`). This is the tool's own answer,
+    // so the `auto` default and a time-boxed allow do not lift it. Nothing runs without a person and a thread: `execute`
+    // refuses the call then, so no look is made.
+    needsApproval: async (context, input) => {
+        if (!context.userId || !context.threadId) {
+            return false;
+        }
+
+        const { threadId, userId } = context;
+
+        return await browserActionNeedsPurchaseApproval(
+            input,
+            async (selector) =>
+                (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
+                    action: "extract",
+                    browserSettings: (context as { browserSettings?: unknown }).browserSettings,
+                    selector,
+                    threadId: threadId as Id<"threads">,
+                    userId,
+                    userTier: context.userTier,
+                })) as BrowserResult,
+        );
+    },
     title: "Browser",
     toModelOutput: (_context, { output }) => {
         // For screenshots, return as image content part
