@@ -4,8 +4,9 @@
  * gateway's exact-match response cache (`cache_hit`, `lib/prompt-cache.ts`); rows the response cache answered are
  * left out, since no provider saw them.
  *
- * The hourly series counts only the models that reported cached tokens at least once in the window, so a model that
- * never caches does not dilute the share; the per-model list shows every model. A drop in the hourly share after a
+ * The hourly series counts only the provider/model pairs that reported cached tokens at least once in the last 30 days,
+ * so a pair that never caches does not dilute the share, and a pair that stopped caching inside a shorter window still
+ * shows its drop. The per-model list is the top 50 by prompt tokens. A drop in the hourly share after a
  * deploy is the reading the prompt-versioning decision waits on (gap-backlog, "Prompt text fixed per thread").
  */
 import { sqliteTime } from "../lib/sqlite-time.js";
@@ -14,7 +15,7 @@ import { sqliteTime } from "../lib/sqlite-time.js";
 export const PROVIDER_CACHE_WINDOW_DAYS = [1, 7, 30] as const;
 export type ProviderCacheWindowDays = (typeof PROVIDER_CACHE_WINDOW_DAYS)[number];
 
-/** Models listed, most prompt tokens first. */
+/** Models listed, most prompt tokens first. A ceiling: the gateway accepts any `modelId` string, so the count is not bounded by the registry. */
 export const PROVIDER_CACHE_MODEL_LIMIT = 50;
 
 export interface CacheCounts {
@@ -32,8 +33,16 @@ export interface ProviderCacheReadings {
     since: string;
 }
 
-/** Rows a provider answered: not served by the response cache, not failed, with prompt tokens. */
-const ANSWERED = "created_at >= ?1 AND cache_hit = 0 AND error_code IS NULL AND prompt_tokens > 0";
+/**
+ * Rows a provider answered: not served by the response cache, not failed, with prompt tokens, and not a cancelled
+ * stream's estimate (`finish_reason = 'cancelled'`, `lib/cancelled-usage.ts`). An estimate carries no cache count, so it
+ * would book every prompt token as a miss.
+ */
+const answered = (since: string): string =>
+    `created_at >= ${since} AND cache_hit = 0 AND error_code IS NULL AND prompt_tokens > 0 AND finish_reason IS NOT 'cancelled'`;
+
+/** Pairs are judged for caching over the longest window, so a complete drop inside a shorter window still shows. */
+const ELIGIBILITY_DAYS = Math.max(...PROVIDER_CACHE_WINDOW_DAYS);
 
 interface CountRow {
     cached_tokens: number | null;
@@ -51,6 +60,7 @@ export const hourStart = (prefix: string): string => `${prefix.replace(" ", "T")
 export const readProviderCacheReadings = async (database: D1Database, days: ProviderCacheWindowDays, now: number): Promise<ProviderCacheReadings> => {
     const sinceMs = now - days * 86_400_000;
     const since = sqliteTime(sinceMs);
+    const eligibilitySince = sqliteTime(now - ELIGIBILITY_DAYS * 86_400_000);
 
     const [hours, models] = await Promise.all([
         database
@@ -58,19 +68,19 @@ export const readProviderCacheReadings = async (database: D1Database, days: Prov
                 `SELECT substr(created_at, 1, 13) AS hour, COUNT(*) AS requests,
                         SUM(prompt_tokens) AS prompt_tokens, SUM(cached_tokens) AS cached_tokens
                  FROM usage_log
-                 WHERE ${ANSWERED}
-                   AND model_id IN (SELECT model_id FROM usage_log WHERE ${ANSWERED} GROUP BY model_id HAVING SUM(cached_tokens) > 0)
+                 WHERE ${answered("?1")}
+                   AND (provider, model_id) IN (SELECT provider, model_id FROM usage_log WHERE ${answered("?2")} GROUP BY provider, model_id HAVING SUM(cached_tokens) > 0)
                  GROUP BY hour
                  ORDER BY hour`,
             )
-            .bind(since)
+            .bind(since, eligibilitySince)
             .all<CountRow & { hour: string }>(),
         database
             .prepare(
                 `SELECT provider, model_id, COUNT(*) AS requests,
                         SUM(prompt_tokens) AS prompt_tokens, SUM(cached_tokens) AS cached_tokens
                  FROM usage_log
-                 WHERE ${ANSWERED}
+                 WHERE ${answered("?1")}
                  GROUP BY provider, model_id
                  ORDER BY prompt_tokens DESC, model_id
                  LIMIT ?2`,

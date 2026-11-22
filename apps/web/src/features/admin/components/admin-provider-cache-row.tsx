@@ -27,8 +27,8 @@ const shareText = (counts: CacheCounts, locale: string): string => {
 
 /**
  * How much of the prompt sent to providers they served from their own prompt cache: per day and for the window across
- * the models that cached at least once, an hour-by-hour table, and every model's share. A drop after a deploy is what a
- * prompt change cost in cache reads.
+ * the provider/model pairs that cached in the last 30 days, an hour-by-hour table, and the top models' shares. A drop
+ * after a deploy is what a prompt change cost in cache reads.
  */
 const AdminProviderCacheRow = () => {
     const { i18n, t } = useLingui();
@@ -45,7 +45,7 @@ const AdminProviderCacheRow = () => {
             <CardHeader>
                 <CardTitle>{t`Provider prompt cache`}</CardTitle>
                 <CardDescription>
-                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the models that cached at least once in the window; the model table lists every model. Answers from the gateway's response cache are left out. Times are UTC.`}
+                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC.`}
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">

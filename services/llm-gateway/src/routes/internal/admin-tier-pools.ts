@@ -4,7 +4,7 @@
  * - GET  /internal/admin/tier-pools           — read current snapshot
  * - POST /internal/admin/tier-pools/recompute — force recompute now (bypass cron)
  *
- * Both require HMAC + the caller's adminUserId to appear in the
+ * Both are served only to the backend's service binding (`internalAuth`), and the caller's adminUserId must appear in the
  * GATEWAY_ADMIN_USER_IDS env allowlist.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";

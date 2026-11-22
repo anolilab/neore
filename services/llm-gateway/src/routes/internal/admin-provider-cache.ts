@@ -2,7 +2,8 @@
  * GET /internal/admin/provider-cache — the provider prompt-cache readings (`usage/provider-cache-readings.ts`): prompt
  * tokens and the share a provider served from its cache, by hour and by model, over the last 1, 7 or 30 days.
  *
- * Requires HMAC and the caller's adminUserId in the GATEWAY_ADMIN_USER_IDS allowlist, like the other admin endpoints.
+ * Served only to the backend's service binding (`internalAuth`), and the caller's adminUserId must be in the
+ * GATEWAY_ADMIN_USER_IDS allowlist, like the other admin endpoints.
  */
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";

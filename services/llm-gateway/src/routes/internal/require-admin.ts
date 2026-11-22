@@ -1,5 +1,5 @@
 /**
- * The second check on the gateway's admin endpoints, after HMAC: the caller's `adminUserId` must be in the
+ * The check on the gateway's admin endpoints, after the service-binding gate (`internalAuth`): the caller's `adminUserId` must be in the
  * `GATEWAY_ADMIN_USER_IDS` allowlist. An empty allowlist turns the endpoints off.
  */
 export const requireAdmin = (env: { GATEWAY_ADMIN_USER_IDS?: string }, adminUserId: string | undefined): { ok: true } | { ok: false; reason: string } => {

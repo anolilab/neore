@@ -18,9 +18,11 @@ interface Row {
     cached: number;
     cacheHit?: number;
     errorCode?: string;
+    finishReason?: string;
     hoursAgo: number;
     model: string;
     prompt: number;
+    provider?: string;
 }
 
 /** A migrated database and an `insert` that adds one usage row to it. */
@@ -31,17 +33,19 @@ const usageLog = (): { db: DatabaseSync; insert: (row: Row) => void } => {
     const insert = (row: Row): void => {
         rowCount += 1;
         db.prepare(
-            `INSERT INTO usage_log (id, request_id, user_id, model_id, provider, model_api_id, prompt_tokens, cached_tokens, cache_hit, error_code, created_at)
-             VALUES (?, ?, 'user-1', ?, 'openrouter', ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO usage_log (id, request_id, user_id, model_id, provider, model_api_id, prompt_tokens, cached_tokens, cache_hit, error_code, finish_reason, created_at)
+             VALUES (?, ?, 'user-1', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
             `row-${rowCount}`,
             `request-${rowCount}`,
             row.model,
+            row.provider ?? "openrouter",
             row.model,
             row.prompt,
             row.cached,
             row.cacheHit ?? 0,
             row.errorCode ?? null,
+            row.finishReason ?? null,
             sqliteTime(NOW - row.hoursAgo * HOUR_MS),
         );
     };
@@ -86,6 +90,51 @@ describe("readProviderCacheReadings", () => {
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 7, NOW);
 
         expect(readings).toMatchObject({ hours: [], models: [] });
+    });
+
+    it("keeps a pair that stopped caching inside the window, so its drop shows", async () => {
+        const { db, insert } = usageLog();
+
+        // Cached 30 hours ago (outside the day, inside the 30-day lookback), then nothing cached in the last two hours.
+        insert({ cached: 800, hoursAgo: 30, model: "claude", prompt: 1000 });
+        insert({ cached: 0, hoursAgo: 2, model: "claude", prompt: 1000 });
+        insert({ cached: 0, hoursAgo: 1, model: "claude", prompt: 1000 });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.hours).toEqual([
+            { cachedTokens: 0, hour: "2026-11-21T10:00:00.000Z", promptTokens: 1000, requests: 1 },
+            { cachedTokens: 0, hour: "2026-11-21T11:00:00.000Z", promptTokens: 1000, requests: 1 },
+        ]);
+    });
+
+    it("does not let another provider's rows for the same model id dilute the share", async () => {
+        const { db, insert } = usageLog();
+
+        insert({ cached: 900, hoursAgo: 1, model: "gemini", prompt: 1000, provider: "google" });
+        // The same model id, served by a provider that never caches.
+        insert({ cached: 0, hoursAgo: 1, model: "gemini", prompt: 5000, provider: "openrouter" });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.hours).toEqual([{ cachedTokens: 900, hour: "2026-11-21T11:00:00.000Z", promptTokens: 1000, requests: 1 }]);
+        expect(readings.models).toEqual([
+            { cachedTokens: 0, modelId: "gemini", promptTokens: 5000, provider: "openrouter", requests: 1 },
+            { cachedTokens: 900, modelId: "gemini", promptTokens: 1000, provider: "google", requests: 1 },
+        ]);
+    });
+
+    it("leaves a cancelled stream's estimate out, since its cache hits are unknown", async () => {
+        const { db, insert } = usageLog();
+
+        insert({ cached: 800, hoursAgo: 1, model: "claude", prompt: 1000 });
+        // Stopped before the provider's usage arrived: every prompt token is an estimate booked as a miss.
+        insert({ cached: 0, finishReason: "cancelled", hoursAgo: 1, model: "claude", prompt: 4000 });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.hours).toEqual([{ cachedTokens: 800, hour: "2026-11-21T11:00:00.000Z", promptTokens: 1000, requests: 1 }]);
+        expect(readings.models).toEqual([{ cachedTokens: 800, modelId: "claude", promptTokens: 1000, provider: "openrouter", requests: 1 }]);
     });
 
     it("turns a stored hour prefix into its ISO start", () => {
