@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MAX_LEASE_MS, SessionHolds, SHARED_DRAIN_MS } from "./session-holds";
+import { MAX_LEASE_MS, RETIRED_KEEP_MS, SessionHolds, SHARED_DRAIN_MS } from "./session-holds";
 import { holdSession, LEASE_MS, SessionLock } from "./session-lock";
 
 /** A hold that was taken: what is left once every refusal is set aside. */
@@ -120,6 +120,7 @@ describe(SessionHolds, () => {
 const namespaceOf = () => {
     const stored = new Map<string, unknown>();
     const writes: string[] = [];
+    const alarms: number[] = [];
     const lock = new SessionLock({
         storage: {
             delete: async (key: string) => {
@@ -131,6 +132,9 @@ const namespaceOf = () => {
             put: async (key: string, value: unknown) => {
                 writes.push(`put ${key}`);
                 stored.set(key, structuredClone(value));
+            },
+            setAlarm: async (at: number) => {
+                alarms.push(at);
             },
         },
     } as never);
@@ -152,7 +156,7 @@ const namespaceOf = () => {
         idFromName: (name: string) => name,
     };
 
-    return { control, namespace: namespace as unknown as DurableObjectNamespace, stored, writes };
+    return { alarms, control, lock, namespace: namespace as unknown as DurableObjectNamespace, stored, writes };
 };
 
 describe(SessionLock, () => {
@@ -199,6 +203,7 @@ describe(SessionLock, () => {
                 put: async (key: string, value: unknown) => {
                     stored.set(key, structuredClone(value));
                 },
+                setAlarm: async () => undefined,
             },
         } as never);
         const send = async (body: Record<string, number | string>) =>
@@ -225,7 +230,7 @@ describe(SessionLock, () => {
 
         await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
         expect(writes).toStrictEqual(["put state"]);
-        expect(stored.get("state")).toStrictEqual({ holds: [], retired: true });
+        expect(stored.get("state")).toStrictEqual({ holds: [], retired: true, retiredUntil: expect.any(Number) });
     });
 
     it("refuses a take that arrives after the deadline its caller gave it, holding nothing", async () => {
@@ -237,6 +242,38 @@ describe(SessionLock, () => {
 
         await expect(response.json()).resolves.toStrictEqual({ held: false });
         expect(stored.has("state")).toBe(false);
+    });
+
+    it("drops a released session's record at its alarm, with no further call to the session", async () => {
+        const { alarms, lock, namespace, stored } = namespaceOf();
+        const hold = await holdSession(namespace, "s", "shared");
+
+        await (hold as Taken<typeof hold>).release();
+
+        // The release's record is kept, and the alarm set for when it runs out.
+        expect(stored.has("state")).toBe(true);
+        expect(alarms.at(-1)).toBe(Date.now() + MAX_LEASE_MS);
+
+        vi.setSystemTime(alarms.at(-1) ?? 0);
+        await lock.alarm();
+
+        expect(stored.has("state")).toBe(false);
+    });
+
+    it("keeps a retired session refused for RETIRED_KEEP_MS, then lets the record go", async () => {
+        const { alarms, lock, namespace, stored } = namespaceOf();
+        const hold = await holdSession(namespace, "s", "exclusive");
+
+        await (hold as Taken<typeof hold>).linger(1000);
+        await vi.advanceTimersByTimeAsync(LEASE_MS + 1000);
+        await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
+
+        vi.setSystemTime(alarms.at(-1) ?? 0);
+        await lock.alarm();
+
+        expect(stored.has("state")).toBe(false);
+        expect(alarms.at(-1)).toBeGreaterThanOrEqual(Date.now() - RETIRED_KEEP_MS);
+        await expect(holdSession(namespace, "s", "shared")).resolves.toHaveProperty("release");
     });
 
     it("keeps its holds in storage, and drops the key once none is left", async () => {
@@ -377,16 +414,7 @@ describe(holdSession, () => {
     });
 
     it("leaves no hold when the release sent on a take's timeout reaches the lock before the take", async () => {
-        const { control, namespace, stored } = namespaceOf();
-        const lock = new SessionLock({
-            storage: {
-                delete: async (key: string) => stored.delete(key),
-                get: async (key: string) => structuredClone(stored.get(key)),
-                put: async (key: string, value: unknown) => {
-                    stored.set(key, structuredClone(value));
-                },
-            },
-        } as never);
+        const { control, lock, namespace } = namespaceOf();
 
         control.reachable = false;
 

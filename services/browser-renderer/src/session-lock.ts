@@ -9,7 +9,7 @@
  */
 
 import type { HoldAnswer, HoldKind, HoldRequest, SessionState } from "./session-holds";
-import { holdsOf } from "./session-holds";
+import { holdsOf, nextChangeOf } from "./session-holds";
 
 export type { HoldKind } from "./session-holds";
 
@@ -37,12 +37,35 @@ const isHoldRequest = (value: unknown): value is HoldRequest => {
     return op === "renew" ? isLease : op === "take" && isLease && isDeadline && (kind === "exclusive" || kind === "shared");
 };
 
-/** The Durable Object: one per session id (`idFromName`). Its holds are stored, so an eviction between two calls keeps them. */
+/**
+ * The Durable Object: one per session id (`idFromName`). Its holds are stored, so an eviction between two calls keeps
+ * them, and an alarm at the next time they change on their own drops what has run out: a session's last call leaves no
+ * record behind for good.
+ */
 export class SessionLock {
-    readonly #state: Pick<DurableObjectState, "storage">;
+    readonly #state: { storage: Pick<DurableObjectStorage, "delete" | "get" | "put" | "setAlarm"> };
 
-    public constructor(state: Pick<DurableObjectState, "storage">) {
+    public constructor(state: { storage: Pick<DurableObjectStorage, "delete" | "get" | "put" | "setAlarm"> }) {
         this.#state = state;
+    }
+
+    /** Stores what is left at `now` (nothing: the key goes), and sets the alarm for when it next changes. */
+    async #store(left: SessionState | undefined): Promise<void> {
+        if (left === undefined) {
+            await this.#state.storage.delete(STATE_KEY);
+
+            return;
+        }
+
+        await this.#state.storage.put(STATE_KEY, left);
+        await this.#state.storage.setAlarm(nextChangeOf(left));
+    }
+
+    /** What has run out by now is dropped; what is still live sets the next alarm. */
+    public async alarm(): Promise<void> {
+        const holds = holdsOf(await this.#state.storage.get<SessionState>(STATE_KEY));
+
+        await this.#store(holds.state(Date.now()));
     }
 
     public async fetch(request: Request): Promise<Response> {
@@ -76,9 +99,7 @@ export class SessionLock {
             }
         }
 
-        const left = holds.state(now);
-
-        await (left === undefined ? this.#state.storage.delete(STATE_KEY) : this.#state.storage.put(STATE_KEY, left));
+        await this.#store(holds.state(now));
 
         return Response.json(answer);
     }

@@ -375,6 +375,9 @@ export const withPassword = (body: Buffer, contentType: string, { name, stand }:
 
 const REDIRECT_KEEPING_BODY = new Set([307, 308]);
 
+/** The statuses a browser follows to the `Location` they name. */
+const FOLLOWED_REDIRECTS = new Set([301, 302, 303, 307, 308]);
+
 /**
  * The largest request body the guard looks into: a login form's POST is far smaller. One larger, the form's own or
  * another request to `origin`, is aborted without being scanned or copied again while the guard holds.
@@ -660,7 +663,8 @@ const armGuard = async (
 
         answerCookies.push(response.headerValues("set-cookie").catch(() => null));
 
-        if (status < 300 || status >= 400) {
+        // Only a redirect the browser follows goes on: a 300, a 304, or a 3xx with no `Location` is the answer itself.
+        if (!FOLLOWED_REDIRECTS.has(status) || response.headers().location === undefined) {
             isCounting = false;
             answerStatus = status;
         }

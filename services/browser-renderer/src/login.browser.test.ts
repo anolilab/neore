@@ -484,6 +484,18 @@ describe(signIn, () => {
         expect(page.url()).toBe("about:blank");
     });
 
+    it("takes a 300 answer to the form's POST as the answer, not as a redirect still to come", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            response.writeHead(300, { "content-type": "text/html" });
+            response.end("<!doctype html><title>Choose</title><p>Pick an account</p>");
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/session` });
+    });
+
     it("signs in when the site answers the form's POST at once, with no redirect", async () => {
         fixture.page = loginForm();
         fixture.onSession = (_request, response) => {

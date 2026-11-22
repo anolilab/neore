@@ -32,6 +32,8 @@ export interface SessionState {
     drainUntil?: number;
     holds: [string, Hold][];
     retired?: true;
+    /** Until when the retired flag is kept (`RETIRED_KEEP_MS`). */
+    retiredUntil?: number;
 }
 
 /** The longest lease a call may ask for: past it, a hold of an isolate that died outlasts any reason to keep it. */
@@ -43,20 +45,36 @@ export const MAX_LEASE_MS = 10 * 60_000;
  */
 export const SHARED_DRAIN_MS = 30_000;
 
+/**
+ * How long a retired session stays refused, from the lapse that retired it: past the longest its browser can still be
+ * open (Browser Rendering's keep-alive is at most ten minutes, and a close still under way holds it at most a lease
+ * more), so a record is not kept for every session for good.
+ */
+export const RETIRED_KEEP_MS = 60 * 60_000;
+
 /** The holds of one session, and the rules they follow; time is passed in so the tests can move it. */
 export class SessionHolds {
     readonly #holds: Map<string, Hold>;
 
     #isRetired: boolean;
 
+    #retiredUntil: number;
+
     #drainUntil: number;
 
     /** Released tokens, until when each is kept: a take that arrives after its own release creates no hold. */
     readonly #cancelled: Map<string, number>;
 
-    public constructor(holds: Iterable<[string, Hold]> = [], isRetired = false, drainUntil = 0, cancelled: Iterable<[string, number]> = []) {
+    public constructor(
+        holds: Iterable<[string, Hold]> = [],
+        isRetired = false,
+        drainUntil = 0,
+        cancelled: Iterable<[string, number]> = [],
+        retiredUntil = isRetired ? Number.MAX_SAFE_INTEGER : 0,
+    ) {
         this.#holds = new Map(holds);
         this.#isRetired = isRetired;
+        this.#retiredUntil = retiredUntil;
         this.#drainUntil = drainUntil;
         this.#cancelled = new Map(cancelled);
     }
@@ -80,13 +98,25 @@ export class SessionHolds {
             }
 
             this.#holds.delete(token);
-            this.#isRetired ||= hold.kind === "exclusive";
 
-            if (hold.kind === "shared") {
+            if (hold.kind === "exclusive") {
+                this.#isRetired = true;
+                this.#retiredUntil = Math.max(this.#retiredUntil, hold.expiresAt + RETIRED_KEEP_MS);
+            } else {
                 // Lapsed, not released: its action may not have stopped yet.
                 this.#drainUntil = Math.max(this.#drainUntil, hold.expiresAt + SHARED_DRAIN_MS);
             }
         }
+    }
+
+    /** Whether the session is retired at `now`: a flag whose time has run out is dropped. */
+    #retiredAt(now: number): boolean {
+        if (this.#isRetired && this.#retiredUntil <= now) {
+            this.#isRetired = false;
+            this.#retiredUntil = 0;
+        }
+
+        return this.#isRetired;
     }
 
     /** What to store at `now`, in one write: a lapse and the retired flag it sets go together; `undefined` when nothing is left to keep. */
@@ -94,8 +124,9 @@ export class SessionHolds {
         const holds = this.entries(now);
         const drainUntil = this.#drainUntil > now ? this.#drainUntil : undefined;
         const cancelled = this.#cancelledAt(now);
+        const isRetired = this.#retiredAt(now);
 
-        if (drainUntil === undefined && !this.#isRetired && holds.length === 0 && cancelled.length === 0) {
+        if (drainUntil === undefined && !isRetired && holds.length === 0 && cancelled.length === 0) {
             return undefined;
         }
 
@@ -103,7 +134,7 @@ export class SessionHolds {
             ...(cancelled.length > 0 && { cancelled }),
             holds,
             ...(drainUntil !== undefined && { drainUntil }),
-            ...(this.#isRetired && { retired: true as const }),
+            ...(isRetired && { retired: true as const, retiredUntil: this.#retiredUntil }),
         };
     }
 
@@ -133,7 +164,7 @@ export class SessionHolds {
         // First: a lapse it drops may retire the session.
         this.#dropLapsed(now);
 
-        if (this.#isRetired) {
+        if (this.#retiredAt(now)) {
             return { held: false, retired: true };
         }
 
@@ -188,4 +219,13 @@ export class SessionHolds {
 
 /** The holds of a stored state. */
 export const holdsOf = (state: SessionState | undefined): SessionHolds =>
-    new SessionHolds(state?.holds ?? [], state?.retired === true, state?.drainUntil ?? 0, state?.cancelled ?? []);
+    new SessionHolds(state?.holds ?? [], state?.retired === true, state?.drainUntil ?? 0, state?.cancelled ?? [], state?.retiredUntil);
+
+/** When a stored state next changes on its own (a hold lapses, a drain, a record or the retired flag runs out). */
+export const nextChangeOf = (state: SessionState): number =>
+    Math.min(
+        ...state.holds.map(([, hold]) => hold.expiresAt),
+        ...(state.cancelled ?? []).map(([, until]) => until),
+        state.drainUntil ?? Infinity,
+        state.retiredUntil ?? Infinity,
+    );

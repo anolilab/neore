@@ -19,6 +19,7 @@ const lockNamespace = () => {
             put: async (key: string, value: unknown) => {
                 stored.set(key, value);
             },
+            setAlarm: async () => undefined,
         };
     };
     const namespace = {
