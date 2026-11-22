@@ -288,13 +288,15 @@ interface RawSection {
 
 /** Takes a trailing `{key=…}` off a heading's text. Only a `bundle: 2` file declares keys; in a plain bundle the label is taken as written. */
 const splitKey = (text: string, declaresKeys: boolean): { key?: string; label: string } => {
-    const match = declaresKeys ? KEY_ATTRIBUTE_RE.exec(text) : null;
+    // A trailing space or tab after `{key=…}` is an editor's leftover, not part of the key, so it does not stop the key being read.
+    const trimmed = text.trimEnd();
+    const match = declaresKeys ? KEY_ATTRIBUTE_RE.exec(trimmed) : null;
 
     if (!match) {
         return { label: text };
     }
 
-    return { key: match[1]!, label: text.slice(0, match.index) };
+    return { key: match[1]!, label: trimmed.slice(0, match.index) };
 };
 
 /** Splits the body into sections, tracking fence state line by line. */

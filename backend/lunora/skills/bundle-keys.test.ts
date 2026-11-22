@@ -51,6 +51,17 @@ describe("declared keys in a bundle", () => {
         expect(parsed.ok && parsed.bundle.entries[0]).toMatchObject({ declaredKey: "digest", label: "Weekly {key=old}" });
     });
 
+    it("trailing whitespace after a section's key does not hide the key", () => {
+        const body = buildBundleMarkdown({ description: "", items: [{ key: "analyst", kind: "skill", skill: ANALYST }], name: "Keys" });
+        const edited = asPlugin(body).replace("{key=analyst}\n", "{key=analyst} \t\n");
+
+        expect(edited).not.toBe(asPlugin(body));
+
+        const parsed = parseBundleMarkdown(edited);
+
+        expect(parsed.ok && parsed.bundle.entries[0]).toMatchObject({ declaredKey: "analyst", label: "analyst", problems: [] });
+    });
+
     it("a plugin section without a key fails the whole file", () => {
         const body = buildBundleMarkdown({ description: "", items: [{ kind: "skill", skill: ANALYST }], name: "Keys" });
 
