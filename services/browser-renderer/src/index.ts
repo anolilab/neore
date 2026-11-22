@@ -54,6 +54,11 @@ const actionSchema = z.object({
 /** Hoisted so they are compiled once, not on every request. */
 const DIGITS_RE = /^\d+$/;
 
+/** The longest accessible name the approval read returns; a longer one is cut and reported (`labelTruncated`). */
+const LABEL_MAX_LENGTH = 15_000;
+
+const WHITESPACE_RE = /\s+/u;
+
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
 
 // ─── URL validation ─────────────────────────────────────────────────────────────
@@ -246,6 +251,7 @@ interface ActionResult {
     error?: string;
     /** The control's accessible name when it is not its text (`visibleOnly` reads only): aria-label, labelled-by text, title, a submit button's value. */
     label?: string;
+    labelTruncated?: boolean;
     screenshot?: string;
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
@@ -533,6 +539,7 @@ const actHeld = async (
             case "extract": {
                 let extractedText: string;
                 let label: string | undefined;
+                let isLabelTruncated = false;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -550,40 +557,51 @@ const actHeld = async (
                     if (visibleOnly === true) {
                         // The name a control is announced by, when it is not its text. A text field's value is never read:
                         // a person may have typed into it.
-                        label = await element.evaluate((control) => {
-                            // A visible child (an icon in a button) is clicked as its button, so the button's name counts too.
-                            const actionable =
-                                control.closest(
-                                    "button, a[href], [role='button'], [role='link'], input[type='button'], input[type='submit'], input[type='reset']",
-                                ) ?? control;
-                            const names: string[] = [];
+                        const labelled = await element.evaluate(
+                            (control, { max, splitter }) => {
+                                // A visible child (an icon in a button) is clicked as its button, so the button's name counts too.
+                                const actionable =
+                                    control.closest(
+                                        "button, a[href], [role='button'], [role='link'], input[type='button'], input[type='submit'], input[type='reset']",
+                                    ) ?? control;
+                                const names: string[] = [];
 
-                            for (const node of [control, actionable]) {
-                                names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+                                for (const node of [control, actionable]) {
+                                    names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
 
-                                const ids = (node.getAttribute("aria-labelledby") ?? "").split(" ").filter(Boolean);
+                                    // Ids are separated by any ASCII whitespace, not only a space.
+                                    const ids = (node.getAttribute("aria-labelledby") ?? "").split(splitter).filter(Boolean);
 
-                                for (const id of ids) {
-                                    names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
+                                    for (const id of ids) {
+                                        names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
+                                    }
+
+                                    // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
+                                    if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
+                                        names.push(node.value);
+                                    }
                                 }
 
-                                // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
-                                if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
-                                    names.push(node.value);
+                                // Names that come from inside the button: an image's alt, a child's aria-label or title, an SVG title.
+                                for (const node of actionable.querySelectorAll("img[alt], [aria-label], [title]")) {
+                                    names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
                                 }
-                            }
 
-                            // Names that come from inside the button: an image's alt, a child's aria-label or title, an SVG title.
-                            for (const node of actionable.querySelectorAll("img[alt], [aria-label], [title]")) {
-                                names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
-                            }
+                                for (const node of actionable.querySelectorAll(":scope svg title")) {
+                                    names.push(node.textContent ?? "");
+                                }
 
-                            for (const node of actionable.querySelectorAll(":scope svg title")) {
-                                names.push(node.textContent ?? "");
-                            }
+                                // Capped in the page, so an oversized name is not sent whole; one cut short asks (`labelTruncated`).
+                                return names
+                                    .filter(Boolean)
+                                    .join(" ")
+                                    .slice(0, max + 1);
+                            },
+                            { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE },
+                        );
 
-                            return names.filter(Boolean).join(" ");
-                        });
+                        isLabelTruncated = labelled.length > LABEL_MAX_LENGTH;
+                        label = isLabelTruncated ? labelled.slice(0, LABEL_MAX_LENGTH) : labelled;
                     }
                 } else {
                     extractedText = await page.evaluate(() => {
@@ -610,6 +628,7 @@ const actHeld = async (
                     truncated: isTruncated,
                     url: page.url(),
                     ...(label !== undefined && { label }),
+                    ...(isLabelTruncated && { labelTruncated: true }),
                 };
                 break;
             }

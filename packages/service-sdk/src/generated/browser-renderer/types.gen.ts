@@ -126,6 +126,10 @@ export type BrowserActionResponse = {
      * Accessible name of the extracted control, when it is not its text (visibleOnly reads only)
      */
     label?: string;
+    /**
+     * The accessible name was cut short
+     */
+    labelTruncated?: boolean;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;

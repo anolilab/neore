@@ -98,6 +98,12 @@ describe("the purchase gate on browser actions", () => {
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, look)).toBe(false);
     });
 
+    it("asks when the accessible name was cut short, since a purchase word may sit past the cut", async () => {
+        const look = vi.fn(() => Promise.resolve({ content: "→", label: "Next", labelTruncated: true, success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, look)).toBe(true);
+    });
+
     it("asks for a truncated read, since a purchase word may sit past the cut", async () => {
         const look = vi.fn(() => Promise.resolve({ content: "Next", success: true, truncated: true }));
 

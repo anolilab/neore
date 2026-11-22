@@ -35,6 +35,8 @@ export interface ClickTargetLook {
     content?: string;
     /** The control's accessible name (aria-label, labelled-by text, title), when it is not its text. */
     label?: string;
+    /** The renderer cut the accessible name short: a purchase word may sit past the cut, so the gate cannot clear it. */
+    labelTruncated?: boolean;
     success: boolean;
     /** The renderer cut the text short: a purchase word may sit past the cut, so the gate cannot clear it. */
     truncated?: boolean;
@@ -55,7 +57,7 @@ export const browserActionNeedsPurchaseApproval = async (
     try {
         const target = await look(input.selector);
 
-        if (target.success !== true || target.truncated === true) {
+        if (target.success !== true || target.truncated === true || target.labelTruncated === true) {
             return true;
         }
 

@@ -312,6 +312,7 @@
                     "screenshotFormat": { "type": "string" },
                     "content": { "type": "string", "description": "Extracted text content" },
                     "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
+                    "labelTruncated": { "type": "boolean", "description": "The accessible name was cut short" },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },
