@@ -175,7 +175,8 @@ export const executeBrowserAction = internalAction
                 let expectTarget: string | undefined;
 
                 if (action === "click" && args.approvedCallId !== undefined) {
-                    expectTarget = (await ctx.runQuery(internal.browser.functions.purchaseLookOf, { sessionId, toolCallId: args.approvedCallId })) ?? undefined;
+                    expectTarget =
+                        (await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId })) ?? undefined;
                 } else if (action === "click") {
                     expectTarget = args.expectTarget;
                 }

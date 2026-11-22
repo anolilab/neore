@@ -60,8 +60,11 @@ export const getBrowserDomainSettings = internalQuery
         return preferences?.browserSettings ?? {};
     });
 
-/** How many purchase decision looks a session keeps: the newest, one per tool call. */
-const PURCHASE_LOOKS_KEPT = 20;
+/**
+ * How many purchase decision looks a session keeps, the newest first to go: one per decision not yet clicked. An approved
+ * click takes its own (`takePurchaseLook`), so only decisions never clicked accumulate.
+ */
+const PURCHASE_LOOKS_KEPT = 50;
 
 /**
  * The target a purchase decision looked at for one tool call. Written by the decision's own look, before the person is asked;
@@ -81,14 +84,24 @@ export const recordPurchaseLook = internalMutation
         }
     });
 
-/** The target the decision of one tool call looked at, or nothing when no decision recorded one (ask mode asks without a look). */
-export const purchaseLookOf = internalQuery
+/**
+ * Takes the target the decision of one tool call looked at, and forgets it: the approved click is checked against it once,
+ * and a retry needs a new decision. Nothing when no decision recorded one (ask mode asks without a look).
+ */
+export const takePurchaseLook = internalMutation
     .input({ sessionId: v.id("browserSessions"), toolCallId: v.string() })
     .output(v.union(v.string(), v.null()))
-    .query(async ({ args: { sessionId, toolCallId }, ctx }) => {
+    .mutation(async ({ args: { sessionId, toolCallId }, ctx }) => {
         const session = await ctx.db.get("browserSessions", sessionId);
+        const look = session?.purchaseLooks?.find((entry) => entry.toolCallId === toolCallId);
 
-        return session?.purchaseLooks?.find((look) => look.toolCallId === toolCallId)?.target ?? null;
+        if (session && look !== undefined) {
+            await patchRow(ctx.db, "browserSessions", session, {
+                purchaseLooks: (session.purchaseLooks ?? []).filter((entry) => entry.toolCallId !== toolCallId),
+            });
+        }
+
+        return look?.target ?? null;
     });
 
 export const createSession = internalMutation
