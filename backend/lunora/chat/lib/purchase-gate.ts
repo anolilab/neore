@@ -19,8 +19,9 @@ const PURCHASE_PATTERNS: ReadonlyArray<RegExp> = [
     /\b(?:confirm|submit|complete|make|proceed to|continue to) (?:the )?payment\b/iu,
     /\b(?:bezahlen|bezahle|kaufen|kaufe|bestellen|bestelle)\b/iu,
     /\bjetzt (?:zahlen|zahle|bezahlen)\b/iu,
-    /\bbestellung (?:aufgeben|abschicken|absenden|abschließen)\b/iu,
-    /\bkauf abschließen\b/iu,
+    // The end is a letter or digit look-ahead, not \b: \b does not follow "ß" at the end of a string, so it would never match.
+    /\bbestellung (?:aufgeben|abschicken|absenden|abschließen)(?![\p{L}\p{N}])/iu,
+    /\bkauf abschließen(?![\p{L}\p{N}])/iu,
     /\bzur kasse\b/iu,
     /\bzahlungspflichtig\w*\b/iu,
 ];

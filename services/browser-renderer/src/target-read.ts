@@ -16,7 +16,8 @@ export interface TargetRead {
     label: string;
     labelTruncated: boolean;
     /** Why a click given `click` or `expect` did not run: the target changed, or the control is disabled or hidden. */
-    refused?: "changed" | "disabled" | "hidden";
+    /** `changed`: the target differs before any click. `moved`: the click ran, and a page handler moved its destination, so the browser was stopped. */
+    refused?: "changed" | "disabled" | "hidden" | "moved";
     shown: string;
     submitLike: boolean;
     target: string;
@@ -333,15 +334,32 @@ export function readTarget(
         enclosingForm === null
             ? []
             : [...Element.prototype.querySelectorAll.call(enclosingForm, "iframe")].map((frame) => Element.prototype.getAttribute.call(frame, "src") ?? "");
-    const isPaymentFrame = frameSources.some((source) => source !== "" && options.payment.test(new URL(source, document.URL).hostname));
+    // A frame whose address does not parse is no payment frame: the read itself must not fail on it.
+    const isPaymentFrame = frameSources.some((source) => {
+        try {
+            return source !== "" && options.payment.test(new URL(source, document.URL).hostname);
+        } catch {
+            return false;
+        }
+    });
     const formUrl = new URL(formAction, document.URL);
     const isPaymentPost = formUrl.origin !== new URL(document.URL).origin && options.payment.test(formUrl.hostname);
     const isCardFields = hasCardFields || isPaymentFrame || isPaymentPost;
     // The address's path words, not the whole address: "cart" is a page's word, "cartoon" or a host name containing it is not.
-    const pathWords = new URL(document.URL).pathname.toLowerCase().split(options.pathSplitter);
-    const isCheckoutPage = pathWords.some(
-        (word) => ["basket", "cart", "checkout", "kasse", "payment", "warenkorb"].includes(word) || word.startsWith("bestell"),
-    );
+    // The path is decoded first: an encoded separator ("%2F") is a separator too. A path that will not decode is read as a checkout,
+    // so a bare submit label there asks rather than clears.
+    let decodedPath = "";
+    let isUndecodable = false;
+
+    try {
+        decodedPath = decodeURIComponent(new URL(document.URL).pathname);
+    } catch {
+        isUndecodable = true;
+    }
+
+    const pathWords = decodedPath.toLowerCase().split(options.pathSplitter);
+    const isCheckoutPage =
+        isUndecodable || pathWords.some((word) => ["basket", "cart", "checkout", "kasse", "payment", "warenkorb"].includes(word) || word.startsWith("bestell"));
 
     // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
     // different targets share a fingerprint. The page digests it below.
@@ -418,7 +436,8 @@ export function readTarget(
     if (options.expect !== undefined && target !== options.expect) {
         refused = "changed";
     } else if (options.click === true) {
-        if (control.matches(":disabled") || control.getAttribute("aria-disabled") === "true") {
+        // The control or any ancestor is disabled: a click on a child of a disabled button reaches its handler as a synthetic event.
+        if (control.closest(":disabled, [aria-disabled='true']") !== null) {
             refused = "disabled";
         } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden") {
             refused = "hidden";
@@ -446,10 +465,11 @@ export function readTarget(
             control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
             stop.abort();
 
-            isClicked = !isMoved;
+            // The click was dispatched either way; a moved destination is what stops it from being submitted.
+            isClicked = true;
 
             if (isMoved) {
-                refused = "changed";
+                refused = "moved";
             }
         }
     }

@@ -6,15 +6,18 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { readTarget, TARGET_READ_OPTIONS } from "./target-read";
 
+/** A SHA-256 digest in hex. */
+const HEX_DIGEST = /^[0-9a-f]{64}$/u;
+
 /** A page with the given markup, served at an address (a read resolves URLs against the page's own, so `about:blank` will not do). */
-const pageWith = async (page: Page, markup: string) => {
+const pageWith = async (page: Page, markup: string, path = "/cart") => {
     await page.route("https://shop.example/**", async (route) => {
         await route.fulfill({
             body: `<!doctype html><html><head><title>Shop</title></head><body>${markup}</body></html>`,
             contentType: "text/html",
         });
     });
-    await page.goto("https://shop.example/cart", { waitUntil: "domcontentloaded" });
+    await page.goto(`https://shop.example${path}`, { waitUntil: "domcontentloaded" });
 };
 
 /** Whether the page's click handler ran. */
@@ -166,9 +169,40 @@ describe("readTarget in a page", () => {
         });
         const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
 
-        expect(read.refused).toBe("changed");
-        expect(read.clicked).toBe(false);
+        // The click ran (its handlers did), and the browser stopped the submission: a `moved` refusal, not a changed target.
+        expect(read.refused).toBe("moved");
+        expect(read.clicked).toBe(true);
         expect(await page.evaluate(() => document.body.dataset.submitted === "true")).toBe(false);
+    });
+
+    it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
+        await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
+        const element = await page.$("#label");
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true });
+
+        expect(read.refused).toBe("disabled");
+        expect(await wasClicked(page)).toBe(false);
+    });
+
+    it("a form with a malformed frame address still reads its target", async () => {
+        await pageWith(page, `<form action="/order"><iframe src="http://["></iframe><button id="go" type="submit">Go</button></form>`);
+        const element = await page.$("#go");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.target).toHaveLength(64);
+        expect(read.target).toMatch(HEX_DIGEST);
+        expect(read.refused).toBeUndefined();
+    });
+
+    it("an encoded checkout route counts as a checkout page", async () => {
+        await pageWith(page, `<button id="confirm">Confirm</button>`, "/checkout%2Fconfirm");
+        const element = await page.$("#confirm");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.checkout).toBe(true);
     });
 
     it("a click whose destination does not move submits as it always did", async () => {

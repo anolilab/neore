@@ -63,6 +63,10 @@ const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at
 const NOT_VISIBLE_TARGET = "The target is not visible, so nothing was clicked. Look at the page again before you click.";
 
 /** The click found another element, or this one with other text: the person's yes was for what they were shown. */
+/** A click ran, and a page handler moved its destination during it: the browser stopped the submission. Its handlers did run. */
+const DESTINATION_MOVED =
+    "The page moved this click's destination while the click ran, so the browser stopped the submission. Its handlers did run; look at the page before you act.";
+
 const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
@@ -569,6 +573,13 @@ const actHeld = async (
 
                     if (read.refused === "disabled") {
                         result = { error: DISABLED_TARGET, success: false };
+                        break;
+                    }
+
+                    // The click ran, and a page handler moved its destination: the browser stopped the submission. Not a changed target
+                    // (no `targetChanged`): the click must not be retried, since its handlers already ran.
+                    if (read.refused === "moved") {
+                        result = { error: DESTINATION_MOVED, success: false };
                         break;
                     }
 

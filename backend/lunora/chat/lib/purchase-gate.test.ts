@@ -183,7 +183,7 @@ describe("isPurchaseText for ordinary link text", () => {
         expect(isPurchaseText(text)).toBe(false);
     });
 
-    it.each(["Jetzt zahlen", "Jetzt bezahlen", "Checkout", "Pay now"])("still reads %j as a purchase", (text) => {
+    it.each(["Jetzt zahlen", "Jetzt bezahlen", "Checkout", "Pay now", "Kauf abschließen", "Bestellung abschließen"])("still reads %j as a purchase", (text) => {
         expect(isPurchaseText(text)).toBe(true);
     });
 });
