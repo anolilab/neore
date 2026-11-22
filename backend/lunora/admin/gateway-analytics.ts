@@ -88,7 +88,7 @@ export const getProviderCacheReadingsForAdmin = adminAction
     .input({ days: v.optional(v.union(v.literal(1), v.literal(7), v.literal(30))) })
     .output(
         v.object({
-            all: v.object(providerCacheCountsFields),
+            all: v.object({ ...providerCacheCountsFields }),
             days: v.union(v.literal(1), v.literal(7), v.literal(30)),
             models: v.array(v.object({ ...providerCacheCountsFields, modelId: v.string(), provider: v.string() })),
             pairs: v.number(),
