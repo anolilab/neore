@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,6 +39,8 @@ const backend = vi.hoisted(() => {
         unpolled: new Set<string>(),
         ruleFiles: [] as Record<string, unknown>[],
         listDevices: vi.fn(),
+        // The options each start was built with: online-only, never paused or retried.
+        startOptions: [] as unknown[][],
         start: vi.fn(),
     };
 });
@@ -74,7 +76,9 @@ vi.mock("@/lib/lunora/crpc", () => {
                             return backend.calls.get(callId);
                         }),
                         startGlobalInstructionsCall: {
-                            mutationOptions: () => {
+                            mutationOptions: (...options: unknown[]) => {
+                                backend.startOptions.push(options);
+
                                 return { mutationFn: backend.start };
                             },
                         },
@@ -152,6 +156,7 @@ const readAll = (files: string[], listed = LISTED): Row => {
 
 afterEach(() => {
     vi.useRealTimers();
+    onlineManager.setOnline(true);
 });
 
 beforeEach(() => {
@@ -382,10 +387,12 @@ describe("import from this computer", () => {
         await user.click(screen.getByRole("button", { name: "Import selected" }));
         await screen.findByText("Approve the request in the desktop app on Studio.");
         await user.click(screen.getByRole("button", { name: "Discard changes" }));
-        finish();
 
+        // Freed at once, before the computer answers: no wait on an approval nobody will use.
         await waitFor(() => expect(screen.queryByText("Approve the request in the desktop app on Studio.")).toBeNull());
         await waitFor(() => expect(screen.getByRole("button", { name: "Import files" }).hasAttribute("disabled")).toBe(false));
+        expect(isDisabled(screen.getByRole("button", { name: "Import selected" }))).toBe(false);
+        finish();
         await new Promise((resolve) => {
             setTimeout(resolve, 60);
         });
@@ -573,5 +580,182 @@ describe("import from this computer", () => {
         expect(isDisabled(find)).toBe(false);
         vi.advanceTimersByTime(10_000);
         await waitFor(() => expect(isDisabled(find)).toBe(true));
+    });
+
+    it("starts each call online-only, and refuses to start one while offline", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+        await screen.findByRole("button", { name: "Find files" });
+
+        expect(backend.startOptions.at(-1)).toEqual([{ networkMode: "always", retry: 0 }, { onlineOnly: true }]);
+
+        onlineManager.setOnline(false);
+        await user.click(screen.getByRole("button", { name: "Find files" }));
+
+        const offline = await screen.findByRole("alert");
+
+        expect(offline.textContent).toBe("You are offline. Reconnect and try again.");
+        expect(backend.start).not.toHaveBeenCalled();
+    });
+
+    it("says the connection is down when Lunora refuses the online-only start", async () => {
+        const user = userEvent.setup();
+
+        backend.start.mockRejectedValue(Object.assign(new Error("offline"), { code: "OFFLINE_NOT_QUEUED" }));
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+        await user.click(await screen.findByRole("button", { name: "Find files" }));
+
+        const refused = await screen.findByRole("alert");
+
+        expect(refused.textContent).toBe("You are offline. Reconnect and try again.");
+    });
+
+    it("keeps a ticked file the answer left out, or sent without text, ticked and says so", async () => {
+        const user = userEvent.setup();
+
+        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+            const callId = `partial-${String(backend.start.mock.calls.length)}`;
+
+            // The read's answer carries CLAUDE.md alone: AGENTS.md was dropped on the way.
+            backend.calls.set(callId, files ? readAll(["claude"]) : { files: LISTED, status: "completed" });
+
+            return { callId };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(await screen.findByRole("listitem", { name: "CLAUDE.md" })).toBeDefined();
+
+        const left = await screen.findByRole("list", { name: "Files not imported" });
+
+        expect(left.textContent).toContain("~/.codex/AGENTS.md");
+        expect(left.textContent).toContain("(not in the computer's answer: try again)");
+
+        const boxes = within(screen.getByRole("list", { name: "Instruction files" })).getAllByRole("checkbox");
+
+        await waitFor(() => expect(boxes.map((box) => box.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]));
+        expect(screen.getByTestId("computer-rule-file-import")).toBeDefined();
+    });
+
+    it("names the computer a read went to, even once it is unpaired and another is chosen", async () => {
+        const user = userEvent.setup();
+        let deny: () => void = () => undefined;
+        const answer = backend.start.getMockImplementation()!;
+
+        backend.devices = [
+            { _id: "desk", createdAt: 0, lastSeenAt: Date.now(), name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
+            { _id: "lap", createdAt: 0, lastSeenAt: Date.now(), name: "Laptop", platform: "darwin", toolNames: [], updateRequired: false },
+        ];
+        backend.start.mockImplementation(async (args: { files?: string[] }) => {
+            if (!args.files) {
+                return await answer(args);
+            }
+
+            backend.calls.set("asked", { phase: "prompting", status: "claimed" });
+            deny = () => backend.calls.set("asked", { status: "denied" });
+
+            return { callId: "asked" };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+        await screen.findByText("Approve the request in the desktop app on Studio.");
+        backend.devices = backend.devices.filter((device) => device._id !== "desk");
+        await waitFor(() => expect(screen.queryByRole("radio")).toBeNull());
+        deny();
+
+        const denied = await screen.findByRole("alert");
+
+        expect(denied.textContent).toBe("The request was denied on Studio.");
+    });
+
+    it("says why Find files cannot be clicked when the one computer is offline", async () => {
+        const user = userEvent.setup();
+
+        backend.devices = [
+            { _id: "desk", createdAt: 0, lastSeenAt: Date.now() - 3_600_000, name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
+        ];
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+
+        const find = await screen.findByRole("button", { name: "Find files" });
+        const note = screen.getByText("Studio is offline. Open the desktop app on it to continue.");
+
+        expect(isDisabled(find)).toBe(true);
+        expect(find.getAttribute("aria-describedby")).toBe(note.id);
+    });
+
+    it("says the computers could not be loaded even over a list loaded before", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+        await screen.findByText(LOOKS_FOR);
+        backend.listDevices.mockImplementation(() => {
+            throw new Error("down");
+        });
+
+        const notLoaded = await screen.findByRole("alert");
+
+        expect(notLoaded.textContent).toBe("Your computers could not be loaded.");
+        expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+        expect(screen.getByText(LOOKS_FOR)).toBeDefined();
+    });
+
+    it("reads a waiting call once now and then, so a live query gone quiet does not strand the read", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date", "setInterval", "clearInterval"] });
+
+        const user = userEvent.setup();
+
+        // The live status is pushed once, and never again.
+        backend.unpolled.add("getGlobalInstructionsCall");
+        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+            const callId = `quiet-${String(backend.start.mock.calls.length)}`;
+
+            backend.calls.set(callId, files ? { phase: "prompting", status: "claimed" } : { files: LISTED, status: "completed" });
+
+            return { callId };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+        await screen.findByText("Approve the request in the desktop app on Studio.");
+        backend.calls.set("quiet-2", readAll(["claude", "codex"]));
+        vi.advanceTimersByTime(15_000);
+
+        expect(await screen.findByRole("listitem", { name: "CLAUDE.md" })).toBeDefined();
+        expect(screen.getByRole("listitem", { name: "AGENTS.md" })).toBeDefined();
+    });
+
+    it("gives up on a call still waiting past its deadline, and frees the editor", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date", "setInterval", "clearInterval"] });
+
+        const user = userEvent.setup();
+        const answer = backend.start.getMockImplementation()!;
+
+        backend.start.mockImplementation(async (args: { files?: string[] }) => {
+            if (!args.files) {
+                return await answer(args);
+            }
+
+            // Never answered, and never marked expired either.
+            backend.calls.set("stuck", { phase: "prompting", status: "claimed" });
+
+            return { callId: "stuck" };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+        await screen.findByText("Approve the request in the desktop app on Studio.");
+        vi.advanceTimersByTime(5 * 60_000 + 40_000);
+
+        const gaveUp = await screen.findByRole("alert");
+
+        expect(gaveUp.textContent).toBe("Lost track of the request to Studio. Try again.");
+        await waitFor(() => expect(isDisabled(screen.getByRole("button", { name: "Import files" }))).toBe(false));
     });
 });

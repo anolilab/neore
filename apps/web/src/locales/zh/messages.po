@@ -85,11 +85,11 @@ msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
-#: src/features/projects/components/project-rule-files.tsx:689
+#: src/features/projects/components/project-rule-files.tsx:703
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "“{name}”的文件模式超过 {limit} 个。请删除一些，或移到另一个文件中。"
 
-#: src/features/projects/components/project-rule-files.tsx:672
+#: src/features/projects/components/project-rule-files.tsx:686
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "“{name}”超过 {limit} 个字符。请缩短，或拆分为多个文件。"
 
@@ -139,7 +139,7 @@ msgstr "（已删除的用例）"
 msgid "(deleted task)"
 msgstr "（已删除的任务）"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:266
+#: src/features/projects/components/computer-rule-file-import.tsx:395
 msgid "(did not fit in one read: import it on its own)"
 msgstr "（一次读取放不下：请单独导入）"
 
@@ -187,11 +187,15 @@ msgstr "（微美元；1,000,000 = $1）"
 msgid "(none)"
 msgstr "（无）"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:267
+#: src/features/projects/components/computer-rule-file-import.tsx:400
+msgid "(not in the computer's answer: try again)"
+msgstr "{'de': '(nicht in der Antwort des Computers: versuche es erneut)', 'es': '(no está en la respuesta del ordenador: inténtalo de nuevo)', 'fr': '(absent de la réponse de l’ordinateur : réessayez)', 'it': '(non presente nella risposta del computer: riprova)', 'ja': '（コンピューターの応答に含まれていません：もう一度お試しください）', 'pl': '(brak w odpowiedzi komputera: spróbuj ponownie)', 'pt': '(não está na resposta do computador: tente novamente)', 'zh': '（不在电脑的回应中：请重试）'}"
+
+#: src/features/projects/components/computer-rule-file-import.tsx:396
 msgid "(not on this computer)"
 msgstr "（此电脑上没有）"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:313
+#: src/features/projects/components/computer-rule-file-import.tsx:444
 msgid "(offline)"
 msgstr "（离线）"
 
@@ -215,7 +219,7 @@ msgstr "（在新标签页中打开）"
 msgid "(optional)"
 msgstr "（可选）"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:269
+#: src/features/projects/components/computer-rule-file-import.tsx:398
 msgid "(refused: it links outside your home folder or is not a text file)"
 msgstr "（已拒绝：它指向主文件夹之外，或不是文本文件）"
 
@@ -231,7 +235,7 @@ msgstr "(与 {path} 是同一文件)"
 msgid "(shared)"
 msgstr "（共享）"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:270
+#: src/features/projects/components/computer-rule-file-import.tsx:399
 #: src/features/projects/components/repo-rule-file-import.tsx:434
 msgid "(too large)"
 msgstr "（太大）"
@@ -284,7 +288,7 @@ msgid "{0, plural, one {# file changed} other {# files changed}}"
 msgstr "{0, plural, other {# 个文件已更改}}"
 
 #. placeholder {0}: read.notRead
-#: src/features/projects/components/project-rule-files.tsx:578
+#: src/features/projects/components/project-rule-files.tsx:580
 msgid "{0, plural, one {# file was not read this time} other {# files were not read this time}}: import again to add the rest."
 msgstr "{0, plural, other {本次有 # 个文件未读取}}：请重新导入以添加其余文件。"
 
@@ -410,7 +414,7 @@ msgid "{0, plural, one {# result} other {# results}}, {1}"
 msgstr "{0, plural, other {# 个结果}}，{1}"
 
 #. placeholder {0}: added.length
-#: src/features/projects/components/project-rule-files.tsx:558
+#: src/features/projects/components/project-rule-files.tsx:560
 msgid "{0, plural, one {# rule file imported.} other {# rule files imported.}} Review, then save."
 msgstr "{0, plural, other {已导入 # 个规则文件。}} 请检查后保存。"
 
@@ -650,6 +654,11 @@ msgstr "{0}（{1} 个评分）"
 msgid "{0} input, {1} output per 1M tokens"
 msgstr "每百万 token：输入 {0}，输出 {1}"
 
+#. placeholder {0}: chosen.name
+#: src/features/projects/components/computer-rule-file-import.tsx:507
+msgid "{0} is offline. Open the desktop app on it to continue."
+msgstr "{'de': '{0} ist offline. Öffne dort die Desktop-App, um fortzufahren.', 'es': '{0} está sin conexión. Abre la aplicación de escritorio en él para continuar.', 'fr': '{0} est hors ligne. Ouvrez l’application de bureau sur cet ordinateur pour continuer.', 'it': '{0} è offline. Apri l’app desktop su di esso per continuare.', 'ja': '{0} はオフラインです。続けるには、そのコンピューターでデスクトップアプリを開いてください。', 'pl': '{0} jest offline. Otwórz na nim aplikację desktopową, aby kontynuować.', 'pt': '{0} está offline. Abra o aplicativo para desktop nele para continuar.', 'zh': '{0} 已离线。请在该电脑上打开桌面应用以继续。'}"
+
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:209
 msgid "{0} is one of {totalModels}+ AI models available on Neore — all in one workspace, one subscription. No tab-switching. No managing six accounts."
@@ -666,7 +675,7 @@ msgid "{0} items were created. Skills, schedules and webhooks are switched off; 
 msgstr "已创建 {0} 个项目。技能、计划任务和 webhook 处于关闭状态；准备好后请逐个开启。"
 
 #. placeholder {0}: formatNumber(Math.max(1, Math.ceil(bytes / 1024)), i18n.locale)
-#: src/features/projects/components/computer-rule-file-import.tsx:262
+#: src/features/projects/components/computer-rule-file-import.tsx:391
 msgid "{0} KB"
 msgstr "{0} KB"
 
@@ -1023,7 +1032,7 @@ msgstr "已完成 {done}/{total} 项任务。进行中：{inProgress}"
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
 msgstr "{droppedCount, plural, other {重新加载时移除了 # 个附件}}"
 
-#: src/features/projects/components/project-rule-files.tsx:577
+#: src/features/projects/components/project-rule-files.tsx:579
 msgid "{duplicates, plural, one {# file was left out as the same file as another picked} other {# files were left out as the same file as another picked}}: the same text would apply twice."
 msgstr "{duplicates, plural, other {# 个文件与另一个已选文件是同一文件，已略过}}：同样的文本会生效两次。"
 
@@ -1307,7 +1316,7 @@ msgstr "{modelCount, plural, other {向 # 个模型提问任何问题...}}"
 msgid "{months}mo ago"
 msgstr "{months} 个月前"
 
-#: src/features/projects/components/project-rule-files.tsx:567
+#: src/features/projects/components/project-rule-files.tsx:569
 msgid "{more, plural, one {# more} other {# more}}"
 msgstr "{more, plural, other {另外 # 个}}"
 
@@ -1363,11 +1372,11 @@ msgstr "{name} 已连接。"
 msgid "{name} connection activated"
 msgstr "{name} 连接已激活"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:159
+#: src/features/projects/components/computer-rule-file-import.tsx:254
 msgid "{name} could not read the files."
 msgstr "{name} 无法读取这些文件。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:158
+#: src/features/projects/components/computer-rule-file-import.tsx:253
 msgid "{name} did not answer in time. Open the desktop app on it and try again."
 msgstr "{name} 未及时响应。请在该电脑上打开桌面应用后重试。"
 
@@ -1379,7 +1388,7 @@ msgstr "{name} 已断开连接"
 msgid "{name} hidden from the model picker"
 msgstr "已在模型选择器中隐藏 {name}"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:156
+#: src/features/projects/components/computer-rule-file-import.tsx:250
 msgid "{name} is busy with other requests. Try again in a moment."
 msgstr "{name} 正在处理其他请求。请稍后再试。"
 
@@ -1387,7 +1396,7 @@ msgstr "{name} 正在处理其他请求。请稍后再试。"
 msgid "{name} is installed"
 msgstr "{name} 已安装"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:163
+#: src/features/projects/components/computer-rule-file-import.tsx:258
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} 处于离线状态。请在该电脑上打开桌面应用后重试。"
 
@@ -1476,7 +1485,7 @@ msgstr "{providerName} · 你自己的 Bedrock 账号（{region}）"
 msgid "{refusedLabel} does not have the format this request asks for, so nothing was saved. Enter it again."
 msgstr "{refusedLabel} 的格式不符合此请求的要求，因此未保存任何内容。请重新输入。"
 
-#: src/features/projects/components/project-rule-files.tsx:587
+#: src/features/projects/components/project-rule-files.tsx:589
 msgid "{renamed, plural, one {# name opened with id:, which names a file by its id, so it now opens with id-} other {# names opened with id:, which names a file by its id, so they now open with id-}} instead."
 msgstr "{renamed, plural, other {# 个名称以 id: 开头（id: 按 ID 指代文件），现已改为以 id- 开头}}。"
 
@@ -1537,7 +1546,7 @@ msgstr "已选择 {selectedCount}/{MAX_PARALLEL}"
 msgid "{server} · until {until}"
 msgstr "{server} · 截至 {until}"
 
-#: src/features/projects/components/project-rule-files.tsx:586
+#: src/features/projects/components/project-rule-files.tsx:588
 msgid "{shortened, plural, one {# name was} other {# names were}} shortened to {titleLimit} characters."
 msgstr "已将 {shortened, plural, other {# 个名称}}缩短为 {titleLimit} 个字符。"
 
@@ -1549,7 +1558,7 @@ msgstr "{skipped, plural, other {有 # 个文件无法导入，已被跳过}}"
 msgid "{skipped, plural, one {# file} other {# files}} could not be included in the export"
 msgstr "{skipped, plural, other {有 # 个文件无法包含在导出中}}"
 
-#: src/features/projects/components/project-rule-files.tsx:572
+#: src/features/projects/components/project-rule-files.tsx:574
 msgid "{skippedCount, plural, one {# file was left out.} other {# files were left out.}} A project holds at most {limit} rule files. Left out: {skippedNames}."
 msgstr "{skippedCount, plural, other {有 # 个文件未导入。}} 一个项目最多包含 {limit} 个规则文件。未导入：{skippedNames}。"
 
@@ -1599,7 +1608,7 @@ msgstr "{title}：{0}"
 msgid "{title}: {0}. {exitText}"
 msgstr "{title}：{0}。{exitText}"
 
-#: src/features/projects/components/project-rule-files.tsx:583
+#: src/features/projects/components/project-rule-files.tsx:585
 msgid "{tooLargeCount, plural, one {# file was left out as too large} other {# files were left out as too large}}: a rule file holds at most {length} characters, and all of a project's together at most {size} MB. Too large: {tooLargeNames}."
 msgstr "{tooLargeCount, plural, other {# 个文件因过大被略过}}：一个规则文件最多 {length} 个字符，一个项目的所有规则文件合计最多 {size} MB。过大：{tooLargeNames}。"
 
@@ -1611,7 +1620,7 @@ msgstr "{toolId} API 密钥已移除"
 msgid "{toolId} API key saved"
 msgstr "{toolId} API 密钥已保存"
 
-#: src/features/projects/components/project-rule-files.tsx:559
+#: src/features/projects/components/project-rule-files.tsx:561
 msgid "{toSet, plural, one {# file says nothing about when it applies} other {# files say nothing about when they apply}}: set a description or another mode."
 msgstr "{toSet, plural, other {# 个文件未说明何时适用}}：请设置描述或选择其他模式。"
 
@@ -1623,7 +1632,7 @@ msgstr "{total, plural, other {已使用 # 个工具 · {tail}}}"
 msgid "{totalReplies} on {activeDays} in the last year, {totalCost} spent."
 msgstr "过去一年在 {activeDays}中共 {totalReplies}，支出 {totalCost}。"
 
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:577
 msgid "{unreadableCount, plural, one {# file could not be read} other {# files could not be read}}: gone from the repository or too large. Not read: {unreadableNames}."
 msgstr "{unreadableCount, plural, other {# 个文件无法读取}}：已不在仓库中或太大。未读取：{unreadableNames}。"
 
@@ -1998,7 +2007,7 @@ msgstr "与你一起思考的文档编辑器。"
 msgid "A few questions first"
 msgstr "先回答几个问题"
 
-#: src/features/projects/components/project-rule-files.tsx:685
+#: src/features/projects/components/project-rule-files.tsx:699
 msgid "A file applied when files match needs at least one pattern."
 msgstr "“文件匹配时”应用的规则文件至少需要一个模式。"
 
@@ -2006,7 +2015,7 @@ msgstr "“文件匹配时”应用的规则文件至少需要一个模式。"
 msgid "A file only its owner can read (no keychain available)"
 msgstr "仅所有者可读取的文件（无可用的钥匙串）"
 
-#: src/features/projects/components/project-rule-files.tsx:679
+#: src/features/projects/components/project-rule-files.tsx:693
 msgid "A file read when needed needs a line saying when to read it."
 msgstr "按需读取的文件需要一行说明何时读取它。"
 
@@ -2123,7 +2132,7 @@ msgstr "引号外的占位符或 @提及 在此处会被读作 null，因此在�
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "一个项目最多可列出 {MAX_REPOSITORIES} 个仓库。"
 
-#: src/features/projects/components/project-rule-files.tsx:706
+#: src/features/projects/components/project-rule-files.tsx:720
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "一个项目最多包含 {limit} 个规则文件。请先删除一个。"
 
@@ -2161,11 +2170,11 @@ msgstr "使用了记忆的回复会显示“已使用的记忆”列表，方便
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "经路由或被提及的一轮最多有三位发言者。并行一轮最多有四个回答和一份综合结果，辩论最多进行三轮。"
 
-#: src/features/projects/components/project-rule-files.tsx:696
+#: src/features/projects/components/project-rule-files.tsx:710
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "规则文件的名称最多 {limit} 个字符。"
 
-#: src/features/projects/components/project-rule-files.tsx:692
+#: src/features/projects/components/project-rule-files.tsx:706
 msgid "A rule file's name may not start with \"id:\". Rename \"{name}\"."
 msgstr "规则文件的名称不能以“id:”开头。请重命名“{name}”。"
 
@@ -2733,7 +2742,7 @@ msgstr "添加参考图以保持一致性"
 msgid "Add row"
 msgstr "添加行"
 
-#: src/features/projects/components/project-rule-files.tsx:930
+#: src/features/projects/components/project-rule-files.tsx:944
 msgid "Add rule file"
 msgstr "添加规则文件"
 
@@ -3752,7 +3761,7 @@ msgstr "智能体（技能）"
 msgid "An agent works the task on its own, then a verifier checks the result against your success criteria."
 msgstr "智能体会自主处理任务，然后由验证器根据你的成功标准检查结果。"
 
-#: src/features/projects/components/project-rule-files.tsx:936
+#: src/features/projects/components/project-rule-files.tsx:950
 msgid "An AGENTS.md, CLAUDE.md or GEMINI.md file, or other Markdown files"
 msgstr "AGENTS.md、CLAUDE.md 或 GEMINI.md 文件，或其他 Markdown 文件"
 
@@ -4209,7 +4218,7 @@ msgstr "批准验证码"
 msgid "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
 msgstr "批准会运行该调用一次，回复基于其结果继续。拒绝会将拒绝结果返回给模型，模型将在没有该工具的情况下继续。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:278
+#: src/features/projects/components/computer-rule-file-import.tsx:408
 msgid "Approve the request in the desktop app on {name}."
 msgstr "请在 {name} 上的桌面应用中批准此请求。"
 
@@ -5965,7 +5974,7 @@ msgstr "加拿大"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/add-project-dialog.tsx:682
-#: src/features/projects/components/computer-rule-file-import.tsx:392
+#: src/features/projects/components/computer-rule-file-import.tsx:536
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
 #: src/features/projects/components/repo-rule-file-import.tsx:461
@@ -7724,7 +7733,7 @@ msgid "Compressing context..."
 msgstr "正在压缩上下文..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/projects/components/computer-rule-file-import.tsx:299
+#: src/features/projects/components/computer-rule-file-import.tsx:430
 #: src/features/settings/components/chat/bots-settings.tsx:435
 msgid "Computer"
 msgstr "电脑"
@@ -11094,7 +11103,7 @@ msgid "Discard"
 msgstr "放弃"
 
 #: src/features/projects/components/project-form-dialog.tsx:515
-#: src/features/projects/components/project-rule-files.tsx:1011
+#: src/features/projects/components/project-rule-files.tsx:1028
 msgid "Discard changes"
 msgstr "放弃更改"
 
@@ -11742,7 +11751,7 @@ msgstr "每个连接都有自己的 Webhook 地址，应用会将新消息发送
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "每个 Discord 频道会在 Neore Chat 中创建一个单独的对话。AI 会在频道中自动回复。"
 
-#: src/features/projects/components/project-rule-files.tsx:683
+#: src/features/projects/components/project-rule-files.tsx:697
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "“{name}”中的每个文件模式必须在一行内，且最多 {limit} 个字符。"
 
@@ -14856,7 +14865,7 @@ msgstr ""
 msgid "Files found"
 msgstr "找到的文件"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:359
+#: src/features/projects/components/computer-rule-file-import.tsx:490
 msgid "Files not imported"
 msgstr "未导入的文件"
 
@@ -14990,7 +14999,7 @@ msgstr "正在收尾..."
 msgid "Financial data and bank connection APIs"
 msgstr "金融数据与银行连接 API"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:387
+#: src/features/projects/components/computer-rule-file-import.tsx:531
 #: src/features/projects/components/repo-rule-file-import.tsx:457
 msgid "Find files"
 msgstr "查找文件"
@@ -15335,7 +15344,7 @@ msgstr "转发到新聊天"
 
 #. placeholder {0}: found.filter((file) => file.status === "found").length
 #. placeholder {0}: found.length
-#: src/features/projects/components/computer-rule-file-import.tsx:326
+#: src/features/projects/components/computer-rule-file-import.tsx:457
 #: src/features/projects/components/repo-rule-file-import.tsx:403
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "找到 {0, plural, other {# 个文件}}。"
@@ -16064,7 +16073,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab 密钥令牌（X-Gitlab-Token）"
 
-#: src/features/projects/components/project-rule-files.tsx:691
+#: src/features/projects/components/project-rule-files.tsx:705
 msgid "Give every rule file a name."
 msgstr "请为每个规则文件命名。"
 
@@ -17615,7 +17624,7 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
-#: src/features/projects/components/project-rule-files.tsx:941
+#: src/features/projects/components/project-rule-files.tsx:955
 msgid "Import files"
 msgstr "导入文件"
 
@@ -17624,8 +17633,8 @@ msgstr "导入文件"
 msgid "Import from repository"
 msgstr "从仓库导入"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:284
-#: src/features/projects/components/computer-rule-file-import.tsx:422
+#: src/features/projects/components/computer-rule-file-import.tsx:414
+#: src/features/projects/components/computer-rule-file-import.tsx:566
 msgid "Import from this computer"
 msgstr "从此电脑导入"
 
@@ -17641,11 +17650,11 @@ msgstr "导入 Notion 导出文件（.zip）"
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
 
-#: src/features/projects/components/project-rule-files.tsx:951
+#: src/features/projects/components/project-rule-files.tsx:965
 msgid "Import rule folder"
 msgstr "导入规则文件夹"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:382
+#: src/features/projects/components/computer-rule-file-import.tsx:519
 #: src/features/projects/components/repo-rule-file-import.tsx:453
 msgid "Import selected"
 msgstr "导入所选文件"
@@ -18075,7 +18084,7 @@ msgstr "已安装的模型"
 msgid "instruct"
 msgstr "指令型"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:329
+#: src/features/projects/components/computer-rule-file-import.tsx:460
 msgid "Instruction files"
 msgstr "指令文件"
 
@@ -18096,7 +18105,7 @@ msgstr "指令"
 msgid "Instructions"
 msgstr "指令"
 
-#: src/features/projects/components/project-rule-files.tsx:869
+#: src/features/projects/components/project-rule-files.tsx:883
 msgid "Instructions added to this project's chats: always, only when the chat's attached files match a pattern such as **/*.sql, or read by the chat when it needs them."
 msgstr "添加到此项目聊天中的说明：始终应用、仅当聊天附件匹配 **/*.sql 等模式时应用，或由聊天在需要时读取。"
 
@@ -20143,7 +20152,7 @@ msgstr "在仓库根目录中查找 AGENTS.md、CLAUDE.md 和 GEMINI.md，以及
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "在 {0} 的根目录中查找 AGENTS.md、CLAUDE.md 和 GEMINI.md，以及规则文件夹。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:320
+#: src/features/projects/components/computer-rule-file-import.tsx:451
 msgid "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md in your home folder on {name}, and nothing else. You approve each request in the desktop app."
 msgstr "只在 {name} 的主文件夹中查找全局 CLAUDE.md、AGENTS.md、GEMINI.md 和 global_rules.md，不查找其他内容。每个请求都需在桌面应用中批准。"
 
@@ -20152,7 +20161,7 @@ msgstr "只在 {name} 的主文件夹中查找全局 CLAUDE.md、AGENTS.md、GEM
 msgid "LoRA"
 msgstr "LoRA"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:162
+#: src/features/projects/components/computer-rule-file-import.tsx:257
 msgid "Lost track of the request to {name}. Try again."
 msgstr "与发送到 {name} 的请求失去了联系。请重试。"
 
@@ -22865,7 +22874,7 @@ msgstr "未找到语言"
 msgid "No lens selected"
 msgstr "未选择镜头"
 
-#: src/features/projects/components/project-rule-files.tsx:556
+#: src/features/projects/components/project-rule-files.tsx:558
 msgid "No Markdown files were found to import."
 msgstr "未找到可导入的 Markdown 文件。"
 
@@ -25168,7 +25177,7 @@ msgstr "在 Neore 桌面应用中配对一台电脑，以便智能体处理你�
 msgid "Pair one in Settings"
 msgstr "在设置中配对一台"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:296
+#: src/features/projects/components/computer-rule-file-import.tsx:427
 msgid "Pair the desktop app in Settings → Devices to import from a computer."
 msgstr "请在 设置 → 设备 中配对桌面应用，以便从电脑导入。"
 
@@ -29168,11 +29177,11 @@ msgstr "评分标准"
 msgid "Rule file {0}"
 msgstr "规则文件 {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:867
+#: src/features/projects/components/project-rule-files.tsx:881
 msgid "Rule files"
 msgstr "规则文件"
 
-#: src/features/projects/components/project-rule-files.tsx:844
+#: src/features/projects/components/project-rule-files.tsx:858
 msgid "Rule files saved."
 msgstr "规则文件已保存。"
 
@@ -29505,7 +29514,7 @@ msgstr "保存图像"
 msgid "Save login"
 msgstr "保存登录信息"
 
-#: src/features/projects/components/project-rule-files.tsx:1025
+#: src/features/projects/components/project-rule-files.tsx:1042
 msgid "Save or discard your rule file changes first."
 msgstr "请先保存或放弃你对规则文件的更改。"
 
@@ -29517,7 +29526,7 @@ msgstr "保存预设"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "保存可复用的系统提示词，并将其绑定到特定模型。使用“优化”按钮，通过提示词优化器改进每个预设。"
 
-#: src/features/projects/components/project-rule-files.tsx:991
+#: src/features/projects/components/project-rule-files.tsx:1005
 msgid "Save rule files"
 msgstr "保存规则文件"
 
@@ -29595,7 +29604,7 @@ msgstr "正在保存工具…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:991
+#: src/features/projects/components/project-rule-files.tsx:1005
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -34282,7 +34291,7 @@ msgstr "无法加载对比结果。"
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "粘贴准备好之前输入框已被锁定，因此未插入。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:166
+#: src/features/projects/components/computer-rule-file-import.tsx:261
 msgid "The computer's answer could not be read. Try again, or update the desktop app on {name}."
 msgstr "无法读取这台电脑的回复。请重试，或更新 {name} 上的桌面应用。"
 
@@ -34326,7 +34335,7 @@ msgstr "数据集、其用例及所有运行记录都将被删除。"
 msgid "The description is cut short."
 msgstr "描述已被截断。"
 
-#: src/features/projects/components/project-rule-files.tsx:677
+#: src/features/projects/components/project-rule-files.tsx:691
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
 
@@ -34409,7 +34418,7 @@ msgstr "文件未导入："
 msgid "The files arrived while the account changed, so they were not attached. Drop them again."
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:643
+#: src/features/projects/components/project-rule-files.tsx:650
 msgid "The files could not be read."
 msgstr "无法读取这些文件。"
 
@@ -34806,7 +34815,7 @@ msgstr "无法读取该仓库。"
 msgid "The repository or its branch was not found."
 msgstr "找不到该仓库或其分支。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:165
+#: src/features/projects/components/computer-rule-file-import.tsx:260
 msgid "The request could not be sent."
 msgstr "无法发送请求。"
 
@@ -34822,7 +34831,7 @@ msgstr "请求已超时，但可能仍会完成。请先查看对话，再重试
 msgid "The request timed out. Please try again."
 msgstr "请求已超时。请重试。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:157
+#: src/features/projects/components/computer-rule-file-import.tsx:251
 msgid "The request was denied on {name}."
 msgstr "请求已在 {name} 上被拒绝。"
 
@@ -34842,7 +34851,7 @@ msgstr "重试耗时比预期更长"
 msgid "The right model, every time."
 msgstr "每次都用对模型。"
 
-#: src/features/projects/components/project-rule-files.tsx:874
+#: src/features/projects/components/project-rule-files.tsx:888
 msgid "The rule files could not be loaded."
 msgstr "无法加载规则文件。"
 
@@ -35266,7 +35275,7 @@ msgstr "这台电脑未能恢复其自身会话，因此已移交对话"
 msgid "This computer is no longer paired."
 msgstr "此电脑已不再配对。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:160
+#: src/features/projects/components/computer-rule-file-import.tsx:255
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "这台电脑已不再配对。请在 设置 → 设备 中重新配对。"
 
@@ -36071,7 +36080,7 @@ msgstr "今天"
 msgid "Today, {label}"
 msgstr "今天，{label}"
 
-#: src/features/projects/components/project-rule-files.tsx:701
+#: src/features/projects/components/project-rule-files.tsx:715
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "这些规则文件合计超过 {limit} MB。请缩短或删除其中一些。"
 
@@ -36235,7 +36244,7 @@ msgid "Too many requests right now. Try again in a moment."
 msgstr "当前请求过多。请稍后重试。"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:164
-#: src/features/projects/components/computer-rule-file-import.tsx:161
+#: src/features/projects/components/computer-rule-file-import.tsx:256
 msgid "Too many requests. Please try again in a moment."
 msgstr "请求过多。请稍后再试。"
 
@@ -36642,7 +36651,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:154
-#: src/features/projects/components/computer-rule-file-import.tsx:292
+#: src/features/projects/components/computer-rule-file-import.tsx:423
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
@@ -37283,7 +37292,7 @@ msgstr "更新角色"
 msgid "Update Server"
 msgstr "更新服务器"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:164
+#: src/features/projects/components/computer-rule-file-import.tsx:259
 msgid "Update the desktop app on {name} first."
 msgstr "请先更新 {name} 上的桌面应用。"
 
@@ -38642,7 +38651,7 @@ msgstr "正在等待 {0}。"
 msgid "Waiting for {device} to pick this up…"
 msgstr "等待 {device} 接收…"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:278
+#: src/features/projects/components/computer-rule-file-import.tsx:408
 msgid "Waiting for {name}…"
 msgstr "正在等待 {name}…"
 
@@ -39562,6 +39571,10 @@ msgstr "你没有监视任何仓库。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 
+#: src/features/projects/components/computer-rule-file-import.tsx:252
+msgid "You are offline. Reconnect and try again."
+msgstr "{'de': 'Du bist offline. Stelle die Verbindung wieder her und versuche es erneut.', 'es': 'Estás sin conexión. Vuelve a conectarte e inténtalo de nuevo.', 'fr': 'Vous êtes hors ligne. Reconnectez-vous et réessayez.', 'it': 'Sei offline. Riconnettiti e riprova.', 'ja': 'オフラインです。再接続してからもう一度お試しください。', 'pl': 'Jesteś offline. Połącz się ponownie i spróbuj jeszcze raz.', 'pt': 'Você está offline. Reconecte-se e tente novamente.', 'zh': '你已离线。请重新连接后重试。'}"
+
 #: src/features/chat/thread/composer-input.tsx:1116
 #: src/features/chat/thread/composer-input.tsx:1241
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
@@ -39881,7 +39894,7 @@ msgstr "你的电脑正忙。请稍后重试。"
 msgid "Your computer is offline. Open Neore on it and try again."
 msgstr "你的电脑已离线。请在其上打开 Neore 后重试。"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:289
+#: src/features/projects/components/computer-rule-file-import.tsx:420
 msgid "Your computers could not be loaded."
 msgstr "无法加载你的电脑。"
 

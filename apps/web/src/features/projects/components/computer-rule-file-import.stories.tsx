@@ -33,8 +33,8 @@ const meta = {
     // The editor's import, run at once and always still wanted.
     args: {
         disabled: false,
-        runImport: fn((read: (isCurrent: () => boolean) => Promise<unknown>) => {
-            read(() => true).catch(() => undefined);
+        runImport: fn((read: (isCurrent: () => boolean, discarded: AbortSignal) => Promise<unknown>) => {
+            read(() => true, new AbortController().signal).catch(() => undefined);
         }),
     },
     component: ComputerRuleFileImport,
@@ -209,6 +209,66 @@ export const RequestLost: Story = {
 
         await expect(await canvas.findByRole("alert")).toHaveTextContent("Lost track of the request to Studio. Try again.");
         await expect(canvas.getByRole("button", { name: "Find files" })).toBeEnabled();
+    },
+};
+
+/** The one paired computer has stopped checking in: Find files cannot be clicked, and the panel says why. */
+export const ComputerOffline: Story = {
+    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), devices([{ ...desktop, lastSeenAt: ago(3_600_000) }])) } } },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(canvas.getByRole("button", { name: "Import from this computer" }));
+
+        const find = await canvas.findByRole("button", { name: "Find files" });
+
+        await expect(find.hasAttribute("disabled") || find.getAttribute("aria-disabled") === "true").toBe(true);
+        await expect(find).toHaveAccessibleDescription("Studio is offline. Open the desktop app on it to continue.");
+    },
+};
+
+/** The read's answer left a ticked file out: what came is imported, the one left out stays ticked with a note. */
+export const FileLeftOut: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    devices([desktop]),
+                    lunora(api.devices.global_instructions.startGlobalInstructionsCall, ({ files }) => {
+                        return { callId: files ? "read-1" : "list-1" };
+                    }),
+                    lunora(api.devices.global_instructions.getGlobalInstructionsCall, ({ callId }) =>
+                        callId === "read-1"
+                            ? {
+                                  files: [
+                                      {
+                                          id: "claude" as const,
+                                          name: "CLAUDE.md",
+                                          path: "~/.claude/CLAUDE.md",
+                                          status: "read" as const,
+                                          text: "# Global rules",
+                                      },
+                                  ],
+                                  status: "completed" as const,
+                              }
+                            : { files: LISTED, status: "completed" as const },
+                    ),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(canvas.getByRole("button", { name: "Import from this computer" }));
+        await userEvent.click(await canvas.findByRole("button", { name: "Find files" }));
+        await userEvent.click(await canvas.findByRole("button", { name: "Import selected" }));
+
+        const left = within(await canvas.findByRole("list", { name: "Files not imported" }));
+
+        await expect(left.getByText("~/.codex/AGENTS.md")).toBeInTheDocument();
+        await expect(left.getByText("(not in the computer's answer: try again)")).toBeInTheDocument();
     },
 };
 

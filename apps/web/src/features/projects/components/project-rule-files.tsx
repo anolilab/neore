@@ -477,6 +477,8 @@ const ProjectRuleFiles: FC<{
     const latest = useRef({ draft, keptLegacyId, revision: data?.revision ?? "", savedFiles });
     // Bumped by Discard: an import still reading then adds nothing.
     const importGeneration = useRef(0);
+    // Aborted by Discard, so an import waiting on someone else (a computer's approval) ends then, not when they answer.
+    const importDiscard = useRef<AbortController | undefined>(undefined);
     // Bumped by each import that adds drafts: a save it lands during keeps them, and does not say the list is saved.
     const importsApplied = useRef(0);
     // Bumped by each import that leaves a note, drafts or not: a save it lands during keeps the note.
@@ -607,19 +609,24 @@ const ProjectRuleFiles: FC<{
     /**
      * Adds what `read` imports as unsaved drafts, up to the project's limit; the person saves them like any edit. One
      * import at a time: one asked for while another reads is dropped. `onApplied` hears the paths added, so a panel
-     * keeps those the project had no room for picked.
+     * keeps those the project had no room for picked. `discarded` is aborted by a Discard, which frees the editor at once.
      */
-    const runImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>, onApplied?: (added: ReadonlyArray<string>) => void) => {
+    const runImport = (
+        read: (isCurrent: () => boolean, discarded: AbortSignal) => Promise<RepoImportResult | null>,
+        onApplied?: (added: ReadonlyArray<string>) => void,
+    ) => {
         if (importing) {
             return;
         }
 
         const generation = importGeneration.current;
+        const discard = new AbortController();
 
         const isCurrent = () => generation === importGeneration.current;
 
+        importDiscard.current = discard;
         setImporting(true);
-        read(isCurrent)
+        read(isCurrent, discard.signal)
             // An import a Discard overtook adds nothing.
             .then((result) => {
                 if (!result || !isCurrent()) {
@@ -642,7 +649,14 @@ const ProjectRuleFiles: FC<{
                 importNotes.current += 1;
                 setImportNote(t`The files could not be read.`);
             })
-            .then(() => setImporting(false))
+            // One a Discard overtook was freed by it: another may be running by now.
+            .then(() => {
+                if (isCurrent()) {
+                    setImporting(false);
+                }
+
+                return undefined;
+            })
             .catch(() => undefined);
     };
 
@@ -998,6 +1012,9 @@ const ProjectRuleFiles: FC<{
                                         refetch().catch(() => undefined);
                                         // An import still reading is discarded with the rest.
                                         importGeneration.current += 1;
+                                        importDiscard.current?.abort();
+                                        importDiscard.current = undefined;
+                                        setImporting(false);
                                         setDraft(null);
                                         setImportNote("");
                                         setBlocked(false);

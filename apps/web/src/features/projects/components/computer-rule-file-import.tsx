@@ -9,7 +9,7 @@ import { Checkbox } from "@neore/ui/components/checkbox";
 import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { formatNumber } from "@neore/ui/utils/locale-format";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { onlineManager, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Laptop } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -28,19 +28,38 @@ type FileEntry = {
     path: string;
     reason?: string;
     size?: number;
-    status: "found" | "left_out" | "missing" | "read" | "refused" | "too_large";
+    // `unanswered`: asked for, but the answer did not carry it (or carried it without its text).
+    status: "found" | "left_out" | "missing" | "read" | "refused" | "too_large" | "unanswered";
     text?: string;
 };
 
-type Failure = "busy" | "denied" | "expired" | "failed" | "gone" | "limited" | "lost" | "offline" | "outdated" | "unknown" | "unreadable";
+type Failure = "busy" | "denied" | "disconnected" | "expired" | "failed" | "gone" | "limited" | "lost" | "offline" | "outdated" | "unknown" | "unreadable";
 
-type RunImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>, onApplied?: (added: ReadonlyArray<string>) => void) => void;
+type RunImport = (
+    read: (isCurrent: () => boolean, discarded: AbortSignal) => Promise<RepoImportResult | null>,
+    onApplied?: (added: ReadonlyArray<string>) => void,
+) => void;
 
-/** A call and the computer it went to: what it found or read is that computer's, never another's. */
-type CallOn = { callId: string; deviceId: string };
+/**
+ * A call and the computer it went to, by the name it had then: what it found or read is that computer's, never
+ * another's, even once it leaves the list. `asked` is what a read asked for.
+ */
+type CallOn = { asked?: FileId[]; callId: string; deviceId: string; name: string; startedAt: number };
 
 /** How often whether a computer is online is read again, so one that stops checking in shows offline. */
 const PRESENCE_CHECK_MS = 10_000;
+
+/**
+ * How often a call still waiting is read once, outside its live query: a subscription Lunora refused or lost after its
+ * first push leaves that query on its last status, and its refetch answers from that push, never the server.
+ */
+const STATUS_CHECK_MS = 15_000;
+
+/**
+ * The backend's deadline for a call, approval and run (`DEVICE_CALL_DEADLINE_MS`, `devices/lib/constants.ts`), and a
+ * margin for the sweep that marks it expired: a call still waiting after both is one this panel lost track of.
+ */
+const CALL_DEADLINE_MS = 5 * 60_000 + 30_000;
 
 /** A refusal by its code (`devices/global-instructions.ts`): the backend's own (`data.code`) before the general one. */
 const REFUSALS: Readonly<Record<string, Failure>> = {
@@ -48,6 +67,8 @@ const REFUSALS: Readonly<Record<string, Failure>> = {
     DEVICE_OFFLINE: "offline",
     DEVICE_OUTDATED: "outdated",
     NOT_FOUND: "gone",
+    // Lunora's online-only write, refused while the connection is down rather than queued for the reconnect.
+    OFFLINE_NOT_QUEUED: "disconnected",
     TOO_MANY_REQUESTS: "limited",
 };
 
@@ -61,9 +82,15 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
+    const offlineId = useId();
     const deviceList = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const devices = deviceList.data;
-    const start = useMutation(crpc.devices.global_instructions.startGlobalInstructionsCall.mutationOptions());
+    const queryClient = useQueryClient();
+    // Each call prompts the desktop: refused offline, never queued, paused or retried, so none is sent after the person
+    // left the panel.
+    const start = useMutation(
+        crpc.devices.global_instructions.startGlobalInstructionsCall.mutationOptions({ networkMode: "always", retry: 0 }, { onlineOnly: true }),
+    );
     const [chosenId, setChosenId] = useState<string | undefined>(undefined);
     const [listing, setListing] = useState<CallOn | undefined>(undefined);
     const [reading, setReading] = useState<CallOn | undefined>(undefined);
@@ -84,9 +111,13 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const listCallId = listing?.deviceId === chosen?._id ? listing?.callId : undefined;
     const active = reading ?? (listCallId === undefined ? undefined : listing);
     const activeCallId = active?.callId;
-    const { data: call, isError: callLost } = useQuery(
+    const { data: call, isError: callUnreadable } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(activeCallId ? { callId: activeCallId as Id<"deviceCalls"> } : skipToken),
     );
+    // Past its deadline and still not ended: the backend has given up on it, so this panel does too.
+    const overdue =
+        active !== undefined && now > active.startedAt + CALL_DEADLINE_MS && (call === undefined || call?.status === "pending" || call?.status === "claimed");
+    const callLost = callUnreadable || overdue;
     const readCallId = reading?.callId;
     const { data: listed } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(listCallId ? { callId: listCallId as Id<"deviceCalls"> } : skipToken),
@@ -107,7 +138,59 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     }, [found]);
 
     const readFiles: FileEntry[] | undefined = readCallId && call?.status === "completed" ? call.files : undefined;
-    const notRead = readFiles?.filter((file) => file.status !== "read") ?? [];
+    const isRead = (file: FileEntry): boolean => file.status === "read" && file.text !== undefined;
+    // What did not come: each file the answer says was not read, then each asked for that it read without text or left out.
+    const notRead: FileEntry[] = readFiles
+        ? (reading?.asked ?? readFiles.map((file) => file.id)).flatMap((id): FileEntry[] => {
+              const answered = readFiles.find((file) => file.id === id);
+
+              if (answered && isRead(answered)) {
+                  return [];
+              }
+
+              if (answered && answered.status !== "read") {
+                  return [answered];
+              }
+
+              const listedFile = found?.find((file) => file.id === id);
+
+              return [{ id, name: listedFile?.name ?? id, path: listedFile?.path ?? id, status: "unanswered" }];
+          })
+        : [];
+
+    // A call still waiting is read once now and then, outside its live query, so a subscription that went quiet does not
+    // keep the panel waiting on its last push.
+    const waitingCallId = active?.callId;
+    const stillWaiting = waitingCallId !== undefined && !callLost && (call === undefined || call?.status === "pending" || call?.status === "claimed");
+
+    useEffect(() => {
+        if (!stillWaiting || waitingCallId === undefined) {
+            return undefined;
+        }
+
+        const args = { callId: waitingCallId as Id<"deviceCalls"> };
+        const liveKey = crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(args).queryKey;
+        const statusRead = crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(args, { live: false });
+        const timer = setInterval(() => {
+            if (typeof statusRead.queryFn !== "function") {
+                return;
+            }
+
+            Promise.resolve(statusRead.queryFn({ queryKey: statusRead.queryKey } as never))
+                .then((fresh) => {
+                    // Only an end is taken: a waiting status says nothing the live query does not.
+                    if (fresh && fresh.status !== "pending" && fresh.status !== "claimed") {
+                        queryClient.setQueryData(liveKey, fresh);
+                    }
+
+                    return undefined;
+                })
+                // Not read this time: the next try, or the deadline, settles it.
+                .catch(() => undefined);
+        }, STATUS_CHECK_MS);
+
+        return () => clearInterval(timer);
+    }, [crpc, queryClient, stillWaiting, waitingCallId]);
 
     // Answered, or no longer to be heard of (its status could not be read): either way the import waits no more.
     const readEnded = readCallId !== undefined && (callLost || (call !== undefined && call?.status !== "pending" && call?.status !== "claimed"));
@@ -133,8 +216,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     );
 
     const online = chosen !== undefined && isDeviceOnline(chosen.lastSeenAt, now);
-    // The computer asked, by its own name, even once another takes its place in the list.
-    const name = (desktops.find((device) => device._id === active?.deviceId) ?? chosen)?.name ?? "";
+    // The computer asked, by the name it had when asked, even once it leaves the list and another takes its place.
+    const name = active?.name ?? chosen?.name ?? "";
     const callFailure: Failure | undefined = (() => {
         if (callLost) {
             return "lost";
@@ -155,6 +238,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const failureText: Record<Failure, string> = {
         busy: t`${name} is busy with other requests. Try again in a moment.`,
         denied: t`The request was denied on ${name}.`,
+        disconnected: t`You are offline. Reconnect and try again.`,
         expired: t`${name} did not answer in time. Open the desktop app on it and try again.`,
         failed: t`${name} could not read the files.`,
         gone: t`This computer is no longer paired. Pair it again in Settings → Devices.`,
@@ -172,15 +256,24 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         }
 
         const deviceId = chosen._id;
+        const deviceName = chosen.name;
 
         // Kept to this computer, so another coming online does not take its place under the files it found.
         setChosenId(deviceId);
         setListing(undefined);
         setReading(undefined);
         setStartFailure(undefined);
+
+        // Refused here rather than sent: an online-only start would fail anyway.
+        if (!onlineManager.isOnline()) {
+            setStartFailure("disconnected");
+
+            return;
+        }
+
         start
             .mutateAsync({ deviceId: deviceId as Id<"devices"> })
-            .then(({ callId }) => setListing({ callId, deviceId }))
+            .then(({ callId }) => setListing({ callId, deviceId, name: deviceName, startedAt: Date.now() }))
             .catch((error: unknown) => setStartFailure(failureOf(error)));
     };
 
@@ -190,19 +283,38 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             return;
         }
 
-        // The computer that found them, whatever is chosen by the time it answers.
-        const { deviceId } = listing;
-        let came: FileEntry[] = [];
-        let allRead = false;
-
         // The previous read's ended row must not answer this one.
         setReading(undefined);
         setStartFailure(undefined);
+
+        if (!onlineManager.isOnline()) {
+            setStartFailure("disconnected");
+
+            return;
+        }
+
+        // The computer that found them, whatever is chosen by the time it answers.
+        const { deviceId, name: deviceName } = listing;
+        let came: FileEntry[] = [];
+        let allRead = false;
+
         runImport(
-            async (isCurrent) => {
+            async (isCurrent, discarded) => {
                 const answered = new Promise<FileEntry[] | null>((resolve) => {
                     pendingRead.current = resolve;
                 });
+
+                // A Discard ends the read at once: the computer may still answer, but what it sends is dropped, and
+                // the panel no longer waits on it.
+                discarded.addEventListener(
+                    "abort",
+                    () => {
+                        pendingRead.current?.(null);
+                        pendingRead.current = undefined;
+                        setReading(undefined);
+                    },
+                    { once: true },
+                );
                 // A close settles `answered` with nothing: the import ends then, even while the start still waits.
                 const started = await Promise.race([
                     start.mutateAsync({ deviceId: deviceId as Id<"devices">, files }).catch((error: unknown) => {
@@ -219,7 +331,12 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     return null;
                 }
 
-                setReading({ callId: started.callId, deviceId });
+                // Discarded while the start was on its way: the race above already ended this read.
+                if (discarded.aborted) {
+                    return null;
+                }
+
+                setReading({ asked: files, callId: started.callId, deviceId, name: deviceName, startedAt: Date.now() });
 
                 const answer = await answered;
 
@@ -228,8 +345,9 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     return null;
                 }
 
-                came = answer.flatMap((file) => (file.status === "read" && file.text !== undefined ? [file] : []));
-                allRead = answer.every((file) => file.status === "read");
+                came = answer.filter((file) => isRead(file));
+                // Each file asked for, not each the answer names: one it left out stays ticked, with a note.
+                allRead = files.every((id) => came.some((file) => file.id === id));
 
                 if (came.length === 0) {
                     return null;
@@ -268,6 +386,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         read: "",
         refused: t`(refused: it links outside your home folder or is not a text file)`,
         too_large: t`(too large)`,
+        unanswered: t`(not in the computer's answer: try again)`,
     };
 
     const progress = (() => {
@@ -283,7 +402,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             <h4 className="text-sm font-medium" id={headingId} tabIndex={-1}>
                 {t`Import from this computer`}
             </h4>
-            {deviceList.isError && !devices && (
+            {/* Said even over a list loaded before: the computers shown may no longer be the person's. */}
+            {deviceList.isError && (
                 <div className="flex flex-wrap items-center gap-2">
                     <p className="text-destructive text-sm" role="alert">
                         {t`Your computers could not be loaded.`}
@@ -370,6 +490,12 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     {failureText[failure]}
                 </p>
             )}
+            {/* Why Find files cannot be clicked, with one computer too, where no list says it is offline. */}
+            {chosen && !online && !waiting && (
+                <p className="text-muted-foreground text-sm" id={offlineId}>
+                    {t`${chosen.name} is offline. Open the desktop app on it to continue.`}
+                </p>
+            )}
             <div className="flex flex-wrap gap-2">
                 {found && found.some((file) => file.status === "found") ? (
                     <Button
@@ -383,7 +509,14 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     </Button>
                 ) : (
                     chosen && (
-                        <Button disabled={disabled || waiting || !online} focusableWhenDisabled onClick={look} size="sm" type="button">
+                        <Button
+                            aria-describedby={!online && !waiting ? offlineId : undefined}
+                            disabled={disabled || waiting || !online}
+                            focusableWhenDisabled
+                            onClick={look}
+                            size="sm"
+                            type="button"
+                        >
                             {t`Find files`}
                         </Button>
                     )
