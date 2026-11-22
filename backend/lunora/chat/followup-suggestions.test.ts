@@ -164,6 +164,21 @@ describe("one paid call per reply", () => {
         await expect(hold(claimedAt + 1)).resolves.toBe(false);
     });
 
+    // A retry whose claim is gone (another run took and released the reply) renews nothing: it must not bring the claim back.
+    it("does not renew a reply whose claim row is gone", async () => {
+        const claimedAt = (await admit("reply-gone")) as number;
+
+        await harness.action(
+            async (context: any) => await context.runMutation(releaseFollowupSuggestions, { claimedAt, lastMessageId: "reply-gone", threadId, userId: OWNER }),
+        );
+
+        await expect(
+            harness.action(
+                async (context: any) => await context.runMutation(holdFollowupClaim, { claimedAt, lastMessageId: "reply-gone", threadId, userId: OWNER }),
+            ),
+        ).resolves.toBe(false);
+    });
+
     it("the next reply is admitted on its own claim", async () => {
         await admit("reply-1");
 
@@ -265,8 +280,8 @@ describe("a late run cannot replace a newer cache", () => {
 
     it("an earlier sibling of the same turn that finishes after a later one is refused", async () => {
         await cache("sibling-later", 5, ["later?"], 2000);
-        await cache("sibling-earlier", 5, ["earlier?"], 1000);
 
+        await expect(cache("sibling-earlier", 5, ["earlier?"], 1000)).resolves.toBe(false);
         await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-later", suggestions: ["later?"] });
     });
 
@@ -356,6 +371,10 @@ describe("a late run cannot replace a newer cache", () => {
             lastMessageId: `reply-${FOLLOWUP_CACHE_ROWS}`,
             suggestions: [`s${FOLLOWUP_CACHE_ROWS}?`],
         });
+
+        // A reply older than every kept one is refused, and nothing is evicted for it.
+        await expect(cache("reply-stale", 0, ["stale?"])).resolves.toBe(false);
+        await expect(cached("reply-1")).resolves.toEqual({ lastMessageId: "reply-1", suggestions: ["s1?"] });
     });
 
     it("a newer reply on the selected branch still refuses an older one on it", async () => {

@@ -268,7 +268,9 @@ modelProxyRouter.openapi(
                 const cachedTokens = usage?.inputTokens?.cacheRead ?? 0;
                 const reasoningTokens = usage?.outputTokens?.reasoning ?? 0;
 
-                const pricing = await pricingRead;
+                // A pricing read that fails after the call succeeded costs nothing here: the provider's usage is still recorded as returned.
+                // Read through the catch path, a failure would record the cancellation estimate instead of this call's actual usage.
+                const pricing = await pricingRead.catch(() => null);
                 const costMicrodollars = pricing ? calculateCost(pricing, { cachedTokens, completionTokens, promptTokens, reasoningTokens }) : 0;
 
                 // Non-blocking usage tracking

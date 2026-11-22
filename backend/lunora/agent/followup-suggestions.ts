@@ -7,7 +7,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
+import { claimFence, claimRow, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { isLocalBrowserModel, LOCAL_BROWSER_PROVIDER, loadCustomProviders } from "../chat/lib/local-turn";
 import { loadActivePathTail } from "./branch-rows";
@@ -194,17 +194,18 @@ export const admitFollowupSuggestions = internalMutation
 export const holdFollowupClaim = internalMutation
     .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
     .output(v.boolean())
-    .mutation(
-        async ({ args: { claimedAt, lastMessageId, threadId, userId }, ctx: context }) =>
-            await holdClaim(
-                context,
-                FOLLOWUP_CLAIM_SCOPE,
-                `${threadId}:${lastMessageId}`,
-                claimedAt,
-                holdTtlFrom(claimedAt, FOLLOWUP_CLAIM_TTL_MS, context.now),
-                userId,
-            ),
-    );
+    .mutation(async ({ args: { claimedAt, lastMessageId, threadId, userId }, ctx: context }) => {
+        const key = `${threadId}:${lastMessageId}`;
+        // Renewed only while this run's own claim is live. A claim row that is gone (another run took and released the reply) or has
+        // lapsed is not brought back, so the retry that lost its claim drops its write.
+        const live = await claimRow(context, FOLLOWUP_CLAIM_SCOPE, key);
+
+        if (live?.claimedAt !== claimedAt) {
+            return false;
+        }
+
+        return await holdClaim(context, FOLLOWUP_CLAIM_SCOPE, key, claimedAt, holdTtlFrom(claimedAt, FOLLOWUP_CLAIM_TTL_MS, context.now), userId);
+    });
 
 export const releaseFollowupSuggestions = internalMutation
     .input({ claimedAt: v.number(), lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
@@ -323,7 +324,14 @@ export const followupInFlight = internalQuery
 export const FOLLOWUP_CACHE_ROWS = 20;
 
 /** Newer replies first: the later turn, then the later sibling of the same turn, then the row written later. */
-export const newerFirst = <Row extends { createdAt: number; order?: number; replyAt?: number }>(a: Row, b: Row): number =>
+/** How a reply ranks: its turn, its sibling time, and when it was written. A stored row and an incoming reply both rank this way. */
+export interface ReplyRank {
+    createdAt: number;
+    order?: number;
+    replyAt?: number;
+}
+
+export const newerFirst = (a: ReplyRank, b: ReplyRank): number =>
     (b.order ?? -1) - (a.order ?? -1) || (b.replyAt ?? -1) - (a.replyAt ?? -1) || b.createdAt - a.createdAt;
 
 export const getCachedFollowupSuggestions = internalQuery
@@ -427,13 +435,16 @@ export const cacheFollowupSuggestions = internalMutation
             return false;
         }
 
-        // The thread keeps its newest replies: the oldest rows make room for this one.
-        await Promise.all(
-            stored
-                .toSorted(newerFirst)
-                .slice(FOLLOWUP_CACHE_ROWS - 1)
-                .map(async (row) => await context.db.delete("followupSuggestions", row._id)),
-        );
+        // The thread keeps its newest replies. A full thread refuses a reply that ranks below every row it keeps (nothing is evicted for
+        // it, and no unit is taken); otherwise the lowest-ranked row makes room for this one.
+        const ranked = stored.toSorted(newerFirst);
+        const lastKept = ranked[FOLLOWUP_CACHE_ROWS - 1];
+
+        if (lastKept && newerFirst({ createdAt: now, order, replyAt }, lastKept) >= 0) {
+            return false;
+        }
+
+        await Promise.all(ranked.slice(FOLLOWUP_CACHE_ROWS - 1).map(async (row) => await context.db.delete("followupSuggestions", row._id)));
 
         await context.db.insert("followupSuggestions", {
             createdAt: now,

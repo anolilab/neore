@@ -29,7 +29,8 @@ export const resolveBackgroundModel = async (
     if (!userId) {
         load = Promise.resolve({});
     } else if (sharedWithCaller) {
-        load = loadSharedModelFilterRules(ctx, sharedWithCaller, userId, planUserId);
+        // The plan that grades the paid fallback is the payer's, the same payer `billedUserId` names below.
+        load = loadSharedModelFilterRules(ctx, sharedWithCaller, userId, planUserId ?? userId);
     } else {
         load = loadModelFilterRules(ctx, userId, planUserId);
     }

@@ -4659,7 +4659,16 @@ export const retryFollowupCache = internalAction
 
         const written = await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, write);
 
+        // Refused (a newer reply's suggestions are stored): the renewed claim goes, as the generator's does, so a later run is not blocked.
+        // A write that threw keeps its claim instead, for the scheduled retry.
         if (!written) {
+            await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                claimedAt,
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+                userId: chargedUserId,
+            });
+
             return;
         }
 
@@ -4709,10 +4718,14 @@ export const retryFollowupCache = internalAction
 
 export const generateFollowupSuggestionsForThread = internalAction
     .input({
+        // The author the newest reply's row carries, when it is not `userId`: an approved reply's final row is saved by the owner's
+        // continuation even when a collaborator started the run. Unset: `userId` wrote it.
+        replyUserId: v.optional(v.string().max(MAX_LENGTH.id)),
+        // The run's own actor: the actor gate, billing and the model's filters.
         threadId: v.string(),
         userId: v.string(),
     })
-    .action(async ({ args: { threadId, userId }, ctx: context }) => {
+    .action(async ({ args: { replyUserId, threadId, userId }, ctx: context }) => {
         chatLogger.debug(`[generateFollowupSuggestionsForThread] Starting`, { threadId, userId });
 
         // The reply's paid claim, once taken. A failure before its cache lands gives the claim back (see the catch).
@@ -4836,7 +4849,7 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             // In a shared thread the newest reply may be another member's: that member's own run pays for it, so this run must not
             // charge the member who scheduled it. Rows that hide their user id are not compared.
-            if (newest.userId !== undefined && newest.userId !== userId) {
+            if (newest.userId !== undefined && newest.userId !== (replyUserId ?? userId)) {
                 chatLogger.debug(`[generateFollowupSuggestionsForThread] The newest reply is another member's, skipping: ${threadId}`);
 
                 return;
@@ -5030,6 +5043,15 @@ export const generateFollowupSuggestionsForThread = internalAction
                         userId: ownerUserId,
                     }),
                 );
+
+                // A reply the local browser model wrote stays on the device: no cloud model is called for it, and nothing is charged for it.
+                if (localRowIds.has(newest._id)) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The newest reply is local, not suggesting: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
                 // A local reply's prompt was on the device too: the user rows of its turn are left out with it.
                 const localTurns = new Set(modelRows.filter((row) => localRowIds.has(row._id)).map((row) => row.order));
                 const modelMessages = docsToModelMessages(

@@ -1268,7 +1268,11 @@ export const continueAfterToolApproval = internalAction
             // reply-author check: a collaborator's approved reply is theirs. Owner-started replies keep the owner.
             if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped && resumed.savedReply === true) {
                 await ctx.scheduler
-                    .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId: config.startedBy ?? userId })
+                    .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
+                        replyUserId: userId,
+                        threadId,
+                        userId: config.startedBy ?? userId,
+                    })
                     .catch((error: unknown) => {
                         streamLogger.warn(`[ToolApproval] Could not queue the follow-up suggestions of ${threadId}:`, error);
                     });
