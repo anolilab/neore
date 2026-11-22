@@ -46,15 +46,16 @@ export interface ProviderCacheReadings {
  * `lib/cancelled-usage.ts`); an estimate carries no cache count, so it would book every prompt token as a miss.
  *
  * Chat only: speech, transcription, music, video and embeddings rows store characters, seconds, a generation count or
- * embedding tokens in `prompt_tokens`, with no completion tokens, and realtime rows have `session_type = 'realtime'`.
- * `usage_log` keeps no operation column, so a chat row is one with completion tokens in a text session; a chat reply
- * with no output at all is left out with them.
+ * embedding tokens in `prompt_tokens`. A row is chat when `operation = 'chat'` (migration 0017). A row with no operation
+ * (written before that column, or by a writer that passes none) counts when it has completion or cached tokens, which
+ * none of the non-chat writers record; realtime rows have `session_type = 'realtime'`. So the 90 days of older rows
+ * still count, and an empty chat reply that read the cache is kept.
  *
  * Migration 0017's partial index has this clause as its WHERE and every column it reads: a term the index adds that this
  * lacks, or a column it reads that the index leaves out, sends both queries back to the table. Change both together.
  */
 export const answered = (since: string): string =>
-    `created_at >= ${since} AND cache_hit = 0 AND error_code IS NULL AND prompt_tokens > 0 AND completion_tokens > 0 AND session_type = 'text' AND finish_reason IS NOT 'cancelled'`;
+    `created_at >= ${since} AND cache_hit = 0 AND error_code IS NULL AND prompt_tokens > 0 AND session_type = 'text' AND finish_reason IS NOT 'cancelled' AND (operation = 'chat' OR (operation IS NULL AND (completion_tokens > 0 OR cached_tokens > 0)))`;
 
 /** Pairs are judged for caching over the longest window, so a complete drop inside a shorter window still shows. */
 const ELIGIBILITY_DAYS = Math.max(...PROVIDER_CACHE_WINDOW_DAYS);

@@ -86,7 +86,10 @@ const AdminProviderCacheRow = () => {
                 </p>
                 {readings.isError ? (
                     <p className="text-destructive text-sm" role="alert">
-                        {t`The provider cache readings could not be loaded.`}
+                        {/* A failed refresh keeps the last readings on screen: say they are older, and from when. */}
+                        {data === undefined
+                            ? t`The provider cache readings could not be loaded.`
+                            : t`The provider cache readings could not be refreshed. The figures below are from ${formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })}.`}
                     </p>
                 ) : null}
                 <dl className="grid grid-cols-2 gap-4 md:grid-cols-3">

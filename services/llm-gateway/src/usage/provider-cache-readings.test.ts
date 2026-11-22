@@ -22,6 +22,8 @@ interface Row {
     finishReason?: string;
     hoursAgo: number;
     model: string;
+    /** `null` for a row written before the column, or by a writer that passes none. */
+    operation?: string | null;
     prompt: number;
     provider?: string;
     sessionType?: string;
@@ -35,8 +37,8 @@ const usageLog = (): { db: DatabaseSync; insert: (row: Row) => void } => {
     const insert = (row: Row): void => {
         rowCount += 1;
         db.prepare(
-            `INSERT INTO usage_log (id, request_id, user_id, model_id, provider, model_api_id, prompt_tokens, completion_tokens, cached_tokens, cache_hit, error_code, finish_reason, session_type, created_at)
-             VALUES (?, ?, 'user-1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO usage_log (id, request_id, user_id, model_id, provider, model_api_id, prompt_tokens, completion_tokens, cached_tokens, cache_hit, error_code, finish_reason, session_type, operation, created_at)
+             VALUES (?, ?, 'user-1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
             `row-${rowCount}`,
             `request-${rowCount}`,
@@ -50,6 +52,7 @@ const usageLog = (): { db: DatabaseSync; insert: (row: Row) => void } => {
             row.errorCode ?? null,
             row.finishReason ?? null,
             row.sessionType ?? "text",
+            row.operation === undefined ? "chat" : row.operation,
             sqliteTime(NOW - row.hoursAgo * HOUR_MS),
         );
     };
@@ -187,19 +190,34 @@ describe("readProviderCacheReadings", () => {
         expect(quarterStart("2026-11-21 09:45")).toBe("2026-11-21T09:45:00.000Z");
     });
 
-    it("leaves out rows that are not chat prompts: no completion tokens, or a realtime session", async () => {
+    it("leaves out rows that are not chat prompts", async () => {
         const { db, insert } = usageLog();
 
         insert({ cached: 800, hoursAgo: 1, model: "claude", prompt: 1000 });
-        // Music stores one generation, video its seconds, speech its characters, embeddings their tokens: none has output tokens.
-        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "music-model", prompt: 1 });
-        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "embedding-model", prompt: 90_000 });
-        insert({ cached: 0, hoursAgo: 1, model: "gpt-realtime", prompt: 4000, sessionType: "realtime" });
+        // Music stores one generation, speech its characters (no operation, no output); embeddings say so; realtime is its own session.
+        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "music-model", operation: null, prompt: 1 });
+        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "tts-model", operation: null, prompt: 3000 });
+        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "embedding-model", operation: "embeddings", prompt: 90_000 });
+        insert({ cached: 0, hoursAgo: 1, model: "gpt-realtime", operation: null, prompt: 4000, sessionType: "realtime" });
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
 
         expect(readings.all).toEqual({ cachedTokens: 800, promptTokens: 1000, requests: 1 });
         expect(readings.models.map((model) => model.modelId)).toEqual(["claude"]);
+    });
+
+    it("keeps an empty chat reply, and an older row with no operation that has output or cache reads", async () => {
+        const { db, insert } = usageLog();
+
+        // A chat call whose reply was empty: no output tokens, but the provider read 900 from its cache.
+        insert({ cached: 900, completion: 0, hoursAgo: 1, model: "claude", prompt: 1000 });
+        // Written before `operation` existed: kept by its output tokens, or by its cache reads.
+        insert({ cached: 0, hoursAgo: 1, model: "claude", operation: null, prompt: 1000 });
+        insert({ cached: 500, completion: 0, hoursAgo: 1, model: "claude", operation: null, prompt: 1000 });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.all).toEqual({ cachedTokens: 1400, promptTokens: 3000, requests: 3 });
     });
 
     it("reads both queries from migration 0017's covering index alone", () => {

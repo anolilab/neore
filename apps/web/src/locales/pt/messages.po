@@ -3568,7 +3568,7 @@ msgstr "Todos os prompts"
 #. placeholder {0}: formatNumber(data.all.requests, locale)
 #. placeholder {1}: formatNumber(data.all.promptTokens, locale)
 #. placeholder {2}: shareText(data.all, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:108
+#: src/features/admin/components/admin-provider-cache-row.tsx:111
 msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
 msgstr "Todo o tráfego dos provedores no período, com ou sem cache. Solicitações: {0}. Tokens de prompt: {1}. Servido do cache: {2}."
 
@@ -5769,25 +5769,25 @@ msgstr "por <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "por um colaborador"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:112
+#: src/features/admin/components/admin-provider-cache-row.tsx:115
 msgid "By day, newest first."
 msgstr "Por dia, os mais recentes primeiro."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:134
+#: src/features/admin/components/admin-provider-cache-row.tsx:137
 msgid "By hour"
 msgstr "Por hora"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:136
+#: src/features/admin/components/admin-provider-cache-row.tsx:139
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "Por hora, as mais antigas primeiro. Uma queda que começa na mesma hora em todos os modelos indica uma mudança no que é enviado."
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:171
+#: src/features/admin/components/admin-provider-cache-row.tsx:174
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "Por modelo, os com mais tokens de prompt primeiro: os {0} primeiros de {1} pares de provedor e modelo."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:172
+#: src/features/admin/components/admin-provider-cache-row.tsx:175
 msgid "By model, most prompt tokens first."
 msgstr "Por modelo, os com mais tokens de prompt primeiro."
 
@@ -10058,7 +10058,7 @@ msgstr "Data"
 msgid "Date and time"
 msgstr "Data e hora"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:115
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "Dia"
@@ -17170,7 +17170,7 @@ msgstr "Hosts"
 msgid "hotkey"
 msgstr "tecla de atalho"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:139
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "Hora"
@@ -21309,7 +21309,7 @@ msgstr "Modo {0}, em {1}. Nada começa quando é criado."
 msgid "Mode:"
 msgstr "Modo:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:176
+#: src/features/admin/components/admin-provider-cache-row.tsx:179
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26929,10 +26929,10 @@ msgstr "Prompt otimizado com sucesso"
 msgid "Prompt to run on all models..."
 msgstr "Prompt a executar em todos os modelos..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:98
-#: src/features/admin/components/admin-provider-cache-row.tsx:117
-#: src/features/admin/components/admin-provider-cache-row.tsx:141
-#: src/features/admin/components/admin-provider-cache-row.tsx:179
+#: src/features/admin/components/admin-provider-cache-row.tsx:101
+#: src/features/admin/components/admin-provider-cache-row.tsx:120
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
+#: src/features/admin/components/admin-provider-cache-row.tsx:182
 msgid "Prompt tokens"
 msgstr "Tokens de prompt"
 
@@ -27001,7 +27001,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Confiabilidade comprovada da geração anterior"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:177
+#: src/features/admin/components/admin-provider-cache-row.tsx:180
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -28582,10 +28582,10 @@ msgstr "Solicitando..."
 msgid "Requesting…"
 msgstr "Solicitando…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:102
-#: src/features/admin/components/admin-provider-cache-row.tsx:116
-#: src/features/admin/components/admin-provider-cache-row.tsx:140
-#: src/features/admin/components/admin-provider-cache-row.tsx:178
+#: src/features/admin/components/admin-provider-cache-row.tsx:105
+#: src/features/admin/components/admin-provider-cache-row.tsx:119
+#: src/features/admin/components/admin-provider-cache-row.tsx:143
+#: src/features/admin/components/admin-provider-cache-row.tsx:181
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30621,10 +30621,10 @@ msgstr "Sérvio (Sérvia)"
 msgid "Serif"
 msgstr "Serifada"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:94
-#: src/features/admin/components/admin-provider-cache-row.tsx:118
-#: src/features/admin/components/admin-provider-cache-row.tsx:142
-#: src/features/admin/components/admin-provider-cache-row.tsx:180
+#: src/features/admin/components/admin-provider-cache-row.tsx:97
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
+#: src/features/admin/components/admin-provider-cache-row.tsx:145
+#: src/features/admin/components/admin-provider-cache-row.tsx:183
 msgid "Served from cache"
 msgstr "Servido do cache"
 
@@ -34872,9 +34872,14 @@ msgstr "O prompt vira a entrada do caso e esta resposta vira a resposta esperada
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "O provedor cobra essas solicitações diretamente de você. Quando sabemos o preço do modelo, a taxa de plataforma habitual para chaves próprias é cobrada em créditos."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:89
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
 msgid "The provider cache readings could not be loaded."
 msgstr "Não foi possível carregar as leituras do cache dos provedores."
+
+#. placeholder {0}: formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })
+#: src/features/admin/components/admin-provider-cache-row.tsx:92
+msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
+msgstr "Não foi possível atualizar as leituras do cache dos provedores. Os números abaixo são de {0}."
 
 #: src/features/chat/host/host-composer.tsx:1054
 msgid "The queue is paused. Send next to go on with the queued messages."
