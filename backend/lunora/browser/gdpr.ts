@@ -82,16 +82,22 @@ export const eraseBrowserDataForUser = async (ctx: MutationCtx, userId: string):
 };
 
 /**
- * What one export page may cost, each far under the limit it guards. `PAGE_BYTES`: the JSON the page returns, a workflow step's
- * stored result (1 MiB). `READ_BYTES`: what its reads may cost, against Lunora's 32 MiB per transaction
- * (`DEFAULT_TRANSACTION_LIMITS.maxReadBytes`), charged the whole row, a typed `value` included. `QUERIES`: the reads it makes,
- * so a walk over many empty sessions ends its page too.
+ * What one export page may cost. `PAGE_BYTES`: the JSON the page holds; it ends once that is spent, so it holds at most one read
+ * ({@link BATCH} rows at {@link EXPORT_ROW_BYTES}) more, {@link PAGE_MAX_BYTES}. `READ_BYTES`: what its reads may cost, half of Lunora's
+ * 32 MiB per transaction (`DEFAULT_TRANSACTION_LIMITS.maxReadBytes`), charged the whole row, a typed `value` included. `QUERIES`: the
+ * reads it makes, so a walk over many empty sessions ends its page too.
  */
 const PAGE_BYTES = 512 * 1024;
 const READ_BYTES = 16 * 1024 * 1024;
 const QUERIES = 100;
 
-/** The most a stored row can hold (the shard's SQLite caps a row at 2 MB), so a read of `n` rows costs at most `n` times it. */
+/**
+ * What a read reckons each row it has not seen costs: the largest the page has read, never under `ROW_FLOOR_BYTES`, so small rows
+ * are read a {@link BATCH} at a time and the other 16 MiB of the transaction covers rows a little larger than any seen. A page whose
+ * read passes the transaction's limit all the same is read again `cautious`, at `STORED_ROW_BYTES` a row (the shard's SQLite caps a
+ * row at 2 MB), which no read can pass.
+ */
+const ROW_FLOOR_BYTES = 64 * 1024;
 const STORED_ROW_BYTES = 2 * 1024 * 1024;
 
 /** The JSON of one exported string, or of a list of them; longer ones are cut and named in the row's `truncated`. */
@@ -100,25 +106,69 @@ export const EXPORT_FIELD_BYTES = 4096;
 /** The most one exported row's JSON can be: every field at {@link EXPORT_FIELD_BYTES}, its names and `truncated` besides. */
 export const EXPORT_ROW_BYTES = 48 * 1024;
 
+/** The most a stored page can be: {@link PAGE_BYTES}, and the read that passed it. */
+const PAGE_MAX_BYTES = PAGE_BYTES + BATCH * EXPORT_ROW_BYTES;
+
 const ENCODER = new TextEncoder();
 const jsonBytes = (value: unknown): number => ENCODER.encode(JSON.stringify(value)).length;
 
 const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
 
-/** `text` cut so its JSON fits {@link EXPORT_FIELD_BYTES}, never inside a surrogate pair. */
-const cutText = (text: string): string => {
-    let cut = text.slice(0, EXPORT_FIELD_BYTES);
+/** `text` cut so its JSON fits `maxBytes`, never inside a surrogate pair. */
+const cutText = (text: string, maxBytes = EXPORT_FIELD_BYTES): string => {
+    let cut = text.slice(0, maxBytes);
 
-    while (jsonBytes(cut) > EXPORT_FIELD_BYTES) {
+    while (jsonBytes(cut) > maxBytes) {
         cut = cut.slice(0, Math.floor(cut.length * 0.75));
     }
 
     return LONE_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
 };
 
+/** The most items a list keeps: each needs its quotes and a comma, an empty string at the least. */
+const LIST_ITEMS = Math.floor((EXPORT_FIELD_BYTES - 1) / 3);
+
 /**
- * `row` with each string, and each list of strings, cut to {@link EXPORT_FIELD_BYTES}; `truncated` names the fields cut, so the
- * export says where it holds less than was stored.
+ * `items` whose JSON fits {@link EXPORT_FIELD_BYTES}, each item kept: the short ones whole, the long ones cut to an equal share of
+ * what the short ones leave. `cut` lists the indices cut, and `"<n>-"` when the items from `n` on are left out (past {@link LIST_ITEMS}).
+ */
+const cutList = (items: string[]): { cut: string[]; kept: string[] } => {
+    const listed = items.slice(0, LIST_ITEMS);
+    // The JSON strings' bytes, without the brackets and commas.
+    let left = EXPORT_FIELD_BYTES - 2 - Math.max(0, listed.length - 1);
+    let share = left;
+    let unsized = listed.length;
+
+    const sizes = listed.map((item) => jsonBytes(item)).toSorted((a, b) => a - b);
+
+    for (const size of sizes) {
+        share = Math.floor(left / unsized);
+
+        if (size > share) {
+            break;
+        }
+
+        left -= size;
+        unsized -= 1;
+    }
+
+    const cut: string[] = [];
+    const kept = listed.map((item, index) => {
+        if (jsonBytes(item) <= share) {
+            return item;
+        }
+
+        cut.push(String(index));
+
+        return cutText(item, share);
+    });
+
+    return { cut: listed.length < items.length ? [...cut, `${String(listed.length)}-`] : cut, kept };
+};
+
+/**
+ * `row` with each string, and each list of strings, cut to {@link EXPORT_FIELD_BYTES}; `truncated` names the fields cut, a list's
+ * with the items it cut (`capabilities[0,3]`), so the export says where it holds less than was stored.
  */
 const capped = <R extends Record<string, unknown>>(row: R): R & { truncated?: string[] } => {
     const out: Record<string, unknown> = { ...row };
@@ -129,20 +179,10 @@ const capped = <R extends Record<string, unknown>>(row: R): R & { truncated?: st
             out[key] = cutText(value);
             truncated.push(key);
         } else if (Array.isArray(value) && jsonBytes(value) > EXPORT_FIELD_BYTES) {
-            const kept: string[] = [];
-
-            for (const item of value as string[]) {
-                const cut = cutText(item);
-
-                if (jsonBytes([...kept, cut]) > EXPORT_FIELD_BYTES) {
-                    break;
-                }
-
-                kept.push(cut);
-            }
+            const { cut, kept } = cutList(value as string[]);
 
             out[key] = kept;
-            truncated.push(key);
+            truncated.push(`${key}[${cut.join(",")}]`);
         }
     }
 
@@ -154,26 +194,35 @@ interface Spent {
     bytes: number;
     queries: number;
     readBytes: number;
+    /** What a row not yet read is reckoned to cost ({@link ROW_FLOOR_BYTES}). */
+    rowBytes: number;
 }
 
+const spentNothing = (cautious: boolean): Spent => {
+    return { bytes: 0, queries: 0, readBytes: 0, rowBytes: cautious ? STORED_ROW_BYTES : ROW_FLOOR_BYTES };
+};
+
 /**
- * The most rows the next read may take: none once the page has spent its queries, and never so many that, all at their
- * largest, they would pass the page's read or output budget.
+ * The most rows the next read may take: none once the page has spent its queries or its output, and never so many that, each
+ * at what a row is reckoned to cost, they would pass the page's read budget.
  */
 const nextLimit = (spent: Spent): number => {
-    if (spent.queries >= QUERIES) {
+    if (spent.queries >= QUERIES || spent.bytes >= PAGE_BYTES) {
         return 0;
     }
 
-    return Math.max(
-        0,
-        Math.min(BATCH, Math.floor((READ_BYTES - spent.readBytes) / STORED_ROW_BYTES), Math.floor((PAGE_BYTES - spent.bytes) / EXPORT_ROW_BYTES)),
-    );
+    return Math.max(0, Math.min(BATCH, Math.floor((READ_BYTES - spent.readBytes) / spent.rowBytes)));
 };
 
 const charge = (spent: Spent, rows: ReadonlyArray<unknown>): void => {
     spent.queries += 1;
-    spent.readBytes += rows.reduce<number>((total, row) => total + jsonBytes(row), 0);
+
+    for (const row of rows) {
+        const bytes = jsonBytes(row);
+
+        spent.readBytes += bytes;
+        spent.rowBytes = Math.max(spent.rowBytes, bytes);
+    }
 };
 
 /**
@@ -309,8 +358,9 @@ const collectRows = async <R, E>(
     read: (cursor: string | undefined, limit: number) => Promise<Read<R>>,
     exported: (row: R) => E,
     cursor: string | undefined,
+    cautious: boolean,
 ): Promise<{ next?: string; rows: E[] }> => {
-    const spent: Spent = { bytes: 0, queries: 0, readBytes: 0 };
+    const spent = spentNothing(cautious);
     const rows: E[] = [];
     let at = cursor;
 
@@ -340,8 +390,8 @@ const collectRows = async <R, E>(
  * Walks the user's sessions from `cursor`, reading each one's actions in reads sized by {@link nextLimit}, until the page's
  * budget is spent. It stops only before a read, so the cursor names exactly where the next page starts.
  */
-const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cursor: BrowserExportCursor): Promise<BrowserExportPage> => {
-    const spent: Spent = { bytes: 0, queries: 0, readBytes: 0 };
+const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cursor: BrowserExportCursor, cautious: boolean): Promise<BrowserExportPage> => {
+    const spent = spentNothing(cautious);
     const actions: Infer<typeof vExportAction>[] = [];
     let sessionCursor = cursor.page;
     let actionCursor = cursor.inner;
@@ -411,13 +461,14 @@ const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cur
  * its budgets (`PAGE_BYTES`, `READ_BYTES`, `QUERIES`) and every page makes progress, so the export always finishes.
  */
 export const collectBrowserForExport = internalQuery
-    .input({ cursor: v.optional(vBrowserExportCursor), userId: v.string().max(MAX_LENGTH.id) })
+    // `cautious`: each row reckoned at the largest a row can be, for a page whose read passed the transaction's limit.
+    .input({ cautious: v.optional(v.boolean()), cursor: v.optional(vBrowserExportCursor), userId: v.string().max(MAX_LENGTH.id) })
     .output(vBrowserExportPage)
-    .query(async ({ args: { cursor, userId }, ctx }) => {
+    .query(async ({ args: { cautious = false, cursor, userId }, ctx }) => {
         const phase = cursor?.phase ?? "sessions";
 
         if (phase === "actions") {
-            return await collectActionsPage(ctx, userId, cursor ?? { phase });
+            return await collectActionsPage(ctx, userId, cursor ?? { phase }, cautious);
         }
 
         const at = cursor?.page;
@@ -427,6 +478,7 @@ export const collectBrowserForExport = internalQuery
                 async (from, limit) => await ctx.db.browserSessions.findMany({ cursor: from, limit, where: { userId } }),
                 exportedSession,
                 at,
+                cautious,
             );
 
             return { ...EMPTY_PAGE, next: next === undefined ? { phase: "actions" } : { page: next, phase: "sessions" }, sessions: rows };
@@ -437,6 +489,7 @@ export const collectBrowserForExport = internalQuery
                 async (from, limit) => await ctx.db.browserHumanChecks.findMany({ cursor: from, limit, where: { userId } }),
                 exportedHumanCheck,
                 at,
+                cautious,
             );
 
             return { ...EMPTY_PAGE, humanChecks: rows, next: next === undefined ? { phase: "extensions" } : { page: next, phase: "humanChecks" } };
@@ -446,6 +499,7 @@ export const collectBrowserForExport = internalQuery
             async (from, limit) => await ctx.db.browserExtensions.findMany({ cursor: from, limit, where: { userId } }),
             exportedExtension,
             at,
+            cautious,
         );
 
         return { ...EMPTY_PAGE, extensions: rows, ...(next !== undefined && { next: { page: next, phase: "extensions" as const } }) };
@@ -456,11 +510,15 @@ export const storeBrowserExportPage = internalAction
     .input({ cursor: v.optional(vBrowserExportCursor), key: v.string(), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ next: v.optional(vBrowserExportCursor) }))
     .action(async ({ args: { cursor, key, userId }, ctx }) => {
-        const { next, ...rows } = (await ctx.runQuery(internal.browser.gdpr.collectBrowserForExport, { cursor, userId })) as BrowserExportPage;
+        const read = async (cautious: boolean): Promise<BrowserExportPage> =>
+            (await ctx.runQuery(internal.browser.gdpr.collectBrowserForExport, { cautious, cursor, userId })) as BrowserExportPage;
+        // A page whose rows were larger than any read before them can pass the transaction's read limit: read again, cautiously
+        // (a read that fails for another reason fails again, and the step's retry takes over).
+        const { next, ...rows } = await read(false).catch(async () => await read(true));
         const blob = new Blob([JSON.stringify(rows)], { type: "application/json" });
 
         await withDependency("file storage", () =>
-            ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: 2 * PAGE_BYTES }),
+            ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: PAGE_MAX_BYTES }),
         );
 
         return next === undefined ? {} : { next };

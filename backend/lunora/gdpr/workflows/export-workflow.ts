@@ -333,7 +333,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 async () =>
                     await context.run(internal.usage.gdpr.openUsageExportRun, { requestId: scope, userId }, { dedupId: stepDedupId(scope, "open-export-run") }),
             );
-            const browserPages = await storeAllBrowserPages(async (cursor, page) => {
+            const { cut: browserCut, pages: browserPages } = await storeAllBrowserPages(async (cursor, page) => {
                 const name = `collect-browser-${String(page)}`;
 
                 return (await context.step.do(
@@ -377,6 +377,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         {
                             activity,
                             bots,
+                            browserCut,
                             browserPages,
                             browserPrefix,
                             codingAgentRuns,

@@ -10,6 +10,7 @@
 import { LunoraError } from "lunorash/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { BROWSER_EXPORT_PAGES } from "../../browser/export-pages";
 import { UsageExportError, usageObjectKey } from "../usage-export-steps";
 import { dataExportWorkflowConfig, exportFailureMessage } from "./export-workflow";
 
@@ -377,6 +378,21 @@ describe("data export workflow: browser data", () => {
         expect(generated).not.toHaveProperty("browser");
         // The stored pages are deleted once the export is done.
         expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([prefix]);
+    });
+
+    it("stops a history past its page limit within the workflow's steps, and the export file says it was cut", async () => {
+        // A history that never ends: every page names a next one.
+        stubs["browser_gdpr:storeBrowserExportPage"] = () => {
+            return { next: { phase: "actions" } };
+        };
+
+        await execute();
+
+        expect(ran("browser_gdpr:storeBrowserExportPage")).toHaveLength(BROWSER_EXPORT_PAGES);
+        // The whole run within 1,024 steps, the lowest workflow step limit (a Free plan's), with room to spare.
+        expect(stepNames.length).toBeLessThan(512);
+        expect(ran("gdpr_steps:generateExportFile")[0]?.args).toMatchObject({ browserCut: true, browserPages: BROWSER_EXPORT_PAGES });
+        expect(progressWith("completed")).toHaveLength(1);
     });
 
     it("deletes the stored pages when the export fails", async () => {

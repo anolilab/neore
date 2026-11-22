@@ -7,14 +7,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { browserExportPageKey, browserExportPrefix, type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
-import { collectBrowserForExport, deleteUserBrowserExportPages } from "./gdpr";
+import { collectBrowserForExport, deleteUserBrowserExportPages, EXPORT_FIELD_BYTES, storeBrowserExportPage } from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
 
+/** Every capability cut, and those past what a list can hold left out. */
+const CUT_CAPABILITIES = /^capabilities\[0,1,.*-\]$/u;
+
 let harness: ReturnType<typeof lunoraTest>;
 
-const seed = async (userId: string, actions: number): Promise<void> => {
+const seed = async (userId: string, actions: number, targetBytes = 0): Promise<void> => {
     await harness.run(async (ctx: any) => {
         const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId });
         const sessionId = await ctx.db.insert("browserSessions", {
@@ -36,7 +39,7 @@ const seed = async (userId: string, actions: number): Promise<void> => {
                 action: "type",
                 sessionId,
                 success: 1,
-                target: `#field-${userId}`,
+                target: `#field-${userId}${"t".repeat(targetBytes)}`,
                 timestamp: 100 + index,
                 value: `typed-secret-${userId}`,
             });
@@ -64,9 +67,9 @@ const exportOf = async (userId: string): Promise<{ pages: number; result: Browse
 
         return { next };
     });
-    const result = await readAllBrowserPages(async (page) => stored[page] as string, pages, Infinity);
+    const result = await readAllBrowserPages(async (page) => stored[page] as string, pages.pages, Infinity);
 
-    return { pages, result };
+    return { pages: pages.pages, result };
 };
 
 beforeEach(() => {
@@ -129,10 +132,10 @@ describe("browser data in the GDPR export", () => {
     });
 
     it("exports every action of a history longer than one page", async () => {
-        // Past the page's scan budget (1000 rows), and not a multiple of an action page (100).
+        // Past a page's 512 KiB at about 1 KiB an action, and not a multiple of a read (100).
         const MANY = 1250;
 
-        await seed(A, MANY);
+        await seed(A, MANY, 1000);
 
         const { pages, result } = await exportOf(A);
         const timestamps = new Set(result.actions.map((action) => (action as { timestamp: number }).timestamp));
@@ -174,19 +177,61 @@ describe("browser export pages left by a killed export", () => {
 });
 
 describe("browser export pages read back", () => {
-    it("fails with PAYLOAD_TOO_LARGE once the stored pages pass the export's limit", async () => {
+    it("stops at the section's share of the file and says it was cut, rather than failing the export", async () => {
         const page = JSON.stringify({ actions: [{ target: "x".repeat(100) }] });
+        const result = await readAllBrowserPages(async () => page, 3, 2 * page.length);
 
-        await expect(readAllBrowserPages(async () => page, 3, 2 * page.length)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+        expect(result.actions).toHaveLength(2);
+        expect(result.truncated).toBe(true);
+    });
+
+    it("says the section was cut when the workflow stopped at its page limit", async () => {
+        const page = JSON.stringify({ actions: [{ target: "x" }] });
+
+        const cut = await readAllBrowserPages(async () => page, 1, Infinity, true);
+
+        expect(cut.truncated).toBe(true);
+        expect(await readAllBrowserPages(async () => page, 1, Infinity)).not.toHaveProperty("truncated");
+    });
+});
+
+describe("browser export page stored", () => {
+    it("reads a page again cautiously when its read passed the transaction's limit", async () => {
+        const reads: unknown[] = [];
+        const ctx = {
+            runQuery: async (_reference: unknown, args: { cautious: boolean }) => {
+                reads.push(args.cautious);
+
+                if (!args.cautious) {
+                    throw Object.assign(new Error("this transaction read too many bytes"), { code: "TRANSACTION_LIMIT_EXCEEDED" });
+                }
+
+                return { actions: [], extensions: [], humanChecks: [], sessions: [] };
+            },
+            storage: { store: async () => "key" },
+        };
+
+        await (storeBrowserExportPage as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler(ctx, { key: "k", userId: A });
+
+        expect(reads).toEqual([false, true]);
     });
 });
 
 describe("browser export pages stay within the export's limits", () => {
-    const pagesOf = async (userId: string): Promise<{ json: string; phase?: string }[]> => {
+    /** Every page, read as `storeBrowserExportPage` reads it: again cautiously when `fallBack` and the read passed a limit. */
+    const pagesOf = async (userId: string, fallBack = false): Promise<{ json: string; phase?: string }[]> => {
         const pages: { json: string; phase?: string }[] = [];
 
         await storeAllBrowserPages(async (cursor) => {
-            const page = await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cursor, userId }));
+            const read = async (cautious: boolean): Promise<any> =>
+                await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cautious, cursor, userId }));
+            const page = await read(false).catch(async (error: unknown) => {
+                if (!fallBack) {
+                    throw error;
+                }
+
+                return await read(true);
+            });
 
             pages.push({ json: JSON.stringify(page), phase: cursor?.phase });
 
@@ -255,11 +300,39 @@ describe("browser export pages stay within the export's limits", () => {
         expect(result.actions).toHaveLength(60);
         expect(result.actions[0]).toEqual(expect.objectContaining({ truncated: ["target"] }));
         expect(result.humanChecks[0]).toEqual(expect.objectContaining({ truncated: ["site"] }));
-        expect(result.extensions[0]).toEqual(expect.objectContaining({ truncated: ["capabilities"] }));
+        expect((result.extensions[0] as { truncated: string[] }).truncated[0]).toMatch(CUT_CAPABILITIES);
     });
 
-    it("reads long typed actions over several pages, never one read past the transaction's 32 MiB", async () => {
-        const ACTIONS = 200;
+    it("keeps every capability of an oversized list, each cut to fit, and names the ones cut", async () => {
+        // One capability that fits a string's cap alone, but not inside the list's brackets, among short ones.
+        const capabilities = ["tabs", "c".repeat(EXPORT_FIELD_BYTES - 2), "scripting"];
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("browserExtensions", { capabilities, extensionId: "e", status: "paired", userId: A });
+        });
+
+        const { result } = await exportOf(A);
+        const extension = result.extensions[0] as { capabilities: string[]; truncated: string[] };
+
+        expect(extension.capabilities).toHaveLength(3);
+        expect(extension.capabilities[0]).toBe("tabs");
+        expect(extension.capabilities[2]).toBe("scripting");
+        expect(extension.capabilities[1]?.startsWith("ccc")).toBe(true);
+        expect(new TextEncoder().encode(JSON.stringify(extension.capabilities)).length).toBeLessThanOrEqual(EXPORT_FIELD_BYTES);
+        expect(extension.truncated).toEqual(["capabilities[1]"]);
+    });
+
+    it("reads small actions a full batch at a time, so a long history takes few pages", async () => {
+        // At 8 rows a read (2 MB reckoned a row), 100 reads a page, this took three pages of actions.
+        await seed(A, 2000);
+
+        const pages = await pagesOf(A);
+
+        expect(pages.filter((page) => page.phase === "actions")).toHaveLength(1);
+    });
+
+    it("reads typed actions far over the reckoned row again cautiously, never one read past the transaction's 32 MiB", async () => {
+        const ACTIONS = 40;
 
         const sessionId = await harness.run(async (ctx: any) => {
             const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId: A });
@@ -267,21 +340,27 @@ describe("browser export pages stay within the export's limits", () => {
             return await ctx.db.insert("browserSessions", { lastActivityAt: 1, startedAt: 1, status: "completed", threadId, userId: A });
         });
 
-        // A write of its own per 20 actions: one transaction may write 32 MiB too.
-        for (let from = 0; from < ACTIONS; from += 20) {
+        // A write of its own per 10 actions: one transaction may write 32 MiB too.
+        for (let from = 0; from < ACTIONS; from += 10) {
             await harness.run(async (ctx: any) => {
-                for (let index = from; index < from + 20; index += 1) {
-                    await ctx.db.insert("browserActions", { action: "type", sessionId, success: 1, timestamp: index, value: "v".repeat(200_000) });
+                for (let index = from; index < from + 10; index += 1) {
+                    await ctx.db.insert("browserActions", { action: "type", sessionId, success: 1, timestamp: index, value: "v".repeat(1_000_000) });
                 }
             });
         }
 
-        const pages = await pagesOf(A);
-        const { result } = await exportOf(A);
+        const read = async (cautious: boolean): Promise<unknown> =>
+            await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cautious, cursor: { phase: "actions" }, userId: A }));
 
-        // 40 MB of typed text: two pages at least, at 16 MiB of reads each.
-        expect(pages.filter((page) => page.phase === "actions").length).toBeGreaterThanOrEqual(3);
-        expect(result.actions).toHaveLength(ACTIONS);
-        expect(JSON.stringify(result)).not.toContain("vvvv");
+        // 40 MB at the 64 KiB a row is reckoned: one read of all of them passes the limit.
+        await expect(read(false)).rejects.toMatchObject({ code: "TRANSACTION_LIMIT_EXCEEDED" });
+
+        const pages = await pagesOf(A, true);
+        const actions = pages.flatMap((page) => (JSON.parse(page.json) as { actions: unknown[] }).actions);
+
+        // The first page, read cautiously, holds 15 of them; the 25 left fit one read.
+        expect(pages.filter((page) => page.phase === "actions").length).toBeGreaterThanOrEqual(2);
+        expect(actions).toHaveLength(ACTIONS);
+        expect(JSON.stringify(actions)).not.toContain("vvvv");
     });
 });
