@@ -605,6 +605,8 @@ msgid "{0} custom headers"
 msgstr "{0} custom headers"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
+#. placeholder {0}: formatNumber(window, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:66
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1817,6 +1819,7 @@ msgstr "21:9 (Ultrawide)"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "235B parameter Mixture-of-Experts architecture"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:66
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 hours"
@@ -2064,7 +2067,7 @@ msgstr "A listed built-in tool no longer exists. Remove it before saving."
 msgid "A locked chat cannot have a guest link."
 msgstr "A locked chat cannot have a guest link."
 
-#: src/features/vault/components/site-logins.tsx:593
+#: src/features/vault/components/site-logins.tsx:623
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "A login can name at most {MAX_TEAMMATES} bots."
 
@@ -5451,7 +5454,7 @@ msgstr "Bot token from the Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
-#: src/features/vault/components/site-logins.tsx:588
+#: src/features/vault/components/site-logins.tsx:618
 msgid "Bots that may use it"
 msgstr "Bots that may use it"
 
@@ -5758,6 +5761,22 @@ msgstr "by <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "by a collaborator"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:93
+msgid "By day, newest first."
+msgstr "By day, newest first."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+msgid "By hour"
+msgstr "By hour"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:116
+msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
+msgstr "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:140
+msgid "By model, most prompt tokens first."
+msgstr "By model, most prompt tokens first."
+
 #: src/features/pages/components/page-version-panel.tsx:140
 msgid "by you"
 msgstr "by you"
@@ -6005,7 +6024,7 @@ msgstr "Canada"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:617
+#: src/features/vault/components/site-logins.tsx:647
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8873,7 +8892,7 @@ msgstr "Could not delete the bot."
 msgid "Could not delete the comment"
 msgstr "Could not delete the comment"
 
-#: src/features/vault/components/site-logins.tsx:419
+#: src/features/vault/components/site-logins.tsx:453
 msgid "Could not delete the login."
 msgstr "Could not delete the login."
 
@@ -9117,7 +9136,7 @@ msgstr "Could not save the Daily Brief setting."
 msgid "Could not save the email setting."
 msgstr "Could not save the email setting."
 
-#: src/features/vault/components/site-logins.tsx:368
+#: src/features/vault/components/site-logins.tsx:396
 msgid "Could not save the login."
 msgstr "Could not save the login."
 
@@ -10024,6 +10043,7 @@ msgstr "Date"
 msgid "Date and time"
 msgstr "Date and time"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:96
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "Day"
@@ -10337,7 +10357,7 @@ msgstr "Delegated {0} work runs on this model."
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:625
+#: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "Delete"
 
@@ -10456,7 +10476,7 @@ msgid "Delete group and children"
 msgstr "Delete group and children"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:495
+#: src/features/vault/components/site-logins.tsx:525
 msgid "Delete login for {0}"
 msgstr "Delete login for {0}"
 
@@ -10590,7 +10610,7 @@ msgstr "Delete the open thread after you confirm ({0})"
 msgid "Delete this case?"
 msgstr "Delete this case?"
 
-#: src/features/vault/components/site-logins.tsx:635
+#: src/features/vault/components/site-logins.tsx:665
 msgid "Delete this login?"
 msgstr "Delete this login?"
 
@@ -11927,12 +11947,12 @@ msgstr "edit image"
 msgid "Edit Image"
 msgstr "Edit Image"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "Edit login"
 msgstr "Edit login"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:485
+#: src/features/vault/components/site-logins.tsx:515
 msgid "Edit login for {0}"
 msgstr "Edit login for {0}"
 
@@ -17135,6 +17155,7 @@ msgstr "Hosts"
 msgid "hotkey"
 msgstr "hotkey"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:119
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "Hour"
@@ -18805,7 +18826,7 @@ msgstr "Kyrgyzstan"
 msgid "Label"
 msgstr "Label"
 
-#: src/features/vault/components/site-logins.tsx:565
+#: src/features/vault/components/site-logins.tsx:595
 msgid "Label (optional)"
 msgstr "Label (optional)"
 
@@ -19222,7 +19243,7 @@ msgstr "Leave empty for \"any model\"."
 msgid "Leave empty for transparent background"
 msgstr "Leave empty for transparent background"
 
-#: src/features/vault/components/site-logins.tsx:558
+#: src/features/vault/components/site-logins.tsx:588
 msgid "Leave empty to keep the saved password"
 msgstr "Leave empty to keep the saved password"
 
@@ -19921,6 +19942,7 @@ msgid "Loading..."
 msgstr "Loading..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
+#: src/features/admin/components/admin-provider-cache-row.tsx:71
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20020,7 +20042,7 @@ msgstr "Log out"
 msgid "Login"
 msgstr "Login"
 
-#: src/features/vault/components/site-logins.tsx:415
+#: src/features/vault/components/site-logins.tsx:449
 msgid "Login deleted"
 msgstr "Login deleted"
 
@@ -20028,11 +20050,11 @@ msgstr "Login deleted"
 msgid "login refused"
 msgstr "login refused"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login saved"
 msgstr "Login saved"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login updated"
 msgstr "Login updated"
 
@@ -20040,7 +20062,7 @@ msgstr "Login updated"
 msgid "Logins"
 msgstr "Logins"
 
-#: src/features/vault/components/site-logins.tsx:431
+#: src/features/vault/components/site-logins.tsx:465
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 
@@ -21272,6 +21294,7 @@ msgstr "Mode {0}, on {1}. Nothing starts when it is created."
 msgid "Mode:"
 msgstr "Mode:"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:143
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -22362,7 +22385,7 @@ msgstr "New high quality model for photorealism and text rendering"
 msgid "New line in message"
 msgstr "New line in message"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "New login"
 msgstr "New login"
 
@@ -25347,7 +25370,7 @@ msgstr "Passkeys allow you to sign in securely using your device's biometric aut
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:552
+#: src/features/vault/components/site-logins.tsx:582
 msgid "Password"
 msgstr "Password"
 
@@ -25394,7 +25417,7 @@ msgstr "Password reset email sent"
 msgid "Password reset successful"
 msgstr "Password reset successful"
 
-#: src/features/vault/components/site-logins.tsx:474
+#: src/features/vault/components/site-logins.tsx:508
 msgid "Password set"
 msgstr "Password set"
 
@@ -26891,6 +26914,13 @@ msgstr "Prompt optimized successfully"
 msgid "Prompt to run on all models..."
 msgstr "Prompt to run on all models..."
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:84
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
+#: src/features/admin/components/admin-provider-cache-row.tsx:146
+msgid "Prompt tokens"
+msgstr "Prompt tokens"
+
 #: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "Prompt Tokens"
@@ -26956,6 +26986,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Proven reliability from previous generation"
 
 #: src/components/model-picker/model-picker.tsx:283
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -26976,6 +27007,10 @@ msgstr "Provider added — its models are now in the model picker"
 #: src/routes/admin/gateway/index.tsx:326
 msgid "Provider Health"
 msgstr "Provider Health"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:46
+msgid "Provider prompt cache"
+msgstr "Provider prompt cache"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:323
 msgid "Provider removed"
@@ -28532,6 +28567,10 @@ msgstr "Requesting..."
 msgid "Requesting…"
 msgstr "Requesting…"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:88
+#: src/features/admin/components/admin-provider-cache-row.tsx:97
+#: src/features/admin/components/admin-provider-cache-row.tsx:120
+#: src/features/admin/components/admin-provider-cache-row.tsx:145
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -29516,7 +29555,7 @@ msgstr "Save case"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Save changes"
@@ -29533,7 +29572,7 @@ msgstr "Save failed"
 msgid "Save Image"
 msgstr "Save Image"
 
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 msgid "Save login"
 msgstr "Save login"
 
@@ -30567,6 +30606,13 @@ msgstr "Serbian (Serbia)"
 msgid "Serif"
 msgstr "Serif"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:99
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
+msgid "Served from cache"
+msgstr "Served from cache"
+
 #: src/features/devices/components/devices-settings.tsx:459
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Server added. Choose which of its folders to share in the desktop app."
@@ -31199,12 +31245,12 @@ msgstr "Sign up to unlock all models"
 msgid "Sign-in expired"
 msgstr "Sign-in expired"
 
-#: src/features/vault/components/site-logins.tsx:526
+#: src/features/vault/components/site-logins.tsx:556
 msgid "Sign-in page (optional)"
 msgstr "Sign-in page (optional)"
 
 #. placeholder {0}: login.signInUrl
-#: src/features/vault/components/site-logins.tsx:478
+#: src/features/vault/components/site-logins.tsx:510
 msgid "Sign-in page: {0}"
 msgstr "Sign-in page: {0}"
 
@@ -31290,15 +31336,15 @@ msgstr "Sinhala"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Sinhala (Sri Lanka)"
 
-#: src/features/vault/components/site-logins.tsx:514
+#: src/features/vault/components/site-logins.tsx:544
 msgid "Site"
 msgstr "Site"
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:463
 msgid "Site logins"
 msgstr "Site logins"
 
-#: src/features/vault/components/site-logins.tsx:452
+#: src/features/vault/components/site-logins.tsx:486
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "Site logins can't be saved, changed or deleted while impersonating."
 
@@ -34165,7 +34211,7 @@ msgid "The agent's browser was replaced, and control went back to the agent. You
 msgstr "The agent's browser was replaced, and control went back to the agent. You can take control again."
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:626
+#: src/features/vault/components/site-logins.tsx:656
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "The agent's browser won't be able to use it to sign in to {0}."
 
@@ -34766,7 +34812,7 @@ msgstr "The page agent could not edit this page"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "The page now shows the other version. Copy anything you want to keep from yours."
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:567
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "The page with the login form. Leave empty to start at the site's front page."
 
@@ -34810,6 +34856,10 @@ msgstr "The prompt becomes the case input and this answer the expected answer. E
 #: src/features/settings/components/chat/native-providers-settings.tsx:719
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:75
+msgid "The provider cache readings could not be loaded."
+msgstr "The provider cache readings could not be loaded."
 
 #: src/features/chat/host/host-composer.tsx:1054
 msgid "The queue is paused. Send next to go on with the queued messages."
@@ -34916,7 +34966,11 @@ msgstr "The server lists no models yet — pull or load one first"
 msgid "The shard footprint could not be measured."
 msgstr "The shard footprint could not be measured."
 
-#: src/features/vault/components/site-logins.tsx:394
+#: src/features/admin/components/admin-provider-cache-row.tsx:48
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
+msgstr "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
+
+#: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
 msgstr "The sign-in page must be an https:// address on the same site, with no username or password in it."
 
@@ -35543,11 +35597,11 @@ msgstr "This list is full: remove a tool before adding another."
 #~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 #~ msgstr "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 
-#: src/features/vault/components/site-logins.tsx:334
+#: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 
-#: src/features/vault/components/site-logins.tsx:344
+#: src/features/vault/components/site-logins.tsx:372
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "This login was changed elsewhere. Reload the page to see it before saving again."
 
@@ -36705,8 +36759,8 @@ msgstr "Try adjusting your search terms."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:446
-#: src/features/vault/components/site-logins.tsx:582
+#: src/features/vault/components/site-logins.tsx:480
+#: src/features/vault/components/site-logins.tsx:612
 msgid "Try again"
 msgstr "Try again"
 
@@ -37889,7 +37943,7 @@ msgstr "Username"
 msgid "Username is required"
 msgstr "Username is required"
 
-#: src/features/vault/components/site-logins.tsx:541
+#: src/features/vault/components/site-logins.tsx:571
 msgid "Username or email"
 msgstr "Username or email"
 
@@ -39274,6 +39328,10 @@ msgstr "Width"
 msgid "Will be saved as your {provider} API key"
 msgstr "Will be saved as your {provider} API key"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:53
+msgid "Window"
+msgstr "Window"
+
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "Windows"
 msgstr "Windows"
@@ -39889,7 +39947,7 @@ msgstr "Your background, preferences, or location to help the AI understand you 
 msgid "Your bots"
 msgstr "Your bots"
 
-#: src/features/vault/components/site-logins.tsx:571
+#: src/features/vault/components/site-logins.tsx:601
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 
@@ -39910,11 +39968,11 @@ msgid "Your changes to this project's rule files are not saved. Closing drops th
 msgstr "Your changes to this project's rule files are not saved. Closing drops them."
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:463
+#: src/features/vault/components/site-logins.tsx:497
 msgid "Your chats and {0}"
 msgstr "Your chats and {0}"
 
-#: src/features/vault/components/site-logins.tsx:465
+#: src/features/vault/components/site-logins.tsx:499
 msgid "Your chats and the bots you chose"
 msgstr "Your chats and the bots you chose"
 
@@ -40104,11 +40162,11 @@ msgstr "Your overview could not be loaded."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Your own Anthropic key. Required to delegate work to Claude Code."
 
-#: src/features/vault/components/site-logins.tsx:590
+#: src/features/vault/components/site-logins.tsx:620
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 
-#: src/features/vault/components/site-logins.tsx:460
+#: src/features/vault/components/site-logins.tsx:494
 msgid "Your own chats only"
 msgstr "Your own chats only"
 
@@ -40167,7 +40225,7 @@ msgstr "Your review was requested"
 msgid "Your rule files are still saving."
 msgstr "Your rule files are still saving."
 
-#: src/features/vault/components/site-logins.tsx:437
+#: src/features/vault/components/site-logins.tsx:471
 msgid "Your saved logins could not be loaded."
 msgstr "Your saved logins could not be loaded."
 

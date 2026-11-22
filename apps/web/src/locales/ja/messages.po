@@ -606,6 +606,8 @@ msgid "{0} custom headers"
 msgstr "カスタムヘッダー {0} 件"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
+#. placeholder {0}: formatNumber(window, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:66
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1818,6 +1820,7 @@ msgstr "21:9（ウルトラワイド）"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "235B パラメータの Mixture-of-Experts アーキテクチャ"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:66
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 時間"
@@ -2065,7 +2068,7 @@ msgstr "一覧の組み込みツールの一つはもう存在しません。保
 msgid "A locked chat cannot have a guest link."
 msgstr "ロックされたチャットにはゲストリンクを作成できません。"
 
-#: src/features/vault/components/site-logins.tsx:593
+#: src/features/vault/components/site-logins.tsx:623
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "1 つのログインに指定できるボットは最大 {MAX_TEAMMATES} 個です。"
 
@@ -5452,7 +5455,7 @@ msgstr "Discord Developer Portal で取得したボットトークン"
 msgid "Bots"
 msgstr "ボット"
 
-#: src/features/vault/components/site-logins.tsx:588
+#: src/features/vault/components/site-logins.tsx:618
 msgid "Bots that may use it"
 msgstr "使用できるボット"
 
@@ -5759,6 +5762,22 @@ msgstr "提供元：<0>{0}</0>"
 msgid "by a collaborator"
 msgstr "共同編集者による編集"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:93
+msgid "By day, newest first."
+msgstr "日別（新しい順）。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+msgid "By hour"
+msgstr "時間別"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:116
+msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
+msgstr "時間別（古い順）。複数のモデルで同じ時刻から下がっている場合は、送信内容が変わったことを示しています。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:140
+msgid "By model, most prompt tokens first."
+msgstr "モデル別（プロンプトトークンの多い順）。"
+
 #: src/features/pages/components/page-version-panel.tsx:140
 msgid "by you"
 msgstr "自分による編集"
@@ -6006,7 +6025,7 @@ msgstr "カナダ"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:617
+#: src/features/vault/components/site-logins.tsx:647
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8874,7 +8893,7 @@ msgstr "ボットを削除できませんでした。"
 msgid "Could not delete the comment"
 msgstr "コメントを削除できませんでした"
 
-#: src/features/vault/components/site-logins.tsx:419
+#: src/features/vault/components/site-logins.tsx:453
 msgid "Could not delete the login."
 msgstr "ログインを削除できませんでした。"
 
@@ -9118,7 +9137,7 @@ msgstr "Daily Brief の設定を保存できませんでした。"
 msgid "Could not save the email setting."
 msgstr "メール設定を保存できませんでした。"
 
-#: src/features/vault/components/site-logins.tsx:368
+#: src/features/vault/components/site-logins.tsx:396
 msgid "Could not save the login."
 msgstr "ログインを保存できませんでした。"
 
@@ -10025,6 +10044,7 @@ msgstr "日付"
 msgid "Date and time"
 msgstr "日付と時刻"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:96
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "日"
@@ -10338,7 +10358,7 @@ msgstr ""
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:625
+#: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "削除"
 
@@ -10457,7 +10477,7 @@ msgid "Delete group and children"
 msgstr "グループと子要素を削除"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:495
+#: src/features/vault/components/site-logins.tsx:525
 msgid "Delete login for {0}"
 msgstr "{0} のログインを削除"
 
@@ -10591,7 +10611,7 @@ msgstr "確認後に開いているスレッドを削除します（{0}）"
 msgid "Delete this case?"
 msgstr "このケースを削除しますか？"
 
-#: src/features/vault/components/site-logins.tsx:635
+#: src/features/vault/components/site-logins.tsx:665
 msgid "Delete this login?"
 msgstr "このログインを削除しますか？"
 
@@ -11928,12 +11948,12 @@ msgstr "画像を編集"
 msgid "Edit Image"
 msgstr "画像を編集"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "Edit login"
 msgstr "ログインを編集"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:485
+#: src/features/vault/components/site-logins.tsx:515
 msgid "Edit login for {0}"
 msgstr "{0} のログインを編集"
 
@@ -17136,6 +17156,7 @@ msgstr "ホスト"
 msgid "hotkey"
 msgstr "ホットキー"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:119
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "時間"
@@ -18806,7 +18827,7 @@ msgstr "キルギス"
 msgid "Label"
 msgstr "ラベル"
 
-#: src/features/vault/components/site-logins.tsx:565
+#: src/features/vault/components/site-logins.tsx:595
 msgid "Label (optional)"
 msgstr "ラベル（任意）"
 
@@ -19223,7 +19244,7 @@ msgstr "「任意のモデル」にする場合は空欄のままにしてくだ
 msgid "Leave empty for transparent background"
 msgstr "透明な背景にする場合は空欄のままにしてください"
 
-#: src/features/vault/components/site-logins.tsx:558
+#: src/features/vault/components/site-logins.tsx:588
 msgid "Leave empty to keep the saved password"
 msgstr "保存済みのパスワードを維持するには空のままにしてください"
 
@@ -19922,6 +19943,7 @@ msgid "Loading..."
 msgstr "読み込んでいます..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
+#: src/features/admin/components/admin-provider-cache-row.tsx:71
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20021,7 +20043,7 @@ msgstr "サインアウト"
 msgid "Login"
 msgstr "サインイン"
 
-#: src/features/vault/components/site-logins.tsx:415
+#: src/features/vault/components/site-logins.tsx:449
 msgid "Login deleted"
 msgstr "ログインを削除しました"
 
@@ -20029,11 +20051,11 @@ msgstr "ログインを削除しました"
 msgid "login refused"
 msgstr "ログインが拒否されました"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login saved"
 msgstr "ログインを保存しました"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login updated"
 msgstr "ログインを更新しました"
 
@@ -20041,7 +20063,7 @@ msgstr "ログインを更新しました"
 msgid "Logins"
 msgstr "ログイン名"
 
-#: src/features/vault/components/site-logins.tsx:431
+#: src/features/vault/components/site-logins.tsx:465
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "エージェントのブラウザー用に保存されたログインです。これらを使ったサインインは今後のアップデートで提供されます。パスワードはサーバーがサイトに入力し、AI が目にすることはありません。"
 
@@ -21273,6 +21295,7 @@ msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 msgid "Mode:"
 msgstr "モード:"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:143
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -22363,7 +22386,7 @@ msgstr "フォトリアリズムとテキスト描画に優れた新しい高品
 msgid "New line in message"
 msgstr "メッセージ内で改行"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "New login"
 msgstr "新しいログイン"
 
@@ -25348,7 +25371,7 @@ msgstr "パスキーを使うと、デバイスの生体認証やセキュリテ
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:552
+#: src/features/vault/components/site-logins.tsx:582
 msgid "Password"
 msgstr "パスワード"
 
@@ -25395,7 +25418,7 @@ msgstr "パスワードリセットのメールを送信しました"
 msgid "Password reset successful"
 msgstr "パスワードをリセットしました"
 
-#: src/features/vault/components/site-logins.tsx:474
+#: src/features/vault/components/site-logins.tsx:508
 msgid "Password set"
 msgstr "パスワード設定済み"
 
@@ -26892,6 +26915,13 @@ msgstr "プロンプトを最適化しました"
 msgid "Prompt to run on all models..."
 msgstr "すべてのモデルで実行するプロンプト..."
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:84
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
+#: src/features/admin/components/admin-provider-cache-row.tsx:146
+msgid "Prompt tokens"
+msgstr "プロンプトトークン"
+
 #: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "プロンプトトークン"
@@ -26957,6 +26987,7 @@ msgid "Proven reliability from previous generation"
 msgstr "前世代で実証された信頼性"
 
 #: src/components/model-picker/model-picker.tsx:283
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -26977,6 +27008,10 @@ msgstr "プロバイダーを追加しました。モデルがモデル選択に
 #: src/routes/admin/gateway/index.tsx:326
 msgid "Provider Health"
 msgstr "プロバイダーのヘルス"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:46
+msgid "Provider prompt cache"
+msgstr "プロバイダーのプロンプトキャッシュ"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:323
 msgid "Provider removed"
@@ -28533,6 +28568,10 @@ msgstr "リクエストしています..."
 msgid "Requesting…"
 msgstr "リクエスト中…"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:88
+#: src/features/admin/components/admin-provider-cache-row.tsx:97
+#: src/features/admin/components/admin-provider-cache-row.tsx:120
+#: src/features/admin/components/admin-provider-cache-row.tsx:145
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -29517,7 +29556,7 @@ msgstr "ケースを保存"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "変更を保存"
@@ -29534,7 +29573,7 @@ msgstr "保存に失敗しました"
 msgid "Save Image"
 msgstr "画像を保存"
 
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 msgid "Save login"
 msgstr "ログインを保存"
 
@@ -30568,6 +30607,13 @@ msgstr "セルビア語（セルビア）"
 msgid "Serif"
 msgstr "セリフ"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:99
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
+msgid "Served from cache"
+msgstr "キャッシュから提供"
+
 #: src/features/devices/components/devices-settings.tsx:459
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "サーバーを追加しました。共有するフォルダはデスクトップアプリで選択してください。"
@@ -31200,12 +31246,12 @@ msgstr "サインアップしてすべてのモデルを利用"
 msgid "Sign-in expired"
 msgstr "サインインの有効期限が切れました"
 
-#: src/features/vault/components/site-logins.tsx:526
+#: src/features/vault/components/site-logins.tsx:556
 msgid "Sign-in page (optional)"
 msgstr "サインインページ（任意）"
 
 #. placeholder {0}: login.signInUrl
-#: src/features/vault/components/site-logins.tsx:478
+#: src/features/vault/components/site-logins.tsx:510
 msgid "Sign-in page: {0}"
 msgstr "サインインページ: {0}"
 
@@ -31291,15 +31337,15 @@ msgstr "シンハラ語"
 msgid "Sinhala (Sri Lanka)"
 msgstr "シンハラ語（スリランカ）"
 
-#: src/features/vault/components/site-logins.tsx:514
+#: src/features/vault/components/site-logins.tsx:544
 msgid "Site"
 msgstr "サイト"
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:463
 msgid "Site logins"
 msgstr "サイトのログイン"
 
-#: src/features/vault/components/site-logins.tsx:452
+#: src/features/vault/components/site-logins.tsx:486
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "なりすまし中はサイトのログインを保存、変更、削除できません。"
 
@@ -34166,7 +34212,7 @@ msgid "The agent's browser was replaced, and control went back to the agent. You
 msgstr "エージェントのブラウザーが置き換えられ、操作はエージェントに戻りました。もう一度操作を代わることができます。"
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:626
+#: src/features/vault/components/site-logins.tsx:656
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "エージェントのブラウザーはこのログインで {0} にサインインできなくなります。"
 
@@ -34767,7 +34813,7 @@ msgstr "ページエージェントがこのページを編集できませんで
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "ページには相手のバージョンが表示されています。残したい内容があれば、自分のバージョンからコピーしてください。"
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:567
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "ログインフォームがあるページです。空欄にすると、サイトのトップページから始めます。"
 
@@ -34811,6 +34857,10 @@ msgstr "プロンプトがケースの入力に、この回答が期待される
 #: src/features/settings/components/chat/native-providers-settings.tsx:719
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "これらのリクエストはプロバイダーから直接請求されます。モデルの価格がわかる場合は、独自キー利用時の通常のプラットフォーム手数料がクレジットで請求されます。"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:75
+msgid "The provider cache readings could not be loaded."
+msgstr "プロバイダーのキャッシュ計測値を読み込めませんでした。"
 
 #: src/features/chat/host/host-composer.tsx:1054
 msgid "The queue is paused. Send next to go on with the queued messages."
@@ -34917,7 +34967,11 @@ msgstr "サーバーにはまだモデルがありません — 先にモデル�
 msgid "The shard footprint could not be measured."
 msgstr "シャードの使用量を測定できませんでした。"
 
-#: src/features/vault/components/site-logins.tsx:394
+#: src/features/admin/components/admin-provider-cache-row.tsx:48
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
+msgstr "プロバイダーが自社のキャッシュから提供したプロンプトトークンの割合です。日別と時間別は、過去 30 日間にキャッシュを使ったプロバイダーとモデルの組み合わせを集計します。モデル表には、プロンプトトークンの多い上位 50 モデルを表示します。ゲートウェイのレスポンスキャッシュからの応答は含みません。時刻は UTC です。"
+
+#: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
 msgstr "サインインページは、同じサイトの https:// アドレスで、ユーザー名やパスワードを含まないものにしてください。"
 
@@ -35544,11 +35598,11 @@ msgstr "このリストは上限に達しています。別のツールを追加
 #~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 #~ msgstr "このログインは別の場所で変更されたため、再読み込みしました。ユーザー名とラベルの編集はそのまま残っています。ボットを確認し、パスワードを変更していた場合はもう一度入力してから、再度保存してください。"
 
-#: src/features/vault/components/site-logins.tsx:334
+#: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "このログインは別の場所で変更されたため、再読み込みしました。ユーザー名、ラベル、サインインページの編集はそのまま残っています。ボットを確認し、パスワードを変更していた場合はもう一度入力してから、再度保存してください。"
 
-#: src/features/vault/components/site-logins.tsx:344
+#: src/features/vault/components/site-logins.tsx:372
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "このログインは別の場所で変更されました。再度保存する前に、ページを再読み込みして確認してください。"
 
@@ -36706,8 +36760,8 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:446
-#: src/features/vault/components/site-logins.tsx:582
+#: src/features/vault/components/site-logins.tsx:480
+#: src/features/vault/components/site-logins.tsx:612
 msgid "Try again"
 msgstr "再試行"
 
@@ -37890,7 +37944,7 @@ msgstr "ユーザー名"
 msgid "Username is required"
 msgstr "ユーザー名は必須です"
 
-#: src/features/vault/components/site-logins.tsx:541
+#: src/features/vault/components/site-logins.tsx:571
 msgid "Username or email"
 msgstr "ユーザー名またはメール"
 
@@ -39275,6 +39329,10 @@ msgstr "幅"
 msgid "Will be saved as your {provider} API key"
 msgstr "{provider} の API キーとして保存されます"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:53
+msgid "Window"
+msgstr "期間"
+
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "Windows"
 msgstr "Windows"
@@ -39890,7 +39948,7 @@ msgstr "AI があなたをより理解できるよう、経歴、好み、所在
 msgid "Your bots"
 msgstr "自分のボット"
 
-#: src/features/vault/components/site-logins.tsx:571
+#: src/features/vault/components/site-logins.tsx:601
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "ボットを読み込めませんでした。保存済みログインのボットを維持するため、変更は読み込み後に保存できます。"
 
@@ -39911,11 +39969,11 @@ msgid "Your changes to this project's rule files are not saved. Closing drops th
 msgstr "このプロジェクトのルールファイルへの変更は保存されていません。閉じると破棄されます。"
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:463
+#: src/features/vault/components/site-logins.tsx:497
 msgid "Your chats and {0}"
 msgstr "自分のチャットと {0}"
 
-#: src/features/vault/components/site-logins.tsx:465
+#: src/features/vault/components/site-logins.tsx:499
 msgid "Your chats and the bots you chose"
 msgstr "自分のチャットと選択したボット"
 
@@ -40105,11 +40163,11 @@ msgstr "概要を読み込めませんでした。"
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "ご自身の Anthropic キー。Claude Code に作業を任せるために必要です。"
 
-#: src/features/vault/components/site-logins.tsx:590
+#: src/features/vault/components/site-logins.tsx:620
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "自分のチャットは常に使用できます。ボットのチャットは、ここでそのボットにチェックを入れた場合のみ使用できます。共有、公開、グループ、メッセンジャーのチャットでは使用できません。"
 
-#: src/features/vault/components/site-logins.tsx:460
+#: src/features/vault/components/site-logins.tsx:494
 msgid "Your own chats only"
 msgstr "自分のチャットのみ"
 
@@ -40168,7 +40226,7 @@ msgstr "あなたのレビューがリクエストされました"
 msgid "Your rule files are still saving."
 msgstr "ルールファイルはまだ保存中です。"
 
-#: src/features/vault/components/site-logins.tsx:437
+#: src/features/vault/components/site-logins.tsx:471
 msgid "Your saved logins could not be loaded."
 msgstr "保存済みのログインを読み込めませんでした。"
 

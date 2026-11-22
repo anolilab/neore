@@ -606,6 +606,8 @@ msgid "{0} custom headers"
 msgstr "{0} cabeçalhos personalizados"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
+#. placeholder {0}: formatNumber(window, locale)
+#: src/features/admin/components/admin-provider-cache-row.tsx:66
 #: src/features/admin/components/admin-shard-footprint-row.tsx:150
 #: src/features/admin/components/admin-shard-footprint-row.tsx:170
 msgid "{0} days"
@@ -1818,6 +1820,7 @@ msgstr "21:9 (Ultrawide)"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "Arquitetura Mixture-of-Experts com 235B de parâmetros"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:66
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 horas"
@@ -2065,7 +2068,7 @@ msgstr "Uma ferramenta integrada da lista já não existe. Remova-a antes de sal
 msgid "A locked chat cannot have a guest link."
 msgstr "Um chat bloqueado não pode ter um link de convidado."
 
-#: src/features/vault/components/site-logins.tsx:593
+#: src/features/vault/components/site-logins.tsx:623
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "Um login pode indicar no máximo {MAX_TEAMMATES} bots."
 
@@ -5452,7 +5455,7 @@ msgstr "Token do bot do Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
-#: src/features/vault/components/site-logins.tsx:588
+#: src/features/vault/components/site-logins.tsx:618
 msgid "Bots that may use it"
 msgstr "Bots que podem usá-lo"
 
@@ -5759,6 +5762,22 @@ msgstr "por <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "por um colaborador"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:93
+msgid "By day, newest first."
+msgstr "Por dia, os mais recentes primeiro."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:114
+msgid "By hour"
+msgstr "Por hora"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:116
+msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
+msgstr "Por hora, as mais antigas primeiro. Uma queda que começa na mesma hora em todos os modelos indica uma mudança no que é enviado."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:140
+msgid "By model, most prompt tokens first."
+msgstr "Por modelo, os com mais tokens de prompt primeiro."
+
 #: src/features/pages/components/page-version-panel.tsx:140
 msgid "by you"
 msgstr "por você"
@@ -6006,7 +6025,7 @@ msgstr "Canadá"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:617
+#: src/features/vault/components/site-logins.tsx:647
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8874,7 +8893,7 @@ msgstr "Não foi possível excluir o bot."
 msgid "Could not delete the comment"
 msgstr "Não foi possível excluir o comentário"
 
-#: src/features/vault/components/site-logins.tsx:419
+#: src/features/vault/components/site-logins.tsx:453
 msgid "Could not delete the login."
 msgstr "Não foi possível excluir o login."
 
@@ -9118,7 +9137,7 @@ msgstr "Não foi possível salvar a configuração do Daily Brief."
 msgid "Could not save the email setting."
 msgstr "Não foi possível salvar a configuração de e-mail."
 
-#: src/features/vault/components/site-logins.tsx:368
+#: src/features/vault/components/site-logins.tsx:396
 msgid "Could not save the login."
 msgstr "Não foi possível salvar o login."
 
@@ -10025,6 +10044,7 @@ msgstr "Data"
 msgid "Date and time"
 msgstr "Data e hora"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:96
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Day"
 msgstr "Dia"
@@ -10338,7 +10358,7 @@ msgstr ""
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:625
+#: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "Excluir"
 
@@ -10457,7 +10477,7 @@ msgid "Delete group and children"
 msgstr "Excluir grupo e filhos"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:495
+#: src/features/vault/components/site-logins.tsx:525
 msgid "Delete login for {0}"
 msgstr "Excluir login de {0}"
 
@@ -10591,7 +10611,7 @@ msgstr "Exclui a conversa aberta após confirmação ({0})"
 msgid "Delete this case?"
 msgstr "Excluir este caso?"
 
-#: src/features/vault/components/site-logins.tsx:635
+#: src/features/vault/components/site-logins.tsx:665
 msgid "Delete this login?"
 msgstr "Excluir este login?"
 
@@ -11928,12 +11948,12 @@ msgstr "editar imagem"
 msgid "Edit Image"
 msgstr "Editar imagem"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "Edit login"
 msgstr "Editar login"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:485
+#: src/features/vault/components/site-logins.tsx:515
 msgid "Edit login for {0}"
 msgstr "Editar login de {0}"
 
@@ -17136,6 +17156,7 @@ msgstr "Hosts"
 msgid "hotkey"
 msgstr "tecla de atalho"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:119
 #: src/features/settings/components/chat/usage-settings.tsx:99
 msgid "Hour"
 msgstr "Hora"
@@ -18806,7 +18827,7 @@ msgstr "Quirguistão"
 msgid "Label"
 msgstr "Rótulo"
 
-#: src/features/vault/components/site-logins.tsx:565
+#: src/features/vault/components/site-logins.tsx:595
 msgid "Label (optional)"
 msgstr "Rótulo (opcional)"
 
@@ -19223,7 +19244,7 @@ msgstr "Deixe em branco para \"qualquer modelo\"."
 msgid "Leave empty for transparent background"
 msgstr "Deixe vazio para fundo transparente"
 
-#: src/features/vault/components/site-logins.tsx:558
+#: src/features/vault/components/site-logins.tsx:588
 msgid "Leave empty to keep the saved password"
 msgstr "Deixe vazio para manter a senha salva"
 
@@ -19922,6 +19943,7 @@ msgid "Loading..."
 msgstr "Carregando..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
+#: src/features/admin/components/admin-provider-cache-row.tsx:71
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20021,7 +20043,7 @@ msgstr "Sair"
 msgid "Login"
 msgstr "Entrar"
 
-#: src/features/vault/components/site-logins.tsx:415
+#: src/features/vault/components/site-logins.tsx:449
 msgid "Login deleted"
 msgstr "Login excluído"
 
@@ -20029,11 +20051,11 @@ msgstr "Login excluído"
 msgid "login refused"
 msgstr "login recusado"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login saved"
 msgstr "Login salvo"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login updated"
 msgstr "Login atualizado"
 
@@ -20041,7 +20063,7 @@ msgstr "Login atualizado"
 msgid "Logins"
 msgstr "Logins"
 
-#: src/features/vault/components/site-logins.tsx:431
+#: src/features/vault/components/site-logins.tsx:465
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "Logins salvos para o navegador do agente. A opção de entrar com eles chega em uma próxima atualização: o servidor digitará a senha no site, e a IA nunca a verá."
 
@@ -21273,6 +21295,7 @@ msgstr "Modo {0}, em {1}. Nada começa quando é criado."
 msgid "Mode:"
 msgstr "Modo:"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:143
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -22363,7 +22386,7 @@ msgstr "Novo modelo de alta qualidade para fotorrealismo e renderização de tex
 msgid "New line in message"
 msgstr "Nova linha na mensagem"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "New login"
 msgstr "Novo login"
 
@@ -25348,7 +25371,7 @@ msgstr "As chaves de acesso permitem entrar com segurança usando a biometria do
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:552
+#: src/features/vault/components/site-logins.tsx:582
 msgid "Password"
 msgstr "Senha"
 
@@ -25395,7 +25418,7 @@ msgstr "E-mail de redefinição de senha enviado"
 msgid "Password reset successful"
 msgstr "Senha redefinida com sucesso"
 
-#: src/features/vault/components/site-logins.tsx:474
+#: src/features/vault/components/site-logins.tsx:508
 msgid "Password set"
 msgstr "Senha definida"
 
@@ -26892,6 +26915,13 @@ msgstr "Prompt otimizado com sucesso"
 msgid "Prompt to run on all models..."
 msgstr "Prompt a executar em todos os modelos..."
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:84
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
+#: src/features/admin/components/admin-provider-cache-row.tsx:146
+msgid "Prompt tokens"
+msgstr "Tokens de prompt"
+
 #: src/features/settings/components/chat/usage-settings.tsx:280
 msgid "Prompt Tokens"
 msgstr "Tokens de prompt"
@@ -26957,6 +26987,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Confiabilidade comprovada da geração anterior"
 
 #: src/components/model-picker/model-picker.tsx:283
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -26977,6 +27008,10 @@ msgstr "Provedor adicionado — os modelos dele já estão no seletor de modelos
 #: src/routes/admin/gateway/index.tsx:326
 msgid "Provider Health"
 msgstr "Saúde dos provedores"
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:46
+msgid "Provider prompt cache"
+msgstr "Cache de prompts dos provedores"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:323
 msgid "Provider removed"
@@ -28533,6 +28568,10 @@ msgstr "Solicitando..."
 msgid "Requesting…"
 msgstr "Solicitando…"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:88
+#: src/features/admin/components/admin-provider-cache-row.tsx:97
+#: src/features/admin/components/admin-provider-cache-row.tsx:120
+#: src/features/admin/components/admin-provider-cache-row.tsx:145
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -29517,7 +29556,7 @@ msgstr "Salvar caso"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Salvar alterações"
@@ -29534,7 +29573,7 @@ msgstr "Falha ao salvar"
 msgid "Save Image"
 msgstr "Salvar imagem"
 
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 msgid "Save login"
 msgstr "Salvar login"
 
@@ -30568,6 +30607,13 @@ msgstr "Sérvio (Sérvia)"
 msgid "Serif"
 msgstr "Serifada"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:99
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
+msgid "Served from cache"
+msgstr "Servido do cache"
+
 #: src/features/devices/components/devices-settings.tsx:459
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Servidor adicionado. Escolha quais das pastas dele compartilhar no app para desktop."
@@ -31200,12 +31246,12 @@ msgstr "Cadastre-se para desbloquear todos os modelos"
 msgid "Sign-in expired"
 msgstr "Login expirado"
 
-#: src/features/vault/components/site-logins.tsx:526
+#: src/features/vault/components/site-logins.tsx:556
 msgid "Sign-in page (optional)"
 msgstr "Página de login (opcional)"
 
 #. placeholder {0}: login.signInUrl
-#: src/features/vault/components/site-logins.tsx:478
+#: src/features/vault/components/site-logins.tsx:510
 msgid "Sign-in page: {0}"
 msgstr "Página de login: {0}"
 
@@ -31291,15 +31337,15 @@ msgstr "Cingalês"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Cingalês (Sri Lanka)"
 
-#: src/features/vault/components/site-logins.tsx:514
+#: src/features/vault/components/site-logins.tsx:544
 msgid "Site"
 msgstr "Site"
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:463
 msgid "Site logins"
 msgstr "Logins de sites"
 
-#: src/features/vault/components/site-logins.tsx:452
+#: src/features/vault/components/site-logins.tsx:486
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "Não é possível salvar, alterar ou excluir logins de sites enquanto representa um usuário."
 
@@ -34166,7 +34212,7 @@ msgid "The agent's browser was replaced, and control went back to the agent. You
 msgstr "O navegador do agente foi substituído e o controle voltou para o agente. Você pode assumir o controle novamente."
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:626
+#: src/features/vault/components/site-logins.tsx:656
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "O navegador do agente não poderá usá-lo para entrar em {0}."
 
@@ -34767,7 +34813,7 @@ msgstr "O agente da página não conseguiu editar esta página"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "A página agora mostra a outra versão. Copie da sua o que quiser manter."
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:567
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "A página com o formulário de login. Deixe em branco para começar na página inicial do site."
 
@@ -34811,6 +34857,10 @@ msgstr "O prompt vira a entrada do caso e esta resposta vira a resposta esperada
 #: src/features/settings/components/chat/native-providers-settings.tsx:719
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "O provedor cobra essas solicitações diretamente de você. Quando sabemos o preço do modelo, a taxa de plataforma habitual para chaves próprias é cobrada em créditos."
+
+#: src/features/admin/components/admin-provider-cache-row.tsx:75
+msgid "The provider cache readings could not be loaded."
+msgstr "Não foi possível carregar as leituras do cache dos provedores."
 
 #: src/features/chat/host/host-composer.tsx:1054
 msgid "The queue is paused. Send next to go on with the queued messages."
@@ -34917,7 +34967,11 @@ msgstr "O servidor ainda não lista nenhum modelo — baixe ou carregue um prime
 msgid "The shard footprint could not be measured."
 msgstr "Não foi possível medir a ocupação do shard."
 
-#: src/features/vault/components/site-logins.tsx:394
+#: src/features/admin/components/admin-provider-cache-row.tsx:48
+msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Times are UTC."
+msgstr "A parcela dos tokens de prompt que os provedores serviram do próprio cache. Dias e horas contam os pares de provedor e modelo que usaram o cache nos últimos 30 dias; a tabela de modelos lista os 50 modelos com mais tokens de prompt. Respostas do cache de respostas do gateway não são incluídas. Horários em UTC."
+
+#: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
 msgstr "A página de login deve ser um endereço https:// do mesmo site, sem nome de usuário nem senha."
 
@@ -35544,11 +35598,11 @@ msgstr "Esta lista está cheia: remova uma ferramenta antes de adicionar outra."
 #~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 #~ msgstr "Este login foi alterado em outro lugar e foi recarregado. Suas alterações no nome de usuário e no rótulo foram mantidas; confira os bots dele, digite a senha novamente se estava alterando-a e salve de novo."
 
-#: src/features/vault/components/site-logins.tsx:334
+#: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "Este login foi alterado em outro lugar e foi recarregado. Suas alterações no nome de usuário, no rótulo e na página de login foram mantidas; confira os bots dele, digite a senha novamente se estava alterando-a e salve de novo."
 
-#: src/features/vault/components/site-logins.tsx:344
+#: src/features/vault/components/site-logins.tsx:372
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "Este login foi alterado em outro lugar. Recarregue a página para vê-lo antes de salvar novamente."
 
@@ -36706,8 +36760,8 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:446
-#: src/features/vault/components/site-logins.tsx:582
+#: src/features/vault/components/site-logins.tsx:480
+#: src/features/vault/components/site-logins.tsx:612
 msgid "Try again"
 msgstr "Tentar novamente"
 
@@ -37890,7 +37944,7 @@ msgstr "Nome de usuário"
 msgid "Username is required"
 msgstr "O nome de usuário é obrigatório"
 
-#: src/features/vault/components/site-logins.tsx:541
+#: src/features/vault/components/site-logins.tsx:571
 msgid "Username or email"
 msgstr "Nome de usuário ou e-mail"
 
@@ -39275,6 +39329,10 @@ msgstr "Largura"
 msgid "Will be saved as your {provider} API key"
 msgstr "Será salvo como sua chave de API de {provider}"
 
+#: src/features/admin/components/admin-provider-cache-row.tsx:53
+msgid "Window"
+msgstr "Período"
+
 #: src/features/local-models/components/local-setup-guide.tsx:76
 msgid "Windows"
 msgstr "Windows"
@@ -39890,7 +39948,7 @@ msgstr "Sua formação, preferências ou localização, para ajudar a IA a enten
 msgid "Your bots"
 msgstr "Seus bots"
 
-#: src/features/vault/components/site-logins.tsx:571
+#: src/features/vault/components/site-logins.tsx:601
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "Não foi possível carregar seus bots. As alterações em um login salvo poderão ser salvas quando eles carregarem, para que os bots dele sejam mantidos."
 
@@ -39911,11 +39969,11 @@ msgid "Your changes to this project's rule files are not saved. Closing drops th
 msgstr "Suas alterações nos arquivos de regras deste projeto não foram salvas. Ao fechar, elas serão perdidas."
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:463
+#: src/features/vault/components/site-logins.tsx:497
 msgid "Your chats and {0}"
 msgstr "Suas conversas e {0}"
 
-#: src/features/vault/components/site-logins.tsx:465
+#: src/features/vault/components/site-logins.tsx:499
 msgid "Your chats and the bots you chose"
 msgstr "Suas conversas e os bots que você escolheu"
 
@@ -40105,11 +40163,11 @@ msgstr "Não foi possível carregar sua visão geral."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Sua própria chave da Anthropic. Necessária para delegar trabalho ao Claude Code."
 
-#: src/features/vault/components/site-logins.tsx:590
+#: src/features/vault/components/site-logins.tsx:620
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "Suas próprias conversas sempre podem usá-lo. As conversas de um bot só podem usá-lo quando você marca esse bot aqui. Conversas compartilhadas, públicas, de grupo e de mensageiros nunca podem."
 
-#: src/features/vault/components/site-logins.tsx:460
+#: src/features/vault/components/site-logins.tsx:494
 msgid "Your own chats only"
 msgstr "Somente suas próprias conversas"
 
@@ -40168,7 +40226,7 @@ msgstr "Sua revisão foi solicitada"
 msgid "Your rule files are still saving."
 msgstr "Seus arquivos de regras ainda estão sendo salvos."
 
-#: src/features/vault/components/site-logins.tsx:437
+#: src/features/vault/components/site-logins.tsx:471
 msgid "Your saved logins could not be loaded."
 msgstr "Não foi possível carregar seus logins salvos."
 
