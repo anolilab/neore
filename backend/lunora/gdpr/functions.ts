@@ -16,6 +16,17 @@ import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { withDependency } from "../lib/dependency";
 import { signedReadUrl } from "../lib/storage-read";
 
+/**
+ * An admin acting as the owner starts and downloads no export: it holds the owner's whole account, device-call output
+ * and instruction files included. The status stays readable, as the API key list does, since it carries no content or
+ * link; cancelling stays open too, as it only withdraws an export.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined, refused: string): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", `${refused} while impersonating`);
+    }
+};
+
 export const getExportStatus = authQuery.query(async ({ ctx }) => {
     const { userId } = ctx.user;
 
@@ -243,6 +254,8 @@ export const getGdprStatus = authQuery
     });
 
 export const requestDataExport = authMutation.use(rateLimit("gdpr/request")).mutation(async ({ ctx }) => {
+    refuseImpersonation(ctx.user.impersonatedBy, "A data export cannot be requested");
+
     const { userId } = ctx.user;
     const userEmail = ctx.user.email || "";
 
@@ -340,6 +353,8 @@ export const getExportDownloadUrl = authAction
     .use(rateLimit("gdpr/request"))
     .output(v.object({ expiresAt: v.union(v.number(), v.null()), url: v.string() }))
     .action(async ({ ctx }) => {
+        refuseImpersonation(ctx.user.impersonatedBy, "A data export cannot be downloaded");
+
         const { userId } = ctx.user;
 
         const request = await ctx.runQuery(internal.gdpr.functions.getExportRequest, { userId });

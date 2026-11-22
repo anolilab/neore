@@ -436,13 +436,13 @@ no content worth exporting.
 
 ### Mutations
 
-- `requestDataExport()` - Request a data export
+- `requestDataExport()` - Request a data export (refused while an admin impersonates the user)
 - `requestAccountDeletion()` - Request account deletion
 - `cancelStuckExport()` - Cancel a stuck export request
 
 ### Actions
 
-- `getExportDownloadUrl()` - Get signed download URL for completed export
+- `getExportDownloadUrl()` - Get signed download URL for completed export (refused while an admin impersonates the user)
 
 ### Internal Functions
 
