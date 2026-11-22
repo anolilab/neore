@@ -119,7 +119,7 @@ const sameSite = (a: string, b: string): boolean => {
  * login opened meanwhile starts with no password, so one in it was typed there and stays.
  */
 const afterSave =
-    (submitted: LoginDraft, saved: { id: Id<"savedSiteLogins">; updatedAt: number }) =>
+    (submitted: LoginDraft, saved: { id: Id<"savedSiteLogins">; signInUrl?: string; updatedAt: number }) =>
     (current: LoginDraft): LoginDraft => {
         if (current === submitted) {
             return emptyDraft();
@@ -132,15 +132,19 @@ const afterSave =
             return current.id !== undefined || password === current.password ? current : { ...current, password };
         }
 
+        // The page as the server stored it (no fragment): an unchanged field takes it too, so a later conflict reload does
+        // not read the submitted spelling as an edit made here.
+        const storedPage = saved.signInUrl ?? "";
         const opened = {
             label: submitted.label.trim(),
-            signInUrl: submitted.signInUrl.trim(),
+            signInUrl: storedPage,
             teammateIds: submitted.teammateIds,
             updatedAt: saved.updatedAt,
             username: submitted.username.trim(),
         };
+        const signInUrl = current.signInUrl === submitted.signInUrl ? storedPage : current.signInUrl;
 
-        return { ...current, id: saved.id, opened, password };
+        return { ...current, id: saved.id, opened, password, signInUrl };
     };
 
 /** The `data.code` a refused save carries, if any. */

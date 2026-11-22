@@ -322,6 +322,35 @@ describe("saving a site login", () => {
         expect(await signInUrlNow()).toBe(PAGE);
         expect(listed.logins[0]?.["signInUrl"]).toBe(PAGE);
 
+        // The save answers with the page as stored, which the form then holds as the one it opened; an edit that sends
+        // none answers with the page it kept.
+        const answered = (await as(OWNER).mutation(
+            saveSiteLogin as never,
+            {
+                expectedUpdatedAt: await updatedAtOf(id),
+                loginId: id,
+                signInUrl: `${PAGE}#again`,
+                site: SITE,
+                teammateIds: [],
+                username: "ada@example.com",
+            } as never,
+        )) as { signInUrl?: string };
+
+        expect(answered.signInUrl).toBe(PAGE);
+
+        const kept = (await as(OWNER).mutation(
+            saveSiteLogin as never,
+            {
+                expectedUpdatedAt: await updatedAtOf(id),
+                loginId: id,
+                site: SITE,
+                teammateIds: [],
+                username: "ada@example.com",
+            } as never,
+        )) as { signInUrl?: string };
+
+        expect(kept.signInUrl).toBe(PAGE);
+
         const refused = [
             [INSECURE_SITE, "login"].join("/"),
             "https://other.example/login",

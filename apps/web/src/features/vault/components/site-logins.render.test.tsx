@@ -698,6 +698,37 @@ describe("SiteLogins", () => {
             });
         });
 
+        it("holds the sign-in page as the server stored it after a save, so a later reload takes a newer one from elsewhere", async () => {
+            const user = userEvent.setup();
+            let finishSave: (value: unknown) => void = () => {};
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+            const heldSave = new Promise((resolve) => {
+                finishSave = resolve;
+            });
+
+            harness.logins = [savedLogin()];
+            harness.saveSiteLogin.mockReturnValueOnce(heldSave);
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.type(screen.getByLabelText("Sign-in page (optional)"), `${SITE}/login#top`);
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+            // Another field changes while the save is on its way; the server stores the page without its fragment.
+            await user.type(screen.getByLabelText("Label (optional)"), "Work");
+            finishSave({ id: "login-1", signInUrl: `${SITE}/login`, updatedAt: 2 });
+            await waitFor(() => expect(valueOf("Sign-in page (optional)")).toBe(`${SITE}/login`));
+
+            // Another tab moves the page; the next save here is refused as stale and the form reloads.
+            harness.logins = [{ ...savedLogin(), signInUrl: `${SITE}/sign-in`, updatedAt: 5 }];
+            harness.saveSiteLogin.mockRejectedValueOnce(changedElsewhere());
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+            await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("changed elsewhere and has been reloaded")));
+            expect(valueOf("Sign-in page (optional)")).toBe(`${SITE}/sign-in`);
+            expect(valueOf("Label (optional)")).toBe("Work");
+        });
+
         it("keeps a bot unticked here unticked after the reload", async () => {
             const user = userEvent.setup();
 

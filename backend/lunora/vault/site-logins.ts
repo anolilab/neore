@@ -194,8 +194,9 @@ export const saveSiteLogin = authMutation
         teammateIds: v.array(v.id("bots")).max(MAX_SITE_LOGIN_TEAMMATES * 2),
         username: v.string().max(USERNAME_MAX),
     })
-    // The version saved, so the form can keep editing the login without refusing its own next save.
-    .output(v.object({ id: v.id("savedSiteLogins"), updatedAt: v.number() }))
+    // The version saved, so the form can keep editing the login without refusing its own next save, and the sign-in page
+    // as stored (without its fragment), which the form then holds as the one it opened.
+    .output(v.object({ id: v.id("savedSiteLogins"), signInUrl: v.optional(v.string()), updatedAt: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
@@ -242,7 +243,9 @@ export const saveSiteLogin = authMutation
             await patchRow(ctx.db, "savedSiteLogins", row, { ...fields, ...signInPage, updatedAt, ...withoutUndefined({ encryptedPassword }) });
             ctx.log.event("vault.site_login_saved", { created: false, passwordChanged: encryptedPassword !== undefined });
 
-            return { id: row._id, updatedAt };
+            const storedPage = args.signInUrl === undefined ? row.signInUrl : signInUrl;
+
+            return { id: row._id, updatedAt, ...(storedPage !== undefined && { signInUrl: storedPage }) };
         }
 
         if (encryptedPassword === undefined) {
@@ -268,7 +271,7 @@ export const saveSiteLogin = authMutation
 
         ctx.log.event("vault.site_login_saved", { created: true, passwordChanged: true });
 
-        return { id, updatedAt: fields.updatedAt };
+        return { id, updatedAt: fields.updatedAt, ...(signInUrl !== undefined && { signInUrl }) };
     });
 
 export const deleteSiteLogin = authMutation
