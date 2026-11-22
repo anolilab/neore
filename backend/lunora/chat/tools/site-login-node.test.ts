@@ -36,7 +36,7 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 const { default: schema } = await import("../../schema");
 const { encryptKey } = await import("../../lib/encryption");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
-const { NO_USABLE_LOGIN, PASSWORD_TOO_SHORT, SCRIPT_SIGN_IN, SIGN_IN_RETIRED, WITHHELD_FIELD, withoutLogin, withoutPassword } =
+const { NO_USABLE_LOGIN, PASSWORD_TOO_SHORT, PASSWORD_UNREADABLE, SCRIPT_SIGN_IN, SIGN_IN_RETIRED, WITHHELD_FIELD, withoutLogin, withoutPassword } =
     await import("./site-login-node");
 const { applyLimit } = await import("../../lib/rate-limiter-mutations");
 const { PERSON_HAS_CONTROL } = await import("./browser-node");
@@ -434,6 +434,28 @@ describe("what the renderer answers", () => {
 
         expect(result.output.error).toContain("will not be used again");
         await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
+    });
+
+    it("types nothing, and gives the charge back, when the saved password cannot be decrypted", async () => {
+        await insertApprovalRow();
+        await withBrowser();
+        await harness.run(async (ctx: any) => {
+            const [login] = await ctx.db.query("savedSiteLogins").collect();
+
+            // Random text, not a ciphertext of this key: decrypting it fails.
+            await ctx.db.patch("savedSiteLogins", login._id, { encryptedPassword: crypto.randomUUID() });
+        });
+        // The hour's 20 spent, this sign-in's unit with them: only a refund leaves one.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 19, identifier: OWNER, key: "browser/action:free" }));
+
+        const result = await signIn();
+
+        expect(result.output).toMatchObject({ error: PASSWORD_UNREADABLE, success: false });
+        expect(renderer).not.toHaveBeenCalled();
+        expect(await session()).not.toHaveProperty("inUseHolds");
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/action:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
     });
 
     it("types no saved password shorter than the renderer can keep out of its results", async () => {

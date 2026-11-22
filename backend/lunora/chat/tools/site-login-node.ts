@@ -130,6 +130,10 @@ export const SCRIPT_SIGN_IN =
 export const PASSWORD_TOO_SHORT =
     "The password saved for this site is too short to be typed without it showing in what the browser returns, so nothing was typed. Ask the person to sign in themselves in the live view.";
 
+/** The saved password could not be decrypted: nothing was typed. */
+export const PASSWORD_UNREADABLE =
+    "The password saved for this site could not be read, so nothing was typed. Ask the person to save the login again, or to sign in themselves in the live view.";
+
 /** The browser session the renderer retired was replaced, but too little time was left to sign in on the new one. */
 export const SIGN_IN_RETIRED =
     "The browser session was retired and cannot be used again, so nothing was typed. Ask to sign in again: the next sign-in opens a new browser.";
@@ -251,7 +255,12 @@ export const fillSavedLogin = internalAction
                 return told(refused("Browser automation rate limit exceeded.", login.site));
             }
 
-            password = await decryptKey(login.encryptedPassword, "site-logins");
+            try {
+                password = await decryptKey(login.encryptedPassword, "site-logins");
+            } catch {
+                // Nothing was sent: the hold ends and the charge is given back, as for any sign-in that typed nothing.
+                return await unrun(PASSWORD_UNREADABLE);
+            }
 
             if (password.length < MIN_FILL_PASSWORD_LENGTH) {
                 return await unrun(PASSWORD_TOO_SHORT);
