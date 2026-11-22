@@ -719,6 +719,19 @@ describe("useSession", () => {
         await panel.unmount();
     });
 
+    it("reads again after a failed read, so a sign-in from signed out still shows", async () => {
+        const panel = await mount(createElement(Probe));
+
+        await vi.waitFor(() => expect(seen.at(-1)).toBeNull());
+        vi.spyOn(chrome.storage.local, "get").mockRejectedValueOnce(new Error("storage unavailable"));
+        await act(async () => {
+            await chrome.storage.local.set({ [GRANT_KEY]: { id: "g1", token: "grant", user: USER } });
+        });
+
+        await vi.waitFor(() => expect(seen.at(-1)).toBe("g1"));
+        await panel.unmount();
+    });
+
     it("finishes a pending sign-out once per panel, however many components read the session", async () => {
         store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
         store.set(SIGNED_OUT_KEY, "g1");

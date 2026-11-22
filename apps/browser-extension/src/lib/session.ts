@@ -59,7 +59,7 @@ const setSignOutUnfinished = (next: boolean): void => {
     }
 };
 
-/** Hide the notice of an unfinished sign-out (`useSignOutUnfinished`): a new sign-in is starting. */
+/** Hide the notice of an unfinished sign-out (`useSignOutUnfinished`): a new sign-in replaced the marked grant. */
 export const dismissSignOutUnfinished = (): void => {
     setSignOutUnfinished(false);
 };
@@ -157,18 +157,25 @@ const publish = (next: GrantSession | null): void => {
     }
 };
 
+/** How long the session watch waits before each read again after a failed one; then it waits for the next change. */
+const READ_RETRY_DELAYS_MS = [250, 1000, 4000] as const;
+
 /**
  * Follow the stored grant in `storage.local`. A grant marked signed out
  * (`SIGNED_OUT_KEY`) reads as none, so each change to either key is read
  * again; the latest read wins. A first read that fails offers sign-in
  * (`loadGrantSession`); a later one keeps what is shown, since publishing none
- * would sign the provider out and drop the writes queued offline.
+ * would sign the provider out and drop the writes queued offline. Either way a
+ * failed latest read is tried again (`READ_RETRY_DELAYS_MS`): it may have
+ * discarded an older read that would have shown the change.
  */
 const watchGrantSession = (): (() => void) => {
     let stopped = false;
     let reads = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
-    const load = async () => {
+    const load = async (attempt = 0) => {
+        clearTimeout(retry);
         reads += 1;
 
         const read = reads;
@@ -177,6 +184,18 @@ const watchGrantSession = (): (() => void) => {
         try {
             loaded = toGrantSession(await readGrant());
         } catch {
+            if (stopped || read !== reads) {
+                return;
+            }
+
+            const delay = READ_RETRY_DELAYS_MS[attempt];
+
+            if (delay !== undefined) {
+                retry = setTimeout(() => {
+                    void load(attempt + 1);
+                }, delay);
+            }
+
             if (shown !== undefined) {
                 return;
             }
@@ -202,6 +221,7 @@ const watchGrantSession = (): (() => void) => {
 
     return () => {
         stopped = true;
+        clearTimeout(retry);
         shown = undefined;
         chrome.storage.onChanged.removeListener(listener);
     };
