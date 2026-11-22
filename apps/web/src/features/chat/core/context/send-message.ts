@@ -63,6 +63,24 @@ const guestRefusalText = (texts: SendMessageTexts, code: GatewayErrorBody["error
     return typeof code === "string" && Object.hasOwn(byCode, code) ? byCode[code]?.() : undefined;
 };
 
+/** How long a send waits for its chat's pin. Past it the send fails visibly (draft kept) instead of hanging before the gateway deadline starts. */
+const PIN_LOOKUP_DEADLINE_MS = 5000;
+
+const withPinDeadline = async <T>(lookup: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+            reject(new Error("The chat's pinned goal did not load in time"));
+        }, PIN_LOOKUP_DEADLINE_MS);
+    });
+
+    try {
+        return await Promise.race([lookup, deadline]);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
 /** User-facing strings the send body needs, as thunks so the `t` templates stay in the provider where Lingui compiles them. */
 export interface SendMessageTexts {
     bannedContent: () => string;
@@ -471,16 +489,12 @@ const runSendMessageBody = async (
 
         if (currentMode === "text" && guestMessageId === undefined && threadId && text.trim() && !useGoalComposer.getState().enabled && env.pinnedGoalAllowed) {
             const pinOverride = pinOverrideFor(threadId);
+            const pinOptions = crpc.chat.goals.functions.getPinnedGoal.queryOptions({
+                threadId: threadId as Id<"threads">,
+                unlockProof: currentUnlockProof(threadId),
+            });
 
-            pinnedGoal =
-                pinOverride === undefined
-                    ? await queryClient.ensureQueryData(
-                          crpc.chat.goals.functions.getPinnedGoal.queryOptions({
-                              threadId: threadId as Id<"threads">,
-                              unlockProof: currentUnlockProof(threadId),
-                          }),
-                      )
-                    : pinOverride;
+            pinnedGoal = pinOverride === undefined ? await withPinDeadline(queryClient.ensureQueryData(pinOptions)) : pinOverride;
         }
 
         const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text, pinnedGoal) : undefined;

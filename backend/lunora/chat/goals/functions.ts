@@ -143,6 +143,11 @@ export const clearPinnedGoal = authMutation
     .use(rateLimit("chat/update"))
     .output(v.null())
     .mutation(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+        // Set and clear refuse alike: an impersonating admin does not change the owner's pin.
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "A pinned goal cannot be cleared while impersonating");
+        }
+
         await requireOwnedThread(context, threadId, context.user.userId, unlockProof);
         await setThreadPinnedGoal(context.db, threadId, undefined);
 

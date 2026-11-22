@@ -11,6 +11,7 @@ import { Pin, X } from "lucide-react";
 import type { FC, FormEvent } from "react";
 import { useEffect, useId, useState } from "react";
 
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { setPinOverride, useGoalComposer } from "./goal-store";
@@ -28,6 +29,8 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const unlockProof = useUnlockProof(threadId);
+    // The server refuses every pin change while an admin acts as the owner, so the controls stay hidden then.
+    const impersonating = useImpersonating();
     const maxRounds = useGoalComposer((state) => state.maxRounds);
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState("");
@@ -58,9 +61,11 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
         }),
     );
 
-    if (!isOwner) {
+    if (!isOwner || impersonating) {
         return null;
     }
+
+    const failed = pin.isError || clear.isError;
 
     const handleOpenChange = (next: boolean) => {
         if (next) {
@@ -82,7 +87,7 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
     };
 
     return (
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
             <Popover onOpenChange={handleOpenChange} open={open}>
                 <PopoverTrigger
                     render={
@@ -144,6 +149,11 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
                 >
                     <X aria-hidden="true" className="size-3" />
                 </Button>
+            )}
+            {failed && (
+                <p className="text-destructive basis-full text-xs" role="alert">
+                    {t`Could not save that choice. Try again.`}
+                </p>
             )}
         </div>
     );
