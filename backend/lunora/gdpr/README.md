@@ -139,8 +139,9 @@ Users can request a complete export of all their personal data in JSON format. T
    with its usage object, and keeps the record until the pages are gone (a deletion that exhausts its retries is tried again a day on), and account erasure deletes the user's whole prefix (`delete-user-browser-export-pages`). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
    `control` claim, a typed action's `value` (it can be a password) and an extension's pairing code. A string field
    over 4 KiB is cut and named in the row's `truncated` (a list keeps every item, the cut ones named: `capabilities[1]`). The
-   section is held to 8 MiB of the file and 256 pages (workflow steps): past either the rest is left out and the section says
-   `truncated: true`, and the rest of the export is written
+   section is held to 8 MiB of the file (measured as written, indented) and 256 pages (workflow steps): past either no further
+   page is stored, the rest is left out and the section says `truncated: true`, and the rest of the export is written. The
+   actions are read last, as by far the largest, so a cut drops the newest actions before any session, site or extension
 
 **Workflow Steps:**
 

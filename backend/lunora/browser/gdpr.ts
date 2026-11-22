@@ -15,7 +15,7 @@ import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { withDependency } from "../lib/dependency";
 import { gdprLogger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
-import { browserExportUserPrefix } from "./export-pages";
+import { browserExportUserPrefix, browserPageFileBytes } from "./export-pages";
 
 /**
  * Deletes one batch of the sites a deleted thread's runs asked the person to clear; `true` when none are left. The
@@ -244,13 +244,16 @@ const charge = (spent: Spent, rows: ReadonlyArray<unknown>): void => {
 };
 
 /**
- * Where the next page starts: `phase` names the table, `page` the cursor in it (for `actions`, in the user's sessions, at the
- * session being read) and `inner` the cursor in that session's actions.
+ * Where the next page starts: `phase` names the table and `page` the cursor in it. For `actions`, `page` is the cursor in the user's
+ * sessions after the batch being read, `sessions` that batch's sessions still to read, `inner` the cursor in the first one's actions,
+ * and `last` says no batch follows.
  */
 const vBrowserExportCursor = v.object({
     inner: v.optional(v.string().max(MAX_LENGTH.cursor)),
+    last: v.optional(v.boolean()),
     page: v.optional(v.string().max(MAX_LENGTH.cursor)),
     phase: v.union(v.literal("sessions"), v.literal("actions"), v.literal("humanChecks"), v.literal("extensions")),
+    sessions: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
 });
 
 export type BrowserExportCursor = Infer<typeof vBrowserExportCursor>;
@@ -411,34 +414,49 @@ const collectRows = async <R, E>(
 };
 
 /**
- * Walks the user's sessions from `cursor`, reading each one's actions in reads sized by {@link nextLimit}, until the page's
- * budget is spent. It stops only before a read, so the cursor names exactly where the next page starts.
+ * Walks the user's sessions from `cursor`, a batch sized by {@link nextLimit} at a time, reading each one's actions in reads sized
+ * the same way, until the page's budget is spent. It stops only before a read, so the cursor names exactly where the next page
+ * starts: the batch's sessions not yet read are carried in it, so a page that ends mid-batch neither repeats nor skips one.
  */
 const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cursor: BrowserExportCursor, cautious: boolean): Promise<BrowserExportPage> => {
     const spent = spentNothing(cautious);
     const actions: Infer<typeof vExportAction>[] = [];
-    let sessionCursor = cursor.page;
-    let actionCursor = cursor.inner;
+    let { inner: actionCursor, last = false, page: sessionCursor, sessions: pending = [] } = cursor;
     const stop = (): BrowserExportPage => {
         return {
             ...EMPTY_PAGE,
             actions,
-            next: { phase: "actions", ...(actionCursor !== undefined && { inner: actionCursor }), ...(sessionCursor !== undefined && { page: sessionCursor }) },
+            next: {
+                phase: "actions",
+                sessions: pending,
+                ...(actionCursor !== undefined && { inner: actionCursor }),
+                ...(last && { last }),
+                ...(sessionCursor !== undefined && { page: sessionCursor }),
+            },
         };
     };
 
     for (;;) {
-        if (nextLimit(spent) === 0) {
-            return stop();
-        }
+        const [sessionId] = pending;
 
-        const sessions = await ctx.db.browserSessions.findMany({ cursor: sessionCursor, limit: 1, where: { userId } });
-        const [session] = sessions.page;
+        if (sessionId === undefined) {
+            if (last) {
+                return { ...EMPTY_PAGE, actions };
+            }
 
-        charge(spent, sessions.page);
+            const limit = nextLimit(spent);
 
-        if (!session) {
-            return { ...EMPTY_PAGE, actions, next: { phase: "humanChecks" } };
+            if (limit === 0) {
+                return stop();
+            }
+
+            const sessions = await ctx.db.browserSessions.findMany({ cursor: sessionCursor, limit, where: { userId } });
+
+            charge(spent, sessions.page);
+            pending = sessions.page.map((session) => session._id as string);
+            last = sessions.isDone || !sessions.continueCursor;
+            sessionCursor = last ? undefined : (sessions.continueCursor ?? undefined);
+            continue;
         }
 
         for (;;) {
@@ -452,13 +470,13 @@ const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cur
                 cursor: actionCursor,
                 limit,
                 orderBy: [{ timestamp: "asc" }],
-                where: { sessionId: session._id },
+                where: { sessionId: sessionId as Id<"browserSessions"> },
             });
 
             charge(spent, page.page);
 
             for (const row of page.page) {
-                const exported = exportedAction(row, session._id as string);
+                const exported = exportedAction(row, sessionId);
 
                 spent.bytes += jsonBytes(exported);
                 actions.push(exported);
@@ -471,18 +489,15 @@ const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cur
             }
         }
 
-        if (sessions.isDone || !sessions.continueCursor) {
-            return { ...EMPTY_PAGE, actions, next: { phase: "humanChecks" } };
-        }
-
-        sessionCursor = sessions.continueCursor;
+        pending = pending.slice(1);
     }
 };
 
 /**
- * One page of the user's browser export: their sessions, then each session's actions, then the sites a run asked them to clear,
- * then their extensions. `next` is absent on the last page; the workflow asks again with it until it is. Every page stays within
- * its budgets (`PAGE_BYTES`, `READ_BYTES`, `QUERIES`) and every page makes progress, so the export always finishes.
+ * One page of the user's browser export: their sessions, then the sites a run asked them to clear, then their extensions, then each
+ * session's actions, last as by far the largest, so a history cut at its pages or its bytes loses its newest actions first. `next`
+ * is absent on the last page; the workflow asks again with it until it is. Every page stays within its budgets (`PAGE_BYTES`,
+ * `READ_BYTES`, `QUERIES`) and every page makes progress, so the export always finishes.
  */
 export const collectBrowserForExport = internalQuery
     // `cautious`: each row reckoned at the largest a row can be, for a page whose read passed the transaction's limit.
@@ -505,7 +520,7 @@ export const collectBrowserForExport = internalQuery
                 cautious,
             );
 
-            return { ...EMPTY_PAGE, next: next === undefined ? { phase: "actions" } : { page: next, phase: "sessions" }, sessions: rows };
+            return { ...EMPTY_PAGE, next: next === undefined ? { phase: "humanChecks" } : { page: next, phase: "sessions" }, sessions: rows };
         }
 
         if (phase === "humanChecks") {
@@ -526,7 +541,7 @@ export const collectBrowserForExport = internalQuery
             cautious,
         );
 
-        return { ...EMPTY_PAGE, extensions: rows, ...(next !== undefined && { next: { page: next, phase: "extensions" as const } }) };
+        return { ...EMPTY_PAGE, extensions: rows, next: next === undefined ? { phase: "actions" } : { page: next, phase: "extensions" } };
     });
 
 /**
@@ -538,7 +553,8 @@ export const collectBrowserForExport = internalQuery
  */
 export const storeBrowserExportPage = internalAction
     .input({ cursor: v.optional(vBrowserExportCursor), key: v.string(), runKey: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ next: v.optional(vBrowserExportCursor) }))
+    // `bytes`: what the page's rows take in the export file (`export-pages.ts#browserPageFileBytes`), so the walker stops at its share.
+    .output(v.object({ bytes: v.number(), next: v.optional(vBrowserExportCursor) }))
     .action(async ({ args: { cursor, key, runKey, userId }, ctx }) => {
         // The page's object is deleted whenever the run has stopped, before the write too: a retried step whose earlier attempt
         // stored the page but failed its check after the write would otherwise leave that object behind.
@@ -571,7 +587,9 @@ export const storeBrowserExportPage = internalAction
 
         await stopIfRunStopped();
 
-        return next === undefined ? {} : { next };
+        const bytes = browserPageFileBytes(rows);
+
+        return next === undefined ? { bytes } : { bytes, next };
     });
 
 /** Deletes every object under `prefix`, a listing at a time; none left is not an error. */

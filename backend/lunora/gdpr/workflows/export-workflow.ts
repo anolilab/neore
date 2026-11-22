@@ -344,7 +344,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         };
 
         try {
-            // Browser sessions, their actions, the sites a run asked to clear and the extensions: a page per step, each stored as an
+            // Browser sessions, the sites a run asked to clear, the extensions and the sessions' actions: a page per step, each stored as an
             // object under the run's prefix. Only the page count reaches the export file's action, which reads the pages itself, so no
             // dispatch body (Lunora's 1 MiB) or step result carries the whole history. Inside the try, so a page that fails for good
             // fails the export, and the pages already stored are deleted.
@@ -365,7 +365,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             { cursor, key: browserExportPageKey(browserPrefix, page), runKey: scope, userId },
                             { dedupId: stepDedupId(scope, name) },
                         ),
-                )) as { next?: BrowserExportCursor };
+                )) as { bytes?: number; next?: BrowserExportCursor };
             });
 
             await progress({ currentStep: "collecting_usage", progress: 70 });

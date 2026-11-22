@@ -37,18 +37,49 @@ export const browserExportPrefix = (userId: string, runKey: string): string => `
 
 export const browserExportPageKey = (prefix: string, page: number): string => `${prefix}${String(page)}.json`;
 
+const ENCODER = new TextEncoder();
+
+/** Where each row sits in the export file (`gdpr/steps.ts#generateExportFile`): `browser.<list>[i]`, so every line of it is indented 6 spaces. */
+const ROW_INDENT = 6;
+
 /**
- * Stores the pages of the user's browser export, at most {@link BROWSER_EXPORT_PAGES}, and returns how many there are and whether
- * the history went on past them. `storePage` runs one page as its own workflow step (given the cursor and the page number, for the
- * step's name and the object's key) and returns the next cursor.
+ * What a page's rows take in the export file, which is written with a 2-space indent: each row's indented JSON, every line of it
+ * at {@link ROW_INDENT}, and the comma and line break after it. Measured where the page is stored and again where it is read back,
+ * so both stop at the same page.
+ */
+export const browserPageFileBytes = (page: Partial<BrowserExport>): number => {
+    const rows = [...(page.actions ?? []), ...(page.extensions ?? []), ...(page.humanChecks ?? []), ...(page.sessions ?? [])];
+    let bytes = 0;
+
+    for (const row of rows) {
+        const text = JSON.stringify(row, null, 2);
+
+        bytes += ENCODER.encode(text).byteLength + text.split("\n").length * ROW_INDENT + 2;
+    }
+
+    return bytes;
+};
+
+/**
+ * Stores the pages of the user's browser export, at most {@link BROWSER_EXPORT_PAGES} and {@link BROWSER_EXPORT_BYTES} in the export
+ * file, and returns how many to read back and whether the history went on past them. `storePage` runs one page as its own workflow
+ * step (given the cursor and the page number, for the step's name and the object's key) and returns the next cursor and the page's
+ * size in the file ({@link browserPageFileBytes}). A page that would pass the bytes is not counted, and no page is stored after it.
  */
 export const storeAllBrowserPages = async (
-    storePage: (cursor: BrowserExportCursor | undefined, page: number) => Promise<{ next?: BrowserExportCursor }>,
+    storePage: (cursor: BrowserExportCursor | undefined, page: number) => Promise<{ bytes?: number; next?: BrowserExportCursor }>,
 ): Promise<{ cut: boolean; pages: number }> => {
     let cursor: BrowserExportCursor | undefined;
+    let total = 0;
 
     for (let page = 0; ; page += 1) {
-        const { next } = await storePage(cursor, page);
+        const { bytes = 0, next } = await storePage(cursor, page);
+
+        total += bytes;
+
+        if (total > BROWSER_EXPORT_BYTES) {
+            return { cut: true, pages: page };
+        }
 
         if (next === undefined || page + 1 >= BROWSER_EXPORT_PAGES) {
             return { cut: next !== undefined, pages: page + 1 };
@@ -59,8 +90,9 @@ export const storeAllBrowserPages = async (
 };
 
 /**
- * The stored pages read back in order into one section, held to `maxBytes` in total: the first page past it, and every one after,
- * is left out and the section is marked `truncated`, so the rest of the export is still written. `cut`: the pages were cut already.
+ * The stored pages read back in order into one section, held to `maxBytes` in the export file ({@link browserPageFileBytes}): the
+ * first page past it, and every one after, is left out and the section is marked `truncated`, so the rest of the export is still
+ * written. `cut`: the pages were cut already.
  */
 export const readAllBrowserPages = async (
     readPage: (page: number) => Promise<string>,
@@ -72,15 +104,13 @@ export const readAllBrowserPages = async (
     let bytes = 0;
 
     for (let page = 0; page < pages; page += 1) {
-        const text = await readPage(page);
+        const result = JSON.parse(await readPage(page)) as Partial<BrowserExport>;
 
-        bytes += new TextEncoder().encode(text).byteLength;
+        bytes += browserPageFileBytes(result);
 
         if (bytes > maxBytes) {
             return { ...collected, truncated: true };
         }
-
-        const result = JSON.parse(text) as Partial<BrowserExport>;
 
         collected.actions.push(...(result.actions ?? []));
         collected.extensions.push(...(result.extensions ?? []));

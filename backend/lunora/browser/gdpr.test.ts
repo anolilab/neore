@@ -7,7 +7,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { exportRunStopped } from "../usage/gdpr";
-import { browserExportPageKey, browserExportPrefix, type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
+import {
+    BROWSER_EXPORT_BYTES,
+    browserExportPageKey,
+    browserExportPrefix,
+    type BrowserExport,
+    browserPageFileBytes,
+    readAllBrowserPages,
+    storeAllBrowserPages,
+} from "./export-pages";
 import { collectBrowserForExport, deleteBrowserExportPages, deleteUserBrowserExportPages, EXPORT_FIELD_BYTES, storeBrowserExportPage } from "./gdpr";
 
 const A = "user-a";
@@ -256,11 +264,39 @@ describe("browser export pages left by a killed export", () => {
 
 describe("browser export pages read back", () => {
     it("stops at the section's share of the file and says it was cut, rather than failing the export", async () => {
-        const page = JSON.stringify({ actions: [{ target: "x".repeat(100) }] });
-        const result = await readAllBrowserPages(async () => page, 3, 2 * page.length);
+        const rows = { actions: [{ target: "x".repeat(100) }] };
+        const page = JSON.stringify(rows);
+        const result = await readAllBrowserPages(async () => page, 3, 2 * browserPageFileBytes(rows));
 
         expect(result.actions).toHaveLength(2);
         expect(result.truncated).toBe(true);
+    });
+
+    it("measures a page as the export file writes it, indented, not as it is stored", async () => {
+        const rows = {
+            actions: [{ action: "click", sessionId: "s1", success: true, target: "#a", timestamp: 1 }],
+            extensions: [{ capabilities: ["tabs", "scripting"], extensionId: "e", status: "paired" }],
+        };
+        const empty = { actions: [], extensions: [], humanChecks: [], sessions: [] };
+        const file = (browser: object): number => new TextEncoder().encode(JSON.stringify({ browser, other: 1 }, null, 2)).length;
+        const written = file({ ...empty, ...rows }) - file(empty);
+
+        expect(written).toBeGreaterThan(1.5 * JSON.stringify(rows).length);
+        // Within the brackets' line breaks of each list.
+        expect(Math.abs(browserPageFileBytes(rows) - written)).toBeLessThanOrEqual(8);
+    });
+
+    it("stores no page past the section's share of the file, and says the history was cut", async () => {
+        const stores: number[] = [];
+        const result = await storeAllBrowserPages(async (_cursor, page) => {
+            stores.push(page);
+
+            return { bytes: BROWSER_EXPORT_BYTES / 4 + 1, next: { phase: "actions" } };
+        });
+
+        // The fourth page passes the share: it is the last one stored and is not read back.
+        expect(stores).toEqual([0, 1, 2, 3]);
+        expect(result).toEqual({ cut: true, pages: 3 });
     });
 
     it("says the section was cut when the workflow stopped at its page limit", async () => {
@@ -319,7 +355,7 @@ describe("browser export page stored", () => {
         };
         const run = (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", runKey: "request-1:instance-1", userId: A });
 
-        await (stored.length > 0 ? expect(run).resolves.toEqual({}) : expect(run).rejects.toThrow("The export has stopped"));
+        await (stored.length > 0 ? expect(run).resolves.toEqual({ bytes: 0 }) : expect(run).rejects.toThrow("The export has stopped"));
         expect([...objects]).toEqual(stored);
     });
 
@@ -378,23 +414,36 @@ describe("browser export pages stay within the export's limits", () => {
         return pages;
     };
 
-    it("ends a page after its reads are spent, even over many sessions with no actions", async () => {
+    it("ends a page after its reads are spent over many sessions, and goes on mid-batch with neither a repeat nor a gap", async () => {
         const SESSIONS = 150;
 
         await harness.run(async (ctx: any) => {
             const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId: A });
 
             for (let index = 0; index < SESSIONS; index += 1) {
-                await ctx.db.insert("browserSessions", { lastActivityAt: index, startedAt: index, status: "completed", threadId, userId: A });
+                const sessionId = await ctx.db.insert("browserSessions", { lastActivityAt: index, startedAt: index, status: "completed", threadId, userId: A });
+
+                await ctx.db.insert("browserActions", { action: "click", sessionId, success: 1, timestamp: index });
             }
         });
 
         const pages = await pagesOf(A);
         const { result } = await exportOf(A);
+        const actionPages = pages.filter((page) => page.phase === "actions");
 
-        // Two reads per empty session, 100 a page.
-        expect(pages.filter((page) => page.phase === "actions").length).toBeGreaterThanOrEqual(3);
+        // A read for a batch of 100 sessions, then one per session: 100 reads a page end the first inside its batch.
+        expect(actionPages).toHaveLength(2);
         expect(result.sessions).toHaveLength(SESSIONS);
+        expect(new Set(result.actions.map((action) => (action as { sessionId: string }).sessionId)).size).toBe(SESSIONS);
+        expect(result.actions).toHaveLength(SESSIONS);
+    });
+
+    it("reads the actions last, so a history cut at its pages or bytes keeps every site to clear and extension", async () => {
+        await seed(A, 2);
+
+        const pages = await pagesOf(A);
+
+        expect(pages.map((page) => page.phase)).toEqual([undefined, "humanChecks", "extensions", "actions"]);
     });
 
     it("cuts an oversized field, says so, and keeps every page under a step's 1 MiB", async () => {
