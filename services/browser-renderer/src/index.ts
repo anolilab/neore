@@ -166,7 +166,8 @@ function readTarget(
     const scanned = [scope, ...inside];
 
     for (const node of scanned) {
-        if (node.matches("img[alt], [aria-label], [title]")) {
+        // An image (`img`) or an image button (`input type="image"`) names itself by its alt text.
+        if (node.matches("img[alt], input[type='image'][alt], [aria-label], [title]")) {
             names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
         }
 
