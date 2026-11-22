@@ -146,6 +146,10 @@ export type BrowserActionResponse = {
      * The element is on a checkout (visibleOnly reads only)
      */
     checkout?: boolean;
+    /**
+     * One of the element's name sources is exactly a submit word (visibleOnly reads only)
+     */
+    submitLike?: boolean;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;

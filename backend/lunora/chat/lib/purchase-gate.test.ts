@@ -119,6 +119,12 @@ describe("the purchase gate on browser actions", () => {
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, elsewhere)).toBe(false);
     });
 
+    it("asks for a checkout control whose joined name hides a bare submit word as one of its parts", async () => {
+        const combined = vi.fn(() => Promise.resolve({ checkout: true, content: "", label: "Continue shopping Confirm", submitLike: true, success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#icon" }, combined)).toBe(true);
+    });
+
     it("does not ask for a checkout's navigation link that only starts with a submit word", async () => {
         const shopping = vi.fn(() => Promise.resolve({ checkout: true, content: "Continue shopping", success: true }));
 

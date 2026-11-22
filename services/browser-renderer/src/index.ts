@@ -60,6 +60,9 @@ const LABEL_MAX_LENGTH = 15_000;
 
 const WHITESPACE_RE = /\s+/u;
 
+/** A label that is only a submit word (with optional punctuation): "Confirm", "Weiter.", never "Continue shopping". */
+const SUBMIT_WORD_RE = /^(?:confirm|submit|continue|complete|place|weiter|bestätigen|absenden)[.!]?$/iu;
+
 /** The click found another element, or this one with other text: the person's yes was for what they were shown. */
 /** A disabled control is not clicked on an approved target: it is not clicked until it is enabled, on a fresh look. */
 const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at the page again before you click.";
@@ -73,8 +76,8 @@ const TARGET_CHANGED = "The target changed since it was checked, so nothing was 
  */
 function readTarget(
     control: Element,
-    options: { max: number; splitter: RegExp },
-): { canonical: string; checkout: boolean; label: string; labelTruncated: boolean } {
+    options: { max: number; splitter: RegExp; submit: RegExp },
+): { canonical: string; checkout: boolean; label: string; labelTruncated: boolean; submitLike: boolean } {
     // This function is serialized into the page by Playwright (`element.evaluate`). A bundler wraps a named inner function in a
     // helper the page does not have, so this function declares none: every step is written out in its body.
     // The elements the click lands in: the control, then each actionable ancestor. A visible child (an icon in a button, a
@@ -268,6 +271,8 @@ function readTarget(
         }
     }
 
+    // Each name source on its own: a submit word is a name only when a source is exactly that word (joined names never are).
+    const isSubmitLike = names.some((part) => options.submit.test(part.trim()));
     const joined = names.filter(Boolean).join(" ");
     const label = joined.slice(0, options.max);
     // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
@@ -357,6 +362,7 @@ function readTarget(
         checkout: isCheckout,
         label,
         labelTruncated: joined.length > options.max || isScanCapped,
+        submitLike: isSubmitLike,
     };
 }
 
@@ -565,6 +571,8 @@ interface ActionResult {
     screenshot?: string;
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
+    /** One of the control's name sources is exactly a submit word (`visibleOnly` reads only). */
+    submitLike?: boolean;
     success: boolean;
     /** The fingerprint of the extracted element (`visibleOnly` reads only), which a click can be checked against. */
     target?: string;
@@ -856,7 +864,7 @@ const actHeld = async (
                         break;
                     }
 
-                    const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
+                    const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE, submit: SUBMIT_WORD_RE });
 
                     if ((await targetOf(read.canonical)) !== expectTarget) {
                         result = { error: TARGET_CHANGED, success: false, targetChanged: true };
@@ -883,6 +891,7 @@ const actHeld = async (
                 let isLabelTruncated = false;
                 let target: string | undefined;
                 let isCheckout = false;
+                let isSubmitLike = false;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -903,12 +912,13 @@ const actHeld = async (
                             : ((await element.textContent()) ?? "");
 
                     if (visibleOnly === true) {
-                        const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
+                        const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE, submit: SUBMIT_WORD_RE });
 
                         label = read.label;
                         isLabelTruncated = read.labelTruncated;
                         target = await targetOf(read.canonical);
                         isCheckout = read.checkout;
+                        isSubmitLike = read.submitLike;
                     }
                 } else {
                     extractedText = await page.evaluate(() => {
@@ -938,6 +948,7 @@ const actHeld = async (
                     ...(isLabelTruncated && { labelTruncated: true }),
                     ...(target !== undefined && { target }),
                     ...(isCheckout && { checkout: true }),
+                    ...(isSubmitLike && { submitLike: true }),
                 };
                 break;
             }

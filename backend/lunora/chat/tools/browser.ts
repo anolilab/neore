@@ -50,6 +50,8 @@ export interface BrowserResult {
     screenshot?: string;
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
+    /** One of the element's name sources is exactly a submit word (`visibleOnly` reads): on a checkout it is the payment. */
+    submitLike?: boolean;
     success: boolean;
     /** The fingerprint of the element a look read: a click is checked against it (`expectTarget`). */
     target?: string;

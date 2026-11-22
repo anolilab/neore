@@ -43,6 +43,8 @@ export interface ClickTargetLook {
     label?: string;
     /** The renderer cut the accessible name short: a purchase word may sit past the cut, so the gate cannot clear it. */
     labelTruncated?: boolean;
+    /** One of the control's name sources is exactly a submit word (the renderer's check on each name part). */
+    submitLike?: boolean;
     success: boolean;
     /** The renderer cut the text short: a purchase word may sit past the cut, so the gate cannot clear it. */
     truncated?: boolean;
@@ -83,8 +85,10 @@ export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean =>
     const text = target.content?.trim() ?? "";
     const name = target.label?.trim() ?? "";
 
-    // On a checkout a bare "Confirm", "Submit" or "Continue" is the payment itself: the same words elsewhere are not.
-    const submitsOnCheckout = target.checkout === true && [text, name].some((part) => CHECKOUT_SUBMIT_WORDS.some((pattern) => pattern.test(part)));
+    // On a checkout a bare "Confirm", "Submit" or "Continue" is the payment itself: the same words elsewhere are not. The
+    // name is joined from several parts ("Continue shopping Confirm"), so the renderer also reports a part that is one.
+    const submitsOnCheckout =
+        target.checkout === true && (target.submitLike === true || [text, name].some((part) => CHECKOUT_SUBMIT_WORDS.some((pattern) => pattern.test(part))));
 
     return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name) || submitsOnCheckout;
 };

@@ -323,6 +323,10 @@
                     },
                     "target": { "type": "string", "description": "Fingerprint of the extracted element (visibleOnly reads only)" },
                     "checkout": { "type": "boolean", "description": "The element is on a checkout (visibleOnly reads only)" },
+                    "submitLike": {
+                        "type": "boolean",
+                        "description": "One of the element's name sources is exactly a submit word (visibleOnly reads only)"
+                    },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },
