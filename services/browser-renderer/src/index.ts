@@ -142,7 +142,12 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
             if (content !== "none" && content !== "normal") {
                 // CSS `content` is a sequence of quoted strings (their text) and attr(name) calls (the attribute's value). url()
                 // and counters draw no words of their own, so they add nothing.
-                const quoted = content.split('"').filter((_, index) => index % 2 === 1);
+                // A url("...") holds a file name, not text: its quoted part is dropped before the quoted strings are read.
+                const withoutUrls = content
+                    .split("url(")
+                    .map((part, index) => (index === 0 ? part : part.slice(part.indexOf(")") + 1)))
+                    .join("");
+                const quoted = withoutUrls.split('"').filter((_, index) => index % 2 === 1);
                 const attributes = content
                     .split("attr(")
                     .slice(1)
