@@ -1136,6 +1136,16 @@ describe(signIn, () => {
         expect(page.isClosed()).toBe(true);
     });
 
+    it("takes out a rule set however its type is cased or spaced, and leaves a data block whose type only names rules", async () => {
+        const probe = `addEventListener("DOMContentLoaded", () => { fetch("/probe?data=" + Boolean(document.getElementById("data")) + "&rules=" + Boolean(document.getElementById("rules"))); });`;
+
+        fixture.page = `<script id="data" type="application/speculationrules+json">{}</script><script id="rules" type=" SpeculationRules ">{}</script>${loginForm(probe)}`;
+
+        await run();
+
+        expect(login.hits.filter((hit) => hit.url.startsWith("/probe")).map((hit) => hit.url)).toStrictEqual(["/probe?data=true&rules=false"]);
+    });
+
     it("signs in with a form whose empty action is the page's own address, whatever its base", async () => {
         fixture.page = `<base href="/other/">${loginForm("", 'method="post" action=""')}`;
 
@@ -1696,7 +1706,9 @@ describe(signIn, () => {
     });
 
     it("closes the session when turning the scripts off for the cleanup stalls past the hold", async () => {
-        const deadline = Date.now() + 30_000;
+        // The sign-in's clock stands still but for the jump below: how long the browser takes does not move it.
+        const start = Date.now();
+        const deadline = start + 30_000;
         let offset = 0;
         let cleanupLeft: number | undefined;
 
@@ -1709,16 +1721,17 @@ describe(signIn, () => {
                 return send();
             }
 
-            cleanupLeft = deadline - (Date.now() + offset);
-            offset = deadline - 1300 - Date.now();
+            cleanupLeft = deadline - (start + offset);
+            offset = deadline - 1300 - start;
 
             return NEVER;
         });
         fixture.page = loginForm();
 
-        const result = await run(() => Date.now() + offset, undefined, deadline);
+        const result = await run(() => start + offset, undefined, deadline);
 
-        expect(cleanupLeft).toBeGreaterThan(20_000);
+        // The cleanup reached the command with the whole hold left: none of it was spent before.
+        expect(cleanupLeft).toBe(30_000);
         expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
         expect(page.isClosed()).toBe(true);
     });

@@ -60,14 +60,16 @@ const PAGE_LOCK = `(() => {
     const { querySelectorAll: inDocument } = Document.prototype;
     const { querySelectorAll: inFragment } = DocumentFragment.prototype;
     const { attachShadow, remove } = Element.prototype;
-    const { includes, toLowerCase } = String.prototype;
+    const { toLowerCase, trim } = String.prototype;
     const { add: keep, has: isKept } = WeakSet.prototype;
     const typeOf = getOwnPropertyDescriptor(HTMLScriptElement.prototype, "type").get;
     const sizeOf = getOwnPropertyDescriptor(NodeList.prototype, "length").get;
     const { item } = NodeList.prototype;
     const nameOf = getOwnPropertyDescriptor(Element.prototype, "localName").get;
     const [kindOf, targetOf, oldValueOf] = ["type", "target", "oldValue"].map((name) => getOwnPropertyDescriptor(MutationRecord.prototype, name).get);
-    const isRules = (type) => typeof type === "string" && apply(includes, apply(toLowerCase, type, []), ["speculationrules"]);
+    // The browser's own test: the type trimmed, matched case-insensitively. A data block such as
+    // \`application/speculationrules+json\` is no rule set, and the page keeps it.
+    const isRules = (type) => typeof type === "string" && apply(toLowerCase, apply(trim, type, []), []) === "speculationrules";
     // A rule set stays once read, whatever its script's type becomes: a script whose type was rules is taken out too.
     const watching = { attributeFilter: ["type"], attributeOldValue: true, characterData: true, childList: true, subtree: true };
     const root = document;
