@@ -341,30 +341,55 @@ describe("data export workflow: the usage object", () => {
 });
 
 describe("data export workflow: browser data", () => {
-    it("reads the browser tables a page per step and hands every page to the export file", async () => {
-        const pages = [
-            { actions: [], extensions: [], humanChecks: [], next: { phase: "actions" }, sessions: [{ id: "s1" }] },
-            { actions: [{ action: "click" }], extensions: [{ extensionId: "e1" }], humanChecks: [], sessions: [] },
-        ];
+    /** Lunora's dispatch body limit (`@lunora/runtime`: a `/_lunora/` POST over 1 MiB is refused with 413). */
+    const DISPATCH_BODY_BYTES = 1024 * 1024;
+    // Three pages of about 600 KiB each: every page fits, their sum does not fit one dispatch body.
+    const bigPage = (index: number): { actions: { target: string }[]; extensions: never[]; humanChecks: never[]; sessions: { id: string }[] } => {
+        return { actions: [{ target: "x".repeat(600 * 1024) }], extensions: [], humanChecks: [], sessions: [{ id: `s${String(index)}` }] };
+    };
+    const pageCount = 3;
+    const pagesWithCursors = (): (() => unknown) => {
         let page = 0;
 
-        stubs["browser_gdpr:collectBrowserForExport"] = () => {
+        return () => {
             page += 1;
 
-            return pages[page - 1];
+            return { ...bigPage(page), ...(page < pageCount && { next: { page: String(page), phase: "actions" } }) };
+        };
+    };
+
+    it("stores a history past 1 MiB a page per step and hands the export file only where the pages are", async () => {
+        // The page query is stubbed too, so a workflow that passes the pages themselves to the export file is caught as well.
+        stubs["browser_gdpr:collectBrowserForExport"] = pagesWithCursors();
+        stubs["browser_gdpr:storeBrowserExportPage"] = pagesWithCursors();
+
+        await execute();
+
+        const stores = ran("browser_gdpr:storeBrowserExportPage");
+        const generated = ran("gdpr_steps:generateExportFile")[0]?.args;
+        const prefix = generated?.["browserPrefix"] as string;
+
+        expect(calls.every((call) => JSON.stringify(call.args).length < DISPATCH_BODY_BYTES)).toBe(true);
+        expect(stores.map((call) => call.args["cursor"])).toEqual([undefined, { page: "1", phase: "actions" }, { page: "2", phase: "actions" }]);
+        expect(stores.map((call) => call.args["key"])).toEqual([`${prefix}0.json`, `${prefix}1.json`, `${prefix}2.json`]);
+        expect(stepNames).toEqual(expect.arrayContaining(["collect-browser-0", "collect-browser-1", "collect-browser-2"]));
+        expect(generated).toMatchObject({ browserPages: pageCount });
+        expect(generated).not.toHaveProperty("browser");
+        // The stored pages are deleted once the export is done.
+        expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([prefix]);
+    });
+
+    it("deletes the stored pages when the export fails", async () => {
+        stubs["browser_gdpr:storeBrowserExportPage"] = pagesWithCursors();
+        generate = () => {
+            throw new Error("boom");
         };
 
         await execute();
 
-        const reads = ran("browser_gdpr:collectBrowserForExport");
+        expect(progressWith("failed")).toHaveLength(1);
+        const firstKey = String(ran("browser_gdpr:storeBrowserExportPage")[0]?.args["key"]);
 
-        expect(reads.map((call) => call.args["cursor"])).toEqual([undefined, { phase: "actions" }]);
-        expect(stepNames).toEqual(expect.arrayContaining(["collect-browser-0", "collect-browser-1"]));
-        expect(ran("gdpr_steps:generateExportFile")[0]?.args["browser"]).toEqual({
-            actions: [{ action: "click" }],
-            extensions: [{ extensionId: "e1" }],
-            humanChecks: [],
-            sessions: [{ id: "s1" }],
-        });
+        expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([firstKey.slice(0, -"0.json".length)]);
     });
 });

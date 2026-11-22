@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { collectAllBrowserPages } from "./export-pages";
+import { type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
 import { collectBrowserForExport } from "./gdpr";
 
 const A = "user-a";
@@ -54,13 +54,17 @@ const seed = async (userId: string, actions: number): Promise<void> => {
     });
 };
 
-const exportOf = async (userId: string): Promise<{ pages: number; result: Awaited<ReturnType<typeof collectAllBrowserPages>> }> => {
-    let pages = 0;
-    const result = await collectAllBrowserPages(async (cursor) => {
-        pages += 1;
+/** The export as the workflow and the export file's action build it: every page stored, then read back in order. */
+const exportOf = async (userId: string): Promise<{ pages: number; result: BrowserExport }> => {
+    const stored: string[] = [];
+    const pages = await storeAllBrowserPages(async (cursor) => {
+        const { next, ...rows } = await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cursor, userId }));
 
-        return await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cursor, userId }));
+        stored.push(JSON.stringify(rows));
+
+        return { next };
     });
+    const result = await readAllBrowserPages(async (page) => stored[page] as string, pages, Infinity);
 
     return { pages, result };
 };
@@ -139,11 +143,19 @@ describe("browser data in the GDPR export", () => {
     });
 });
 
+describe("browser export pages read back", () => {
+    it("fails with PAYLOAD_TOO_LARGE once the stored pages pass the export's limit", async () => {
+        const page = JSON.stringify({ actions: [{ target: "x".repeat(100) }] });
+
+        await expect(readAllBrowserPages(async () => page, 3, 2 * page.length)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    });
+});
+
 describe("browser export pages stay within the export's limits", () => {
     const pagesOf = async (userId: string): Promise<{ json: string; phase?: string }[]> => {
         const pages: { json: string; phase?: string }[] = [];
 
-        await collectAllBrowserPages(async (cursor) => {
+        await storeAllBrowserPages(async (cursor) => {
             const page = await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cursor, userId }));
 
             pages.push({ json: JSON.stringify(page), phase: cursor?.phase });

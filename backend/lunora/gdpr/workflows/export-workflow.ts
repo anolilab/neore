@@ -22,7 +22,8 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
-import { collectAllBrowserPages } from "../../browser/export-pages";
+import type { BrowserExportCursor } from "../../browser/gdpr";
+import { browserExportPageKey, browserExportPrefix, storeAllBrowserPages } from "../../browser/export-pages";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
 import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
@@ -200,15 +201,8 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             "collect-devices",
             async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-devices") }),
         );
-        // Browser sessions, their actions, the sites a run asked to clear and the extensions: a page per step.
-        const browser = await collectAllBrowserPages(async (cursor, page) => {
-            const name = `collect-browser-${String(page)}`;
-
-            return await context.step.do(
-                name,
-                async () => await context.run(internal.browser.gdpr.collectBrowserForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
-            );
-        });
+        // Where this run stores its browser pages (`browser/export-pages.ts`).
+        const browserPrefix = browserExportPrefix(scope);
         const activity = await context.step.do(
             "collect-activity",
             async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
@@ -229,12 +223,26 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             );
         };
 
+        // The run's stored browser pages, deleted on every terminal path like the usage object.
+        const deleteBrowserPages = async (): Promise<void> => {
+            await context.step.do(
+                "delete-browser-pages",
+                async () =>
+                    await context.run(
+                        internal.browser.gdpr.deleteBrowserExportPages,
+                        { prefix: browserPrefix },
+                        { dedupId: stepDedupId(scope, "delete-browser-pages") },
+                    ),
+            );
+        };
+
         const failExport = async (message: string): Promise<void> => {
             const failed = await progress({ errorMessage: message, progress: 80, status: "failed" });
 
             // Refused once the export was cancelled: nothing is announced, and the usage is cleared all the same.
             if (failed === false) {
                 await deleteUsageObject();
+                await deleteBrowserPages();
                 await clearUsagePieces(usageIo);
 
                 return;
@@ -261,6 +269,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // A failed export keeps nothing: its usage object and its pieces hold the user's usage, and no file was stored from them.
             // The object goes first, so a failed clear cannot leave it behind.
             await deleteUsageObject();
+            await deleteBrowserPages();
             await clearUsagePieces(usageIo);
         };
 
@@ -314,6 +323,24 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         };
 
         try {
+            // Browser sessions, their actions, the sites a run asked to clear and the extensions: a page per step, each stored as an
+            // object under the run's prefix. Only the page count reaches the export file's action, which reads the pages itself, so no
+            // dispatch body (Lunora's 1 MiB) or step result carries the whole history. Inside the try, so a page that fails for good
+            // fails the export, whose cleanup deletes the pages already stored.
+            const browserPages = await storeAllBrowserPages(async (cursor, page) => {
+                const name = `collect-browser-${String(page)}`;
+
+                return (await context.step.do(
+                    name,
+                    async () =>
+                        await context.run(
+                            internal.browser.gdpr.storeBrowserExportPage,
+                            { cursor, key: browserExportPageKey(browserPrefix, page), userId },
+                            { dedupId: stepDedupId(scope, name) },
+                        ),
+                )) as { next?: BrowserExportCursor };
+            });
+
             await progress({ currentStep: "collecting_usage", progress: 70 });
             const collected = await collectUsageExport(usageIo);
 
@@ -344,7 +371,8 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         {
                             activity,
                             bots,
-                            browser,
+                            browserPages,
+                            browserPrefix,
                             codingAgentRuns,
                             conversations,
                             devices,
@@ -390,6 +418,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // Refused once the export was cancelled: nothing is announced, and the usage is cleared as a failed export's is.
         if ((await progress({ progress: 100, status: "completed", storageId })) === false) {
             await deleteUsageObject();
+            await deleteBrowserPages();
             await clearUsagePieces(usageIo);
 
             return;
@@ -435,6 +464,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // The usage object it was read from, and the run's pieces, are no longer needed. They go after the audit: a cleanup that fails
         // permanently leaves the sweep to remove them, and must not hide the export's record.
         await deleteUsageObject();
+        await deleteBrowserPages();
         await clearUsagePieces(usageIo);
     },
 };

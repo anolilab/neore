@@ -4,6 +4,7 @@ import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-
 import { readStoredText } from "../lib/storage-read";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
@@ -561,9 +562,10 @@ export const generateExportFile = internalAction
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         bots: v.optional(v.any()),
-        // Browser sessions, actions, human checks and extensions (`browser/gdpr.ts`). Optional for the same
-        // in-flight-replay reason as `threadTags`.
-        browser: v.optional(v.any()),
+        // How many browser pages the workflow stored under `browserPrefix` (`browser/export-pages.ts`), read here. Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        browserPages: v.optional(v.number()),
+        browserPrefix: v.optional(v.string()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -692,10 +694,20 @@ export const generateExportFile = internalAction
             ),
             PROJECT_CONTEXT_EXPORT_BYTES,
         );
+        // The browser pages, read from their objects, so neither this action's arguments nor its read budget carry them.
+        const { browserPages, browserPrefix } = args;
+        const browser =
+            browserPrefix === undefined || browserPages === undefined
+                ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
+                : await readAllBrowserPages(
+                      async (page) => await readStoredText(context.storage, browserExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      browserPages,
+                      MAX_EXPORT_BYTES,
+                  );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
-            browser: args.browser ?? { actions: [], extensions: [], humanChecks: [], sessions: [] },
+            browser,
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {

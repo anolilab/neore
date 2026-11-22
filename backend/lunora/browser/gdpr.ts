@@ -1,15 +1,18 @@
 /**
  * The browser module's erasure and export. Erasure is for account deletion (called by `gdpr/steps/deletion-steps.ts`) and for a
  * deleted thread's ask rows (called by `agent/threads.ts`), plain functions over the caller's `ctx`. The export is read a page per
- * workflow step by `gdpr/workflows/export-workflow.ts` (`export-pages.ts#collectAllBrowserPages`).
+ * workflow step by `gdpr/workflows/export-workflow.ts` and stored as an object (`storeBrowserExportPage`), which the export file's
+ * action reads back (`export-pages.ts`).
  */
 import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalQuery } from "../_generated/server";
+import { internal } from "../_generated/internal";
+import { internalAction, internalQuery } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
+import { withDependency } from "../lib/dependency";
 import { MAX_LENGTH } from "../lib/validators";
 
 /**
@@ -445,4 +448,35 @@ export const collectBrowserForExport = internalQuery
         );
 
         return { ...EMPTY_PAGE, extensions: rows, ...(next !== undefined && { next: { page: next, phase: "extensions" as const } }) };
+    });
+
+/** One page of the export, read in this action's own request and stored at `key`; only its `next` cursor goes back to the workflow. */
+export const storeBrowserExportPage = internalAction
+    .input({ cursor: v.optional(vBrowserExportCursor), key: v.string(), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ next: v.optional(vBrowserExportCursor) }))
+    .action(async ({ args: { cursor, key, userId }, ctx }) => {
+        const { next, ...rows } = (await ctx.runQuery(internal.browser.gdpr.collectBrowserForExport, { cursor, userId })) as BrowserExportPage;
+        const blob = new Blob([JSON.stringify(rows)], { type: "application/json" });
+
+        await withDependency("file storage", () =>
+            ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: 2 * PAGE_BYTES }),
+        );
+
+        return next === undefined ? {} : { next };
+    });
+
+/** Deletes every page object under a run's `prefix`, a listing at a time; none left is not an error, so any terminal path calls it. */
+export const deleteBrowserExportPages = internalAction
+    .input({ prefix: v.string() })
+    .output(v.null())
+    .action(async ({ args: { prefix }, ctx }) => {
+        for (;;) {
+            const listing = await ctx.storage.list(prefix, { limit: 100 });
+
+            await Promise.all(listing.objects.map(async (object) => await ctx.storage.delete(object.key)));
+
+            if (!listing.truncated) {
+                return null;
+            }
+        }
     });
