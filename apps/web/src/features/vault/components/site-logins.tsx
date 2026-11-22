@@ -181,10 +181,16 @@ const changedElsewhere = (error: unknown): boolean => refusalCode(error) === SIT
  * otherwise take the saved one. The bots are the saved ones, less any the person unticked: a bot removed elsewhere is
  * never written back, and none ticked here is added without being seen again. The password is never kept.
  */
-const reloadAfterConflict =
+export const reloadAfterConflict =
     (submitted: LoginDraft, fresh: ListedLogin | undefined) =>
     (current: LoginDraft): LoginDraft => {
         if (current.id === undefined || current.id !== submitted.id) {
+            return current;
+        }
+
+        // The form moved on to a newer version while this read was on its way (it saved the login again): the read is
+        // older than what it holds, and is not applied.
+        if (current.opened?.updatedAt !== submitted.opened?.updatedAt) {
             return current;
         }
 
