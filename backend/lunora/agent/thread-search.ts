@@ -8,7 +8,7 @@
  * thread, embeds through the gateway, inserts the vectors, then commits them in a
  * mutation. A commit that finds its text already changed deletes its own vectors.
  */
-import { LunoraError, v } from "lunorash/server";
+import { type Infer, LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
@@ -114,9 +114,30 @@ const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[]): Prom
 };
 
 /**
+ * The texts still worth sending to the gateway. The plan was made from a read that a lock
+ * or an edit may have overtaken, so this reads again right before the send: a thread no
+ * longer wanted, or text that has moved, sends nothing. The window that remains is this
+ * read's latency; the commit still decides what is kept.
+ */
+const textsStillWanted = async <T extends { kind: SearchKind; text: string }>(
+    ctx: ActionCtx,
+    threadId: Id<"threads">,
+    state: NonNullable<Infer<typeof vSearchState>>,
+    texts: T[],
+): Promise<T[]> => {
+    const fresh = await ctx.runQuery(internal.agent.thread_search.readThreadSearchState, { threadId });
+
+    if (fresh === null || !fresh.eligible || !fresh.enoughTurns) {
+        return [];
+    }
+
+    return texts.filter((entry) => fresh[entry.kind].text === state[entry.kind].text);
+};
+
+/**
  * One sync of a thread's vectors: plan from the state, embed what is wanted,
- * commit. A failed embed leaves the stored vectors as they are and logs it: the
- * next write to the thread queues another sync.
+ * commit. A failed embed leaves the stored vectors as they are and throws, so the
+ * scheduler retries the sync (`SYNC_RETRY` in `thread-search-triggers.ts`).
  */
 export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: SearchKind[]; threadId: Id<"threads"> }): Promise<void> => {
     const state = await ctx.runQuery(internal.agent.thread_search.readThreadSearchState, { threadId: args.threadId });
@@ -135,11 +156,15 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
         return;
     }
 
-    const texts = plan.embed.flatMap((kind) => {
+    let texts = plan.embed.flatMap((kind) => {
         const { text } = slots[kind];
 
         return text === undefined ? [] : [{ kind, text: text.slice(0, 8000) }];
     });
+
+    if (texts.length > 0) {
+        texts = await textsStillWanted(ctx, args.threadId, state, texts);
+    }
 
     let vectors: number[][] = [];
 
@@ -151,9 +176,9 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
                 texts.map((entry) => entry.text),
             );
         } catch (error) {
-            console.warn("[agent/thread-search] Embedding failed; the thread keeps its stored vectors:", error);
+            console.warn("[agent/thread-search] Embedding failed; the scheduler retries the sync:", error);
 
-            return;
+            throw error;
         }
     }
 

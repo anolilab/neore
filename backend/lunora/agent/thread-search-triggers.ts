@@ -15,14 +15,26 @@ type Internal = (typeof import("../_generated/internal"))["internal"];
 type ScheduledTarget = Parameters<TriggerCtx["scheduler"]["runAfter"]>[1];
 
 /**
+ * How a sync that fails (the gateway is down) is retried. Without it a thread whose
+ * last sync failed stays unindexed until its next write, which for an idle thread
+ * may never come.
+ */
+export const SYNC_RETRY = { backoff: "exponential", baseMs: 60_000, maxAttempts: 5 } as const;
+
+/**
  * A failed schedule does not fail the thread write that caused it: the index is derived data, and the thread's next write
  * queues the sync again. The failure is logged, not thrown.
  */
-const scheduleOrLog = async (context: TriggerCtx, pick: (internal: Internal) => ScheduledTarget, args: Record<string, unknown>): Promise<void> => {
+const scheduleOrLog = async (
+    context: TriggerCtx,
+    pick: (internal: Internal) => ScheduledTarget,
+    args: Record<string, unknown>,
+    options?: { retry: typeof SYNC_RETRY },
+): Promise<void> => {
     try {
         const { internal } = await import("../_generated/internal");
 
-        await context.scheduler.runAfter(0, pick(internal), args);
+        await context.scheduler.runAfter(0, pick(internal), args, options);
     } catch (error) {
         console.warn("[agent/thread-search] Could not schedule the palette index update:", error);
     }
@@ -39,21 +51,35 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
             });
 
             if (vectorIds.length > 0) {
-                await scheduleOrLog(context, (internal) => internal.agent.thread_search.deleteThreadVectors, { vectorIds });
+                // Not logged and swallowed as the others are: a deleted thread gets no later write that would queue this
+                // cleanup again, so a failed schedule must fail the delete, which then runs again.
+                const { internal } = await import("../_generated/internal");
+
+                await context.scheduler.runAfter(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds });
             }
         }),
         threadSearchInsert: t.afterInsert(async (context, event) => {
             const changed = searchKindsChanged(undefined, event.doc as unknown as SearchRow);
 
             if (changed.length > 0) {
-                await scheduleOrLog(context, (internal) => internal.agent.thread_search.syncThreadSearch, { changed, threadId: event.id });
+                await scheduleOrLog(
+                    context,
+                    (internal) => internal.agent.thread_search.syncThreadSearch,
+                    { changed, threadId: event.id },
+                    { retry: SYNC_RETRY },
+                );
             }
         }),
         threadSearchUpdate: t.afterUpdate(async (context, event) => {
             const changed = searchKindsChanged(event.previous as unknown as SearchRow, event.doc as unknown as SearchRow);
 
             if (changed.length > 0) {
-                await scheduleOrLog(context, (internal) => internal.agent.thread_search.syncThreadSearch, { changed, threadId: event.id });
+                await scheduleOrLog(
+                    context,
+                    (internal) => internal.agent.thread_search.syncThreadSearch,
+                    { changed, threadId: event.id },
+                    { retry: SYNC_RETRY },
+                );
             }
         }),
     };

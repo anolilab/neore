@@ -136,15 +136,36 @@ describe(runThreadSearchSync, () => {
         expect(mocks.embedMany).not.toHaveBeenCalled();
     });
 
-    it("keeps the stored vectors and writes nothing when the embedder fails", async () => {
+    it("keeps the stored vectors, writes nothing, and throws so the scheduler retries when the embedder fails", async () => {
         mocks.embedMany.mockRejectedValueOnce(new Error("gateway down"));
         const ctx = makeCtx({ readThreadSearchState: readyThread({ title: { text: "Moved", vectorId: "old" } }) });
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
-        await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
+        await expect(runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD })).rejects.toThrow("gateway down");
 
         expect((ctx as unknown as { runMutation: ReturnType<typeof vi.fn> }).runMutation).not.toHaveBeenCalled();
         warn.mockRestore();
+    });
+
+    it("sends no text to the gateway when a lock lands after the plan read the thread", async () => {
+        const reads = [readyThread(), readyThread({ eligible: false })];
+        const runQuery = vi.fn(async () => reads.shift() ?? null);
+        const runMutation = vi.fn(async () => []);
+
+        await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title"], threadId: THREAD });
+
+        expect(mocks.embedMany).not.toHaveBeenCalled();
+        expect(runMutation).toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, { clear: [], embedded: [], threadId: THREAD });
+    });
+
+    it("sends no text to the gateway when the title changed after the plan read the thread", async () => {
+        const reads = [readyThread(), readyThread({ title: { text: "Edited title", vectorId: null } })];
+        const runQuery = vi.fn(async () => reads.shift() ?? null);
+        const runMutation = vi.fn(async () => []);
+
+        await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title"], threadId: THREAD });
+
+        expect(mocks.embedMany).not.toHaveBeenCalled();
     });
 });
 
