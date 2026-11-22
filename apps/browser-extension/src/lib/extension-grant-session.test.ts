@@ -3,8 +3,18 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 // `env.ts` reads the build's env once, at import: set it first, then load the module.
 vi.stubEnv("VITE_LUNORA_URL", "https://api.example.test");
 
-const { migrateFromCookieSession, readReconnectNeeded, RECONNECT_KEY, requestGrantAccessToken, signInWithWebAuthFlow, signOutGrant, watchReconnectNeeded } =
-    await import("./extension-grant");
+const {
+    finishPendingSignOut,
+    migrateFromCookieSession,
+    readReconnectNeeded,
+    RECONNECT_KEY,
+    requestGrantAccessToken,
+    REVOKE_TIMEOUT_MS,
+    SIGNED_OUT_KEY,
+    signInWithWebAuthFlow,
+    signOutGrant,
+    watchReconnectNeeded,
+} = await import("./extension-grant");
 const { clearAccessToken, getAccessToken, resumeAccessTokens } = await import("./access-token");
 const { endSession, loadGrantSession } = await import("./session");
 const { createAuthTokenSync } = await import("./auth-token-sync");
@@ -14,7 +24,7 @@ const REDIRECT_URI = `https://${"a".repeat(32)}.chromiumapp.org/`;
 const USER = { email: "a@example.test", id: "u1", image: null, name: "A" };
 
 /** What these tests keep in storage: the grant, and the migration and notice marks. */
-type Stored = boolean | number | { id?: string; token: string; user: typeof USER };
+type Stored = boolean | number | string | { id?: string; token: string; user: typeof USER };
 
 let store: Map<string, Stored>;
 let launchWebAuthFlow: ReturnType<typeof vi.fn>;
@@ -280,17 +290,13 @@ describe("endSession", () => {
     });
 
     it.each([
-        ["cannot be read", "get", undefined],
-        ["cannot be removed while offline", "remove", new TypeError("offline")],
-    ] as const)("brings the session back when the grant %s, keeping the bearer, and rejects so the failure shows", async (_label, failing, revokeError) => {
+        ["cannot be read", "get"],
+        ["cannot be marked signed out", "set"],
+    ] as const)("brings the session back when the grant %s, keeping the bearer, and rejects so the failure shows", async (_label, failing) => {
         const { setAuthToken, sync } = await signedIn();
 
         stopSync = sync.signOut;
         vi.spyOn(chrome.storage.local, failing).mockRejectedValueOnce(new Error("storage unavailable"));
-
-        if (revokeError) {
-            fetchMock.mockRejectedValueOnce(revokeError);
-        }
 
         await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
 
@@ -299,6 +305,63 @@ describe("endSession", () => {
         await vi.waitFor(() => expect(setAuthToken).toHaveBeenCalledWith(bearerFor(USER.id), USER.id));
         expect(setAuthToken).not.toHaveBeenCalledWith(null);
         await expect(getAccessToken({ force: true })).resolves.toBe(bearerFor(USER.id));
+    });
+
+    it("ends within the timeout when the revoke never answers, and forgets the grant", async () => {
+        const { setAuthToken, sync } = await signedIn();
+        const timeout = new AbortController();
+
+        stopSync = sync.signOut;
+        vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+            expect(ms).toBe(REVOKE_TIMEOUT_MS);
+
+            return timeout.signal;
+        });
+        // A revoke that never answers: only its signal ends it.
+        fetchMock.mockImplementationOnce(
+            async (_input, init) =>
+                await new Promise<Response>((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+                }),
+        );
+
+        const signingOut = endSession(sync, USER.id);
+
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything()));
+        timeout.abort(new DOMException("timed out", "TimeoutError"));
+
+        await expect(signingOut).resolves.toBeUndefined();
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        expect(setAuthToken.mock.calls).toEqual([[null]]);
+    });
+
+    it("never signs back in from a grant whose removal failed, in this panel or a new one, and the next panel removes it", async () => {
+        const { setAuthToken, sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+        fetchMock.mockRejectedValueOnce(new TypeError("offline"));
+
+        await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+
+        // Still stored, but marked: this panel cleared its bearer, and nothing hands out a token for it.
+        expect(store.get(GRANT_KEY)).toEqual(grant);
+        expect(setAuthToken.mock.calls).toEqual([[null]]);
+        await expect(getAccessToken({ force: true })).resolves.toBeNull();
+
+        // A panel opened later reads no session, and removes the leftover.
+        resumeAccessTokens();
+        clearAccessToken();
+        await expect(loadGrantSession()).resolves.toBeNull();
+        await expect(getAccessToken({ force: true })).resolves.toBeNull();
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/token"))).toHaveLength(1);
+
+        await finishPendingSignOut();
+
+        expect(fetchMock).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: "/extension/auth/revoke" }), expect.anything());
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
     });
 
     it("does not bring back a grant the server revoked when only its removal failed", async () => {
@@ -416,9 +479,12 @@ describe("a refresh against a sign-out", () => {
 
         const signingOut = signOutGrant(USER.id);
 
-        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        // The sign-out has read the grant and queues its mark behind the refresh's write.
+        await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
         held.resolve(new Response(null));
         await Promise.all([refresh, signingOut]);
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
 
         expect(store.get(GRANT_KEY)).toBeUndefined();
     });
@@ -593,6 +659,18 @@ describe("signInWithWebAuthFlow", () => {
         expect((body as { codeVerifier: string }).codeVerifier).toMatch(/^[\w-]{43}$/);
         expect(store.get(GRANT_KEY)).toEqual({ id: expect.stringMatching(/^[\w-]{43}$/), token: "grant", user: USER });
         expect(store.get(RECONNECT_KEY)).toBeUndefined();
+    });
+
+    it("signs in again over a grant left by a failed sign-out, and drops its mark", async () => {
+        store.set(GRANT_KEY, { token: "left-over", user: USER });
+        store.set(SIGNED_OUT_KEY, USER.id);
+        launchWebAuthFlow.mockImplementationOnce(async ({ url }: { url: string }) => `${REDIRECT_URI}?code=c&state=${new URL(url).searchParams.get("state")}`);
+        fetchMock.mockResolvedValueOnce(Response.json({ token: "fresh", user: USER }));
+
+        await signInWithWebAuthFlow();
+
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        await expect(loadGrantSession()).resolves.toMatchObject({ user: USER });
     });
 
     it("stores nothing when the exchange is refused", async () => {
