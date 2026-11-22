@@ -69,7 +69,8 @@ export const browserActionNeedsPurchaseApproval = async (
 
 /** Whether one read of a click's target asks the person first. A read that failed, or was cut short, asks. */
 /** Words a checkout's own submit button carries when it has no purchase word of its own (English and German). */
-const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [/\b(?:confirm|submit|continue|complete|place|weiter|bestätigen|absenden)\b/iu];
+// The whole label must be the word: "Continue shopping" is navigation on a checkout, not the payment.
+const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [/^\s*(?:confirm|submit|continue|complete|place|weiter|bestätigen|absenden)\s*[.!]?\s*$/iu];
 
 export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean => {
     if (target.success !== true || target.truncated === true || target.labelTruncated === true) {

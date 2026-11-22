@@ -119,6 +119,12 @@ describe("the purchase gate on browser actions", () => {
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, elsewhere)).toBe(false);
     });
 
+    it("does not ask for a checkout's navigation link that only starts with a submit word", async () => {
+        const shopping = vi.fn(() => Promise.resolve({ checkout: true, content: "Continue shopping", success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#back" }, shopping)).toBe(false);
+    });
+
     it("does not ask for an ordinary control with no text but an ordinary name", async () => {
         const look = vi.fn(() => Promise.resolve({ content: "", label: "Next", success: true }));
 
