@@ -280,12 +280,16 @@ function readTarget(
     // there pays, so the gate reads a submit-like label on a checkout as a purchase.
     // A card form is also one whose fields sit in a frame the page cannot read (a hosted card element), or one that posts to
     // another site: its fields are not in the DOM, so the field check alone misses it.
+    // Card fields are read in the form when there is one, and on the page when there is not (a card form built from divs).
+    // A frame or a cross-origin action only counts inside a form, since those are what a hosted card form is.
+    const hasCardFields =
+        (enclosingForm ?? document).querySelector(
+            "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i]",
+        ) !== null;
     const isCardFields =
-        enclosingForm !== null &&
-        (enclosingForm.querySelector(
-            "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i], iframe",
-        ) !== null ||
-            new URL(enclosingForm.action, document.URL).origin !== new URL(document.URL).origin);
+        hasCardFields ||
+        (enclosingForm !== null &&
+            (enclosingForm.querySelector("iframe") !== null || new URL(enclosingForm.action, document.URL).origin !== new URL(document.URL).origin));
     const address = document.URL.toLowerCase();
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
 
