@@ -129,6 +129,21 @@ export const listPinsForExport = internalQuery
         };
     });
 
+/**
+ * The threads another user shared with the caller, each with its owner: the export reads the caller's pins on them from the
+ * owner's shard (`gdpr/steps.ts#collectSharedPins`). A grant saved without its owner is skipped, since the owner is unknown here.
+ */
+export const listSharedPinGrantsForExport = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.array(v.object({ ownerId: v.string(), threadId: v.string() })))
+    .query(async ({ args, ctx: context }) => {
+        const grants = await context.db.threadAccess.findMany({ where: { userId: args.userId } });
+
+        return grants.page.flatMap((grant) =>
+            typeof grant.ownerId === "string" && grant.ownerId !== args.userId ? [{ ownerId: grant.ownerId, threadId: grant.threadId }] : [],
+        );
+    });
+
 export const createPin = authMutation
     .use(rateLimit("pins/create"))
     .input({

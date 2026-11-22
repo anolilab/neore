@@ -18,6 +18,7 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
 import { storedPage, storedRows } from "../lib/stored-row";
+import { callOnShard } from "../lib/cross-shard";
 
 const TRAILING_SLASH = /\/$/;
 
@@ -377,6 +378,32 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     return conversations;
 });
 
+/**
+ * The pins the caller made on threads other people shared with them. Such a thread and its pins live on its owner's shard, so the
+ * pins are read there, page by page, by the caller's own id. A thread's pins that the caller made nothing on are left out.
+ */
+export const collectSharedPins = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
+    const grants = await context.runQuery(internal.chat.pins.functions.listSharedPinGrantsForExport, { userId });
+    const shared: { pins: unknown[]; threadId: string }[] = [];
+
+    for (const grant of grants) {
+        const pins = await readAllPages(
+            async (cursor) =>
+                await callOnShard(
+                    internal.chat.pins.functions.listPinsForExport,
+                    { cursor, threadId: grant.threadId as Id<"threads">, userId },
+                    { shardKey: grant.ownerId },
+                ),
+        );
+
+        if (pins.length > 0) {
+            shared.push({ pins, threadId: grant.threadId });
+        }
+    }
+
+    return shared;
+});
+
 export const collectFiles = internalQuery
     .input({ userId: v.string() })
     .output(
@@ -623,6 +650,9 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         reviewDrafts: v.optional(v.any()),
         settings: v.any(),
+        // The pins the caller made on threads shared with them, read from each owner's shard (`collectSharedPins`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        sharedThreadPins: v.optional(v.any()),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         tasks: v.optional(v.any()),
@@ -756,6 +786,7 @@ export const generateExportFile = internalAction
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             settings: args.settings,
+            sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,

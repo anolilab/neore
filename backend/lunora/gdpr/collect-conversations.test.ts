@@ -15,12 +15,12 @@ import { describe, expect, it, vi } from "vitest";
 import { registeredApi } from "../../test/registered-api";
 
 import { listGuestLinksForExport, listGuestNotesForExport } from "../chat/guest-links";
-import { listPinsForExport } from "../chat/pins/functions";
+import { listPinsForExport, listSharedPinGrantsForExport } from "../chat/pins/functions";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
 import schema from "../schema";
-import { collectConversations, collectThreadTags } from "./steps";
+import { collectConversations, collectSharedPins, collectThreadTags } from "./steps";
 
 /**
  * The harness's `ctx.runQuery` takes the REGISTERED procedure object, not a
@@ -31,6 +31,17 @@ const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+// The harness is one database for every shard, so a call to another shard runs in the harness under test.
+const shard = vi.hoisted(() => {
+    return { harness: undefined as any };
+});
+
+vi.mock("../lib/cross-shard", () => {
+    return {
+        callOnShard: async (reference: never, args: never) => await shard.harness.run(async (ctx: any) => await ctx.runQuery(reference, args)),
+    };
+});
 
 const THREADS = 3;
 const MESSAGES_PER_THREAD = 12;
@@ -320,6 +331,74 @@ describe("collectConversations", () => {
  * owner's export (plan note, GDPR open question 5). The export is only ever
  * built for the user the workflow names, so another user's locked chat stays out.
  */
+describe("collectSharedPins", () => {
+    it("reads a collaborator's pins on each thread shared with them, and skips a grant with no recorded owner", async () => {
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
+        registry.set("chat_pins_functions:listSharedPinGrantsForExport", listSharedPinGrantsForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        shard.harness = harness;
+
+        try {
+            const threadId = await harness.run(async (context: any) => {
+                const sharedThreadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "Shared",
+                    userId: "user-owner",
+                });
+
+                await context.db.insert("threadPins", {
+                    createdAt: 3,
+                    messageId: "m-1",
+                    messageRole: "assistant",
+                    note: "collaborator note",
+                    selectedText: "quoted",
+                    threadId: sharedThreadId,
+                    updatedAt: 4,
+                    userId: "user-collab",
+                });
+                await context.db.insert("threadAccess", {
+                    grantedAt: 0,
+                    grantedBy: "user-owner",
+                    ownerId: "user-owner",
+                    permission: "read",
+                    threadId: sharedThreadId,
+                    userId: "user-collab",
+                });
+
+                // A grant saved before owners were recorded: the owner is unknown here, so it is skipped.
+                const legacyThreadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "Legacy",
+                    userId: "user-owner",
+                });
+
+                await context.db.insert("threadAccess", {
+                    grantedAt: 0,
+                    grantedBy: "user-owner",
+                    permission: "read",
+                    threadId: legacyThreadId,
+                    userId: "user-collab",
+                });
+
+                return sharedThreadId;
+            });
+
+            const shared = await harness.action(async (context: any) => await context.runAction(collectSharedPins, { userId: "user-collab" }));
+
+            expect(shared).toStrictEqual([{ pins: [expect.objectContaining({ messageId: "m-1", note: "collaborator note" })], threadId }]);
+        } finally {
+            shard.harness = undefined;
+            harness.close();
+        }
+    });
+});
+
 describe("collectConversations: a locked chat", () => {
     const LOCKED_TITLE = "Secret plan";
 
