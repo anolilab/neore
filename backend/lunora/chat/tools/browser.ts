@@ -53,6 +53,8 @@ export interface BrowserResult {
     success: boolean;
     /** The fingerprint of the element a look read: a click is checked against it (`expectTarget`). */
     target?: string;
+    /** A click was refused because its target changed since it was checked; nothing was clicked (the renderer's answer). */
+    targetChanged?: boolean;
     title?: string;
     truncated?: boolean;
     typedSelector?: string;
@@ -156,7 +158,21 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 }
             }
 
-            const first = await run(step);
+            let first = await run(step);
+
+            // A click that was not approved is checked against the target looked at just before it. When the page changed in
+            // between, that target is looked at once more: an ordinary target is clicked, a purchase (or one that cannot be read)
+            // needs the person's yes as before. An approved click is never retried: its approval is for the target it was shown.
+            if (first.targetChanged === true && step.approvedCallId === undefined && step.expectTarget !== undefined && input.selector !== undefined) {
+                const again = await run({ action: "extract", approvalLook: true, selector: input.selector });
+
+                if (again.target === undefined || purchaseTargetNeedsApproval(again as ClickTargetLook)) {
+                    return { error: CLICK_NEEDS_APPROVAL, success: false };
+                }
+
+                first = await run({ ...step, expectTarget: again.target });
+            }
+
             // A refused or failed action (a person in control, the browser closed) is not a page to judge.
             const result =
                 first.success === true || first.handedBack === true

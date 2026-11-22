@@ -317,6 +317,10 @@
                     "content": { "type": "string", "description": "Extracted text content" },
                     "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
                     "labelTruncated": { "type": "boolean", "description": "The accessible name was cut short" },
+                    "targetChanged": {
+                        "type": "boolean",
+                        "description": "A click was refused because its target changed since it was checked; nothing was clicked"
+                    },
                     "target": { "type": "string", "description": "Fingerprint of the extracted element (visibleOnly reads only)" },
                     "checkout": { "type": "boolean", "description": "The element is on a checkout (visibleOnly reads only)" },
                     "truncated": { "type": "boolean" },

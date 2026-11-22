@@ -135,6 +135,10 @@ export type BrowserActionResponse = {
      */
     labelTruncated?: boolean;
     /**
+     * A click was refused because its target changed since it was checked; nothing was clicked
+     */
+    targetChanged?: boolean;
+    /**
      * Fingerprint of the extracted element (visibleOnly reads only)
      */
     target?: string;

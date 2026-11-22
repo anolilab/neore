@@ -568,6 +568,8 @@ interface ActionResult {
     success: boolean;
     /** The fingerprint of the extracted element (`visibleOnly` reads only), which a click can be checked against. */
     target?: string;
+    /** A click was refused because its target changed since it was checked (`expectTarget`); nothing was clicked. */
+    targetChanged?: boolean;
     title?: string;
     truncated?: boolean;
     typedSelector?: string;
@@ -857,7 +859,7 @@ const actHeld = async (
                     const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
 
                     if ((await targetOf(read.canonical)) !== expectTarget) {
-                        result = { error: TARGET_CHANGED, success: false };
+                        result = { error: TARGET_CHANGED, success: false, targetChanged: true };
                         break;
                     }
 
