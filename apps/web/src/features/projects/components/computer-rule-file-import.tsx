@@ -27,6 +27,8 @@ type FileEntry = {
     name: string;
     path: string;
     reason?: string;
+    // An earlier file this one is a link to: the same text, so one draft of the two.
+    sameAs?: FileId;
     size?: number;
     // `unanswered`: asked for, but the answer did not carry it (or carried it without its text).
     status: "found" | "left_out" | "missing" | "read" | "refused" | "too_large" | "unanswered";
@@ -71,6 +73,32 @@ const REFUSALS: Readonly<Record<string, Failure>> = {
     // Lunora's online-only write, refused while the connection is down rather than queued for the reconnect.
     OFFLINE_NOT_QUEUED: "disconnected",
     TOO_MANY_REQUESTS: "limited",
+};
+
+/** The found file `file` is a link to, among `files`: listed, but not ticked, as its text would apply twice. */
+const linkTarget = (file: FileEntry, files: ReadonlyArray<FileEntry>): FileEntry | undefined =>
+    file.sameAs === undefined ? undefined : files.find((other) => other.id === file.sameAs && other.status === "found");
+
+/**
+ * The files of a read (in the device's order) as one per draft: a link to an earlier one (`sameAs`), or, from a desktop
+ * that does not say so, a file with an earlier one's text, would apply the same text twice. `duplicateOf` names, for
+ * each one left out, the file kept.
+ */
+const onePerText = (files: ReadonlyArray<FileEntry>): { duplicateOf: Map<FileId, FileEntry>; kept: FileEntry[] } => {
+    const kept: FileEntry[] = [];
+    const duplicateOf = new Map<FileId, FileEntry>();
+
+    for (const file of files) {
+        const keeper = kept.find((earlier) => earlier.id === file.sameAs) ?? kept.find((earlier) => earlier.text === file.text);
+
+        if (keeper) {
+            duplicateOf.set(file.id, keeper);
+        } else {
+            kept.push(file);
+        }
+    }
+
+    return { duplicateOf, kept };
 };
 
 const failureOf = (error: unknown): Failure => {
@@ -138,7 +166,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
 
     useEffect(() => {
         if (found) {
-            setPicked(new Set(found.filter((file) => file.status === "found").map((file) => file.id)));
+            setPicked(new Set(found.filter((file) => file.status === "found" && !linkTarget(file, found)).map((file) => file.id)));
         }
     }, [found]);
 
@@ -308,6 +336,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         // The computer that found them, whatever is chosen by the time it answers.
         const { deviceId, name: deviceName } = listing;
         let came: FileEntry[] = [];
+        let duplicateOf = new Map<FileId, FileEntry>();
         let allRead = false;
 
         runImport(
@@ -369,18 +398,23 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     return null;
                 }
 
+                const one = onePerText(came);
+
+                ({ duplicateOf } = one);
+
                 // Each a tool's global instructions, so applied always and whole, Windsurf's `global_rules.md` too.
                 const imported = await importRuleTexts(
-                    came.map((file) => {
+                    one.kept.map((file) => {
                         return { path: file.name, text: () => file.text ?? "", whole: true };
                     }),
                     MAX_RULE_FILES,
                 );
 
-                return { ...imported, duplicates: 0, notRead: 0, unreadable: [] };
+                return { ...imported, duplicates: duplicateOf.size, notRead: 0, unreadable: [] };
             },
             (added) => {
-                const addedIds = new Set(came.flatMap((file) => (added.includes(file.name) ? [file.id] : [])));
+                // A copy left out is done once the file kept for it was added.
+                const addedIds = new Set(came.flatMap((file) => (added.includes((duplicateOf.get(file.id) ?? file).name) ? [file.id] : [])));
 
                 // Those added are unticked, so trying again does not add them twice; those the project had no room for stay.
                 setPicked((current) => new Set([...current].filter((id) => !addedIds.has(id))));
@@ -392,6 +426,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             },
         );
     };
+
+    const sameText = (path: string): string => t`(same file as ${path})`;
 
     const sizeOf = (bytes: number): string => t`${formatNumber(Math.max(1, Math.ceil(bytes / 1024)), i18n.locale)} KB`;
 
@@ -463,32 +499,37 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             </p>
             {found && (
                 <ul aria-label={t`Instruction files`} className="space-y-2">
-                    {found.map((file) => (
-                        <li key={file.id}>
-                            <Label className="flex flex-wrap items-center gap-2 text-sm font-normal">
-                                <Checkbox
-                                    checked={picked.has(file.id)}
-                                    disabled={file.status !== "found" || waiting}
-                                    onCheckedChange={(checked) => {
-                                        const next = new Set(picked);
+                    {found.map((file) => {
+                        const target = file.status === "found" ? linkTarget(file, found) : undefined;
 
-                                        if (checked) {
-                                            next.add(file.id);
-                                        } else {
-                                            next.delete(file.id);
-                                        }
+                        return (
+                            <li key={file.id}>
+                                <Label className="flex flex-wrap items-center gap-2 text-sm font-normal">
+                                    <Checkbox
+                                        checked={picked.has(file.id)}
+                                        disabled={file.status !== "found" || waiting}
+                                        onCheckedChange={(checked) => {
+                                            const next = new Set(picked);
 
-                                        setPicked(next);
-                                    }}
-                                />
-                                <span className="font-mono text-xs">{file.path}</span>
-                                {file.size !== undefined && file.status === "found" && (
-                                    <span className="text-muted-foreground text-xs">{sizeOf(file.size)}</span>
-                                )}
-                                {statusText[file.status] && <span className="text-muted-foreground text-xs">{statusText[file.status]}</span>}
-                            </Label>
-                        </li>
-                    ))}
+                                            if (checked) {
+                                                next.add(file.id);
+                                            } else {
+                                                next.delete(file.id);
+                                            }
+
+                                            setPicked(next);
+                                        }}
+                                    />
+                                    <span className="font-mono text-xs">{file.path}</span>
+                                    {file.size !== undefined && file.status === "found" && (
+                                        <span className="text-muted-foreground text-xs">{sizeOf(file.size)}</span>
+                                    )}
+                                    {statusText[file.status] && <span className="text-muted-foreground text-xs">{statusText[file.status]}</span>}
+                                    {target && <span className="text-muted-foreground text-xs">{sameText(target.path)}</span>}
+                                </Label>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
             {notRead.length > 0 && (

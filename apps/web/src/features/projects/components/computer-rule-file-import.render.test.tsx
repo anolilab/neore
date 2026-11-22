@@ -582,6 +582,80 @@ describe("import from this computer", () => {
         expect((within(imported).getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value).toBe("global_rules.md text");
     });
 
+    it("lists a linked copy unticked, and makes one draft of two files that are one", async () => {
+        const user = userEvent.setup();
+        // `~/.codex/AGENTS.md` is a link to `~/.claude/CLAUDE.md`: the device names the first.
+        const linked = [{ ...LISTED[0]! }, { ...LISTED[1]!, sameAs: "claude" }, LISTED[2]!, LISTED[3]!];
+
+        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+            const callId = `linked-${String(backend.start.mock.calls.length)}`;
+
+            backend.calls.set(
+                callId,
+                files
+                    ? {
+                          files: linked.filter((file) => files.includes(file.id)).map((file) => ({ ...file, status: "read", text: "One text" })),
+                          status: "completed",
+                      }
+                    : { files: linked, status: "completed" },
+            );
+
+            return { callId };
+        });
+        renderEditor();
+        await openAndList(user);
+
+        const list = screen.getByRole("list", { name: "Instruction files" });
+
+        expect(within(list).getByText("(same file as ~/.claude/CLAUDE.md)")).toBeDefined();
+        expect(
+            within(list)
+                .getAllByRole("checkbox")
+                .map((box) => box.getAttribute("aria-checked")),
+        ).toEqual(["true", "false", "false", "false"]);
+
+        // Ticked by hand, the copy is still left out, and said so.
+        await user.click(within(list).getAllByRole("checkbox")[1]!);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(await screen.findByRole("listitem", { name: "CLAUDE.md" })).toBeDefined();
+        expect(screen.queryByRole("listitem", { name: "AGENTS.md" })).toBeNull();
+        expect(
+            screen.getByText(
+                "1 rule file imported. Review, then save. 1 file was left out as the same file as another picked: the same text would apply twice.",
+            ),
+        ).toBeDefined();
+        await waitFor(() => expect(screen.queryByTestId("computer-rule-file-import")).toBeNull());
+    });
+
+    it("makes one draft of two files with the same text from a desktop that does not say they are linked", async () => {
+        const user = userEvent.setup();
+
+        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+            const callId = `same-${String(backend.start.mock.calls.length)}`;
+
+            backend.calls.set(
+                callId,
+                files
+                    ? {
+                          files: LISTED.filter((file) => files.includes(file.id)).map((file) => ({ ...file, status: "read", text: "Same text" })),
+                          status: "completed",
+                      }
+                    : { files: LISTED, status: "completed" },
+            );
+
+            return { callId };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(backend.start).toHaveBeenLastCalledWith({ deviceId: "desk", files: ["claude", "codex"] }, expect.anything());
+        expect(await screen.findByRole("listitem", { name: "CLAUDE.md" })).toBeDefined();
+        expect(screen.queryByRole("listitem", { name: "AGENTS.md" })).toBeNull();
+        await waitFor(() => expect(screen.queryByTestId("computer-rule-file-import")).toBeNull());
+    });
+
     it("shows a computer that stops checking in as offline while the panel is open", async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date", "setInterval", "clearInterval"] });
 

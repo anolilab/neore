@@ -39,7 +39,7 @@
         "test:storybook": "vitest run --config vitest.storybook.config.ts",
         "translate:auto": "node scripts/translate-catalogs.mjs",
         "translate:clean": "lingui extract --clean",
-        "translate:compile": "lingui compile",
+        "translate:compile": "node scripts/check-locale-catalogs.mjs && lingui compile",
         "translate:extract": "lingui extract"
     },
     "dependencies": {

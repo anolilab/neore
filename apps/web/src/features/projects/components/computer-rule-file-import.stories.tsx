@@ -89,6 +89,37 @@ export const FilesFound: Story = {
     },
 };
 
+/** One file is a link to another: listed as the same file, and not ticked, as its text would apply twice. */
+export const LinkedCopy: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    devices([desktop]),
+                    started,
+                    lunora(api.devices.global_instructions.getGlobalInstructionsCall, {
+                        files: LISTED.map((file) => (file.id === "codex" ? { ...file, sameAs: "claude" as const } : file)),
+                        status: "completed",
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const canvas = within(canvasElement);
+
+        await userEvent.click(canvas.getByRole("button", { name: "Import from this computer" }));
+        await userEvent.click(await canvas.findByRole("button", { name: "Find files" }));
+
+        const list = within(await canvas.findByRole("list", { name: "Instruction files" }));
+
+        await expect(list.getByText("(same file as ~/.claude/CLAUDE.md)")).toBeInTheDocument();
+        await expect(list.getByRole("checkbox", { name: /^~\/\.claude\/CLAUDE\.md/u })).toBeChecked();
+        await expect(list.getByRole("checkbox", { name: /AGENTS\.md/u })).not.toBeChecked();
+    },
+};
+
 /** Waiting on the person at the desktop. */
 export const WaitingForApproval: Story = {
     parameters: {

@@ -47,6 +47,8 @@ const vFileEntry = v.object({
     name: v.string(),
     path: v.string(),
     reason: v.optional(v.string()),
+    // An earlier file this one leads to (a link): the same text, imported once.
+    sameAs: v.optional(vFileId),
     size: v.optional(v.number()),
     status: v.union(v.literal("found"), v.literal("left_out"), v.literal("missing"), v.literal("read"), v.literal("refused"), v.literal("too_large")),
     text: v.optional(v.string()),
@@ -85,6 +87,7 @@ export const parseGlobalInstructionFiles = (output: string | undefined): FileEnt
         const reason = text(entry.reason, 200);
         const body = text(entry.text, 100_000);
         const size = byteCount(entry.size);
+        const sameAs = typeof entry.sameAs === "string" && IDS.has(entry.sameAs) && entry.sameAs !== entry.id ? (entry.sameAs as FileEntry["id"]) : undefined;
 
         return [
             {
@@ -93,6 +96,7 @@ export const parseGlobalInstructionFiles = (output: string | undefined): FileEnt
                 path: text(entry.path, 200) ?? "",
                 status: entry.status as FileEntry["status"],
                 ...(reason !== undefined && { reason }),
+                ...(sameAs !== undefined && { sameAs }),
                 ...(size !== undefined && { size }),
                 ...(body !== undefined && { text: body }),
             },

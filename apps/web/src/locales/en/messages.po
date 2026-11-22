@@ -138,7 +138,7 @@ msgstr "(deleted case)"
 msgid "(deleted task)"
 msgstr "(deleted task)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:399
+#: src/features/projects/components/computer-rule-file-import.tsx:436
 msgid "(did not fit in one read: import it on its own)"
 msgstr "(did not fit in one read: import it on its own)"
 
@@ -186,15 +186,15 @@ msgstr "(microdollars; 1,000,000 = $1)"
 msgid "(none)"
 msgstr "(none)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:404
+#: src/features/projects/components/computer-rule-file-import.tsx:441
 msgid "(not in the computer's answer: try again)"
 msgstr "(not in the computer's answer: try again)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:400
+#: src/features/projects/components/computer-rule-file-import.tsx:437
 msgid "(not on this computer)"
 msgstr "(not on this computer)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:448
+#: src/features/projects/components/computer-rule-file-import.tsx:485
 msgid "(offline)"
 msgstr "(offline)"
 
@@ -218,7 +218,7 @@ msgstr "(opens in new tab)"
 msgid "(optional)"
 msgstr "(optional)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:402
+#: src/features/projects/components/computer-rule-file-import.tsx:439
 msgid "(refused: it links outside your home folder or is not a text file)"
 msgstr "(refused: it links outside your home folder or is not a text file)"
 
@@ -226,6 +226,7 @@ msgstr "(refused: it links outside your home folder or is not a text file)"
 msgid "(required)"
 msgstr "(required)"
 
+#: src/features/projects/components/computer-rule-file-import.tsx:430
 #: src/features/projects/components/repo-rule-file-import.tsx:245
 msgid "(same file as {path})"
 msgstr "(same file as {path})"
@@ -234,7 +235,7 @@ msgstr "(same file as {path})"
 msgid "(shared)"
 msgstr "(shared)"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:403
+#: src/features/projects/components/computer-rule-file-import.tsx:440
 #: src/features/projects/components/repo-rule-file-import.tsx:434
 msgid "(too large)"
 msgstr "(too large)"
@@ -654,7 +655,7 @@ msgid "{0} input, {1} output per 1M tokens"
 msgstr "{0} input, {1} output per 1M tokens"
 
 #. placeholder {0}: chosen.name
-#: src/features/projects/components/computer-rule-file-import.tsx:511
+#: src/features/projects/components/computer-rule-file-import.tsx:553
 msgid "{0} is offline. Open the desktop app on it to continue."
 msgstr "{0} is offline. Open the desktop app on it to continue."
 
@@ -674,7 +675,7 @@ msgid "{0} items were created. Skills, schedules and webhooks are switched off; 
 msgstr "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 
 #. placeholder {0}: formatNumber(Math.max(1, Math.ceil(bytes / 1024)), i18n.locale)
-#: src/features/projects/components/computer-rule-file-import.tsx:395
+#: src/features/projects/components/computer-rule-file-import.tsx:432
 msgid "{0} KB"
 msgstr "{0} KB"
 
@@ -1371,11 +1372,11 @@ msgstr "{name} connected."
 msgid "{name} connection activated"
 msgstr "{name} connection activated"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:255
+#: src/features/projects/components/computer-rule-file-import.tsx:283
 msgid "{name} could not read the files."
 msgstr "{name} could not read the files."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:254
+#: src/features/projects/components/computer-rule-file-import.tsx:282
 msgid "{name} did not answer in time. Open the desktop app on it and try again."
 msgstr "{name} did not answer in time. Open the desktop app on it and try again."
 
@@ -1387,7 +1388,7 @@ msgstr "{name} disconnected"
 msgid "{name} hidden from the model picker"
 msgstr "{name} hidden from the model picker"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:251
+#: src/features/projects/components/computer-rule-file-import.tsx:279
 msgid "{name} is busy with other requests. Try again in a moment."
 msgstr "{name} is busy with other requests. Try again in a moment."
 
@@ -1395,7 +1396,7 @@ msgstr "{name} is busy with other requests. Try again in a moment."
 msgid "{name} is installed"
 msgstr "{name} is installed"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:259
+#: src/features/projects/components/computer-rule-file-import.tsx:287
 msgid "{name} is offline. Open the desktop app on it and try again."
 msgstr "{name} is offline. Open the desktop app on it and try again."
 
@@ -4217,7 +4218,7 @@ msgstr "Approve a code"
 msgid "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
 msgstr "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:412
+#: src/features/projects/components/computer-rule-file-import.tsx:449
 msgid "Approve the request in the desktop app on {name}."
 msgstr "Approve the request in the desktop app on {name}."
 
@@ -5973,7 +5974,7 @@ msgstr "Canada"
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/add-project-dialog.tsx:682
-#: src/features/projects/components/computer-rule-file-import.tsx:540
+#: src/features/projects/components/computer-rule-file-import.tsx:582
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
 #: src/features/projects/components/repo-rule-file-import.tsx:461
@@ -7732,7 +7733,7 @@ msgid "Compressing context..."
 msgstr "Compressing context..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/projects/components/computer-rule-file-import.tsx:434
+#: src/features/projects/components/computer-rule-file-import.tsx:471
 #: src/features/settings/components/chat/bots-settings.tsx:435
 msgid "Computer"
 msgstr "Computer"
@@ -14864,7 +14865,7 @@ msgstr "Files dropped earlier for another account were not attached. Drop them a
 msgid "Files found"
 msgstr "Files found"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:494
+#: src/features/projects/components/computer-rule-file-import.tsx:536
 msgid "Files not imported"
 msgstr "Files not imported"
 
@@ -14998,7 +14999,7 @@ msgstr "Finalizing..."
 msgid "Financial data and bank connection APIs"
 msgstr "Financial data and bank connection APIs"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:535
+#: src/features/projects/components/computer-rule-file-import.tsx:577
 #: src/features/projects/components/repo-rule-file-import.tsx:457
 msgid "Find files"
 msgstr "Find files"
@@ -15343,7 +15344,7 @@ msgstr "Forward to a new chat"
 
 #. placeholder {0}: found.filter((file) => file.status === "found").length
 #. placeholder {0}: found.length
-#: src/features/projects/components/computer-rule-file-import.tsx:461
+#: src/features/projects/components/computer-rule-file-import.tsx:498
 #: src/features/projects/components/repo-rule-file-import.tsx:403
 msgid "Found {0, plural, one {# file} other {# files}}."
 msgstr "Found {0, plural, one {# file} other {# files}}."
@@ -17632,8 +17633,8 @@ msgstr "Import files"
 msgid "Import from repository"
 msgstr "Import from repository"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:418
-#: src/features/projects/components/computer-rule-file-import.tsx:570
+#: src/features/projects/components/computer-rule-file-import.tsx:455
+#: src/features/projects/components/computer-rule-file-import.tsx:612
 msgid "Import from this computer"
 msgstr "Import from this computer"
 
@@ -17653,7 +17654,7 @@ msgstr "Import one kind of export at a time."
 msgid "Import rule folder"
 msgstr "Import rule folder"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:523
+#: src/features/projects/components/computer-rule-file-import.tsx:565
 #: src/features/projects/components/repo-rule-file-import.tsx:453
 msgid "Import selected"
 msgstr "Import selected"
@@ -18083,7 +18084,7 @@ msgstr "Installed models"
 msgid "instruct"
 msgstr "instruct"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:464
+#: src/features/projects/components/computer-rule-file-import.tsx:501
 msgid "Instruction files"
 msgstr "Instruction files"
 
@@ -20151,7 +20152,7 @@ msgstr "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the repository's root, a
 msgid "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 msgstr "Looks for AGENTS.md, CLAUDE.md and GEMINI.md at the root of {0}, and for a rules folder."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:455
+#: src/features/projects/components/computer-rule-file-import.tsx:492
 msgid "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md in your home folder on {name}, and nothing else. You approve each request in the desktop app."
 msgstr "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md in your home folder on {name}, and nothing else. You approve each request in the desktop app."
 
@@ -20160,7 +20161,7 @@ msgstr "Looks for the global CLAUDE.md, AGENTS.md, GEMINI.md and global_rules.md
 msgid "LoRA"
 msgstr "LoRA"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:258
+#: src/features/projects/components/computer-rule-file-import.tsx:286
 msgid "Lost track of the request to {name}. Try again."
 msgstr "Lost track of the request to {name}. Try again."
 
@@ -25176,7 +25177,7 @@ msgstr "Pair a computer in the Neore desktop app so agents can work on your file
 msgid "Pair one in Settings"
 msgstr "Pair one in Settings"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:431
+#: src/features/projects/components/computer-rule-file-import.tsx:468
 msgid "Pair the desktop app in Settings → Devices to import from a computer."
 msgstr "Pair the desktop app in Settings → Devices to import from a computer."
 
@@ -34290,7 +34291,7 @@ msgstr "The comparison could not be loaded."
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "The composer was locked before the paste was ready, so it was not inserted."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:262
+#: src/features/projects/components/computer-rule-file-import.tsx:290
 msgid "The computer's answer could not be read. Try again, or update the desktop app on {name}."
 msgstr "The computer's answer could not be read. Try again, or update the desktop app on {name}."
 
@@ -34814,7 +34815,7 @@ msgstr "The repository could not be read."
 msgid "The repository or its branch was not found."
 msgstr "The repository or its branch was not found."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:261
+#: src/features/projects/components/computer-rule-file-import.tsx:289
 msgid "The request could not be sent."
 msgstr "The request could not be sent."
 
@@ -34830,7 +34831,7 @@ msgstr "The request timed out but may still complete. Check the conversation bef
 msgid "The request timed out. Please try again."
 msgstr "The request timed out. Please try again."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:252
+#: src/features/projects/components/computer-rule-file-import.tsx:280
 msgid "The request was denied on {name}."
 msgstr "The request was denied on {name}."
 
@@ -35274,7 +35275,7 @@ msgstr "This computer did not resume its own session, so the conversation was ha
 msgid "This computer is no longer paired."
 msgstr "This computer is no longer paired."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:256
+#: src/features/projects/components/computer-rule-file-import.tsx:284
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "This computer is no longer paired. Pair it again in Settings → Devices."
 
@@ -36243,7 +36244,7 @@ msgid "Too many requests right now. Try again in a moment."
 msgstr "Too many requests right now. Try again in a moment."
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:164
-#: src/features/projects/components/computer-rule-file-import.tsx:257
+#: src/features/projects/components/computer-rule-file-import.tsx:285
 msgid "Too many requests. Please try again in a moment."
 msgstr "Too many requests. Please try again in a moment."
 
@@ -36650,7 +36651,7 @@ msgstr "Try adjusting your search terms."
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:169
 #: src/features/home/components/home-page.tsx:154
-#: src/features/projects/components/computer-rule-file-import.tsx:427
+#: src/features/projects/components/computer-rule-file-import.tsx:464
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
@@ -37291,7 +37292,7 @@ msgstr "Update Role"
 msgid "Update Server"
 msgstr "Update Server"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:260
+#: src/features/projects/components/computer-rule-file-import.tsx:288
 msgid "Update the desktop app on {name} first."
 msgstr "Update the desktop app on {name} first."
 
@@ -38650,7 +38651,7 @@ msgstr "Waiting for {0}."
 msgid "Waiting for {device} to pick this up…"
 msgstr "Waiting for {device} to pick this up…"
 
-#: src/features/projects/components/computer-rule-file-import.tsx:412
+#: src/features/projects/components/computer-rule-file-import.tsx:449
 msgid "Waiting for {name}…"
 msgstr "Waiting for {name}…"
 
@@ -39570,7 +39571,7 @@ msgstr "You are not watching any repository."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "You are offline. Neore will reconnect when the network is back."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:253
+#: src/features/projects/components/computer-rule-file-import.tsx:281
 msgid "You are offline. Reconnect and try again."
 msgstr "You are offline. Reconnect and try again."
 
@@ -39893,7 +39894,7 @@ msgstr "Your computer is busy. Try again in a moment."
 msgid "Your computer is offline. Open Neore on it and try again."
 msgstr "Your computer is offline. Open Neore on it and try again."
 
-#: src/features/projects/components/computer-rule-file-import.tsx:424
+#: src/features/projects/components/computer-rule-file-import.tsx:461
 msgid "Your computers could not be loaded."
 msgstr "Your computers could not be loaded."
 

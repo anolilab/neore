@@ -233,15 +233,21 @@ impl Request {
     }
 
     /// Runs the request against the shared folders saved now (`current`, canonical) as well as those it was planned
-    /// with: a JSON list in [`FILES`] order.
+    /// with: a JSON list in [`FILES`] order. A file that leads to the same place as one before it (a link such as
+    /// `~/.claude/CLAUDE.md → ~/.codex/AGENTS.md`) names that one in `sameAs`, so the editor makes one draft of the two.
     pub fn run(&self, current: &[PathBuf]) -> String {
         let roots: Vec<PathBuf> = self.roots.iter().chain(current).cloned().collect();
+        let mut opened_at: Vec<(PathBuf, &'static str)> = Vec::new();
         let mut entries: Vec<Value> = self
             .resolved
             .iter()
             .map(|(file, planned)| {
                 let mut entry = json!({ "id": file.id, "name": file.name, "path": format!("~/{}", file.relative) });
                 let now = resolve(&self.home, file, &roots);
+                let place = match &now {
+                    Resolved::At(real, _) => Some(real.clone()),
+                    _ => None,
+                };
                 let opened = match now {
                     Resolved::At(real, approved) if now_matches(planned, &real, approved) => {
                         open(&self.home, &real, approved)
@@ -250,6 +256,14 @@ impl Request {
                     _ if now != *planned => Err(Resolved::Refused(CHANGED)),
                     other => Err(other),
                 };
+
+                // Hard links are refused, so only a link leads two names to one file: its real path says so.
+                if let (Ok(_), Some(place)) = (&opened, place) {
+                    match opened_at.iter().find(|(earlier, _)| *earlier == place) {
+                        Some((_, first)) => entry["sameAs"] = json!(first),
+                        None => opened_at.push((place, file.id)),
+                    }
+                }
 
                 match (opened, &self.read) {
                     (Err(Resolved::Refused(reason)), _) => {
@@ -735,6 +749,37 @@ mod tests {
         .unwrap();
 
         assert_eq!(read(&home, &["claude"])[0]["text"], json!("mine"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn names_the_earlier_file_a_link_leads_to() {
+        let (_dir, home) = home("same-as");
+
+        put(&home, ".codex/AGENTS.md", "shared");
+        put(&home, ".gemini/GEMINI.md", "shared");
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        std::os::unix::fs::symlink(
+            home.join(".codex/AGENTS.md"),
+            home.join(".claude/CLAUDE.md"),
+        )
+        .unwrap();
+
+        let listed = entries(&plan(LIST_TOOL, &json!({}), Some(home.clone()), &[]).unwrap());
+        let same: Vec<_> = listed.iter().map(|entry| entry["sameAs"].clone()).collect();
+
+        // The first of the two keeps its place; equal text in another file is another file.
+        assert_eq!(
+            same,
+            [Value::Null, json!("claude"), Value::Null, Value::Null]
+        );
+
+        let got = read(&home, &["codex", "claude"]);
+
+        assert_eq!(got[1]["sameAs"], json!("claude"));
+        assert_eq!(got[1]["text"], json!("shared"));
+        // Read on its own, the link's target names nothing.
+        assert!(read(&home, &["codex"])[0].get("sameAs").is_none());
     }
 
     #[test]

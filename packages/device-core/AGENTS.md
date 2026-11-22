@@ -24,7 +24,7 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
   approved dev/inode (Windows: the approved real path) and not hard-linked (Unix); 48 KiB each, always asked
   (`can_always_allow`); the desktop words it as the person's request (`apps/desktop/src/device/prompt-origin.ts`), so an
   envelope that names a `threadId` (a chat's) is refused before it asks.
-  Never add a path from the request.
+  A file that is a link to an earlier one names it in `sameAs` (one draft of the two). Never add a path from the request.
 - **`device-core` has two halves**: `actions.rs` imports no pairing/envelope/approval/keychain; `engine.rs` verifies, asks, then calls it. The paired half is the default `keychain` feature.
 - `neore-host --stdio` is built `--no-default-features`, trusts only its pipe and re-checks folders and sandbox on its own machine. New tools/changed results go in `tests/common/actions.json`. Desktop main-process calls use `HostTransport`.
 - **Servers over SSH**: a server's secret lives only in this desktop's keychain (`store.rs`, one entry per device id); everything for it is verified and signed on the desktop after the same local approval (no "Always allow"). The relay's desktop-id comparison is NOT the security control.
