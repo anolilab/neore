@@ -1048,6 +1048,39 @@ describe("opening a page while in control", () => {
         await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
     });
 
+    it("keeps the browser a navigation whose hold the renderer lost names, and tells the person the page may have opened", async () => {
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        await addSession();
+        await take(OWNER);
+        // The row's browser could not be reconnected: the renderer opened the page in a new one, then lost the hold.
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-2", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-2" });
+    });
+
+    it("tells the person a page may have opened when the renderer lost the hold of a navigation on the row's own browser", async () => {
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-1", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: lost, status: "refused" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-1" });
+    });
+
     it("gives back the person's charge for a navigation the renderer ran none of because it retired the browser", async () => {
         await addSession();
         await take(OWNER);

@@ -273,6 +273,34 @@ describe(SessionLock, () => {
         expect(stored.has("state")).toBe(false);
     });
 
+    it("sends a record's write and its alarm together, with no await between them, so they land as one batch", async () => {
+        const sent: string[] = [];
+        const written = Promise.withResolvers<undefined>();
+        const lock = new SessionLock({
+            storage: {
+                delete: async () => true,
+                get: async () => undefined,
+                put: async () => {
+                    sent.push("put");
+
+                    return written.promise;
+                },
+                setAlarm: async () => {
+                    sent.push("setAlarm");
+                },
+            },
+        } as never);
+        const answering = lock.fetch(
+            new Request("https://session-lock/", { body: JSON.stringify({ kind: "shared", leaseMs: 1000, op: "take", token: "t" }), method: "POST" }),
+        );
+
+        await vi.advanceTimersByTimeAsync(0);
+        // The write has not landed yet, and the alarm is already on its way.
+        expect(sent).toStrictEqual(["put", "setAlarm"]);
+        written.resolve(undefined);
+        await expect(answering).resolves.toHaveProperty("status", 200);
+    });
+
     it("drops a released session's record at its alarm, with no further call to the session", async () => {
         const { alarms, lock, namespace, stored } = namespaceOf();
         const hold = await holdSession(namespace, "s", "shared");

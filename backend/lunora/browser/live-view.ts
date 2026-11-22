@@ -827,19 +827,27 @@ export const navigateInControl = authAction
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
         const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
         const signal = budget === 0 ? undefined : AbortSignal.timeout(budget);
-        const { data, response } =
+        const { data, error, response } =
             signal === undefined
-                ? { data: undefined, response: undefined }
+                ? { data: undefined, error: undefined, response: undefined }
                 : await browserAction({
                       body: { action: "navigate", sessionId: navigation.providerSessionId, url },
                       client,
                       signal,
                   }).catch(() => {
-                      return { data: undefined, response: undefined };
+                      return { data: undefined, error: undefined, response: undefined };
                   });
         const result = data as BrowserActionResponse | undefined;
         // The renderer retired the browser for good: the row forgets it, so the next action opens a new one.
         const isRetired = response?.status === 410;
+        // The renderer lost the call's hold while the page loaded (a 503 that ran something): the page may have opened,
+        // and the browser it names (a new one, when the row's could not be reconnected) stays the row's.
+        const withheld =
+            response?.status === 503 && response.headers?.get?.("x-browser-action") !== "not-run"
+                ? ((error ?? {}) as { error?: unknown; sessionId?: unknown })
+                : undefined;
+        const withheldSessionId = typeof withheld?.sessionId === "string" ? withheld.sessionId : undefined;
+        const withheldError = typeof withheld?.error === "string" ? withheld.error : undefined;
 
         // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
         // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
@@ -857,8 +865,9 @@ export const navigateInControl = authAction
                 action: "navigate",
                 actor: navigation.byOwner ? "owner" : "collaborator",
                 durationMs: Date.now() - startedAt,
-                ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
+                ...(result?.success !== true && { errorMessage: result?.error ?? withheldError ?? "The page could not be opened." }),
                 ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
+                ...(withheldSessionId !== undefined && { providerSessionId: withheldSessionId }),
                 sessionId: navigation.sessionId,
                 startedAt,
                 startedWithProviderSessionId: navigation.providerSessionId,
@@ -893,13 +902,14 @@ export const navigateInControl = authAction
         if (
             logged?.replaced === true ||
             isRetired ||
-            (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)
+            (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId) ||
+            (withheldSessionId !== undefined && withheldSessionId !== navigation.providerSessionId)
         ) {
             return { status: "closed" as const };
         }
 
         if (result?.success !== true) {
-            return { error: result?.error ?? "The page could not be opened.", status: "refused" as const };
+            return { error: result?.error ?? withheldError ?? "The page could not be opened.", status: "refused" as const };
         }
 
         return { status: "ok" as const, ...(result.url !== undefined && { url: result.url }) };

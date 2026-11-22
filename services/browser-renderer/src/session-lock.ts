@@ -66,8 +66,12 @@ export class SessionLock {
             return;
         }
 
-        await this.#state.storage.put(STATE_KEY, left);
-        await this.#state.storage.setAlarm(nextChangeOf(left));
+        // Both sent before either is awaited: a Durable Object coalesces writes with no await between them into one
+        // atomic batch, so the record is never stored without the alarm that will drop it.
+        const writing = this.#state.storage.put(STATE_KEY, left);
+        const scheduling = this.#state.storage.setAlarm(nextChangeOf(left));
+
+        await Promise.all([writing, scheduling]);
     }
 
     /** What has run out by now is dropped; what is still live sets the next alarm. */
