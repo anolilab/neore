@@ -4698,10 +4698,15 @@ export const retryFollowupCache = internalAction
         }
 
         if (charged) {
-            await ctx.runMutation(internal.agent.followup_suggestions.markFollowupCharged, {
-                lastMessageId: write.lastMessageId,
-                threadId: write.threadId,
-            });
+            const mark = { lastMessageId: write.lastMessageId, threadId: write.threadId };
+
+            try {
+                await ctx.runMutation(internal.agent.followup_suggestions.markFollowupCharged, mark);
+            } catch (markError) {
+                // Idempotent: the scheduler retries the mark, so the paid suggestion is shown without another unit or model call.
+                chatLogger.error(`[retryFollowupCache] The charged mark failed, retrying it: ${write.threadId}`, markError);
+                await runAfterWithRetry(ctx.scheduler, 0, internal.agent.followup_suggestions.markFollowupCharged, mark, FOLLOWUP_CACHE_RETRY);
+            }
         }
 
         // No unit, no suggestion: the written suggestions are cleared for this reply (the clear is retried by the scheduler if it cannot land).
@@ -5187,7 +5192,20 @@ export const generateFollowupSuggestionsForThread = internalAction
                 if (charged) {
                     // The unit is taken, so the suggestions become readable. Until this lands they stay hidden: a run that finds them
                     // uncharged takes the same unit again, which is a no-op, and marks them.
-                    await context.runMutation(internal.agent.followup_suggestions.markFollowupCharged, { lastMessageId, threadId });
+                    // A mark that fails is retried by the scheduler (it is idempotent): a paid suggestion must not stay hidden for the claim's hour.
+                    try {
+                        await context.runMutation(internal.agent.followup_suggestions.markFollowupCharged, { lastMessageId, threadId });
+                    } catch (markError) {
+                        chatLogger.error(`[generateFollowupSuggestionsForThread] The charged mark failed, retrying it: ${threadId}`, markError);
+                        await runAfterWithRetry(
+                            context.scheduler,
+                            0,
+                            internal.agent.followup_suggestions.markFollowupCharged,
+                            { lastMessageId, threadId },
+                            FOLLOWUP_CACHE_RETRY,
+                        );
+                    }
+
                     chatLogger.info(`[generateFollowupSuggestionsForThread] Stored ${suggestions.length} suggestions for thread: ${threadId}`);
                 } else {
                     // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown
