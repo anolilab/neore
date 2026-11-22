@@ -19,6 +19,7 @@ import {
     holdFollowupClaim,
     holdFollowupRevoke,
     markFollowupCharged,
+    newestShownRowIdHandler,
     releaseFollowupRevoke,
     followupInFlight,
     followupModelRows,
@@ -553,5 +554,21 @@ describe("withDeadline", () => {
             }),
         ).rejects.toThrow("provider failed");
         expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+// The retry writes a reply's suggestions only while it is still the newest the composer shows, even when the leaf has not moved.
+describe("the newest row the composer shows", () => {
+    const addRow = async (order: number, role: string) =>
+        await harness.run(async (ctx: any) => await ctx.db.insert("messages", { message: { role }, order, status: "complete", stepOrder: 0, threadId }));
+
+    it("moves to a newer message in a thread without a leaf, so the older reply's write is stale", async () => {
+        const reply = await addRow(1, "assistant");
+
+        await expect(harness.run(async (ctx: any) => await newestShownRowIdHandler(ctx, { threadId }))).resolves.toBe(reply);
+
+        const next = await addRow(2, "user");
+
+        await expect(harness.run(async (ctx: any) => await newestShownRowIdHandler(ctx, { threadId }))).resolves.toBe(next);
     });
 });

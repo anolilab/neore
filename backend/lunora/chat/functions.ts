@@ -4600,6 +4600,7 @@ export const retryFollowupCache = internalAction
         claimedAt: v.number(),
         lastMessageId: v.string().max(MAX_LENGTH.id),
         leafId: v.optional(v.string().max(MAX_LENGTH.id)),
+        newestId: v.optional(v.string().max(MAX_LENGTH.id)),
         order: v.number(),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         pathIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
@@ -4610,7 +4611,7 @@ export const retryFollowupCache = internalAction
         threadId: v.string().max(MAX_LENGTH.id),
     })
     .action(async ({ args, ctx }) => {
-        const { chargedUserId, claimedAt, leafId, organizationId, requestId, resetOrder, ...write } = args;
+        const { chargedUserId, claimedAt, leafId, newestId, organizationId, requestId, resetOrder, ...write } = args;
 
         // The reply's claim is renewed before each attempt, so no second model call can start while this write is still outstanding.
         // If the claim is no longer this run's (it lapsed and another run took the reply), this write is dropped: the newer run owns it.
@@ -4628,9 +4629,11 @@ export const retryFollowupCache = internalAction
         // A suggestion is written only while its reply is still the one the composer shows: a `/clear` since the job began, a branch
         // switch, or a deletion drops it (the claim goes, and no unit is taken). A clear always lands, so it is never dropped.
         if (write.suggestions.length > 0) {
-            const [thread, reset] = await Promise.all([
+            const [thread, reset, shownNewest] = await Promise.all([
                 ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: write.threadId as Id<"threads"> }),
                 ctx.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: write.threadId as Id<"threads"> }),
+                // The newest row the composer shows, not just the leaf: a newer message in a thread without a leaf supersedes the reply too.
+                ctx.runQuery(internal.agent.followup_suggestions.newestShownRowId, { leafId, threadId: write.threadId }),
             ]);
             const fresh =
                 thread !== null &&
@@ -4638,7 +4641,8 @@ export const retryFollowupCache = internalAction
                 !thread.deletedAt &&
                 thread.deletingAt === undefined &&
                 (thread.activeLeafMessageId ?? undefined) === leafId &&
-                reset?.order === resetOrder;
+                reset?.order === resetOrder &&
+                shownNewest === newestId;
 
             if (!fresh) {
                 chatLogger.debug(`[retryFollowupCache] The reply is no longer the one shown, dropping its suggestions: ${write.threadId}`);
@@ -5114,6 +5118,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                             claimedAt: paid.claimedAt,
                             // The reply as it was when the suggestions were made: a retry that finds it changed drops its write.
                             leafId: threadData.activeLeafMessageId ?? undefined,
+                            newestId: newest._id,
                             organizationId: threadData.organizationId ?? undefined,
                             requestId: replyChargeKey,
                             resetOrder: contextReset?.order,
@@ -5183,6 +5188,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                                 chargedUserId,
                                 claimedAt: paid.claimedAt,
                                 leafId: threadData.activeLeafMessageId ?? undefined,
+                                newestId: newest._id,
                                 organizationId: threadData.organizationId ?? undefined,
                                 requestId: replyChargeKey,
                                 resetOrder: contextReset?.order,

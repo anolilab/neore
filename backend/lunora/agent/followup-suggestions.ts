@@ -35,6 +35,30 @@ export const localBrowserRowIds = internalQuery
         return flags.filter((messageId): messageId is string => messageId !== null);
     });
 
+/**
+ * The newest user or assistant row the composer shows: on the active path of a branched thread, else in the thread. A cache write
+ * queued for a reply is current only while this is still that reply's row (a newer message, even with the leaf unchanged, supersedes it).
+ */
+export const newestShownRowIdHandler = async (context: QueryContext, { leafId, threadId }: { leafId?: string; threadId: string }): Promise<string | null> => {
+    const rows =
+        leafId === undefined
+            ? await context.db
+                  .query("messages")
+                  .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+                  .order("desc")
+                  .take(FOLLOWUP_PATH_LIMIT)
+            : await loadActivePathTail(context, threadId as Id<"threads">, leafId, FOLLOWUP_PATH_LIMIT);
+    const roleOf = (row: unknown): string | undefined => (row as { message?: { role?: string } }).message?.role;
+    const newest = rows.find((row) => roleOf(row) === "user" || roleOf(row) === "assistant");
+
+    return newest?._id ?? null;
+};
+
+export const newestShownRowId = internalQuery
+    .input({ leafId: v.optional(v.string()), threadId: v.string() })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args, ctx: context }) => await newestShownRowIdHandler(context, args));
+
 /** How many rows of a branched thread's active path the job reads: a turn longer than this is not keyed (see the job). */
 export const FOLLOWUP_PATH_LIMIT = 60;
 
