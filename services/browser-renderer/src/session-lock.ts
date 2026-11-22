@@ -20,7 +20,7 @@ export type { HoldKind } from "./session-holds";
 const STATE_KEY = "state";
 
 const isHoldRequest = (value: unknown): value is HoldRequest => {
-    const { kind, leaseMs, op, token } = (value ?? {}) as { kind?: unknown; leaseMs?: unknown; op?: unknown; token?: unknown };
+    const { kind, leaseMs, notAfter, op, token } = (value ?? {}) as { kind?: unknown; leaseMs?: unknown; notAfter?: unknown; op?: unknown; token?: unknown };
 
     if (typeof token !== "string" || token === "") {
         return false;
@@ -32,7 +32,9 @@ const isHoldRequest = (value: unknown): value is HoldRequest => {
 
     const isLease = typeof leaseMs === "number" && Number.isFinite(leaseMs) && leaseMs > 0;
 
-    return op === "renew" ? isLease : op === "take" && isLease && (kind === "exclusive" || kind === "shared");
+    const isDeadline = notAfter === undefined || (typeof notAfter === "number" && Number.isFinite(notAfter));
+
+    return op === "renew" ? isLease : op === "take" && isLease && isDeadline && (kind === "exclusive" || kind === "shared");
 };
 
 /** The Durable Object: one per session id (`idFromName`). Its holds are stored, so an eviction between two calls keeps them. */
@@ -69,7 +71,8 @@ export class SessionLock {
             }
 
             default: {
-                answer = holds.take(asked.token, asked.kind, asked.leaseMs, now);
+                // Arrived after its caller gave up on it: taken, it would hold the session for a call that never runs.
+                answer = asked.notAfter !== undefined && now > asked.notAfter ? { held: false } : holds.take(asked.token, asked.kind, asked.leaseMs, now);
             }
         }
 
@@ -136,6 +139,9 @@ export interface SessionHold {
 /** The wait before a release is sent again, doubled each time. */
 const RESEND_FIRST_MS = 250;
 
+/** How far the lock's clock and an isolate's may differ, as far as a take's deadline goes. */
+const CLOCK_MARGIN_MS = 1000;
+
 /** Asks the lock of `sessionId`; `null` when it does not answer within `LOCK_CALL_MS`. */
 const ask = async (namespace: DurableObjectNamespace, sessionId: string, request: HoldRequest, ms = LOCK_CALL_MS): Promise<HoldAnswer | null> => {
     const asking = (async () => {
@@ -174,15 +180,19 @@ export const holdSession = async (
 ): Promise<"retired" | "unreachable" | SessionHold | { busy: HoldKind }> => {
     const token = crypto.randomUUID();
     const sentAt = now();
-    const taken = takeMs > 0 ? await ask(namespace, sessionId, { kind, leaseMs: LEASE_MS, op: "take", token }, Math.min(takeMs, LOCK_CALL_MS)) : null;
+    const waitMs = Math.min(takeMs, LOCK_CALL_MS);
+    // The lock refuses the take past this: so the latest a lease of it could start, and end, is known here.
+    const notAfter = sentAt + waitMs;
+    const taken = takeMs > 0 ? await ask(namespace, sessionId, { kind, leaseMs: LEASE_MS, notAfter, op: "take", token }, waitMs) : null;
 
     if (!taken) {
         // Never rejects; not awaited, so the refusal is not held up by a lock that does not answer. The lock keeps the
         // token as released, so the take, should it arrive after this, holds nothing. Kept past the answer, and sent
-        // again until the lock answers one, while the take's lease could still run: a release given up on would leave a
-        // late take to lapse, and an exclusive one to retire the session.
+        // again until the lock answers one, while a lease of the take could still run (taken by `notAfter` at the
+        // latest, give or take the two clocks): a release given up on would leave a late take to lapse, and an exclusive
+        // one to retire the session.
         const releasing = (async () => {
-            const until = sentAt + LEASE_MS;
+            const until = notAfter + LEASE_MS + CLOCK_MARGIN_MS;
             let wait = RESEND_FIRST_MS;
 
             while (now() < until) {
@@ -193,7 +203,8 @@ export const holdSession = async (
                 await new Promise((resolve) => {
                     setTimeout(resolve, Math.max(0, Math.min(wait, until - now())));
                 });
-                wait *= 2;
+                // At most a lock call apart: the window's last seconds are covered too.
+                wait = Math.min(wait * 2, LOCK_CALL_MS);
             }
         })().catch(() => undefined);
 

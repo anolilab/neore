@@ -228,6 +228,17 @@ describe(SessionLock, () => {
         expect(stored.get("state")).toStrictEqual({ holds: [], retired: true });
     });
 
+    it("refuses a take that arrives after the deadline its caller gave it, holding nothing", async () => {
+        const { namespace, stored } = namespaceOf();
+        const response = await namespace.get(namespace.idFromName("s")).fetch("https://session-lock/", {
+            body: JSON.stringify({ kind: "exclusive", leaseMs: LEASE_MS, notAfter: Date.now() - 1, op: "take", token: "late" }),
+            method: "POST",
+        });
+
+        await expect(response.json()).resolves.toStrictEqual({ held: false });
+        expect(stored.has("state")).toBe(false);
+    });
+
     it("keeps its holds in storage, and drops the key once none is left", async () => {
         const { namespace, stored } = namespaceOf();
         const hold = await holdSession(namespace, "s", "shared");
@@ -305,6 +316,39 @@ describe(holdSession, () => {
 
         expect(isKept).toBe(true);
         expect(control.calls.slice(before)).toContainEqual({ op: "release", token: expect.any(String) });
+    });
+
+    it("keeps sending a lost take's release until the latest a lease of it could end, not one lease from its sending", async () => {
+        const { control, namespace } = namespaceOf();
+        const kept: Promise<unknown>[] = [];
+
+        control.reachable = false;
+
+        const taking = holdSession(namespace, "s", "exclusive", {
+            keep: (work) => {
+                kept.push(work);
+            },
+            takeMs: 1000,
+        });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(taking).resolves.toBe("unreachable");
+
+        // A take the lock accepted just before its deadline holds a lease past that: the release is still sent then.
+        let isKept = false;
+
+        kept[0]
+            ?.finally(() => {
+                isKept = true;
+            })
+            .catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(LEASE_MS + 500);
+        expect(isKept).toBe(false);
+
+        // And no longer than that lease, give or take the clocks.
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(isKept).toBe(true);
     });
 
     it("renews its hold while it runs, so another call stays refused past one lease", async () => {

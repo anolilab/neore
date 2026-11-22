@@ -9,7 +9,8 @@ export interface Hold {
 
 /** What a call asks of a session's holds; `token` is the caller's, so a release reaches its hold even when the answer to the take was lost. */
 export type HoldRequest =
-    | { kind: HoldKind; leaseMs: number; op: "take"; token: string }
+    /** `notAfter`: the lock's clock past which the take is refused, holding nothing (its caller has given up on it). */
+    | { kind: HoldKind; leaseMs: number; notAfter?: number; op: "take"; token: string }
     | { leaseMs: number; op: "renew"; token: string }
     | { op: "release"; token: string };
 
