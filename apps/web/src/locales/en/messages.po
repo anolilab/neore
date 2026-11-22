@@ -1993,6 +1993,10 @@ msgstr "A conversation shared from Neore Chat."
 msgid "A coordinator picks who answers — up to three per message."
 msgstr "A coordinator picks who answers — up to three per message."
 
+#: src/features/settings/components/privacy/data-export.tsx:170
+msgid "A data export can't be requested or downloaded while impersonating."
+msgstr "A data export can't be requested or downloaded while impersonating."
+
 #: src/features/evals/components/dataset-form-dialog.tsx:67
 msgid "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
 msgstr "A dataset is a set of test cases you run against an agent, a model or your knowledge base."
