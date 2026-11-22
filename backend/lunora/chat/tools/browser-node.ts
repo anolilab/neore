@@ -161,10 +161,36 @@ export const executeBrowserAction = internalAction
                           url: args.url,
                       };
                 let { data, error, response } = await browserAction({ body: sent, client, signal: callSignal });
+                // The row's browser when the result below is logged: none, once a retired one is dropped.
+                let startedWith = startedWithProviderSessionId;
 
                 // The renderer retired the session for good (a sign-in on it could not confirm its page clean): its id is
-                // never sent again. A navigate runs at once on a new browser; any other action needs a page first.
+                // dropped from the row first, so a retry that fails or throws leaves it there no more, and is never sent
+                // again. A navigate runs at once on a new browser; any other action needs a page first.
                 if (response?.status === 410 && sent.action === "navigate" && sent.sessionId !== undefined) {
+                    // This action's hold is kept for the retry: no `heldUntil`.
+                    const dropped = await ctx.runMutation(internal.browser.functions.logAction, {
+                        action: sent.action,
+                        durationMs: Date.now() - startTime,
+                        errorMessage: BROWSER_SESSION_RETIRED,
+                        providerSessionId: NO_PROVIDER_SESSION,
+                        sessionId,
+                        startedAt: startTime,
+                        startedWithProviderSessionId,
+                        success: false,
+                    });
+
+                    // Another action moved the row on meanwhile: its browser is the thread's, and this one opens none beside it.
+                    if (dropped.closed === true || dropped.replaced) {
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+
+                        const discarded =
+                            dropped.closed === true ? { error: BROWSER_CLOSED_DURING_ACTION, success: false } : browserReplacedResult(dropped.currentUrl);
+
+                        return returned === undefined ? discarded : handedBackResult(discarded, returned);
+                    }
+
+                    startedWith = NO_PROVIDER_SESSION;
                     ({ data, error, response } = await browserAction({ body: { ...sent, sessionId: undefined }, client, signal: callSignal }));
                 }
 
@@ -179,7 +205,7 @@ export const executeBrowserAction = internalAction
                         providerSessionId: NO_PROVIDER_SESSION,
                         sessionId,
                         startedAt: startTime,
-                        startedWithProviderSessionId,
+                        startedWithProviderSessionId: startedWith,
                         success: false,
                     });
 
@@ -220,7 +246,7 @@ export const executeBrowserAction = internalAction
                     providerSessionId: returnedSessionId,
                     sessionId,
                     startedAt: startTime,
-                    startedWithProviderSessionId,
+                    startedWithProviderSessionId: startedWith,
                     success: result.success ?? false,
                     target: looksFirst ? undefined : (args.url ?? args.selector),
                     value: looksFirst ? undefined : args.text,

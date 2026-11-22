@@ -328,6 +328,37 @@ describe("a browser action on a running browser", () => {
         await expect(row()).resolves.toMatchObject({ providerSessionId: "s-2" });
     });
 
+    it.each([
+        ["throws", () => Promise.reject(new Error("network down"))],
+        [
+            "fails",
+            async () => {
+                return { data: undefined, error: { error: "boom", success: false }, response: { ok: false, status: 500 } };
+            },
+        ],
+    ])("drops the retired session before the navigate's retry, so a retry that %s leaves no retired id on the row", async (_how, retry) => {
+        await addSession(NOW - 1000);
+        renderer
+            .mockResolvedValueOnce({
+                data: undefined,
+                error: { code: "SESSION_RETIRED", error: "retired", success: false },
+                response: { ok: false, status: 410 },
+            })
+            .mockImplementationOnce(retry);
+
+        await expect(act()).resolves.toMatchObject({ success: false });
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe(NO_PROVIDER_SESSION);
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+        await act("extract");
+
+        expect(renderer.mock.lastCall?.[0]).toMatchObject({ body: { sessionId: undefined } });
+    });
+
     it("stops offering the browser the renderer closed after a blocked redirect, and forgets its page", async () => {
         await addSession(NOW - 1000);
         renderer.mockResolvedValueOnce(answered({ error: "Redirected to blocked URL", success: false }));

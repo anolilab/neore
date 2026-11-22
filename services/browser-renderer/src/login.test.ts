@@ -124,7 +124,7 @@ describe(standIn, () => {
     });
 });
 
-const FOUR_DIGITS_RE = /^\d{4}$/u;
+const THIRTEEN_DIGITS_RE = /^\d{13}$/u;
 
 describe(standInFor, () => {
     const lengths = { length: 64, max: Infinity, min: 0 };
@@ -134,7 +134,7 @@ describe(standInFor, () => {
     it.each([
         ["A[A-Za-z0-9]{63}", 64],
         ["[0-9]*", 64],
-        [String.raw`\d{4,8}`, 8],
+        [String.raw`\d{4,16}`, 16],
         [".{8,}", 64],
         [String.raw`^[a-z]+\d?$`, 64],
         ["[A-Z]{2}[a-z0-9]{10,}?", 64],
@@ -150,8 +150,9 @@ describe(standInFor, () => {
     it("refuses a pattern with groups at once, without running it, however it would backtrack", () => {
         const startedAt = performance.now();
 
-        expect(standInFor("(.+)+!", "secret", lengths)).toBeNull();
-        expect(standInFor("(a|aa)*b", "secret", lengths)).toBeNull();
+        // Joined from parts: the test hands them to the code as text a page would set, and compiles neither.
+        expect(standInFor(["(.+)", "+!"].join(""), "secret", lengths)).toBeNull();
+        expect(standInFor(["(a|aa)", "*b"].join(""), "secret", lengths)).toBeNull();
         expect(standInFor(`${"[a-z]*".repeat(80)}!`, "secret", lengths)).toBeNull();
         expect(standInFor("a".repeat(5000), "secret", lengths)).toBeNull();
         expect(performance.now() - startedAt).toBeLessThan(50);
@@ -168,8 +169,8 @@ describe(standInFor, () => {
     });
 
     it("keeps to the field's minlength and maxlength", () => {
-        expect(standInFor("[0-9]*", "1234", { length: 64, max: 6, min: 0 })).toHaveLength(6);
-        expect(standInFor(String.raw`\d{4}`, "1234", { length: 64, max: 4, min: 0 })).toMatch(FOUR_DIGITS_RE);
+        expect(standInFor("[0-9]*", "1234", { length: 64, max: 13, min: 0 })).toHaveLength(13);
+        expect(standInFor(String.raw`\d{13}`, "1234", { length: 64, max: 13, min: 0 })).toMatch(THIRTEEN_DIGITS_RE);
         expect(standInFor(null, "secret", { length: 64, max: Infinity, min: 80 })).toHaveLength(80);
         expect(standInFor(String.raw`\d{4}`, "secret", { length: 64, max: Infinity, min: 6 })).toBeNull();
     });
@@ -191,9 +192,36 @@ describe(standInFor, () => {
         expect(standInFor(".*", "secret", { length: 64, max: 2, min: 0 })).toBeNull();
     });
 
-    it("refuses a pattern of literals alone that spells the password", () => {
-        expect(standInFor("hunter2", "hunter2", lengths)).toBeNull();
-        expect(standInFor("hunter2", "other", lengths)).toBe("hunter2");
+    it.each([
+        ["a literal", "hunter2"],
+        ["a short PIN", String.raw`\d{4}`],
+        ["a class of two", "[ab]{39}"],
+        ["literals around a narrow step", "hunter[0-9]{2}"],
+    ])("refuses a field with fewer than 2^40 stand-ins (%s) the same way whatever the password", (_kind, pattern) => {
+        for (const password of ["hunter2", "hunter42", "1234", "a".repeat(39), "other"]) {
+            expect(standInFor(pattern, password, lengths)).toBeNull();
+        }
+    });
+
+    it("refuses a maxlength too short for 2^40 stand-ins, and takes one just long enough", () => {
+        // 62^6 is under 2^40, 62^7 over it; 10^12 under, 10^13 over.
+        expect(standInFor(null, "secret", { length: 64, max: 6, min: 0 })).toBeNull();
+        expect(standInFor(null, "secret", { length: 64, max: 7, min: 0 })).toHaveLength(7);
+        expect(standInFor("[0-9]*", "1234", { length: 64, max: 12, min: 0 })).toBeNull();
+    });
+
+    it("draws again, without refusing, a stand-in that comes out as the password", () => {
+        // The draw is the only randomness: every byte 0 makes a stand-in of the first character alone.
+        const bytes = vi.spyOn(crypto, "getRandomValues");
+
+        bytes.mockImplementationOnce((array) => array);
+
+        const stand = standInFor(null, "A".repeat(64), lengths);
+
+        bytes.mockRestore();
+
+        expect(stand).toHaveLength(64);
+        expect(stand).not.toBe("A".repeat(64));
     });
 });
 

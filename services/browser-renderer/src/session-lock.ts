@@ -122,7 +122,17 @@ export interface SessionHold {
     onLost: (onLost: () => void) => void;
     /** Ends it, within `ms`: whether it was in force all along, up to the release, as the lock answers it; one it does not answer in time is judged by the last lease it confirmed. */
     release: (ms?: number) => Promise<boolean>;
+
+    /**
+     * Sends the release again until the lock answers one, while the last lease it confirmed runs: a sign-in's hold that
+     * lapses retires its session, so a release whose answer was lost must not leave it to lapse. Ends at once when the
+     * lock already answered one.
+     */
+    settle: () => Promise<void>;
 }
+
+/** The wait before a release is sent again, doubled each time. */
+const RESEND_FIRST_MS = 250;
 
 /** Asks the lock of `sessionId`; `null` when it does not answer within `LOCK_CALL_MS`. */
 const ask = async (namespace: DurableObjectNamespace, sessionId: string, request: HoldRequest, ms = LOCK_CALL_MS): Promise<HoldAnswer | null> => {
@@ -173,6 +183,7 @@ export const holdSession = async (
     let confirmedUntil = sentAt + LEASE_MS;
     let isLost = false;
     let isRenewing = false;
+    let isReleased = false;
     const lostListeners: (() => void)[] = [];
     const lose = (): void => {
         if (isLost) {
@@ -225,7 +236,13 @@ export const holdSession = async (
         isLost: () => isLost,
         linger: async (ms) => {
             clearInterval(timer);
-            await ask(namespace, sessionId, { leaseMs: ms, op: "renew", token });
+
+            const askedAt = now();
+            const answer = await ask(namespace, sessionId, { leaseMs: ms, op: "renew", token });
+
+            if (answer?.held) {
+                confirmedUntil = Math.max(confirmedUntil, askedAt + ms);
+            }
         },
         onLost: (listener) => {
             if (isLost) {
@@ -242,8 +259,29 @@ export const holdSession = async (
             const wasIntact = !wasLost && now() < confirmedUntil - LOST_MARGIN_MS;
             const released = await ask(namespace, sessionId, { op: "release", token }, ms);
 
+            isReleased ||= released !== null;
+
             // No answer in time: the last confirmed lease decides. A lock that answers decides by its own word.
             return released === null ? wasIntact : !wasLost && released.held;
+        },
+        settle: async () => {
+            clearInterval(timer);
+
+            let wait = RESEND_FIRST_MS;
+
+            while (!isReleased && now() < confirmedUntil) {
+                // A release the lock already took answers again: it only says the hold is gone.
+                isReleased = (await ask(namespace, sessionId, { op: "release", token }, Math.min(LOCK_CALL_MS, confirmedUntil - now()))) !== null;
+
+                if (!isReleased) {
+                    const pause = Math.max(0, Math.min(wait, confirmedUntil - now()));
+
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, pause);
+                    });
+                    wait *= 2;
+                }
+            }
         },
     };
 };

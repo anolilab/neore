@@ -209,7 +209,7 @@ describe(signIn, () => {
         await context.close();
     });
 
-    const run = async (now: () => number = Date.now, url = `${login.origin}/`, deadline = Date.now() + 30_000) =>
+    const run = async (now: () => number = Date.now, url = `${login.origin}/`, deadline = Date.now() + 30_000, password = SAVED_SECRET) =>
         signIn(
             // The Worker's fork of the same API; its types differ only in a few narrower overloads.
             page as unknown as WorkerPage,
@@ -219,7 +219,7 @@ describe(signIn, () => {
                 now,
                 origin: login.origin,
                 pageTimeout: 5000,
-                password: SAVED_SECRET,
+                password,
                 url,
                 username: "ann",
             },
@@ -1293,6 +1293,30 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([]);
     });
 
+    it("stops no address of a page whose form's POST was refused, whatever guess at the password it holds", async () => {
+        // Each round sends a right and a wrong guess in one task, until the cleanup turns the scripts off.
+        fixture.page = loginForm(
+            `document.forms[0].addEventListener("submit", () => {
+                const field = document.forms[0].pw;
+                field.value = [...field.value].reverse().join("");
+                setInterval(() => {
+                    for (const guess of ["${SAVED_SECRET}", "wrong-guess"]) {
+                        fetch("/probe?g=" + guess).catch(() => undefined);
+                    }
+                }, 2);
+            });`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("changed the password field"), submitted: false, success: false });
+
+        const reached = (guess: string): number => login.hits.filter((hit) => hit.url === `/probe?g=${guess}`).length;
+
+        expect(reached("wrong-guess")).toBeGreaterThan(0);
+        expect(reached(SAVED_SECRET)).toBe(reached("wrong-guess"));
+    });
+
     /** The bodies `route.fallback` hands on with the password; `handled` is told of every route handed on or aborted. */
     const forwardedPasswords = async (handled: (route: Route) => void = () => undefined): Promise<string[]> => {
         const forwarded: string[] = [];
@@ -1648,6 +1672,18 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ submitted: true, success: true });
         expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
+    });
+
+    it("sends a password longer than the field's maxlength whole, with a stand-in that fits the field and says nothing of its length", async () => {
+        const long = "a-saved-password-of-forty-characters-123";
+
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password" maxlength="12"><button>Go</button></form><script>document.forms[0].addEventListener("submit", () => console.log("stand-in length " + document.forms[0].pw.value.length));</script>`;
+
+        const result = await run(Date.now, `${login.origin}/`, Date.now() + 30_000, long);
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${long}`, method: "POST", url: "/session" }]);
+        expect(logged.filter((line) => line.startsWith("stand-in length "))).toStrictEqual(["stand-in length 12"]);
     });
 
     it("signs in through a field whose pattern fixes a prefix and a length, every time", async () => {

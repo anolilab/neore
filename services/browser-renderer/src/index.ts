@@ -354,6 +354,10 @@ const holdsOf = (env: Env, kind: HoldKind) => {
 
             return released.every(Boolean);
         },
+        /** Sends each release the lock has not answered again, while its lease runs (`SessionHold.settle`). */
+        settle: async (): Promise<void> => {
+            await Promise.all(held.map(async (hold) => hold.settle()));
+        },
         take: async (sessionId: string): Promise<"busy" | "retired" | "unreachable" | null> => {
             const taken = await holdSession(env.SESSION_LOCK, sessionId, kind);
 
@@ -767,6 +771,15 @@ const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: nu
     return { isSessionClosed: isSessionClosed(), opened, ready, settling };
 };
 
+/** Keeps `work` running past the answer. */
+const afterAnswer = (c: { executionCtx: { waitUntil: (promise: Promise<unknown>) => void } }, work: Promise<unknown>): void => {
+    try {
+        c.executionCtx.waitUntil(work);
+    } catch {
+        // No execution context (a test's request): the work goes on regardless.
+    }
+};
+
 app.post("/login", async (c) => {
     let body: unknown;
 
@@ -848,16 +861,14 @@ app.post("/login", async (c) => {
             // as long as a browser left open idles before Browser Rendering reclaims it. One that fails keeps it held so.
             const lingering = Promise.all(holds.held.map(async (hold) => hold.linger(KEEP_ALIVE_MS + LEASE_MS)));
             // After the linger: a release that overtook it would be undone by it.
-            const releasing = Promise.all([held, lingering]).then(async ([hasClosed]) => (hasClosed ? holds.release() : false));
+            const releasing = Promise.all([held, lingering]).then(async ([hasClosed]) => (hasClosed ? holds.release().then(holds.settle) : undefined));
 
-            try {
-                c.executionCtx.waitUntil(releasing);
-            } catch {
-                // No execution context (a test's request): the close goes on regardless.
-            }
+            afterAnswer(c, releasing);
         } else {
-            // The rest of the margin is the answer's; a release that does not end in it ends on its own.
+            // The rest of the margin is the answer's. A release whose answer is lost there is sent again past the
+            // answer, while the lease runs: left to lapse, the hold would retire a session the cleanup left clean.
             await holds.release(Math.max(500, deadline + LOGIN_MARGIN_MS - Date.now()));
+            afterAnswer(c, holds.settle());
         }
     }
 });

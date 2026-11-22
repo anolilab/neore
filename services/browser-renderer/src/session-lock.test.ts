@@ -284,6 +284,53 @@ describe(holdSession, () => {
         await expect(dropped.release()).resolves.toBe(false);
     });
 
+    it("sends a sign-in's release again when its answer is lost, so the hold does not lapse and retire a clean session", async () => {
+        const { control, namespace, stored } = namespaceOf();
+        const hold = await held(namespace);
+
+        control.reachable = false;
+
+        const releasing = hold.release(500);
+
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(releasing).resolves.toBe(true);
+
+        const settling = hold.settle();
+
+        // Two more releases lost, then the lock answers.
+        await vi.advanceTimersByTimeAsync(3000 + 250 + 3000);
+        control.reachable = true;
+        await vi.advanceTimersByTimeAsync(500 + 3000);
+        await settling;
+
+        expect(stored.get("state")).toBeUndefined();
+
+        await vi.advanceTimersByTimeAsync(LEASE_MS);
+
+        await expect(holdSession(namespace, "s", "shared")).resolves.not.toBe("retired");
+        expect(control.calls.filter((call) => (call as { op: string }).op === "release").length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("stops sending the release once the lock answered one, and gives up when the lease it confirmed has run out", async () => {
+        const answered = namespaceOf();
+        const hold = await held(answered.namespace);
+
+        await hold.release();
+        await hold.settle();
+
+        expect(answered.control.calls.filter((call) => (call as { op: string }).op === "release")).toHaveLength(1);
+
+        const { control, namespace } = namespaceOf();
+        const lost = await held(namespace);
+
+        control.reachable = false;
+
+        const settling = lost.settle();
+
+        await vi.advanceTimersByTimeAsync(LEASE_MS);
+        await expect(settling).resolves.toBeUndefined();
+    });
+
     it("keeps a lingering hold for the time it is given, renewing it no more, and frees the session when released in it", async () => {
         const { namespace } = namespaceOf();
         const hold = await held(namespace);

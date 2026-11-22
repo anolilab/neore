@@ -190,7 +190,7 @@ export const withoutSecret = (text: string, secret: string): string => {
 
 const STAND_IN_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-/** The shortest stand-in: no other text of a request matches it by chance, and it hides the length of most passwords. */
+/** The stand-in's length where the field allows it: no other text of a request matches it by chance. */
 const STAND_IN_LENGTH = 64;
 
 /** `length` random characters of `characters`, each as likely as any other: a byte past the last whole multiple of the alphabet's size is drawn again. */
@@ -229,8 +229,12 @@ export const standIn = (length: number, password: string, characters = STAND_IN_
  */
 const STAND_IN_BOUNDS = { max: 1024, min: 4 } as const;
 
-/** The draws of a pattern's stand-in that may come out as the password before the field is refused (a pattern of literals alone). */
-const STAND_IN_TRIES = 4;
+/**
+ * The fewest stand-ins, as a power of two, a field's rules must leave to choose from. The stand-in is drawn again when
+ * it comes out as the password, so the page learns that one value is not the password: out of fewer, a page that sets
+ * the field's rules could learn which value the password is. Whether a field is refused never depends on the password.
+ */
+const STAND_IN_MIN_BITS = 40;
 
 /** Whether the browser compiles `pattern` as it reads a field's (whole, with the `v` flag): compiled only, never run. */
 const isCompiled = (pattern: string): boolean => {
@@ -246,7 +250,8 @@ const isCompiled = (pattern: string): boolean => {
  * regular expression of the page runs in the Worker: `length` long where the pattern allows it, else the length nearest
  * it the pattern and the field's `minLength` and `maxLength` (`min`, `max`) allow. A pattern the browser does not
  * compile checks nothing, so it is ignored; `null` for one that is not a plain sequence of letters, digits and classes
- * (`readPattern`), or whose lengths cannot meet the field's: the field is refused, the same way each time.
+ * (`readPattern`), whose lengths cannot meet the field's, or that leaves fewer than 2^40 stand-ins: the field is refused,
+ * the same way each time and whatever the password. `password` is only used to draw again a stand-in that equals it.
  */
 export const standInFor = (pattern: string | null, password: string, { length, max, min }: { length: number; max: number; min: number }): string | null => {
     if (pattern !== null && pattern.length > MAX_PATTERN_LENGTH) {
@@ -292,15 +297,20 @@ export const standInFor = (pattern: string | null, password: string, { length, m
         extra -= added;
     }
 
-    for (let index = 0; index < STAND_IN_TRIES; index++) {
-        const stand = steps.map((step, at) => draw(counts[at] ?? 0, step.characters)).join("");
+    const bits = steps.reduce((sum, step, at) => sum + (counts[at] ?? 0) * Math.log2(step.characters.length), 0);
 
-        if (stand !== password) {
-            return stand;
-        }
+    if (bits < STAND_IN_MIN_BITS) {
+        return null;
     }
 
-    return null;
+    let stand = password;
+
+    // Out of 2^40 or more, a draw is the password about once in a trillion tries: the loop ends.
+    while (stand === password) {
+        stand = steps.map((step, at) => draw(counts[at] ?? 0, step.characters)).join("");
+    }
+
+    return stand;
 };
 
 const FORM_SAFE_RE = /[\w*.-]/;
@@ -533,11 +543,14 @@ const armGuard = async (
     };
 
     /**
-     * Whether an address carries what the page holds, or, once the form's POST is claimed, the password: a site that
-     * echoes it into a redirect's `Location` would have the browser put it in the address and send it again by GET. From
-     * the claim, not from `sent`: the answer can arrive while the POST is still being handed on.
+     * Whether an address carries what the page holds, or, once the form's POST is being handed on with it, the password:
+     * a site that echoes it into a redirect's `Location` would have the browser put it in the address and send it again
+     * by GET. From the hand-on, not from `sent`: the answer can arrive while the POST is still being handed on. Not from
+     * a claim that was refused: the password never left, and the page's scripts, still running, could put guesses in
+     * addresses and learn from which one is stopped whether a guess is the password.
      */
-    const isSecretAddress = (url: string): boolean => hasSecretInAddress(url, stand) || (isClaimed && hasSecretInAddress(url, password));
+    const isSecretAddress = (url: string): boolean =>
+        hasSecretInAddress(url, stand) || ((forwarding !== null || sent !== null) && hasSecretInAddress(url, password));
 
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();
@@ -1626,9 +1639,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 };
             }),
         );
+        // The stand-in's length comes from the field alone, so it always fits `maxlength` and says nothing of the
+        // password's: refusing a password longer than `maxlength` would let the page learn its length by setting it.
+        // The guard puts the whole password in the POST, as the site has it saved.
         const stand = standInFor(rules.pattern, password, {
-            length: Math.max(password.length, STAND_IN_LENGTH),
-            max: rules.maxLength > 0 ? Math.max(rules.maxLength, password.length) : Infinity,
+            length: STAND_IN_LENGTH,
+            max: rules.maxLength >= 0 ? rules.maxLength : Infinity,
             min: Math.max(rules.minLength, 0),
         });
 
