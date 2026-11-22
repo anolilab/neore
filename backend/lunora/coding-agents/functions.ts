@@ -14,7 +14,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
@@ -27,7 +27,7 @@ import { createRatelimit } from "../lib/rate-limiter";
 import { notifyQuietly } from "../notifications/notify";
 import { loadTaskAccount } from "../tasks/account";
 import type { CommitAuthor } from "./commands";
-import { isValidBranchName, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
+import { CODING_AGENTS, isValidBranchName, missingKeyMessage, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
 import { PR_BUDGET_MS } from "./runner";
 import { buildSetupFixPrompt, isFixableSetupStep, SETUP_STEP_MAX, setupLogTail } from "./setup-fix";
@@ -96,20 +96,38 @@ const isCurrentPullRequestAttempt = (run: Pick<RunDoc, "prStartedAt" | "prStatus
 export const isPullRequestStale = (run: Pick<RunDoc, "prStartedAt" | "prStatus" | "updatedAt">, now: number): boolean =>
     run.prStatus === "pending" && now - (run.prStartedAt ?? run.updatedAt) > PR_REAP_AFTER_MS;
 
-/** The step "Fix setup" applies to: a failed run that stopped at a fixable setup step and has no fix run yet. */
-export const setupFixStep = (run: Pick<RunDoc, "setupFailure" | "setupFixRunId" | "status">) => {
-    const step = run.setupFailure?.step;
+/** A fix run that ended without finishing: the failed step may be tried again from the original run. */
+const RETRYABLE_FIX_STATUSES = new Set<RunDoc["status"]>(["cancelled", "failed"]);
 
-    return run.status === "failed" && run.setupFixRunId === undefined && step !== undefined && isFixableSetupStep(step) ? step : undefined;
+/**
+ * The step "Fix setup" applies to: a failed run that stopped at a fixable setup step, whose fix run (if any) ended
+ * without finishing. `fixRunStatus` is the linked fix run's status, `undefined` when there is none.
+ */
+export const setupFixStep = (run: Pick<RunDoc, "setupFailure" | "setupFixRunId" | "status">, fixRunStatus?: RunDoc["status"]) => {
+    const step = run.setupFailure?.step;
+    const fixDone = run.setupFixRunId === undefined || (fixRunStatus !== undefined && RETRYABLE_FIX_STATUSES.has(fixRunStatus));
+
+    return run.status === "failed" && fixDone && step !== undefined && isFixableSetupStep(step) ? step : undefined;
 };
 
-const setupFixView = (run: RunDoc): { prompt: string; step: string } | null => {
-    const step = setupFixStep(run);
+/** The status of the fix run linked to `run`, for {@link setupFixStep}. */
+const linkedFixStatus = async (ctx: Pick<QueryCtx, "db">, run: Pick<RunDoc, "setupFixRunId">): Promise<RunDoc["status"] | undefined> => {
+    if (run.setupFixRunId === undefined) {
+        return undefined;
+    }
+
+    const fixRun = await ctx.db.get("codingAgentRuns", run.setupFixRunId);
+
+    return fixRun?.status;
+};
+
+const setupFixView = (run: RunDoc, fixRunStatus?: RunDoc["status"]): { prompt: string; step: string } | null => {
+    const step = setupFixStep(run, fixRunStatus);
 
     return step && run.setupFailure ? { prompt: buildSetupFixPrompt({ logTail: run.setupFailure.logTail, step }), step } : null;
 };
 
-const toView = (run: RunDoc) => {
+const toView = (run: RunDoc, fixRunStatus?: RunDoc["status"]) => {
     return {
         _id: run._id,
         agent: run.agent,
@@ -127,7 +145,7 @@ const toView = (run: RunDoc) => {
         prPending: run.prStatus === "pending",
         prUrl: run.prUrl ?? null,
         repoUrl: run.repoUrl,
-        setupFix: setupFixView(run),
+        setupFix: setupFixView(run, fixRunStatus),
         setupFixRunId: run.setupFixRunId ?? null,
         startedAt: run.startedAt ?? null,
         status: run.status,
@@ -156,7 +174,7 @@ export const getRun = authQuery
     .query(async ({ args, ctx }) => {
         const run = await ctx.db.get("codingAgentRuns", args.runId);
 
-        return run && run.userId === ctx.user.userId ? toView(run) : null;
+        return run && run.userId === ctx.user.userId ? toView(run, await linkedFixStatus(ctx, run)) : null;
     });
 
 /** The run a chat tool call started — the tool part knows only its call id. */
@@ -169,7 +187,7 @@ export const getRunByToolCall = authQuery
             .withIndex("by_user_and_toolCallId", (q) => q.eq("userId", ctx.user.userId).eq("toolCallId", args.toolCallId))
             .first();
 
-        return run ? toView(run) : null;
+        return run ? toView(run, await linkedFixStatus(ctx, run)) : null;
     });
 
 /** The newest run of a task assigned to a coding agent. */
@@ -189,7 +207,7 @@ export const getLatestRunForTask = authQuery
             .order("desc")
             .first();
 
-        return run && run.userId === ctx.user.userId ? toView(run) : null;
+        return run && run.userId === ctx.user.userId ? toView(run, await linkedFixStatus(ctx, run)) : null;
     });
 
 export const cancelRun = authMutation
@@ -232,18 +250,20 @@ export const cancelRun = authMutation
 // ─── Internal: lifecycle ─────────────────────────────────────────────────────
 
 /** Whether the user stored their own key for `provider`, without decrypting it. */
+const storedProviderKey = async (ctx: Pick<QueryCtx, "db">, userId: string, provider: "anthropic" | "openai"): Promise<boolean> => {
+    const prefs = await ctx.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+    const entry = (prefs?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[provider];
+
+    return Boolean(entry?.enabled && entry.encryptedKey);
+};
+
 export const hasProviderKey = internalQuery
     .input({ provider: v.union(v.literal("anthropic"), v.literal("openai")), userId: v.string() })
     .output(v.boolean())
-    .query(async ({ args, ctx }) => {
-        const prefs = await ctx.db
-            .query("aiUserPreferences")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
-            .unique();
-        const entry = (prefs?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[args.provider];
-
-        return Boolean(entry?.enabled && entry.encryptedKey);
-    });
+    .query(async ({ args, ctx }) => await storedProviderKey(ctx, args.userId, args.provider));
 
 /** Why `userId` may not start a run now, or `undefined`. Charges the rate limit when it may. */
 const startProblem = async (ctx: MutationCtx, userId: string): Promise<string | undefined> => {
@@ -381,10 +401,15 @@ export const startSetupFix = authMutation
             throw new LunoraError("NOT_FOUND", "Run not found");
         }
 
-        const step = setupFixStep(run);
+        const step = setupFixStep(run, await linkedFixStatus(ctx, run));
 
         if (!step) {
             return { error: "This run cannot start a setup fix." };
+        }
+
+        // Checked before `insertRun`, which charges the run rate limit: a run without the key fails at once anyway.
+        if (!(await storedProviderKey(ctx, ctx.user.userId, CODING_AGENTS[run.agent].providerKey))) {
+            return { error: missingKeyMessage(run.agent) };
         }
 
         const created = await insertRun(ctx, {
@@ -557,10 +582,12 @@ export const expireRun = internalMutation
         const { now } = ctx;
         const error = `Timed out after ${String(RUN_TIMEOUT_MS / 60_000)} minutes`;
 
+        // A setup failure stored by a poll that raced this timeout is dropped: the run did not end at that step.
         await patchById(ctx.db, "codingAgentRuns", run._id, {
             completedAt: now,
             error,
             log: appendToLog(run.log, `${error}.\n`),
+            setupFailure: undefined,
             status: "failed",
             updatedAt: now,
         });
@@ -640,6 +667,8 @@ export const recordPoll = internalMutation
         runId: v.id("codingAgentRuns"),
         // The poll that saw `setup-failed:<step>`: the end of the log is kept with the step, for "Fix setup".
         setupFailedStep: v.optional(v.string()),
+        // That log's end, read from the sandbox itself: the poll's own chunk may stop short of it (see `readSetupLogTail`).
+        setupFailedTail: v.optional(v.string()),
         summary: v.optional(v.string()),
         text: v.string(),
     })
@@ -656,7 +685,10 @@ export const recordPoll = internalMutation
         await patchById(ctx.db, "codingAgentRuns", run._id, {
             ...(args.text && { log }),
             ...(args.setupFailedStep !== undefined && {
-                setupFailure: { logTail: setupLogTail(log), step: args.setupFailedStep.slice(0, SETUP_STEP_MAX) },
+                setupFailure: {
+                    logTail: setupLogTail(args.setupFailedTail ?? log),
+                    step: args.setupFailedStep.slice(0, SETUP_STEP_MAX),
+                },
             }),
             logOffset: args.offset,
             ...(args.summary !== undefined && { summary: args.summary.slice(0, 20_000) }),

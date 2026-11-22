@@ -35,6 +35,7 @@ import {
     describePullRequestFailure,
     pullRequestApiFromDriver,
     pullRequestProblem,
+    readSetupLogTail,
     startPullRequest,
     startRun,
 } from "./runner";
@@ -209,10 +210,13 @@ export const pollCodingAgentRun = internalAction
             return null;
         }
 
+        // Read before `finalizeRun` kills the sandbox. A failed read keeps the log this poll has, rather than failing the poll.
+        const setupFailedTail = polled.status?.kind === "setup-failed" ? await readSetupLogTail(sandbox, secrets).catch(() => undefined) : undefined;
         const { cancelled } = await ctx.runMutation(internal.coding_agents.functions.recordPoll, {
             offset: polled.offset,
             runId,
             ...(polled.status?.kind === "setup-failed" && { setupFailedStep: polled.status.step }),
+            ...(setupFailedTail !== undefined && { setupFailedTail }),
             ...(polled.summary !== undefined && { summary: polled.summary }),
             text: polled.text,
         });

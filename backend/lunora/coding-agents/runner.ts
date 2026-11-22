@@ -50,6 +50,7 @@ import {
     TIMEOUT_EXIT_CODE,
 } from "./commands";
 import { expandSecrets, redactSecrets } from "./redact";
+import { completeTailLines } from "./setup-fix";
 import type { HostDriver } from "../source-control/driver";
 import { createBoundRequester, HostApiError } from "../source-control/origin-fetch";
 
@@ -246,6 +247,22 @@ export const pollRun = async (
     const rendered = input.agent === "claude_code" ? formatClaudeChunk(redacted) : { text: redacted };
 
     return { offset: input.offset + utf8Length(consumed), ...(status && { status }), ...rendered };
+};
+
+/** Bytes read from the end of the run log for "Fix setup": far more than the stored tail, so its last lines are whole. */
+export const SETUP_TAIL_READ_BYTES = 65_536;
+
+/**
+ * The end of the run log once a setup step has failed, redacted. A poll reads at most {@link READ_CHUNK_BYTES} from its
+ * offset, so the chunk it saw can stop well short of the failure; this reads the file's own end instead.
+ */
+export const readSetupLogTail = async (sandbox: Pick<SandboxHandle, "run">, secrets: ReadonlyArray<string>): Promise<string> => {
+    const result = await sandbox.run(`tail -c ${String(SETUP_TAIL_READ_BYTES)} ${RUN_LOG_PATH} 2>/dev/null`, {
+        cwd: "/home/user",
+        timeoutMs: COMMAND_TIMEOUT_MS,
+    });
+
+    return redactSecrets(completeTailLines(result.stdout, utf8Length(result.stdout) >= SETUP_TAIL_READ_BYTES), secrets);
 };
 
 /**

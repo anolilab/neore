@@ -27,6 +27,20 @@ export const LOG_TAIL_MAX_LINES = 40;
 
 export const LOG_TAIL_MAX_CHARS = 4000;
 
+/**
+ * A tail read from the sandbox with a byte cap. When the read hit the cap, its first line may start mid-line, and a
+ * secret cut there would show only a fragment, so that partial line goes. Whole lines only otherwise.
+ */
+export const completeTailLines = (text: string, hitCap: boolean): string => {
+    if (!hitCap) {
+        return text;
+    }
+
+    const newline = text.indexOf("\n");
+
+    return newline === -1 ? "" : text.slice(newline + 1);
+};
+
 /** The end of a run's (already redacted) log: at most {@link LOG_TAIL_MAX_LINES} lines and {@link LOG_TAIL_MAX_CHARS} characters. */
 export const setupLogTail = (log: string): string => {
     const lines = log.trimEnd().split("\n").slice(-LOG_TAIL_MAX_LINES).join("\n");

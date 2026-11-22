@@ -455,10 +455,25 @@ describe("setupFixStep", () => {
     it.each([
         ["a step the repository cannot break", { setupFailure: { logTail: "", step: "clone" } }],
         ["no recorded setup failure", { setupFailure: undefined }],
-        ["a fix already started", { setupFixRunId: "run-2" as never }],
         ["a run that did not fail", { status: "cancelled" as const }],
     ])("not for %s", (_label, patch) => {
         expect(setupFixStep({ ...run, ...patch })).toBeUndefined();
+    });
+
+    it("not while its fix run is still queued, running or succeeded", () => {
+        const linked = { ...run, setupFixRunId: "run-2" as never };
+
+        expect(setupFixStep(linked, "queued")).toBeUndefined();
+        expect(setupFixStep(linked, "running")).toBeUndefined();
+        expect(setupFixStep(linked, "succeeded")).toBeUndefined();
+        expect(setupFixStep(linked)).toBeUndefined();
+    });
+
+    it("again once its fix run failed or was cancelled, without finishing", () => {
+        const linked = { ...run, setupFixRunId: "run-2" as never };
+
+        expect(setupFixStep(linked, "failed")).toBe("repo-setup");
+        expect(setupFixStep(linked, "cancelled")).toBe("repo-setup");
     });
 });
 

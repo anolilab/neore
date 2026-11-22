@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PROMPT_MAX } from "./commands";
-import { buildSetupFixPrompt, isFixableSetupStep, LOG_TAIL_MAX_CHARS, LOG_TAIL_MAX_LINES, setupLogTail } from "./setup-fix";
+import { buildSetupFixPrompt, completeTailLines, isFixableSetupStep, LOG_TAIL_MAX_CHARS, LOG_TAIL_MAX_LINES, setupLogTail } from "./setup-fix";
 
 describe("isFixableSetupStep", () => {
     it("offers the repository's own setup step", () => {
@@ -27,6 +27,20 @@ describe("setupLogTail", () => {
 
         expect(tail).toHaveLength(LOG_TAIL_MAX_CHARS);
         expect(tail.endsWith("END")).toBe(true);
+    });
+});
+
+describe("completeTailLines", () => {
+    it("keeps a read that did not reach its cap as it is", () => {
+        expect(completeTailLines("first\nsecond\n", false)).toBe("first\nsecond\n");
+    });
+
+    it("drops the first, possibly cut, line of a read that hit its cap", () => {
+        expect(completeTailLines("cut-mid-sec\nline a\nline b\n", true)).toBe("line a\nline b\n");
+    });
+
+    it("returns nothing when a capped read holds no whole line", () => {
+        expect(completeTailLines("one long line without a break", true)).toBe("");
     });
 });
 

@@ -363,7 +363,11 @@ export const buildRunScript = (input: {
     agent: CodingAgentId;
     branch?: string;
     repo: ParsedRepo;
-    /** Leaves the repository's own setup step out of the run (a fix run for that step). */
+    /**
+     * Leaves the repository's own setup step out of the run (a fix run for that step).
+     * TODO: nothing reads this yet — the `repo-setup` step arrives in a separate change, which must wrap its script
+     * line in `if (!input.skipRepoSetup)`, or a fix run fails at the same step before its agent starts.
+     */
     skipRepoSetup?: boolean;
     timeoutSeconds: number;
 }): string => {

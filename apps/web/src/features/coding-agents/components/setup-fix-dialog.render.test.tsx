@@ -33,6 +33,7 @@ vi.mock("@neore/ui/components/responsive-dialog", () => {
         DialogDescription: Part,
         DialogFooter: Part,
         DialogHeader: Part,
+        DialogPanel: Part,
         DialogTitle: Part,
     };
 });
@@ -102,5 +103,21 @@ describe("SetupFixButton", () => {
         fireEvent.change(screen.getByRole("textbox", { name: "Task for the coding agent" }), { target: { value: " ".repeat(3) } });
 
         expect(screen.getByRole("button", { name: "Start fix" })).toHaveProperty("disabled", true);
+    });
+
+    it("says why an empty task cannot start, and links the reason to the field", () => {
+        render(<SetupFixButton prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Fix setup" }));
+        const field = screen.getByRole("textbox", { name: "Task for the coding agent" });
+
+        expect(field.getAttribute("aria-describedby")).toBeNull();
+
+        fireEvent.change(field, { target: { value: "" } });
+
+        const reason = screen.getByText("Write the task for the agent before you start the fix.");
+
+        expect(field.getAttribute("aria-describedby")).toBe(reason.id);
+        expect(field.hasAttribute("required")).toBe(true);
     });
 });

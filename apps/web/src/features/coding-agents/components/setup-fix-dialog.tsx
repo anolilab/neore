@@ -10,7 +10,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Label } from "@neore/ui/components/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Wrench } from "lucide-react";
@@ -33,6 +33,7 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ prompt: preparedPrompt, runId
     const { t } = useLingui();
     const crpc = useCRPC();
     const fieldId = useId();
+    const helpId = useId();
     const [open, setOpen] = useState(false);
     const [prompt, setPrompt] = useState(preparedPrompt);
     const start = useMutation(crpc.coding_agents.functions.startSetupFix.mutationOptions());
@@ -76,17 +77,27 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ prompt: preparedPrompt, runId
                             {t`A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it.`}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-2">
-                        <Label htmlFor={fieldId}>{t`Task for the coding agent`}</Label>
-                        <Textarea
-                            className="max-h-[50vh] min-h-48 font-mono text-xs"
-                            id={fieldId}
-                            maxLength={PROMPT_MAX}
-                            onChange={(event) => setPrompt(event.target.value)}
-                            spellCheck
-                            value={prompt}
-                        />
-                    </div>
+                    {/* The panel scrolls on a short screen, so the footer's buttons stay reachable under a tall task. */}
+                    <DialogPanel>
+                        <div className="grid gap-2">
+                            <Label htmlFor={fieldId}>{t`Task for the coding agent`}</Label>
+                            <Textarea
+                                aria-describedby={trimmed.length === 0 ? helpId : undefined}
+                                className="max-h-[50vh] min-h-48 font-mono text-xs"
+                                id={fieldId}
+                                maxLength={PROMPT_MAX}
+                                onChange={(event) => setPrompt(event.target.value)}
+                                required
+                                spellCheck
+                                value={prompt}
+                            />
+                            {trimmed.length === 0 && (
+                                <p className="text-muted-foreground text-xs" id={helpId}>
+                                    {t`Write the task for the agent before you start the fix.`}
+                                </p>
+                            )}
+                        </div>
+                    </DialogPanel>
                     <DialogFooter>
                         <Button disabled={start.isPending} onClick={() => setOpen(false)} variant="outline">
                             {t`Cancel`}
