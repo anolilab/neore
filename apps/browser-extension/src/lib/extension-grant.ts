@@ -1,5 +1,6 @@
 import { hasCookieBuildReads } from "./cookie-build-trace";
 import { APP_URL, LUNORA_URL } from "./env";
+import { GrantReadError } from "./grant-read-error";
 import { GrantRemovalError } from "./grant-removal-error";
 
 /*
@@ -52,6 +53,24 @@ export const STORAGE_KEY = "neore.extensionGrant";
 
 /** Set once a Chrome install that rode the web cookie has been told to connect; cleared by a sign-in. */
 export const RECONNECT_KEY = "neore.reconnectNeeded";
+
+/**
+ * The key (`grantKey`) of a grant whose sign-out began, written before the
+ * revoke and removed with the grant. While it names the stored grant, that
+ * grant reads as absent: a sign-out whose removal failed never signs back in,
+ * in this panel or one opened later (`finishPendingSignOut` retries).
+ */
+export const SIGNED_OUT_KEY = "neore.signedOutGrant";
+
+/**
+ * The key of a marked grant storage kept after its removal. Every panel warns
+ * while it names the stored grant; a sign-out still running has only
+ * `SIGNED_OUT_KEY` written, even past a failed revoke.
+ */
+export const SIGN_OUT_FAILED_KEY = "neore.signOutFailed";
+
+/** How long a sign-out waits on the revoke before forgetting the grant anyway. */
+export const REVOKE_TIMEOUT_MS = 10_000;
 
 /** Written on the first run of a build that signs in through the grant, so the check below runs once per install. */
 const MIGRATION_KEY = "neore.authMigration";
@@ -143,38 +162,78 @@ const readError = async (response: Response): Promise<string> => {
 };
 
 /** POST JSON to the backend with no cookies — the whole point of this path. */
-const postBackend = async (path: string, body: unknown): Promise<Response> =>
+const postBackend = async (path: string, body: unknown, signal?: AbortSignal): Promise<Response> =>
     await fetch(new URL(path, LUNORA_URL), {
         body: JSON.stringify(body),
         credentials: "omit",
         headers: { "Content-Type": "application/json" },
         method: "POST",
+        signal,
     });
 
-export const readGrant = async (): Promise<StoredGrant | undefined> => {
-    const stored = await chrome.storage.local.get(STORAGE_KEY);
+/** The grant in storage and the sign-out marks, as stored: also a grant signed out but not yet removed. */
+const readStored = async (): Promise<{ failed: unknown; grant: StoredGrant | undefined; signedOut: unknown }> => {
+    const stored = await chrome.storage.local.get([STORAGE_KEY, SIGNED_OUT_KEY, SIGN_OUT_FAILED_KEY]);
 
-    return stored[STORAGE_KEY] as StoredGrant | undefined;
+    return { failed: stored[SIGN_OUT_FAILED_KEY], grant: stored[STORAGE_KEY] as StoredGrant | undefined, signedOut: stored[SIGNED_OUT_KEY] };
+};
+
+/**
+ * The stored grant as `readGrant` shows it, and whether a grant marked signed
+ * out (`SIGNED_OUT_KEY`) is still stored after its removal failed
+ * (`SIGN_OUT_FAILED_KEY`). One still being removed is hidden, not failed.
+ * `markedKey` names a grant marked signed out and still stored.
+ */
+export const readGrantState = async (): Promise<{ grant: StoredGrant | undefined; markedKey: string | undefined; removalFailed: boolean }> => {
+    const { failed, grant, signedOut } = await readStored();
+    const marked = grant !== undefined && grantKey(grant) === signedOut;
+
+    return { grant: marked ? undefined : grant, markedKey: marked ? signedOut : undefined, removalFailed: marked && failed === signedOut };
+};
+
+/** The stored grant, or none when its sign-out began (`SIGNED_OUT_KEY`): that one is never used again. */
+export const readGrant = async (): Promise<StoredGrant | undefined> => {
+    const { grant } = await readGrantState();
+
+    return grant;
 };
 
 /** One name for every context of this extension (panel, popup, service worker): they share the lock. */
 const GRANT_LOCK = "neore.extensionGrant";
 
+/** Runs `step` holding the Web Lock `name`; without the API (never in a supported browser) it runs unguarded. */
+const withLock = async <T>(name: string, step: () => Promise<T>): Promise<T> => {
+    const locks = globalThis.navigator?.locks as LockManager | undefined;
+
+    return locks ? await locks.request(name, step) : await step();
+};
+
 /**
  * Runs `step` alone among every grant write in this extension. Storage has no
  * compare-and-set, so a check and the write it guards hold this lock together:
- * nothing (a sign-out in another panel, say) lands between them. Without the
- * Web Locks API (never in a supported browser) the step runs unguarded.
+ * nothing (a sign-out in another panel, say) lands between them.
  */
-const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => {
-    const locks = globalThis.navigator?.locks as LockManager | undefined;
+const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => await withLock(GRANT_LOCK, step);
 
-    return locks ? await locks.request(GRANT_LOCK, step) : await step();
-};
+/**
+ * Runs the whole sign-out of the grant `key` names (mark, revoke, removal)
+ * alone among every context of this extension, so a panel opened meanwhile
+ * waits for it instead of revoking and removing the same grant again. A context
+ * that closes mid-way releases it, and the waiting cleanup finishes the job.
+ * Always taken before the grant lock, never inside it.
+ */
+const withSignOutLock = async <T>(key: string, step: () => Promise<T>): Promise<T> => await withLock(`neore.signOut:${key}`, step);
 
+/**
+ * Store a new grant and drop the old sign-out mark. The mark names an older
+ * grant's key, never this one's (minted per sign-in), so a mark storage fails to
+ * remove hides nothing: the sign-in still succeeded, and the next sign-out
+ * overwrites the mark.
+ */
 const writeGrant = async (grant: StoredGrant): Promise<void> => {
     await withGrantLock(async () => {
         await chrome.storage.local.set({ [STORAGE_KEY]: grant });
+        await chrome.storage.local.remove([SIGNED_OUT_KEY, SIGN_OUT_FAILED_KEY]).catch(() => undefined);
     });
 };
 
@@ -189,6 +248,7 @@ const updateGrantIf = async (token: string, change: (stored: StoredGrant) => Sto
     await withGrantLock(async () => {
         const stored = await readGrant();
 
+        // Gone, replaced, or signed out: a refresh writes nothing for it.
         if (stored?.token !== token) {
             return;
         }
@@ -271,9 +331,119 @@ export const watchReconnectNeeded = (onChange: (needed: boolean) => void): (() =
     };
 };
 
-/** Forget the grant `token` names, and only that one. */
+/** Forget the grant `token` names, and only that one (signed out or not). */
 const clearGrant = async (token: string): Promise<void> => {
-    await updateGrantIf(token, () => undefined);
+    await withGrantLock(async () => {
+        const { grant } = await readStored();
+
+        if (grant?.token === token) {
+            await chrome.storage.local.remove(STORAGE_KEY);
+        }
+    });
+};
+
+/**
+ * Forget the grant `key` names together with its sign-out marks. Another grant
+ * stored since keeps its place; a mark for this key goes either way.
+ */
+const forgetSignedOutGrant = async (token: string, key: string): Promise<void> => {
+    await withGrantLock(async () => {
+        const { failed, grant, signedOut } = await readStored();
+        const keys = [
+            ...(grant?.token === token ? [STORAGE_KEY] : []),
+            ...(signedOut === key ? [SIGNED_OUT_KEY] : []),
+            ...(failed === key ? [SIGN_OUT_FAILED_KEY] : []),
+        ];
+
+        if (keys.length > 0) {
+            await chrome.storage.local.remove(keys);
+        }
+    });
+};
+
+/** Revoke the grant's session server side; `true` once the server confirmed it. Offline or out of time: `false`. */
+const revokeGrant = async (token: string): Promise<boolean> => {
+    try {
+        const response = await postBackend("/extension/auth/revoke", { token }, AbortSignal.timeout(REVOKE_TIMEOUT_MS));
+
+        // The status is the answer; the body is dropped unawaited, so a cancel that stalls never holds the sign-out past its deadline.
+        response.body?.cancel().catch(() => undefined);
+
+        return response.ok;
+    } catch {
+        return false;
+    }
+};
+
+/** Record that the removal of the grant `key` names failed, while its mark still stands. Best effort. */
+const markSignOutFailed = async (key: string): Promise<void> => {
+    await withGrantLock(async () => {
+        const { signedOut } = await readStored();
+
+        if (signedOut === key) {
+            await chrome.storage.local.set({ [SIGN_OUT_FAILED_KEY]: key });
+        }
+    }).catch(() => undefined);
+};
+
+/**
+ * Revoke a grant marked signed out, then forget it with its marks, even when
+ * the revoke fails or runs out of time. Storage that keeps the grant writes the
+ * failure mark and rejects with `GrantRemovalError`; only then do other panels
+ * warn. A panel that closes before the removal leaves the mark alone, hidden,
+ * for the next panel's `finishPendingSignOut`.
+ */
+const removeSignedOutGrant = async (token: string, key: string): Promise<void> => {
+    // Offline or out of time: the session expires on its own; the local copy goes regardless.
+    await revokeGrant(token);
+
+    try {
+        await forgetSignedOutGrant(token, key);
+    } catch (error) {
+        await markSignOutFailed(key);
+
+        throw new GrantRemovalError(error, key);
+    }
+};
+
+const readStoredOrFail = async (): Promise<Awaited<ReturnType<typeof readStored>>> => {
+    try {
+        return await readStored();
+    } catch (error) {
+        throw new GrantReadError(error);
+    }
+};
+
+/** The grant `SIGNED_OUT_KEY` marks, while it is the stored one. */
+const markedGrant = (stored: Awaited<ReturnType<typeof readStored>>): { grant: StoredGrant; key: string } | undefined => {
+    const { grant, signedOut } = stored;
+
+    return grant && grantKey(grant) === signedOut ? { grant, key: signedOut } : undefined;
+};
+
+/**
+ * Finish a sign-out that did not (`SIGNED_OUT_KEY` still names the stored
+ * grant): revoke it once more, best effort, and forget it. Run when a panel
+ * loads the session; a failure leaves the mark for the next one. A sign-out
+ * still running in another panel holds its lock: this waits for it and acts
+ * only on what it left. A storage read that fails rejects with
+ * `GrantReadError`: nothing was tried.
+ */
+export const finishPendingSignOut = async (): Promise<void> => {
+    const found = markedGrant(await readStoredOrFail());
+
+    if (!found) {
+        return;
+    }
+
+    await withSignOutLock(found.key, async () => {
+        // Read again: the sign-out that held the lock has likely removed it.
+        const left = markedGrant(await readStoredOrFail());
+
+        if (left?.key === found.key) {
+            await removeSignedOutGrant(left.grant.token, left.key);
+        }
+    });
 };
 
 /**
@@ -363,37 +533,40 @@ export const requestGrantAccessToken = async (grant: StoredGrant | undefined): P
 
 /**
  * Revoke the session of the grant `key` names (`grantKey`), then forget it.
- * Forgets it even if the revoke fails, but not a grant a sign-in stored while
- * the revoke was out. `"replaced"` when another grant is stored now: it is left
- * alone, unrevoked. A failed removal rejects with `GrantRemovalError`.
+ * Forgets it even if the revoke fails or runs past `REVOKE_TIMEOUT_MS`, but not
+ * a grant a sign-in stored while the revoke was out. `"replaced"` when another
+ * grant is stored now: it is left alone, unrevoked.
+ *
+ * The grant is marked signed out (`SIGNED_OUT_KEY`) before the revoke, so a
+ * failed removal (`GrantRemovalError`) leaves a grant nothing reads again. A
+ * mark that cannot be written rejects with storage's own error: nothing
+ * changed, and the session may come back.
  */
-export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> => {
-    const grant = await readGrant();
+export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> =>
+    // Held from before the mark until the removal ends: a panel that reads the mark meanwhile waits.
+    await withSignOutLock(key, async () => {
+        // Checked and marked under one lock: a sign-in and another grant's sign-out
+        // landing in between would otherwise have their mark overwritten by this one.
+        const grant = await withGrantLock(async () => {
+            // Raw: a grant already marked by a sign-out whose removal failed is retried.
+            const { grant: stored } = await readStored();
 
-    if (!grant) {
+            if (stored && grantKey(stored) === key) {
+                await chrome.storage.local.set({ [SIGNED_OUT_KEY]: key });
+            }
+
+            return stored;
+        });
+
+        if (!grant) {
+            return "signed-out";
+        }
+
+        if (grantKey(grant) !== key) {
+            return "replaced";
+        }
+
+        await removeSignedOutGrant(grant.token, key);
+
         return "signed-out";
-    }
-
-    if (grantKey(grant) !== key) {
-        return "replaced";
-    }
-
-    let revoked = false;
-
-    try {
-        const response = await postBackend("/extension/auth/revoke", { token: grant.token });
-
-        revoked = response.ok;
-        await response.body?.cancel();
-    } catch {
-        // Offline: the session expires on its own; the local copy goes regardless.
-    }
-
-    try {
-        await clearGrant(grant.token);
-    } catch (error) {
-        throw new GrantRemovalError(error, revoked);
-    }
-
-    return "signed-out";
-};
+    });

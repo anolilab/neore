@@ -350,7 +350,10 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.updateThreadVisibility` | mutation | authMutation + RL | threads | row.userId == caller | **fixed** (low) — share token minted server-side; the caller-chosen one is gone |
 | `chat_functions.validateThreadExists` | query | optionalAuthQuery | threads | row.userId == caller | ok |
 | `chat_group_functions.createGroupChat` | mutation | authMutation + RL | threads | skill access | ok |
+| `chat_goals_functions.clearPinnedGoal` | mutation | authMutation + RL | threads | row.userId == caller (requireOwnedThread, lock proof); refused while impersonating | ok — new |
+| `chat_goals_functions.getPinnedGoal` | query | authQuery | threads | row.userId == caller, else null; locked chat needs the read gate's proof | ok — new |
 | `chat_goals_functions.getThreadGoal` | query | authQuery | threads, threadGoals | thread read gate (lock proof); goal row.userId == caller | ok |
+| `chat_goals_functions.setPinnedGoal` | mutation | authMutation + RL | threads | row.userId == caller (requireOwnedThread, lock proof); refused while impersonating | ok — new |
 | `chat_group_functions.createGroupChatFromTemplate` | mutation | authMutation + RL | threads, skills, userSkills, skillStats, skillHistory | caller-scoped (ctx.user): template is a server-side constant; persona skills are read/created only under the caller's own `userId` (free-plan skill limit applied), then the same skill-access gate as `createGroupChat` | ok — new |
 | `chat_group_functions.getGroupChat` | query | authQuery | threads | thread access (owner/grant) | ok |
 | `chat_group_functions.listGroupCandidates` | query | authQuery | — | caller-scoped (ctx.user) | ok |
@@ -469,11 +472,11 @@ for a schema table that is neither policed nor listed:
 | `gdpr_functions.cancelStuckExport` | mutation | authMutation + RL | gdprAuditLog | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getDataAccessSummary` | query | authQuery | gdprRequests | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getDeletionStatus` | query | authQuery | gdprRequests | caller-scoped (ctx.user) | ok |
-| `gdpr_functions.getExportDownloadUrl` | action | authAction | — | caller-scoped (ctx.user) | ok |
+| `gdpr_functions.getExportDownloadUrl` | action | authAction + RL | — | caller-scoped (ctx.user); FORBIDDEN while impersonating (the export holds the whole account), checked before the rate limit so a refused call spends none of the owner's quota | **fixed** — an impersonating admin could download the owner's export |
 | `gdpr_functions.getExportStatus` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getGdprStatus` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.requestAccountDeletion` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | identity (self-resolved) | ok |
-| `gdpr_functions.requestDataExport` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | caller-scoped (ctx.user) | ok |
+| `gdpr_functions.requestDataExport` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | caller-scoped (ctx.user); FORBIDDEN while impersonating, before the rate limit; the status reads stay open (no content or link) | **fixed** — an impersonating admin could start the owner's export |
 | `home_overview.getHomeOverview` | query | authQuery | toolApprovalRuns, tasks, codingAgentRuns, subAgentRuns, threads, notifications, userSettings, user, organizationPolicies | caller-scoped (ctx.user) | ok — new; row reads `where: { userId: caller }`, bounded, chats by id from the caller's own rows; for the Daily Brief offer, only when otherwise eligible, the caller's own `user` row and the policy of `ctx.user.activeOrganization` (from the session, never args; primary read) |
 | `knowledge_agent_assignment.assignToProject` | mutation | authMutation + RL | knowledgeFiles, projectKnowledge, projects | row.userId == caller | ok |
 | `knowledge_agent_assignment.getProjectKnowledge` | query | authQuery | projects | row.userId == caller | ok |

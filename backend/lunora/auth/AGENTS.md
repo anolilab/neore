@@ -24,7 +24,7 @@ reasoning are in [docs/agents/backend-auth.md](../../../docs/agents/backend-auth
 
 - `authorizeShard` (`backend/src/shard-routing.ts#createShardAuthorizer`) must COMPARE the shard key with the caller / a `.global()` grant's `ownerId`, never pattern-match a prefix; never admit an anonymous caller to a user shard.
 - Grants are cached 30s per isolate at the shard gate: procedures must re-read the grant themselves.
-- Bearer JWTs must be VERIFIED against our JWKS (`resolveIdentity`, `jose`), never just decoded.
+- Bearer JWTs must be VERIFIED against our JWKS (`resolveIdentity`, `jose`), never just decoded. A bad bearer falls through to the cookie; keys that could not be read (`JwksUnavailableError`, `src/jwks-cache.ts`) answer 503 with no cookie fallback, on RPC, the socket upgrade and the ticket mint.
 - Never give the extension/app grant JWT `sid`: its session is the exchange's fresh one with no impersonation mark, so as `sessionId` it would pass account deletion's checks. It carries `gsid` → `grantSessionId` (`src/bearer-identity.ts`). So `/extension/auth/authorize` refuses an impersonated session and approves only from a web `sid`; device codes refuse it in `refuseGuestApproval`.
 - No extension origin is trusted for a cookie: none in CORS or better-auth's `trustedOrigins`, and `src/extension-cookie.ts` strips the cookie off any `*-extension://` request before auth reads it. Every extension build authenticates with its grant's bearer.
 - No credential while impersonating: a key, passkey, password, address or linked sign-in made then carries no mark. better-auth routes that add one go in `CREDENTIAL_PATHS` (`auth/impersonation-credential-guard.ts`); our own minting procedures check `ctx.user.impersonatedBy`.

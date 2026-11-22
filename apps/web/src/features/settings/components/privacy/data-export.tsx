@@ -12,6 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import { useImpersonationState } from "@/features/admin/hooks/use-is-impersonating";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 /** Mirrors the `export` half of `gdpr_functions.getGdprStatus` — those fields are nullable. */
@@ -39,6 +40,9 @@ const DataExport: FC<DataExportProps> = ({ exportStatus, isLoading }) => {
     const [isRequesting, setIsRequesting] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
+    // The server refuses to start or download an export for an admin acting as the owner.
+    const impersonation = useImpersonationState();
+    const canExport = impersonation === "self";
 
     const handleRequestExport = async () => {
         try {
@@ -85,8 +89,8 @@ const DataExport: FC<DataExportProps> = ({ exportStatus, isLoading }) => {
     const isFailed = exportStatus?.status === "failed";
     const isCancelled = exportStatus?.status === "cancelled";
     const hasFile = exportStatus?.hasFile ?? false;
-    const canDownload = isCompleted && hasFile;
-    const canRequestExport = !isLoading && !isProcessing && !isCompleted;
+    const canDownload = canExport && isCompleted && hasFile;
+    const canRequestExport = canExport && !isLoading && !isProcessing && !isCompleted;
     const progress = exportStatus?.progress ?? 0;
 
     return (
@@ -121,9 +125,11 @@ const DataExport: FC<DataExportProps> = ({ exportStatus, isLoading }) => {
                     <div className="bg-destructive/10 text-destructive rounded-lg p-4 text-sm">
                         <p className="font-medium">{t`Export failed`}</p>
                         {exportStatus?.errorMessage && <p className="mt-1">{exportStatus.errorMessage}</p>}
-                        <Button className="mt-2" disabled={isRequesting} onClick={handleRequestExport} size="sm" variant="outline">
-                            {isRequesting ? t`Requesting...` : t`Retry Export`}
-                        </Button>
+                        {canExport && (
+                            <Button className="mt-2" disabled={isRequesting} onClick={handleRequestExport} size="sm" variant="outline">
+                                {isRequesting ? t`Requesting...` : t`Retry Export`}
+                            </Button>
+                        )}
                     </div>
                 )}
 
@@ -153,12 +159,16 @@ const DataExport: FC<DataExportProps> = ({ exportStatus, isLoading }) => {
                         </Button>
                     )}
 
-                    {isCompleted && (
+                    {canExport && isCompleted && (
                         <Button disabled={isRequesting} onClick={handleRequestExport} variant="outline">
                             {t`New Export`}
                         </Button>
                     )}
                 </div>
+
+                {impersonation === "impersonating" && (
+                    <p className="text-muted-foreground text-sm" role="status">{t`A data export can't be requested or downloaded while impersonating.`}</p>
+                )}
 
                 <p className="text-muted-foreground text-xs">
                     {t`Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days.`}

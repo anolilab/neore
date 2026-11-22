@@ -1,10 +1,11 @@
-/** Storage kept a grant whose sign-out ran. `revoked` when the server had confirmed the revoke: the grant is dead. */
+/** Storage kept a grant whose sign-out ran: it is marked signed out, so nothing reads it again. */
 export class GrantRemovalError extends Error {
-    public readonly revoked: boolean;
+    /** The key of the grant left stored (`grantKey`). */
+    public readonly key: string;
 
-    public constructor(cause: unknown, revoked: boolean) {
+    public constructor(cause: unknown, key: string) {
         super(cause instanceof Error ? cause.message : "The grant could not be removed.", { cause });
         this.name = "GrantRemovalError";
-        this.revoked = revoked;
+        this.key = key;
     }
 }
