@@ -489,6 +489,30 @@ describe("endSession", () => {
         await page.unmount();
     });
 
+    it("keeps the sign-in page's warning through a sign-in that is denied", async () => {
+        const { sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+
+        await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+
+        Reflect.set(chrome, "permissions", { request: async () => false });
+
+        const page = await mount(createElement(AuthPage));
+
+        await act(async () => {
+            page.container.querySelector("button")?.click();
+        });
+        await settle();
+
+        const alerts = [...page.container.querySelectorAll("[role=alert]")].map((alert) => alert.textContent);
+
+        expect(alerts).toContainEqual(expect.stringMatching(/^Anole needs access/u));
+        expect(alerts).toContainEqual(expect.stringMatching(/^Sign-out did not finish/u));
+        await page.unmount();
+    });
+
     it("runs one sign-out per grant: a second call joins the first", async () => {
         const { setAuthToken, sync } = await signedIn();
         const revoke = deferred();

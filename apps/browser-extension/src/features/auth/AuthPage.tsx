@@ -36,7 +36,6 @@ export function AuthPage() {
 
     const signIn = () => {
         setError(undefined);
-        dismissSignOutUnfinished();
         setIsSigningIn(true);
 
         // MV3 host permissions can be withheld or revoked by the user (Firefox, and
@@ -54,6 +53,8 @@ export function AuthPage() {
 
                 // Success is observed through storage: the session hook re-renders the panel.
                 await signInWithWebAuthFlow();
+                // Only now: a denied or failed attempt leaves the marked grant stored, and the warning true.
+                dismissSignOutUnfinished();
             } catch (signInError: unknown) {
                 setError(signInError instanceof Error ? signInError.message : "Sign-in failed.");
             } finally {
