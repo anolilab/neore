@@ -366,7 +366,8 @@ const revokeGrant = async (token: string): Promise<boolean> => {
     try {
         const response = await postBackend("/extension/auth/revoke", { token }, AbortSignal.timeout(REVOKE_TIMEOUT_MS));
 
-        await response.body?.cancel();
+        // The status is the answer; the body is dropped unawaited, so a cancel that stalls never holds the sign-out past its deadline.
+        response.body?.cancel().catch(() => undefined);
 
         return response.ok;
     } catch {

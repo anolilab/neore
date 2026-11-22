@@ -437,6 +437,29 @@ describe("endSession", () => {
         expect(setAuthToken.mock.calls).toEqual([[null]]);
     });
 
+    it("forgets the grant when the revoke answers but its body never finishes cancelling", async () => {
+        const { setAuthToken, sync } = await signedIn();
+        const cancel = vi.fn(
+            async () =>
+                await new Promise<void>(() => {
+                    // Never settles.
+                }),
+        );
+        const revoked = new Response(null, { status: 204 });
+
+        stopSync = sync.signOut;
+        // Headers arrived; the body's cancel never settles.
+        Object.defineProperty(revoked, "body", { value: { cancel } });
+        fetchMock.mockResolvedValueOnce(revoked);
+
+        await expect(endSession(sync, USER.id)).resolves.toBeUndefined();
+
+        expect(cancel).toHaveBeenCalledOnce();
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        expect(setAuthToken.mock.calls).toEqual([[null]]);
+    });
+
     it("never signs back in from a grant whose removal failed, in this panel or a new one, and the next panel removes it", async () => {
         const { setAuthToken, sync } = await signedIn();
 
