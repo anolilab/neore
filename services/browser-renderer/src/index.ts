@@ -177,7 +177,8 @@ function readTarget(
             continue;
         }
 
-        for (const pseudo of ["::before", "::after"]) {
+        // `::marker` is a list item's bullet, which the stylesheet can set to words (a "Buy" marker); it is drawn text too.
+        for (const pseudo of ["::before", "::after", "::marker"]) {
             const { content } = getComputedStyle(node, pseudo);
 
             if (content !== "none" && content !== "normal") {
