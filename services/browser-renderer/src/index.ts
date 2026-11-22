@@ -84,13 +84,19 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
         return root instanceof ShadowRoot ? root.host : null;
     };
     // Text the stylesheet draws, from CSS `content`: a quoted string. `none`, `normal` and counters are not text.
-    const generatedText = (node: Element): string[] =>
-        ["::before", "::after"].flatMap((pseudo) => {
+    // An element nothing is drawn for (display: none, visibility: hidden) shows none of its generated text either.
+    const generatedText = (node: Element): string[] => {
+        if (node.getClientRects().length === 0 || getComputedStyle(node).visibility === "hidden") {
+            return [];
+        }
+
+        return ["::before", "::after"].flatMap((pseudo) => {
             const { content } = getComputedStyle(node, pseudo);
             const quote = content.charAt(0);
 
             return quote === '"' || quote === "'" ? [content.slice(1, -1)] : [];
         });
+    };
 
     const nodes: Element[] = [control];
 
