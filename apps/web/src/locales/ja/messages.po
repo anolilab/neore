@@ -5783,11 +5783,11 @@ msgstr "時間別（古い順）。複数のモデルで同じ時刻から下が
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:158
+#: src/features/admin/components/admin-provider-cache-row.tsx:156
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "モデル別（プロンプトトークンの多い順）：プロバイダーとモデルの組み合わせ {1} 件のうち上位 {0} 件。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:159
+#: src/features/admin/components/admin-provider-cache-row.tsx:157
 msgid "By model, most prompt tokens first."
 msgstr "モデル別（プロンプトトークンの多い順）。"
 
@@ -21308,7 +21308,7 @@ msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 msgid "Mode:"
 msgstr "モード:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:163
+#: src/features/admin/components/admin-provider-cache-row.tsx:161
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26931,7 +26931,7 @@ msgstr "すべてのモデルで実行するプロンプト..."
 #: src/features/admin/components/admin-provider-cache-row.tsx:94
 #: src/features/admin/components/admin-provider-cache-row.tsx:113
 #: src/features/admin/components/admin-provider-cache-row.tsx:137
-#: src/features/admin/components/admin-provider-cache-row.tsx:166
+#: src/features/admin/components/admin-provider-cache-row.tsx:164
 msgid "Prompt tokens"
 msgstr "プロンプトトークン"
 
@@ -27000,7 +27000,7 @@ msgid "Proven reliability from previous generation"
 msgstr "前世代で実証された信頼性"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:164
+#: src/features/admin/components/admin-provider-cache-row.tsx:162
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -28584,7 +28584,7 @@ msgstr "リクエスト中…"
 #: src/features/admin/components/admin-provider-cache-row.tsx:98
 #: src/features/admin/components/admin-provider-cache-row.tsx:112
 #: src/features/admin/components/admin-provider-cache-row.tsx:136
-#: src/features/admin/components/admin-provider-cache-row.tsx:165
+#: src/features/admin/components/admin-provider-cache-row.tsx:163
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30623,7 +30623,7 @@ msgstr "セリフ"
 #: src/features/admin/components/admin-provider-cache-row.tsx:90
 #: src/features/admin/components/admin-provider-cache-row.tsx:114
 #: src/features/admin/components/admin-provider-cache-row.tsx:138
-#: src/features/admin/components/admin-provider-cache-row.tsx:167
+#: src/features/admin/components/admin-provider-cache-row.tsx:165
 msgid "Served from cache"
 msgstr "キャッシュから提供"
 

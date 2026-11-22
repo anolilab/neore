@@ -5783,11 +5783,11 @@ msgstr "Por hora, as mais antigas primeiro. Uma queda que começa na mesma hora 
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:158
+#: src/features/admin/components/admin-provider-cache-row.tsx:156
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "Por modelo, os com mais tokens de prompt primeiro: os {0} primeiros de {1} pares de provedor e modelo."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:159
+#: src/features/admin/components/admin-provider-cache-row.tsx:157
 msgid "By model, most prompt tokens first."
 msgstr "Por modelo, os com mais tokens de prompt primeiro."
 
@@ -21308,7 +21308,7 @@ msgstr "Modo {0}, em {1}. Nada começa quando é criado."
 msgid "Mode:"
 msgstr "Modo:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:163
+#: src/features/admin/components/admin-provider-cache-row.tsx:161
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26931,7 +26931,7 @@ msgstr "Prompt a executar em todos os modelos..."
 #: src/features/admin/components/admin-provider-cache-row.tsx:94
 #: src/features/admin/components/admin-provider-cache-row.tsx:113
 #: src/features/admin/components/admin-provider-cache-row.tsx:137
-#: src/features/admin/components/admin-provider-cache-row.tsx:166
+#: src/features/admin/components/admin-provider-cache-row.tsx:164
 msgid "Prompt tokens"
 msgstr "Tokens de prompt"
 
@@ -27000,7 +27000,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Confiabilidade comprovada da geração anterior"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:164
+#: src/features/admin/components/admin-provider-cache-row.tsx:162
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -28584,7 +28584,7 @@ msgstr "Solicitando…"
 #: src/features/admin/components/admin-provider-cache-row.tsx:98
 #: src/features/admin/components/admin-provider-cache-row.tsx:112
 #: src/features/admin/components/admin-provider-cache-row.tsx:136
-#: src/features/admin/components/admin-provider-cache-row.tsx:165
+#: src/features/admin/components/admin-provider-cache-row.tsx:163
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30623,7 +30623,7 @@ msgstr "Serifada"
 #: src/features/admin/components/admin-provider-cache-row.tsx:90
 #: src/features/admin/components/admin-provider-cache-row.tsx:114
 #: src/features/admin/components/admin-provider-cache-row.tsx:138
-#: src/features/admin/components/admin-provider-cache-row.tsx:167
+#: src/features/admin/components/admin-provider-cache-row.tsx:165
 msgid "Served from cache"
 msgstr "Servido do cache"
 
