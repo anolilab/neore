@@ -38,7 +38,11 @@ export const findLocaleMaps = (catalog, locales) =>
                 return false;
             }
 
-            return opensAsObject(entry.msgstr) ? !opensAsObject(entry.msgid) : !looksLikeLocaleMap(entry.msgid, locales);
+            // A source that opens with an ICU placeholder (`{count} files`) is no object: only a source that is itself a
+            // locale map excuses a translation shaped as one.
+            const isSourceMap = looksLikeLocaleMap(entry.msgid, locales);
+
+            return opensAsObject(entry.msgstr) ? !(opensAsObject(entry.msgid) && isSourceMap) : !isSourceMap;
         })
         .map((entry) => {
             return { line: entry.msgstrLines[0] + 1, msgid: entry.msgid };

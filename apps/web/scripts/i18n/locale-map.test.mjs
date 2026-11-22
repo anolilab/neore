@@ -44,6 +44,21 @@ describe("findLocaleMaps", () => {
         expect(findLocaleMaps(catalog, LOCALES)).toStrictEqual([{ line: 11, msgid: "Save" }]);
     });
 
+    it("finds a map pasted over the translation of a source that opens with an ICU placeholder", () => {
+        const catalog = [
+            'msgid ""',
+            'msgstr ""',
+            '"Language: de\\n"',
+            "",
+            "#: src/d.tsx:4",
+            'msgid "{count} files"',
+            "msgstr \"{'de': '{count} Dateien', 'fr': '{count} fichiers'}\"",
+            "",
+        ].join("\n");
+
+        expect(findLocaleMaps(catalog, LOCALES)).toStrictEqual([{ line: 7, msgid: "{count} files" }]);
+    });
+
     it("finds a map pasted over the translation of a source that names quoted locales in prose", () => {
         const catalog = [
             'msgid ""',
