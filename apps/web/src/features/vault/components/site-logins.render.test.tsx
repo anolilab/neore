@@ -805,5 +805,29 @@ describe("SiteLogins", () => {
             await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
             expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ expectedUpdatedAt: 7 });
         });
+
+        it("opens an edit right after its own save with what that save wrote, so a cleared page is not brought back by the older row", async () => {
+            const user = userEvent.setup();
+
+            harness.logins = [{ ...savedLogin(), label: "Work", signInUrl: `${SITE}/login` }];
+            harness.saveSiteLogin.mockResolvedValue({ id: "login-1", updatedAt: 7 });
+            mount();
+
+            await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+            await user.clear(screen.getByLabelText("Sign-in page (optional)"));
+            await user.clear(screen.getByLabelText("Label (optional)"));
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login updated"));
+
+            // The list has not caught up: it still shows the page and label the save just cleared.
+            await user.click(screen.getByRole("button", { name: `Edit login for ${SITE}` }));
+
+            expect(valueOf("Sign-in page (optional)")).toBe("");
+            expect(valueOf("Label (optional)")).toBe("");
+
+            await user.click(screen.getByRole("button", { name: "Save changes" }));
+            await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+            expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ expectedUpdatedAt: 7, signInUrl: "" });
+        });
     });
 });

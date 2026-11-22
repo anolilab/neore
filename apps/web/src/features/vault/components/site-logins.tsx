@@ -61,13 +61,31 @@ const emptyDraft = (): LoginDraft => {
     return { label: "", password: "", signInUrl: "", site: "", teammateIds: [], username: "" };
 };
 
+/** What a save from this form wrote: its version and the fields as the server now holds them. */
+interface SavedHere {
+    label: string;
+    signInUrl: string;
+    teammateIds: Id<"bots">[];
+    updatedAt: number;
+    username: string;
+}
+
 /**
- * An edit of `login`. `savedHere` is the version a save from this form wrote, when the listed row may predate it; the
- * fields are the listed ones either way, as a save here writes what the form shows.
+ * An edit of `login`. `savedHere` is what a save from this form wrote: when the listed row predates it, the edit opens
+ * from that save, so a field it cleared or changed is not brought back by the older row; once the list has caught up,
+ * the listed row is the one opened.
  */
-const editDraft = (login: ListedLogin, savedHere?: number): LoginDraft => {
-    const updatedAt = Math.max(login.updatedAt, savedHere ?? 0);
-    const opened = { label: login.label ?? "", signInUrl: login.signInUrl ?? "", teammateIds: login.teammateIds, updatedAt, username: login.username };
+const editDraft = (login: ListedLogin, savedHere?: SavedHere): LoginDraft => {
+    const opened =
+        savedHere !== undefined && savedHere.updatedAt > login.updatedAt
+            ? savedHere
+            : {
+                  label: login.label ?? "",
+                  signInUrl: login.signInUrl ?? "",
+                  teammateIds: login.teammateIds,
+                  updatedAt: login.updatedAt,
+                  username: login.username,
+              };
 
     return {
         id: login.id,
@@ -306,7 +324,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const mounted = useRef(true);
     // The version each save here wrote: the live list may not show it yet, and an edit opened from the older one would be
     // refused as changed elsewhere. A newer version in the list (another tab) still wins.
-    const savedVersions = useRef(new Map<Id<"savedSiteLogins">, number>());
+    const savedVersions = useRef(new Map<Id<"savedSiteLogins">, SavedHere>());
 
     useEffect(() => {
         mounted.current = true;
@@ -376,7 +394,13 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             const written = await saveMutation.mutateAsync(args);
 
             saveMutation.reset();
-            savedVersions.current.set(written.id, written.updatedAt);
+            savedVersions.current.set(written.id, {
+                label: submitted.label.trim(),
+                signInUrl: written.signInUrl ?? "",
+                teammateIds: submitted.teammateIds,
+                updatedAt: written.updatedAt,
+                username: submitted.username.trim(),
+            });
             setDraft(afterSave(submitted, written));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
 
