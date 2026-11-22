@@ -156,6 +156,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 
 const LOOKS_FOR = /Looks for the global CLAUDE\.md/u;
 const LAPTOP = /Laptop/u;
+const ONE_NOT_READ = /1 file was not read this time: import again to add the rest\./u;
 
 const LISTED = [
     { id: "claude", name: "CLAUDE.md", path: "~/.claude/CLAUDE.md", size: 2048, status: "found" },
@@ -781,6 +782,8 @@ describe("import from this computer", () => {
 
         await waitFor(() => expect(boxes.map((box) => box.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]));
         expect(screen.getByTestId("computer-rule-file-import")).toBeDefined();
+        // The editor says it too, so the note outlasts the panel.
+        expect(screen.getByText(ONE_NOT_READ)).toBeDefined();
 
         // A Discard after the read ended takes the draft, not what the panel says about that read.
         await user.click(screen.getByRole("button", { name: "Discard changes" }));
@@ -901,6 +904,12 @@ describe("import from this computer", () => {
         await vi.advanceTimersByTimeAsync(100);
         expect(screen.getByRole("list", { name: "Instruction files" })).toBeDefined();
         expect(screen.queryByText("Approve the request in the desktop app on Studio.")).toBeNull();
+
+        // The live query failing now does not undo the end the status check read.
+        backend.lost.add("quiet-1");
+        await vi.advanceTimersByTimeAsync(100);
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.getByRole("list", { name: "Instruction files" })).toBeDefined();
 
         await user.click(screen.getByRole("button", { name: "Import selected" }));
         await screen.findByText("Approve the request in the desktop app on Studio.");

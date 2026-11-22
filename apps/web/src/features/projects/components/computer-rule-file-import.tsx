@@ -153,7 +153,10 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     // Past its deadline and still not ended: the backend has given up on it, so this panel does too.
     const overdue =
         active !== undefined && now > active.startedAt + CALL_DEADLINE_MS && (call === undefined || call?.status === "pending" || call?.status === "claimed");
-    const callLost = callUnreadable || overdue;
+    // An end already read (by the status check, or pushed before the live query failed) stands: only a call not known
+    // to have ended is lost by a failed read.
+    const callEnded = call !== undefined && call !== null && call.status !== "pending" && call.status !== "claimed";
+    const callLost = (callUnreadable && !callEnded) || overdue;
     const readCallId = reading?.callId;
     const { data: liveListed } = useQuery(
         crpc.devices.global_instructions.getGlobalInstructionsCall.queryOptions(listCallId ? { callId: listCallId as Id<"deviceCalls"> } : skipToken),
@@ -417,10 +420,13 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                 // Only the files asked for: one the answer adds, even a known one left unticked, is not imported.
                 came = answer.filter((file) => files.includes(file.id) && isRead(file));
                 // Each file asked for, not each the answer names: one it left out stays ticked, with a note.
-                allRead = files.every((id) => came.some((file) => file.id === id));
+                const missed = files.filter((id) => came.every((file) => file.id !== id)).length;
 
+                allRead = missed === 0;
+
+                // None came: the editor still says how many were not read, as it does once the panel is closed.
                 if (came.length === 0) {
-                    return null;
+                    return missed > 0 ? { duplicates: 0, imported: [], notRead: missed, skipped: [], unreadable: [] } : null;
                 }
 
                 const one = onePerText(came);
@@ -435,7 +441,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     MAX_RULE_FILES,
                 );
 
-                return { ...imported, duplicates: duplicateOf.size, notRead: 0, unreadable: [] };
+                return { ...imported, duplicates: duplicateOf.size, notRead: missed, unreadable: [] };
             },
             (added) => {
                 // A copy left out is done once the file kept for it was added.
