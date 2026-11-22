@@ -139,7 +139,7 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 // The release route crosses to the shard its token names as the system: here, straight into the harness, and the
 // shard it asked for is kept for the test to check.
 const { releaseLimit, releaseShards } = vi.hoisted(() => {
-    return { releaseLimit: { limited: false }, releaseShards: [] as string[] };
+    return { releaseLimit: { down: false, limited: false }, releaseShards: [] as string[] };
 });
 
 vi.mock("../lib/http-shard", async (importOriginal) => {
@@ -158,8 +158,13 @@ vi.mock("../lib/http-shard", async (importOriginal) => {
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
-        // The release route's per-address limit: `releaseShards.limited` refuses it.
-        checkRateLimit: async () => {
+        // The release route's per-address limit: `releaseLimit.limited` refuses it, and `down` is a limiter outage, answered as
+        // the caller's `failMode` says (closed unless it asks for open).
+        checkRateLimit: async (_context: unknown, _operation: string, options?: { failMode?: "closed" | "open" }) => {
+            if (releaseLimit.down) {
+                return { ok: options?.failMode === "open" };
+            }
+
             return { ok: !releaseLimit.limited };
         },
         rateLimitGuard: async () => undefined,
@@ -248,6 +253,7 @@ beforeEach(async () => {
 
 afterEach(() => {
     releaseShards.length = 0;
+    releaseLimit.down = false;
     releaseLimit.limited = false;
     delete replica.grant;
     impersonation.by = undefined;
@@ -1186,6 +1192,17 @@ describe("a closing page's hand back", () => {
 
         await expect(release(taken.release)).resolves.toBe(204);
         await expect(lease()).resolves.toEqual(lapsed);
+    });
+
+    it("refuses a proven token while the limiter is down, so no replay reaches the owner's shard", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        releaseLimit.down = true;
+        await expect(release(taken.release)).resolves.toBe(429);
+        await expect(release(taken.release)).resolves.toBe(429);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
     });
 
     it("refuses a sender over its limit once the token is proven, and ends nothing", async () => {

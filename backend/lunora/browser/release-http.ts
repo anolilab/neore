@@ -71,9 +71,9 @@ export const releaseControlHttpAction = async (context: HttpActionCtx, request: 
         return answer(401);
     }
 
-    // Only a proven token is charged, so junk never writes to the root shard; an outage of the limiter refuses nobody.
+    // Only a proven token is charged, so junk never writes to the root shard. A limiter outage refuses it too (closed, the default):
+    // a token can be replayed, and each replay would reach the owner's shard. The lease then ends at its idle timeout.
     const limited = await checkRateLimit(context, "browser/releaseIp", {
-        failMode: "open",
         key: request.headers.get("cf-connecting-ip") ?? "unknown",
         throws: false,
     });
