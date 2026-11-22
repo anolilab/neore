@@ -153,3 +153,69 @@ export const NoPicture: Story = {
         await expect(await canvas.findByRole("button", { name: "Take control" })).toBeVisible();
     },
 };
+
+/** A result that names its ask: the card can answer it once. */
+const ASKED_PART = {
+    ...PART,
+    output: { ...(PART.output as object), humanCheck: { browserId: "browser-1", checkId: "check-1", site: "shop.example.com", status: "asked" } },
+} as unknown as ToolPart;
+
+const humanCheck = (overrides: Record<string, unknown> = {}) =>
+    lunora(api.browser.human_check_card.getHumanCheck, {
+        canResolve: true,
+        expiresAt: STORY_NOW + 3_600_000,
+        now: STORY_NOW,
+        site: "shop.example.com",
+        status: "open",
+        ...overrides,
+    });
+
+/** The person may answer: Mark done once they cleared it, or Decline; marking it done says the agent looks again. */
+export const CanAnswer: Story = {
+    args: { part: ASKED_PART },
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    browser(),
+                    humanCheck(),
+                    lunora(api.browser.human_check_card.resolveHumanCheck, (args: { resolution: "declined" | "done" }) => {
+                        return { changed: true, status: args.resolution };
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.browser.human_check_card.getHumanCheck);
+        await expect(await canvas.findByRole("button", { name: "Decline" })).toBeVisible();
+        await userEvent.click(await canvas.findByRole("button", { name: "Mark done" }));
+        await expect(await canvas.findByRole("status")).toHaveTextContent("You marked this check done.");
+        await expect(canvas.queryByRole("button", { name: "Take control" })).toBeNull();
+    },
+};
+
+/** Declined (here, or in another tab): no answer and no Take control are offered again. */
+export const Declined: Story = {
+    args: { part: ASKED_PART },
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), browser(), humanCheck({ canResolve: false, status: "declined" })) } },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("status")).toHaveTextContent("You declined this check.");
+        await expect(canvas.queryByRole("button", { name: "Mark done" })).toBeNull();
+    },
+};
+
+/** Nobody answered within the hour: the ask is closed, and a retry asks again. */
+export const Expired: Story = {
+    args: { part: ASKED_PART },
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), browser(), humanCheck({ canResolve: false, status: "expired" })) } },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("status")).toHaveTextContent("This check is no longer open.");
+        await expect(canvas.queryByRole("button", { name: "Take control" })).toBeNull();
+    },
+};

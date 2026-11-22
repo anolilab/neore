@@ -6058,7 +6058,7 @@ msgstr "Abbrechen"
 msgid "Cancel deep work"
 msgstr "Deep Work abbrechen"
 
-#: src/features/settings/components/privacy/data-export.tsx:108
+#: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "Export abbrechen"
 
@@ -6097,7 +6097,7 @@ msgstr "Abgebrochen"
 msgid "Cancelled on this computer."
 msgstr "Auf diesem Computer abgebrochen."
 
-#: src/features/settings/components/privacy/data-export.tsx:108
+#: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancelling..."
 msgstr "Wird abgebrochen..."
 
@@ -10011,7 +10011,7 @@ msgstr "Daten & Analyse"
 msgid "Data Access Summary"
 msgstr "Datenzugriffs-Übersicht"
 
-#: src/features/settings/components/privacy/data-export.tsx:95
+#: src/features/settings/components/privacy/data-export.tsx:99
 #: src/features/settings/lib/settings-keywords.ts:106
 msgid "Data Export"
 msgstr "Datenexport"
@@ -10092,6 +10092,7 @@ msgstr "Debattiert {0} Runden lang."
 msgid "Debug an error or review my code..."
 msgstr "Einen Fehler debuggen oder meinen Code prüfen..."
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:213
 #: src/features/chat/host/host-composer.tsx:176
 #: src/features/chat/thread/request-secret-prompt.tsx:494
 msgid "Decline"
@@ -11448,7 +11449,7 @@ msgstr "{fileName} herunterladen"
 msgid "Download {name} ({size})"
 msgstr "{name} herunterladen ({size})"
 
-#: src/features/settings/components/privacy/data-export.tsx:94
+#: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
 msgstr "Lade eine Kopie aller deiner persönlichen Daten im JSON-Format herunter (DSGVO Artikel 20 - Recht auf Datenportabilität)"
 
@@ -11477,7 +11478,7 @@ msgstr "Inhalt herunterladen"
 msgid "Download document"
 msgstr "Dokument herunterladen"
 
-#: src/features/settings/components/privacy/data-export.tsx:152
+#: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Download Export"
 msgstr "Export herunterladen"
 
@@ -11517,7 +11518,7 @@ msgstr "PDF herunterladen"
 msgid "Download PNG"
 msgstr "PNG herunterladen"
 
-#: src/features/settings/components/privacy/data-export.tsx:62
+#: src/features/settings/components/privacy/data-export.tsx:66
 msgid "Download started"
 msgstr "Download gestartet"
 
@@ -13374,7 +13375,7 @@ msgid "Expires in {remainingTime}"
 msgstr "Läuft in {remainingTime} ab"
 
 #. placeholder {0}: formatDate(exportStatus.expiresAt, i18n.locale)
-#: src/features/settings/components/privacy/data-export.tsx:116
+#: src/features/settings/components/privacy/data-export.tsx:120
 msgid "Expires on {0}"
 msgstr "Läuft ab am {0}"
 
@@ -13431,7 +13432,7 @@ msgstr "Als SKILL.md exportieren"
 msgid "Export bundle"
 msgstr "Bundle exportieren"
 
-#: src/features/settings/components/privacy/data-export.tsx:75
+#: src/features/settings/components/privacy/data-export.tsx:79
 msgid "Export cancelled"
 msgstr "Export abgebrochen"
 
@@ -13439,11 +13440,11 @@ msgstr "Export abgebrochen"
 msgid "Export chat"
 msgstr "Chat exportieren"
 
-#: src/features/settings/components/privacy/data-export.tsx:122
+#: src/features/settings/components/privacy/data-export.tsx:126
 msgid "Export failed"
 msgstr "Export fehlgeschlagen"
 
-#: src/features/settings/components/privacy/data-export.tsx:138
+#: src/features/settings/components/privacy/data-export.tsx:144
 msgid "Export incomplete"
 msgstr "Export unvollständig"
 
@@ -13452,11 +13453,11 @@ msgstr "Export unvollständig"
 msgid "Export presentation"
 msgstr "Präsentation exportieren"
 
-#: src/features/settings/components/privacy/data-export.tsx:115
+#: src/features/settings/components/privacy/data-export.tsx:119
 msgid "Export ready!"
 msgstr "Export bereit!"
 
-#: src/features/settings/components/privacy/data-export.tsx:47
+#: src/features/settings/components/privacy/data-export.tsx:51
 msgid "Export request submitted. You will receive an email when it's ready."
 msgstr "Exportanfrage eingereicht. Du erhältst eine E-Mail, wenn der Export bereit ist."
 
@@ -13661,7 +13662,7 @@ msgstr "Datei konnte nicht angehängt werden"
 msgid "Failed to ban user"
 msgstr "Benutzer konnte nicht gesperrt werden"
 
-#: src/features/settings/components/privacy/data-export.tsx:77
+#: src/features/settings/components/privacy/data-export.tsx:81
 msgid "Failed to cancel export"
 msgstr "Export konnte nicht abgebrochen werden"
 
@@ -13858,7 +13859,7 @@ msgstr "Connector konnte nicht getrennt werden"
 msgid "Failed to dismiss the digest"
 msgstr "Die Zusammenfassung konnte nicht ausgeblendet werden"
 
-#: src/features/settings/components/privacy/data-export.tsx:65
+#: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
 msgstr "Export konnte nicht heruntergeladen werden"
 
@@ -14055,7 +14056,7 @@ msgstr "Tag konnte nicht umbenannt werden"
 msgid "Failed to reorder tags"
 msgstr "Tags konnten nicht neu angeordnet werden"
 
-#: src/features/settings/components/privacy/data-export.tsx:49
+#: src/features/settings/components/privacy/data-export.tsx:53
 msgid "Failed to request export"
 msgstr "Exportanfrage fehlgeschlagen"
 
@@ -20509,6 +20510,10 @@ msgstr "Alle als gelesen markieren"
 msgid "Mark as favorite"
 msgstr "Als Favorit markieren"
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:202
+msgid "Mark done"
+msgstr "Als erledigt markieren"
+
 #: src/features/workflow/components/nodes/object-editor-node.tsx:142
 msgid "Mark the area to edit in white"
 msgstr "Den zu bearbeitenden Bereich weiß markieren"
@@ -22118,7 +22123,7 @@ msgstr "Braucht mein Review"
 msgid "Needs review"
 msgstr "Prüfung nötig"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:116
+#: src/features/chat/browser-live-view/browser-human-check.tsx:179
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
 #: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
@@ -22380,7 +22385,7 @@ msgstr "Neuer Kontext"
 msgid "New dataset"
 msgstr "Neuer Datensatz"
 
-#: src/features/settings/components/privacy/data-export.tsx:158
+#: src/features/settings/components/privacy/data-export.tsx:164
 msgid "New Export"
 msgstr "Neuer Export"
 
@@ -23050,7 +23055,7 @@ msgstr "Noch kein Computer gekoppelt."
 msgid "No pending invitations"
 msgstr "Keine ausstehenden Einladungen"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:155
+#: src/features/chat/browser-live-view/browser-human-check.tsx:246
 msgid "No picture of the page could be taken. Take control to see it in the live view."
 msgstr "Von der Seite konnte kein Bild aufgenommen werden. Übernimm die Steuerung, um sie in der Live-Ansicht zu sehen."
 
@@ -23880,6 +23885,10 @@ msgstr "Onboarding-Assistent"
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
 msgstr "Einmal pro Nacht führt ein Reflexionsdurchlauf für Nutzende, die an diesem Tag aktiv waren, Duplikate zusammen und befördert wiederholte Fakten."
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:168
+msgid "Once the check is cleared, mark it done. Or decline if you will not."
+msgstr "Sobald die Prüfung erledigt ist, markiere sie als erledigt. Oder lehne ab, wenn du es nicht tun willst."
+
 #: src/features/appearance/components/appearance-controls.tsx:175
 msgid "One"
 msgstr "One"
@@ -24035,7 +24044,7 @@ msgstr "Nur ausführen, wenn jeder Filter zum JSON-Body passt. Verwende Punktpfa
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Nur Modelle desselben Typs können verglichen werden. Leere die Auswahl, um den Typ zu wechseln."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:100
+#: src/features/chat/browser-live-view/browser-human-check.tsx:144
 msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "Nur wer in diesem Chat schreiben darf, kann die Steuerung des Browsers übernehmen."
 
@@ -24424,7 +24433,7 @@ msgstr "Thread des Sub-Agenten öffnen"
 msgid "Open the thread list search and focus it ({0})"
 msgstr "Suche in der Thread-Liste öffnen und fokussieren ({0})"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:103
+#: src/features/chat/browser-live-view/browser-human-check.tsx:147
 msgid "Open this model's chat on its own to take control of its browser."
 msgstr "Öffne den Chat dieses Modells einzeln, um seinen Browser zu steuern."
 
@@ -26287,7 +26296,7 @@ msgstr "Anfrage wird vorbereitet…"
 msgid "Preparing the import…"
 msgstr "Import wird vorbereitet…"
 
-#: src/features/settings/components/privacy/data-export.tsx:152
+#: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Preparing..."
 msgstr "Wird vorbereitet..."
 
@@ -26466,7 +26475,7 @@ msgstr "Zurück"
 msgid "Previous branch"
 msgstr "Vorheriger Branch"
 
-#: src/features/settings/components/privacy/data-export.tsx:132
+#: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
 msgstr "Vorheriger Export wurde abgebrochen"
 
@@ -26655,7 +26664,7 @@ msgstr "Spracheingabe wird verarbeitet"
 #: src/features/chat/header/temporary-chat-dropdown.tsx:211
 #: src/features/chat/thread-list/thread-node.tsx:114
 #: src/features/chat/thread-list/thread-node.tsx:122
-#: src/features/settings/components/privacy/data-export.tsx:101
+#: src/features/settings/components/privacy/data-export.tsx:105
 msgid "Processing..."
 msgstr "Wird verarbeitet..."
 
@@ -28556,7 +28565,7 @@ msgstr "Änderungen anfordern"
 msgid "Request count"
 msgstr "Anzahl der Anfragen"
 
-#: src/features/settings/components/privacy/data-export.tsx:146
+#: src/features/settings/components/privacy/data-export.tsx:152
 msgid "Request Data Export"
 msgstr "Datenexport anfordern"
 
@@ -28581,8 +28590,8 @@ msgstr "Anfragevolumen, Kosten und Fehleranzahl pro Modell"
 msgid "Requested permissions"
 msgstr "Angeforderte Berechtigungen"
 
-#: src/features/settings/components/privacy/data-export.tsx:125
-#: src/features/settings/components/privacy/data-export.tsx:146
+#: src/features/settings/components/privacy/data-export.tsx:130
+#: src/features/settings/components/privacy/data-export.tsx:152
 msgid "Requesting..."
 msgstr "Wird angefordert..."
 
@@ -28903,7 +28912,7 @@ msgstr "wiederholen"
 msgid "Retry"
 msgstr "Erneut versuchen"
 
-#: src/features/settings/components/privacy/data-export.tsx:125
+#: src/features/settings/components/privacy/data-export.tsx:130
 msgid "Retry Export"
 msgstr "Export wiederholen"
 
@@ -31726,7 +31735,7 @@ msgstr "Einige Bilder aus diesem Lauf konnten nicht gespeichert werden."
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Für einige Schritte gab es keine Preisdaten; die Summe ist ein Mindestwert."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:98
+#: src/features/chat/browser-live-view/browser-human-check.tsx:142
 #: src/features/chat/browser-live-view/browser-live-view.tsx:970
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1029
 msgid "Someone else has control of this browser."
@@ -33425,12 +33434,16 @@ msgstr "Taiwan"
 msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "Ein Eingabebild nehmen, den Hintergrund entfernen und dann eine Stilübertragung anwenden"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:149
+#: src/features/chat/browser-live-view/browser-human-check.tsx:240
 #: src/features/chat/browser-live-view/browser-live-view.tsx:994
 msgid "Take control"
 msgstr "Steuerung übernehmen"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:122
+#: src/features/chat/browser-live-view/browser-human-check.tsx:165
+msgid "Take control, clear it and hand the browser back, then mark it done. Or decline if you will not."
+msgstr "Übernimm die Steuerung, erledige die Prüfung und gib den Browser zurück, dann markiere sie als erledigt. Oder lehne ab, wenn du es nicht tun willst."
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:166
 msgid "Take control, clear it, then hand the browser back."
 msgstr "Übernimm die Steuerung, erledige die Prüfung und gib den Browser dann zurück."
 
@@ -34221,11 +34234,11 @@ msgstr "Der Agent auf deinem Computer liest die Änderung…"
 msgid "The agent's browser closed while the page loaded."
 msgstr "Der Browser des Agenten wurde geschlossen, während die Seite lud."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:120
+#: src/features/chat/browser-live-view/browser-human-check.tsx:183
 msgid "The agent's browser reached a page on {site} only a person can clear. The agent waits and will not try to get around it."
 msgstr "Der Browser des Agenten ist auf {site} auf eine Seite gestoßen, die nur ein Mensch freigeben kann. Der Agent wartet und versucht nicht, sie zu umgehen."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:119
+#: src/features/chat/browser-live-view/browser-human-check.tsx:182
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "Der Browser des Agenten ist auf eine Seite gestoßen, die nur ein Mensch freigeben kann. Der Agent wartet und versucht nicht, sie zu umgehen."
 
@@ -34299,7 +34312,7 @@ msgstr "Der Bot legt das Modell für diesen Chat fest."
 msgid "The bot's tools were saved"
 msgstr "Die Tools des Bots wurden gespeichert"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:94
+#: src/features/chat/browser-live-view/browser-human-check.tsx:138
 msgid "The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed."
 msgstr "Der Browser kann gerade nicht übernommen werden. Bitte den Agenten, sich die Seite erneut anzusehen, falls sie noch gebraucht wird."
 
@@ -34311,11 +34324,11 @@ msgstr "Der Browser kann dieses Video nicht lesen, um ein Bild aufzunehmen"
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "Der Browser konnte nicht zurückgegeben werden. Der Agent erhält ihn nach zwei Minuten ohne Eingabe von selbst zurück."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:87
+#: src/features/chat/browser-live-view/browser-human-check.tsx:131
 msgid "The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows."
 msgstr "Der Browser wurde geschlossen, daher kann diese Prüfung hier nicht mehr erledigt werden. Bitte den Agenten, sobald seine Antwort fertig ist, es erneut zu versuchen: Er öffnet einen neuen Browser und fragt dich erneut, falls die Prüfung noch angezeigt wird."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:91
+#: src/features/chat/browser-live-view/browser-human-check.tsx:135
 msgid "The browser has since moved on from {site}, so this check is no longer open."
 msgstr "Der Browser hat {site} inzwischen verlassen, daher ist diese Prüfung nicht mehr offen."
 
@@ -34484,7 +34497,7 @@ msgstr "Der Editor ist noch nicht bereit"
 msgid "The endpoint listed no models — add model ids by hand"
 msgstr "Der Endpunkt hat keine Modelle aufgelistet – füge Modell-IDs manuell hinzu"
 
-#: src/features/settings/components/privacy/data-export.tsx:139
+#: src/features/settings/components/privacy/data-export.tsx:145
 msgid "The export file was not generated. Please request a new export."
 msgstr "Die Exportdatei wurde nicht generiert. Bitte fordere einen neuen Export an."
 
@@ -35349,7 +35362,11 @@ msgstr "Dieser Chat ist gesperrt. Entsperre ihn, um zu senden."
 msgid "This chat is too long to compact."
 msgstr "Dieser Chat ist zu lang zum Komprimieren."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:89
+#: src/features/chat/browser-live-view/browser-human-check.tsx:118
+msgid "This check is no longer open. Ask the agent to try again if it is still needed."
+msgstr "Diese Prüfung ist nicht mehr offen. Bitte den Agenten, es erneut zu versuchen, falls sie noch nötig ist."
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:133
 msgid "This check was for an earlier browser, which the agent no longer uses."
 msgstr "Diese Prüfung galt einem früheren Browser, den der Agent nicht mehr verwendet."
 
@@ -36777,7 +36794,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:52
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-human-check.tsx:139
+#: src/features/chat/browser-live-view/browser-human-check.tsx:230
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1041
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1158
 #: src/features/chat/guest-links/guest-page.tsx:269
@@ -39149,11 +39166,11 @@ msgstr "Worauf soll der Leitfaden achten?"
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Was der Agent in den letzten 30 Tagen von deinen Geräten verlangt hat."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:159
+#: src/features/chat/browser-live-view/browser-human-check.tsx:250
 msgid "What the agent's browser sees"
 msgstr "Was der Browser des Agenten sieht"
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:159
+#: src/features/chat/browser-live-view/browser-human-check.tsx:250
 msgid "What the agent's browser sees on {site}"
 msgstr "Was der Browser des Agenten auf {site} sieht"
 
@@ -39297,9 +39314,13 @@ msgstr "Wo du die Kontrolle behältst"
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "Ob der Agent einen Browser nutzt, konnte nicht geprüft werden."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:82
+#: src/features/chat/browser-live-view/browser-human-check.tsx:126
 msgid "Whether the browser is still open could not be checked."
 msgstr "Ob der Browser noch geöffnet ist, konnte nicht geprüft werden."
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:157
+msgid "Whether this check is still open could not be checked."
+msgstr "Ob diese Prüfung noch offen ist, konnte nicht geprüft werden."
 
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
@@ -39776,6 +39797,10 @@ msgstr "Du wählst den Zeitplan, das Ziel des Laufs und das Projekt. Das Projekt
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "Du hast diese Integrationen im Agent-Builder ausgewählt. Jede öffnet sich zur Prüfung, bevor etwas verbunden wird."
 
+#: src/features/chat/browser-live-view/browser-human-check.tsx:116
+msgid "You declined this check. The agent will not use this site again in this reply."
+msgstr "Du hast diese Prüfung abgelehnt. Der Agent nutzt diese Website in dieser Antwort nicht mehr."
+
 #: src/features/marketing/use-cases/use-case-data.ts:39
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "Du erhältst eine Benachrichtigung, wenn ein Lauf endet, deine Prüfung braucht oder fehlschlägt. Ein abgeschlossener Lauf verlinkt auf seinen Chat, ein Lauf, der Prüfung braucht, auf das Aufgabenboard."
@@ -39785,7 +39810,7 @@ msgstr "Du erhältst eine Benachrichtigung, wenn ein Lauf endet, deine Prüfung 
 msgid "You handed the browser back to the agent."
 msgstr "Du hast den Browser an den Agenten zurückgegeben."
 
-#: src/features/chat/browser-live-view/browser-human-check.tsx:96
+#: src/features/chat/browser-live-view/browser-human-check.tsx:140
 msgid "You have control. Clear the check in the live view, then hand the browser back."
 msgstr "Du hast die Steuerung. Erledige die Prüfung in der Live-Ansicht und gib den Browser dann zurück."
 
@@ -39842,6 +39867,10 @@ msgstr "Du hast die heutigen Nachrichten aufgebraucht. Versuche es später erneu
 #: src/features/chat/translation/message-translation.tsx:80
 msgid "You have used today's translations. Try again later."
 msgstr "Du hast dein heutiges Kontingent für Übersetzungen aufgebraucht. Versuche es später erneut."
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:117
+msgid "You marked this check done. The agent looks at the page again before it goes on."
+msgstr "Du hast diese Prüfung als erledigt markiert. Der Agent sieht sich die Seite erneut an, bevor er weitermacht."
 
 #: src/features/chat/browser-live-view/browser-live-view.tsx:318
 msgid "You may not take control of this browser."
@@ -39953,6 +39982,10 @@ msgstr "Dein KI-Arbeitsbereich <0>beginnt hier.</0>"
 #: src/features/chat/thread/ask-user-prompt.tsx:261
 msgid "Your answer"
 msgstr "Deine Antwort"
+
+#: src/features/chat/browser-live-view/browser-human-check.tsx:155
+msgid "Your answer could not be saved. Try again."
+msgstr "Deine Antwort konnte nicht gespeichert werden. Versuche es erneut."
 
 #: src/features/chat/core/context/chat-context.tsx:636
 msgid "Your answer in Neore has finished."
@@ -40077,7 +40110,7 @@ msgstr "Dein Anzeigename für dein Konto"
 msgid "Your draft is kept. The prompt from the link was not added."
 msgstr "Dein Entwurf bleibt erhalten. Der Prompt aus dem Link wurde nicht hinzugefügt."
 
-#: src/features/settings/components/privacy/data-export.tsx:164
+#: src/features/settings/components/privacy/data-export.tsx:174
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "Dein Export enthält: Profil, Einstellungen, Konversationen, Datei-Metadaten, Prompts und Nutzungshistorie. Der Download-Link läuft nach 7 Tagen ab."
 

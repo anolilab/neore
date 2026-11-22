@@ -3,17 +3,18 @@
  * reached a page only a person can clear (a human verification, a sign-in it cannot pass) and the person was asked
  * (`backend/lunora/browser/human-check.ts`). It names the site, shows what the browser sees, and takes control through
  * the live view card above the composer, which owns the lease; the agent gets the browser back on Hand back or after
- * the person stops using it.
+ * the person stops using it. The person can also answer the ask once, Done or Decline
+ * (`backend/lunora/browser/human-check-card.ts`): the agent hears it at its next look or while it waits for the answer.
  */
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import type { ToolPart } from "@neore/chat-ui/types";
 import { toolImageSource } from "@neore/chat-ui/utils/tool-image-source";
 import { Button } from "@neore/ui/components/button";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
 import type { FC } from "react";
-import { use, useId, useState } from "react";
+import { use, useEffect, useId, useRef, useState } from "react";
 
 import { BrowserLiveViewHereContext, requestBrowserControl } from "@/features/chat/browser-live-view/control-request";
 import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/status-clock";
@@ -34,8 +35,8 @@ const hostOf = (url: string | undefined): string | undefined => {
 };
 
 interface HumanCheckOutput {
-    /** `browserId`: the browser the ask was about (`getThreadBrowser`'s name for it). */
-    humanCheck?: { browserId?: string; site?: string };
+    /** `browserId`: the browser the ask was about (`getThreadBrowser`'s name for it); `checkId`: the ask the card answers. */
+    humanCheck?: { browserId?: string; checkId?: string; site?: string };
     screenshot?: string;
     screenshotFormat?: string;
     screenshotUrl?: string;
@@ -70,40 +71,104 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
     // while nobody has control: taking it over from this card would hand the agent's current work to the person.
     const earlierBrowser = browser !== undefined && browser !== null && output.humanCheck?.browserId !== browser.browserId;
     const movedOn = browser !== undefined && browser !== null && site !== undefined && control === undefined && hostOf(browser.currentUrl) !== site;
+    // The ask's own answer: given once, by whoever may control the browser; an older result names no ask to answer.
+    const checkId = output.humanCheck?.checkId;
+    const check = useQuery(
+        crpc.browser.human_check_card.getHumanCheck.queryOptions(
+            checkId && threadId ? { checkId: checkId as Id<"browserHumanChecks">, threadId: threadId as Id<"threads"> } : skipToken,
+        ),
+    );
+    const resolve = useMutation(crpc.browser.human_check_card.resolveHumanCheck.mutationOptions());
+    // An unanswered ask closes at `expiresAt` on the server's clock, which its own answer carries (`now`).
+    const checkSkew = useStatusSkew(check.data?.now, check.dataUpdatedAt);
+    const lapsed = usePassed(check.data?.status === "open" ? check.data.expiresAt - checkSkew : undefined);
+    // The answer this card saved stands over a lapse its timer saw before the new read came.
+    const answer = resolve.data?.status ?? (lapsed && check.data?.status === "open" ? "expired" : check.data?.status);
+    const answered = answer !== undefined && answer !== "open";
+    const canAnswer = check.data?.canResolve === true && !answered && threadId !== undefined && checkId !== undefined;
+    // A browser that is gone, or another one now, holds nothing to mark done: the person can still decline.
+    const browserGone = browser === null || earlierBrowser || movedOn;
+    const canMarkDone = canAnswer && !browserGone;
+    // The buttons go once the answer is saved: focus moves to the status that says so, not to the page.
+    const statusRef = useRef<HTMLParagraphElement>(null);
+    const focusAnswer = useRef(false);
+
+    useEffect(() => {
+        if (!answered || !focusAnswer.current) {
+            return;
+        }
+
+        focusAnswer.current = false;
+        statusRef.current?.focus();
+    }, [answered]);
+
+    const sendAnswer = (resolution: "declined" | "done"): void => {
+        if (checkId === undefined || threadId === undefined) {
+            return;
+        }
+
+        focusAnswer.current = true;
+        resolve.mutate({ checkId: checkId as Id<"browserHumanChecks">, resolution, threadId: threadId as Id<"threads"> });
+    };
     const screenshot = output.screenshotFormat
         ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
         : undefined;
 
-    let state: string | undefined;
+    const answerNotes = {
+        declined: t`You declined this check. The agent will not use this site again in this reply.`,
+        done: t`You marked this check done. The agent looks at the page again before it goes on.`,
+        expired: t`This check is no longer open. Ask the agent to try again if it is still needed.`,
+    };
 
-    // The status could not be read: the browser may still be running, so the card says so and can ask again, never
-    // that it closed.
+    let browserState: string | undefined;
+
     if (status.isError) {
-        state = t`Whether the browser is still open could not be checked.`;
+        // The status could not be read: the browser may still be running, so the card says so and can ask again, never
+        // that it closed.
+        browserState = t`Whether the browser is still open could not be checked.`;
     } else if (browser === null) {
         // The provider closes a browser about a minute after its last action, and an open ask does not keep it (that would
         // be paid browser time while nobody looks): a late reader is told so, and a retry in a new reply (a steer keeps the
         // reply's one ask per site) opens a new browser.
-        state = t`The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows.`;
+        browserState = t`The browser has closed, so this check can no longer be cleared here. Once the agent's reply has finished, ask it to try again: it opens a new browser and asks you again if the check still shows.`;
     } else if (earlierBrowser) {
-        state = t`This check was for an earlier browser, which the agent no longer uses.`;
+        browserState = t`This check was for an earlier browser, which the agent no longer uses.`;
     } else if (movedOn) {
-        state = t`The browser has since moved on from ${site}, so this check is no longer open.`;
+        browserState = t`The browser has since moved on from ${site}, so this check is no longer open.`;
     } else if (missed) {
         // No live view card answered: the browser went idle (its card is gone) though the status still lists it.
-        state = t`The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed.`;
+        browserState = t`The browser cannot be taken over right now. Ask the agent to look at the page again if it is still needed.`;
     } else if (control?.byYou === true) {
-        state = t`You have control. Clear the check in the live view, then hand the browser back.`;
+        browserState = t`You have control. Clear the check in the live view, then hand the browser back.`;
     } else if (control !== undefined) {
-        state = t`Someone else has control of this browser.`;
+        browserState = t`Someone else has control of this browser.`;
     } else if (browser?.canControl === false) {
-        state = t`Only someone who can write in this chat can take control of the browser.`;
+        browserState = t`Only someone who can write in this chat can take control of the browser.`;
     } else if (!liveViewHere && browser !== undefined) {
         // A comparison column has no live view card: an unanswered request would not mean the browser closed.
-        state = t`Open this model's chat on its own to take control of its browser.`;
+        browserState = t`Open this model's chat on its own to take control of its browser.`;
+    }
+
+    let state = browserState;
+
+    if (answered) {
+        state = answerNotes[answer];
+    } else if (resolve.isError && canAnswer) {
+        state = t`Your answer could not be saved. Try again.`;
+    } else if (check.isError) {
+        state = t`Whether this check is still open could not be checked.`;
     }
 
     const canAsk = browser !== undefined && browser !== null && state === undefined && threadId !== undefined;
+    let hint: string | undefined;
+
+    if (canAsk) {
+        hint = canMarkDone
+            ? t`Take control, clear it and hand the browser back, then mark it done. Or decline if you will not.`
+            : t`Take control, clear it, then hand the browser back.`;
+    } else if (canMarkDone && control !== undefined) {
+        hint = t`Once the check is cleared, mark it done. Or decline if you will not.`;
+    }
 
     return (
         <section
@@ -119,18 +184,48 @@ export const HumanCheckCard: FC<{ liveViewHere?: boolean; part: ToolPart; thread
                             ? t`The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it.`
                             : t`The agent's browser reached a page on ${site} only a person can clear. The agent waits and will not try to get around it.`}
                     </p>
-                    <p className="text-xs text-amber-800 dark:text-amber-300">{t`Take control, clear it, then hand the browser back.`}</p>
+                    {hint !== undefined && <p className="text-xs text-amber-800 dark:text-amber-300">{hint}</p>}
                     {/* Mounted throughout, so a screen reader announces the text when it changes. */}
-                    <p className="mt-1 text-xs text-amber-800 empty:hidden dark:text-amber-300" role="status">
+                    <p className="mt-1 text-xs text-amber-800 outline-none empty:hidden dark:text-amber-300" ref={statusRef} role="status" tabIndex={-1}>
                         {state}
                     </p>
                 </div>
-                {status.isError && (
+                {canAnswer && (
+                    <div className="flex flex-wrap gap-2">
+                        {canMarkDone && (
+                            <Button
+                                className="any-pointer-coarse:min-h-11"
+                                disabled={resolve.isPending}
+                                onClick={() => sendAnswer("done")}
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                            >
+                                {t`Mark done`}
+                            </Button>
+                        )}
+                        <Button
+                            className="any-pointer-coarse:min-h-11"
+                            disabled={resolve.isPending}
+                            onClick={() => sendAnswer("declined")}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                        >
+                            {t`Decline`}
+                        </Button>
+                    </div>
+                )}
+                {!answered && (status.isError || check.isError) && (
                     <Button
                         className="any-pointer-coarse:min-h-11"
-                        disabled={status.isFetching}
+                        disabled={status.isFetching || check.isFetching}
                         onClick={() => {
-                            status.refetch().catch(() => undefined);
+                            for (const query of [status, check]) {
+                                if (query.isError) {
+                                    query.refetch().catch(() => undefined);
+                                }
+                            }
                         }}
                         size="sm"
                         type="button"
