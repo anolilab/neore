@@ -41,8 +41,8 @@ export interface ProviderCacheReadings {
 
 /**
  * Rows a provider answered: not served by the response cache, not failed, with prompt tokens, and not a cancelled
- * stream's estimate (`finish_reason = 'cancelled'`, `lib/cancelled-usage.ts`). An estimate carries no cache count, so it
- * would book every prompt token as a miss.
+ * call's estimate (`finish_reason = 'cancelled'`, written by the stream and model-proxy paths from
+ * `lib/cancelled-usage.ts`). An estimate carries no cache count, so it would book every prompt token as a miss.
  */
 const answered = (since: string): string =>
     `created_at >= ${since} AND cache_hit = 0 AND error_code IS NULL AND prompt_tokens > 0 AND finish_reason IS NOT 'cancelled'`;
