@@ -4,6 +4,7 @@ import { holdAccessTokens, releaseAccessTokens } from "./access-token";
 import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
 import { finishPendingSignOut, grantKey, readGrantState, SIGN_OUT_FAILED_KEY, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
+import { GrantReadError } from "./grant-read-error";
 import { GrantRemovalError } from "./grant-removal-error";
 
 /**
@@ -150,6 +151,27 @@ const watchGrantSession = (): (() => void) => {
     let stopped = false;
     let reads = 0;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    /** The leftover cleanup: `pending` until one ran past its storage read, never two at once. */
+    let cleanup: "done" | "pending" | "running" = "pending";
+
+    // A sign-out whose removal failed in an earlier panel: remove its leftover grant, once per watch.
+    // A storage read that fails first leaves it pending for the next good read; any other failure
+    // leaves it stored, and the sign-in page says so (`useSignOutUnfinished`).
+    const finishLeftover = () => {
+        if (cleanup !== "pending") {
+            return;
+        }
+
+        cleanup = "running";
+        void trackRemoval(async () => {
+            try {
+                await finishPendingSignOut();
+                cleanup = "done";
+            } catch (error) {
+                cleanup = error instanceof GrantReadError ? "pending" : "done";
+            }
+        });
+    };
 
     const load = async (attempt = 0) => {
         clearTimeout(retry);
@@ -164,6 +186,10 @@ const watchGrantSession = (): (() => void) => {
 
             loaded = toGrantSession(state.grant);
             failed = state.removalFailed;
+
+            if (!stopped) {
+                finishLeftover();
+            }
         } catch {
             if (stopped || read !== reads) {
                 return;
@@ -199,9 +225,7 @@ const watchGrantSession = (): (() => void) => {
         void load();
     };
     void load();
-    // A sign-out whose removal failed in an earlier panel: remove its leftover grant, once per watch.
-    // A retry that fails too leaves it stored, and the sign-in page says so (`useSignOutUnfinished`).
-    void trackRemoval(finishPendingSignOut).catch(() => undefined);
+    finishLeftover();
 
     return () => {
         stopped = true;

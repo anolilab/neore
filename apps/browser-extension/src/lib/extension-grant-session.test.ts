@@ -894,6 +894,25 @@ describe("useSession", () => {
         await panel.unmount();
     });
 
+    it("removes a marked grant once storage recovers from failing as the panel opened, without reopening it", async () => {
+        store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
+        store.set(SIGNED_OUT_KEY, "g1");
+        fetchMock.mockImplementation(async () => new Response(null, { status: 204 }));
+
+        // The first read and the leftover cleanup's read both fail.
+        vi.spyOn(chrome.storage.local, "get").mockRejectedValueOnce(new Error("storage unavailable")).mockRejectedValueOnce(new Error("storage unavailable"));
+
+        const panel = await mount(createElement(Probe));
+
+        await vi.waitFor(() => expect(store.has(GRANT_KEY)).toBe(false));
+        await settle();
+
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(1);
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        expect(seen.at(-1)).toBeNull();
+        await panel.unmount();
+    });
+
     it("finishes a pending sign-out once per panel, however many components read the session", async () => {
         store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
         store.set(SIGNED_OUT_KEY, "g1");

@@ -1,5 +1,6 @@
 import { hasCookieBuildReads } from "./cookie-build-trace";
 import { APP_URL, LUNORA_URL } from "./env";
+import { GrantReadError } from "./grant-read-error";
 import { GrantRemovalError } from "./grant-removal-error";
 
 /*
@@ -395,10 +396,19 @@ const removeSignedOutGrant = async (token: string, key: string): Promise<void> =
 /**
  * Finish a sign-out whose removal failed earlier (`SIGNED_OUT_KEY` still names
  * the stored grant): revoke it once more, best effort, and forget it. Run when
- * a panel loads the session; a failure leaves the mark for the next one.
+ * a panel loads the session; a failure leaves the mark for the next one. A
+ * storage read that fails rejects with `GrantReadError`: nothing was tried.
  */
 export const finishPendingSignOut = async (): Promise<void> => {
-    const { grant, signedOut } = await readStored();
+    let stored: Awaited<ReturnType<typeof readStored>>;
+
+    try {
+        stored = await readStored();
+    } catch (error) {
+        throw new GrantReadError(error);
+    }
+
+    const { grant, signedOut } = stored;
 
     if (!grant || grantKey(grant) !== signedOut) {
         return;
