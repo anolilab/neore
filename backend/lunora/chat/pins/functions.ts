@@ -131,11 +131,9 @@ export const createDocumentPin = authMutation
         const { userId } = context.user;
         const { now } = context;
 
-        const thread = await context.db.get("threads", threadId as Id<"threads">);
-
-        if (thread && isThreadLocked(thread)) {
-            throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }));
-        }
+        // Every document pin is read through the gate, locked or not: a thread the caller has no grant for is not found,
+        // and an unlocked shared thread is readable only with its read grant.
+        throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }));
 
         const document = await context.db.get("documents", documentId as Id<"documents">);
 

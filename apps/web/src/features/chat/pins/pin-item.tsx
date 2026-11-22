@@ -60,9 +60,10 @@ interface PinItemProps {
         imageIndex?: number;
         /** The pinned image's storage path, when it has one (`pinned-image-preview.tsx`). */
         imageKey?: string;
-        /** `"image"` pins one image of the message, at `imageIndex`; absent pins the whole message. */
-        kind?: "image" | "message";
-        messageId: string;
+        /** `"image"` pins one image of the message, at `imageIndex`; absent pins the whole message. `"document"` pins a visual or plan. */
+        kind?: "document" | "image" | "message";
+        /** Absent for a document pin whose document was made without a message. */
+        messageId?: string;
         messageRole: string;
         note?: string;
         selectedText?: string;
@@ -164,13 +165,14 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
     const handleCancelEdit = () => setIsEditDialogOpen(false);
 
     const isUser = pin.messageRole === "user";
+    const { messageId } = pin;
 
     return (
         <>
             <div className="group/pin relative flex overflow-hidden rounded-md border">
                 <div className="flex w-full flex-col px-3 pt-2.5 pb-2">
-                    {pin.kind === "image" && pin.imageIndex !== undefined && (
-                        <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} imageKey={pin.imageKey} messageId={pin.messageId} />
+                    {pin.kind === "image" && pin.imageIndex !== undefined && messageId !== undefined && (
+                        <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} imageKey={pin.imageKey} messageId={messageId} />
                     )}
 
                     {pin.kind !== "image" && !pin.selectedText && (
@@ -244,15 +246,17 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
                         </div>
 
                         <div className="flex items-center gap-0.5">
-                            <button
-                                aria-label={t`Go to message`}
-                                className="text-muted-foreground/50 hover:text-muted-foreground rounded p-0.5 transition-colors"
-                                onClick={() => scrollToMessage(pin.messageId)}
-                                title={t`Go to message`}
-                                type="button"
-                            >
-                                <LocateFixedIcon aria-hidden="true" className="size-4" />
-                            </button>
+                            {messageId !== undefined && (
+                                <button
+                                    aria-label={t`Go to message`}
+                                    className="text-muted-foreground/50 hover:text-muted-foreground rounded p-0.5 transition-colors"
+                                    onClick={() => scrollToMessage(messageId)}
+                                    title={t`Go to message`}
+                                    type="button"
+                                >
+                                    <LocateFixedIcon aria-hidden="true" className="size-4" />
+                                </button>
+                            )}
                             <button
                                 className="text-muted-foreground/50 hover:text-muted-foreground rounded p-0.5 transition-colors"
                                 onClick={handleOpenEditDialog}

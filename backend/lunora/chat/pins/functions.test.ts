@@ -15,6 +15,7 @@ const SHAPE_ERROR = /An image pin names the part it pins/;
 const KIND_ERROR = /Only visuals and plans can be pinned/;
 const WRITING_ERROR = /still being written/;
 const NOT_FOUND_ERROR = /Document not found in this chat/;
+const NO_ACCESS_ERROR = /Thread not found or you do not have access/;
 
 vi.mock("../../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -224,6 +225,13 @@ describe("document pins", () => {
         const documentId = await insertDocument({ kind: "design", threadId: otherThreadId as Id<"threads"> });
 
         await expect(pinDocument(documentId)).rejects.toThrow(NOT_FOUND_ERROR);
+        expect(await pinsOf()).toHaveLength(0);
+    });
+
+    it("refuses a document of a thread the caller has no grant for", async () => {
+        const documentId = await insertDocument({ kind: "design" });
+
+        await expect(as("user-stranger").mutation(createDocumentPin as never, { documentId, threadId } as never)).rejects.toThrow(NO_ACCESS_ERROR);
         expect(await pinsOf()).toHaveLength(0);
     });
 });
