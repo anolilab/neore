@@ -75,7 +75,7 @@ const installChrome = () => {
     });
 };
 
-/** Steps holding the grant lock right now. */
+/** Steps holding the grant lock (not a sign-out's own lock) right now. */
 let lockHolders = 0;
 
 /** The Web Locks API, as browsers run it: one holder per name at a time, the rest queued in order. */
@@ -86,13 +86,14 @@ const installLocks = () => {
     vi.stubGlobal("navigator", {
         locks: {
             request: async (name: string, step: () => Promise<unknown>) => {
+                const counted = name === GRANT_KEY ? 1 : 0;
                 const hold = async () => {
-                    lockHolders += 1;
+                    lockHolders += counted;
 
                     try {
                         return await step();
                     } finally {
-                        lockHolders -= 1;
+                        lockHolders -= counted;
                     }
                 };
                 const run = (tails.get(name) ?? Promise.resolve()).then(hold);
@@ -544,6 +545,80 @@ describe("endSession", () => {
         await settle();
 
         expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
+    it("lets a panel opened during another panel's sign-out wait for it, with no second revoke and no warning", async () => {
+        store.set(GRANT_KEY, grant);
+        const revoke = deferred();
+
+        fetchMock.mockReturnValueOnce(revoke.promise).mockResolvedValue(new Response(null, { status: 204 }));
+        // Another panel's sign-out has marked the grant and waits on its revoke.
+        const signingOut = signOutGrant(USER.id);
+
+        await vi.waitFor(() => expect(store.get(SIGNED_OUT_KEY)).toBe(USER.id));
+
+        // This panel opens now: its leftover cleanup reads the mark.
+        const page = await mount(createElement(AuthPage));
+
+        await settle();
+        expect(warningOf(page)).toBeUndefined();
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(1);
+
+        revoke.resolve(new Response(null, { status: 204 }));
+        await act(async () => {
+            await expect(signingOut).resolves.toBe("signed-out");
+        });
+        await settle();
+
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(1);
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(warningOf(page)).toBeUndefined();
+        await page.unmount();
+    });
+
+    it("lets a panel that waited on a sign-out whose removal failed retry it once that sign-out ends", async () => {
+        store.set(GRANT_KEY, grant);
+        const revoke = deferred();
+
+        fetchMock.mockReturnValueOnce(revoke.promise).mockResolvedValue(new Response(null, { status: 204 }));
+        const signingOut = signOutGrant(USER.id);
+
+        await vi.waitFor(() => expect(store.get(SIGNED_OUT_KEY)).toBe(USER.id));
+
+        const page = await mount(createElement(AuthPage));
+
+        await settle();
+        // The other panel's removal fails; this panel's waiting cleanup then tries again, and succeeds.
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+        revoke.resolve(new Response(null, { status: 204 }));
+        await act(async () => {
+            await expect(signingOut).rejects.toThrow("storage unavailable");
+        });
+        await settle();
+
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(2);
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        expect(warningOf(page)).toBeUndefined();
+        await page.unmount();
+    });
+
+    it("writes no failure mark for an offline sign-out whose removal succeeds, so no other panel warns", async () => {
+        store.set(GRANT_KEY, grant);
+        const page = await mount(createElement(AuthPage));
+        const set = vi.spyOn(chrome.storage.local, "set");
+
+        fetchMock.mockRejectedValueOnce(new TypeError("offline"));
+
+        await act(async () => {
+            await expect(signOutGrant(USER.id)).resolves.toBe("signed-out");
+        });
+        await settle();
+
+        expect(set.mock.calls.some(([items]) => Object.hasOwn(items, "neore.signOutFailed"))).toBe(false);
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(warningOf(page)).toBeUndefined();
         await page.unmount();
     });
 

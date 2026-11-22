@@ -63,9 +63,9 @@ export const RECONNECT_KEY = "neore.reconnectNeeded";
 export const SIGNED_OUT_KEY = "neore.signedOutGrant";
 
 /**
- * The key of a marked grant whose removal failed: its revoke failed or ran out
- * of time, or storage kept it. Every panel warns while it names the stored
- * grant; a sign-out still running has only `SIGNED_OUT_KEY` written.
+ * The key of a marked grant storage kept after its removal. Every panel warns
+ * while it names the stored grant; a sign-out still running has only
+ * `SIGNED_OUT_KEY` written, even past a failed revoke.
  */
 export const SIGN_OUT_FAILED_KEY = "neore.signOutFailed";
 
@@ -201,17 +201,28 @@ export const readGrant = async (): Promise<StoredGrant | undefined> => {
 /** One name for every context of this extension (panel, popup, service worker): they share the lock. */
 const GRANT_LOCK = "neore.extensionGrant";
 
+/** Runs `step` holding the Web Lock `name`; without the API (never in a supported browser) it runs unguarded. */
+const withLock = async <T>(name: string, step: () => Promise<T>): Promise<T> => {
+    const locks = globalThis.navigator?.locks as LockManager | undefined;
+
+    return locks ? await locks.request(name, step) : await step();
+};
+
 /**
  * Runs `step` alone among every grant write in this extension. Storage has no
  * compare-and-set, so a check and the write it guards hold this lock together:
- * nothing (a sign-out in another panel, say) lands between them. Without the
- * Web Locks API (never in a supported browser) the step runs unguarded.
+ * nothing (a sign-out in another panel, say) lands between them.
  */
-const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => {
-    const locks = globalThis.navigator?.locks as LockManager | undefined;
+const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => await withLock(GRANT_LOCK, step);
 
-    return locks ? await locks.request(GRANT_LOCK, step) : await step();
-};
+/**
+ * Runs the whole sign-out of the grant `key` names (mark, revoke, removal)
+ * alone among every context of this extension, so a panel opened meanwhile
+ * waits for it instead of revoking and removing the same grant again. A context
+ * that closes mid-way releases it, and the waiting cleanup finishes the job.
+ * Always taken before the grant lock, never inside it.
+ */
+const withSignOutLock = async <T>(key: string, step: () => Promise<T>): Promise<T> => await withLock(`neore.signOut:${key}`, step);
 
 /**
  * Store a new grant and drop the old sign-out mark. The mark names an older
@@ -376,14 +387,14 @@ const markSignOutFailed = async (key: string): Promise<void> => {
 
 /**
  * Revoke a grant marked signed out, then forget it with its marks, even when
- * the revoke fails. A revoke that fails or runs out of time, or storage that
- * keeps the grant, writes the failure mark first; a removal that succeeds drops
- * it. Storage that keeps the grant rejects with `GrantRemovalError`.
+ * the revoke fails or runs out of time. Storage that keeps the grant writes the
+ * failure mark and rejects with `GrantRemovalError`; only then do other panels
+ * warn. A panel that closes before the removal leaves the mark alone, hidden,
+ * for the next panel's `finishPendingSignOut`.
  */
 const removeSignedOutGrant = async (token: string, key: string): Promise<void> => {
-    if (!(await revokeGrant(token))) {
-        await markSignOutFailed(key);
-    }
+    // Offline or out of time: the session expires on its own; the local copy goes regardless.
+    await revokeGrant(token);
 
     try {
         await forgetSignedOutGrant(token, key);
@@ -394,28 +405,44 @@ const removeSignedOutGrant = async (token: string, key: string): Promise<void> =
     }
 };
 
-/**
- * Finish a sign-out whose removal failed earlier (`SIGNED_OUT_KEY` still names
- * the stored grant): revoke it once more, best effort, and forget it. Run when
- * a panel loads the session; a failure leaves the mark for the next one. A
- * storage read that fails rejects with `GrantReadError`: nothing was tried.
- */
-export const finishPendingSignOut = async (): Promise<void> => {
-    let stored: Awaited<ReturnType<typeof readStored>>;
-
+const readStoredOrFail = async (): Promise<Awaited<ReturnType<typeof readStored>>> => {
     try {
-        stored = await readStored();
+        return await readStored();
     } catch (error) {
         throw new GrantReadError(error);
     }
+};
 
+/** The grant `SIGNED_OUT_KEY` marks, while it is the stored one. */
+const markedGrant = (stored: Awaited<ReturnType<typeof readStored>>): { grant: StoredGrant; key: string } | undefined => {
     const { grant, signedOut } = stored;
 
-    if (!grant || grantKey(grant) !== signedOut) {
+    return grant && grantKey(grant) === signedOut ? { grant, key: signedOut } : undefined;
+};
+
+/**
+ * Finish a sign-out that did not (`SIGNED_OUT_KEY` still names the stored
+ * grant): revoke it once more, best effort, and forget it. Run when a panel
+ * loads the session; a failure leaves the mark for the next one. A sign-out
+ * still running in another panel holds its lock: this waits for it and acts
+ * only on what it left. A storage read that fails rejects with
+ * `GrantReadError`: nothing was tried.
+ */
+export const finishPendingSignOut = async (): Promise<void> => {
+    const found = markedGrant(await readStoredOrFail());
+
+    if (!found) {
         return;
     }
 
-    await removeSignedOutGrant(grant.token, signedOut);
+    await withSignOutLock(found.key, async () => {
+        // Read again: the sign-out that held the lock has likely removed it.
+        const left = markedGrant(await readStoredOrFail());
+
+        if (left?.key === found.key) {
+            await removeSignedOutGrant(left.grant.token, left.key);
+        }
+    });
 };
 
 /**
@@ -514,30 +541,31 @@ export const requestGrantAccessToken = async (grant: StoredGrant | undefined): P
  * mark that cannot be written rejects with storage's own error: nothing
  * changed, and the session may come back.
  */
-export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> => {
-    // Checked and marked under one lock: a sign-in and another grant's sign-out
-    // landing in between would otherwise have their mark overwritten by this one.
-    const grant = await withGrantLock(async () => {
-        // Raw: a grant already marked by a sign-out whose removal failed is retried.
-        const { grant: stored } = await readStored();
+export const signOutGrant = async (key: string): Promise<"replaced" | "signed-out"> =>
+    // Held from before the mark until the removal ends: a panel that reads the mark meanwhile waits.
+    await withSignOutLock(key, async () => {
+        // Checked and marked under one lock: a sign-in and another grant's sign-out
+        // landing in between would otherwise have their mark overwritten by this one.
+        const grant = await withGrantLock(async () => {
+            // Raw: a grant already marked by a sign-out whose removal failed is retried.
+            const { grant: stored } = await readStored();
 
-        if (stored && grantKey(stored) === key) {
-            await chrome.storage.local.set({ [SIGNED_OUT_KEY]: key });
+            if (stored && grantKey(stored) === key) {
+                await chrome.storage.local.set({ [SIGNED_OUT_KEY]: key });
+            }
+
+            return stored;
+        });
+
+        if (!grant) {
+            return "signed-out";
         }
 
-        return stored;
-    });
+        if (grantKey(grant) !== key) {
+            return "replaced";
+        }
 
-    if (!grant) {
+        await removeSignedOutGrant(grant.token, key);
+
         return "signed-out";
-    }
-
-    if (grantKey(grant) !== key) {
-        return "replaced";
-    }
-
-    // Offline or out of time: the session expires on its own; the local copy goes regardless.
-    await removeSignedOutGrant(grant.token, key);
-
-    return "signed-out";
-};
+    });
