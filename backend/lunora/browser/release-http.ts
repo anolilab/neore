@@ -12,7 +12,7 @@ import type { HttpActionCtx } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { inSystemShard } from "../lib/http-shard";
-import { checkRateLimit } from "../lib/rate-limiter";
+import { checkRateLimit, clientBucket } from "../lib/rate-limiter";
 import { verifyReleaseToken } from "./release-token";
 
 /** A token is well under this; a body past it is not one. */
@@ -74,7 +74,8 @@ export const releaseControlHttpAction = async (context: HttpActionCtx, request: 
     // Only a proven token is charged, so junk never writes to the root shard. A limiter outage refuses it too (closed, the default):
     // a token can be replayed, and each replay would reach the owner's shard. The lease then ends at its idle timeout.
     const limited = await checkRateLimit(context, "browser/releaseIp", {
-        key: request.headers.get("cf-connecting-ip") ?? "unknown",
+        // An IPv6 sender is limited by its /64, so stepping through addresses buys no fresh allowance.
+        key: clientBucket(request.headers.get("cf-connecting-ip") ?? "unknown"),
         throws: false,
     });
 

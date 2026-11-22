@@ -139,7 +139,7 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 // The release route crosses to the shard its token names as the system: here, straight into the harness, and the
 // shard it asked for is kept for the test to check.
 const { releaseLimit, releaseShards } = vi.hoisted(() => {
-    return { releaseLimit: { down: false, limited: false }, releaseShards: [] as string[] };
+    return { releaseLimit: { down: false, keys: [] as string[], limited: false }, releaseShards: [] as string[] };
 });
 
 vi.mock("../lib/http-shard", async (importOriginal) => {
@@ -160,7 +160,9 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
         ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
         // The release route's per-address limit: `releaseLimit.limited` refuses it, and `down` is a limiter outage, answered as
         // the caller's `failMode` says (closed unless it asks for open).
-        checkRateLimit: async (_context: unknown, _operation: string, options?: { failMode?: "closed" | "open" }) => {
+        checkRateLimit: async (_context: unknown, _operation: string, options?: { failMode?: "closed" | "open"; key?: string }) => {
+            releaseLimit.keys.push(options?.key ?? "");
+
             if (releaseLimit.down) {
                 return { ok: options?.failMode === "open" };
             }
@@ -254,6 +256,7 @@ beforeEach(async () => {
 afterEach(() => {
     releaseShards.length = 0;
     releaseLimit.down = false;
+    releaseLimit.keys.length = 0;
     releaseLimit.limited = false;
     delete replica.grant;
     impersonation.by = undefined;
@@ -1065,8 +1068,12 @@ describe("a closing page's hand back", () => {
 
         return session.control;
     };
-    const release = async (token: string): Promise<number> => {
-        const response = await releaseControlHttpAction({} as never, new Request("https://backend.test/browser/release", { body: token, method: "POST" }));
+    const release = async (token: string, ip?: string): Promise<number> => {
+        const headers = ip === undefined ? undefined : { "cf-connecting-ip": ip };
+        const response = await releaseControlHttpAction(
+            {} as never,
+            new Request("https://backend.test/browser/release", { body: token, headers, method: "POST" }),
+        );
 
         return response.status;
     };
@@ -1192,6 +1199,19 @@ describe("a closing page's hand back", () => {
 
         await expect(release(taken.release)).resolves.toBe(204);
         await expect(lease()).resolves.toEqual(lapsed);
+    });
+
+    it("charges an IPv6 sender by its /64, so stepping through its addresses buys no fresh allowance", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        await release(taken.release, "2001:db8:1:2::1");
+        await release(taken.release, "2001:db8:1:2:ffff::9");
+        await release(taken.release, "203.0.113.7");
+
+        expect(releaseLimit.keys).toHaveLength(3);
+        expect(releaseLimit.keys[0]).toBe(releaseLimit.keys[1]);
+        expect(releaseLimit.keys[2]).toBe("203.0.113.7");
     });
 
     it("refuses a proven token while the limiter is down, so no replay reaches the owner's shard", async () => {
