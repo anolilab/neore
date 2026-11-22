@@ -4607,7 +4607,7 @@ export const retryFollowupCache = internalAction
         replyAt: v.number(),
         requestId: v.string().max(MAX_LENGTH.long),
         resetOrder: v.optional(v.number()),
-        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string() })),
+        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string(), resetOrder: v.optional(v.number()) })),
         suggestions: v.array(v.string().max(MAX_LENGTH.long)),
         threadId: v.string().max(MAX_LENGTH.id),
     })
@@ -5125,7 +5125,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                     ...(threadData.activeLeafMessageId && { pathIds: (messagesResult.page || []).map((row) => row._id) }),
                     replyAt: newest.createdAt ?? newest._creationTime,
                     // The newest row the job saw, on the leaf it saw: the cache write checks both in its own transaction.
-                    shown: { leafId: threadData.activeLeafMessageId ?? undefined, newestId: newest._id },
+                    shown: { leafId: threadData.activeLeafMessageId ?? undefined, newestId: newest._id, resetOrder: contextReset?.order },
                     suggestions,
                     threadId,
                 };

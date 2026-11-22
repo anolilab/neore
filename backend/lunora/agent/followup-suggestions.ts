@@ -10,6 +10,7 @@ import { getUser } from "../auth/lib/better-auth-queries";
 import { claimFence, claimRow, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { isLocalBrowserModel, LOCAL_BROWSER_PROVIDER, loadCustomProviders } from "../chat/lib/local-turn";
+import { contextResetOf } from "./context-reset-read";
 import { loadActivePathTail } from "./branch-rows";
 
 /**
@@ -406,7 +407,7 @@ export const cacheFollowupSuggestions = internalMutation
         replyAt: v.number(),
         // The reply as the job saw it: a write is refused once a newer message is the one the composer shows. Checked here, in the same
         // transaction as the write, so a message that lands after the job's own check cannot be cached and charged for.
-        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string() })),
+        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string(), resetOrder: v.optional(v.number()) })),
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
@@ -421,10 +422,12 @@ export const cacheFollowupSuggestions = internalMutation
         }
 
         // Suggestions for a reply that is no longer the one the composer shows are not stored (nor charged): a newer message supersedes it.
+        // A `/clear` that committed after the job read the context ends this reply's context too, so the write checks the reset as well.
         if (shown && suggestions.length > 0) {
             const current = await newestShownRowIdHandler(context, { leafId: shown.leafId, threadId });
+            const reset = await contextResetOf(context, threadId as Id<"threads">);
 
-            if (current !== shown.newestId) {
+            if (current !== shown.newestId || reset?.order !== shown.resetOrder) {
                 return false;
             }
         }

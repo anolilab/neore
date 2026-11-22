@@ -611,4 +611,23 @@ describe("the newest row the composer shows", () => {
         await expect(write(reply, 1, reply)).resolves.toBe(false);
         await expect(write(next, 2, next)).resolves.toBe(true);
     });
+
+    // A reset the job did not see (a `/clear` since it read the context) refuses the write too.
+    it("refuses a write whose context reset is not the thread's current one", async () => {
+        const reply = await addRow(1, "assistant");
+
+        await expect(
+            harness.action(
+                async (context: any) =>
+                    await context.runMutation(cacheFollowupSuggestions, {
+                        lastMessageId: reply,
+                        order: 1,
+                        replyAt: 1,
+                        shown: { newestId: reply, resetOrder: 7 },
+                        suggestions: ["s?"],
+                        threadId,
+                    }),
+            ),
+        ).resolves.toBe(false);
+    });
 });
