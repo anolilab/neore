@@ -4646,8 +4646,10 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             const { claimedAt, lastMessageId } = paid;
 
-            paid = null;
+            // Cleared only once the release has landed: a release that throws leaves `paid` set, so the caller's cleanup can try again.
+            // The release is fenced by `claimedAt`, so a repeat cannot free a claim a later run has taken.
             await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { claimedAt, lastMessageId, threadId, userId });
+            paid = null;
         };
 
         try {

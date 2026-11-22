@@ -23,6 +23,7 @@ import {
     replyAnchorRow,
     withDeadline,
 } from "../agent/followup-suggestions";
+import { deleteThreadAccess } from "../agent/sharing";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
 
@@ -304,6 +305,36 @@ describe("a late run cannot replace a newer cache", () => {
         await cache("reply-old", 3, ["older?"], 3, ["root", "reply-new", "reply-old"]);
 
         await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
+    });
+});
+
+describe("a grant is not deleted while a suggestion is being sent", () => {
+    const grant = async () =>
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: OWNER, permission: "read", threadId, userId: COLLAB }),
+        );
+
+    it("is refused while the chat's dispatch claim is held, and the grant stays for a retry", async () => {
+        const accessId = await grant();
+
+        await harness.action(async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId: "reply-1", threadId }));
+
+        await expect(harness.action(async (context: any) => await context.runMutation(deleteThreadAccess, { accessId }))).rejects.toMatchObject({
+            code: "CONFLICT",
+        });
+        await expect(harness.run(async (ctx: any) => await ctx.db.get("threadAccess", accessId))).resolves.not.toBeNull();
+    });
+
+    it("is deleted once the request has settled", async () => {
+        const accessId = await grant();
+        const claimedAt = (await harness.action(
+            async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId: "reply-2", threadId }),
+        )) as number;
+
+        await harness.action(async (context: any) => await context.runMutation(endFollowupDispatch, { claimedAt, requestId: "reply-2", threadId }));
+        await harness.action(async (context: any) => await context.runMutation(deleteThreadAccess, { accessId }));
+
+        await expect(harness.run(async (ctx: any) => await ctx.db.get("threadAccess", accessId))).resolves.toBeNull();
     });
 });
 
