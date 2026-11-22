@@ -69,52 +69,24 @@ const TARGET_CHANGED = "The target changed since it was checked, so nothing was 
  * `target` runs only on the element that still has it. The read is one function, so the check and the read agree.
  */
 function readTarget(control: Element, options: { max: number; splitter: RegExp }): { label: string; labelTruncated: boolean; target: string } {
-    // The elements the click lands in: the control, then each actionable ancestor. A visible child (an
-    // icon in a button, a span in a clickable div) is clicked as those ancestors too.
+    // This function is serialized into the page by Playwright (`element.evaluate`). A bundler wraps a named inner function in a
+    // helper the page does not have, so this function declares none: every step is written out in its body.
+    // The elements the click lands in: the control, then each actionable ancestor. A visible child (an icon in a button, a
+    // span in a clickable div) is clicked as those ancestors too. A shadow root is crossed to its host.
     const actionableSelector =
         "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
-    // The parent of an element, crossing a shadow root to its host: a button in a shadow tree is clicked as the host's ancestors too.
-    const parentOf = (node: Element): Element | null => {
-        if (node.parentElement !== null) {
-            return node.parentElement;
-        }
-
-        const root = node.getRootNode();
-
-        return root instanceof ShadowRoot ? root.host : null;
-    };
-    // Text the stylesheet draws, from CSS `content`: a quoted string. `none`, `normal` and counters are not text.
-    // An element nothing is drawn for (display: none, visibility: hidden) shows none of its generated text either.
-    const generatedText = (node: Element): string[] => {
-        if (node.getClientRects().length === 0 || getComputedStyle(node).visibility === "hidden") {
-            return [];
-        }
-
-        return ["::before", "::after"].flatMap((pseudo) => {
-            const { content } = getComputedStyle(node, pseudo);
-
-            if (content === "none" || content === "normal") {
-                return [];
-            }
-
-            // CSS `content` is a sequence of quoted strings (their text) and attr(name) calls (the attribute's value). url()
-            // and counters draw no words of their own, so they add nothing.
-            const quoted = content.split('"').filter((_, index) => index % 2 === 1);
-            const attributes = content
-                .split("attr(")
-                .slice(1)
-                .map((part) => node.getAttribute(part.split(")", 1)[0]?.trim() ?? "") ?? "");
-
-            return [...quoted, ...attributes];
-        });
-    };
-
     const nodes: Element[] = [control];
+    let climb: Element | null = control;
 
-    for (let ancestor = parentOf(control); ancestor !== null; ancestor = parentOf(ancestor)) {
-        if (ancestor.matches(actionableSelector) && !nodes.includes(ancestor)) {
-            nodes.push(ancestor);
+    while (climb !== null) {
+        const root = climb.getRootNode();
+        const parent: Element | null = climb.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+
+        if (parent !== null && parent.matches(actionableSelector) && !nodes.includes(parent)) {
+            nodes.push(parent);
         }
+
+        climb = parent;
     }
 
     // The nearest actionable element is the one the click lands on, so its text and content count. A farther one (a clickable
@@ -137,16 +109,11 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
             names.push(node.value);
         }
 
-        // The control and the element it lands on: their text, and the text the stylesheet draws (CSS `content`), which is on
-        // screen but in neither innerText nor textContent.
-        if (node === control || node === scope) {
-            names.push(...generatedText(node));
-
-            // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
-            if (node instanceof HTMLElement) {
-                // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
-                names.push(node.innerText);
-            }
+        // The rendered text of the control and of the element it lands on: a child with ordinary text can sit beside a purchase
+        // word the person sees.
+        if ((node === control || node === scope) && node instanceof HTMLElement) {
+            // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
+            names.push(node.innerText);
         }
     }
 
@@ -159,14 +126,33 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
         names.push(node.textContent ?? "");
     }
 
-    // Generated text drawn by the elements inside the scope: a purchase word in a descendant's ::before is shown too.
-    // Stops once the name is past its cap, which the read reports as cut short.
+    // Generated text (CSS `content`) drawn by the control, the scope, and the elements inside the scope: it is on screen but in
+    // neither innerText nor textContent. An element nothing is drawn for shows none of its own. Stops once past the cap.
     let generatedLength = 0;
+    const drawn = new Set<Element>([control, scope, ...scope.querySelectorAll("*")]);
 
-    for (const node of scope.querySelectorAll("*")) {
-        for (const text of generatedText(node)) {
-            names.push(text);
-            generatedLength += text.length;
+    for (const node of drawn) {
+        if (node.getClientRects().length === 0 || getComputedStyle(node).visibility === "hidden") {
+            continue;
+        }
+
+        for (const pseudo of ["::before", "::after"]) {
+            const { content } = getComputedStyle(node, pseudo);
+
+            if (content !== "none" && content !== "normal") {
+                // CSS `content` is a sequence of quoted strings (their text) and attr(name) calls (the attribute's value). url()
+                // and counters draw no words of their own, so they add nothing.
+                const quoted = content.split('"').filter((_, index) => index % 2 === 1);
+                const attributes = content
+                    .split("attr(")
+                    .slice(1)
+                    .map((part) => node.getAttribute(part.split(")", 1)[0]?.trim() ?? "") ?? "");
+
+                for (const text of [...quoted, ...attributes]) {
+                    names.push(text);
+                    generatedLength += text.length;
+                }
+            }
         }
 
         if (generatedLength > options.max) {
@@ -179,19 +165,19 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
     // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
     const shown = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
 
-    // The element's place: the tag and position of each ancestor, from the root down.
+    // The element's place: the tag and position of each ancestor, from the root down, crossing shadow roots like the walk above.
     const steps: string[] = [];
     let current: Element | null = control;
 
     while (current !== null && current !== document.documentElement) {
         const index = current.parentElement === null ? 0 : [...current.parentElement.children].indexOf(current);
+        const root = current.getRootNode();
 
         steps.unshift(`${current.localName}.${index}`);
-        current = parentOf(current);
+        current = current.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
     }
 
-    // FNV-1a over the three parts: a click compares the same string the read built.
-    // The whole name, not its capped part: a purchase word appended past the cap still changes the fingerprint.
+    // FNV-1a over the three parts, the whole name included: a click compares the same string the read built.
     const fingerprintOf = [steps.join(">"), joined, shown].join("\u{0}");
     let hash = 0x81_1c_9d_c5;
 
