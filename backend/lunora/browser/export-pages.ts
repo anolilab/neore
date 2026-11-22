@@ -23,13 +23,17 @@ export const BROWSER_EXPORT_BYTES = 8 * 1024 * 1024;
  */
 export const BROWSER_EXPORT_PAGES = 256;
 
-const safe = (value: string): string => value.replaceAll(/[^\w-]/g, "_");
+/**
+ * One key segment from an id: `encodeURIComponent` is injective (`%` itself becomes `%25`, and `/` is escaped), so two ids never share
+ * a segment, and one user's erasure or one run's cleanup never reaches another's pages. A lossy substitution (`user/a`, `user_a`) did.
+ */
+const segment = (value: string): string => encodeURIComponent(value);
 
 /** Every browser page of a user's export runs sits under this prefix, so account erasure deletes whatever a dead run left. */
-export const browserExportUserPrefix = (userId: string): string => `gdpr-exports/browser-${safe(userId)}/`;
+export const browserExportUserPrefix = (userId: string): string => `gdpr-exports/browser-${segment(userId)}/`;
 
 /** Where a run's browser pages are stored; one prefix per run, so the cleanup lists and deletes every page it wrote. */
-export const browserExportPrefix = (userId: string, runKey: string): string => `${browserExportUserPrefix(userId)}${safe(runKey)}/`;
+export const browserExportPrefix = (userId: string, runKey: string): string => `${browserExportUserPrefix(userId)}${segment(runKey)}/`;
 
 export const browserExportPageKey = (prefix: string, page: number): string => `${prefix}${String(page)}.json`;
 

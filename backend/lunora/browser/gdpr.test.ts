@@ -146,18 +146,12 @@ describe("browser data in the GDPR export", () => {
     });
 });
 
-describe("browser export pages left by a killed export", () => {
-    it("are deleted by account erasure for the user, and another user's are kept", async () => {
-        // A run of each user that never reached its cleanup, and A's second run, each with stored pages.
-        const keys = [
-            browserExportPageKey(browserExportPrefix(A, "request-1:instance-1"), 0),
-            browserExportPageKey(browserExportPrefix(A, "request-1:instance-1"), 1),
-            browserExportPageKey(browserExportPrefix(A, "request-2:instance-2"), 0),
-            browserExportPageKey(browserExportPrefix(B, "request-3:instance-3"), 0),
-        ];
-        const stored = new Set(keys);
-        // A listing of two at a time, so the erasure is shown to follow a truncated listing.
-        const storage = {
+/** A storage double holding `keys`, listing two at a time, so the erasure is shown to follow a truncated listing. */
+const storageOf = (keys: string[]) => {
+    const stored = new Set(keys);
+
+    return {
+        storage: {
             delete: async (key: string) => stored.delete(key),
             list: async (prefix: string) => {
                 const objects = [...stored]
@@ -168,11 +162,54 @@ describe("browser export pages left by a killed export", () => {
 
                 return { objects: objects.slice(0, 2), truncated: objects.length > 2 };
             },
-        };
+        },
+        stored,
+    };
+};
 
-        await (deleteUserBrowserExportPages as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler({ storage }, { userId: A });
+const eraseFor = async (storage: ReturnType<typeof storageOf>["storage"], userId: string): Promise<void> => {
+    await (deleteUserBrowserExportPages as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler({ storage }, { userId });
+};
+
+describe("browser export pages left by a killed export", () => {
+    it("are deleted by account erasure for the user, and another user's are kept", async () => {
+        // A run of each user that never reached its cleanup, and A's second run, each with stored pages.
+        const keys = [
+            browserExportPageKey(browserExportPrefix(A, "request-1:instance-1"), 0),
+            browserExportPageKey(browserExportPrefix(A, "request-1:instance-1"), 1),
+            browserExportPageKey(browserExportPrefix(A, "request-2:instance-2"), 0),
+            browserExportPageKey(browserExportPrefix(B, "request-3:instance-3"), 0),
+        ];
+        const { storage, stored } = storageOf(keys);
+
+        await eraseFor(storage, A);
 
         expect([...stored]).toStrictEqual([keys[3]]);
+    });
+
+    it("gives ids a lossy substitution mapped alike their own prefixes, and erasing one keeps the other's pages", async () => {
+        // `user/a`, `user_a` and `user%2Fa` all became `user_a` under the old `[^\w-]` → `_` replacement.
+        const ids = ["user/a", "user_a", "user%2Fa", "user:a"];
+        const prefixes = ids.map((id) => browserExportPrefix(id, "request-1:instance-1"));
+
+        expect(new Set(prefixes).size).toBe(ids.length);
+        expect(browserExportPrefix(A, "request/1")).not.toBe(browserExportPrefix(A, "request_1"));
+
+        const keys = prefixes.map((prefix) => browserExportPageKey(prefix, 0));
+        const { storage, stored } = storageOf(keys);
+
+        await eraseFor(storage, "user/a");
+
+        expect([...stored]).toStrictEqual(keys.slice(1));
+    });
+
+    it("erasing user-1 leaves user-12's pages", async () => {
+        const keys = [browserExportPageKey(browserExportPrefix("user-1", "r:1"), 0), browserExportPageKey(browserExportPrefix("user-12", "r:1"), 0)];
+        const { storage, stored } = storageOf(keys);
+
+        await eraseFor(storage, "user-1");
+
+        expect([...stored]).toStrictEqual([keys[1]]);
     });
 });
 
