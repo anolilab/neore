@@ -1393,6 +1393,9 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                         (candidate): candidate is HTMLInputElement =>
                             candidate instanceof HTMLInputElement &&
                             ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
+                            // One that takes no typing (disabled, read-only) is not the username field, however close.
+                            !candidate.disabled &&
+                            !candidate.readOnly &&
                             candidate.getClientRects().length > 0 &&
                             Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
                     );

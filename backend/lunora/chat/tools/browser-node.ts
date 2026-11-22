@@ -197,6 +197,19 @@ export const executeBrowserAction = internalAction
                     }
 
                     startedWith = NO_PROVIDER_SESSION;
+
+                    // The call's time ran out while the retired id was dropped: the retry is not sent, so nothing runs in the
+                    // renderer, and the hold and the charge are given back here (a retry sent with a spent signal would throw
+                    // and read as a call that may still act).
+                    if (callSignal.aborted || Date.now() >= callEndsBy) {
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                        await refund();
+
+                        const retired = { error: BROWSER_SESSION_RETIRED, success: false };
+
+                        return returned === undefined ? retired : handedBackResult(retired, returned);
+                    }
+
                     ({ data, error, response } = await browserAction({ body: { ...sent, sessionId: undefined }, client, signal: callSignal }));
                 }
 

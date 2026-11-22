@@ -354,6 +354,31 @@ describe("a browser action on a running browser", () => {
         await expect(row()).resolves.toMatchObject({ providerSessionId: "s-2" });
     });
 
+    it("sends no retry, and gives back the hold and the charge, when the navigate's time ran out before the retired session was dropped", async () => {
+        await addSession(NOW - 1000);
+        // One unit left of the hour's 200.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 199, identifier: OWNER, key: "browser/action:premium" }));
+        renderer.mockImplementationOnce(async () => {
+            // The renderer's 410 answers only once the call's whole budget is spent.
+            vi.setSystemTime(Date.now() + FETCH_TIMEOUT_LONG_MS * 2);
+
+            return { data: undefined, error: { code: "SESSION_RETIRED", error: "retired", success: false }, response: { ok: false, status: 410 } };
+        });
+
+        await expect(act()).resolves.toStrictEqual({ error: BROWSER_SESSION_RETIRED, success: false });
+        expect(renderer).toHaveBeenCalledTimes(1);
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe(NO_PROVIDER_SESSION);
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+
+        // The unit given back is the one this navigate spends.
+        await expect(act()).resolves.toMatchObject({ success: true });
+    });
+
     it.each([
         ["throws", () => Promise.reject(new Error("network down"))],
         [

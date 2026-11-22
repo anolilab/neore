@@ -1029,6 +1029,15 @@ describe(signIn, () => {
         expect(login.hits.filter((hit) => hit.method === "POST")).toStrictEqual([]);
     });
 
+    it("types the username into the last field before the password that takes typing, past a disabled or read-only one", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="code" value="x" disabled><input name="hint" value="y" readonly><input name="pw" type="password"><button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([{ body: `user=ann&hint=y&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
+    });
+
     it("signs in with a form whose empty action is the page's own address, whatever its base", async () => {
         fixture.page = `<base href="/other/">${loginForm("", 'method="post" action=""')}`;
 
