@@ -181,6 +181,39 @@ describe(SessionLock, () => {
         vi.useRealTimers();
     });
 
+    it("judges a lapse by the time its read of storage finished, so a release whose read outlasts the hold still retires the session", async () => {
+        vi.useFakeTimers();
+
+        const stored = new Map<string, unknown>();
+        let readTakes = 0;
+        const lock = new SessionLock({
+            storage: {
+                delete: async (key: string) => stored.delete(key),
+                get: async (key: string) => {
+                    vi.setSystemTime(Date.now() + readTakes);
+
+                    return structuredClone(stored.get(key));
+                },
+                put: async (key: string, value: unknown) => {
+                    stored.set(key, structuredClone(value));
+                },
+            },
+        } as never);
+        const send = async (body: Record<string, number | string>) =>
+            lock.fetch(new Request("https://session-lock/", { body: JSON.stringify(body), method: "POST" })).then(async (response) => response.json());
+
+        await expect(send({ kind: "exclusive", leaseMs: 1000, op: "take", token: "login" })).resolves.toStrictEqual({ held: true });
+
+        // The release is sent inside the lease; its read of storage ends past it.
+        vi.setSystemTime(Date.now() + 900);
+        readTakes = 500;
+
+        await expect(send({ op: "release", token: "login" })).resolves.toMatchObject({ held: false });
+        expect(stored.get("state")).toMatchObject({ retired: true });
+
+        vi.useRealTimers();
+    });
+
     it("drops a lapsed sign-in's hold and retires the session in one write, so no crash between two loses both", async () => {
         vi.useFakeTimers();
 

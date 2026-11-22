@@ -51,8 +51,10 @@ export class SessionLock {
         }
 
         // Read, changed and written with no other I/O between: the object's input gate keeps another call out meanwhile.
-        const now = Date.now();
         const holds = holdsOf(await this.#state.storage.get<SessionState>(STATE_KEY));
+        // Taken once the read is done: a Worker's clock moves only across I/O, so a time from before the read could judge
+        // an exclusive hold that lapsed during it as still in force, and release it without retiring the session.
+        const now = Date.now();
         let answer: HoldAnswer;
 
         switch (asked.op) {
