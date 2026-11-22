@@ -103,7 +103,7 @@ msgstr "「{truncatedName}」は拒否されました"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
-msgstr ""
+msgstr "「常に」はアシスタントへの指針であり、厳密なルールではありません。自分で行うよう頼めば、アシスタントは自分で行います。チャットは選んだモデルをそのまま使い、これらのモデルを使うのはサブエージェントだけです。"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:567
 msgid "\"v1\" for the current Azure OpenAI API. A dated version such as 2024-10-21 uses the older per-deployment URLs."
@@ -2860,7 +2860,7 @@ msgstr "{added} 件のドキュメントを追加しました。"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
 msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
-msgstr ""
+msgstr "このロールの組み込み指示の後に追加されます。例：「すべての変更をスタイルガイドに照らして確認してください。」"
 
 #: src/features/settings/components/personalization/memory-item.tsx:72
 msgid "Added by you · {learnedOn}"
@@ -3583,7 +3583,7 @@ msgstr "すべてのプロバイダー + BYOK"
 #. placeholder {0}: roleLabel.toLowerCase()
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:292
 msgid "All real {0} work goes to this model, even quick work."
-msgstr ""
+msgstr "{0}の実作業はすべて、短いものも含めてこのモデルに任されます。"
 
 #: src/features/develop/components/checks-tab.tsx:96
 msgid "All required checks passed."
@@ -4019,7 +4019,7 @@ msgstr "自分のすべてのチャット"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:63
 msgid "Any other self-contained task."
-msgstr ""
+msgstr "その他の独立したタスク。"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:162
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
@@ -4136,7 +4136,7 @@ msgstr "適用"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:443
 msgid "Applies to"
-msgstr ""
+msgstr "適用先"
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
@@ -4300,7 +4300,7 @@ msgstr "Arcee の小型推論 LLM"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:50
 msgid "Architecture"
-msgstr ""
+msgstr "アーキテクチャ"
 
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
@@ -5289,7 +5289,7 @@ msgstr "直接 API 経由の BFL プロフェッショナル FLUX モデル"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:293
 msgid "Bigger pieces go to this model; quick questions stay in the chat."
-msgstr ""
+msgstr "大きな作業はこのモデルに任され、簡単な質問はチャット内で答えます。"
 
 #: src/features/chat/thread/message-cost-badge.tsx:79
 msgid "Billed to your own API key, not your credits."
@@ -6547,7 +6547,7 @@ msgstr "確認中"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:66
 msgid "Checking code, a draft or a plan for mistakes."
-msgstr ""
+msgstr "コード、下書き、計画の誤りを確認します。"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "Checking image safety..."
@@ -6616,7 +6616,7 @@ msgstr ".md または .zip を選択"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:429
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
-msgstr ""
+msgstr "アシスタントがサブエージェントに任せる作業の種類ごとにモデルを選びます。モデルを設定したロールはアシスタントに提示され、設定していないロールはオフのままです。"
 
 #: src/features/workflow/components/template-picker.tsx:111
 msgid "Choose a template to get started quickly. Templates provide pre-configured workflows for common tasks."
@@ -7176,7 +7176,7 @@ msgstr "コードの出力"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "code review"
-msgstr ""
+msgstr "コードレビュー"
 
 #: src/features/chat/group/group-mode.ts:50
 #: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:16
@@ -9023,7 +9023,7 @@ msgstr "組織の請求の詳細を読み込めませんでした。後でもう
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:488
 msgid "Could not load your roles."
-msgstr ""
+msgstr "ロールを読み込めませんでした。"
 
 #: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
@@ -9169,7 +9169,7 @@ msgstr "ページを保存できませんでした"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
 msgid "Could not save the role"
-msgstr ""
+msgstr "ロールを保存できませんでした"
 
 #: src/features/develop/components/review-panel.tsx:185
 msgid "Could not save the summary, so nothing was submitted. Try again."
@@ -9278,7 +9278,7 @@ msgstr "参加者を更新できませんでした"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
-msgstr ""
+msgstr "フォロー状態を読み込めませんでした"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -10335,7 +10335,7 @@ msgstr "遅延"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "delegate"
-msgstr ""
+msgstr "委任"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:226
 msgid "Delegate tasks to Devin, the AI software engineer"
@@ -10344,7 +10344,7 @@ msgstr "AI ソフトウェアエンジニアの Devin にタスクを委任"
 #. placeholder {0}: roleLabel.toLowerCase()
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
 msgid "Delegated {0} work runs on this model."
-msgstr ""
+msgstr "委任された{0}の作業はこのモデルで実行されます。"
 
 #: src/components/delete-confirmation-dialog.tsx:45
 #: src/components/delete-confirmation-dialog.tsx:71
@@ -10943,7 +10943,7 @@ msgstr "テキストとレイアウトの精度が最も重要な、ロゴ、ア
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:61
 msgid "Designing a system or a change that spans several parts."
-msgstr ""
+msgstr "複数の部分にまたがるシステムや変更を設計します。"
 
 #: src/features/download/components/download-page.tsx:65
 msgid "Desktop"
@@ -11352,7 +11352,7 @@ msgstr "アカウントをお持ちでないですか？"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:352
 msgid "Don't use your default instructions in this project"
-msgstr ""
+msgstr "このプロジェクトでは既定の指示を使わない"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
@@ -11421,7 +11421,7 @@ msgstr "ダウンロード — Neore Desktop"
 #. placeholder {0}: part.filename
 #: ../../packages/chat-ui/src/chat/message-content.tsx:475
 msgid "Download {0}"
-msgstr ""
+msgstr "{0} をダウンロード"
 
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:43
 msgid "Download {displayName}"
@@ -11485,7 +11485,7 @@ msgstr "{0} 向けにダウンロード"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:475
 #: ../../packages/chat-ui/src/chat/message-content.tsx:482
 msgid "Download image"
-msgstr ""
+msgstr "画像をダウンロード"
 
 #: src/features/chat/header/thread-download-button.tsx:134
 msgid "Download JSON"
@@ -11615,7 +11615,7 @@ msgstr "ここにファイルをドロップ..."
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:166
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:172
 msgid "Drop files to start a new chat"
-msgstr ""
+msgstr "ファイルをドロップして新しいチャットを開始"
 
 #: src/features/chat/thread-list/components/thread-group-renderer.tsx:108
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:342
@@ -12998,7 +12998,7 @@ msgstr "このボットのすべてのチャットとスケジュール実行は
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
-msgstr ""
+msgstr "プロジェクトでロールが設定されていない限り、すべてのチャット。"
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -13513,7 +13513,7 @@ msgstr "Anthropic で最も高性能な Opus での拡張思考"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:322
 msgid "Extra instructions"
-msgstr ""
+msgstr "追加の指示"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:29
 msgid "Extra Tall"
@@ -14897,12 +14897,12 @@ msgstr "このターンで変更されたファイル"
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:98
 msgid "Files dropped before the account changed were not attached. Drop them again."
-msgstr ""
+msgstr "アカウントが切り替わる前にドロップしたファイルは添付されませんでした。もう一度ドロップしてください。"
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:110
 #: src/lib/native/native-bridge.tsx:84
 msgid "Files dropped earlier for another account were not attached. Drop them again."
-msgstr ""
+msgstr "以前に別のアカウントでドロップしたファイルは添付されませんでした。もう一度ドロップしてください。"
 
 #: src/features/projects/components/repo-rule-file-import.tsx:414
 msgid "Files found"
@@ -15072,7 +15072,7 @@ msgstr "Python プログラミングを学ぶためのチュートリアルを�
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:65
 msgid "Finding, reading and comparing sources."
-msgstr ""
+msgstr "情報源を探し、読み、比較します。"
 
 #: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
@@ -15225,7 +15225,7 @@ msgstr "次の手順に従って {platform} アカウントを接続してくだ
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:105
 msgid "Follow thread"
-msgstr ""
+msgstr "スレッドをフォロー"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -17408,13 +17408,13 @@ msgstr "画像"
 #. placeholder {1}: images.length
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:176
 msgid "Image {0} of {1}"
-msgstr ""
+msgstr "画像 {0} / {1}"
 
 #. placeholder {0}: position + 1
 #. placeholder {1}: labelOf(image)
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:210
 msgid "Image {0}: {1}"
-msgstr ""
+msgstr "画像 {0}：{1}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:84
 msgid "Image {position} could not be loaded"
@@ -17477,7 +17477,7 @@ msgstr "画像生成モデル"
 
 #: src/features/chat/pins/pinned-image-preview.tsx:122
 msgid "Image pinned"
-msgstr ""
+msgstr "画像をピン留めしました"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
@@ -17557,12 +17557,12 @@ msgstr "画像と動画"
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:172
 #: src/features/chat/image-gallery/thread-images-button.tsx:42
 msgid "Images in this chat"
-msgstr ""
+msgstr "このチャットの画像"
 
 #. placeholder {0}: images.length
 #: src/features/chat/image-gallery/thread-images-button.tsx:33
 msgid "Images in this chat ({0})"
-msgstr ""
+msgstr "このチャットの画像（{0}）"
 
 #: src/features/marketing/data/models-data.ts:193
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
@@ -17620,7 +17620,7 @@ msgstr "なりすましを終了"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:53
 msgid "Implementation"
-msgstr ""
+msgstr "実装"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
@@ -18202,7 +18202,7 @@ msgstr "強度"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:62
 msgid "Interface, user experience and visual design."
-msgstr ""
+msgstr "インターフェース、ユーザー体験、ビジュアルデザイン。"
 
 #: src/features/chat/thread/composer-input-area.tsx:361
 msgid "Interrupt and restart"
@@ -19826,7 +19826,7 @@ msgstr "プレビューを読み込んでいます…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 msgid "Loading projects…"
-msgstr ""
+msgstr "プロジェクトを読み込み中…"
 
 #: src/features/projects/components/project-repo-picker.tsx:241
 #: src/features/projects/components/project-repositories.tsx:304
@@ -19835,7 +19835,7 @@ msgstr "リポジトリを読み込んでいます…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:480
 msgid "Loading roles…"
-msgstr ""
+msgstr "ロールを読み込み中…"
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -21374,7 +21374,7 @@ msgstr "モデル情報"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "Model per kind of work"
-msgstr ""
+msgstr "作業の種類ごとのモデル"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:74
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
@@ -21871,7 +21871,7 @@ msgstr "ミュート"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:115
 msgid "Mute thread"
-msgstr ""
+msgstr "スレッドをミュート"
 
 #: src/features/settings/lib/settings-keywords.ts:106
 msgid "my data"
@@ -22526,7 +22526,7 @@ msgstr "次世代"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:193
 msgid "Next image"
-msgstr ""
+msgstr "次の画像"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Next item"
@@ -22827,7 +22827,7 @@ msgstr "有効期限なし"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:243
 msgid "No extra instructions in this project. Reset to use your default again."
-msgstr ""
+msgstr "このプロジェクトには追加の指示がありません。リセットすると既定の指示に戻ります。"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:276
 msgid "No facts found in the pasted text."
@@ -23712,7 +23712,7 @@ msgstr "デフォルトではオフです。長いチャットがしばらく使
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
 msgid "Off until you pick a model."
-msgstr ""
+msgstr "モデルを選ぶまでオフです。"
 
 #: src/features/settings/components/account/account-settings.tsx:561
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
@@ -24073,7 +24073,7 @@ msgstr "このプロジェクトのリポジトリを変更できるのはプロ
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:474
 msgid "Only the project's owner can change its roles."
-msgstr ""
+msgstr "ロールを変更できるのはプロジェクトのオーナーだけです。"
 
 #: src/features/devices/components/device-scope.tsx:73
 msgid "Only these projects"
@@ -24141,7 +24141,7 @@ msgstr "始値"
 
 #: ../../packages/chat-ui/src/chat/gallery-image.tsx:27
 msgid "Open {alt} in the image gallery"
-msgstr ""
+msgstr "{alt} を画像ギャラリーで開く"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open {filename}"
@@ -25844,7 +25844,7 @@ msgstr "目標をピン留め"
 #: src/features/chat/pins/pinnable-image.tsx:74
 #: src/features/chat/pins/pinnable-image.tsx:80
 msgid "Pin image"
-msgstr ""
+msgstr "画像をピン留め"
 
 #: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
@@ -25885,7 +25885,7 @@ msgstr "ピン留め済み"
 
 #: src/features/chat/pins/pinned-image-preview.tsx:129
 msgid "Pinned image"
-msgstr ""
+msgstr "ピン留めした画像"
 
 #: src/features/chat/thread-list/group-header.tsx:103
 msgid "Pinned project"
@@ -26178,7 +26178,7 @@ msgstr "正確で、定量的で、的を絞った説明。"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:310
 msgid "Prefer"
-msgstr ""
+msgstr "優先"
 
 #: src/features/settings/components/personalization/memory-types.ts:29
 msgid "Preferences"
@@ -26467,7 +26467,7 @@ msgstr "複雑なシーン向けの旧世代の高品質モデル"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:181
 msgid "Previous image"
-msgstr ""
+msgstr "前の画像"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Previous item"
@@ -28674,7 +28674,7 @@ msgstr "{0} を既定に戻す"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 msgid "Reset {roleLabel} to your default"
-msgstr ""
+msgstr "{roleLabel} を既定に戻す"
 
 #: src/features/workflow/components/canvas/workflow-controls.tsx:664
 #: src/features/workflow/components/canvas/workflow-controls.tsx:671
@@ -29129,7 +29129,7 @@ msgstr "ロールの更新"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "roles"
-msgstr ""
+msgstr "ロール"
 
 #: src/features/chat/core/utils/language-utilities.ts:393
 msgid "Romania"
@@ -32984,7 +32984,7 @@ msgstr "スタイライズされたアニメーション"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "sub-agent"
-msgstr ""
+msgstr "サブエージェント"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 msgid "Sub-agent"
@@ -33001,7 +33001,7 @@ msgstr "サブエージェントが完了しました"
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:427
 #: src/features/settings/lib/settings-navigation.ts:97
 msgid "Sub-agent roles"
-msgstr ""
+msgstr "サブエージェントのロール"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:71
 msgid "Sub-agent was not approved."
@@ -33799,7 +33799,7 @@ msgstr "テスト"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:57
 msgid "Testing"
-msgstr ""
+msgstr "テスト"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:105
 msgid "text"
@@ -34512,7 +34512,7 @@ msgstr "ファイルはインポートされませんでした："
 
 #: src/lib/native/native-bridge.tsx:77
 msgid "The files arrived while the account changed, so they were not attached. Drop them again."
-msgstr ""
+msgstr "アカウントの切り替え中にファイルが届いたため、添付されませんでした。もう一度ドロップしてください。"
 
 #: src/features/projects/components/project-rule-files.tsx:650
 msgid "The files could not be read."
@@ -34804,7 +34804,7 @@ msgstr "このデバイスの Neore アプリが {0} としてサインインし
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:123
 msgid "The new chat could not open, so the files were not attached. Drop them again."
-msgstr ""
+msgstr "新しいチャットを開けなかったため、ファイルは添付されませんでした。もう一度ドロップしてください。"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:117
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
@@ -35147,7 +35147,7 @@ msgstr "これらのツールは、表示されている時刻まで確認なし
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:167
 msgid "They are attached; nothing is sent until you send it."
-msgstr ""
+msgstr "ファイルは添付されます。送信するまで何も送られません。"
 
 #: src/features/chat/thread/composer-draw-dialog.tsx:35
 msgid "Thick"
@@ -35667,7 +35667,7 @@ msgstr "このメッセージは{value, plural, other {# 秒}}後に閉じます
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:235
 msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
-msgstr ""
+msgstr "このモデルは利用できないため、このロールはアシスタントに提示されません。別のモデルを選んでください。"
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
@@ -35735,7 +35735,7 @@ msgstr "このプレビューを読み込めませんでした。"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "This project's chats. Anything it does not set uses your default."
-msgstr ""
+msgstr "このプロジェクトのチャット。プロジェクトで設定されていない項目は既定値を使います。"
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
@@ -36101,7 +36101,7 @@ msgstr "木"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:205
 msgid "Thumbnails"
-msgstr ""
+msgstr "サムネイル"
 
 #: src/features/evals/components/dataset-panel.tsx:219
 msgid "Tick two runs to compare them."
@@ -37142,7 +37142,7 @@ msgstr "元に戻す (Ctrl+Z)"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:110
 msgid "Unfollow thread"
-msgstr ""
+msgstr "スレッドのフォローを解除"
 
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
@@ -38733,7 +38733,7 @@ msgstr "取引量 (24 時間)"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:67
 msgid "Vulnerabilities, secrets, access control, threat models."
-msgstr ""
+msgstr "脆弱性、シークレット、アクセス制御、脅威モデル。"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:258
 msgctxt "width abbreviation"
@@ -39245,7 +39245,7 @@ msgstr "アシスタントはどんなときにこのスキルを使うべきで
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:288
 msgid "When to delegate"
-msgstr ""
+msgstr "委任のタイミング"
 
 #: src/features/projects/components/project-rule-files.tsx:307
 msgid "When to read it"
@@ -39514,11 +39514,11 @@ msgstr "ライティング"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:64
 msgid "Writing or changing code, configuration or scripts."
-msgstr ""
+msgstr "コード、設定、スクリプトを書いたり変更したりします。"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:68
 msgid "Writing tests and checking that a change works."
-msgstr ""
+msgstr "テストを書き、変更が動作することを確認します。"
 
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "Writing the guide…"
@@ -40045,11 +40045,11 @@ msgstr "データのエクスポートの準備ができました"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default ({inheritedModelName})"
-msgstr ""
+msgstr "既定（{inheritedModelName}）"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default (off)"
-msgstr ""
+msgstr "既定（オフ）"
 
 #: src/features/auth/components/settings/account/update-name-card.tsx:21
 msgid "Your display name for your account"

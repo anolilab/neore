@@ -103,7 +103,7 @@ msgstr "« {truncatedName} » a été refusé"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:436
 msgid "\"Always\" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models."
-msgstr ""
+msgstr "« Toujours » est une consigne pour l’assistant, pas une règle stricte. Si vous lui demandez de faire quelque chose lui-même, il le fera. Les discussions gardent le modèle que vous avez choisi pour elles ; seuls les sous-agents utilisent ces modèles."
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:567
 msgid "\"v1\" for the current Azure OpenAI API. A dated version such as 2024-10-21 uses the older per-deployment URLs."
@@ -2860,7 +2860,7 @@ msgstr "{added} document(s) ajouté(s)."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:240
 msgid "Added after the built-in instructions for this role, e.g. \"Check every change against our style guide.\""
-msgstr ""
+msgstr "Ajoutées après les instructions intégrées de ce rôle, par ex. « Vérifie chaque modification selon notre guide de style. »"
 
 #: src/features/settings/components/personalization/memory-item.tsx:72
 msgid "Added by you · {learnedOn}"
@@ -3583,7 +3583,7 @@ msgstr "Tous les fournisseurs + BYOK"
 #. placeholder {0}: roleLabel.toLowerCase()
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:292
 msgid "All real {0} work goes to this model, even quick work."
-msgstr ""
+msgstr "Tout le vrai travail de {0} va à ce modèle, même le travail rapide."
 
 #: src/features/develop/components/checks-tab.tsx:96
 msgid "All required checks passed."
@@ -4019,7 +4019,7 @@ msgstr "N’importe lequel de mes chats"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:63
 msgid "Any other self-contained task."
-msgstr ""
+msgstr "Toute autre tâche autonome."
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:162
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
@@ -4136,7 +4136,7 @@ msgstr "S’applique"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:443
 msgid "Applies to"
-msgstr ""
+msgstr "S’applique à"
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
@@ -4300,7 +4300,7 @@ msgstr "Le petit LLM de raisonnement d’Arcee"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:50
 msgid "Architecture"
-msgstr ""
+msgstr "Architecture"
 
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
@@ -5289,7 +5289,7 @@ msgstr "Le modèle FLUX professionnel de BFL via API directe"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:293
 msgid "Bigger pieces go to this model; quick questions stay in the chat."
-msgstr ""
+msgstr "Les tâches plus importantes vont à ce modèle ; les questions rapides restent dans la discussion."
 
 #: src/features/chat/thread/message-cost-badge.tsx:79
 msgid "Billed to your own API key, not your credits."
@@ -6547,7 +6547,7 @@ msgstr "Vérification"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:66
 msgid "Checking code, a draft or a plan for mistakes."
-msgstr ""
+msgstr "Vérifier du code, un brouillon ou un plan pour y trouver des erreurs."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "Checking image safety..."
@@ -6616,7 +6616,7 @@ msgstr "Choisir un .md ou un .zip"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:429
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
-msgstr ""
+msgstr "Choisissez un modèle pour chaque type de travail que l’assistant confie à un sous-agent. Un rôle avec un modèle est proposé à l’assistant ; un rôle sans modèle reste désactivé."
 
 #: src/features/workflow/components/template-picker.tsx:111
 msgid "Choose a template to get started quickly. Templates provide pre-configured workflows for common tasks."
@@ -7176,7 +7176,7 @@ msgstr "Sortie du code"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "code review"
-msgstr ""
+msgstr "revue de code"
 
 #: src/features/chat/group/group-mode.ts:50
 #: src/features/marketing/use-cases/visuals/group-chats-visual.tsx:16
@@ -9023,7 +9023,7 @@ msgstr "Impossible de charger les détails de facturation de votre organisation.
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:488
 msgid "Could not load your roles."
-msgstr ""
+msgstr "Impossible de charger vos rôles."
 
 #: src/features/onboarding/components/setup-checklist.tsx:230
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
@@ -9169,7 +9169,7 @@ msgstr "Impossible d’enregistrer la page"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:418
 msgid "Could not save the role"
-msgstr ""
+msgstr "Impossible d’enregistrer le rôle"
 
 #: src/features/develop/components/review-panel.tsx:185
 msgid "Could not save the summary, so nothing was submitted. Try again."
@@ -9278,7 +9278,7 @@ msgstr "Impossible de mettre à jour les participants"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:100
 msgid "Couldn't load follow state"
-msgstr ""
+msgstr "Impossible de charger l’état de suivi"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -10335,7 +10335,7 @@ msgstr "Retardé"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "delegate"
-msgstr ""
+msgstr "déléguer"
 
 #: src/features/settings/components/chat/mcp/popular-servers.ts:226
 msgid "Delegate tasks to Devin, the AI software engineer"
@@ -10344,7 +10344,7 @@ msgstr "Déléguez des tâches à Devin, l’ingénieur logiciel IA"
 #. placeholder {0}: roleLabel.toLowerCase()
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:237
 msgid "Delegated {0} work runs on this model."
-msgstr ""
+msgstr "Le travail de {0} délégué s’exécute sur ce modèle."
 
 #: src/components/delete-confirmation-dialog.tsx:45
 #: src/components/delete-confirmation-dialog.tsx:71
@@ -10943,7 +10943,7 @@ msgstr "Designers créant des logos, des icônes et des éléments de marque où
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:61
 msgid "Designing a system or a change that spans several parts."
-msgstr ""
+msgstr "Concevoir un système ou une modification qui touche plusieurs parties."
 
 #: src/features/download/components/download-page.tsx:65
 msgid "Desktop"
@@ -11352,7 +11352,7 @@ msgstr "Vous n’avez pas de compte ?"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:352
 msgid "Don't use your default instructions in this project"
-msgstr ""
+msgstr "Ne pas utiliser vos instructions par défaut dans ce projet"
 
 #: src/features/auth/components/settings/api-key/api-key-display-dialog.tsx:62
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
@@ -11421,7 +11421,7 @@ msgstr "Télécharger — Neore Desktop"
 #. placeholder {0}: part.filename
 #: ../../packages/chat-ui/src/chat/message-content.tsx:475
 msgid "Download {0}"
-msgstr ""
+msgstr "Télécharger {0}"
 
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:43
 msgid "Download {displayName}"
@@ -11485,7 +11485,7 @@ msgstr "Télécharger pour {0}"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:475
 #: ../../packages/chat-ui/src/chat/message-content.tsx:482
 msgid "Download image"
-msgstr ""
+msgstr "Télécharger l’image"
 
 #: src/features/chat/header/thread-download-button.tsx:134
 msgid "Download JSON"
@@ -11615,7 +11615,7 @@ msgstr "Déposez les fichiers ici..."
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:166
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:172
 msgid "Drop files to start a new chat"
-msgstr ""
+msgstr "Déposez des fichiers pour démarrer une nouvelle discussion"
 
 #: src/features/chat/thread-list/components/thread-group-renderer.tsx:108
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:342
@@ -12998,7 +12998,7 @@ msgstr "Chaque chat et chaque exécution planifiée de ce bot ne reçoit que ces
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "Every chat, unless its project sets the role."
-msgstr ""
+msgstr "Toutes les discussions, sauf si leur projet définit le rôle."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -13513,7 +13513,7 @@ msgstr "Réflexion étendue sur l’Opus le plus performant d’Anthropic"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:322
 msgid "Extra instructions"
-msgstr ""
+msgstr "Instructions supplémentaires"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-row-height-menu.tsx:29
 msgid "Extra Tall"
@@ -14897,12 +14897,12 @@ msgstr "Fichiers modifiés par ce tour"
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:98
 msgid "Files dropped before the account changed were not attached. Drop them again."
-msgstr ""
+msgstr "Les fichiers déposés avant le changement de compte n’ont pas été joints. Déposez-les à nouveau."
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:110
 #: src/lib/native/native-bridge.tsx:84
 msgid "Files dropped earlier for another account were not attached. Drop them again."
-msgstr ""
+msgstr "Les fichiers déposés plus tôt pour un autre compte n’ont pas été joints. Déposez-les à nouveau."
 
 #: src/features/projects/components/repo-rule-file-import.tsx:414
 msgid "Files found"
@@ -15072,7 +15072,7 @@ msgstr "Trouver des tutoriels pour apprendre la programmation Python"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:65
 msgid "Finding, reading and comparing sources."
-msgstr ""
+msgstr "Trouver, lire et comparer des sources."
 
 #: src/features/workflow/types/index.ts:375
 msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
@@ -15225,7 +15225,7 @@ msgstr "Suivez ces étapes pour connecter votre compte {platform}."
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:105
 msgid "Follow thread"
-msgstr ""
+msgstr "Suivre la conversation"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -17408,13 +17408,13 @@ msgstr "Image"
 #. placeholder {1}: images.length
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:176
 msgid "Image {0} of {1}"
-msgstr ""
+msgstr "Image {0} sur {1}"
 
 #. placeholder {0}: position + 1
 #. placeholder {1}: labelOf(image)
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:210
 msgid "Image {0}: {1}"
-msgstr ""
+msgstr "Image {0} : {1}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:84
 msgid "Image {position} could not be loaded"
@@ -17477,7 +17477,7 @@ msgstr "Modèle de génération d’images"
 
 #: src/features/chat/pins/pinned-image-preview.tsx:122
 msgid "Image pinned"
-msgstr ""
+msgstr "Image épinglée"
 
 #: src/features/workflow/components/nodes/style-ref-node.tsx:117
 msgid "Image to apply the style to (or use input from previous node)"
@@ -17557,12 +17557,12 @@ msgstr "images et vidéo"
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:172
 #: src/features/chat/image-gallery/thread-images-button.tsx:42
 msgid "Images in this chat"
-msgstr ""
+msgstr "Images de cette discussion"
 
 #. placeholder {0}: images.length
 #: src/features/chat/image-gallery/thread-images-button.tsx:33
 msgid "Images in this chat ({0})"
-msgstr ""
+msgstr "Images de cette discussion ({0})"
 
 #: src/features/marketing/data/models-data.ts:193
 msgid "Images that require current knowledge, web search context, or complex reasoning about the subject matter"
@@ -17620,7 +17620,7 @@ msgstr "Emprunt d’identité arrêté"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:53
 msgid "Implementation"
-msgstr ""
+msgstr "Implémentation"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
@@ -18202,7 +18202,7 @@ msgstr "Intensité"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:62
 msgid "Interface, user experience and visual design."
-msgstr ""
+msgstr "Interface, expérience utilisateur et design visuel."
 
 #: src/features/chat/thread/composer-input-area.tsx:361
 msgid "Interrupt and restart"
@@ -19826,7 +19826,7 @@ msgstr "Chargement de l'aperçu…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:467
 msgid "Loading projects…"
-msgstr ""
+msgstr "Chargement des projets…"
 
 #: src/features/projects/components/project-repo-picker.tsx:241
 #: src/features/projects/components/project-repositories.tsx:304
@@ -19835,7 +19835,7 @@ msgstr "Chargement des dépôts…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:480
 msgid "Loading roles…"
-msgstr ""
+msgstr "Chargement des rôles…"
 
 #: src/features/evals/components/run-detail.tsx:144
 msgid "Loading run…"
@@ -21374,7 +21374,7 @@ msgstr "Infos sur le modèle"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "Model per kind of work"
-msgstr ""
+msgstr "Modèle par type de travail"
 
 #: src/features/marketing/components/gateway-landing-page.tsx:74
 msgid "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost calculation in microdollars."
@@ -21871,7 +21871,7 @@ msgstr "Couper le son"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:115
 msgid "Mute thread"
-msgstr ""
+msgstr "Mettre la conversation en sourdine"
 
 #: src/features/settings/lib/settings-keywords.ts:106
 msgid "my data"
@@ -22526,7 +22526,7 @@ msgstr "nouvelle génération"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:193
 msgid "Next image"
-msgstr ""
+msgstr "Image suivante"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:94
 msgid "Next item"
@@ -22827,7 +22827,7 @@ msgstr "Sans expiration"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:243
 msgid "No extra instructions in this project. Reset to use your default again."
-msgstr ""
+msgstr "Aucune instruction supplémentaire dans ce projet. Réinitialisez pour utiliser à nouveau votre valeur par défaut."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:276
 msgid "No facts found in the pasted text."
@@ -23712,7 +23712,7 @@ msgstr "Désactivé par défaut. Quand un long chat reste inactif, ses anciens m
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:232
 msgid "Off until you pick a model."
-msgstr ""
+msgstr "Désactivé jusqu’à ce que vous choisissiez un modèle."
 
 #: src/features/settings/components/account/account-settings.tsx:561
 msgid "Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next."
@@ -24073,7 +24073,7 @@ msgstr "Seul le propriétaire du projet peut modifier ses dépôts."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:474
 msgid "Only the project's owner can change its roles."
-msgstr ""
+msgstr "Seul le propriétaire du projet peut modifier ses rôles."
 
 #: src/features/devices/components/device-scope.tsx:73
 msgid "Only these projects"
@@ -24141,7 +24141,7 @@ msgstr "Ouverture"
 
 #: ../../packages/chat-ui/src/chat/gallery-image.tsx:27
 msgid "Open {alt} in the image gallery"
-msgstr ""
+msgstr "Ouvrir {alt} dans la galerie d’images"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:101
 msgid "Open {filename}"
@@ -25844,7 +25844,7 @@ msgstr "Épingler un objectif"
 #: src/features/chat/pins/pinnable-image.tsx:74
 #: src/features/chat/pins/pinnable-image.tsx:80
 msgid "Pin image"
-msgstr ""
+msgstr "Épingler l’image"
 
 #: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
@@ -25885,7 +25885,7 @@ msgstr "Épinglées"
 
 #: src/features/chat/pins/pinned-image-preview.tsx:129
 msgid "Pinned image"
-msgstr ""
+msgstr "Image épinglée"
 
 #: src/features/chat/thread-list/group-header.tsx:103
 msgid "Pinned project"
@@ -26178,7 +26178,7 @@ msgstr "Description précise, chiffrée et ciblée."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:310
 msgid "Prefer"
-msgstr ""
+msgstr "De préférence"
 
 #: src/features/settings/components/personalization/memory-types.ts:29
 msgid "Preferences"
@@ -26467,7 +26467,7 @@ msgstr "Modèle de haute qualité de génération précédente pour les scènes 
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:181
 msgid "Previous image"
-msgstr ""
+msgstr "Image précédente"
 
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Previous item"
@@ -28674,7 +28674,7 @@ msgstr "Rétablir la valeur par défaut de {0}"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 msgid "Reset {roleLabel} to your default"
-msgstr ""
+msgstr "Réinitialiser {roleLabel} à votre valeur par défaut"
 
 #: src/features/workflow/components/canvas/workflow-controls.tsx:664
 #: src/features/workflow/components/canvas/workflow-controls.tsx:671
@@ -29129,7 +29129,7 @@ msgstr "Changements de rôle"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "roles"
-msgstr ""
+msgstr "rôles"
 
 #: src/features/chat/core/utils/language-utilities.ts:393
 msgid "Romania"
@@ -32984,7 +32984,7 @@ msgstr "animation stylisée"
 
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "sub-agent"
-msgstr ""
+msgstr "sous-agent"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 msgid "Sub-agent"
@@ -33001,7 +33001,7 @@ msgstr "Sous-agent terminé"
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:427
 #: src/features/settings/lib/settings-navigation.ts:97
 msgid "Sub-agent roles"
-msgstr ""
+msgstr "Rôles des sous-agents"
 
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:71
 msgid "Sub-agent was not approved."
@@ -33799,7 +33799,7 @@ msgstr "tests"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:57
 msgid "Testing"
-msgstr ""
+msgstr "Tests"
 
 #: ../../packages/chat-ui/src/model-picker/utils.ts:105
 msgid "text"
@@ -34512,7 +34512,7 @@ msgstr "Le fichier n’a pas été importé :"
 
 #: src/lib/native/native-bridge.tsx:77
 msgid "The files arrived while the account changed, so they were not attached. Drop them again."
-msgstr ""
+msgstr "Les fichiers sont arrivés pendant le changement de compte, ils n’ont donc pas été joints. Déposez-les à nouveau."
 
 #: src/features/projects/components/project-rule-files.tsx:650
 msgid "The files could not be read."
@@ -34804,7 +34804,7 @@ msgstr "L’application Neore sur cet appareil sera connectée en tant que {0}. 
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:123
 msgid "The new chat could not open, so the files were not attached. Drop them again."
-msgstr ""
+msgstr "La nouvelle discussion n’a pas pu s’ouvrir, les fichiers n’ont donc pas été joints. Déposez-les à nouveau."
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:117
 msgid "The new passcode needs {MIN_PASSCODE_LENGTH} characters, typed twice the same."
@@ -35147,7 +35147,7 @@ msgstr "Ces outils s’exécutent sans demander jusqu’à l’heure indiquée. 
 
 #: src/features/chat/thread-list/thread-list-drop-zone.tsx:167
 msgid "They are attached; nothing is sent until you send it."
-msgstr ""
+msgstr "Ils sont joints ; rien n’est envoyé tant que vous ne l’envoyez pas."
 
 #: src/features/chat/thread/composer-draw-dialog.tsx:35
 msgid "Thick"
@@ -35667,7 +35667,7 @@ msgstr "Ce message se fermera dans {value, plural, one {# seconde} other {# seco
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:235
 msgid "This model cannot run for you, so the role is not offered to the assistant. Pick another one."
-msgstr ""
+msgstr "Ce modèle ne peut pas s’exécuter pour vous, le rôle n’est donc pas proposé à l’assistant. Choisissez-en un autre."
 
 #: src/features/chat/thread/composer-effort-shortcuts.tsx:67
 msgid "This model has no reasoning effort"
@@ -35735,7 +35735,7 @@ msgstr "Impossible de charger cet aperçu."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:446
 msgid "This project's chats. Anything it does not set uses your default."
-msgstr ""
+msgstr "Les discussions de ce projet. Ce qu’il ne définit pas utilise votre valeur par défaut."
 
 #: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "This prompt will be used for every message alongside the conversation history."
@@ -36101,7 +36101,7 @@ msgstr "Jeu"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:205
 msgid "Thumbnails"
-msgstr ""
+msgstr "Miniatures"
 
 #: src/features/evals/components/dataset-panel.tsx:219
 msgid "Tick two runs to compare them."
@@ -37142,7 +37142,7 @@ msgstr "Annuler (Ctrl+Z)"
 
 #: src/features/chat/thread-list/thread-options-menu.tsx:110
 msgid "Unfollow thread"
-msgstr ""
+msgstr "Ne plus suivre la conversation"
 
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
@@ -38733,7 +38733,7 @@ msgstr "Volume (24 h)"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:67
 msgid "Vulnerabilities, secrets, access control, threat models."
-msgstr ""
+msgstr "Vulnérabilités, secrets, contrôle d’accès, modèles de menace."
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:258
 msgctxt "width abbreviation"
@@ -39245,7 +39245,7 @@ msgstr "Quand l’assistant doit-il utiliser cette compétence ?"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:288
 msgid "When to delegate"
-msgstr ""
+msgstr "Quand déléguer"
 
 #: src/features/projects/components/project-rule-files.tsx:307
 msgid "When to read it"
@@ -39514,11 +39514,11 @@ msgstr "Rédaction"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:64
 msgid "Writing or changing code, configuration or scripts."
-msgstr ""
+msgstr "Écrire ou modifier du code, de la configuration ou des scripts."
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:68
 msgid "Writing tests and checking that a change works."
-msgstr ""
+msgstr "Écrire des tests et vérifier qu’une modification fonctionne."
 
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "Writing the guide…"
@@ -40045,11 +40045,11 @@ msgstr "Votre exportation de données est prête"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default ({inheritedModelName})"
-msgstr ""
+msgstr "Votre valeur par défaut ({inheritedModelName})"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:231
 msgid "Your default (off)"
-msgstr ""
+msgstr "Votre valeur par défaut (désactivé)"
 
 #: src/features/auth/components/settings/account/update-name-card.tsx:21
 msgid "Your display name for your account"
