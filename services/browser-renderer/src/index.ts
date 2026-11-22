@@ -225,6 +225,15 @@ function readTarget(
 
     // Where the click goes: a link's href, a button's formaction, and the form it submits to. Changing one changes what the
     // click does, so it is part of the fingerprint.
+    // The form a click submits: a button's own form (its `form` attribute can name one outside it), else the enclosing form.
+    let enclosingForm: HTMLFormElement | null = control.closest("form");
+
+    for (const node of nodes) {
+        if ((node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.form !== null) {
+            enclosingForm = node.form;
+        }
+    }
+
     let destinations = "";
 
     for (const node of nodes) {
@@ -236,8 +245,6 @@ function readTarget(
         destinations += `${link}|${formTarget}|`;
     }
 
-    const enclosingForm = control.closest("form");
-
     destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
 
     // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
@@ -246,8 +253,8 @@ function readTarget(
 
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
     // there pays, so the gate reads a submit-like label on a checkout as a purchase.
-    const form = control.closest("form");
-    const isCardFields = form !== null && form.querySelector("input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i]") !== null;
+    const isCardFields =
+        enclosingForm !== null && enclosingForm.querySelector("input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i]") !== null;
     const address = document.URL.toLowerCase();
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
 
