@@ -4595,12 +4595,17 @@ export const retryFollowupCache = internalAction
         const { chargedUserId, claimedAt, organizationId, requestId, ...write } = args;
 
         // The reply's claim is renewed before each attempt, so no second model call can start while this write is still outstanding.
-        await ctx.runMutation(internal.agent.followup_suggestions.holdFollowupClaim, {
+        // If the claim is no longer this run's (it lapsed and another run took the reply), this write is dropped: the newer run owns it.
+        const stillOurs = await ctx.runMutation(internal.agent.followup_suggestions.holdFollowupClaim, {
             claimedAt,
             lastMessageId: write.lastMessageId,
             threadId: write.threadId,
             userId: chargedUserId,
         });
+
+        if (!stillOurs) {
+            return;
+        }
 
         const written = await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, write);
 
