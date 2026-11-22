@@ -43,4 +43,19 @@ describe("findLocaleMaps", () => {
 
         expect(findLocaleMaps(catalog, LOCALES)).toStrictEqual([{ line: 11, msgid: "Save" }]);
     });
+
+    it("finds a map pasted over the translation of a source that names quoted locales in prose", () => {
+        const catalog = [
+            'msgid ""',
+            'msgstr ""',
+            '"Language: de\\n"',
+            "",
+            "#: src/c.tsx:3",
+            'msgid "For \\"de\\": use German; for \\"fr\\": use French."',
+            "msgstr \"{'de': 'Deutsch', 'fr': 'Französisch'}\"",
+            "",
+        ].join("\n");
+
+        expect(findLocaleMaps(catalog, LOCALES)).toStrictEqual([{ line: 7, msgid: 'For "de": use German; for "fr": use French.' }]);
+    });
 });

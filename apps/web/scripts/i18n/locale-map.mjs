@@ -19,9 +19,13 @@ export const looksLikeLocaleMap = (text, locales) => {
     return keys.size >= 2 || (keys.size === 1 && new RegExp(`^\\{\\s*${key.source}`, "u").test(text.trim()));
 };
 
+/** Whether `text` opens as an object literal: a pasted map always does, prose that names locales does not. */
+const opensAsObject = (text) => text.trimStart().startsWith("{");
+
 /**
- * The entries of a catalog whose translation, continuation lines joined, is such a map, and whose source is not: a
- * faithful translation of a source that itself reads as one is left, as the batch check leaves it.
+ * The entries of a catalog whose translation, continuation lines joined, is such a map. A translation shaped as an
+ * object is one unless its source is an object too; prose that names quoted locales is left only when its source
+ * does the same, so a faithful translation of it passes but a map pasted over it does not.
  *
  * @param {string} catalog a `.po` file's text
  * @param {readonly string[]} locales
@@ -29,7 +33,13 @@ export const looksLikeLocaleMap = (text, locales) => {
  */
 export const findLocaleMaps = (catalog, locales) =>
     parsePo(catalog)
-        .filter((entry) => looksLikeLocaleMap(entry.msgstr, locales) && !looksLikeLocaleMap(entry.msgid, locales))
+        .filter((entry) => {
+            if (!looksLikeLocaleMap(entry.msgstr, locales)) {
+                return false;
+            }
+
+            return opensAsObject(entry.msgstr) ? !opensAsObject(entry.msgid) : !looksLikeLocaleMap(entry.msgid, locales);
+        })
         .map((entry) => {
             return { line: entry.msgstrLines[0] + 1, msgid: entry.msgid };
         });
