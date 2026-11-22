@@ -7,7 +7,6 @@ import { useUnlockProof } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { afterLastContextReset } from "@/features/chat/core/context/chat-action-shared";
 import { useChatIsRunning, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
@@ -20,14 +19,13 @@ const useNextPromptSuggestion = (): string | null => {
     const { thread, threadId } = useChatThread();
     const { messages } = useChatMessages();
     const isRunning = useChatIsRunning();
-    const { data: userSettings } = useUserSettings();
     const crpc = useCRPC();
     const unlockProof = useUnlockProof(threadId);
     // A locked chat without its proof is a stub: its cache is not read, so the query is not sent and is not refused.
     const lockedWithoutProof = Boolean(thread?.lockedAt) && !unlockProof;
 
-    // Off until the settings have loaded: an unresolved query is `undefined`, and a loaded setting without an explicit `false` is on.
-    const enabled = userSettings !== undefined && userSettings?.enableFollowupSuggestions !== false;
+    // The owner's setting decides whether a suggestion is made at all (the backend's generator checks it). The viewer's own setting
+    // does not hide a suggestion on a thread they were shared into: a collaborator with suggestions off still sees the owner's.
     const validThreadId = getValidThreadId(threadId);
 
     // The newest non-divider row, and only when it is a reply to something the person wrote: the rule the backend's generator keeps.
@@ -37,13 +35,13 @@ const useNextPromptSuggestion = (): string | null => {
 
     const { data: cached } = useQuery({
         ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions(
-            validThreadId && enabled && !isRunning && lastReplyId !== undefined && !lockedWithoutProof
+            validThreadId && !isRunning && lastReplyId !== undefined && !lockedWithoutProof
                 ? { lastMessageId: lastReplyId, threadId: validThreadId as Id<"threads">, unlockProof }
                 : skipToken,
         ),
     });
 
-    return pickNextPrompt({ cached, enabled, isRunning, lastReplyId });
+    return pickNextPrompt({ cached, enabled: true, isRunning, lastReplyId });
 };
 
 export default useNextPromptSuggestion;

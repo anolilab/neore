@@ -9,7 +9,7 @@ import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "
 import { getUser } from "../auth/lib/better-auth-queries";
 import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
-import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
+import { isLocalBrowserModel, LOCAL_BROWSER_PROVIDER, loadCustomProviders } from "../chat/lib/local-turn";
 import { loadActivePathTail } from "./branch-rows";
 
 /**
@@ -25,7 +25,10 @@ export const localBrowserRowIds = internalQuery
             args.messageIds.map(async (messageId) => {
                 const row = await context.db.get("messages", messageId as Id<"messages">);
 
-                return row !== null && isLocalBrowserModel(row.model, providers) ? messageId : null;
+                // A saved local reply carries the provider tag (its model is a bare id); a custom endpoint's reply carries `custom:<id>/…`.
+                const local = row !== null && (row.provider === LOCAL_BROWSER_PROVIDER || isLocalBrowserModel(row.model, providers));
+
+                return local ? messageId : null;
             }),
         );
 

@@ -4617,16 +4617,40 @@ export const retryFollowupCache = internalAction
             return;
         }
 
-        // The unit is taken on the charged user's own shard, where their message quota lives (`/chat/start` charges there too).
-        const charged = await callOnShard(
-            internal.chat.daily_charge.chargeDailyUnit,
-            { kind: "Text", organizationId, requestId, userId: chargedUserId },
-            { shardKey: chargedUserId },
-        );
+        // A clear takes no unit: it lands, and the reply's claim is given back so a later run may ask again.
+        if (write.suggestions.length === 0) {
+            await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                claimedAt,
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+                userId: chargedUserId,
+            });
 
-        // No unit, no suggestion: the written suggestions are cleared for this reply, as the job does for its own refused charge.
+            return;
+        }
+
+        // The unit is taken on the charged user's own shard, where their message quota lives (`/chat/start` charges there too).
+        let charged = false;
+
+        try {
+            charged = await callOnShard(
+                internal.chat.daily_charge.chargeDailyUnit,
+                { kind: "Text", organizationId, requestId, userId: chargedUserId },
+                { shardKey: chargedUserId },
+            );
+        } catch (chargeError) {
+            chatLogger.error(`[retryFollowupCache] The Text unit could not be taken: ${write.threadId}`, chargeError);
+        }
+
+        // No unit, no suggestion: the written suggestions are cleared for this reply (the clear is retried by the scheduler if it cannot land).
         if (!charged) {
             await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...write, suggestions: [] });
+            await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                claimedAt,
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+                userId: chargedUserId,
+            });
         }
     });
 
@@ -4824,7 +4848,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                 threadId,
             });
 
-            if (cached && cached.lastMessageId === lastMessageId) {
+            // A cleared row (its unit was refused, or the charge failed) is not a cache hit: the reply may be asked again.
+            if (cached && cached.lastMessageId === lastMessageId && cached.suggestions.length > 0) {
                 chatLogger.debug(`[generateFollowupSuggestionsForThread] Already cached for this message`, { lastMessageId, threadId });
 
                 return;
@@ -4952,7 +4977,11 @@ export const generateFollowupSuggestionsForThread = internalAction
                         userId: ownerUserId,
                     }),
                 );
-                const modelMessages = docsToModelMessages(modelRows.filter((row) => !localRowIds.has(row._id)));
+                // A local reply's prompt was on the device too: the user rows of its turn are left out with it.
+                const localTurns = new Set(modelRows.filter((row) => localRowIds.has(row._id)).map((row) => row.order));
+                const modelMessages = docsToModelMessages(
+                    modelRows.filter((row) => !localRowIds.has(row._id) && !(row.message?.role === "user" && localTurns.has(row.order))),
+                );
 
                 // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
                 // Narrows the window to this read; the delete actions refuse while a suggestion is in flight (`followupInFlight`).
@@ -5057,25 +5086,54 @@ export const generateFollowupSuggestionsForThread = internalAction
                 paid.cached = true;
 
                 // Taken on the charged user's shard (see `retryFollowupCache`); a collaborator's unit is their own, not the owner's bucket there.
-                const charged = await callOnShard(
-                    internal.chat.daily_charge.chargeDailyUnit,
-                    {
-                        kind: "Text",
-                        organizationId: threadData.organizationId ?? undefined,
-                        requestId: replyChargeKey,
-                        // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
-                        userId: chargedUserId,
-                    },
-                    { shardKey: chargedUserId },
-                );
+                // A throw counts as refused: the suggestions written above must not stay shown for a unit that was never taken.
+                let charged = false;
+
+                try {
+                    charged = await callOnShard(
+                        internal.chat.daily_charge.chargeDailyUnit,
+                        {
+                            kind: "Text",
+                            organizationId: threadData.organizationId ?? undefined,
+                            requestId: replyChargeKey,
+                            // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                            userId: chargedUserId,
+                        },
+                        { shardKey: chargedUserId },
+                    );
+                } catch (chargeError) {
+                    chatLogger.error(`[generateFollowupSuggestionsForThread] The Text unit could not be taken: ${threadId}`, chargeError);
+                }
 
                 if (charged) {
                     chatLogger.info(`[generateFollowupSuggestionsForThread] Stored ${suggestions.length} suggestions for thread: ${threadId}`);
                 } else {
                     // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown
-                    // that was not paid for. The claim stays held, so the model is not called again for this reply.
+                    // that was not paid for. Once the clear lands the claim is given back, so a later run may ask again; the availability
+                    // check before the model call keeps a spent quota from costing a call. A clear that cannot land is retried by the scheduler.
                     chatLogger.warn(`[generateFollowupSuggestionsForThread] The Text unit was refused; clearing the suggestions: ${threadId}`);
-                    await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...cacheWrite, suggestions: [] });
+
+                    try {
+                        await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...cacheWrite, suggestions: [] });
+                        paid.cached = false;
+                        await giveBackPaidClaim();
+                    } catch (clearError) {
+                        chatLogger.error(`[generateFollowupSuggestionsForThread] The clear could not land, retrying it: ${threadId}`, clearError);
+                        await runAfterWithRetry(
+                            context.scheduler,
+                            0,
+                            internal.chat.functions.retryFollowupCache,
+                            {
+                                ...cacheWrite,
+                                chargedUserId,
+                                claimedAt: paid.claimedAt,
+                                organizationId: threadData.organizationId ?? undefined,
+                                requestId: replyChargeKey,
+                                suggestions: [],
+                            },
+                            FOLLOWUP_CACHE_RETRY,
+                        );
+                    }
                 }
             } finally {
                 // The request has settled, so the chat may be locked again.

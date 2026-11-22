@@ -227,8 +227,9 @@ export const deleteThreadAccess = internalMutation
     .mutation(async ({ args, ctx }) => {
         const access = await ctx.db.threadAccess.findFirst({ where: { _id: args.accessId } });
 
-        // A suggestion job takes its dispatch claim before it reads the grant. A claim held here is checked in this same transaction,
-        // so the grant is refused (and kept for a retry) rather than deleted under a job that may send the thread to a model.
+        // A suggestion job takes its dispatch claim before it reads the grant, so a claim held here refuses the removal (kept for a retry).
+        // The grant is a global row and the claim is shard-local, so this check and the delete are not one transaction: a claim that
+        // starts just after the check is not refused. That window is the known limit recorded on the PR.
         if (access && (await followupDispatchInFlight(ctx, access.threadId))) {
             throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }

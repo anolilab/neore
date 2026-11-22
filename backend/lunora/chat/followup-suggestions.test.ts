@@ -24,6 +24,7 @@ import {
     replyAnchorRow,
     withDeadline,
 } from "../agent/followup-suggestions";
+import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { deleteThreadAccess } from "../agent/sharing";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
@@ -333,6 +334,31 @@ describe("a late run cannot replace a newer cache", () => {
         await cache("reply-old", 3, ["older?"], 3, ["root", "reply-new", "reply-old"]);
 
         await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
+    });
+});
+
+describe("a thread is not deleted while a suggestion is being sent", () => {
+    it("its first deletion write is refused while the chat's dispatch claim is held, and the thread is left as it was", async () => {
+        await harness.action(async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId: "reply-3", threadId }));
+
+        await expect(
+            harness.action(async (context: any) => await context.runMutation(deleteAllForThreadIdAsync, { threadId: threadId as never })),
+        ).rejects.toMatchObject({ code: "CONFLICT" });
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(row?.deletingAt).toBeUndefined();
+    });
+
+    it("is deleted once the request has settled", async () => {
+        const claimedAt = (await harness.action(
+            async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId: "reply-4", threadId }),
+        )) as number;
+
+        await harness.action(async (context: any) => await context.runMutation(endFollowupDispatch, { claimedAt, requestId: "reply-4", threadId }));
+
+        await expect(
+            harness.action(async (context: any) => await context.runMutation(deleteAllForThreadIdAsync, { threadId: threadId as never })),
+        ).resolves.toEqual(expect.objectContaining({ isDone: expect.any(Boolean) }));
     });
 });
 
