@@ -356,6 +356,8 @@ describe("saving a site login", () => {
             "https://other.example/login",
             "https://login.example.com/",
             "https://example.com:8443/login",
+            // No scheme: the parser reads `example.com` as one, which is not https.
+            "example.com:443/login",
             // Credentials in the URL, joined so no such literal sits in the source.
             ["https://ada", "pw@example.com/login"].join(":"),
             ["https://ada", "example.com/login"].join("@"),

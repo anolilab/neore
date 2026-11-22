@@ -65,8 +65,9 @@ export const normalizeSignInUrl = (input: string, origin: string, maxLength: num
         return null;
     }
 
-    // A parsed URL always carries its scheme, so this refuses anything but HTTPS, and credentials, as a login's site does.
-    if (normalizeSiteOrigin(url.href) !== origin) {
+    // Its own scheme, read here: `example.com:443/login` parses with the scheme `example.com`, which the origin check would
+    // read as a bare host and so as HTTPS. With the scheme https, that check refuses credentials, as for a login's site.
+    if (url.protocol !== "https:" || normalizeSiteOrigin(url.href) !== origin) {
         return null;
     }
 
