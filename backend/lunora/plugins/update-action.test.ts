@@ -241,7 +241,9 @@ describe("plugin update action", () => {
 
         const rows = await skillsNamed();
 
-        expect(rows.map((row: { slug: string }) => row.slug).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["analyst", "critic-pro"]);
+        const slugs: string[] = rows.map((row: { slug: string }) => row.slug);
+
+        expect(slugs.toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["analyst", "critic-pro"]);
 
         const again = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
 
