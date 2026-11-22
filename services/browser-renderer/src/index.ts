@@ -123,7 +123,16 @@ function readTarget(
         const ids = (node.getAttribute("aria-labelledby") ?? "").split(options.splitter).filter(Boolean);
 
         for (const id of ids) {
-            names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
+            const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
+
+            if (target !== null) {
+                // The referenced element's text, and the names inside it (an image's alt, a child's aria-label or title).
+                names.push(target.textContent ?? "");
+
+                for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
+                    names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
+                }
+            }
         }
 
         // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
@@ -206,7 +215,16 @@ function readTarget(
         const referenced = (node.getAttribute("aria-labelledby") ?? "").split(options.splitter).filter(Boolean);
 
         for (const id of referenced) {
-            names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
+            const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
+
+            if (target !== null) {
+                // The referenced element's text, and the names inside it (an image's alt, a child's aria-label or title).
+                names.push(target.textContent ?? "");
+
+                for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
+                    names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
+                }
+            }
         }
     }
 
