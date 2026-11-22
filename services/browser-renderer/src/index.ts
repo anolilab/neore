@@ -260,7 +260,10 @@ function readTarget(
     let current: Element | null = control;
 
     while (current !== null && current !== document.documentElement) {
-        const index = current.parentElement === null ? 0 : [...current.parentElement.children].indexOf(current);
+        // The position among its siblings, in the parent node: a child of a shadow root has no parent element, so its
+        // siblings are the root's children (indexing those as zero would make two different controls share a place).
+        const { parentNode } = current;
+        const index = parentNode === null ? 0 : [...(parentNode as Element | ShadowRoot).children].indexOf(current);
         const root = current.getRootNode();
 
         steps.unshift(`${current.localName}.${index}`);
