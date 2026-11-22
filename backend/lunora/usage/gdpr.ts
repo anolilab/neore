@@ -99,11 +99,47 @@ export const purgeObject = async (
     await release();
 };
 
-/**
- * Releases a run's record once its object is gone: the key is cleared, and the row removed when no piece and no index row of the run
- * is left. A run still holding either keeps its row, so the sweep can finish them.
- */
+/** Releases a run's record once its object is gone ({@link releaseRun}). */
 export const releaseUsageKey = internalMutation
+    .input({ runId: v.id("usageExportRuns") })
+    .output(v.null())
+    .mutation(async ({ args: { runId }, ctx }) => {
+        const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { _id: runId } });
+
+        if (run) {
+            await releaseRun(ctx, run);
+        }
+
+        return null;
+    });
+
+/**
+ * Clears a run's key and removes its row once no piece and no index row of the run is left; a run still holding either keeps its row,
+ * so the sweep can finish them.
+ */
+const releaseRun = async (ctx: MutationCtx, run: { _id: Id<"usageExportRuns">; requestId: string; usageKey?: string; userId: string }): Promise<void> => {
+    const piece = await ctx.db.usageExportPieces.findFirst({
+        consistency: "primary",
+        where: { requestId: run.requestId, userId: run.userId },
+    });
+    const project = await ctx.db.usageExportProjects.findFirst({
+        consistency: "primary",
+        where: { requestId: run.requestId, userId: run.userId },
+    });
+
+    if (piece || project) {
+        await patchRow(ctx.db, "usageExportRuns", run, { usageKey: undefined });
+    } else {
+        await ctx.db.delete("usageExportRuns", run._id);
+    }
+};
+
+/**
+ * Called once the sweep's deletion of a dead run's browser pages has succeeded (`browser/gdpr.ts#deleteBrowserExportPages`). Only then
+ * does the run's record go: a keyed run's purge is scheduled, and releases the record after its object; an unkeyed run is released now.
+ * A deletion that fails for good never calls this, so the record stays and a later sweep deletes the pages again.
+ */
+export const releaseBrowserPages = internalMutation
     .input({ runId: v.id("usageExportRuns") })
     .output(v.null())
     .mutation(async ({ args: { runId }, ctx }) => {
@@ -113,20 +149,7 @@ export const releaseUsageKey = internalMutation
             return null;
         }
 
-        const piece = await ctx.db.usageExportPieces.findFirst({
-            consistency: "primary",
-            where: { requestId: run.requestId, userId: run.userId },
-        });
-        const project = await ctx.db.usageExportProjects.findFirst({
-            consistency: "primary",
-            where: { requestId: run.requestId, userId: run.userId },
-        });
-
-        if (piece || project) {
-            await patchRow(ctx.db, "usageExportRuns", run, { usageKey: undefined });
-        } else {
-            await ctx.db.delete("usageExportRuns", run._id);
-        }
+        await (run.usageKey === undefined ? releaseRun(ctx, run) : schedulePurge(ctx, run));
 
         return null;
     });
@@ -281,8 +304,8 @@ export const rearmLiveUsageRun = internalMutation
  * `deleteAt`. A run found live is set one time to live ahead (a minute ahead when the erasure re-armed it), so a run that dies at any point
  * before then is found dead at that time:
  * its pieces and index rows go then. A sweep reads at most one batch of pieces in all, however many runs are due, so its reads stay
- * within the transaction's read limit; a run with pieces left is due again at once. A keyed run keeps its row until its purge has
- * released it, and waits a time to live before its next purge.
+ * within the transaction's read limit; a run with pieces left is due again at once. A drained run keeps its row until its browser pages
+ * are deleted and, if keyed, its purge has released it, and waits a time to live before the sweep tries its cleanup again.
  */
 export const sweepUsageExportPieces = internalMutation
     .input({})
@@ -342,29 +365,23 @@ export const sweepUsageExportPieces = internalMutation
                 const more = pieces.page.length >= limit || fullPieces(projects.page);
 
                 // A dead run's browser pages, which the export stores under a prefix derived from the run (`browser/export-pages.ts`).
+                // Scheduled once the run's pieces and index rows are drained, not on every pass that clears some: a run with pieces left
+                // is due again at once, and a deletion per pass would queue duplicates. The record stays until the deletion succeeds
+                // (`releaseBrowserPages`, which then schedules a keyed run's purge), so a deletion that exhausts its retries is tried
+                // again by the sweep a time to live from now.
                 if (!more) {
                     await runAfterOnShard(
                         ctx.scheduler,
                         0,
                         internal.browser.gdpr.deleteBrowserExportPages,
-                        { prefix: browserExportPrefix(run.userId, run.requestId) },
+                        { prefix: browserExportPrefix(run.userId, run.requestId), runId: run._id },
                         run.userId,
                         RECORD_RETRY,
                     );
                 }
 
-                // Scheduled once the run's pieces and index rows are drained, not on every pass that clears some: a run with pieces
-                // left is due again at once, and a purge per pass would queue duplicates while the first one is still running.
-                if (run.usageKey !== undefined && !more) {
-                    await schedulePurge(ctx, run);
-                }
-
-                if (run.usageKey === undefined && !more) {
-                    await ctx.db.delete("usageExportRuns", run._id);
-                } else {
-                    // Pieces remain, so the run is due again at once. A keyed run waits for its purge a time to live from now.
-                    await armRun(ctx, run._id, run.userId, more ? ctx.now : ctx.now + EXPORT_PIECE_TTL_MS);
-                }
+                // Pieces remain, so the run is due again at once; otherwise a time to live from now, in case its cleanup fails for good.
+                await armRun(ctx, run._id, run.userId, more ? ctx.now : ctx.now + EXPORT_PIECE_TTL_MS);
 
                 handled += 1;
             }

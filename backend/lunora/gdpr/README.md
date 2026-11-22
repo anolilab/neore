@@ -136,7 +136,7 @@ Users can request a complete export of all their personal data in JSON format. T
    whatever the outcome, before the steps that follow it; no page is stored once the account's deletion has begun, and a page
    whose write ends after it began is deleted again). The pages sit under `gdpr-exports/browser-<user>/<run>/`, and the run's record (`usageExportRuns`) is written
    before the first page, so a run killed before its ending is still cleaned up: the usage sweep deletes a dead run's pages
-   with its usage object, and account erasure deletes the user's whole prefix (`delete-user-browser-export-pages`). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
+   with its usage object, and keeps the record until the pages are gone (a deletion that exhausts its retries is tried again a day on), and account erasure deletes the user's whole prefix (`delete-user-browser-export-pages`). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
    `control` claim, a typed action's `value` (it can be a password) and an extension's pairing code. A string field
    over 4 KiB is cut and named in the row's `truncated` (a list keeps every item, the cut ones named: `capabilities[1]`). The
    section is held to 8 MiB of the file and 256 pages (workflow steps): past either the rest is left out and the section says

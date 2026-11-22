@@ -17,13 +17,14 @@ import {
     eraseUsageForUser,
     keyedUsageRuns,
     purgeObject,
+    releaseBrowserPages,
     releaseUsageKey,
     sweepUsageExportPieces,
 } from "./gdpr";
 
 /** Object keys the purges were scheduled for, and the shards the scheduler was asked to run a tick on, captured in place of the scheduler. */
 const scheduled = vi.hoisted(() => {
-    return { keys: [] as string[], prefixes: [] as string[], shards: [] as string[] };
+    return { keys: [] as string[], prefixes: [] as string[], runIds: [] as string[], shards: [] as string[] };
 });
 
 vi.mock("../lib/shard-scheduler", async (importOriginal) => {
@@ -36,6 +37,10 @@ vi.mock("../lib/shard-scheduler", async (importOriginal) => {
 
             if (typeof args["prefix"] === "string") {
                 scheduled.prefixes.push(args["prefix"]);
+            }
+
+            if (typeof args["prefix"] === "string" && typeof args["runId"] === "string") {
+                scheduled.runIds.push(args["runId"]);
             }
 
             scheduled.shards.push(shardKey);
@@ -106,6 +111,17 @@ const eraseAll = async (userId: string): Promise<void> => {
     }
 };
 
+/** Plays the scheduled browser-page deletions succeeding: each reports its run's pages gone, as the action does after deleting them. */
+const pagesDeleted = async (): Promise<void> => {
+    const runIds = [...scheduled.runIds];
+
+    scheduled.runIds.length = 0;
+
+    for (const runId of runIds) {
+        await harness.run(async (ctx: any) => await ctx.runMutation(releaseBrowserPages, { runId }));
+    }
+};
+
 beforeEach(() => {
     // The sweep's 24-hour boundary is measured from the clock: it is pinned for each test, so the fixtures cannot drift between calls.
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -113,6 +129,7 @@ beforeEach(() => {
     harness = lunoraTest(schema as never);
     scheduled.keys = [];
     scheduled.prefixes = [];
+    scheduled.runIds = [];
     scheduled.shards = [];
 });
 
@@ -406,7 +423,47 @@ describe("the sweep and the clear", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
 
         expect(scheduled.prefixes).toStrictEqual([browserExportPrefix(A, runKey.key)]);
+        // The record stays until the deletion reports the pages gone.
+        expect(await countOf("usageExportRuns", A)).toBe(1);
+
+        await pagesDeleted();
         expect(await countOf("usageExportRuns", A)).toBe(0);
+    });
+
+    it.each([
+        { key: undefined, name: "an unkeyed run" },
+        { key: "gdpr-exports/retry.json", name: "a keyed run" },
+    ])("keeps $name's record when its page deletion exhausts its retries, so a later sweep deletes the pages again", async ({ key }) => {
+        const t0 = Date.now();
+
+        await harness.run(async (ctx: any) => {
+            const request = await ctx.db.insert("gdprRequests", {
+                requestedAt: 1,
+                requestType: "export",
+                status: "failed",
+                userEmail: "a@example.com",
+                userId: A,
+            });
+
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: `${request}:1`, userId: A, ...(key && { usageKey: key }) });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(scheduled.prefixes).toHaveLength(1);
+        // The deletion fails for good: it never reports back. The record stays, due a time to live on, and no purge was queued.
+        scheduled.runIds = [];
+        expect(scheduled.keys).toStrictEqual([]);
+        expect(await countOf("usageExportRuns", A)).toBe(1);
+
+        vi.setSystemTime(t0 + EXPORT_PIECE_TTL_MS);
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(scheduled.prefixes).toHaveLength(2);
+        expect(scheduled.prefixes[1]).toBe(scheduled.prefixes[0]);
+
+        // This time it succeeds: an unkeyed record goes now, a keyed one's purge is queued, which releases it after its object.
+        await pagesDeleted();
+        expect(scheduled.keys).toStrictEqual(key === undefined ? [] : [key]);
+        expect(await countOf("usageExportRuns", A)).toBe(key === undefined ? 0 : 1);
     });
 
     it("removes a dead run's pieces at the time its last live sweep set, and not before", async () => {
@@ -503,6 +560,7 @@ describe("the sweep and the clear", () => {
 
         await harness.run(async (ctx: any) => await ctx.db.patch("gdprRequests", request, { status: "failed" }));
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        await pagesDeleted();
         expect(await countOf("usageExportRuns", A)).toBe(0);
     });
 
@@ -558,7 +616,7 @@ describe("the sweep and the clear", () => {
         expect(scheduled.shards).toEqual([A]);
     });
 
-    it("schedules a keyed run's purge once, when its pieces are drained, not on each pass that clears some of them", async () => {
+    it("schedules a keyed run's cleanup once, when its pieces are drained, not on each pass that clears some of them", async () => {
         const old = Date.now() - EXPORT_PIECE_TTL_MS - 60_000;
 
         await harness.run(async (ctx: any) => {
@@ -578,12 +636,16 @@ describe("the sweep and the clear", () => {
         // Two full passes of ten pieces each leave the run due again at once, and no purge is queued while pieces remain.
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
-        expect(scheduled.keys).toEqual([]);
+        expect(scheduled.prefixes).toEqual([]);
 
-        // The last five drain the run: its purge is queued exactly once.
+        // The last five drain the run: its page deletion is queued exactly once, and its purge once the pages are gone.
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
 
         expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(scheduled.prefixes).toEqual([browserExportPrefix(A, "many:1")]);
+        expect(scheduled.keys).toEqual([]);
+
+        await pagesDeleted();
         expect(scheduled.keys).toEqual(["gdpr-exports/many-pieces.json"]);
     });
 
@@ -607,13 +669,13 @@ describe("the sweep and the clear", () => {
 
         // The first sweep handles the ten keyed runs, and moves them out of the window.
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
-        expect(scheduled.keys).toHaveLength(10);
+        expect(scheduled.prefixes).toHaveLength(10);
         expect(await countOf("usageExportPieces", A)).toBe(1);
 
         // The second sweep reaches the expired run behind them.
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
         expect(await countOf("usageExportPieces", A)).toBe(0);
-        expect(scheduled.keys).toHaveLength(10);
+        expect(scheduled.prefixes).toHaveLength(11);
     });
 
     it("accepts a composite run id longer than a single id, as an export run's id is", async () => {
@@ -623,7 +685,7 @@ describe("the sweep and the clear", () => {
 
         expect(result).toEqual({ hasMore: false });
     });
-    it("removes a dead run's pieces and index rows, schedules its purge, and leaves a live run alone", async () => {
+    it("removes a dead run's pieces and index rows, schedules its cleanup, and leaves a live run alone", async () => {
         const old = Date.now() - EXPORT_PIECE_TTL_MS - 60_000;
         const { dead, live } = await harness.run(async (ctx: any) => {
             const deadRequest = await ctx.db.insert("gdprRequests", {
@@ -658,7 +720,7 @@ describe("the sweep and the clear", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
 
-        expect(scheduled.keys).toEqual(["gdpr-exports/dead-1.json"]);
+        expect(scheduled.prefixes).toEqual([browserExportPrefix(A, `${dead}:1`)]);
 
         const pieces = await harness.run(async (ctx: any) => {
             const { page } = await ctx.db.usageExportPieces.findMany({ limit: 100, where: { userId: A } });

@@ -13,6 +13,7 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalQuery } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { withDependency } from "../lib/dependency";
+import { gdprLogger } from "../lib/logger";
 import { MAX_LENGTH } from "../lib/validators";
 import { browserExportUserPrefix } from "./export-pages";
 
@@ -554,8 +555,12 @@ export const storeBrowserExportPage = internalAction
         const read = async (cautious: boolean): Promise<BrowserExportPage> =>
             (await ctx.runQuery(internal.browser.gdpr.collectBrowserForExport, { cautious, cursor, userId })) as BrowserExportPage;
         // A page whose rows were larger than any read before them can pass the transaction's read limit: read again, cautiously
-        // (a read that fails for another reason fails again, and the step's retry takes over).
-        const { next, ...rows } = await read(false).catch(async () => await read(true));
+        // (a read that fails for another reason fails again, and the step's retry takes over). Logged, so the fallback's cause stays visible.
+        const { next, ...rows } = await read(false).catch(async (error: unknown) => {
+            gdprLogger.warn(`A browser export page (${cursor?.phase ?? "sessions"}) is read again cautiously`, error);
+
+            return await read(true);
+        });
         const blob = new Blob([JSON.stringify(rows)], { type: "application/json" });
 
         await withDependency("file storage", () =>
@@ -586,12 +591,19 @@ export const deleteObjectsUnder = async (
     }
 };
 
-/** Deletes every page object under a run's `prefix`; any terminal path of the export, and the sweep of a dead run, call it. */
+/**
+ * Deletes every page object under a run's `prefix`; any terminal path of the export, and the sweep of a dead run, call it. The sweep
+ * passes the run's record (`runId`), released only once the pages are gone (`usage/gdpr.ts#releaseBrowserPages`).
+ */
 export const deleteBrowserExportPages = internalAction
-    .input({ prefix: v.string() })
+    .input({ prefix: v.string(), runId: v.optional(v.id("usageExportRuns")) })
     .output(v.null())
-    .action(async ({ args: { prefix }, ctx }) => {
+    .action(async ({ args: { prefix, runId }, ctx }) => {
         await deleteObjectsUnder(ctx.storage, prefix);
+
+        if (runId !== undefined) {
+            await ctx.runMutation(internal.usage.gdpr.releaseBrowserPages, { runId });
+        }
 
         return null;
     });

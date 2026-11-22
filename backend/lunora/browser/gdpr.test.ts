@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { browserExportPageKey, browserExportPrefix, type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
-import { collectBrowserForExport, deleteUserBrowserExportPages, EXPORT_FIELD_BYTES, storeBrowserExportPage } from "./gdpr";
+import { collectBrowserForExport, deleteBrowserExportPages, deleteUserBrowserExportPages, EXPORT_FIELD_BYTES, storeBrowserExportPage } from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
@@ -219,6 +219,37 @@ describe("browser export pages left by a killed export", () => {
         await eraseFor(storage, "user-1");
 
         expect([...stored]).toStrictEqual([keys[1]]);
+    });
+
+    it("releases the sweep's run record only once the run's pages are deleted", async () => {
+        const prefix = browserExportPrefix(A, "request-1:instance-1");
+        const { storage, stored } = storageOf([browserExportPageKey(prefix, 0), browserExportPageKey(prefix, 1), browserExportPageKey(prefix, 2)]);
+        const released: unknown[] = [];
+        const run = async (target: typeof storage) =>
+            await (deleteBrowserExportPages as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler(
+                {
+                    runMutation: async (_ref: unknown, args: unknown) => {
+                        released.push(args);
+                    },
+                    storage: target,
+                },
+                { prefix, runId: "run-1" },
+            );
+
+        // A delete that fails throws before the release, so the record stays for the next sweep.
+        await expect(
+            run({
+                ...storage,
+                delete: async () => {
+                    throw new Error("storage down");
+                },
+            }),
+        ).rejects.toThrow("storage down");
+        expect(released).toStrictEqual([]);
+
+        await run(storage);
+        expect([...stored]).toStrictEqual([]);
+        expect(released).toStrictEqual([{ runId: "run-1" }]);
     });
 });
 
