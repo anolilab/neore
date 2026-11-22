@@ -131,6 +131,17 @@ function readTarget(
             names.push(node.value);
         }
 
+        // A label is clicked as the control it labels (a submit input, or a button): that control's name and value count too.
+        const labelled = node instanceof HTMLLabelElement ? node.control : null;
+
+        if (labelled !== null) {
+            names.push(labelled.getAttribute("aria-label") ?? "", labelled.getAttribute("title") ?? "");
+
+            if (labelled instanceof HTMLInputElement && ["button", "reset", "submit"].includes(labelled.type)) {
+                names.push(labelled.value);
+            }
+        }
+
         // The rendered text of the control and of the element it lands on: a child with ordinary text can sit beside a purchase
         // word the person sees.
         if ((node === control || node === scope) && node instanceof HTMLElement) {
