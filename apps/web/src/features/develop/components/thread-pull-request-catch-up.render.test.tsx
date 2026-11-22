@@ -13,7 +13,7 @@ const { merge, prefill, pull } = vi.hoisted(() => {
     return {
         merge: { current: {} as { data?: { state: string; status: string } } },
         prefill: vi.fn(),
-        pull: { current: {} as { data?: { detail?: { baseBranch: string; state: string }; status: string } } },
+        pull: { current: {} as { data?: { detail?: { baseBranch: string; headBranch: string; state: string }; status: string } } },
     };
 });
 
@@ -28,13 +28,12 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+// Mirrors the real TooltipTrigger: with `render`, the element is the trigger and its children are not forwarded into it.
 vi.mock("@neore/ui/components/tooltip", () => {
     return {
         Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
         TooltipContent: () => null,
-        TooltipTrigger: ({ children, render: element }: { children: ReactNode; render: ReactElement<{ children?: ReactNode }> }) => (
-            <element.type {...element.props}>{children}</element.type>
-        ),
+        TooltipTrigger: ({ render: element }: { render: ReactElement<{ children?: ReactNode }> }) => <element.type {...element.props} />,
     };
 });
 
@@ -53,7 +52,7 @@ vi.mock("../lib/use-merge", () => {
 const BUTTON = { name: "Catch up octo/hello#7 with main" };
 
 const given = (state: string, mergeState: string) => {
-    pull.current = { data: { detail: { baseBranch: "main", state }, status: "ok" } };
+    pull.current = { data: { detail: { baseBranch: "main", headBranch: "feat/x", state }, status: "ok" } };
     merge.current = { data: { state: mergeState, status: "ok" } };
 };
 
@@ -70,9 +69,14 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(screen.getByText("Behind main")).toBeTruthy();
 
-        fireEvent.click(screen.getByRole("button", BUTTON));
+        const button = screen.getByRole("button", BUTTON);
+
+        expect(button.textContent).toBe("Catch up");
+
+        fireEvent.click(button);
 
         expect(prefill).toHaveBeenCalledTimes(1);
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("git switch feat/x"));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("git rebase origin/main"));
     });
 

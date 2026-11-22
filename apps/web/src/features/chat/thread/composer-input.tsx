@@ -1626,6 +1626,12 @@ const ComposerInput = ({
     const applyPrefill = useCallback(
         (prefilled: string) => {
             promptHistory.reset();
+
+            // A rejection warning is about the text that was there: typing clears it (`handleTextChange`), so the prefill does too.
+            if (useChatUIStore.getState().composerBannedContent) {
+                useChatUIStore.getState().setComposerBannedContent(null);
+            }
+
             setText(textAfterRestore(getComposerText(), { append: true, files: [], text: prefilled }));
             inputAreaRef.current?.focus();
         },

@@ -35,6 +35,7 @@ const ThreadPullRequestCatchUp = ({ link, threadId }: { link: { number: number; 
     }
 
     const base = detail.baseBranch;
+    const head = detail.headBranch;
     const pullRequest = `${link.repository}#${String(link.number)}`;
     const label = t`Catch up ${pullRequest} with ${base}`;
 
@@ -42,18 +43,19 @@ const ThreadPullRequestCatchUp = ({ link, threadId }: { link: { number: number; 
         <span className="inline-flex items-center gap-1 text-xs">
             <span className="text-muted-foreground">{t`Behind ${base}`}</span>
             <Tooltip>
+                {/* A `render` element replaces the trigger, and TooltipTrigger does not forward its children into it: the label goes in the button. */}
                 <TooltipTrigger
                     render={
                         <Button
                             aria-label={label}
-                            onClick={() => prefillComposer(threadId, catchUpPrompt({ baseBranch: base, ...address }))}
+                            onClick={() => prefillComposer(threadId, catchUpPrompt({ baseBranch: base, headBranch: head, ...address }))}
                             size="sm"
                             variant="outline"
-                        />
+                        >
+                            {t`Catch up`}
+                        </Button>
                     }
-                >
-                    {t`Catch up`}
-                </TooltipTrigger>
+                />
                 <TooltipContent side="bottom">{t`Puts a prompt in the composer to rebase this branch on ${base}, resolve conflicts, check the build and tests, and push. Nothing is sent.`}</TooltipContent>
             </Tooltip>
         </span>

@@ -317,6 +317,40 @@ describe("the thread list and the sidebar counts", () => {
         expect(unlocked.map((row: any) => row.title)).toEqual(["a thread"]);
     });
 
+    it("lists the newest links of a thread past the per-thread read, not only the oldest", async () => {
+        const threadId = await threadOf(A);
+
+        await harness.run(async (ctx: any) => {
+            for (let number = 1; number <= 100; number += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: number,
+                    kind: "opened",
+                    number,
+                    repository: "octo/hello",
+                    threadId,
+                    title: "t",
+                    url: `https://github.com/octo/hello/pull/${String(number)}`,
+                    userId: A,
+                });
+            }
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1000,
+                kind: "opened",
+                number: 500,
+                repository: "octo/hello",
+                threadId,
+                title: "newest",
+                url: "https://github.com/octo/hello/pull/500",
+                userId: A,
+            });
+        });
+
+        const listed = (await as(A).query(listForThread as never, { threadId } as never)) as any[];
+
+        expect(listed[0].number).toBe(500);
+    });
+
     it("gives no badge to a thread past the per-thread read, rather than a partial count", async () => {
         const threadId = await threadOf(A);
 

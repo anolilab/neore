@@ -231,6 +231,8 @@ export const listForThread = authQuery
         const rows = await ctx.db
             .query("pullRequestThreads")
             .withIndex("by_user_and_threadId", (q) => q.eq("userId", ctx.user.userId).eq("threadId", args.threadId as Id<"threads">))
+            // Newest first: the index is oldest first, so an unordered read past the cap would keep the oldest links only.
+            .order("desc")
             .take(MAX_LINKS_READ_PER_THREAD);
         const { live, threads } = await partitionLinks(ctx, rows);
 
