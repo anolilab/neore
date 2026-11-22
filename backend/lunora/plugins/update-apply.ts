@@ -72,6 +72,7 @@ export const updateSkillChild = internalMutation
         installId: v.string().max(128),
         instructions: v.string().max(65536),
         name: v.string().max(256),
+        slug: v.string().max(256),
         tags: v.optional(v.array(v.string().max(256))),
         variables: v.optional(v.any()),
         version: v.optional(v.string().max(64)),
@@ -101,6 +102,7 @@ export const updateSkillChild = internalMutation
         // Pending first: if the write below stops, repair sees a child that matches neither hash and knows an update was half done.
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
+        // The slug is part of the content hash, so the row must take the planned slug or it reads as edited on the next update.
         await ctx.db.patch(
             "skills",
             skill._id as Id<"skills">,
@@ -111,6 +113,7 @@ export const updateSkillChild = internalMutation
                 icon: args.icon,
                 instructions: args.instructions,
                 name: args.name,
+                slug: args.slug,
                 tags: args.tags,
                 updatedAt: ctx.now,
                 variables: args.variables,

@@ -214,4 +214,37 @@ describe("plugin update action", () => {
         expect(result.applied).toEqual(expect.arrayContaining(["skill:critic-two", "skill:critic"]));
         expect((await skillsNamed()).map((row: { slug: string }) => row.slug).toSorted()).toStrictEqual(["analyst", "critic-2"]);
     });
+
+    it("a keyed skill whose slug changes takes the new slug on its row, so the next update does not read it as edited", async () => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill", skill: skill("analyst") },
+                { key: "critic", kind: "skill", skill: skill("critic-pro") },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+
+        expect(preview.plan).toContainEqual({ action: "update", entryKey: "skill:critic" });
+
+        const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
+            confirmDowngrade: false,
+            contentHash,
+            markdown,
+        } as never)) as UpdateResult;
+
+        expect(result.applied).toContain("skill:critic");
+
+        const rows = await skillsNamed();
+
+        expect(rows.map((row: { slug: string }) => row.slug).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["analyst", "critic-pro"]);
+
+        const again = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+
+        expect(again.plan).toContainEqual({ action: "same", entryKey: "skill:critic" });
+    });
 });

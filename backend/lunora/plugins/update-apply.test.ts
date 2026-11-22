@@ -81,6 +81,7 @@ describe("applying an update", () => {
                     installId,
                     instructions: REVISED.instructions,
                     name: REVISED.name,
+                    slug: REVISED.slug,
                     userId: OWNER,
                 }),
         );
@@ -115,6 +116,7 @@ describe("applying an update", () => {
                         installId,
                         instructions: REVISED.instructions,
                         name: REVISED.name,
+                        slug: REVISED.slug,
                         userId: OWNER,
                     }),
             ),

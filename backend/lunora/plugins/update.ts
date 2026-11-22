@@ -259,6 +259,7 @@ export const updatePlugin = authAction
                 installId: installed.installId,
                 instructions: content.instructions,
                 name: content.name,
+                slug: content.slug,
                 tags: content.tags,
                 userId,
                 variables: content.variables,

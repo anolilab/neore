@@ -1063,7 +1063,7 @@ export interface InternalApiTypes {
             detachChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
             finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
             removeChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
-            updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
+            updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; slug: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
             updateTriggerChild: FunctionReference<"mutation", { contentHash: string; cronExpression?: string; description?: string; entryKey: string; generation: number; inputTemplate?: string; installId: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; userId: string }, null>;
         };
     };
