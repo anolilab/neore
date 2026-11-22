@@ -92,9 +92,20 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
 
         return ["::before", "::after"].flatMap((pseudo) => {
             const { content } = getComputedStyle(node, pseudo);
-            const quote = content.charAt(0);
 
-            return quote === '"' || quote === "'" ? [content.slice(1, -1)] : [];
+            if (content === "none" || content === "normal") {
+                return [];
+            }
+
+            // CSS `content` is a sequence of quoted strings (their text) and attr(name) calls (the attribute's value). url()
+            // and counters draw no words of their own, so they add nothing.
+            const quoted = content.split('"').filter((_, index) => index % 2 === 1);
+            const attributes = content
+                .split("attr(")
+                .slice(1)
+                .map((part) => node.getAttribute(part.split(")", 1)[0]?.trim() ?? "") ?? "");
+
+            return [...quoted, ...attributes];
         });
     };
 
