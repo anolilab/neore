@@ -109,18 +109,18 @@ export const executeBrowserAction = internalAction
                 decisionSession = sessionId;
 
                 // A click the person approved is checked against the target its decision read recorded, taken here, before the
-                // hold. A decision whose target was pushed out, or that could not read one, is refused: nothing is clicked unseen.
-                // No decision at all (ask mode asks without a look) is not checked, as before.
+                // hold. Only a recorded target lets it run: a decision that was pushed out, could not read one, or never recorded
+                // one (`none`) is refused, so nothing is clicked unseen.
                 let approvedTarget: string | undefined;
 
                 if (action === "click" && args.approvedCallId !== undefined) {
                     const taken = await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId });
 
-                    if (taken.kind === "lost" || taken.kind === "unreadable") {
+                    if (taken.kind !== "target" || taken.target === undefined) {
                         return { error: APPROVED_TARGET_UNKNOWN, success: false };
                     }
 
-                    approvedTarget = taken.kind === "target" ? taken.target : undefined;
+                    approvedTarget = taken.target;
                 }
 
                 // The row is in use from here on, not only once the action returns: no person takes control mid-action, and

@@ -135,8 +135,13 @@ function readTarget(
             const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
 
             if (target !== null) {
-                // The referenced element's text, and the names inside it (an image's alt, a child's aria-label or title).
-                names.push(target.textContent ?? "");
+                // The referenced element's own name (an image's alt, its aria-label or title), its text, and the names inside it.
+                names.push(
+                    target.getAttribute("alt") ?? "",
+                    target.getAttribute("aria-label") ?? "",
+                    target.getAttribute("title") ?? "",
+                    target.textContent ?? "",
+                );
 
                 for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
                     names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
@@ -229,8 +234,13 @@ function readTarget(
             const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
 
             if (target !== null) {
-                // The referenced element's text, and the names inside it (an image's alt, a child's aria-label or title).
-                names.push(target.textContent ?? "");
+                // The referenced element's own name (an image's alt, its aria-label or title), its text, and the names inside it.
+                names.push(
+                    target.getAttribute("alt") ?? "",
+                    target.getAttribute("aria-label") ?? "",
+                    target.getAttribute("title") ?? "",
+                    target.textContent ?? "",
+                );
 
                 for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
                     names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
@@ -332,9 +342,11 @@ function readTarget(
         destinations += `${link}|${formTarget}|${kind}|`;
     }
 
-    // The form's destination is read through the prototype: a field named "action" (or "querySelector") in the form would
-    // otherwise shadow the form's own property, and the destination would be that field.
-    const formAction = enclosingForm === null ? "" : new URL(Element.prototype.getAttribute.call(enclosingForm, "action") ?? "", document.URL).href;
+    // The form's destination is the browser's own resolved `action` (its native getter, through the prototype): a field named
+    // "action" (or "querySelector") in the form would otherwise shadow the form's own property, and a `<base>` change moves
+    // the destination the browser submits to, which resolving the raw attribute against the page address would miss.
+    const formActionGetter = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "action")?.get;
+    const formAction = enclosingForm === null || formActionGetter === undefined ? "" : String(formActionGetter.call(enclosingForm));
 
     // The form's method is part of what a submit does (a GET form puts its fields in the address).
     destinations += enclosingForm === null ? "" : `|${Element.prototype.getAttribute.call(enclosingForm, "method") ?? ""}`;
@@ -370,7 +382,9 @@ function readTarget(
     // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
     // different targets share a fingerprint. `targetOf` digests it outside the page.
     const isCheckout = isCardFields || isCheckoutPage;
-    const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout)].join("\u{0}");
+    // The submit-like flag is part of it too: a name change that makes a control submit-like (an arrow named "Review" with a
+    // title "Confirm") invalidates an earlier approval, as the checkout flag does.
+    const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout), String(isSubmitLike)].join("\u{0}");
 
     return {
         canonical,

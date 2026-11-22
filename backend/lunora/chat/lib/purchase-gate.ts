@@ -52,13 +52,13 @@ export interface ClickTargetLook {
 
 /**
  * Whether a browser action needs the person's yes before it runs. Only a click reads a target. Anything else, and a click
- * with no selector, asks nothing: the action itself refuses or fails.
+ * with no selector (an empty one too: the renderer reads "" as no selector), asks nothing: the action itself refuses or fails.
  */
 export const browserActionNeedsPurchaseApproval = async (
     input: { action: string; selector?: string },
     look: (selector: string) => Promise<ClickTargetLook>,
 ): Promise<boolean> => {
-    if (input.action !== "click" || input.selector === undefined) {
+    if (input.action !== "click" || !input.selector) {
         return false;
     }
 

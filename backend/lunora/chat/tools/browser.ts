@@ -146,13 +146,15 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             // purchase: a purchase needs the person's yes, which this call was not given (its decision read was not one).
             let step: Parameters<typeof run>[0] = action === "needs_person" ? { action: "screenshot" } : { ...input, action };
 
-            if (action === "click" && input.selector !== undefined) {
+            // An empty selector is no selector: the renderer refuses that click, so no look runs for it.
+            if (action === "click" && input.selector) {
                 if (approvedToolCallIds(options.messages).has(options.toolCallId)) {
                     step = { ...step, approvedCallId: options.toolCallId };
                 } else {
                     const look = await run({ action: "extract", approvalLook: true, selector: input.selector });
 
-                    if (purchaseTargetNeedsApproval(look as ClickTargetLook)) {
+                    // A look that reads no target clears nothing: a click without a fingerprint would run unchecked.
+                    if (look.target === undefined || purchaseTargetNeedsApproval(look as ClickTargetLook)) {
                         return { error: CLICK_NEEDS_APPROVAL, success: false };
                     }
 

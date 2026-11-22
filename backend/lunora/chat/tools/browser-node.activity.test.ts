@@ -941,7 +941,7 @@ describe("a browser a person took control of", () => {
         expect(renderer.mock.calls).toHaveLength(callsBefore);
     });
 
-    it("an approved click is checked against the target its decision look recorded, and one with no record is not", async () => {
+    it("an approved click is checked against the target its decision look recorded, and one with no record is refused", async () => {
         await addSession(NOW - 1000);
         renderer.mockResolvedValueOnce(answered({ content: "Pay now", label: "Pay now", success: true, target: "T-1", url: "https://example.com/cart" }));
 
@@ -973,20 +973,21 @@ describe("a browser a person took control of", () => {
 
         expect(renderer.mock.calls[1]?.[0]).toMatchObject({ body: { action: "click", expectTarget: "T-1", selector: "#pay" } });
 
-        renderer.mockResolvedValueOnce(answered({ clickedSelector: "#pay", success: true, url: "https://example.com/paid" }));
-        await harness.action(
-            async (ctx: any) =>
-                await ctx.runAction(executeBrowserAction, {
-                    action: "click",
-                    approvedCallId: "call-without-a-look",
-                    selector: "#pay",
-                    threadId,
-                    userId: OWNER,
-                    userTier: "premium",
-                }),
-        );
-
-        expect((renderer.mock.calls[2]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("expectTarget");
+        // No decision recorded a target for this call: nothing is clicked, so the renderer is not called again.
+        await expect(
+            harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(executeBrowserAction, {
+                        action: "click",
+                        approvedCallId: "call-without-a-look",
+                        selector: "#pay",
+                        threadId,
+                        userId: OWNER,
+                        userTier: "premium",
+                    }),
+            ),
+        ).resolves.toEqual({ error: APPROVED_TARGET_UNKNOWN, success: false });
+        expect(renderer).toHaveBeenCalledTimes(2);
     });
 
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
