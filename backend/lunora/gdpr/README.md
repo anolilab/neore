@@ -129,7 +129,7 @@ Users can request a complete export of all their personal data in JSON format. T
 4. **Files** - File metadata (actual files stored separately)
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
-7. **Browser** - Browser sessions (started, status, last page), their actions (action, target, time, success),
+7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),
    the sites a run asked the user to clear, and paired extensions (`browser/gdpr.ts#collectBrowserForExport`, a
    page per workflow step, each stored as an object under the run's prefix and read back by `generateExportFile`, so no
    call carries the whole history past Lunora's 1 MiB dispatch body; the objects are deleted once the export file's step ends,

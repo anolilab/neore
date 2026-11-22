@@ -24,6 +24,8 @@ const seed = async (userId: string, actions: number, targetBytes = 0): Promise<v
             connectUrl: `wss://renderer.example/connect?token=secret-${userId}`,
             control: { by: "holder-hash", claim: "claim-token", since: 1, until: 2 },
             currentUrl: `https://${userId}.example.com/page`,
+            extensionId: `ext-${userId}`,
+            extensionVersion: "1.2.3",
             inUseHolds: [5],
             lastActivityAt: 20,
             providerSessionId: `provider-${userId}`,
@@ -87,7 +89,14 @@ describe("browser data in the GDPR export", () => {
         const { result } = await exportOf(A);
 
         expect(result.sessions).toEqual([
-            expect.objectContaining({ currentUrl: "https://user-a.example.com/page", lastActivityAt: 20, startedAt: 10, status: "completed" }),
+            expect.objectContaining({
+                currentUrl: "https://user-a.example.com/page",
+                extensionId: "ext-user-a",
+                extensionVersion: "1.2.3",
+                lastActivityAt: 20,
+                startedAt: 10,
+                status: "completed",
+            }),
         ]);
         expect(result.actions).toHaveLength(2);
         expect(result.actions[0]).toEqual(

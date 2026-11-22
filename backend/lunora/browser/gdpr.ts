@@ -241,7 +241,7 @@ export type BrowserExportCursor = Infer<typeof vBrowserExportCursor>;
 const vTruncated = v.optional(v.array(v.string()));
 
 /**
- * What the export keeps of a session: when it ran, how it ended and the last page it showed. Left out: the renderer's connect
+ * What the export keeps of a session: when it ran, how it ended, the last page it showed and the extension that drove it. Left out: the renderer's connect
  * URL and session id (credentials for a browser), the in-flight holds and the live-view `control` claim (bookkeeping, and an
  * opaque holder of the person who drove).
  */
@@ -249,6 +249,8 @@ const vExportSession = v.object({
     completedAt: v.optional(v.number()),
     currentUrl: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
+    extensionId: v.optional(v.string()),
+    extensionVersion: v.optional(v.string()),
     id: v.string(),
     lastActivityAt: v.number(),
     source: v.optional(v.string()),
@@ -327,6 +329,8 @@ const exportedSession = (row: Doc<"browserSessions">): Infer<typeof vExportSessi
         ...(row.completedAt !== undefined && { completedAt: row.completedAt }),
         ...(row.currentUrl !== undefined && { currentUrl: row.currentUrl }),
         ...(row.errorMessage !== undefined && { errorMessage: row.errorMessage }),
+        ...(row.extensionId !== undefined && { extensionId: row.extensionId }),
+        ...(row.extensionVersion !== undefined && { extensionVersion: row.extensionVersion }),
         ...(row.source !== undefined && { source: row.source }),
     });
 
