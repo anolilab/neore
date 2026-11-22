@@ -51,10 +51,9 @@ export const getThreadPins = authQuery
     .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
-        // A pin quotes the chat's messages: a locked chat's pins need its proof.
-        const thread = await context.db.get("threads", threadId as Id<"threads">);
-
-        if (thread && isThreadLocked(thread) && (await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId })) !== "ok") {
+        // A pin quotes the chat's messages and documents, so the caller reads them only while the thread's grant stands: a revoked
+        // grant reads none, locked or not. The grant is read from the primary, as the write gate reads it.
+        if ((await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId })) !== "ok") {
             return [];
         }
 

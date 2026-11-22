@@ -254,3 +254,29 @@ describe("document pins", () => {
         expect(lookup.mock.calls.every((call) => call[4]?.primary === true)).toBe(true);
     });
 });
+
+describe("listing a thread's pins after a grant is revoked", () => {
+    const COLLABORATOR = "user-collaborator";
+
+    it("returns a collaborator's own pins while the grant stands, and none once it is revoked", async () => {
+        const grantId = await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", {
+                createdAt: 1,
+                messageRole: "assistant",
+                selectedText: "Launch banner",
+                threadId,
+                updatedAt: 1,
+                userId: COLLABORATOR,
+            });
+
+            return await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId, userId: COLLABORATOR });
+        });
+        const listed = async () => (await as(COLLABORATOR).query(getThreadPins as never, { threadId } as never)) as unknown[];
+
+        expect(await listed()).toHaveLength(1);
+
+        await harness.run(async (context: any) => await context.db.delete("threadAccess", grantId));
+
+        expect(await listed()).toHaveLength(0);
+    });
+});
