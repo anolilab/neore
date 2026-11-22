@@ -8,7 +8,16 @@ The rules for working in `apps/browser-extension/`. The protocol and the reasoni
 - Every request to our origins sends no cookie: `credentials: "omit"` on our fetches, and the Lunora client gets a `fetch` that forces it (`src/lib/lunora-client.ts`), since it asks for `"include"` on its own. The backend strips the cookie off extension-origin requests anyway (`backend/src/extension-cookie.ts`).
 - No host permission for the app origin: the extension only opens it in the sign-in window.
 - A 401 from `/extension/auth/token` drops the grant (revoked or expired); sign-out revokes it server side, then forgets it even if offline.
-- A sign-out (`endSession`, `src/lib/session.ts`) holds new tokens (a count, so one sign-out ending early never lifts another's hold: `releaseAccessTokens`) and stops the refresh loop while the grant is revoked and removed, but clears the bearer only once the grant is gone: clearing it drops the offline queue. If storage fails to read or remove the grant it rejects, so Settings shows the failure; never report that sign-out as done. The session comes back for the grant (tokens resume, the loop restarts) only while the server still accepts it: after a confirmed revoke the bearer is cleared. It acts on the grant Settings shows (`grantKey`), leaving a newer one unrevoked, and one sign-out runs per grant. A session started meanwhile (`suspend`'s generation check) is left alone.
+- Sign-out (`endSession`, `src/lib/session.ts`); sequence and reasoning in
+  [the reference](../../docs/agents/extension-sign-out.md):
+    - Hold new tokens by count (`releaseAccessTokens`), then check and write the mark (`neore.signedOutGrant`) under the grant lock; the bearer stays until the mark is written.
+    - Never report a rejected sign-out as done: a failed grant read or mark write brings the session back and shows the error.
+    - Never sign back in after a failed removal: `readGrant` hides a marked grant; the next panel removes it (`finishPendingSignOut`), reading again once it holds the sign-out lock.
+    - A storage read that fails after a change keeps the session shown and retries with capped backoff; only the first read counts a failure as signed out.
+    - Lock order: the sign-out lock (`neore.signOut:<key>`) first, then the grant lock inside it.
+    - Warn only from the storage failure mark (`neore.signOutFailed`) or this panel's own failed removal (`failedHere`), never for a failed revoke alone, and not while a removal runs here or a sign-out runs elsewhere.
+    - Bound the revoke (`REVOKE_TIMEOUT_MS`) and never await its body: only the status counts. Out of time is a failed revoke; the grant goes either way.
+    - Act on the grant Settings shows (`grantKey`), one sign-out per grant; leave a newer grant or session alone.
 - A Chrome install updated from the cookie build is told once to connect (`migrateFromCookieSession` on `runtime.onInstalled`, `neore.reconnectNeeded`), only when the old build's Lunora read cache holds something (`hasCookieBuildReads`): that build queried only when signed in. Keep the migration mark (`neore.authMigration`) so it runs once per install.
 - A Chrome build signs in only when the backend lists `https://<id>.chromiumapp.org/` in `TRUSTED_EXTENSION_REDIRECT_URIS`. That one list also holds the desktop and mobile callbacks, and a value replaces it whole: add the Chrome URI to what is set, and list the Firefox URI when it was unset.
 - Live queries: the socket signs in with a ticket minted for the bearer (`wireLiveSocket`, `@neore/client-runtime`); no cookie rides it.
