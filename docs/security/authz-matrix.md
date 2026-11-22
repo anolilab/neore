@@ -769,7 +769,15 @@ for a schema table that is neither policed nor listed:
 | `workflow_presence.saveVersion` | mutation | authMutation | projects, workflowVersions | workflow owner | accepted — no rate limit; `v.any()` content into the caller's own workflow |
 
   Saved site logins reach a run only through the internal `vault_site_logins.listUsableSiteLogins` and
-  `siteLoginForFill`, never a client procedure. Both decide only through `vault/site-login-turn.ts#siteLoginTurnVerdict`,
+  `siteLoginForFill`, never a client procedure. The one that uses them is the agent's `signInWithSavedLogin` tool
+  (`chat/tools/site-login.ts`): approved by the person every time (`needsApproval: true`, `BUILTIN_TOOLS_NEEDING_A_PERSON`:
+  no override, time-boxed allow, thread mode or headless run lifts it), refused while a person holds the browser
+  (`beginSessionUse`), and limited to the owner's allowed and blocked domains. The server decrypts the password inside
+  `chat_tools_site_login_node.fillSavedLogin` and hands it only to the browser renderer, which opens the login page and
+  types in one call. The page is the sign-in page saved with the login, or its site's front page; the model names the site
+  only, never the page the password is typed into. The renderer types only on the login's exact origin (checked after redirects and before each field) and the password
+  only into a password field, sending the form only by POST to that origin; the URL, title and errors read back, the action row (`login`, the site only) and the
+  session row never carry it. An approved call's step is read back from the saved rows of the turn (`approvedStepRefusal`). Both decide only through `vault/site-login-turn.ts#siteLoginTurnVerdict`,
   an ALLOWLIST: anything not known to be safe refuses. The turn must be the owner's own at the app
   (`isOwnInteractiveTurn`: `startedBy` the owner, origin `lead`, not headless, not impersonated; a public API run records
   the key's owner as `startedBy`, so that alone is not enough). Impersonation is recorded on the run's job at `/chat/start`

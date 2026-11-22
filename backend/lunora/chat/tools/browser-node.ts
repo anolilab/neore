@@ -20,7 +20,7 @@ import { validateDomain } from "./utilities";
 ("use node");
 
 /** What a session row records as its `connectUrl`: the renderer has no URL any more, only a binding. */
-const BROWSER_RENDERER_CONNECT = "service:browserRenderer";
+export const BROWSER_RENDERER_CONNECT = "service:browserRenderer";
 
 export const executeBrowserAction = internalAction
     .input({
@@ -383,7 +383,7 @@ const withoutHash = (url: string): string => url.split("#", 1)[0] ?? url;
 /** The actions whose result carries the page's URL but neither its title nor its text. */
 const INTERACTIVE_ACTIONS: ReadonlySet<string> = new Set(["click", "scroll", "type"]);
 
-type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
+export type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 
 /** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
 export const PERSON_HAS_CONTROL =
@@ -419,7 +419,7 @@ const handBackNote = (returned: BrowserReturn): string => `The person had contro
  * action that would change the page (`skipped`) was not run; a screenshot of the page came back in its place.
  * `handedBack` marks it for the human-check ladder (`browser/human-check.ts`), which tells whether a check it asked about cleared.
  */
-const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(
+export const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(
     result: T,
     returned: BrowserReturn,
     skipped?: string,
@@ -440,7 +440,7 @@ const handedBackResult = <T extends { error?: string; success?: boolean; url?: s
 };
 
 /** What the agent hears from an action whose browser another, concurrent action replaced: look again, on the kept browser. */
-const browserReplacedResult = (keptUrl: string | undefined): { error: string; success: false; url?: string } => {
+export const browserReplacedResult = (keptUrl: string | undefined): { error: string; success: false; url?: string } => {
     return {
         error: `Another browser action ran at the same time and the thread now uses its browser, not the one this action ran on, so this action's result was discarded. ${
             keptUrl === undefined
@@ -452,7 +452,7 @@ const browserReplacedResult = (keptUrl: string | undefined): { error: string; su
     };
 };
 
-const sanitizeBrowserError = (error: unknown): string => {
+export const sanitizeBrowserError = (error: unknown): string => {
     const raw = error instanceof Error ? error.message : String(error);
 
     return (
