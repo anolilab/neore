@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../../_generated/dataModel";
+import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import schema from "../../schema";
 import { createDocumentPin, createPin, getThreadPins, isPinShapeValid } from "./functions";
 
@@ -36,6 +37,13 @@ vi.mock("../../lib/audit-triggers", async (importOriginal) => {
             return {};
         },
     };
+});
+
+// Wraps the grant lookup so a test can read the options each gate call passes, while the real lookup still runs.
+vi.mock("../../agent/thread-read-access", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../../agent/thread-read-access")>();
+
+    return { ...actual, resolveThreadReadAccess: vi.fn(actual.resolveThreadReadAccess) };
 });
 
 vi.mock("../../auth", async (importOriginal) => {
@@ -233,5 +241,16 @@ describe("document pins", () => {
 
         await expect(as("user-stranger").mutation(createDocumentPin as never, { documentId, threadId } as never)).rejects.toThrow(NO_ACCESS_ERROR);
         expect(await pinsOf()).toHaveLength(0);
+    });
+
+    it("reads the caller's grant from the primary, so a replica's stale grant cannot admit the pin", async () => {
+        const documentId = await insertDocument({ kind: "design" });
+        const lookup = vi.mocked(resolveThreadReadAccess);
+
+        lookup.mockClear();
+        await pinDocument(documentId);
+
+        expect(lookup).toHaveBeenCalled();
+        expect(lookup.mock.calls.every((call) => call[4]?.primary === true)).toBe(true);
     });
 });
