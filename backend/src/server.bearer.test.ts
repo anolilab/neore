@@ -75,6 +75,12 @@ describe("the Worker's bearer check", () => {
         expect(fakeApp.fetch).not.toHaveBeenCalled();
     });
 
+    it("answers an RPC with a code the client's replay retries, so a queued write is sent again", async () => {
+        const response = await worker.fetch(request("/_lunora/rpc", { authorization: `Bearer ${bearer}` }), env, context);
+
+        await expect(response.json()).resolves.toMatchObject({ error: { code: "SHARD_UNAVAILABLE" } });
+    });
+
     it("falls through to the cookie for a bad token", async () => {
         authApi.getJwks.mockImplementation(async () => {
             return { keys: [] };

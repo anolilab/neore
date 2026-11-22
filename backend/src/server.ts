@@ -32,6 +32,7 @@ import {
     purgeExpiredWsTickets,
     resolveWsTicketIdentity,
     WsTicketUnavailableError,
+    callerUnavailableResponse,
     wsTicketUnavailableResponse,
 } from "../lunora/lib/ws-ticket.js";
 import { runInShard } from "../lunora/lib/shard-context.js";
@@ -258,7 +259,16 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<Beare
             // Keys that could not be read say nothing about the token: a 503, never
             // the cookie, or a bearer-only client (extension, app) reads as signed out.
             if (error instanceof JwksUnavailableError) {
-                console.warn(JSON.stringify({ message: error.message, source: "bearer-keys-unavailable" }));
+                const { cause } = error;
+
+                // The read's own failure, for the outage's cause; never the token.
+                console.warn(
+                    JSON.stringify({
+                        cause: cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause),
+                        message: error.message,
+                        source: "bearer-keys-unavailable",
+                    }),
+                );
 
                 throw error;
             }
@@ -590,9 +600,10 @@ const routeToCallerShard = async (env: Env, request: Request): Promise<Request |
     try {
         identity = await resolveCallerIdentity(env, request);
     } catch (error) {
-        // Outside `app.fetch`, so the runtime's error mapping never sees it: answered here, and the client reconnects.
+        // Outside `app.fetch`, so the runtime's error mapping never sees it: answered here. With a code the client's replay
+        // retries (`SHARD_UNAVAILABLE`): `SERVICE_UNAVAILABLE` would settle a queued write as refused, a batch whole.
         if (error instanceof WsTicketUnavailableError || error instanceof JwksUnavailableError) {
-            return wsTicketUnavailableResponse();
+            return callerUnavailableResponse();
         }
 
         throw error;

@@ -40,6 +40,9 @@ export interface JwksCache {
 export const createJwksCache = (load: () => Promise<JSONWebKeySet>, now: () => number = Date.now): JwksCache => {
     let cache: { expiresAt: number; keys: KeySet } | undefined;
     let lastForcedAt = -Infinity;
+    // A forced re-read that could not reach the keys: until one succeeds, an unknown key inside the throttle window is
+    // the same outage, not a bad token, so a rotated key's token is not read as signed out meanwhile.
+    let forcedFailure: JwksUnavailableError | undefined;
 
     const read = async (): Promise<KeySet> => {
         let jwks: JSONWebKeySet;
@@ -53,6 +56,7 @@ export const createJwksCache = (load: () => Promise<JSONWebKeySet>, now: () => n
         const keys = createLocalJWKSet(jwks);
 
         cache = { expiresAt: now() + JWKS_TTL_MS, keys };
+        forcedFailure = undefined;
 
         return keys;
     };
@@ -64,13 +68,25 @@ export const createJwksCache = (load: () => Promise<JSONWebKeySet>, now: () => n
             try {
                 return await jwtVerify(token, await current(), options);
             } catch (error) {
-                if ((error as { code?: string }).code !== "ERR_JWKS_NO_MATCHING_KEY" || now() - lastForcedAt < JWKS_FORCED_RELOAD_INTERVAL_MS) {
+                if ((error as { code?: string }).code !== "ERR_JWKS_NO_MATCHING_KEY") {
                     throw error;
+                }
+
+                if (now() - lastForcedAt < JWKS_FORCED_RELOAD_INTERVAL_MS) {
+                    throw forcedFailure ?? error;
                 }
 
                 lastForcedAt = now();
 
-                return await jwtVerify(token, await read(), options);
+                try {
+                    return await jwtVerify(token, await read(), options);
+                } catch (error_) {
+                    if (error_ instanceof JwksUnavailableError) {
+                        forcedFailure = error_;
+                    }
+
+                    throw error_;
+                }
             }
         },
     };
