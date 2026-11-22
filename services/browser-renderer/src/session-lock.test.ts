@@ -75,6 +75,19 @@ describe(SessionHolds, () => {
         expect(holds.take("a", "shared", 1000, 1500)).toStrictEqual({ held: true });
     });
 
+    it("never shortens a hold when a short renewal arrives after a longer one", () => {
+        const holds = new SessionHolds();
+
+        holds.take("login", "exclusive", 1000, 0);
+        // The long lease sent as the browser closes, then the periodic renewal sent before it, arriving late.
+        expect(holds.renew("login", 60_000, 100)).toStrictEqual({ held: true });
+        expect(holds.renew("login", 1000, 200)).toStrictEqual({ held: true });
+
+        // Past the short lease's end, the long one still holds: nothing lapsed, nothing retired.
+        expect(holds.take("a", "shared", 1000, 5000)).toStrictEqual({ busy: "exclusive", held: false });
+        expect(holds.release("login", 5000)).toStrictEqual({ held: true });
+    });
+
     it("renews the hold a token already has when it asks again, its first answer lost", () => {
         const holds = new SessionHolds();
 
@@ -158,8 +171,9 @@ describe(SessionLock, () => {
         const { namespace } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
 
+        // A linger only ever lengthens the hold: it lapses once the lease it already has runs out.
         await (hold as Taken<typeof hold>).linger(1000);
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(LEASE_MS + 1000);
 
         await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
         await expect(holdSession(namespace, "s", "exclusive")).resolves.toBe("retired");
@@ -173,8 +187,9 @@ describe(SessionLock, () => {
         const { namespace, stored, writes } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
 
+        // A linger only ever lengthens the hold: it lapses once the lease it already has runs out.
         await (hold as Taken<typeof hold>).linger(1000);
-        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(LEASE_MS + 1000);
         writes.length = 0;
 
         await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");

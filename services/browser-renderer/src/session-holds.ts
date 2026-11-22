@@ -155,7 +155,10 @@ export class SessionHolds {
         return { held: true };
     }
 
-    /** A hold in force runs on for `leaseMs` from `now`; a lapsed one is not brought back. */
+    /**
+     * A hold in force runs on for `leaseMs` from `now`, or keeps the later end it already has: a renewal that arrives
+     * late, after a longer one, never shortens the hold. A lapsed one is not brought back.
+     */
     public renew(token: string, leaseMs: number, now: number): HoldAnswer {
         const hold = new Map(this.entries(now)).get(token);
 
@@ -163,7 +166,7 @@ export class SessionHolds {
             return { held: false };
         }
 
-        this.#holds.set(token, { ...hold, expiresAt: now + Math.min(leaseMs, MAX_LEASE_MS) });
+        this.#holds.set(token, { ...hold, expiresAt: Math.max(hold.expiresAt, now + Math.min(leaseMs, MAX_LEASE_MS)) });
 
         return { held: true };
     }
