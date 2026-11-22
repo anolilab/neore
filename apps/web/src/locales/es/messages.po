@@ -2035,11 +2035,11 @@ msgstr "Un objetivo agrupa tareas. Su progreso depende de cuántas estén hechas
 msgid "A group chat. A question from the owner is answered by three agents in turn: a security reviewer, a performance reviewer, and a lead who sums up."
 msgstr "Un chat grupal. Una pregunta del propietario la responden tres agentes por turnos: un revisor de seguridad, un revisor de rendimiento y un líder que resume."
 
-#: src/features/chat/core/context/chat-context.tsx:721
+#: src/features/chat/core/context/chat-context.tsx:725
 msgid "A guest's message cannot be sent as a goal."
 msgstr "El mensaje de un invitado no se puede enviar como objetivo."
 
-#: src/features/chat/core/context/chat-context.tsx:724
+#: src/features/chat/core/context/chat-context.tsx:728
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "El mensaje de un invitado solo se envía a través de un modelo alojado. Elige uno y vuelve a enviarlo."
 
@@ -6280,7 +6280,7 @@ msgid "Change Password"
 msgstr "Cambiar contraseña"
 
 #. placeholder {0}: pinned.text
-#: src/features/chat/goal/pinned-goal.tsx:79
+#: src/features/chat/goal/pinned-goal.tsx:96
 msgid "Change the pinned goal: {0}"
 msgstr "Cambiar el objetivo fijado: {0}"
 
@@ -6885,7 +6885,7 @@ msgstr "Borrar máscara"
 msgid "Clear model"
 msgstr "Quitar modelo"
 
-#: src/features/chat/goal/pinned-goal.tsx:125
+#: src/features/chat/goal/pinned-goal.tsx:142
 msgid "Clear pinned goal"
 msgstr "Quitar el objetivo fijado"
 
@@ -9072,7 +9072,7 @@ msgstr "No se pudo previsualizar · Haz clic para descargar"
 msgid "Could not pull {0}: {1}"
 msgstr "No se pudo descargar {0}: {1}"
 
-#: src/features/chat/core/context/chat-context.tsx:671
+#: src/features/chat/core/context/chat-context.tsx:672
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "No se pudo contactar con el servidor para empezar a generar. Revisa tu conexión e inténtalo de nuevo."
 
@@ -9133,6 +9133,7 @@ msgstr "No pudo reanudar su propia sesión, así que se transfirió la conversac
 msgid "Could not retry. Please try again."
 msgstr "No se pudo reintentar. Inténtalo de nuevo."
 
+#: src/features/chat/goal/pinned-goal.tsx:155
 #: src/features/onboarding/components/setup-checklist.tsx:99
 #: src/features/onboarding/components/setup-checklist.tsx:180
 msgid "Could not save that choice. Try again."
@@ -16253,7 +16254,7 @@ msgstr "Subir a {parent}"
 msgid "Goal"
 msgstr "Objetivo"
 
-#: src/features/chat/goal/pinned-goal.tsx:103
+#: src/features/chat/goal/pinned-goal.tsx:120
 msgid "Goal for this chat"
 msgstr "Objetivo para este chat"
 
@@ -19972,7 +19973,7 @@ msgstr "Cargando…"
 msgid "local"
 msgstr "local"
 
-#: src/features/chat/core/context/chat-context.tsx:728
+#: src/features/chat/core/context/chat-context.tsx:732
 msgid "Local models are text only. Remove the attachments to send."
 msgstr "Los modelos locales solo admiten texto. Quita los adjuntos para enviar."
 
@@ -25836,8 +25837,8 @@ msgstr "Fijar"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Fija un recuerdo para evitar que se desvanezca, se fusione o se promueva. Solo los recuerdos de actividad se desvanecen por sí solos."
 
-#: src/features/chat/goal/pinned-goal.tsx:89
-#: src/features/chat/goal/pinned-goal.tsx:95
+#: src/features/chat/goal/pinned-goal.tsx:106
+#: src/features/chat/goal/pinned-goal.tsx:112
 msgid "Pin goal"
 msgstr "Fijar objetivo"
 
@@ -28509,7 +28510,7 @@ msgstr "Responder"
 msgid "Reply complete"
 msgstr "Respuesta completa"
 
-#: src/features/chat/core/context/chat-context.tsx:635
+#: src/features/chat/core/context/chat-context.tsx:636
 msgid "Reply ready"
 msgstr "Respuesta lista"
 
@@ -29381,7 +29382,7 @@ msgstr "Ejecutando..."
 msgid "Runs ({0})"
 msgstr "Ejecuciones ({0})"
 
-#: src/features/chat/goal/pinned-goal.tsx:114
+#: src/features/chat/goal/pinned-goal.tsx:131
 msgid "Runs for every message you send here, up to {maxRounds} review rounds each, until you clear it."
 msgstr "Se ejecuta con cada mensaje que envíes aquí, con hasta {maxRounds} rondas de revisión cada uno, hasta que lo quites."
 
@@ -29511,7 +29512,7 @@ msgstr "Arabia Saudí"
 #: src/features/auth/components/settings/security/change-email-card.tsx:135
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/goal/pinned-goal.tsx:117
+#: src/features/chat/goal/pinned-goal.tsx:134
 #: src/features/chat/host/host-composer.tsx:961
 #: src/features/chat/pins/pin-item.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
@@ -33259,7 +33260,7 @@ msgstr "Cambiar a {label}"
 msgid "Switch to {name}?"
 msgstr "¿Cambiar a {name}?"
 
-#: src/features/chat/core/context/chat-context.tsx:723
+#: src/features/chat/core/context/chat-context.tsx:727
 msgid "Switch to a text model to send this message."
 msgstr "Cambia a un modelo de texto para enviar este mensaje."
 
@@ -34022,7 +34023,7 @@ msgstr "Esa carpeta es la carpeta personal del servidor o una carpeta superior. 
 msgid "That folder was not found."
 msgstr "No se encontró esa carpeta."
 
-#: src/features/chat/core/context/chat-context.tsx:719
+#: src/features/chat/core/context/chat-context.tsx:723
 msgid "That guest link has ended."
 msgstr "Ese enlace de invitado ha caducado."
 
@@ -34042,7 +34043,7 @@ msgstr "No se pudo leer ese enlace."
 msgid "That message could not be found in this conversation."
 msgstr "No se encontró ese mensaje en esta conversación."
 
-#: src/features/chat/core/context/chat-context.tsx:722
+#: src/features/chat/core/context/chat-context.tsx:726
 #: src/features/chat/guest-links/guest-link-panel.tsx:143
 msgid "That message is being sent."
 msgstr "Ese mensaje se está enviando."
@@ -34055,7 +34056,7 @@ msgstr "Ese mensaje ya no está en espera."
 msgid "That message is too long to send from here."
 msgstr "Ese mensaje es demasiado largo para enviarlo desde aquí."
 
-#: src/features/chat/core/context/chat-context.tsx:720
+#: src/features/chat/core/context/chat-context.tsx:724
 #: src/features/chat/guest-links/guest-link-panel.tsx:240
 #: src/features/chat/guest-links/guest-link-panel.tsx:316
 msgid "That message was already sent."
@@ -35637,7 +35638,7 @@ msgstr "Esto fusiona el commit {0} en la rama base con «{1}» en {hostLabel}. S
 msgid "This message cannot be left. Keep it short, don't start it with / or mention anyone, or try again later."
 msgstr "No se puede dejar este mensaje. Sé breve, no lo empieces con / ni menciones a nadie, o inténtalo más tarde."
 
-#: src/features/chat/core/context/chat-context.tsx:725
+#: src/features/chat/core/context/chat-context.tsx:729
 msgid "This message cannot be sent in this chat."
 msgstr "Este mensaje no se puede enviar en este chat."
 
@@ -38867,11 +38868,11 @@ msgstr "Repositorios vigilados"
 msgid "We could not check that you are signed in. Try again in a moment."
 msgstr "No pudimos comprobar que has iniciado sesión. Inténtalo de nuevo en unos instantes."
 
-#: src/features/chat/core/context/chat-context.tsx:727
+#: src/features/chat/core/context/chat-context.tsx:731
 msgid "We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab."
 msgstr "No pudimos confirmar tu sesión a tiempo. El mensaje del invitado no se envió; vuelve a enviarlo desde la pestaña Invitados."
 
-#: src/features/chat/core/context/chat-context.tsx:730
+#: src/features/chat/core/context/chat-context.tsx:734
 msgid "We could not confirm your session in time. Your message is still in the composer. Please try sending it again."
 msgstr "No pudimos confirmar tu sesión a tiempo. Tu mensaje sigue en el editor. Intenta enviarlo de nuevo."
 
@@ -39936,7 +39937,7 @@ msgstr "Tu espacio de trabajo de IA <0>empieza aquí.</0>"
 msgid "Your answer"
 msgstr "Tu respuesta"
 
-#: src/features/chat/core/context/chat-context.tsx:635
+#: src/features/chat/core/context/chat-context.tsx:636
 msgid "Your answer in Neore has finished."
 msgstr "Tu respuesta en Neore ha terminado."
 
@@ -40126,7 +40127,7 @@ msgstr "Tu mensaje"
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Tu mensaje cambió mientras se subían los archivos, así que no se envió. Pulsa enviar para enviarlo."
 
-#: src/features/chat/core/context/chat-context.tsx:718
+#: src/features/chat/core/context/chat-context.tsx:722
 msgid "Your message contains inappropriate content that cannot be sent."
 msgstr "Tu mensaje contiene contenido inapropiado y no se puede enviar."
 
