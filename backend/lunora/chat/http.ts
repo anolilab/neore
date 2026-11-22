@@ -27,7 +27,7 @@ import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import { parseSkillCommand } from "../skills/slash-command";
 import { clampGoalEffort, GOAL_TEXT_MAX } from "./goals/shared";
 import { vGoalRunConfig } from "./goals/validators";
-import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
+import { chargeDailyLimit, type DailyLimitKind, refundDailyLimit } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart, imagePromptPart } from "./lib/first-user-prompt";
@@ -446,6 +446,11 @@ interface ThreadAttach {
 
 const noThreadAttach: ThreadAttach = { release: async () => undefined };
 
+/** What a send charged to the daily quota, so a refusal after the charge can give the unit back (`refund`). */
+interface SendCharge {
+    refund?: () => Promise<void>;
+}
+
 /**
  * Takes the attach's claim on the THREAD's shard, in the transaction that checks the thread's access and lock, so the chat's
  * lock cannot commit between that check and the save. Runs inside the thread's shard. Only an attach of files into an existing
@@ -769,25 +774,31 @@ export const runChatStart = async (
                 return threadAttach.refusal;
             }
 
+            const charge: SendCharge = {};
+
             try {
                 return await runChatStartOnShard(shardCtx, body, signingSecret, {
                     assertAttachWindow: fileAttach.assertWindow,
+                    charge,
                     origin,
                     pageContext,
                     resend,
                     user,
                     userId,
                 });
+            } catch (error) {
+                // The window closed after the charge: the unit is given back, and the send is answered as a retryable conflict.
+                if (isAttachWindowExpired(error)) {
+                    await charge.refund?.();
+
+                    return attachWindowExpiredResponse();
+                }
+
+                throw error;
             } finally {
                 await threadAttach.release();
             }
         });
-    } catch (error) {
-        if (isAttachWindowExpired(error)) {
-            return attachWindowExpiredResponse();
-        }
-
-        throw error;
     } finally {
         await fileAttach.release();
     }
@@ -861,6 +872,7 @@ const runChatStartOnShard = async (
     signingSecret: string,
     {
         assertAttachWindow,
+        charge,
         origin,
         pageContext,
         resend,
@@ -869,6 +881,8 @@ const runChatStartOnShard = async (
     }: {
         /** Throws before a save the file attach's claim can no longer cover (`FileAttach.assertWindow`). */
         assertAttachWindow: () => void;
+        /** Filled in once the send's text is charged, so a refusal after the charge can give the unit back. */
+        charge: SendCharge;
         origin: "outside_agent" | undefined;
         pageContext: ReturnType<typeof parsePageContext>;
         /** A resend of a saved send: its files are neither checked nor read again (`isSavedResend`). */
@@ -1552,6 +1566,15 @@ const runChatStartOnShard = async (
                 { status: 403 },
             );
         }
+
+        const { windowStart } = dailyLimit;
+
+        charge.refund = async () => {
+            await refundDailyLimit(context, user, "Text", {
+                ...(chargeKey !== undefined && { chargeKey }),
+                ...(windowStart !== undefined && { windowStart }),
+            });
+        };
     }
 
     // Create or continue thread
@@ -1846,7 +1869,7 @@ const signInMarks = async (context: HttpActionCtx, userId: string): Promise<NotT
 };
 
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
-    const holder: { attach?: FileAttach; threadAttach?: ThreadAttach } = {};
+    const holder: { attach?: FileAttach; refundCharge?: () => Promise<void>; threadAttach?: ThreadAttach } = {};
 
     try {
         return await editMessageAttached(context, request, holder);
@@ -1856,7 +1879,11 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
     }
 };
 
-const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { attach?: FileAttach; threadAttach?: ThreadAttach }) => {
+const editMessageAttached = async (
+    context: HttpActionCtx,
+    request: Request,
+    holder: { attach?: FileAttach; refundCharge?: () => Promise<void>; threadAttach?: ThreadAttach },
+) => {
     const {
         content,
         draftFrom: rawDraftFrom,
@@ -2171,6 +2198,13 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             );
         }
 
+        // Given back if the window closes before the save (the catch below).
+        const { windowStart } = editLimit;
+
+        holder.refundCharge = async () => {
+            await refundDailyLimit(context, user, "Text", { ...(windowStart !== undefined && { windowStart }) });
+        };
+
         // The edit's attachments are saved with it: refused rather than saved once the file's claim can no longer hold a lock back.
         holder.attach?.assertWindow();
 
@@ -2230,6 +2264,8 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         );
     } catch (error) {
         if (isAttachWindowExpired(error)) {
+            await holder.refundCharge?.();
+
             return attachWindowExpiredResponse();
         }
 

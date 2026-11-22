@@ -13,6 +13,7 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { BetterAuthUser } from "../../auth/lib/types";
+import { chatLogger } from "../../lib/logger";
 import { getUserTier, type RateLimitKey } from "../../lib/rate-limiter";
 
 export type DailyLimitKind = "Audio" | "Image" | "Suggestion" | "Text" | "Video";
@@ -56,7 +57,8 @@ export const dailyLimitTierOf = (user: LimitedUser): DailyLimitTier => {
 
 export const dailyLimitKeyOf = (kind: DailyLimitKind, tier: DailyLimitTier): RateLimitKey | undefined => DAILY_LIMIT_KEYS[kind][tier];
 
-export type DailyLimitResult = { ok: true } | { ok: false; retryAfter?: number };
+/** `windowStart` is the fixed window the units were taken from; a refund gives them back only while that window is current. */
+export type DailyLimitResult = { ok: true; windowStart?: number } | { ok: false; retryAfter?: number };
 
 /**
  * Charge `count` units of `kind` to `user`'s daily quota. With a `chargeKey` (a keyed send's, `startChargeKey`) the units
@@ -84,5 +86,44 @@ export const chargeDailyLimit = async (
             ? await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count, identifier: user._id, key })
             : await context.runMutation(internal.chat.daily_charge.chargeDailyLimitOnce, { chargeKey, count, identifier: user._id, key });
 
-    return result.ok ? { ok: true } : { ok: false, retryAfter: result.retryAfter };
+    if (!result.ok) {
+        return { ok: false, retryAfter: result.retryAfter };
+    }
+
+    return { ok: true, ...(result.windowStart !== undefined && { windowStart: result.windowStart }) };
+};
+
+/**
+ * Gives back the one unit `chargeDailyLimit` took for a send that was then refused (the file window closed before its save).
+ * A charge that took nothing (a platform admin, a tier without the kind) gives back nothing. `chargeKey` is the keyed send's
+ * key, so its claim goes with the unit (`chat/daily-charge.ts#refundDailyCharge`).
+ */
+export const refundDailyLimit = async (
+    context: Pick<HttpActionCtx, "runMutation">,
+    user: LimitedUser & Pick<BetterAuthUser, "_id">,
+    kind: DailyLimitKind,
+    { chargeKey, windowStart }: { chargeKey?: string; windowStart?: number } = {},
+): Promise<void> => {
+    if (isPlatformAdmin(user)) {
+        return;
+    }
+
+    const key = dailyLimitKeyOf(kind, dailyLimitTierOf(user));
+
+    if (!key) {
+        return;
+    }
+
+    // Best effort: the refusal it follows is the answer the client gets, so a failed refund must not replace it with a 500.
+    try {
+        await context.runMutation(internal.chat.daily_charge.refundDailyCharge, {
+            ...(chargeKey !== undefined && { chargeKey }),
+            count: 1,
+            identifier: user._id,
+            key,
+            ...(windowStart !== undefined && { windowStart }),
+        });
+    } catch (error) {
+        chatLogger.error("Could not refund a daily quota unit:", error);
+    }
 };
