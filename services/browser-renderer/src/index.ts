@@ -189,12 +189,16 @@ function readTarget(
     const scanned = [scope, ...inside];
 
     for (const node of scanned) {
+        // What is drawn names the control: a hidden element's aria-label or title does not (only a referenced one does, below).
+        const isDrawn = node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
+
         // An image (`img`) or an image button (`input type="image"`) names itself by its alt text.
-        if (node.matches("img[alt], input[type='image'][alt], [aria-label], [title]")) {
+        if (isDrawn && node.matches("img[alt], input[type='image'][alt], [aria-label], [title]")) {
             names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
         }
 
-        if (node.localName === "title" && node.parentElement?.localName === "svg") {
+        // An SVG's title names the drawn SVG (a `<title>` itself is never drawn, so its parent is what is checked).
+        if (node.localName === "title" && node.parentElement?.localName === "svg" && node.parentElement.getClientRects().length > 0) {
             names.push(node.textContent ?? "");
         }
 
