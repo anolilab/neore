@@ -170,11 +170,22 @@ const readStored = async (): Promise<{ grant: StoredGrant | undefined; signedOut
     return { grant: stored[STORAGE_KEY] as StoredGrant | undefined, signedOut: stored[SIGNED_OUT_KEY] };
 };
 
+/**
+ * The stored grant as `readGrant` shows it, and whether a grant marked signed
+ * out (`SIGNED_OUT_KEY`) is still stored: its removal has not finished.
+ */
+export const readGrantState = async (): Promise<{ grant: StoredGrant | undefined; removalPending: boolean }> => {
+    const { grant, signedOut } = await readStored();
+    const marked = grant !== undefined && grantKey(grant) === signedOut;
+
+    return { grant: marked ? undefined : grant, removalPending: marked };
+};
+
 /** The stored grant, or none when its sign-out began (`SIGNED_OUT_KEY`): that one is never used again. */
 export const readGrant = async (): Promise<StoredGrant | undefined> => {
-    const { grant, signedOut } = await readStored();
+    const { grant } = await readGrantState();
 
-    return grant && grantKey(grant) === signedOut ? undefined : grant;
+    return grant;
 };
 
 /** One name for every context of this extension (panel, popup, service worker): they share the lock. */

@@ -475,17 +475,98 @@ describe("endSession", () => {
         await expect(getAccessToken({ force: true })).resolves.toBeNull();
     });
 
+    const storageUnavailable = new Error("storage unavailable");
+    const warningOf = (page: { container: HTMLElement }) =>
+        [...page.container.querySelectorAll("[role=alert]")].find((alert) => alert.textContent?.startsWith("Sign-out did not finish"));
+
     it("tells the sign-in page, which replaces Settings, when storage kept the grant", async () => {
         const { sync } = await signedIn();
 
         stopSync = sync.signOut;
-        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+        const page = await mount(createElement(AuthPage));
 
-        await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+
+        await act(async () => {
+            await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+        });
+        await settle();
+
+        expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
+    it("shows the warning in a second panel whose retry fails too", async () => {
+        const { sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        // This panel's own sign-out finished.
+        await endSession(sync, USER.id);
+
+        // Another panel's sign-out marked its grant and could not remove it.
+        store.set(GRANT_KEY, grant);
+        store.set(SIGNED_OUT_KEY, USER.id);
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
 
         const page = await mount(createElement(AuthPage));
 
-        expect(page.container.querySelector("[role=alert]")?.textContent).toMatch(/^Sign-out did not finish/u);
+        await settle();
+
+        expect(store.get(GRANT_KEY)).toEqual(grant);
+        expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
+    it("clears the warning once cleanup succeeds", async () => {
+        store.set(GRANT_KEY, grant);
+        store.set(SIGNED_OUT_KEY, USER.id);
+        fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+
+        const page = await mount(createElement(AuthPage));
+
+        await settle();
+        expect(warningOf(page)).toBeDefined();
+
+        // Another panel's retry removes the leftover.
+        await act(async () => {
+            await finishPendingSignOut();
+        });
+        await settle();
+
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(warningOf(page)).toBeUndefined();
+        await page.unmount();
+    });
+
+    it("shows no stale warning after another panel's sign-in replaced the grant and that session ended", async () => {
+        const { sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        const page = await mount(createElement(AuthPage));
+
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+        await act(async () => {
+            await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+        });
+        await settle();
+        expect(warningOf(page)).toBeDefined();
+
+        // Another panel signs in (the new grant replaces the marked one, the mark goes) ...
+        await act(async () => {
+            await chrome.storage.local.set({ [GRANT_KEY]: { id: "g2", token: "newer", user: USER } });
+            await chrome.storage.local.remove(SIGNED_OUT_KEY);
+        });
+        await settle();
+        expect(warningOf(page)).toBeUndefined();
+
+        // ... and that session ends another way: a 401 drops its grant.
+        await act(async () => {
+            await chrome.storage.local.remove(GRANT_KEY);
+        });
+        await settle();
+
+        expect(warningOf(page)).toBeUndefined();
         await page.unmount();
     });
 
@@ -493,14 +574,16 @@ describe("endSession", () => {
         const { sync } = await signedIn();
 
         stopSync = sync.signOut;
-        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable).mockRejectedValueOnce(storageUnavailable);
 
         await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
 
         Reflect.set(chrome, "permissions", { request: async () => false });
 
+        // A new panel: its retry fails too, so the grant stays and so does the warning.
         const page = await mount(createElement(AuthPage));
 
+        await settle();
         await act(async () => {
             page.container.querySelector("button")?.click();
         });

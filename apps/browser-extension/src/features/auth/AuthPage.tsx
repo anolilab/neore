@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import { LLM_GATEWAY_URL, LUNORA_URL } from "@/lib/env";
 import { signInWithWebAuthFlow, watchReconnectNeeded } from "@/lib/extension-grant";
-import { dismissSignOutUnfinished, useSignOutUnfinished } from "@/lib/session";
+import { useSignOutUnfinished } from "@/lib/session";
 
 /** The backend and gateway host patterns, as `manifest.config.ts` declares them. */
 const hostOrigins = (): string[] =>
@@ -53,8 +53,6 @@ export function AuthPage() {
 
                 // Success is observed through storage: the session hook re-renders the panel.
                 await signInWithWebAuthFlow();
-                // Only now: a denied or failed attempt leaves the marked grant stored, and the warning true.
-                dismissSignOutUnfinished();
             } catch (signInError: unknown) {
                 setError(signInError instanceof Error ? signInError.message : "Sign-in failed.");
             } finally {

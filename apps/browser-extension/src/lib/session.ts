@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { holdAccessTokens, releaseAccessTokens } from "./access-token";
 import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
-import { finishPendingSignOut, grantKey, readGrant, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
+import { finishPendingSignOut, grantKey, readGrant, readGrantState, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
 import { GrantRemovalError } from "./grant-removal-error";
 
 /**
@@ -40,58 +40,39 @@ export const loadGrantSession = async (): Promise<GrantSession | null> => {
 const signingOut = new Map<string, Promise<void>>();
 
 /**
- * Set when a sign-out ends with its grant marked but still stored
- * (`GrantRemovalError`). The mark unmounts Settings, whose own alert goes with
- * it, so the sign-in page reads this instead.
+ * Removals of a marked grant running in this panel (a sign-out, or the retry
+ * `finishPendingSignOut` makes): the mark is written before the revoke, so a
+ * stored marked grant reads as unfinished only once they are done.
  */
-let signOutUnfinished = false;
-const unfinishedWatchers = new Set<() => void>();
+let removing = 0;
+/** Reads storage again for the session watch, when one runs. */
+let reloadGrantSession: (() => void) | undefined;
 
-const setSignOutUnfinished = (next: boolean): void => {
-    if (signOutUnfinished === next) {
-        return;
-    }
+const trackRemoval = async <T>(removal: () => Promise<T>): Promise<T> => {
+    removing += 1;
 
-    signOutUnfinished = next;
-
-    for (const watcher of unfinishedWatchers) {
-        watcher();
+    try {
+        return await removal();
+    } finally {
+        removing -= 1;
+        // A fresh read decides: the removal may have succeeded, or failed and left the grant.
+        reloadGrantSession?.();
     }
 };
-
-/** Hide the notice of an unfinished sign-out (`useSignOutUnfinished`): a new sign-in replaced the marked grant. */
-export const dismissSignOutUnfinished = (): void => {
-    setSignOutUnfinished(false);
-};
-
-/** Whether this panel's last sign-out left its grant stored (marked, never used again). */
-export const useSignOutUnfinished = (): boolean =>
-    useSyncExternalStore(
-        (onChange) => {
-            unfinishedWatchers.add(onChange);
-
-            return () => {
-                unfinishedWatchers.delete(onChange);
-            };
-        },
-        () => signOutUnfinished,
-    );
 
 const runEndSession = async (authTokenSync: { suspend: () => SuspendedSession }, key: string): Promise<void> => {
     holdAccessTokens();
-    setSignOutUnfinished(false);
 
     const suspended = authTokenSync.suspend();
     let outcome: "replaced" | "signed-out";
 
     try {
-        outcome = await signOutGrant(key);
+        outcome = await trackRemoval(async () => await signOutGrant(key));
     } catch (error) {
         // The grant was marked signed out before its removal failed: it is never
         // used again, whether or not the server confirmed the revoke.
         if (error instanceof GrantRemovalError) {
             suspended.finish();
-            setSignOutUnfinished(true);
         } else {
             releaseAccessTokens();
             suspended.restore();
@@ -146,11 +127,14 @@ export const endSession = async (authTokenSync: { suspend: () => SuspendedSessio
 
 /** What every `useSession` in this panel shows: `undefined` until the first read. */
 let shown: GrantSession | null | undefined;
+/** Whether that read found a grant marked signed out still stored, with no removal of it running here. */
+let unfinished = false;
 const sessionWatchers = new Set<() => void>();
 let stopWatching: (() => void) | undefined;
 
-const publish = (next: GrantSession | null): void => {
+const publish = (next: GrantSession | null, removalPending: boolean): void => {
     shown = next;
+    unfinished = removalPending && removing === 0;
 
     for (const watcher of sessionWatchers) {
         watcher();
@@ -180,9 +164,13 @@ const watchGrantSession = (): (() => void) => {
 
         const read = reads;
         let loaded: GrantSession | null;
+        let pending = false;
 
         try {
-            loaded = toGrantSession(await readGrant());
+            const state = await readGrantState();
+
+            loaded = toGrantSession(state.grant);
+            pending = state.removalPending;
         } catch {
             if (stopped || read !== reads) {
                 return;
@@ -204,7 +192,7 @@ const watchGrantSession = (): (() => void) => {
         }
 
         if (!stopped && read === reads) {
-            publish(loaded);
+            publish(loaded, pending);
         }
     };
 
@@ -215,14 +203,20 @@ const watchGrantSession = (): (() => void) => {
     };
 
     chrome.storage.onChanged.addListener(listener);
+    reloadGrantSession = () => {
+        void load();
+    };
     void load();
     // A sign-out whose removal failed in an earlier panel: remove its leftover grant, once per watch.
-    void finishPendingSignOut().catch(() => undefined);
+    // A retry that fails too leaves it stored, and the sign-in page says so (`useSignOutUnfinished`).
+    void trackRemoval(finishPendingSignOut).catch(() => undefined);
 
     return () => {
         stopped = true;
         clearTimeout(retry);
         shown = undefined;
+        unfinished = false;
+        reloadGrantSession = undefined;
         chrome.storage.onChanged.removeListener(listener);
     };
 };
@@ -253,3 +247,11 @@ export const useSession = (): { data: ExtensionSession | null; isPending: boolea
 
     return { data: session ? { sessionId: session.key, user: session.user } : null, isPending };
 };
+
+/**
+ * Whether a sign-out left its grant stored (marked, never used again), in this
+ * panel or any other: read from storage through the shared watch, so every panel
+ * shows it, and it clears once a removal succeeds or a sign-in replaces the
+ * grant. Not while this panel is still removing it.
+ */
+export const useSignOutUnfinished = (): boolean => useSyncExternalStore(subscribeGrantSession, () => unfinished);
