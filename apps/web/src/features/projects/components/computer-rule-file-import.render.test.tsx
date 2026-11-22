@@ -32,6 +32,8 @@ type Row = { code?: string; error?: string; files?: unknown[]; phase?: string; s
 const backend = vi.hoisted(() => {
     return {
         calls: new Map<string, Row>(),
+        // A call's answer, taking its place once its waiting status was read: no wall-clock wait.
+        answers: new Map<string, Row>(),
         devices: [] as Record<string, unknown>[],
         // Calls whose status cannot be read, as a query failing after its retries.
         lost: new Set<string>(),
@@ -41,6 +43,8 @@ const backend = vi.hoisted(() => {
         // only a read with `{ live: false }` reaches the backend.
         quiet: new Set<string>(),
         pushed: new Map<string, unknown>(),
+        // While set, holds each read with `{ live: false }` (the panel's status check) until it dispatches "release".
+        statusGate: undefined as EventTarget | undefined,
         ruleFiles: [] as Record<string, unknown>[],
         listDevices: vi.fn(),
         // The options each start was built with: online-only, never paused or retried.
@@ -72,7 +76,17 @@ vi.mock("@/lib/lunora/crpc", () => {
                 args === skipToken
                     ? { queryFn: skipToken, queryKey: [key] }
                     : {
-                          queryFn: async () => answer(args, options?.live !== false),
+                          queryFn: async () => {
+                              const gate = options?.live === false ? backend.statusGate : undefined;
+
+                              if (gate) {
+                                  await new Promise((resolve) => {
+                                      gate.addEventListener("release", resolve, { once: true });
+                                  });
+                              }
+
+                              return answer(args, options?.live !== false);
+                          },
                           queryKey: [key, args],
                           refetchInterval: backend.unpolled.has(key) ? false : 10,
                       },
@@ -92,7 +106,15 @@ vi.mock("@/lib/lunora/crpc", () => {
                                 throw new Error("lost");
                             }
 
-                            return backend.calls.get(callId);
+                            const row = backend.calls.get(callId);
+                            const next = backend.answers.get(callId);
+
+                            if (next) {
+                                backend.answers.delete(callId);
+                                backend.calls.set(callId, next);
+                            }
+
+                            return row;
                         }),
                         startGlobalInstructionsCall: {
                             mutationOptions: (...options: unknown[]) => {
@@ -133,6 +155,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 const LOOKS_FOR = /Looks for the global CLAUDE\.md/u;
+const LAPTOP = /Laptop/u;
 
 const LISTED = [
     { id: "claude", name: "CLAUDE.md", path: "~/.claude/CLAUDE.md", size: 2048, status: "found" },
@@ -180,10 +203,12 @@ afterEach(() => {
 
 beforeEach(() => {
     backend.calls.clear();
+    backend.answers.clear();
     backend.lost.clear();
     backend.unpolled.clear();
     backend.quiet.clear();
     backend.pushed.clear();
+    backend.statusGate = undefined;
     backend.ruleFiles = [];
     backend.devices = [
         { _id: "desk", createdAt: 0, lastSeenAt: Date.now(), name: "Studio", platform: "linux", toolNames: [], updateRequired: false },
@@ -203,14 +228,12 @@ beforeEach(() => {
     backend.listDevices.mockReset();
     backend.listDevices.mockImplementation(() => backend.devices);
     backend.start.mockReset();
-    // Each call is answered by the device a moment later: approved, then done.
+    // Each call is answered by the device once it was seen waiting: approved, then done.
     backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
         const callId = `call-${String(backend.start.mock.calls.length)}`;
 
         backend.calls.set(callId, { phase: "prompting", status: "claimed" });
-        setTimeout(() => {
-            backend.calls.set(callId, files ? readAll(files) : { files: LISTED, status: "completed" });
-        }, 50);
+        backend.answers.set(callId, files ? readAll(files) : { files: LISTED, status: "completed" });
 
         return { callId };
     });
@@ -448,6 +471,26 @@ describe("import from this computer", () => {
         await waitFor(() => expect(isDisabled(screen.getByRole("button", { name: "Import files" }))).toBe(false));
     });
 
+    it("frees Import selected when the drafts are discarded while the read is still being sent", async () => {
+        const user = userEvent.setup();
+        const answer = backend.start.getMockImplementation()!;
+        const never = new Promise<never>(() => {
+            // Never settled.
+        });
+
+        backend.start.mockImplementation(async (args: { files?: string[] }) => (args.files ? await never : await answer(args)));
+        renderEditor();
+        // A draft, so there are changes to discard.
+        await user.click(await screen.findByRole("button", { name: "Add rule file" }));
+        await openAndList(user);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+        await screen.findByText("Waiting for Studio…");
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+        await waitFor(() => expect(isDisabled(screen.getByRole("button", { name: "Import selected" }))).toBe(false));
+        expect(screen.queryByText("Waiting for Studio…")).toBeNull();
+    });
+
     it("says so when the read's status cannot be read any more, and frees the editor", async () => {
         const user = userEvent.setup();
         const answer = backend.start.getMockImplementation()!;
@@ -594,7 +637,11 @@ describe("import from this computer", () => {
                 callId,
                 files
                     ? {
-                          files: linked.filter((file) => files.includes(file.id)).map((file) => ({ ...file, status: "read", text: "One text" })),
+                          files: linked
+                              .filter((file) => files.includes(file.id))
+                              .map((file) => {
+                                  return { ...file, status: "read", text: "One text" };
+                              }),
                           status: "completed",
                       }
                     : { files: linked, status: "completed" },
@@ -638,7 +685,9 @@ describe("import from this computer", () => {
                 callId,
                 files
                     ? {
-                          files: LISTED.filter((file) => files.includes(file.id)).map((file) => ({ ...file, status: "read", text: "Same text" })),
+                          files: LISTED.filter((file) => files.includes(file.id)).map((file) => {
+                              return { ...file, status: "read", text: "Same text" };
+                          }),
                           status: "completed",
                       }
                     : { files: LISTED, status: "completed" },
@@ -860,6 +909,56 @@ describe("import from this computer", () => {
 
         expect(await screen.findByRole("listitem", { name: "CLAUDE.md" })).toBeDefined();
         expect(screen.getByRole("listitem", { name: "AGENTS.md" })).toBeDefined();
+    });
+
+    it("keeps the person's ticks when a status check of the same listing ends late, and ticks a new listing's defaults", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date", "setInterval", "clearInterval"] });
+
+        const user = userEvent.setup();
+        const status = new EventTarget();
+
+        backend.statusGate = status;
+        backend.devices.push({ _id: "lap", createdAt: 0, lastSeenAt: Date.now(), name: "Laptop", platform: "linux", toolNames: [], updateRequired: false });
+        backend.start.mockImplementation(async () => {
+            const callId = `held-${String(backend.start.mock.calls.length)}`;
+
+            backend.calls.set(callId, { phase: "prompting", status: "claimed" });
+
+            return { callId };
+        });
+        renderEditor();
+        await user.click(await screen.findByRole("button", { name: "Import from this computer" }));
+        await user.click(await screen.findByRole("button", { name: "Find files" }));
+        await screen.findByText("Approve the request in the desktop app on Studio.");
+        // The status check starts while the call waits, and is held; the live query then sees the listing.
+        vi.advanceTimersByTime(15_000);
+        backend.calls.set("held-1", { files: LISTED, status: "completed" });
+
+        const list = await screen.findByRole("list", { name: "Instruction files" });
+
+        await user.click(within(list).getAllByRole("checkbox")[1]!);
+        backend.statusGate = undefined;
+        status.dispatchEvent(new Event("release"));
+        await vi.advanceTimersByTimeAsync(100);
+
+        expect(
+            within(list)
+                .getAllByRole("checkbox")
+                .map((box) => box.getAttribute("aria-checked")),
+        ).toEqual(["true", "false", "false", "false"]);
+
+        // Another computer's listing is ticked by its own defaults.
+        await user.click(screen.getByRole("radio", { name: LAPTOP }));
+        await user.click(await screen.findByRole("button", { name: "Find files" }));
+        backend.calls.set("held-2", { files: LISTED, status: "completed" });
+
+        const listed = await screen.findByRole("list", { name: "Instruction files" });
+
+        expect(
+            within(listed)
+                .getAllByRole("checkbox")
+                .map((box) => box.getAttribute("aria-checked")),
+        ).toEqual(["true", "true", "false", "false"]);
     });
 
     it("gives up on a call still waiting past its deadline, and frees the editor", async () => {

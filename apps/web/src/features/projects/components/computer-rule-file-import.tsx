@@ -124,6 +124,10 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     const [reading, setReading] = useState<CallOn | undefined>(undefined);
     const [picked, setPicked] = useState<ReadonlySet<FileId>>(new Set());
     const [startFailure, setStartFailure] = useState<Failure | undefined>(undefined);
+    // The start on its way, by a token of its own rather than the mutation's pending flag: a Discard drops the read's,
+    // so the panel waits no more on a start whose answer is thrown away.
+    const [starting, setStarting] = useState<symbol | undefined>(undefined);
+    const startDone = (token: symbol) => setStarting((current) => (current === token ? undefined : current));
     // Whether a computer is online is read against it, again every few seconds (the backend checks again on send).
     const [now, setNow] = useState(Date.now);
 
@@ -164,11 +168,14 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
 
     const found: FileEntry[] | undefined = listed?.status === "completed" ? listed.files : undefined;
 
-    useEffect(() => {
-        if (found) {
-            setPicked(new Set(found.filter((file) => file.status === "found" && !linkTarget(file, found)).map((file) => file.id)));
-        }
-    }, [found]);
+    // The listing the ticks were set for. Ticked by default once per listing (a new call, or another computer's), not
+    // each time the same listing's files come again, as from a status check ending late: the person's ticks stay.
+    const [pickedFor, setPickedFor] = useState<string | undefined>(undefined);
+
+    if (found && listCallId !== pickedFor) {
+        setPickedFor(listCallId);
+        setPicked(new Set(found.filter((file) => file.status === "found" && !linkTarget(file, found)).map((file) => file.id)));
+    }
 
     const readFiles: FileEntry[] | undefined = readCallId && call?.status === "completed" ? call.files : undefined;
     const isRead = (file: FileEntry): boolean => file.status === "read" && file.text !== undefined;
@@ -269,7 +276,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
     // A call just started has no answer yet (`call` is still undefined for its new key): it waits too, so a second click starts nothing.
     // A status no longer read waits for nothing, whatever it said before.
     const waiting =
-        start.isPending || (!callLost && ((activeCallId !== undefined && call === undefined) || call?.status === "pending" || call?.status === "claimed"));
+        starting !== undefined ||
+        (!callLost && ((activeCallId !== undefined && call === undefined) || call?.status === "pending" || call?.status === "claimed"));
     // Import selected takes Find files' place once files were found.
     const canRead = found?.some((file) => file.status === "found") ?? false;
     // Find files cannot be clicked for this reason, and no alert says it already.
@@ -311,10 +319,21 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
             return;
         }
 
+        const token = Symbol("list");
+
+        setStarting(token);
         start
             .mutateAsync({ deviceId: deviceId as Id<"devices"> })
-            .then(({ callId }) => setListing({ callId, deviceId, name: deviceName, startedAt: Date.now() }))
-            .catch((error: unknown) => setStartFailure(failureOf(error)));
+            .then(({ callId }) => {
+                startDone(token);
+                setListing({ callId, deviceId, name: deviceName, startedAt: Date.now() });
+
+                return undefined;
+            })
+            .catch((error: unknown) => {
+                startDone(token);
+                setStartFailure(failureOf(error));
+            });
     };
 
     /** Reads the ticked files inside the editor's import, so it is one import at a time and a Discard drops what comes. */
@@ -338,9 +357,12 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
         let came: FileEntry[] = [];
         let duplicateOf = new Map<FileId, FileEntry>();
         let allRead = false;
+        const token = Symbol("read");
 
         runImport(
             async (isCurrent, discarded) => {
+                setStarting(token);
+
                 const answered = new Promise<FileEntry[] | null>((resolve) => {
                     pendingRead.current = resolve;
                 });
@@ -353,6 +375,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                         pendingRead.current?.(null);
                         pendingRead.current = undefined;
                         setReading(undefined);
+                        startDone(token);
                     },
                     { once: true },
                 );
@@ -368,6 +391,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     }),
                     answered.then(() => undefined),
                 ]);
+
+                startDone(token);
 
                 if (!started) {
                     pendingRead.current = undefined;

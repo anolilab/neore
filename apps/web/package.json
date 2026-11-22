@@ -252,7 +252,7 @@
         "wrangler": "catalog:build"
     },
     "engines": {
-        "node": ">=22.x"
+        "node": ">=22.18.0"
     },
     "msw": {
         "workerDirectory": [

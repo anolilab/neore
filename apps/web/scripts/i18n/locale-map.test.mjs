@@ -19,7 +19,7 @@ describe("looksLikeLocaleMap", () => {
 });
 
 describe("findLocaleMaps", () => {
-    it("finds a map split over continuation lines, by the line its msgstr starts on", () => {
+    it("finds a map split over continuation lines, by the line its msgstr starts on, and not one whose source is one too", () => {
         const catalog = [
             'msgid ""',
             'msgstr ""',
@@ -34,6 +34,10 @@ describe("findLocaleMaps", () => {
             'msgstr ""',
             "\"{'de': 'Speichern', \"",
             "\"'es': 'Guardar'}\"",
+            "",
+            "#: src/c.tsx:3",
+            'msgid "For \\"de\\": use German; for \\"fr\\": use French."',
+            'msgstr "Für \\"de\\": Deutsch; für \\"fr\\": Französisch."',
             "",
         ].join("\n");
 

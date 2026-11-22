@@ -20,7 +20,8 @@ export const looksLikeLocaleMap = (text, locales) => {
 };
 
 /**
- * The entries of a catalog whose translation, continuation lines joined, is such a map.
+ * The entries of a catalog whose translation, continuation lines joined, is such a map, and whose source is not: a
+ * faithful translation of a source that itself reads as one is left, as the batch check leaves it.
  *
  * @param {string} catalog a `.po` file's text
  * @param {readonly string[]} locales
@@ -28,7 +29,7 @@ export const looksLikeLocaleMap = (text, locales) => {
  */
 export const findLocaleMaps = (catalog, locales) =>
     parsePo(catalog)
-        .filter((entry) => looksLikeLocaleMap(entry.msgstr, locales))
+        .filter((entry) => looksLikeLocaleMap(entry.msgstr, locales) && !looksLikeLocaleMap(entry.msgid, locales))
         .map((entry) => {
             return { line: entry.msgstrLines[0] + 1, msgid: entry.msgid };
         });
