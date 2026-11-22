@@ -11,6 +11,7 @@
  */
 import type { JSONWebKeySet, JWTVerifyOptions } from "jose";
 import { createLocalJWKSet, jwtVerify } from "jose";
+import { LunoraError } from "lunorash/server";
 
 /** How long an isolate trusts its copy of the key set before re-reading it. */
 export const JWKS_TTL_MS = 5 * 60 * 1000;
@@ -19,6 +20,17 @@ export const JWKS_TTL_MS = 5 * 60 * 1000;
 export const JWKS_FORCED_RELOAD_INTERVAL_MS = 30 * 1000;
 
 type KeySet = ReturnType<typeof createLocalJWKSet>;
+
+/**
+ * The key set could not be read (a D1 error, a timeout). An outage, not a bad
+ * token: the caller answers 503 and does not fall back to the cookie, so a
+ * bearer-only client is never signed out by it.
+ */
+export class JwksUnavailableError extends LunoraError {
+    public constructor(cause?: unknown) {
+        super("SERVICE_UNAVAILABLE", "The sign-in keys could not be read; try again", { cause });
+    }
+}
 
 export interface JwksCache {
     /** Verify `token`, re-reading the key set (throttled) if no cached key matched. */
@@ -30,7 +42,15 @@ export const createJwksCache = (load: () => Promise<JSONWebKeySet>, now: () => n
     let lastForcedAt = -Infinity;
 
     const read = async (): Promise<KeySet> => {
-        const keys = createLocalJWKSet(await load());
+        let jwks: JSONWebKeySet;
+
+        try {
+            jwks = await load();
+        } catch (error) {
+            throw new JwksUnavailableError(error);
+        }
+
+        const keys = createLocalJWKSet(jwks);
 
         cache = { expiresAt: now() + JWKS_TTL_MS, keys };
 

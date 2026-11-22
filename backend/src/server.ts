@@ -12,7 +12,7 @@ import type { ExecutionContextLike, ScheduledControllerLike, ShardNamespaceLike 
 import type { BearerIdentity } from "./bearer-identity";
 import { identityFromBearerClaims } from "./bearer-identity";
 import { withoutExtensionCookie } from "./extension-cookie.js";
-import { createJwksCache, type JwksCache } from "./jwks-cache.js";
+import { createJwksCache, type JwksCache, JwksUnavailableError } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
 import { env as workerEnv } from "cloudflare:workers";
 
@@ -221,7 +221,8 @@ const verifyBearer = async (env: Env, token: string, origin: string) => {
 /**
  * The caller's session identity: a verified bearer JWT, else the cookie session.
  * Shared by `resolveIdentity` and the ws-ticket mint, which must accept exactly
- * the callers RPC accepts.
+ * the callers RPC accepts. Throws `JwksUnavailableError` when a bearer was sent
+ * and the keys to check it could not be read.
  */
 const resolveSessionIdentity = async (env: Env, request: Request): Promise<BearerIdentity | null> => {
     // Bearer first, deliberately. The browser's `LunoraClient`
@@ -254,7 +255,15 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<Beare
                 return identity;
             }
         } catch (error) {
-            // Expired, wrong signature, unreachable JWKS — fall through
+            // Keys that could not be read say nothing about the token: a 503, never
+            // the cookie, or a bearer-only client (extension, app) reads as signed out.
+            if (error instanceof JwksUnavailableError) {
+                console.warn(JSON.stringify({ message: error.message, source: "bearer-keys-unavailable" }));
+
+                throw error;
+            }
+
+            // Expired, wrong signature — fall through
             // to the cookie rather than assuming anonymous, so a stale
             // bearer does not mask a valid same-origin session. The reason is
             // logged (never the token): a rejected bearer otherwise surfaces
@@ -568,7 +577,8 @@ export { SchedulerDO } from "@lunora/scheduler";
  * `resolveIdentity` through {@link routedIdentities}, so it is not resolved
  * twice — which a single-use socket ticket could not survive anyway. A caller
  * with no identity stays on `__root__`. A live-query ticket whose session cannot
- * be read answers a 503 here instead of a request, and the client reconnects.
+ * be read, or a bearer whose keys cannot be, answers a 503 here instead of a
+ * request, and the client retries.
  */
 const routeToCallerShard = async (env: Env, request: Request): Promise<Request | Response> => {
     if (!isShardRoutedRequest(request)) {
@@ -581,7 +591,7 @@ const routeToCallerShard = async (env: Env, request: Request): Promise<Request |
         identity = await resolveCallerIdentity(env, request);
     } catch (error) {
         // Outside `app.fetch`, so the runtime's error mapping never sees it: answered here, and the client reconnects.
-        if (error instanceof WsTicketUnavailableError) {
+        if (error instanceof WsTicketUnavailableError || error instanceof JwksUnavailableError) {
             return wsTicketUnavailableResponse();
         }
 
@@ -747,7 +757,18 @@ export default {
 
         // Minted here rather than as a procedure: `resolveIdentity` redeems the
         // ticket before any procedure runs, so both halves share one raw table.
-        const ticketResponse = await handleWsTicketRequest(request, env.DB, async (ticketRequest) => await resolveSessionIdentity(env, ticketRequest));
+        let ticketResponse: Response | undefined;
+
+        try {
+            ticketResponse = await handleWsTicketRequest(request, env.DB, async (ticketRequest) => await resolveSessionIdentity(env, ticketRequest));
+        } catch (error) {
+            // A bearer whose keys could not be read: retry, not a 401 that opens the socket signed out.
+            if (!(error instanceof JwksUnavailableError)) {
+                throw error;
+            }
+
+            ticketResponse = wsTicketUnavailableResponse();
+        }
 
         if (ticketResponse) {
             return withCors(ticketResponse, request);

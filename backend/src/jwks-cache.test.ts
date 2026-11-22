@@ -6,7 +6,7 @@
 import { exportJWK, generateKeyPair, type JSONWebKeySet, SignJWT } from "jose";
 import { describe, expect, it, vi } from "vitest";
 
-import { createJwksCache, JWKS_FORCED_RELOAD_INTERVAL_MS } from "./jwks-cache";
+import { createJwksCache, JWKS_FORCED_RELOAD_INTERVAL_MS, JwksUnavailableError } from "./jwks-cache";
 
 const ORIGIN = "https://api.example.test";
 
@@ -65,5 +65,17 @@ describe("createJwksCache", () => {
         clock += JWKS_FORCED_RELOAD_INTERVAL_MS;
         await expect(cache.verify(forged, { audience: ORIGIN, issuer: ORIGIN })).rejects.toThrow();
         expect(load).toHaveBeenCalledTimes(3);
+    });
+
+    it("reports a failed key read as unavailable (503), not as a bad token", async () => {
+        const key = await keyPair("known");
+        const cache = createJwksCache(async () => {
+            throw new Error("D1_ERROR: timed out");
+        });
+
+        const failure = cache.verify(await tokenFor(key), { audience: ORIGIN, issuer: ORIGIN });
+
+        await expect(failure).rejects.toBeInstanceOf(JwksUnavailableError);
+        await expect(failure).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", status: 503 });
     });
 });
