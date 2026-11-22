@@ -32,6 +32,7 @@ import { type StepUsage, sumStepUsage } from "../agent/message-cost";
 import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission } from "../agent/thread-read-access";
 import { getThreadListDataBatchHandler, readThreadRelationship, threadForViewer } from "../agent/threads";
 import { liteAuthQuery } from "../lib/crpc";
+import { systemDb } from "../lib/rls/scope";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
 import { loadNsfwStatuses, type RedactedUIMessage, redactUIMessagesForPublicViewer } from "./lib/public-thread";
@@ -159,8 +160,15 @@ export const getThreadWithData = liteAuthQuery
             totalTokens: summed?.totalTokens ?? 0,
         };
 
-        // The newest reply's suggestions seed the composer; another reply's are read by its id when it is on screen.
-        const cachedSuggestions = cachedRows.page.toSorted(newerFirst)[0];
+        // The newest reply's suggestions seed the composer; another reply's are read by its id when it is on screen. Only charged rows
+        // are shown, and only while the owner's setting is on (a shared thread follows its owner's setting).
+        // The owner's setting, read as the gate reads it (absent = on): the owner's row is not visible to a collaborator under RLS.
+        const ownerSettings = await systemDb(context)
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", thread.userId))
+            .unique();
+        const cachedSuggestions =
+            ownerSettings?.enableFollowupSuggestions === false ? undefined : cachedRows.page.filter((row) => row.charged !== false).toSorted(newerFirst)[0];
         const suggestions: FollowupSuggestions = cachedSuggestions
             ? { lastMessageId: cachedSuggestions.lastMessageId, suggestions: cachedSuggestions.suggestions }
             : { suggestions: [] };

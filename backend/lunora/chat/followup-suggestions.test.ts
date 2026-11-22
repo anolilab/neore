@@ -18,6 +18,7 @@ import {
     followupDispatchInFlight,
     holdFollowupClaim,
     holdFollowupRevoke,
+    markFollowupCharged,
     releaseFollowupRevoke,
     followupInFlight,
     followupModelRows,
@@ -204,8 +205,9 @@ describe("a late run cannot free a later run's claim", () => {
 describe("a late run cannot replace a newer cache", () => {
     // `replyAt` defaults to the turn's order: a plain turn's replies are told apart by their turn alone.
     // `pathIds` is a branched thread's active path: without it every stored reply counts (one branch).
-    const cache = async (lastMessageId: string, order: number, suggestions: string[], replyAt = order, pathIds?: string[]) =>
-        await harness.action(
+    // A written reply's unit is taken by the job right after the write: the helper marks it, as the job does, so it is read.
+    const cache = async (lastMessageId: string, order: number, suggestions: string[], replyAt = order, pathIds?: string[]) => {
+        const written = await harness.action(
             async (context: any) =>
                 await context.runMutation(cacheFollowupSuggestions, {
                     lastMessageId,
@@ -217,9 +219,34 @@ describe("a late run cannot replace a newer cache", () => {
                 }),
         );
 
+        if (written && suggestions.length > 0) {
+            await harness.action(async (context: any) => await context.runMutation(markFollowupCharged, { lastMessageId, threadId }));
+        }
+
+        return written;
+    };
+
     // Without a reply id, the thread's newest reply; with one, that reply's own row.
     const cached = async (lastMessageId?: string) =>
         await harness.run(async (ctx: any) => await getCachedFollowupSuggestionsHandler(ctx, { threadId, ...(lastMessageId && { lastMessageId }) }));
+
+    // Suggestions are shown only once their unit is taken: an uncharged row is not read.
+    it("a written reply is not read until its unit is taken", async () => {
+        await harness.action(
+            async (context: any) =>
+                await context.runMutation(cacheFollowupSuggestions, {
+                    lastMessageId: "reply-unpaid",
+                    order: 5,
+                    replyAt: 5,
+                    suggestions: ["unpaid?"],
+                    threadId,
+                }),
+        );
+
+        await expect(cached("reply-unpaid")).resolves.toBeNull();
+        await harness.action(async (context: any) => await context.runMutation(markFollowupCharged, { lastMessageId: "reply-unpaid", threadId }));
+        await expect(cached("reply-unpaid")).resolves.toEqual({ lastMessageId: "reply-unpaid", suggestions: ["unpaid?"] });
+    });
 
     it("an older turn that finishes after a newer one is refused", async () => {
         await cache("reply-new", 5, ["newer?"]);

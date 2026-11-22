@@ -486,6 +486,12 @@ export const removeThreadAccess = authMutation
             await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
 
             if (access) {
+                // Renewed right before the grant goes: the steps above may have taken a while, and a hold that lapsed would let a request
+                // start on the chat before the grant is deleted. A hold that cannot be renewed stops the removal.
+                if (!(await context.runMutation(internal.agent.followup_suggestions.renewFollowupRevoke, { claimedAt: revokeClaim, threadId }))) {
+                    throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+                }
+
                 await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
                     accessId: access._id,
                 });

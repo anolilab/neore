@@ -4532,6 +4532,16 @@ export const getCachedFollowupSuggestions = authQuery
 
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }), "Access denied to this thread");
 
+        // The owner's setting governs a shared thread: suggestions made while it was on are not shown once it is turned off.
+        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+        const ownerGate = thread?.userId
+            ? await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: thread.userId })
+            : null;
+
+        if (!ownerGate?.enabled) {
+            return { suggestions: [] };
+        }
+
         const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
             lastMessageId,
             threadId,
@@ -4672,6 +4682,13 @@ export const retryFollowupCache = internalAction
             );
         } catch (chargeError) {
             chatLogger.error(`[retryFollowupCache] The Text unit could not be taken: ${write.threadId}`, chargeError);
+        }
+
+        if (charged) {
+            await ctx.runMutation(internal.agent.followup_suggestions.markFollowupCharged, {
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+            });
         }
 
         // No unit, no suggestion: the written suggestions are cleared for this reply (the clear is retried by the scheduler if it cannot land).
@@ -5141,6 +5158,9 @@ export const generateFollowupSuggestionsForThread = internalAction
                 }
 
                 if (charged) {
+                    // The unit is taken, so the suggestions become readable. Until this lands they stay hidden: a run that finds them
+                    // uncharged takes the same unit again, which is a no-op, and marks them.
+                    await context.runMutation(internal.agent.followup_suggestions.markFollowupCharged, { lastMessageId, threadId });
                     chatLogger.info(`[generateFollowupSuggestionsForThread] Stored ${suggestions.length} suggestions for thread: ${threadId}`);
                 } else {
                     // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown

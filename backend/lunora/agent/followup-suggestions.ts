@@ -243,6 +243,38 @@ export const releaseFollowupRevoke = internalMutation
         return null;
     });
 
+/**
+ * Renews the removal's hold for another full lifetime, right before the grant is deleted: a removal whose earlier steps took longer
+ * than the hold cannot then delete the grant under a hold that has lapsed. `false` when the hold was lost: the removal must not run.
+ */
+export const renewFollowupRevoke = internalMutation
+    .input({ claimedAt: v.number(), threadId: v.string() })
+    .output(v.boolean())
+    .mutation(
+        async ({ args: { claimedAt, threadId }, ctx: context }) =>
+            await holdClaim(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:revoke`, claimedAt, holdTtlFrom(claimedAt, FOLLOWUP_REVOKE_TTL_MS, context.now)),
+    );
+
+/**
+ * The reply's unit is taken: its suggestions become readable. Only the row for this reply is marked, so another reply's row is not
+ * touched. A repeat is harmless (the unit is keyed per reply, so the charge is not taken twice).
+ */
+export const markFollowupCharged = internalMutation
+    .input({ lastMessageId: v.string(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { lastMessageId, threadId }, ctx: context }) => {
+        const own = await context.db
+            .query("followupSuggestions")
+            .withIndex("by_thread_and_message", (q) => q.eq("threadId", threadId).eq("lastMessageId", lastMessageId))
+            .first();
+
+        if (own && own.charged !== true) {
+            await context.db.patch("followupSuggestions", own._id, { charged: true });
+        }
+
+        return null;
+    });
+
 /** The request has settled: its dispatch claim goes, and the chat may be locked again. */
 export const endFollowupDispatch = internalMutation
     .input({ claimedAt: v.number(), requestId: v.string(), threadId: v.string() })
@@ -291,7 +323,8 @@ export const getCachedFollowupSuggestions = internalQuery
  * Exported for hot-path queries to bypass runQuery validator overhead.
  */
 export const getCachedFollowupSuggestionsHandler = async (context: QueryContext, { lastMessageId, threadId }: { lastMessageId?: string; threadId: string }) => {
-    // With a reply id, that reply's own row (one per reply); without one, the thread's newest reply.
+    // With a reply id, that reply's own row (one per reply); without one, the thread's newest reply. A row whose unit is not taken yet
+    // is not read: it is shown only once charged.
     const rows =
         lastMessageId === undefined
             ? await context.db
@@ -302,7 +335,7 @@ export const getCachedFollowupSuggestionsHandler = async (context: QueryContext,
                   .query("followupSuggestions")
                   .withIndex("by_thread_and_message", (q) => q.eq("threadId", threadId).eq("lastMessageId", lastMessageId))
                   .collect();
-    const cached = rows.toSorted(newerFirst)[0];
+    const cached = rows.filter((row) => row.charged !== false).toSorted(newerFirst)[0];
 
     if (!cached) {
         return null;
@@ -350,8 +383,11 @@ export const cacheFollowupSuggestions = internalMutation
         const own = stored.find((row) => row.lastMessageId === lastMessageId);
 
         // A reply's own row is rewritten in place, so its clear or retry is never refused by another reply's row.
+        // Suggestions start uncharged: the reply's unit is taken next, and `markFollowupCharged` then makes them readable.
+        const uncharged = suggestions.length > 0 ? { charged: false } : {};
+
         if (own) {
-            await context.db.patch("followupSuggestions", own._id, { lastMessageId, order, replyAt, suggestions, updatedAt: now });
+            await context.db.patch("followupSuggestions", own._id, { lastMessageId, order, replyAt, suggestions, updatedAt: now, ...uncharged });
 
             return true;
         }
@@ -383,6 +419,7 @@ export const cacheFollowupSuggestions = internalMutation
             suggestions,
             threadId,
             updatedAt: now,
+            ...uncharged,
         });
 
         return true;
