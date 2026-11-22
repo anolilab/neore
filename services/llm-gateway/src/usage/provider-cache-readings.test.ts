@@ -1,7 +1,7 @@
 /**
- * The provider cache readings run their SQL against the migrated schema: hours and models are summed, the response
- * cache's own answers, failures and rows outside the window are left out, and a model that never caches is listed but
- * kept out of the hourly series.
+ * The provider cache readings run their SQL against the migrated schema: quarter hours and models are summed, the
+ * response cache's own answers, failures, non-chat rows and rows outside the window are left out, and a model that never
+ * caches is listed but kept out of the series.
  */
 import type { DatabaseSync } from "node:sqlite";
 
@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { d1FromSqlite, migratedDatabase } from "../__tests__/helpers/sqlite-d1.js";
 import { sqliteTime } from "../lib/sqlite-time.js";
-import { hourStart, PROVIDER_CACHE_MODEL_LIMIT, readProviderCacheReadings } from "./provider-cache-readings.js";
+import { answered, PROVIDER_CACHE_MODEL_LIMIT, quarterStart, readProviderCacheReadings } from "./provider-cache-readings.js";
 
 const NOW = Date.UTC(2026, 10, 21, 12, 30);
 const HOUR_MS = 3_600_000;
@@ -17,12 +17,14 @@ const HOUR_MS = 3_600_000;
 interface Row {
     cached: number;
     cacheHit?: number;
+    completion?: number;
     errorCode?: string;
     finishReason?: string;
     hoursAgo: number;
     model: string;
     prompt: number;
     provider?: string;
+    sessionType?: string;
 }
 
 /** A migrated database and an `insert` that adds one usage row to it. */
@@ -33,8 +35,8 @@ const usageLog = (): { db: DatabaseSync; insert: (row: Row) => void } => {
     const insert = (row: Row): void => {
         rowCount += 1;
         db.prepare(
-            `INSERT INTO usage_log (id, request_id, user_id, model_id, provider, model_api_id, prompt_tokens, cached_tokens, cache_hit, error_code, finish_reason, created_at)
-             VALUES (?, ?, 'user-1', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO usage_log (id, request_id, user_id, model_id, provider, model_api_id, prompt_tokens, completion_tokens, cached_tokens, cache_hit, error_code, finish_reason, session_type, created_at)
+             VALUES (?, ?, 'user-1', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
             `row-${rowCount}`,
             `request-${rowCount}`,
@@ -42,10 +44,12 @@ const usageLog = (): { db: DatabaseSync; insert: (row: Row) => void } => {
             row.provider ?? "openrouter",
             row.model,
             row.prompt,
+            row.completion ?? 50,
             row.cached,
             row.cacheHit ?? 0,
             row.errorCode ?? null,
             row.finishReason ?? null,
+            row.sessionType ?? "text",
             sqliteTime(NOW - row.hoursAgo * HOUR_MS),
         );
     };
@@ -54,7 +58,7 @@ const usageLog = (): { db: DatabaseSync; insert: (row: Row) => void } => {
 };
 
 describe("readProviderCacheReadings", () => {
-    it("sums caching models by hour and every model by model, inside the window", async () => {
+    it("sums caching models by quarter hour and every model by model, inside the window", async () => {
         const { db, insert } = usageLog();
 
         insert({ cached: 900, hoursAgo: 1, model: "claude", prompt: 1000 });
@@ -72,9 +76,9 @@ describe("readProviderCacheReadings", () => {
 
         expect(readings.days).toBe(1);
         expect(readings.since).toBe(new Date(NOW - 24 * HOUR_MS).toISOString());
-        expect(readings.hours).toEqual([
-            { cachedTokens: 800, hour: "2026-11-21T09:00:00.000Z", promptTokens: 1000, requests: 1 },
-            { cachedTokens: 900, hour: "2026-11-21T11:00:00.000Z", promptTokens: 2000, requests: 2 },
+        expect(readings.quarters).toEqual([
+            { cachedTokens: 800, promptTokens: 1000, requests: 1, start: "2026-11-21T09:30:00.000Z" },
+            { cachedTokens: 900, promptTokens: 2000, requests: 2, start: "2026-11-21T11:30:00.000Z" },
         ]);
         expect(readings.models).toEqual([
             { cachedTokens: 0, modelId: "workers-ai", promptTokens: 5000, provider: "openrouter", requests: 1 },
@@ -92,7 +96,7 @@ describe("readProviderCacheReadings", () => {
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
 
-        expect(readings.hours).toEqual([]);
+        expect(readings.quarters).toEqual([]);
         expect(readings.all).toEqual({ cachedTokens: 0, promptTokens: 4000, requests: 2 });
         expect(readings.pairs).toBe(2);
     });
@@ -118,7 +122,7 @@ describe("readProviderCacheReadings", () => {
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 7, NOW);
 
-        expect(readings).toMatchObject({ all: { cachedTokens: 0, promptTokens: 0, requests: 0 }, hours: [], models: [], pairs: 0 });
+        expect(readings).toMatchObject({ all: { cachedTokens: 0, promptTokens: 0, requests: 0 }, models: [], pairs: 0, quarters: [] });
     });
 
     it("keeps a pair that stopped caching inside the window, so its drop shows", async () => {
@@ -131,9 +135,9 @@ describe("readProviderCacheReadings", () => {
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
 
-        expect(readings.hours).toEqual([
-            { cachedTokens: 0, hour: "2026-11-21T10:00:00.000Z", promptTokens: 1000, requests: 1 },
-            { cachedTokens: 0, hour: "2026-11-21T11:00:00.000Z", promptTokens: 1000, requests: 1 },
+        expect(readings.quarters).toEqual([
+            { cachedTokens: 0, promptTokens: 1000, requests: 1, start: "2026-11-21T10:30:00.000Z" },
+            { cachedTokens: 0, promptTokens: 1000, requests: 1, start: "2026-11-21T11:30:00.000Z" },
         ]);
     });
 
@@ -146,7 +150,7 @@ describe("readProviderCacheReadings", () => {
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
 
-        expect(readings.hours).toEqual([{ cachedTokens: 900, hour: "2026-11-21T11:00:00.000Z", promptTokens: 1000, requests: 1 }]);
+        expect(readings.quarters).toEqual([{ cachedTokens: 900, promptTokens: 1000, requests: 1, start: "2026-11-21T11:30:00.000Z" }]);
         expect(readings.models).toEqual([
             { cachedTokens: 0, modelId: "gemini", promptTokens: 5000, provider: "openrouter", requests: 1 },
             { cachedTokens: 900, modelId: "gemini", promptTokens: 1000, provider: "google", requests: 1 },
@@ -162,11 +166,50 @@ describe("readProviderCacheReadings", () => {
 
         const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
 
-        expect(readings.hours).toEqual([{ cachedTokens: 800, hour: "2026-11-21T11:00:00.000Z", promptTokens: 1000, requests: 1 }]);
+        expect(readings.quarters).toEqual([{ cachedTokens: 800, promptTokens: 1000, requests: 1, start: "2026-11-21T11:30:00.000Z" }]);
         expect(readings.models).toEqual([{ cachedTokens: 800, modelId: "claude", promptTokens: 1000, provider: "openrouter", requests: 1 }]);
     });
 
-    it("turns a stored hour prefix into its ISO start", () => {
-        expect(hourStart("2026-11-21 09")).toBe("2026-11-21T09:00:00.000Z");
+    it("cuts each row to its quarter hour", async () => {
+        const { db, insert } = usageLog();
+
+        // NOW is 12:30, so these land at 12:16, 12:29 and 12:01.
+        insert({ cached: 100, hoursAgo: 14 / 60, model: "claude", prompt: 1000 });
+        insert({ cached: 100, hoursAgo: 1 / 60, model: "claude", prompt: 1000 });
+        insert({ cached: 100, hoursAgo: 29 / 60, model: "claude", prompt: 1000 });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.quarters).toEqual([
+            { cachedTokens: 100, promptTokens: 1000, requests: 1, start: "2026-11-21T12:00:00.000Z" },
+            { cachedTokens: 200, promptTokens: 2000, requests: 2, start: "2026-11-21T12:15:00.000Z" },
+        ]);
+        expect(quarterStart("2026-11-21 09:45")).toBe("2026-11-21T09:45:00.000Z");
+    });
+
+    it("leaves out rows that are not chat prompts: no completion tokens, or a realtime session", async () => {
+        const { db, insert } = usageLog();
+
+        insert({ cached: 800, hoursAgo: 1, model: "claude", prompt: 1000 });
+        // Music stores one generation, video its seconds, speech its characters, embeddings their tokens: none has output tokens.
+        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "music-model", prompt: 1 });
+        insert({ cached: 0, completion: 0, hoursAgo: 1, model: "embedding-model", prompt: 90_000 });
+        insert({ cached: 0, hoursAgo: 1, model: "gpt-realtime", prompt: 4000, sessionType: "realtime" });
+
+        const readings = await readProviderCacheReadings(d1FromSqlite(db), 1, NOW);
+
+        expect(readings.all).toEqual({ cachedTokens: 800, promptTokens: 1000, requests: 1 });
+        expect(readings.models.map((model) => model.modelId)).toEqual(["claude"]);
+    });
+
+    it("reads both queries from migration 0017's covering index alone", () => {
+        const { db } = usageLog();
+        const plan = (sql: string): string =>
+            (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all("2026-11-01 00:00:00") as { detail: string }[]).map((row) => row.detail).join("\n");
+
+        // A term in the index's WHERE that `answered()` lacks, or a filtered column the index leaves out, loses the covering index.
+        expect(
+            plan(`SELECT provider, model_id, SUM(prompt_tokens), SUM(cached_tokens) FROM usage_log WHERE ${answered("?1")} GROUP BY provider, model_id`),
+        ).toContain("USING COVERING INDEX idx_usage_log_provider_cache");
     });
 });

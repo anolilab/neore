@@ -21,7 +21,7 @@ describe("GET /internal/admin/provider-cache", () => {
         const res = await readingsFor("admin-1", "&days=30");
 
         expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({ days: 30, hours: [], models: [] });
+        expect(await res.json()).toMatchObject({ days: 30, models: [], quarters: [] });
     });
 
     it("defaults to 7 days", async () => {

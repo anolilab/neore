@@ -1,27 +1,55 @@
 import { describe, expect, it } from "vitest";
 
-import { byDay, cachedShare, resolveTimeZone, sumCounts } from "./provider-cache";
+import { byDay, byHour, cachedShare, resolveTimeZone, sumCounts } from "./provider-cache";
 
-const hour = (iso: string, promptTokens: number, cachedTokens: number) => {
-    return { cachedTokens, hour: iso, promptTokens, requests: 1 };
+const quarter = (start: string, promptTokens: number, cachedTokens: number) => {
+    return { cachedTokens, promptTokens, requests: 1, start };
 };
 
 describe("provider cache rollups", () => {
-    const hours = [hour("2026-11-20T23:00:00.000Z", 100, 50), hour("2026-11-21T00:00:00.000Z", 100, 90), hour("2026-11-21T05:00:00.000Z", 300, 0)];
+    const quarters = [quarter("2026-11-20T23:00:00.000Z", 100, 50), quarter("2026-11-21T00:00:00.000Z", 100, 90), quarter("2026-11-21T05:00:00.000Z", 300, 0)];
 
-    it("sums hours by day in the given time zone, newest first", () => {
-        expect(byDay(hours, "UTC")).toEqual([
+    it("sums quarter hours by day in the given time zone, newest first", () => {
+        expect(byDay(quarters, "UTC")).toEqual([
             { cachedTokens: 90, day: "2026-11-21", promptTokens: 400, requests: 2 },
             { cachedTokens: 50, day: "2026-11-20", promptTokens: 100, requests: 1 },
         ]);
         // At UTC−08:00, midnight UTC on the 21st is still the 20th.
-        expect(byDay(hours, "America/Los_Angeles")).toEqual([{ cachedTokens: 140, day: "2026-11-20", promptTokens: 500, requests: 3 }]);
+        expect(byDay(quarters, "America/Los_Angeles")).toEqual([{ cachedTokens: 140, day: "2026-11-20", promptTokens: 500, requests: 3 }]);
     });
 
-    it("uses the configured time zone only when Intl knows it", () => {
-        expect(resolveTimeZone("Europe/Berlin")).toBe("Europe/Berlin");
-        expect(resolveTimeZone("Not/AZone")).toBe(new Intl.DateTimeFormat().resolvedOptions().timeZone);
-        expect(resolveTimeZone(undefined)).toBe(new Intl.DateTimeFormat().resolvedOptions().timeZone);
+    it("splits a half-hour zone's days and hours at its own midnight", () => {
+        // In Asia/Kolkata (UTC+05:30), 18:15Z is 23:45 on the 20th and 18:30Z is midnight on the 21st.
+        const kolkata = [quarter("2026-11-20T18:15:00.000Z", 100, 10), quarter("2026-11-20T18:30:00.000Z", 200, 20)];
+
+        expect(byDay(kolkata, "Asia/Kolkata")).toEqual([
+            { cachedTokens: 20, day: "2026-11-21", promptTokens: 200, requests: 1 },
+            { cachedTokens: 10, day: "2026-11-20", promptTokens: 100, requests: 1 },
+        ]);
+        expect(byHour(kolkata, "Asia/Kolkata")).toEqual([
+            { cachedTokens: 10, promptTokens: 100, requests: 1, start: "2026-11-20T17:30:00.000Z" },
+            { cachedTokens: 20, promptTokens: 200, requests: 1, start: "2026-11-20T18:30:00.000Z" },
+        ]);
+    });
+
+    it("keeps the hour that repeats when clocks go back as two hours", () => {
+        // Berlin leaves summer time on 2026-10-25: 00:15Z and 01:15Z are both 02:15 local.
+        const fallBack = [
+            quarter("2026-10-25T00:15:00.000Z", 100, 50),
+            quarter("2026-10-25T00:45:00.000Z", 100, 50),
+            quarter("2026-10-25T01:15:00.000Z", 100, 0),
+        ];
+
+        expect(byHour(fallBack, "Europe/Berlin")).toEqual([
+            { cachedTokens: 100, promptTokens: 200, requests: 2, start: "2026-10-25T00:00:00.000Z" },
+            { cachedTokens: 0, promptTokens: 100, requests: 1, start: "2026-10-25T01:00:00.000Z" },
+        ]);
+    });
+
+    it("uses the configured time zone when Intl knows it, else the fallback, else UTC", () => {
+        expect(resolveTimeZone("Europe/Berlin", "Asia/Tokyo")).toBe("Europe/Berlin");
+        expect(resolveTimeZone("Not/AZone", "Asia/Tokyo")).toBe("Asia/Tokyo");
+        expect(resolveTimeZone(undefined)).toBe("UTC");
     });
 
     it("gives the cached share, and none when nothing was sent", () => {

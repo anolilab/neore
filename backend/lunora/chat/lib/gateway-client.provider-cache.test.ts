@@ -20,9 +20,9 @@ class FakeBinding {
         return Response.json({
             all: { cachedTokens: 0, promptTokens: 0, requests: 0 },
             days: 7,
-            hours: [],
             models: [],
             pairs: 0,
+            quarters: [],
             since: "2026-11-15T00:00:00.000Z",
         });
     }

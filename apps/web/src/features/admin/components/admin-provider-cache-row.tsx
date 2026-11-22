@@ -4,6 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
+import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import { formatDate, formatDateTime, formatNumber } from "@neore/ui/utils/locale-format";
 import { useState } from "react";
 
@@ -11,7 +12,7 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 
 import { useProviderCacheReadings } from "../hooks/use-admin";
 import type { CacheCounts } from "../lib/provider-cache";
-import { byDay, cachedShare, resolveTimeZone, sumCounts } from "../lib/provider-cache";
+import { browserTimeZone, byDay, byHour, cachedShare, resolveTimeZone, sumCounts } from "../lib/provider-cache";
 
 type WindowDays = 1 | 7 | 30;
 
@@ -40,14 +41,17 @@ const AdminProviderCacheRow = () => {
     const [days, setDays] = useState<WindowDays>(7);
     const readings = useProviderCacheReadings(days);
     const userSettings = useUserSettings();
+    const isHydrated = useIsHydrated();
     const { locale } = i18n;
-    const timeZone = resolveTimeZone(userSettings.data?.timezone);
+    // The browser's zone only after hydration: the server renders in its own zone, and the first client render must match it.
+    const timeZone = resolveTimeZone(userSettings.data?.timezone, isHydrated ? browserTimeZone() : undefined);
     // `undefined` until a response arrived (or after a failed first one); `[]` is a loaded window with no traffic.
     const { data } = readings;
-    const hours = data?.hours ?? [];
+    const quarters = data?.quarters ?? [];
     const models = data?.models ?? [];
-    const total = data === undefined ? undefined : sumCounts(hours);
-    const dailyRows = byDay(hours, timeZone);
+    const total = data === undefined ? undefined : sumCounts(quarters);
+    const hours = byHour(quarters, timeZone);
+    const dailyRows = byDay(quarters, timeZone);
     const countText = (value: number | undefined): string => (value === undefined ? NO_READING : formatNumber(value, locale));
 
     return (
@@ -55,7 +59,7 @@ const AdminProviderCacheRow = () => {
             <CardHeader>
                 <CardTitle>{t`Provider prompt cache`}</CardTitle>
                 <CardDescription>
-                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Answers from the gateway's response cache are left out. Days and hours are in ${timeZone}.`}
+                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in ${timeZone}.`}
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -140,8 +144,19 @@ const AdminProviderCacheRow = () => {
                         </TableHeader>
                         <TableBody>
                             {hours.map((row) => (
-                                <TableRow key={row.hour}>
-                                    <TableHead scope="row">{formatDateTime(row.hour, locale, { dateStyle: "short", timeStyle: "short", timeZone })}</TableHead>
+                                <TableRow key={row.start}>
+                                    <TableHead scope="row">
+                                        {/* The offset tells apart the two hours that share a clock time when clocks go back. */}
+                                        {formatDateTime(row.start, locale, {
+                                            day: "2-digit",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                            month: "2-digit",
+                                            timeZone,
+                                            timeZoneName: "shortOffset",
+                                            year: "2-digit",
+                                        })}
+                                    </TableHead>
                                     <TableCell className="text-right tabular-nums">{formatNumber(row.requests, locale)}</TableCell>
                                     <TableCell className="text-right tabular-nums">{formatNumber(row.promptTokens, locale)}</TableCell>
                                     <TableCell className="text-right tabular-nums">{shareText(row, locale)}</TableCell>

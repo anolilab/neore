@@ -79,7 +79,7 @@ const providerCacheCountsFields = {
 
 /**
  * The provider prompt-cache readings from the gateway: prompt tokens and the share each provider served from its own
- * cache, by hour (provider/model pairs that cached in the last 30 days), by model (the top 50), and for every pair in
+ * cache, by quarter hour (provider/model pairs that cached in the last 30 days), by model (the top 50), and for every pair in
  * the window, over the last 1, 7 or 30 days. A drop in the hourly share after a deploy shows what a prompt change cost
  * in cache reads.
  */
@@ -90,9 +90,9 @@ export const getProviderCacheReadingsForAdmin = adminAction
         v.object({
             all: v.object(providerCacheCountsFields),
             days: v.union(v.literal(1), v.literal(7), v.literal(30)),
-            hours: v.array(v.object({ ...providerCacheCountsFields, hour: v.string() })),
             models: v.array(v.object({ ...providerCacheCountsFields, modelId: v.string(), provider: v.string() })),
             pairs: v.number(),
+            quarters: v.array(v.object({ ...providerCacheCountsFields, start: v.string() })),
             since: v.string(),
         }),
     )
