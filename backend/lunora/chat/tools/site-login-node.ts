@@ -80,8 +80,16 @@ const spellingsOf = (secret: string): string[] => {
     ];
 };
 
-/** The shortest username scrubbed: a shorter one would blank ordinary words, and tells nothing of the account. */
-const MIN_SCRUBBED_USERNAME = 3;
+/**
+ * The shortest username replaced by its marker: a shorter one would blank ordinary words. A shorter one is still never
+ * shown: a field that names it is withheld whole.
+ */
+const MIN_REPLACED_USERNAME = 3;
+
+/** How many layers of percent-encoding are read through: a page echoing what it was sent adds one each time. */
+const MAX_PERCENT_LAYERS = 8;
+
+const PERCENT_RUN_RE = /(?:%[\da-f]{2})+/gi;
 
 // The characters a pattern reads as syntax; `-` is literal outside a class, and escaping it is an error under the `u` flag.
 const REGEXP_SPECIAL_RE = /[$()*+./?[\\\]^{|}]/g;
@@ -101,46 +109,78 @@ interface Saved {
     username: string;
 }
 
-/** The login's secrets a text is scrubbed of, each with its marker. */
-const secretsOf = ({ password, username }: Saved): { isToken: boolean; marker: string; value: string }[] => [
+interface Secret {
+    isToken: boolean;
+    /** Replaced by this where it is spelled as written; `undefined`: a field naming it is withheld instead. */
+    marker: string | undefined;
+    value: string;
+}
+
+/** The login's secrets a text is kept clear of. */
+const secretsOf = ({ password, username }: Saved): Secret[] => [
     ...(password === undefined ? [] : [{ isToken: false, marker: "[password]", value: password }]),
-    ...(username.length >= MIN_SCRUBBED_USERNAME ? [{ isToken: true, marker: "[username]", value: username }] : []),
+    ...(username === "" ? [] : [{ isToken: true, marker: username.length >= MIN_REPLACED_USERNAME ? "[username]" : undefined, value: username }]),
 ];
 
-/** Whether `text`, as it is or with its escapes read, spells the password or the username (as a token) anywhere. */
+/** Each percent run of `text` read as UTF-8, or left as it is where it is none. */
+const percentDecoded = (text: string): string =>
+    text.replaceAll(PERCENT_RUN_RE, (run) => {
+        try {
+            return decodeURIComponent(run);
+        } catch {
+            return run;
+        }
+    });
+
+/** `text` as it is, with its escapes read, and through each further layer of percent-encoding it holds. */
+const layersOf = (text: string): string[] => {
+    const layers = [text, unescaped(text)];
+    let current = text;
+
+    for (let round = 0; round < MAX_PERCENT_LAYERS; round += 1) {
+        const next = percentDecoded(current);
+
+        if (next === current) {
+            break;
+        }
+
+        layers.push(next, unescaped(next));
+        current = next;
+    }
+
+    return layers;
+};
+
+/** Whether any reading of `text` (escapes read, percent layers taken off) spells the password, or the username as a token. */
 export const holdsLogin = (text: string, saved: Saved): boolean => {
-    const read = unescaped(text);
+    const layers = layersOf(text);
 
     return secretsOf(saved).some(({ isToken, value }) =>
-        spellingsOf(value).some((spelling) => placesOf(spelling, isToken).test(text) || placesOf(spelling, isToken).test(read)),
+        spellingsOf(value).some((spelling) => layers.some((layer) => placesOf(spelling, isToken).test(layer))),
     );
 };
 
 /**
- * `text` with the password and the username, in the forms an address or a form body encodes them in, replaced; withheld
- * whole when an escaped spelling of either is in it, which no replacement could find.
+ * `text` with the password and the username replaced where they are spelled as written (raw, URI- or form-encoded);
+ * withheld whole when any other reading of it still names either (an escape, another layer of percent-encoding, or a
+ * username too short to replace), which no replacement could find.
  */
 export const withoutLogin = (text: string | undefined, saved: Saved): string | undefined => {
     if (text === undefined) {
         return undefined;
     }
 
-    const secrets = secretsOf(saved);
-    const read = unescaped(text);
-
-    if (read !== text && secrets.some(({ isToken, value }) => spellingsOf(value).some((spelling) => placesOf(spelling, isToken).test(read)))) {
-        return WITHHELD_FIELD;
-    }
-
     let scrubbed = text;
 
-    for (const { isToken, marker, value } of secrets) {
-        for (const spelling of spellingsOf(value)) {
-            scrubbed = scrubbed.replaceAll(placesOf(spelling, isToken), () => marker);
+    for (const { isToken, marker, value } of secretsOf(saved)) {
+        if (marker !== undefined) {
+            for (const spelling of spellingsOf(value)) {
+                scrubbed = scrubbed.replaceAll(placesOf(spelling, isToken), () => marker);
+            }
         }
     }
 
-    return scrubbed;
+    return holdsLogin(scrubbed, saved) ? WITHHELD_FIELD : scrubbed;
 };
 
 /** `text` with the password, and the forms an address or a form body encodes it in, replaced. */

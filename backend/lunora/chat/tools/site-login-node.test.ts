@@ -705,6 +705,17 @@ describe("withoutLogin", () => {
         ).toBe(WITHHELD_FIELD);
     });
 
+    it("withholds a field that names the username behind more layers of percent-encoding", () => {
+        const twice = [...encodeURIComponent(USERNAME)].map((character) => `%25${character.codePointAt(0)?.toString(16)}`).join("");
+
+        expect(withoutLogin(`${SITE}/welcome?u=${twice}`, { password: PASSWORD, username: USERNAME })).toBe(WITHHELD_FIELD);
+    });
+
+    it("withholds a field that names a username too short to replace, and leaves one that does not", () => {
+        expect(withoutLogin("Signed in as jo", { password: PASSWORD, username: "jo" })).toBe(WITHHELD_FIELD);
+        expect(withoutLogin("Join the journey", { password: PASSWORD, username: "jo" })).toBe("Join the journey");
+    });
+
     it("leaves a field with escapes that spell neither as it is", () => {
         expect(withoutLogin(String.raw`Caf\u00e9 &#233;`, { password: PASSWORD, username: USERNAME })).toBe(String.raw`Caf\u00e9 &#233;`);
     });
