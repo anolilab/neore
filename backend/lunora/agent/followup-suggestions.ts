@@ -70,7 +70,8 @@ export const activePathIds = internalQuery
     .input({ leafId: v.string(), threadId: v.string() })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
-        const rows = await loadActivePathTail(ctx, args.threadId as Id<"threads">, args.leafId, FOLLOWUP_PATH_LIMIT);
+        // One row past the cap, so a path of exactly the cap is known to be whole (a path past it is not).
+        const rows = await loadActivePathTail(ctx, args.threadId as Id<"threads">, args.leafId, FOLLOWUP_PATH_LIMIT + 1);
 
         return rows.map((row) => row._id);
     });
@@ -275,10 +276,18 @@ export const releaseFollowupRevoke = internalMutation
 export const renewFollowupRevoke = internalMutation
     .input({ claimedAt: v.number(), threadId: v.string() })
     .output(v.boolean())
-    .mutation(
-        async ({ args: { claimedAt, threadId }, ctx: context }) =>
-            await holdClaim(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:revoke`, claimedAt, holdTtlFrom(claimedAt, FOLLOWUP_REVOKE_TTL_MS, context.now)),
-    );
+    .mutation(async ({ args: { claimedAt, threadId }, ctx: context }) => {
+        const key = `${threadId}:revoke`;
+        // Renewed only while this removal's own hold is live. A hold that lapsed (its row expired) is not recreated: a dispatch may have
+        // started in the gap, so the removal stops rather than deleting the grant under it.
+        const live = await claimRow(context, FOLLOWUP_REVOKE_SCOPE, key);
+
+        if (live?.claimedAt !== claimedAt) {
+            return false;
+        }
+
+        return await holdClaim(context, FOLLOWUP_REVOKE_SCOPE, key, claimedAt, holdTtlFrom(claimedAt, FOLLOWUP_REVOKE_TTL_MS, context.now));
+    });
 
 /**
  * The reply's unit is taken: its suggestions become readable. Only the row for this reply is marked, so another reply's row is not
@@ -395,17 +404,29 @@ export const cacheFollowupSuggestions = internalMutation
         order: v.number(),
         pathIds: v.optional(v.array(v.string())),
         replyAt: v.number(),
+        // The reply as the job saw it: a write is refused once a newer message is the one the composer shows. Checked here, in the same
+        // transaction as the write, so a message that lands after the job's own check cannot be cached and charged for.
+        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string() })),
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
     .output(v.boolean())
-    .mutation(async ({ args: { lastMessageId, order, pathIds, replyAt, suggestions, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { lastMessageId, order, pathIds, replyAt, shown, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
         const thread = await context.db.get("threads", threadId as Id<"threads">);
 
         // A deleted thread keeps no suggestions, and a hard delete marks `deletingAt` first, so that window keeps none either.
         if (!thread || thread.deletedAt || thread.deletingAt !== undefined) {
             return false;
+        }
+
+        // Suggestions for a reply that is no longer the one the composer shows are not stored (nor charged): a newer message supersedes it.
+        if (shown && suggestions.length > 0) {
+            const current = await newestShownRowIdHandler(context, { leafId: shown.leafId, threadId });
+
+            if (current !== shown.newestId) {
+                return false;
+            }
         }
 
         const stored = await context.db

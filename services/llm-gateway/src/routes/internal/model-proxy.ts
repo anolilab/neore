@@ -585,7 +585,8 @@ modelProxyRouter.openapi(
                         ]);
                     })(),
                 );
-            } else {
+            } else if (!c.req.raw.signal.aborted) {
+                // A request the caller already cancelled (before the provider was reached) is not the provider's failure either.
                 c.executionCtx.waitUntil(policy.recordHealth.failure());
             }
 

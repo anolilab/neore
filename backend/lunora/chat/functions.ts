@@ -4607,6 +4607,7 @@ export const retryFollowupCache = internalAction
         replyAt: v.number(),
         requestId: v.string().max(MAX_LENGTH.long),
         resetOrder: v.optional(v.number()),
+        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string() })),
         suggestions: v.array(v.string().max(MAX_LENGTH.long)),
         threadId: v.string().max(MAX_LENGTH.id),
     })
@@ -4820,7 +4821,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                           // A path read at its cap is not the whole path: the turn may run past it, so it is not complete.
                           const page = await readFollowupPath(context, threadId, threadData.activeLeafMessageId as string);
 
-                          return { continueCursor: null, isDone: page.length < FOLLOWUP_PATH_LIMIT, page };
+                          // The reader fetches one row past the cap: a path of exactly the cap is whole, and only a longer one is not read to its end.
+                          return { continueCursor: null, isDone: page.length <= FOLLOWUP_PATH_LIMIT, page: page.slice(0, FOLLOWUP_PATH_LIMIT) };
                       })()
                     : await agent.listMessages(context, {
                           paginationOpts: { cursor: null, numItems: 10 },
@@ -5122,6 +5124,8 @@ export const generateFollowupSuggestionsForThread = internalAction
                     // On a branched thread the rows read are the active path: only a stored reply on it can refuse this write.
                     ...(threadData.activeLeafMessageId && { pathIds: (messagesResult.page || []).map((row) => row._id) }),
                     replyAt: newest.createdAt ?? newest._creationTime,
+                    // The newest row the job saw, on the leaf it saw: the cache write checks both in its own transaction.
+                    shown: { leafId: threadData.activeLeafMessageId ?? undefined, newestId: newest._id },
                     suggestions,
                     threadId,
                 };

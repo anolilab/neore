@@ -590,4 +590,25 @@ describe("the newest row the composer shows", () => {
 
         await expect(harness.run(async (ctx: any) => await newestShownRowIdHandler(ctx, { threadId }))).resolves.toBe(next);
     });
+
+    // The write itself refuses a reply a newer message has superseded: the check and the write share one transaction.
+    it("refuses the cache write of a superseded reply, and writes the one still shown", async () => {
+        const reply = await addRow(1, "assistant");
+        const next = await addRow(2, "user");
+        const write = (lastMessageId: string, order: number, newestId: string) =>
+            harness.action(
+                async (context: any) =>
+                    await context.runMutation(cacheFollowupSuggestions, {
+                        lastMessageId,
+                        order,
+                        replyAt: order,
+                        shown: { newestId },
+                        suggestions: ["s?"],
+                        threadId,
+                    }),
+            );
+
+        await expect(write(reply, 1, reply)).resolves.toBe(false);
+        await expect(write(next, 2, next)).resolves.toBe(true);
+    });
 });
