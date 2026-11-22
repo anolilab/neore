@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { byDay, byHour, cachedShare, resolveTimeZone, sumCounts } from "./provider-cache";
+import { byDay, byHour, cachedShare, hourKeyIn, resolveTimeZone, sumCounts } from "./provider-cache";
 
 const quarter = (start: string, promptTokens: number, cachedTokens: number) => {
     return { cachedTokens, promptTokens, requests: 1, start };
@@ -66,6 +66,11 @@ describe("provider cache rollups", () => {
             { cachedTokens: 10, promptTokens: 100, requests: 1, start: "2026-04-04T14:00:00.000Z" },
             { cachedTokens: 20, promptTokens: 100, requests: 1, start: "2026-04-04T15:00:00.000Z" },
         ]);
+    });
+
+    it("keys an instant by its local date, hour and offset", () => {
+        expect(hourKeyIn("2026-11-21T09:45:00.000Z", "Europe/Berlin")).toBe("2026-11-21 10 GMT+01:00");
+        expect(hourKeyIn("2026-11-21T10:05:00.000Z", "Europe/Berlin")).toBe("2026-11-21 11 GMT+01:00");
     });
 
     it("uses the configured time zone when Intl knows it, else the fallback, else UTC", () => {

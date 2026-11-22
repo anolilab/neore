@@ -56,6 +56,8 @@ export const resolveTimeZone = (configured: string | null | undefined, fallback?
 const partsIn = (iso: string, timeZone: string): Partial<Record<Intl.DateTimeFormatPartTypes, string>> => {
     const parts = new Intl.DateTimeFormat("en-US", {
         day: "2-digit",
+        // `hourCycle` alone asks for no hour: without `hour`, the parts carry none.
+        hour: "2-digit",
         hourCycle: "h23",
         minute: "2-digit",
         month: "2-digit",
@@ -79,7 +81,7 @@ const MINUTE_MS = 60_000;
 const QUARTER_MS = 15 * MINUTE_MS;
 
 /** The local hour `iso` falls in, with its UTC offset: `YYYY-MM-DD HH GMT+hh:mm`. An hour that repeats has two offsets. */
-const hourKeyIn = (iso: string, timeZone: string): string => {
+export const hourKeyIn = (iso: string, timeZone: string): string => {
     const parts = partsIn(iso, timeZone);
 
     return `${parts.year ?? ""}-${parts.month ?? ""}-${parts.day ?? ""} ${parts.hour ?? ""} ${parts.timeZoneName ?? ""}`;
