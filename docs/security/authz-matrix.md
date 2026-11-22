@@ -349,7 +349,10 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.updateThreadVisibility` | mutation | authMutation + RL | threads | row.userId == caller | **fixed** (low) — share token minted server-side; the caller-chosen one is gone |
 | `chat_functions.validateThreadExists` | query | optionalAuthQuery | threads | row.userId == caller | ok |
 | `chat_group_functions.createGroupChat` | mutation | authMutation + RL | threads | skill access | ok |
+| `chat_goals_functions.clearPinnedGoal` | mutation | authMutation + RL | threads | row.userId == caller (requireOwnedThread, lock proof); refused while impersonating | ok — new |
+| `chat_goals_functions.getPinnedGoal` | query | authQuery | threads | row.userId == caller, else null; locked chat needs the read gate's proof | ok — new |
 | `chat_goals_functions.getThreadGoal` | query | authQuery | threads, threadGoals | thread read gate (lock proof); goal row.userId == caller | ok |
+| `chat_goals_functions.setPinnedGoal` | mutation | authMutation + RL | threads | row.userId == caller (requireOwnedThread, lock proof); refused while impersonating | ok — new |
 | `chat_group_functions.createGroupChatFromTemplate` | mutation | authMutation + RL | threads, skills, userSkills, skillStats, skillHistory | caller-scoped (ctx.user): template is a server-side constant; persona skills are read/created only under the caller's own `userId` (free-plan skill limit applied), then the same skill-access gate as `createGroupChat` | ok — new |
 | `chat_group_functions.getGroupChat` | query | authQuery | threads | thread access (owner/grant) | ok |
 | `chat_group_functions.listGroupCandidates` | query | authQuery | — | caller-scoped (ctx.user) | ok |
