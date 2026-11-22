@@ -551,15 +551,38 @@ const actHeld = async (
                         // The name a control is announced by, when it is not its text. A text field's value is never read:
                         // a person may have typed into it.
                         label = await element.evaluate((control) => {
-                            const labelledBy = (control.getAttribute("aria-labelledby") ?? "")
-                                .split(" ")
-                                .filter(Boolean)
-                                .map((id) => (control.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "")
-                                .join(" ");
-                            const submitValue =
-                                control instanceof HTMLInputElement && ["button", "reset", "submit"].includes(control.type) ? control.value : "";
+                            // A visible child (an icon in a button) is clicked as its button, so the button's name counts too.
+                            const actionable =
+                                control.closest(
+                                    "button, a[href], [role='button'], [role='link'], input[type='button'], input[type='submit'], input[type='reset']",
+                                ) ?? control;
+                            const names: string[] = [];
 
-                            return [control.getAttribute("aria-label"), labelledBy, control.getAttribute("title"), submitValue].filter(Boolean).join(" ");
+                            for (const node of [control, actionable]) {
+                                names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+
+                                const ids = (node.getAttribute("aria-labelledby") ?? "").split(" ").filter(Boolean);
+
+                                for (const id of ids) {
+                                    names.push((node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "");
+                                }
+
+                                // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
+                                if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
+                                    names.push(node.value);
+                                }
+                            }
+
+                            // Names that come from inside the button: an image's alt, a child's aria-label or title, an SVG title.
+                            for (const node of actionable.querySelectorAll("img[alt], [aria-label], [title]")) {
+                                names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
+                            }
+
+                            for (const node of actionable.querySelectorAll(":scope svg title")) {
+                                names.push(node.textContent ?? "");
+                            }
+
+                            return names.filter(Boolean).join(" ");
                         });
                     }
                 } else {
