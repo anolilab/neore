@@ -308,7 +308,13 @@ function readTarget(
         const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
         // A button's type decides whether its click submits the form ("submit" by default, "button" does not): a change to it
         // is a change of what the click does.
-        const kind = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.type : "";
+        // What a submit sends with the form: a submit control's name and value (an order intent is often a value), and how it
+        // submits (its method). A text field's value is never read: a person may have typed into it.
+        const submitter = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node : null;
+        const isSubmitValued =
+            submitter instanceof HTMLButtonElement ||
+            (submitter instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(submitter.type));
+        const kind = submitter === null ? "" : [submitter.type, submitter.name, isSubmitValued ? submitter.value : "", submitter.formMethod].join("#");
 
         destinations += `${link}|${formTarget}|${kind}|`;
     }
@@ -316,6 +322,9 @@ function readTarget(
     // The form's destination is read through the prototype: a field named "action" (or "querySelector") in the form would
     // otherwise shadow the form's own property, and the destination would be that field.
     const formAction = enclosingForm === null ? "" : new URL(Element.prototype.getAttribute.call(enclosingForm, "action") ?? "", document.URL).href;
+
+    // The form's method is part of what a submit does (a GET form puts its fields in the address).
+    destinations += enclosingForm === null ? "" : `|${Element.prototype.getAttribute.call(enclosingForm, "method") ?? ""}`;
 
     destinations += formAction;
 
