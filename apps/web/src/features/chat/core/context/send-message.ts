@@ -8,7 +8,8 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
-import { goalForMessage, useGoalComposer } from "@/features/chat/goal/goal-store";
+import type { PinnedGoal } from "@/features/chat/goal/goal-store";
+import { goalForMessage, pinOverrideFor, useGoalComposer } from "@/features/chat/goal/goal-store";
 import { draftGeneration } from "@/features/chat/split/composer-drafts";
 import {
     clearSentDraft,
@@ -90,6 +91,8 @@ export interface SendMessageEnv extends ChatActionBase {
     model: string;
     navigate: ReturnType<typeof useNavigate>;
     newChatsTemporary: boolean;
+    /** False while an admin acts as the owner: the owner's pinned goal does not apply then (`chat/http.ts` refuses a goal too). */
+    pinnedGoalAllowed: boolean;
     queryClient: QueryClient;
     refetchSession: () => unknown;
     sendLocalTurn: ReturnType<typeof useLocalModelTurn>["send"];
@@ -463,13 +466,23 @@ const runSendMessageBody = async (
         };
 
         // "Run until done": this message is a goal (text turns only). A goal armed for it wins; otherwise the chat's pinned goal
-        // applies. The pin is read from the cache the composer keeps live, and read once when that cache is empty.
-        const pinnedGoal =
-            currentMode === "text" && guestMessageId === undefined && threadId && text.trim() && !useGoalComposer.getState().enabled
-                ? await queryClient.ensureQueryData(
-                      crpc.chat.goals.functions.getPinnedGoal.queryOptions({ threadId: threadId as Id<"threads">, unlockProof: currentUnlockProof(threadId) }),
-                  )
-                : null;
+        // applies, unless an admin is acting as the owner. The pin is what this tab last saved, else the cache the composer keeps live.
+        let pinnedGoal: PinnedGoal | null = null;
+
+        if (currentMode === "text" && guestMessageId === undefined && threadId && text.trim() && !useGoalComposer.getState().enabled && env.pinnedGoalAllowed) {
+            const pinOverride = pinOverrideFor(threadId);
+
+            pinnedGoal =
+                pinOverride === undefined
+                    ? await queryClient.ensureQueryData(
+                          crpc.chat.goals.functions.getPinnedGoal.queryOptions({
+                              threadId: threadId as Id<"threads">,
+                              unlockProof: currentUnlockProof(threadId),
+                          }),
+                      )
+                    : pinOverride;
+        }
+
         const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text, pinnedGoal) : undefined;
 
         if (goal) {

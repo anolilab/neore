@@ -10,7 +10,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import { setThreadPinnedGoal } from "../../agent/table-writes";
-import { requireOwnedThreadIgnoringLock } from "../../agent/thread-read-access";
+import { requireOwnedThread } from "../../agent/thread-read-access";
 import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { MAX_LENGTH } from "../../lib/validators";
@@ -103,18 +103,20 @@ export const getPinnedGoal = authQuery
     });
 
 /**
- * Pins `text` as the chat's goal, replacing any pin. Owner only. Refused while impersonating: a goal spends the
- * owner's budget over several rounds, and an admin acting as the owner must not start one.
+ * Pins `text` as the chat's goal, replacing any pin. Owner only, and a locked chat needs its unlock proof, as its content
+ * does. Refused while impersonating: a goal spends the owner's budget over several rounds, and an admin acting as the owner
+ * must not start one.
  */
 export const setPinnedGoal = authMutation
     .input({
         maxRounds: v.number(),
         text: v.string().max(GOAL_TEXT_MAX),
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .use(rateLimit("chat/update"))
     .output(v.null())
-    .mutation(async ({ args: { maxRounds, text, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { maxRounds, text, threadId, unlockProof }, ctx: context }) => {
         if (context.user.impersonatedBy) {
             throw new LunoraError("FORBIDDEN", "A pinned goal cannot be set while impersonating");
         }
@@ -129,19 +131,19 @@ export const setPinnedGoal = authMutation
             throw new LunoraError("BAD_REQUEST", `Review rounds must be between 1 and ${GOAL_MAX_ROUNDS}`);
         }
 
-        await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+        await requireOwnedThread(context, threadId, context.user.userId, unlockProof);
         await setThreadPinnedGoal(context.db, threadId, { maxRounds, text: trimmed });
 
         return null;
     });
 
-/** Removes the chat's pinned goal. Owner only. */
+/** Removes the chat's pinned goal. Owner only; a locked chat needs its unlock proof. */
 export const clearPinnedGoal = authMutation
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .use(rateLimit("chat/update"))
     .output(v.null())
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
-        await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+    .mutation(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+        await requireOwnedThread(context, threadId, context.user.userId, unlockProof);
         await setThreadPinnedGoal(context.db, threadId, undefined);
 
         return null;

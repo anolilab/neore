@@ -29,6 +29,22 @@ export interface PinnedGoal {
 }
 
 /**
+ * The pin this tab's owner last saved (`null` once cleared), per chat, until the chat's live query reports a pin again.
+ * The live query catches up a moment after the write, so a send in that gap reads this rather than the older cached pin.
+ */
+const usePinOverrides = create<Record<string, PinnedGoal | null | undefined>>()(() => {
+    return {};
+});
+
+/** The override for a chat: its pin as this tab last left it, or `undefined` when none is pending. */
+export const pinOverrideFor = (threadId: string): PinnedGoal | null | undefined => usePinOverrides.getState()[threadId];
+
+/** Records (or with `undefined`, drops) the pending override for a chat. */
+export const setPinOverride = (threadId: string, pinned: PinnedGoal | null | undefined): void => {
+    usePinOverrides.setState({ [threadId]: pinned });
+};
+
+/**
  * The `goal` field of a `/v1/chat` body for `text`, or `undefined` when the message carries none. A goal armed for this
  * message wins over the chat's pin; without one, the pin applies. Blank text carries no goal.
  */

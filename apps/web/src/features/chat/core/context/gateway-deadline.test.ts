@@ -91,6 +91,7 @@ describe("gateway deadline in chat actions", () => {
             getPendingSettingsFromStore: () => null,
             isMountedRef: { current: true },
             kickOffMedia: vi.fn(),
+            pinnedGoalAllowed: true,
             model: "m",
             navigate: vi.fn(),
             newChatsTemporary: false,

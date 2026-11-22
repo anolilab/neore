@@ -9,11 +9,11 @@ import { Textarea } from "@neore/ui/components/textarea";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Pin, X } from "lucide-react";
 import type { FC, FormEvent } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-import { useGoalComposer } from "./goal-store";
+import { setPinOverride, useGoalComposer } from "./goal-store";
 
 interface PinnedGoalProps {
     disabled?: boolean;
@@ -37,14 +37,26 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
     const isOwner = access?.isOwner === true;
     const { data: pinned } = useQuery(crpc.chat.goals.functions.getPinnedGoal.queryOptions(isOwner ? { threadId: threadId as never, unlockProof } : skipToken));
 
+    // The live query has caught up with the server: its own value supersedes what this tab saved.
+    useEffect(() => {
+        setPinOverride(threadId, undefined);
+    }, [pinned, threadId]);
+
     const pin = useMutation(
         crpc.chat.goals.functions.setPinnedGoal.mutationOptions({
-            onSuccess: () => {
+            onSuccess: (_data, variables) => {
+                setPinOverride(variables.threadId, { maxRounds: variables.maxRounds, text: variables.text });
                 setOpen(false);
             },
         }),
     );
-    const clear = useMutation(crpc.chat.goals.functions.clearPinnedGoal.mutationOptions());
+    const clear = useMutation(
+        crpc.chat.goals.functions.clearPinnedGoal.mutationOptions({
+            onSuccess: (_data, variables) => {
+                setPinOverride(variables.threadId, null);
+            },
+        }),
+    );
 
     if (!isOwner) {
         return null;
@@ -65,7 +77,7 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
         const text = draft.trim();
 
         if (text.length > 0) {
-            pin.mutate({ maxRounds, text, threadId: threadId as never });
+            pin.mutate({ maxRounds, text, threadId: threadId as never, unlockProof });
         }
     };
 
@@ -126,7 +138,7 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
                     className="h-7 px-1.5"
                     disabled={disabled || clear.isPending}
                     onClick={() => {
-                        clear.mutate({ threadId: threadId as never });
+                        clear.mutate({ threadId: threadId as never, unlockProof });
                     }}
                     variant="outline"
                 >

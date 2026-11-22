@@ -1094,6 +1094,14 @@ const runChatStartOnShard = async (
         return workerThreadResponse();
     }
 
+    // A goal spends the owner's budget over several rounds, so an impersonating admin cannot start one: refused here, before
+    // the turn is saved and charged. The web app withholds the chat's pin while impersonating, so only an explicit goal lands here.
+    const placedForGoal = body.goal === undefined ? undefined : await placedPromise;
+
+    if (placedForGoal?.impersonating === true) {
+        return Response.json({ error: "A goal cannot run while impersonating." }, { status: 403 });
+    }
+
     // A goal spends the owner's budget over several rounds: refuse it in a shared thread now, before the turn is saved and charged.
     if (body.goal !== undefined && validThreadId) {
         const goalThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: validThreadId as Id<"threads"> });

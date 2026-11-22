@@ -110,6 +110,17 @@ describe("pinned goal", () => {
         expect(await as("stranger").query(getPinnedGoal as never, { threadId } as never)).toBeNull();
     });
 
+    it("leaves a locked chat's pin alone without its passcode", async () => {
+        await as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 5, text: "Ship it", threadId } as never);
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+
+        await expect(as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 9, text: "Steal", threadId } as never)).rejects.toThrow();
+        await expect(as(OWNER).mutation(clearPinnedGoal as never, { threadId } as never)).rejects.toThrow();
+        const stored = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(stored.pinnedGoal).toEqual({ maxRounds: 5, text: "Ship it" });
+    });
+
     it("refuses blank text and rounds outside the allowed range", async () => {
         await expect(as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 5, text: " ".repeat(3), threadId } as never)).rejects.toThrow();
         await expect(as(OWNER).mutation(setPinnedGoal as never, { maxRounds: 0, text: "Ship it", threadId } as never)).rejects.toThrow();
