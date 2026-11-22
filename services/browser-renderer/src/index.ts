@@ -158,18 +158,30 @@ function readTarget(
         roots.push(scope.shadowRoot);
     }
 
+    // A large control is not walked in full: each node costs style and layout reads, so past this many the scan stops and the
+    // read says so (`labelTruncated`), which makes the gate ask rather than clear a target it did not finish reading.
     const inside: Element[] = [];
+    let isScanCapped = false;
 
     for (let index = 0; index < roots.length; index++) {
         const root = roots[index];
         const found = root.querySelectorAll("*");
 
         for (const element of found) {
+            if (inside.length >= 2000) {
+                isScanCapped = true;
+                break;
+            }
+
             inside.push(element);
 
             if (element.shadowRoot !== null) {
                 roots.push(element.shadowRoot);
             }
+        }
+
+        if (isScanCapped) {
+            break;
         }
     }
 
@@ -302,7 +314,7 @@ function readTarget(
         canonical,
         checkout: isCheckout,
         label,
-        labelTruncated: joined.length > options.max,
+        labelTruncated: joined.length > options.max || isScanCapped,
     };
 }
 
