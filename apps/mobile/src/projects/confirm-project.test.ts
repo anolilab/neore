@@ -173,4 +173,23 @@ describe("confirmOnTick", () => {
 
         expect(signal?.aborted).toBe(true);
     });
+
+    it("reports nothing when the connection drops and the query still answers afterwards", async () => {
+        const answer = Promise.withResolvers<unknown>();
+        const reportRead = vi.fn();
+        const show = vi.fn();
+        const interrupt = new AbortController();
+        // A query that ignores its signal: it answers after the connection has already dropped.
+        const client = clientWith((() => answer.promise) as never);
+
+        confirmOnTick({ client, interrupt: interrupt.signal, projectId: "p1", reportRead, show });
+        await vi.advanceTimersByTimeAsync(0);
+
+        interrupt.abort();
+        answer.resolve({ _id: "p1" });
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(reportRead).not.toHaveBeenCalled();
+        expect(show).not.toHaveBeenCalled();
+    });
 });

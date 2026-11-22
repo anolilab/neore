@@ -86,6 +86,12 @@ export const confirmProject = async (
                 { signal: controller.signal },
             );
 
+            // Aborted while it was out (the screen left, or the connection dropped), even though the query still answered:
+            // the answer is no longer proof of the connection, so nothing is learned.
+            if (controller.signal.aborted) {
+                return { kind: "unreachable" };
+            }
+
             return { found: Boolean(project), kind: "answered" };
         } catch (error: unknown) {
             // An aborted read was given up by its caller or its deadline: nothing about the connection is learned.
