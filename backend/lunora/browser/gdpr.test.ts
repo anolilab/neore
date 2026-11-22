@@ -138,3 +138,108 @@ describe("browser data in the GDPR export", () => {
         expect(timestamps.size).toBe(MANY);
     });
 });
+
+describe("browser export pages stay within the export's limits", () => {
+    const pagesOf = async (userId: string): Promise<{ json: string; phase?: string }[]> => {
+        const pages: { json: string; phase?: string }[] = [];
+
+        await collectAllBrowserPages(async (cursor) => {
+            const page = await harness.run(async (ctx: any) => await ctx.runQuery(collectBrowserForExport, { cursor, userId }));
+
+            pages.push({ json: JSON.stringify(page), phase: cursor?.phase });
+
+            return page;
+        });
+
+        return pages;
+    };
+
+    it("ends a page after its reads are spent, even over many sessions with no actions", async () => {
+        const SESSIONS = 150;
+
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId: A });
+
+            for (let index = 0; index < SESSIONS; index += 1) {
+                await ctx.db.insert("browserSessions", { lastActivityAt: index, startedAt: index, status: "completed", threadId, userId: A });
+            }
+        });
+
+        const pages = await pagesOf(A);
+        const { result } = await exportOf(A);
+
+        // Two reads per empty session, 100 a page.
+        expect(pages.filter((page) => page.phase === "actions").length).toBeGreaterThanOrEqual(3);
+        expect(result.sessions).toHaveLength(SESSIONS);
+    });
+
+    it("cuts an oversized field, says so, and keeps every page under a step's 1 MiB", async () => {
+        const huge = "x".repeat(1_500_000);
+
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId: A });
+            const sessionId = await ctx.db.insert("browserSessions", {
+                currentUrl: `https://a.example.com/${huge}`,
+                lastActivityAt: 1,
+                startedAt: 1,
+                status: "completed",
+                threadId,
+                userId: A,
+            });
+
+            // One batch of actions whose targets together pass 1 MiB.
+            for (let index = 0; index < 60; index += 1) {
+                await ctx.db.insert("browserActions", { action: "click", sessionId, success: 1, target: "t".repeat(30_000), timestamp: index });
+            }
+
+            await ctx.db.insert("browserHumanChecks", { askedAt: 1, run: "r", site: huge, threadId, userId: A });
+            await ctx.db.insert("browserExtensions", {
+                capabilities: Array.from({ length: 2000 }, () => "c".repeat(1000)),
+                extensionId: "e",
+                status: "paired",
+                userId: A,
+            });
+        });
+
+        const pages = await pagesOf(A);
+        const { result } = await exportOf(A);
+
+        for (const page of pages) {
+            expect(new TextEncoder().encode(page.json).length).toBeLessThan(1024 * 1024);
+        }
+
+        expect(result.sessions[0]).toEqual(expect.objectContaining({ truncated: ["currentUrl"] }));
+        expect((result.sessions[0] as { currentUrl: string }).currentUrl.startsWith("https://a.example.com/x")).toBe(true);
+        expect(result.actions).toHaveLength(60);
+        expect(result.actions[0]).toEqual(expect.objectContaining({ truncated: ["target"] }));
+        expect(result.humanChecks[0]).toEqual(expect.objectContaining({ truncated: ["site"] }));
+        expect(result.extensions[0]).toEqual(expect.objectContaining({ truncated: ["capabilities"] }));
+    });
+
+    it("reads long typed actions over several pages, never one read past the transaction's 32 MiB", async () => {
+        const ACTIONS = 200;
+
+        const sessionId = await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId: A });
+
+            return await ctx.db.insert("browserSessions", { lastActivityAt: 1, startedAt: 1, status: "completed", threadId, userId: A });
+        });
+
+        // A write of its own per 20 actions: one transaction may write 32 MiB too.
+        for (let from = 0; from < ACTIONS; from += 20) {
+            await harness.run(async (ctx: any) => {
+                for (let index = from; index < from + 20; index += 1) {
+                    await ctx.db.insert("browserActions", { action: "type", sessionId, success: 1, timestamp: index, value: "v".repeat(200_000) });
+                }
+            });
+        }
+
+        const pages = await pagesOf(A);
+        const { result } = await exportOf(A);
+
+        // 40 MB of typed text: two pages at least, at 16 MiB of reads each.
+        expect(pages.filter((page) => page.phase === "actions").length).toBeGreaterThanOrEqual(3);
+        expect(result.actions).toHaveLength(ACTIONS);
+        expect(JSON.stringify(result)).not.toContain("vvvv");
+    });
+});

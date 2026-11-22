@@ -77,12 +77,100 @@ export const eraseBrowserDataForUser = async (ctx: MutationCtx, userId: string):
     return { hasMore: false };
 };
 
-/** Rows one export page reads, sessions walked included, and the JSON it returns: a step's stored result stays far under 1 MiB. */
-const EXPORT_SCAN_BUDGET = 1000;
-const EXPORT_PAGE_BYTES = 400_000;
+/**
+ * What one export page may cost, each far under the limit it guards. `PAGE_BYTES`: the JSON the page returns, a workflow step's
+ * stored result (1 MiB). `READ_BYTES`: what its reads may cost, against Lunora's 32 MiB per transaction
+ * (`DEFAULT_TRANSACTION_LIMITS.maxReadBytes`), charged the whole row, a typed `value` included. `QUERIES`: the reads it makes,
+ * so a walk over many empty sessions ends its page too.
+ */
+const PAGE_BYTES = 512 * 1024;
+const READ_BYTES = 16 * 1024 * 1024;
+const QUERIES = 100;
+
+/** The most a stored row can hold (the shard's SQLite caps a row at 2 MB), so a read of `n` rows costs at most `n` times it. */
+const STORED_ROW_BYTES = 2 * 1024 * 1024;
+
+/** The JSON of one exported string, or of a list of them; longer ones are cut and named in the row's `truncated`. */
+export const EXPORT_FIELD_BYTES = 4096;
+
+/** The most one exported row's JSON can be: every field at {@link EXPORT_FIELD_BYTES}, its names and `truncated` besides. */
+export const EXPORT_ROW_BYTES = 48 * 1024;
 
 const ENCODER = new TextEncoder();
 const jsonBytes = (value: unknown): number => ENCODER.encode(JSON.stringify(value)).length;
+
+const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
+
+/** `text` cut so its JSON fits {@link EXPORT_FIELD_BYTES}, never inside a surrogate pair. */
+const cutText = (text: string): string => {
+    let cut = text.slice(0, EXPORT_FIELD_BYTES);
+
+    while (jsonBytes(cut) > EXPORT_FIELD_BYTES) {
+        cut = cut.slice(0, Math.floor(cut.length * 0.75));
+    }
+
+    return LONE_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+};
+
+/**
+ * `row` with each string, and each list of strings, cut to {@link EXPORT_FIELD_BYTES}; `truncated` names the fields cut, so the
+ * export says where it holds less than was stored.
+ */
+const capped = <R extends Record<string, unknown>>(row: R): R & { truncated?: string[] } => {
+    const out: Record<string, unknown> = { ...row };
+    const truncated: string[] = [];
+
+    for (const [key, value] of Object.entries(row)) {
+        if (typeof value === "string" && jsonBytes(value) > EXPORT_FIELD_BYTES) {
+            out[key] = cutText(value);
+            truncated.push(key);
+        } else if (Array.isArray(value) && jsonBytes(value) > EXPORT_FIELD_BYTES) {
+            const kept: string[] = [];
+
+            for (const item of value as string[]) {
+                const cut = cutText(item);
+
+                if (jsonBytes([...kept, cut]) > EXPORT_FIELD_BYTES) {
+                    break;
+                }
+
+                kept.push(cut);
+            }
+
+            out[key] = kept;
+            truncated.push(key);
+        }
+    }
+
+    return (truncated.length > 0 ? { ...out, truncated } : out) as R & { truncated?: string[] };
+};
+
+/** What the page has spent so far. */
+interface Spent {
+    bytes: number;
+    queries: number;
+    readBytes: number;
+}
+
+/**
+ * The most rows the next read may take: none once the page has spent its queries, and never so many that, all at their
+ * largest, they would pass the page's read or output budget.
+ */
+const nextLimit = (spent: Spent): number => {
+    if (spent.queries >= QUERIES) {
+        return 0;
+    }
+
+    return Math.max(
+        0,
+        Math.min(BATCH, Math.floor((READ_BYTES - spent.readBytes) / STORED_ROW_BYTES), Math.floor((PAGE_BYTES - spent.bytes) / EXPORT_ROW_BYTES)),
+    );
+};
+
+const charge = (spent: Spent, rows: ReadonlyArray<unknown>): void => {
+    spent.queries += 1;
+    spent.readBytes += rows.reduce<number>((total, row) => total + jsonBytes(row), 0);
+};
 
 /**
  * Where the next page starts: `phase` names the table, `page` the cursor in it (for `actions`, in the user's sessions, at the
@@ -95,6 +183,9 @@ const vBrowserExportCursor = v.object({
 });
 
 export type BrowserExportCursor = Infer<typeof vBrowserExportCursor>;
+
+/** The fields of a row cut to fit ({@link capped}); absent when none was. */
+const vTruncated = v.optional(v.array(v.string()));
 
 /**
  * What the export keeps of a session: when it ran, how it ended and the last page it showed. Left out: the renderer's connect
@@ -111,6 +202,7 @@ const vExportSession = v.object({
     startedAt: v.number(),
     status: v.string(),
     threadId: v.string(),
+    truncated: vTruncated,
 });
 
 /** An action without its `value`: typed text can be a password the agent filled in. */
@@ -123,6 +215,7 @@ const vExportAction = v.object({
     success: v.boolean(),
     target: v.optional(v.string()),
     timestamp: v.number(),
+    truncated: vTruncated,
 });
 
 const vExportHumanCheck = v.object({
@@ -130,6 +223,7 @@ const vExportHumanCheck = v.object({
     reported: v.optional(v.boolean()),
     site: v.string(),
     threadId: v.string(),
+    truncated: vTruncated,
 });
 
 /** An extension without its pairing code, a credential for pairing it. */
@@ -141,6 +235,7 @@ const vExportExtension = v.object({
     lastSeenAt: v.optional(v.number()),
     pairedAt: v.optional(v.number()),
     status: v.string(),
+    truncated: vTruncated,
 });
 
 const vBrowserExportPage = v.object({
@@ -156,8 +251,8 @@ type BrowserExportPage = Infer<typeof vBrowserExportPage>;
 const EMPTY_PAGE = { actions: [], extensions: [], humanChecks: [], sessions: [] };
 
 /** An action as the export keeps it (`vExportAction`). */
-const exportedAction = (row: Doc<"browserActions">, sessionId: string): Infer<typeof vExportAction> => {
-    return {
+const exportedAction = (row: Doc<"browserActions">, sessionId: string): Infer<typeof vExportAction> =>
+    capped({
         action: row.action,
         sessionId,
         success: row.success === 1,
@@ -166,52 +261,135 @@ const exportedAction = (row: Doc<"browserActions">, sessionId: string): Infer<ty
         ...(row.durationMs !== undefined && { durationMs: row.durationMs }),
         ...(row.errorMessage !== undefined && { errorMessage: row.errorMessage }),
         ...(row.target !== undefined && { target: row.target }),
-    };
+    });
+
+const exportedSession = (row: Doc<"browserSessions">): Infer<typeof vExportSession> =>
+    capped({
+        id: row._id as string,
+        lastActivityAt: row.lastActivityAt,
+        startedAt: row.startedAt,
+        status: row.status,
+        threadId: row.threadId as string,
+        ...(row.completedAt !== undefined && { completedAt: row.completedAt }),
+        ...(row.currentUrl !== undefined && { currentUrl: row.currentUrl }),
+        ...(row.errorMessage !== undefined && { errorMessage: row.errorMessage }),
+        ...(row.source !== undefined && { source: row.source }),
+    });
+
+const exportedHumanCheck = (row: Doc<"browserHumanChecks">): Infer<typeof vExportHumanCheck> =>
+    capped({
+        askedAt: row.askedAt,
+        site: row.site,
+        threadId: row.threadId as string,
+        ...(row.reported !== undefined && { reported: row.reported }),
+    });
+
+const exportedExtension = (row: Doc<"browserExtensions">): Infer<typeof vExportExtension> =>
+    capped({
+        extensionId: row.extensionId,
+        status: row.status,
+        ...(row.browserInfo !== undefined && { browserInfo: row.browserInfo }),
+        ...(row.capabilities !== undefined && { capabilities: row.capabilities }),
+        ...(row.extensionVersion !== undefined && { extensionVersion: row.extensionVersion }),
+        ...(row.lastSeenAt !== undefined && { lastSeenAt: row.lastSeenAt }),
+        ...(row.pairedAt !== undefined && { pairedAt: row.pairedAt }),
+    });
+
+type Read<R> = { continueCursor?: string | null; isDone: boolean; page: R[] };
+
+/**
+ * Reads one table from `cursor` in reads sized by {@link nextLimit} until it ends or the page's budget is spent; `next` is
+ * where the rest starts, absent when the table is done.
+ */
+const collectRows = async <R, E>(
+    read: (cursor: string | undefined, limit: number) => Promise<Read<R>>,
+    exported: (row: R) => E,
+    cursor: string | undefined,
+): Promise<{ next?: string; rows: E[] }> => {
+    const spent: Spent = { bytes: 0, queries: 0, readBytes: 0 };
+    const rows: E[] = [];
+    let at = cursor;
+
+    for (let limit = nextLimit(spent); limit > 0; limit = nextLimit(spent)) {
+        const page = await read(at, limit);
+
+        charge(spent, page.page);
+
+        for (const row of page.page) {
+            const value = exported(row);
+
+            spent.bytes += jsonBytes(value);
+            rows.push(value);
+        }
+
+        if (page.isDone || !page.continueCursor) {
+            return { rows };
+        }
+
+        at = page.continueCursor;
+    }
+
+    return { next: at, rows };
 };
 
-/** Walks the user's sessions from `cursor`, reading each one's actions a page at a time until the page's budget is spent. */
+/**
+ * Walks the user's sessions from `cursor`, reading each one's actions in reads sized by {@link nextLimit}, until the page's
+ * budget is spent. It stops only before a read, so the cursor names exactly where the next page starts.
+ */
 const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cursor: BrowserExportCursor): Promise<BrowserExportPage> => {
+    const spent: Spent = { bytes: 0, queries: 0, readBytes: 0 };
     const actions: Infer<typeof vExportAction>[] = [];
     let sessionCursor = cursor.page;
     let actionCursor = cursor.inner;
-    let scanned = 0;
-    let bytes = 0;
+    const stop = (): BrowserExportPage => {
+        return {
+            ...EMPTY_PAGE,
+            actions,
+            next: { phase: "actions", ...(actionCursor !== undefined && { inner: actionCursor }), ...(sessionCursor !== undefined && { page: sessionCursor }) },
+        };
+    };
 
     for (;;) {
+        if (nextLimit(spent) === 0) {
+            return stop();
+        }
+
         const sessions = await ctx.db.browserSessions.findMany({ cursor: sessionCursor, limit: 1, where: { userId } });
         const [session] = sessions.page;
+
+        charge(spent, sessions.page);
 
         if (!session) {
             return { ...EMPTY_PAGE, actions, next: { phase: "humanChecks" } };
         }
 
-        scanned += 1;
-
         for (;;) {
+            const limit = nextLimit(spent);
+
+            if (limit === 0) {
+                return stop();
+            }
+
             const page = await ctx.db.browserActions.findMany({
                 cursor: actionCursor,
-                limit: BATCH,
+                limit,
                 orderBy: [{ timestamp: "asc" }],
                 where: { sessionId: session._id },
             });
 
+            charge(spent, page.page);
+
             for (const row of page.page) {
                 const exported = exportedAction(row, session._id as string);
 
-                bytes += jsonBytes(exported);
+                spent.bytes += jsonBytes(exported);
                 actions.push(exported);
             }
 
-            scanned += page.page.length;
             actionCursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
 
             if (actionCursor === undefined) {
                 break;
-            }
-
-            // Cut between action pages only, so the cursor names exactly where the next page starts.
-            if (scanned >= EXPORT_SCAN_BUDGET || bytes >= EXPORT_PAGE_BYTES) {
-                return { ...EMPTY_PAGE, actions, next: { inner: actionCursor, phase: "actions", ...(sessionCursor !== undefined && { page: sessionCursor }) } };
             }
         }
 
@@ -220,16 +398,13 @@ const collectActionsPage = async (ctx: Pick<QueryCtx, "db">, userId: string, cur
         }
 
         sessionCursor = sessions.continueCursor;
-
-        if (scanned >= EXPORT_SCAN_BUDGET || bytes >= EXPORT_PAGE_BYTES) {
-            return { ...EMPTY_PAGE, actions, next: { page: sessionCursor, phase: "actions" } };
-        }
     }
 };
 
 /**
  * One page of the user's browser export: their sessions, then each session's actions, then the sites a run asked them to clear,
- * then their extensions. `next` is absent on the last page; the workflow asks again with it until it is.
+ * then their extensions. `next` is absent on the last page; the workflow asks again with it until it is. Every page stays within
+ * its budgets (`PAGE_BYTES`, `READ_BYTES`, `QUERIES`) and every page makes progress, so the export always finishes.
  */
 export const collectBrowserForExport = internalQuery
     .input({ cursor: v.optional(vBrowserExportCursor), userId: v.string().max(MAX_LENGTH.id) })
@@ -244,59 +419,30 @@ export const collectBrowserForExport = internalQuery
         const at = cursor?.page;
 
         if (phase === "sessions") {
-            const page = await ctx.db.browserSessions.findMany({ cursor: at, limit: BATCH, where: { userId } });
+            const { next, rows } = await collectRows(
+                async (from, limit) => await ctx.db.browserSessions.findMany({ cursor: from, limit, where: { userId } }),
+                exportedSession,
+                at,
+            );
 
-            return {
-                ...EMPTY_PAGE,
-                next: page.isDone || !page.continueCursor ? { phase: "actions" } : { page: page.continueCursor, phase: "sessions" },
-                sessions: page.page.map((row) => {
-                    return {
-                        id: row._id as string,
-                        lastActivityAt: row.lastActivityAt,
-                        startedAt: row.startedAt,
-                        status: row.status,
-                        threadId: row.threadId as string,
-                        ...(row.completedAt !== undefined && { completedAt: row.completedAt }),
-                        ...(row.currentUrl !== undefined && { currentUrl: row.currentUrl }),
-                        ...(row.errorMessage !== undefined && { errorMessage: row.errorMessage }),
-                        ...(row.source !== undefined && { source: row.source }),
-                    };
-                }),
-            };
+            return { ...EMPTY_PAGE, next: next === undefined ? { phase: "actions" } : { page: next, phase: "sessions" }, sessions: rows };
         }
 
         if (phase === "humanChecks") {
-            const page = await ctx.db.browserHumanChecks.findMany({ cursor: at, limit: BATCH, where: { userId } });
+            const { next, rows } = await collectRows(
+                async (from, limit) => await ctx.db.browserHumanChecks.findMany({ cursor: from, limit, where: { userId } }),
+                exportedHumanCheck,
+                at,
+            );
 
-            return {
-                ...EMPTY_PAGE,
-                humanChecks: page.page.map((row) => {
-                    return {
-                        askedAt: row.askedAt,
-                        site: row.site,
-                        threadId: row.threadId as string,
-                        ...(row.reported !== undefined && { reported: row.reported }),
-                    };
-                }),
-                next: page.isDone || !page.continueCursor ? { phase: "extensions" } : { page: page.continueCursor, phase: "humanChecks" },
-            };
+            return { ...EMPTY_PAGE, humanChecks: rows, next: next === undefined ? { phase: "extensions" } : { page: next, phase: "humanChecks" } };
         }
 
-        const page = await ctx.db.browserExtensions.findMany({ cursor: at, limit: BATCH, where: { userId } });
+        const { next, rows } = await collectRows(
+            async (from, limit) => await ctx.db.browserExtensions.findMany({ cursor: from, limit, where: { userId } }),
+            exportedExtension,
+            at,
+        );
 
-        return {
-            ...EMPTY_PAGE,
-            extensions: page.page.map((row) => {
-                return {
-                    extensionId: row.extensionId,
-                    status: row.status,
-                    ...(row.browserInfo !== undefined && { browserInfo: row.browserInfo }),
-                    ...(row.capabilities !== undefined && { capabilities: row.capabilities }),
-                    ...(row.extensionVersion !== undefined && { extensionVersion: row.extensionVersion }),
-                    ...(row.lastSeenAt !== undefined && { lastSeenAt: row.lastSeenAt }),
-                    ...(row.pairedAt !== undefined && { pairedAt: row.pairedAt }),
-                };
-            }),
-            ...(!page.isDone && page.continueCursor && { next: { page: page.continueCursor, phase: "extensions" as const } }),
-        };
+        return { ...EMPTY_PAGE, extensions: rows, ...(next !== undefined && { next: { page: next, phase: "extensions" as const } }) };
     });
