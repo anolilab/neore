@@ -390,6 +390,10 @@ describe("documents", () => {
         expect(await read("user-member")).toMatchObject({ title: "Shared plan" });
         expect(await read("user-stranger")).toBeNull();
 
+        // Without the thread (a document opened outside a chat), only the author reads it.
+        expect(await as(OWNER).query(getDocument as never, { documentId } as never)).toMatchObject({ title: "Shared plan" });
+        expect(await as("user-member").query(getDocument as never, { documentId } as never)).toBeNull();
+
         await run(async (ctx: any) => await ctx.db.delete("threadAccess", grantId));
 
         expect(await read("user-member")).toBeNull();

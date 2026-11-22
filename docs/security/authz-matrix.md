@@ -170,7 +170,7 @@ for a schema table that is neither policed nor listed:
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
 | `agent_document_history.listVersions` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
-| `agent_documents.getDocument` | query | query | documents | identity (self-resolved); thread read grant (owner or member; lock proof) and the document of that thread | ok |
+| `agent_documents.getDocument` | query | query | documents | identity (self-resolved); with a thread id, its read grant (owner or member; lock proof) and the document of that thread; without one, the author's own document under the author's read grant | ok |
 | `agent_documents.getDocumentByMessage` | query | query | — | identity (self-resolved); row.userId == caller | ok |
 | `agent_documents.getDocumentsByThread` | query | query | threads | identity (self-resolved); thread read grant (owner or member; lock proof) | ok |
 | `agent_documents.updateDocument` | mutation | authMutation | documentVersions, documents | identity (self-resolved); row.userId == caller | accepted — owner-only; no rate limit, `v.any()` commit/contentJson (low) |
@@ -372,7 +372,7 @@ for a schema table that is neither policed nor listed:
 | `chat_pins_functions.createDocumentPin` | mutation | authMutation + RL | threadPins, threads, documents | thread gate (read, grant read from the primary) + document of that thread | ok — one pin per user and document; the thread gate runs for every caller |
 | `chat_pins_functions.createPin` | mutation | authMutation + RL | threadPins, threads | caller-scoped (ctx.user) | accepted — writes only the caller's own rows |
 | `chat_pins_functions.deletePin` | mutation | authMutation + RL | — | row.userId == caller | ok |
-| `chat_pins_functions.getThreadPins` | query | authQuery | threads | caller-scoped (ctx.user) | ok |
+| `chat_pins_functions.getThreadPins` | query | authQuery | threads | caller-scoped (ctx.user); thread gate (read grant from the primary, lock proof) for every thread, so a revoked grant reads none | ok |
 | `chat_pins_functions.updatePinNote` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_pins_functions.updatePinSelectedText` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_prompt_outline.getThreadPromptOutline` | query | liteAuthQuery | messages, threads | thread read access (`resolveThreadReadAccess`: owner or live grantee); a locked chat is refused without its proof; a public viewer without a grant gets an empty outline; bounded scan, reads text only | ok |

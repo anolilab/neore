@@ -423,9 +423,9 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const { data: document } = useQuery({
         ...crpc.agent.documents.getDocument.queryOptions({
             documentId: activeDocumentId as Id<"documents">,
-            threadId: canvasThreadId as Id<"threads">,
+            threadId: canvasThreadId ? (canvasThreadId as Id<"threads">) : undefined,
         }),
-        enabled: !!activeDocumentId && !!canvasThreadId && isCanvasOpen,
+        enabled: !!activeDocumentId && isCanvasOpen,
     });
 
     const { mutateAsync: updateDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());

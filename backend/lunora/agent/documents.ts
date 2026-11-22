@@ -55,8 +55,10 @@ const publicDocument = (documentRow: Doc<"documents">): DocumentDoc => {
 export const getDocument = query
     .input({
         documentId: v.id("documents"),
-        // The document's thread: the call routes to the thread's owner's shard, where the document lives.
-        threadId: v.id("threads"),
+        // The document's thread. With it, the call routes to the thread's owner's shard and a member reads through the thread's grant.
+        // Without it (a document opened outside a chat), only the author reads it, on the caller's own shard, and only while the
+        // thread still admits the author.
+        threadId: v.optional(v.id("threads")),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(v.union(vDocumentDoc, v.null())))
@@ -67,9 +69,35 @@ export const getDocument = query
             return null;
         }
 
-        // The thread's read grant is read first: it admits the thread's rows to this request, so a member reads the document.
-        // A locked thread answers THREAD_LOCKED to its owner until the proof is given.
-        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
+        if (args.threadId !== undefined) {
+            // The grant is read first: it admits the thread's rows to this request. A locked thread answers THREAD_LOCKED to its
+            // owner until the proof is given.
+            const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
+
+            if (access?.kind === "locked") {
+                return throwThreadLocked();
+            }
+
+            if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+                return null;
+            }
+
+            const documentRow = await ctx.db.get("documents", args.documentId);
+
+            if (!documentRow || documentRow.threadId !== args.threadId) {
+                return null;
+            }
+
+            return publicDocument(documentRow);
+        }
+
+        const authoredRow = await ctx.db.get("documents", args.documentId);
+
+        if (!authoredRow || authoredRow.userId !== identity.userId) {
+            return null;
+        }
+
+        const access = await resolveThreadReadAccess(ctx, authoredRow.threadId, identity.userId, args.unlockProof);
 
         if (access?.kind === "locked") {
             return throwThreadLocked();
@@ -79,13 +107,7 @@ export const getDocument = query
             return null;
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
-
-        if (!documentRow || documentRow.threadId !== args.threadId) {
-            return null;
-        }
-
-        return publicDocument(documentRow);
+        return publicDocument(authoredRow);
     });
 
 /** Internal: a locked thread's document is skipped (null) without its proof. */
