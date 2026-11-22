@@ -521,6 +521,11 @@ export const schema = defineSchema({
          */
         purchaseLooks: v.optional(v.array(v.object({ target: v.string(), toolCallId: v.string() }))),
         /**
+         * Tool calls whose decision target was pushed out of `purchaseLooks` before their approved click ran
+         * (`browser/functions.ts#recordPurchaseLook`): such a click is refused, never run unchecked.
+         */
+        purchaseLostCalls: v.optional(v.array(v.string())),
+        /**
          * The deadlines of the browser actions in flight that began while the row read the browser as reaped (or before it
          * named one): they keep a person from taking control until they end, but keep no browser alive, so a reaped one
          * is not offered while the renderer replaces it.

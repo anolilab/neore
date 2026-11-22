@@ -25,6 +25,7 @@ import { getActiveSession, logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { applyLimit } from "../../lib/rate-limiter-mutations";
 import {
+    APPROVED_TARGET_UNKNOWN,
     BROWSER_BUSY_SIGNING_IN,
     BROWSER_CLOSED_BEFORE_ACTION,
     BROWSER_CLOSED_DURING_ACTION,
@@ -801,6 +802,77 @@ describe("a browser a person took control of", () => {
 
         expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "extract", selector: "#pay", visibleOnly: true } });
         expect((renderer.mock.calls[1]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("visibleOnly");
+    });
+
+    it("an approved click whose decision read could not read a target is refused, and nothing is clicked", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce(answered({ error: "Element not found: #pay", success: false, url: "https://example.com/cart" }));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    decisionCallId: "call-unreadable",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        const refused = await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-unreadable",
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(refused).toEqual({ error: APPROVED_TARGET_UNKNOWN, success: false });
+        // Only the decision's own look reached the renderer: the approved click never did.
+        expect(renderer).toHaveBeenCalledTimes(1);
+    });
+
+    it("an approved click whose decision target was pushed out of the record is refused, and nothing is clicked", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValue(answered({ content: "Next", label: "Next", success: true, target: "T-old", url: "https://example.com/a" }));
+
+        // Fifty-one decisions: the first one's target is pushed out of the session's record.
+        for (let index = 0; index <= 50; index += 1) {
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(executeBrowserAction, {
+                        action: "extract",
+                        approvalLook: true,
+                        decisionCallId: `call-${index}`,
+                        selector: "#next",
+                        threadId,
+                        userId: OWNER,
+                        userTier: "premium",
+                    }),
+            );
+        }
+
+        const callsBefore = renderer.mock.calls.length;
+        const refused = await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-0",
+                    selector: "#next",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(refused).toEqual({ error: APPROVED_TARGET_UNKNOWN, success: false });
+        expect(renderer.mock.calls).toHaveLength(callsBefore);
     });
 
     it("an approved click is checked against the target its decision look recorded, and one with no record is not", async () => {

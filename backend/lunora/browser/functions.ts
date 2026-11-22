@@ -70,6 +70,13 @@ const PURCHASE_LOOKS_KEPT = 50;
  * The target a purchase decision looked at for one tool call. Written by the decision's own look, before the person is asked;
  * a click the person approves is checked against it.
  */
+/** How many evicted tool calls a session remembers, so their approved clicks are refused rather than run unchecked. */
+const PURCHASE_LOST_KEPT = 200;
+
+/**
+ * The target a purchase decision looked at for one tool call. Written by the decision's own look, before the person is asked;
+ * a click the person approves is checked against it. An empty target: the decision's look could not read the target.
+ */
 export const recordPurchaseLook = internalMutation
     .input({ sessionId: v.id("browserSessions"), target: v.string(), toolCallId: v.string() })
     .mutation(async ({ args: { sessionId, target, toolCallId }, ctx }) => {
@@ -77,31 +84,47 @@ export const recordPurchaseLook = internalMutation
 
         if (session) {
             const kept = (session.purchaseLooks ?? []).filter((look) => look.toolCallId !== toolCallId);
+            const all = [...kept, { target, toolCallId }];
+            const evicted = all.slice(0, -PURCHASE_LOOKS_KEPT).map((look) => look.toolCallId);
 
             await patchRow(ctx.db, "browserSessions", session, {
-                purchaseLooks: [...kept, { target, toolCallId }].slice(-PURCHASE_LOOKS_KEPT),
+                purchaseLooks: all.slice(-PURCHASE_LOOKS_KEPT),
+                purchaseLostCalls: [...(session.purchaseLostCalls ?? []), ...evicted].slice(-PURCHASE_LOST_KEPT),
             });
         }
     });
 
 /**
- * Takes the target the decision of one tool call looked at, and forgets it: the approved click is checked against it once,
- * and a retry needs a new decision. Nothing when no decision recorded one (ask mode asks without a look).
+ * Takes the decision of one tool call, and forgets it. `target`: the element the person was shown. `unreadable`: its decision
+ * could not read one. `lost`: its target was pushed out before the click ran. `none`: no decision looked at the page (ask
+ * mode asks without a look), so the click is not checked.
  */
 export const takePurchaseLook = internalMutation
     .input({ sessionId: v.id("browserSessions"), toolCallId: v.string() })
-    .output(v.union(v.string(), v.null()))
+    .output(
+        v.object({
+            kind: v.union(v.literal("lost"), v.literal("none"), v.literal("target"), v.literal("unreadable")),
+            target: v.optional(v.string()),
+        }),
+    )
     .mutation(async ({ args: { sessionId, toolCallId }, ctx }) => {
         const session = await ctx.db.get("browserSessions", sessionId);
-        const look = session?.purchaseLooks?.find((entry) => entry.toolCallId === toolCallId);
 
-        if (session && look !== undefined) {
+        if (!session) {
+            return { kind: "none" as const };
+        }
+
+        const look = session.purchaseLooks?.find((entry) => entry.toolCallId === toolCallId);
+
+        if (look !== undefined) {
             await patchRow(ctx.db, "browserSessions", session, {
                 purchaseLooks: (session.purchaseLooks ?? []).filter((entry) => entry.toolCallId !== toolCallId),
             });
+
+            return look.target === "" ? { kind: "unreadable" as const } : { kind: "target" as const, target: look.target };
         }
 
-        return look?.target ?? null;
+        return (session.purchaseLostCalls ?? []).includes(toolCallId) ? { kind: "lost" as const } : { kind: "none" as const };
     });
 
 export const createSession = internalMutation

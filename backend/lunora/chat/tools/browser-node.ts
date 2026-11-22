@@ -101,6 +101,21 @@ export const executeBrowserAction = internalAction
                 const cfSessionId = sessionDocument.providerSessionId === NO_PROVIDER_SESSION ? undefined : sessionDocument.providerSessionId;
                 const sessionId = sessionDocument._id;
 
+                // A click the person approved is checked against the target its decision read recorded, taken here, before the
+                // hold. A decision whose target was pushed out, or that could not read one, is refused: nothing is clicked unseen.
+                // No decision at all (ask mode asks without a look) is not checked, as before.
+                let approvedTarget: string | undefined;
+
+                if (action === "click" && args.approvedCallId !== undefined) {
+                    const taken = await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId });
+
+                    if (taken.kind === "lost" || taken.kind === "unreadable") {
+                        return { error: APPROVED_TARGET_UNKNOWN, success: false };
+                    }
+
+                    approvedTarget = taken.kind === "target" ? taken.target : undefined;
+                }
+
                 // The row is in use from here on, not only once the action returns: no person takes control mid-action, and
                 // a slow action on a browser still alive does not read as idle (one read as reaped is held without being
                 // offered: its old page must not come back while the renderer replaces it). The same write refuses the
@@ -169,16 +184,12 @@ export const executeBrowserAction = internalAction
                 callSignal = AbortSignal.timeout(budget);
                 callEndsBy = Date.now() + budget;
 
-                // A click the person approved is checked against the target they were shown (its decision look recorded it).
-                // With no record (ask mode asks without a look) it is not checked; a click the tool checked itself carries its
-                // own `expectTarget`.
+                // A click the person approved is checked against the target they were shown (taken above). Otherwise a click the
+                // tool checked itself carries its own `expectTarget`.
                 let expectTarget: string | undefined;
 
-                if (action === "click" && args.approvedCallId !== undefined) {
-                    expectTarget =
-                        (await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId })) ?? undefined;
-                } else if (action === "click") {
-                    expectTarget = args.expectTarget;
+                if (action === "click") {
+                    expectTarget = args.approvedCallId === undefined ? args.expectTarget : approvedTarget;
                 }
 
                 const sent: BrowserActionRequest = looksFirst
@@ -320,11 +331,12 @@ export const executeBrowserAction = internalAction
                 const result = data as BrowserActionResponse;
                 const durationMs = Date.now() - startTime;
 
-                // The decision look of a tool call: its target is kept, so the click the person approves is checked against it.
-                if (args.decisionCallId !== undefined && result.success === true && result.target !== undefined) {
+                // The decision look of a tool call: its target is kept, so the click the person approves is checked against it. A
+                // look that read no target keeps an empty one, so the approved click is refused rather than run unchecked.
+                if (args.decisionCallId !== undefined) {
                     await ctx.runMutation(internal.browser.functions.recordPurchaseLook, {
                         sessionId,
-                        target: result.target,
+                        target: result.success === true && result.target !== undefined ? result.target : "",
                         toolCallId: args.decisionCallId,
                     });
                 }
@@ -424,6 +436,10 @@ const INTERACTIVE_ACTIONS: ReadonlySet<string> = new Set(["click", "scroll", "ty
 export type BrowserReturn = "browser_closed" | "handed_back" | "idle" | "left";
 
 /** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
+/** An approved click whose target is no longer known (pushed out of its decision's record, or never read): nothing is clicked. */
+export const APPROVED_TARGET_UNKNOWN =
+    "The target the person approved is no longer known, so nothing was clicked. Look at the page again, and ask for approval before you click.";
+
 export const PERSON_HAS_CONTROL =
     "The person watching this chat has taken control of the browser and is using it now, so this action was not run. Do not use the browser until they hand it back: tell them what you are waiting for, or ask them, and try again later.";
 
