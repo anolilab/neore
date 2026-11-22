@@ -112,6 +112,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
 import { savePromptInTransaction } from "./lib/save-prompt";
+import { type ReferenceClaim, referenceBytesForProvider, referencesStillHeld, releaseReferenceClaims } from "./reference-recheck";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -5017,6 +5018,10 @@ export const generateImage = internalAction
         prompt: v.string(),
         /** The prompt this is a reply to. Set by `/chat/media`, so a regenerate becomes a sibling reply (`agent/branch-tree.ts`). */
         promptMessageId: v.optional(v.id("messages")),
+        /** When the request's references were checked (`/chat/media`): a lock or grant change after it refuses the job. */
+        referenceCheckedAt: v.optional(v.number()),
+        /** The picker's id for each reference image, paired by position (`chat/reference-recheck.ts`). */
+        referenceIds: v.optional(v.array(v.string())),
         referenceImages: v.optional(v.array(v.string())),
         seed: v.optional(v.number()),
         threadId: v.string(),
@@ -5046,6 +5051,8 @@ export const generateImage = internalAction
                 numImages: numberImages = 1,
                 prompt,
                 promptMessageId,
+                referenceCheckedAt,
+                referenceIds,
                 referenceImages,
                 seed,
                 threadId,
@@ -5106,7 +5113,38 @@ export const generateImage = internalAction
                 threadId,
             });
 
+            // The attach claims the recheck takes on the chats' owner shards; released once the provider has the references (`finally`).
+            const referenceClaims: ReferenceClaim[] = [];
+            const referenceRequestId = crypto.randomUUID();
+
             try {
+                // Checked again here, after the queue delivered the job: a lock or grant change since the request must not reach the
+                // provider. Only a job that carries reference ids is checked: `/chat/media` sends them with its references and refuses
+                // references without them, while the image tool and the workflows pass their own URLs, which are not picker rows.
+                // What the provider receives: the URLs as sent, or for a checked job the bytes of each file, read after the holds are renewed
+                // (`referenceBytesForProvider`), so no signed URL reaches the provider.
+                let providerReferences = referenceImages;
+
+                if (referenceIds !== undefined) {
+                    const storageKeys =
+                        referenceImages !== undefined && referenceCheckedAt !== undefined
+                            ? await referencesStillHeld(context, {
+                                  claims: referenceClaims,
+                                  referenceIds,
+                                  referenceImages,
+                                  requestedAt: referenceCheckedAt,
+                                  requestId: referenceRequestId,
+                                  userId,
+                              })
+                            : null;
+
+                    if (storageKeys === null || referenceImages === undefined) {
+                        throw new LunoraError("NOT_FOUND", "File not found");
+                    }
+
+                    providerReferences = await referenceBytesForProvider(context.storage, referenceImages, storageKeys);
+                }
+
                 let images: { mimeType?: string; uint8Array: Uint8Array }[] = [];
                 let warnings: any[] | undefined;
                 let providerMetadata: any;
@@ -5116,7 +5154,7 @@ export const generateImage = internalAction
                 // that take refs as inline image content parts, not as provider-
                 // level `image_url`/`image_urls`, so spreading FAL fields there is
                 // a no-op at best and a foot-gun at worst.
-                const referenceImageInput = buildFalReferenceImageInput(modelDefinition, referenceImages);
+                const referenceImageInput = buildFalReferenceImageInput(modelDefinition, providerReferences);
 
                 if (provider === "openrouter") {
                     const baseProviderOptions = {};
@@ -5296,6 +5334,8 @@ export const generateImage = internalAction
 
                 chatLogger.error("[cvx][image_generation] Error generating image:", error);
                 throw new LunoraError("BAD_REQUEST", `Failed to generate image: ${error instanceof Error ? error.message : "Unknown error"}`);
+            } finally {
+                await releaseReferenceClaims(referenceClaims, referenceRequestId);
             }
         },
     );
