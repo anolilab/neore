@@ -1038,6 +1038,31 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([{ body: `user=ann&hint=y&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
     });
 
+    it("sends nothing once the caller's hold on the session is lost, whatever step the sign-in is at", async () => {
+        fixture.page = loginForm();
+        let looks = 0;
+
+        const result = await signIn(page as unknown as WorkerPage, {
+            deadline: Date.now() + 30_000,
+            // Lost a few steps in: after the page loaded, before the send.
+            isStopped: () => {
+                looks += 1;
+
+                return looks > 3;
+            },
+            navTimeout: 10_000,
+            origin: login.origin,
+            pageTimeout: 5000,
+            password: SAVED_SECRET,
+            url: `${login.origin}/`,
+            username: "ann",
+        });
+
+        expect(result).toMatchObject({ error: expect.stringContaining("The hold on the browser session was lost"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+        expect(await passwordLeft()).toBe(false);
+    });
+
     it("signs in with a form whose empty action is the page's own address, whatever its base", async () => {
         fixture.page = `<base href="/other/">${loginForm("", 'method="post" action=""')}`;
 

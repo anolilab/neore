@@ -998,7 +998,24 @@ const logIn = async (
         held.onLost(closeOnLost);
     }
 
-    const answer = await signInHeld(browser, page, { deadline, hold, opened, origin, password, ready, scrub, url, username });
+    const lostAnswer = (submitted: boolean | undefined) =>
+        ({
+            body: {
+                error: "The hold on the browser session could not be kept for the sign-in, so the session is being closed; do not use it again",
+                sessionCloseUnconfirmed: true,
+                submitted,
+                success: false,
+            },
+            status: 200,
+        }) as const;
+
+    // Lost while the browser was set up: nothing is typed into a session another call may already be on.
+    if (isHoldLost) {
+        return lostAnswer(false);
+    }
+
+    // A loss during the sign-in stops its next step (`isStopped`), the send included, without waiting for the close.
+    const answer = await signInHeld(browser, page, { deadline, hold, isStopped: () => isHoldLost, opened, origin, password, ready, scrub, url, username });
 
     isAnswered = true;
 
@@ -1006,15 +1023,7 @@ const logIn = async (
         return answer;
     }
 
-    return {
-        body: {
-            error: "The hold on the browser session could not be kept for the sign-in, so the session is being closed; do not use it again",
-            sessionCloseUnconfirmed: true,
-            submitted: "submitted" in answer.body ? answer.body.submitted : undefined,
-            success: false,
-        },
-        status: 200,
-    } as const;
+    return lostAnswer("submitted" in answer.body ? answer.body.submitted : undefined);
 };
 
 const signInHeld = async (
@@ -1023,6 +1032,7 @@ const signInHeld = async (
     {
         deadline,
         hold,
+        isStopped,
         opened,
         origin,
         password,
@@ -1033,6 +1043,7 @@ const signInHeld = async (
     }: {
         deadline: number;
         hold: (closing: Promise<boolean>) => void;
+        isStopped: () => boolean;
         opened: { sessionId: string } | undefined;
         origin: string;
         password: string;
@@ -1045,7 +1056,7 @@ const signInHeld = async (
     let result: Awaited<ReturnType<typeof signIn>>;
 
     try {
-        result = await signIn(page, { deadline, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
+        result = await signIn(page, { deadline, isStopped, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
     } catch (error) {
         // Before anything was typed (`signIn` handles every error after): the session holds no password.
         // Its own reason, or a fixed text: a browser error can name what the page chose.

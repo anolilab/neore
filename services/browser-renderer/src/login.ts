@@ -806,6 +806,8 @@ type Guard = Awaited<ReturnType<typeof armGuard>>;
 export interface SignInOptions {
     /** When the caller's hold ends (ms since the epoch, by `now`). */
     deadline: number;
+    /** Whether the caller lost its hold on the session: no step runs once it did, the send included. */
+    isStopped?: () => boolean;
     navTimeout: number;
     now?: () => number;
     origin: string;
@@ -1245,11 +1247,16 @@ const clearPassword = async (
  * time inside the hold.
  */
 export const signIn = async (page: Page, options: SignInOptions): Promise<SignInResult> => {
-    const { deadline, navTimeout, now = Date.now, origin, pageTimeout, password, url, username } = options;
+    const { deadline, isStopped = () => false, navTimeout, now = Date.now, origin, pageTimeout, password, url, username } = options;
     const scrub = (text: string): string => withoutSecret(text, password);
 
     /** The time a step may take: never into the cleanup's time, and no step at all once that began. */
     const left = (cap: number): number => {
+        // A hold that may have lapsed could let another call onto the session: nothing more is done on it, not even the send.
+        if (isStopped()) {
+            throw new SignInStop("The hold on the browser session was lost");
+        }
+
         const ms = deadline - CLEANUP_MS - now();
 
         if (ms <= 0) {
