@@ -9,6 +9,7 @@ vi.stubEnv("VITE_LUNORA_URL", "https://api.example.test");
 const {
     finishPendingSignOut,
     migrateFromCookieSession,
+    readGrant,
     readReconnectNeeded,
     RECONNECT_KEY,
     requestGrantAccessToken,
@@ -19,7 +20,7 @@ const {
     watchReconnectNeeded,
 } = await import("./extension-grant");
 const { clearAccessToken, getAccessToken, resumeAccessTokens } = await import("./access-token");
-const { endSession, loadGrantSession, useSession } = await import("./session");
+const { endSession, useSession } = await import("./session");
 const { createAuthTokenSync } = await import("./auth-token-sync");
 const { AuthPage } = await import("@/features/auth/AuthPage");
 
@@ -324,7 +325,7 @@ describe("signOutGrant", () => {
         }
 
         // The newer grant is still being signed out: nothing reads it.
-        await expect(loadGrantSession()).resolves.toBeNull();
+        await expect(readGrant()).resolves.toBeUndefined();
 
         newerRevoke.resolve(new Response(null, { status: 204 }));
         await newerSignOut;
@@ -452,7 +453,7 @@ describe("endSession", () => {
         // A panel opened later reads no session, and removes the leftover.
         resumeAccessTokens();
         clearAccessToken();
-        await expect(loadGrantSession()).resolves.toBeNull();
+        await expect(readGrant()).resolves.toBeUndefined();
         await expect(getAccessToken({ force: true })).resolves.toBeNull();
         expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/token"))).toHaveLength(1);
 
@@ -797,20 +798,6 @@ describe("getAccessToken", () => {
     });
 });
 
-describe("loadGrantSession", () => {
-    it("reads an unreadable storage as signed out, so the panel offers sign-in", async () => {
-        chrome.storage.local.get = vi.fn().mockRejectedValue(new Error("storage unavailable"));
-
-        await expect(loadGrantSession()).resolves.toBeNull();
-    });
-
-    it("keys the session to the grant, not the user", async () => {
-        store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
-
-        await expect(loadGrantSession()).resolves.toEqual({ key: "g1", user: USER });
-    });
-});
-
 describe("useSession", () => {
     /** What each render of `useSession` showed: the session key, `null` signed out, `undefined` loading. */
     let seen: (string | null | undefined)[];
@@ -825,6 +812,50 @@ describe("useSession", () => {
 
     beforeEach(() => {
         seen = [];
+    });
+
+    it("reads an unreadable storage as signed out on the first read, so the panel offers sign-in", async () => {
+        chrome.storage.local.get = vi.fn().mockRejectedValue(new Error("storage unavailable"));
+
+        const panel = await mount(createElement(Probe));
+
+        await vi.waitFor(() => expect(seen.at(-1)).toBeNull());
+        await panel.unmount();
+    });
+
+    it("signs out once storage recovers from an outage in which another panel marked the grant", async () => {
+        store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
+
+        const panel = await mount(createElement(Probe));
+
+        await vi.waitFor(() => expect(seen.at(-1)).toBe("g1"));
+        vi.useFakeTimers();
+
+        try {
+            const get = vi.spyOn(chrome.storage.local, "get");
+
+            // The read the mark's change starts, and every retry for the next 7 s, fail.
+            for (let failure = 0; failure < 5; failure += 1) {
+                get.mockRejectedValueOnce(new Error("storage unavailable"));
+            }
+
+            await act(async () => {
+                await chrome.storage.local.set({ [SIGNED_OUT_KEY]: "g1" });
+            });
+
+            expect(seen.at(-1)).toBe("g1");
+
+            // Storage recovers with no new change event: only a retry reads the mark.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(60_000);
+            });
+
+            expect(seen.at(-1)).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+
+        await panel.unmount();
     });
 
     it("keeps the session through a storage read that fails after a change, and still ends on a mark", async () => {
@@ -982,7 +1013,7 @@ describe("signInWithWebAuthFlow", () => {
         await signInWithWebAuthFlow();
 
         expect(store.has(SIGNED_OUT_KEY)).toBe(false);
-        await expect(loadGrantSession()).resolves.toMatchObject({ user: USER });
+        await expect(readGrant()).resolves.toMatchObject({ user: USER });
     });
 
     it("signs in when storage fails to drop an older grant's mark, which hides nothing", async () => {
@@ -992,7 +1023,7 @@ describe("signInWithWebAuthFlow", () => {
         vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(new Error("storage unavailable"));
 
         await expect(signInWithWebAuthFlow()).resolves.toEqual(USER);
-        await expect(loadGrantSession()).resolves.toMatchObject({ user: USER });
+        await expect(readGrant()).resolves.toMatchObject({ user: USER });
     });
 
     it("stores nothing when the exchange is refused", async () => {

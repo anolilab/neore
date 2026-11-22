@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { holdAccessTokens, releaseAccessTokens } from "./access-token";
 import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
-import { finishPendingSignOut, grantKey, readGrant, readGrantState, SIGN_OUT_FAILED_KEY, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
+import { finishPendingSignOut, grantKey, readGrantState, SIGN_OUT_FAILED_KEY, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
 import { GrantRemovalError } from "./grant-removal-error";
 
 /**
@@ -22,19 +22,6 @@ interface GrantSession {
 }
 
 const toGrantSession = (grant: StoredGrant | undefined): GrantSession | null => (grant ? { key: grantKey(grant), user: grant.user } : null);
-
-/**
- * The stored grant's session, or `null` when there is none — and when storage
- * cannot be read: the panel then offers sign-in, which writes a new grant,
- * rather than waiting on a read that will not come.
- */
-export const loadGrantSession = async (): Promise<GrantSession | null> => {
-    try {
-        return toGrantSession(await readGrant());
-    } catch {
-        return null;
-    }
-};
 
 /** The sign-out running for each grant key: a second one for the same grant joins it. */
 const signingOut = new Map<string, Promise<void>>();
@@ -141,17 +128,23 @@ const publish = (next: GrantSession | null, removalFailed: boolean): void => {
     }
 };
 
-/** How long the session watch waits before each read again after a failed one; then it waits for the next change. */
-const READ_RETRY_DELAYS_MS = [250, 1000, 4000] as const;
+/**
+ * How long the session watch waits before reading again after a failed read,
+ * doubling per failure up to `READ_RETRY_MAX_MS`. It keeps trying while the
+ * watch runs: a sign-out another panel marks during the outage fires no new
+ * change once storage recovers.
+ */
+const READ_RETRY_FIRST_MS = 250;
+const READ_RETRY_MAX_MS = 30_000;
 
 /**
  * Follow the stored grant in `storage.local`. A grant marked signed out
  * (`SIGNED_OUT_KEY`) reads as none, so each change to either key is read
- * again; the latest read wins. A first read that fails offers sign-in
- * (`loadGrantSession`); a later one keeps what is shown, since publishing none
+ * again; the latest read wins. A first read that fails offers sign-in, which
+ * writes a new grant; a later one keeps what is shown, since publishing none
  * would sign the provider out and drop the writes queued offline. Either way a
- * failed latest read is tried again (`READ_RETRY_DELAYS_MS`): it may have
- * discarded an older read that would have shown the change.
+ * failed latest read is tried again until one succeeds (`READ_RETRY_FIRST_MS`):
+ * it may have missed a change, and that read publishes it.
  */
 const watchGrantSession = (): (() => void) => {
     let stopped = false;
@@ -176,13 +169,12 @@ const watchGrantSession = (): (() => void) => {
                 return;
             }
 
-            const delay = READ_RETRY_DELAYS_MS[attempt];
-
-            if (delay !== undefined) {
-                retry = setTimeout(() => {
+            retry = setTimeout(
+                () => {
                     void load(attempt + 1);
-                }, delay);
-            }
+                },
+                Math.min(READ_RETRY_FIRST_MS * 2 ** attempt, READ_RETRY_MAX_MS),
+            );
 
             if (shown !== undefined) {
                 return;
