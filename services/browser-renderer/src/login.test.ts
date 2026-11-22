@@ -1,7 +1,7 @@
 import type { Page } from "@cloudflare/playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { signIn, standIn, standInFor, WITHHELD, withoutSecret, withPassword } from "./login";
+import { SCAN_BUDGET, secretScan, signIn, standIn, standInFor, WITHHELD, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -80,6 +80,30 @@ describe(withoutSecret, () => {
 
     it("keeps text without the password", () => {
         expect(withoutSecret("https://example.com/home?p=other", SECRET)).toBe("https://example.com/home?p=other");
+    });
+});
+
+describe(secretScan, () => {
+    /** A long password, built here: 64 letters and digits. */
+    const long = Array.from({ length: 64 }, (_, index) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[(index * 37 + 11) % 62]).join("");
+    /** A 2 MB page that repeats all of the password but its last character, then holds it whole, or not. */
+    const page = (isHeld: boolean): string => `${long.slice(0, -1).repeat(32_000)}${isHeld ? long : ""}`.slice(-2_000_000);
+
+    it("withholds a page past a sign-in's budget without reading it, the password in it or not", () => {
+        // Past the budget, nothing is read: a page without the password is withheld as well.
+        expect(secretScan(long).without(page(true))).toBe(WITHHELD);
+        expect(secretScan(long).without(page(false))).toBe(WITHHELD);
+    });
+
+    it.each([true, false])("leaves a later text the same budget whether an earlier one held the password (%s)", (isHeld) => {
+        const scan = secretScan(long);
+        const half = SCAN_BUDGET / 2;
+        const first = isHeld ? `${long}${"x".repeat(half - long.length)}` : "x".repeat(half);
+
+        expect(scan.isHeldIn(first)).toBe(isHeld);
+        // The rest of the budget, then one character more: withheld unread.
+        expect(scan.without("y".repeat(half))).toBe("y".repeat(half));
+        expect(scan.without("z")).toBe(WITHHELD);
     });
 });
 

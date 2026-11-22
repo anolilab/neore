@@ -150,6 +150,16 @@ export interface FormTarget {
 /** A password field whose form's submit buttons send it to different places: no page with one is filled. */
 export const AMBIGUOUS = "ambiguous";
 
+/**
+ * A password field whose form holds a file input (its own, or one tied to it by a `form` attribute): no page with one
+ * is filled. The browser's request interception drops a body built from a file, so the file would be lost once the
+ * password is put in, and the guard would see the body as empty.
+ */
+export const FILE_INPUT = "file-input";
+
+/** What `servedForms` says of a password field: where it goes, or why it cannot be checked. */
+export type ServedForm = FormTarget | typeof AMBIGUOUS | typeof FILE_INPUT | null;
+
 const ENCTYPES = new Set(["application/x-www-form-urlencoded", "multipart/form-data", "text/plain"]);
 
 /** An `enctype` or `formenctype` value as the DOM reads it: an unknown one is URL-encoded. */
@@ -209,14 +219,14 @@ const isSameDestination = (one: Omit<FormTarget, "name">, other: Omit<FormTarget
 
 /**
  * Where each password field of `html` would be sent, in document order (`null` for one in no form, `AMBIGUOUS` for one
- * whose form's enabled submit buttons would send it to different places), read the way
+ * whose form's enabled submit buttons would send it to different places, `FILE_INPUT` for one whose form holds a file input), read the way
  * `checkForm` reads the live page: the form owner by the `form` attribute or the nearest form around it, the first enabled
  * submit button of that form, and the addresses against the first `<base href>` or `url`. A form the parser ties to a field
  * it does not hold (a form in a table) is not seen, so that field is in no form here. A page with a tag of more than
  * `MAX_TAG_ATTRIBUTES` attributes, or that takes more than `MAX_PARSE_WORK` to parse or to resolve its actions against
  * its base, is not read: its first field counts as in no form.
  */
-export const servedForms = (html: string, url: string): (FormTarget | typeof AMBIGUOUS | null)[] => {
+export const servedForms = (html: string, url: string): ServedForm[] => {
     const document = parseBounded(html);
 
     if (!document) {
@@ -270,6 +280,9 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
             submitters.set(form, known);
         }
     }
+
+    // Every form that holds a file input, enabled or not: a script can enable one.
+    const withFile = new Set(html5.filter((entry) => isHtml(entry.element, "input") && typeOf(entry.element) === "file").map((entry) => ownerOf(entry)));
 
     // Each action address resolved once, to where it sends the form without its fragment: a form's own one is shared by
     // every submit button that does not override it. An empty action is the document's own address, whatever its base.
@@ -343,6 +356,10 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
                     return null;
                 }
 
+                if (withFile.has(form)) {
+                    return FILE_INPUT;
+                }
+
                 const destination = destinationOfForm(form);
 
                 return destination === AMBIGUOUS ? AMBIGUOUS : { ...destination, name: attribute(entry.element, "name") ?? "" };
@@ -363,18 +380,19 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
  * name to it, and every password field the site sent in a form goes there too (content the site renders above its login
  * form, or a sign-up form beside it, could otherwise be the one filled); also when that first field is in no form parse5
  * sees (one the parser ties to a form in a table), which cannot be checked, and when any password form the site sent is
- * `AMBIGUOUS`. The live values are read in the page, whose
+ * `AMBIGUOUS` or `FILE_INPUT`. The live values are read in the page, whose
  * scripts could fake them: what is sent is held to the served destination and name by the request guard, so a faked
  * report only has the form not sent.
  */
-export const servedTarget = (served: (FormTarget | typeof AMBIGUOUS | null)[], live: FormTarget): FormTarget | null => {
+export const servedTarget = (served: ServedForm[], live: FormTarget): FormTarget | null => {
     const [first] = served;
-    const targets = served.filter((target): target is FormTarget => target !== null && target !== AMBIGUOUS);
+    const targets = served.filter((target): target is FormTarget => typeof target === "object" && target !== null);
 
     if (
-        !first ||
-        first === AMBIGUOUS ||
+        typeof first !== "object" ||
+        first === null ||
         served.includes(AMBIGUOUS) ||
+        served.includes(FILE_INPUT) ||
         !isSameDestination(first, live) ||
         targets.some((target) => !isSameDestination(target, first))
     ) {

@@ -602,6 +602,27 @@ describe(signIn, () => {
         expect(await leftBlank()).toBe(true);
     });
 
+    it.each([
+        ["holds one", `<form method="post" action="/session">${FIELDS}<input type="file" name="avatar"><button>Go</button></form>`],
+        [
+            "is tied one by a form attribute",
+            `<form id="f" method="post" action="/session">${FIELDS}<button>Go</button></form><input type="file" name="avatar" form="f">`,
+        ],
+        [
+            "had one the site sent, which a script took out",
+            `<form method="post" action="/session">${FIELDS}<input type="file" name="avatar"><button>Go</button></form><script>document.querySelector("[type=file]").remove();</script>`,
+        ],
+        ["is given one by a script", loginForm('document.forms[0].append(Object.assign(document.createElement("input"), { name: "avatar", type: "file" }));')],
+    ])("types nothing into a login form that %s file input, whose file the guard would drop", async (_how, markup) => {
+        fixture.page = markup;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("has a file input"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+        expect(await leftBlank()).toBe(true);
+    });
+
     it("signs in when the page it lands on embeds another site", async () => {
         fixture.page = loginForm();
         fixture.home = `<h1>Home</h1><iframe src="${evil.origin}/widget"></iframe>`;

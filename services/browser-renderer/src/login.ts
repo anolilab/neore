@@ -8,7 +8,7 @@ import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
 import { MAX_PATTERN_LENGTH, readPattern } from "./field-pattern";
 import type { FormTarget } from "./served-form";
-import { AMBIGUOUS, MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
+import { AMBIGUOUS, FILE_INPUT, MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
 
 /** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
 export const originOf = (url: string): string | null => {
@@ -125,13 +125,20 @@ const PERCENT_RUN_RE = /(?:%[\da-f]{2})+/gi;
 const MAX_DECODE_ROUNDS = 32;
 
 /**
- * How many characters the layers of a text may take to read through, as times its length, at least
- * `MIN_DECODE_BUDGET`: each layer is scanned whole, and a scan costs more the longer the password. A large page is read
- * through as many layers as a fixed depth of four spent; one with more is taken to hold the password.
+ * How many characters the layers of a text may take to read through when it is checked alone, as times its length, at
+ * least `MIN_DECODE_BUDGET`: the stand-in checks, which the page holds anyway. A text past it is taken to hold it.
  */
 const DECODE_BUDGET_FACTOR = 5;
 
 const MIN_DECODE_BUDGET = 1_000_000;
+
+/**
+ * How many characters one sign-in reads for the password, every layer of every text it checks counted: an address, a
+ * title, an error, a cookie of the answer. Each layer costs more to scan the longer the password, so the cap is on the
+ * whole sign-in, not on each text: a large page that repeats parts of a long password would otherwise hold the Worker for
+ * seconds. A text whose layers do not fit in what is left is taken to hold the password, and withheld.
+ */
+export const SCAN_BUDGET = 1_000_000;
 
 const UTF8 = new TextDecoder();
 
@@ -154,44 +161,90 @@ const decodeRun = (run: string): string => {
 };
 
 /**
- * Whether `text` carries `secret`: in a form, URL, HTML, JS-escaped or base64 spelling, escaped as a JSON string, or under any
- * number of further layers of percent-encoding, each read in turn until one changes nothing. Each run of escapes is
- * decoded alone, so a stray `%` elsewhere (a "100%") does not stop the rest from being read. A text with more layers
- * than `MAX_DECODE_ROUNDS` or its budget reaches is taken to carry it.
+ * The layers of `text`: itself, then each with every run of escapes decoded, until one changes nothing. `null` when they
+ * are more than `MAX_DECODE_ROUNDS` or take more than `budget` characters. Each run of escapes is decoded alone, so a
+ * stray `%` elsewhere (a "100%") does not stop the rest from being read. Read without `secret`: their cost is the
+ * text's alone.
  */
-const hasSecret = (text: string, secret: string): boolean => {
-    const escaped = JSON.stringify(secret).slice(1, -1);
-    let budget = Math.max(MIN_DECODE_BUDGET, DECODE_BUDGET_FACTOR * text.length);
-    let decoded = text;
+const layersOf = (text: string, budget: number): string[] | null => {
+    const layers = [text];
+    let size = text.length;
 
-    for (let round = 0; round <= MAX_DECODE_ROUNDS && budget >= decoded.length; round++) {
-        budget -= decoded.length;
-
-        if (decoded.includes(escaped) || isSpelledIn(decoded, secret)) {
-            return true;
-        }
-
+    for (let decoded = text; size <= budget;) {
         const next = decoded.replaceAll(PERCENT_RUN_RE, (run) => decodeRun(run));
 
         if (next === decoded) {
-            return false;
+            return layers;
         }
 
+        if (layers.length > MAX_DECODE_ROUNDS) {
+            return null;
+        }
+
+        layers.push(next);
+        size += next.length;
         decoded = next;
     }
 
-    return true;
+    return null;
 };
+
+/**
+ * Whether `text` carries `secret`: in a form, URL, HTML, JS-escaped or base64 spelling, escaped as a JSON string, or under any
+ * number of further layers of percent-encoding; with the characters that took (`cost`). A text with more layers than
+ * `MAX_DECODE_ROUNDS`, or whose layers take more than `budget`, is taken to carry it, and costs nothing. The layers are
+ * counted before any is scanned: the cost hangs on the text alone, never on whether it held `secret`.
+ */
+const readFor = (text: string, secret: string, budget: number): { cost: number; isHeld: boolean } => {
+    const layers = layersOf(text, budget);
+
+    if (!layers) {
+        return { cost: 0, isHeld: true };
+    }
+
+    const escaped = JSON.stringify(secret).slice(1, -1);
+
+    return {
+        cost: layers.reduce((size, layer) => size + layer.length, 0),
+        isHeld: layers.some((layer) => layer.includes(escaped) || isSpelledIn(layer, secret)),
+    };
+};
+
+/** Whether `text` carries `secret` (`readFor`), checked alone: the stand-in checks, on a budget of the text's own. */
+const hasSecret = (text: string, secret: string): boolean => readFor(text, secret, Math.max(MIN_DECODE_BUDGET, DECODE_BUDGET_FACTOR * text.length)).isHeld;
 
 /** What a result says in place of a text (an address, a title, an error) that carries the password. */
 export const WITHHELD = "[withheld: it holds the password]";
 
-/**
- * `text`, or `WITHHELD` in its place when it carries the password in any spelling a page could echo it in (raw, URL- or
- * form-encoded, HTML- or JS-escaped, base64 or base64url, at any depth of percent-encoding). Withheld whole, never marked where
- * it matched: a page that put guesses in its address or title would learn from the mark which guess is the password.
- */
-export const withoutSecret = (text: string, secret: string): string => (hasSecret(text, secret) ? WITHHELD : text);
+/** The password checks of one sign-in, which share one `SCAN_BUDGET`. */
+export interface SecretScan {
+    /** Whether `text` carries the password, or is past what is left of the budget. */
+    isHeldIn: (text: string) => boolean;
+
+    /**
+     * `text`, or `WITHHELD` in its place when it carries the password in any spelling a page could echo it in (raw, URL- or
+     * form-encoded, HTML- or JS-escaped, base64 or base64url, at any depth of percent-encoding), or is past the budget.
+     * Withheld whole, never marked where it matched: a page that put guesses in its address or title would learn from the
+     * mark which guess is the password.
+     */
+    without: (text: string) => string;
+}
+
+export const secretScan = (secret: string): SecretScan => {
+    let left = SCAN_BUDGET;
+    const isHeldIn = (text: string): boolean => {
+        const { cost, isHeld } = readFor(text, secret, left);
+
+        left -= cost;
+
+        return isHeld;
+    };
+
+    return { isHeldIn, without: (text) => (isHeldIn(text) ? WITHHELD : text) };
+};
+
+/** `text` checked alone, on a budget of its own: `SecretScan#without`. */
+export const withoutSecret = (text: string, secret: string): string => secretScan(secret).without(text);
 
 // ─── Stand-in ───────────────────────────────────────────────────────────────────
 
@@ -405,14 +458,15 @@ const isRedirectElsewhere = (
  * Whether an address carries `secret` in its query, fragment or user info, where a form sent by GET, a script or a
  * server's redirect puts it. Not the path: a short password could be a word of the site's own paths.
  */
-const hasSecretInAddress = (url: string, secret: string): boolean => {
+const hasSecretInAddress = (url: string, isHeldIn: (text: string) => boolean): boolean => {
     if (!URL.canParse(url)) {
-        return hasSecret(url, secret);
+        return isHeldIn(url);
     }
 
     const address = new URL(url);
 
-    return [address.username, address.password, address.search + address.hash].some((part) => hasSecret(part, secret));
+    // Every part looked through, whatever an earlier one held: what a sign-in's budget has left never hangs on a hit.
+    return [address.username, address.password, address.search + address.hash].map((part) => isHeldIn(part)).includes(true);
 };
 
 /** Where a `Location` header points, against the address it answers; `null` (another site) when it does not parse. */
@@ -514,8 +568,9 @@ const armGuard = async (
         lock,
         origin,
         password,
+        scan,
         stand,
-    }: { form: FormTarget; isStopped?: () => boolean; lock: ChannelLock; origin: string; password: string; stand: string },
+    }: { form: FormTarget; isStopped?: () => boolean; lock: ChannelLock; origin: string; password: string; scan: SecretScan; stand: string },
 ) => {
     let isExpecting = false;
     let isCounting = true;
@@ -566,7 +621,7 @@ const armGuard = async (
      * addresses and learn from which one is stopped whether a guess is the password.
      */
     const isSecretAddress = (url: string): boolean => {
-        if (hasSecretInAddress(url, stand)) {
+        if (hasSecretInAddress(url, (text) => hasSecret(text, stand))) {
             return true;
         }
 
@@ -576,7 +631,10 @@ const armGuard = async (
 
         // Its path as well once the address leaves the site (a 303 to another site carries no body, but can carry the
         // password echoed into the path): no word of the site's own paths stands in the way there.
-        return hasSecretInAddress(url, password) || (originOf(url) !== origin && URL.canParse(url) && hasSecret(new URL(url).pathname, password));
+        const isInAddress = hasSecretInAddress(url, scan.isHeldIn);
+        const isInPath = originOf(url) !== origin && URL.canParse(url) && scan.isHeldIn(new URL(url).pathname);
+
+        return isInAddress || isInPath;
     };
 
     const onRoute = async (route: Route): Promise<void> => {
@@ -849,6 +907,8 @@ export interface SignInOptions {
     origin: string;
     pageTimeout: number;
     password: string;
+    /** The password checks of the whole call, whose budget the sign-in shares: one of its own when not given. */
+    scan?: SecretScan;
     url: string;
     username: string;
 }
@@ -873,6 +933,9 @@ const CLEANUP_MS = 4000;
 
 /** The end of the hold kept for closing the page when it cannot be cleared. */
 const CLOSE_MS = 1000;
+
+/** Why a login form with a file input is not filled: the browser's request interception drops a body built from a file. */
+const FILE_REFUSAL = "The login form has a file input, whose file the agent's browser would drop when it puts the saved password in, so nothing was typed";
 
 /** The longest wait for the form's request to go out, and then for the page it leads to. */
 const SEND_WAIT_MS = 5000;
@@ -906,7 +969,7 @@ export const ownMessage = (error: unknown): string =>
 const checkForm = (
     input: Element,
     { expected, origin }: { expected?: { charset: string; enctype: string }; origin: string },
-): "encoding" | "invalid" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
+): "encoding" | "file" | "invalid" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
     const { form, isConnected, name, type } = input as HTMLInputElement;
 
     if (!form || !isConnected || type !== "password") {
@@ -957,6 +1020,14 @@ const checkForm = (
 
     if (encoding === "text/plain" || charset !== "utf8") {
         return "encoding";
+    }
+
+    // A file input among the form's controls (a `form` attribute's included): request interception drops a body built
+    // from a file, so the form could not be sent whole with the password in it.
+    const controls = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "elements")?.get?.call(form) as HTMLFormControlsCollection;
+
+    if ([...controls].some((control) => Element.prototype.matches.call(control, 'input[type="file" i]'))) {
+        return "file";
     }
 
     const accepted = getAttribute.call(form, "accept-charset") ?? "";
@@ -1180,7 +1251,7 @@ const documentOf = async (page: Page): Promise<string> => {
  * that planted guesses there would learn from the outcome whether one is the password, while the site that set these
  * lines was sent the password. An answer whose lines could not be read counts as holding it.
  */
-const isClean = async (guard: Guard, password: string): Promise<boolean> => {
+const isClean = async (guard: Guard, scan: SecretScan): Promise<boolean> => {
     const answers = await guard.answerCookies();
 
     if (answers.includes(null)) {
@@ -1190,7 +1261,7 @@ const isClean = async (guard: Guard, password: string): Promise<boolean> => {
     // Every line looked through, whatever an earlier one held: the look takes no shorter for a hit.
     return !answers
         .flat()
-        .map((line) => line !== null && !HTTP_ONLY_RE.test(line) && hasSecret(line.split(";", 1)[0] ?? "", password))
+        .map((line) => line !== null && !HTTP_ONLY_RE.test(line) && scan.isHeldIn(line.split(";", 1)[0] ?? ""))
         .includes(true);
 };
 
@@ -1230,7 +1301,7 @@ const forgetAnswer = async (page: Page, ms: number): Promise<boolean> => {
  */
 const clearPassword = async (
     page: Page,
-    { deadline, guard, now, password, release }: { deadline: number; guard: Guard; now: () => number; password: string; release: () => Promise<void> },
+    { deadline, guard, now, release, scan }: { deadline: number; guard: Guard; now: () => number; release: () => Promise<void>; scan: SecretScan },
 ): Promise<boolean> => {
     // The end of the time the steps and the look may take: the release has the last second.
     const lookUntil = deadline - CLOSE_MS;
@@ -1255,7 +1326,7 @@ const clearPassword = async (
     }
 
     const isClear = await within(
-        isClean(guard, password).catch(() => false),
+        isClean(guard, scan).catch(() => false),
         lookUntil - now(),
         false,
     );
@@ -1290,7 +1361,8 @@ const clearPassword = async (
  */
 export const signIn = async (page: Page, options: SignInOptions): Promise<SignInResult> => {
     const { deadline, isStopped = () => false, navTimeout, now = Date.now, origin, pageTimeout, password, url, username } = options;
-    const scrub = (text: string): string => withoutSecret(text, password);
+    const scan = options.scan ?? secretScan(password);
+    const scrub = scan.without;
 
     /** The time a step may take: never into the cleanup's time, and no step at all once that began. */
     const left = (cap: number): number => {
@@ -1411,6 +1483,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return `The login form would not send the password to ${origin} by POST in this window, so nothing was typed`;
             }
 
+            if (form === "file") {
+                return FILE_REFUSAL;
+            }
+
             // `encoding` (`re-encoded` and `invalid` only at the send, which compares the form with the one the site served).
             if (typeof form === "string") {
                 return "The login form encodes what it sends in a way the agent's browser cannot put a saved password into, so nothing was typed";
@@ -1423,6 +1499,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             const html = await within(load.served(), left(SEND_WAIT_MS), null);
             const served = html ? servedForms(html.text, html.url) : [];
             const target = servedTarget(served, form);
+
+            if (served.includes(FILE_INPUT)) {
+                return FILE_REFUSAL;
+            }
 
             if (served.includes(AMBIGUOUS)) {
                 return "A form of the login page has submit buttons that send it to different places, so the agent's browser cannot check where the password goes; nothing was typed";
@@ -1558,7 +1638,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         let isGuardLate = false;
 
         guard = await settle(async () => {
-            const arming = armGuard(page, { form: target, isStopped, lock: locked, origin, password, stand });
+            const arming = armGuard(page, { form: target, isStopped, lock: locked, origin, password, scan, stand });
 
             arming.then(async (late) => (isGuardLate ? late.disarm() : undefined)).catch(() => undefined);
 
@@ -1615,6 +1695,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             guard.giveUp();
 
             return failed("The login form changed how it encodes what it sends from the form the site served, so the password was not sent");
+        }
+
+        if (form === "file") {
+            return failed(
+                "A script added a file input to the login form, whose file the agent's browser would drop with the password, so the password was not sent",
+            );
         }
 
         if (form === "invalid") {
@@ -1795,7 +1881,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     const landedAt = isAnswerShown ? scrub(page.url()) : origin;
 
     // Whatever happened once the password was typed, it leaves the page before anything else can read the page.
-    if (!(await clearPassword(page, { deadline, guard: armed, now, password, release }))) {
+    if (!(await clearPassword(page, { deadline, guard: armed, now, release, scan }))) {
         // Closed before the lock lifts: a worker it holds would run once let go.
         await within(
             page

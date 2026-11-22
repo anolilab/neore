@@ -2,6 +2,7 @@ import { connect, launch } from "@cloudflare/playwright";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import app from "./index";
+import { signIn } from "./login";
 import { SessionLock } from "./session-lock";
 
 /** The fake binding's RPCs, which the real launcher calls: `launch` to start a browser, `connectSession` to reconnect. */
@@ -16,6 +17,13 @@ vi.mock("@cloudflare/playwright", () => {
         connect: vi.fn(async (endpoint: FakeBinding, sessionId: string) => await endpoint.connectSession(sessionId)),
         launch: vi.fn(async (endpoint: FakeBinding, options: unknown) => await endpoint.launch(options)),
     };
+});
+
+// eslint-disable-next-line no-restricted-syntax -- a sign-in that ends right at its deadline cannot be timed through a page; the real `signIn` runs unless a test says otherwise
+vi.mock("./login", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./login")>();
+
+    return { ...original, signIn: vi.fn(original.signIn) };
 });
 
 /**
@@ -417,6 +425,43 @@ describe("POST /login", () => {
         const answer = await response;
 
         await expect(answer.json()).resolves.toMatchObject({ sessionCloseUnconfirmed: true, success: false });
+    });
+
+    it.each([
+        ["confirms a close that ends quickly", "quick", 200, { sessionClosed: true }],
+        ["says a close that does not end quickly may still be open", "slow", 10_000, { sessionCloseUnconfirmed: true }],
+    ])("%s for a sign-in that fails right at its deadline, answering within the margin", async (_what, sessionId, closeMs, expected) => {
+        vi.mocked(signIn).mockImplementationOnce(async (_page, { deadline }) => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, deadline - Date.now());
+            });
+
+            return { error: "The password could not be cleared from the page in time", sessionClosed: true, submitted: true, success: false };
+        });
+
+        const { env, pending } = binding();
+        const close = vi.fn(
+            async () =>
+                new Promise<void>((resolve) => {
+                    setTimeout(resolve, closeMs);
+                }),
+        );
+        // The budget: the deadline and the margin after it.
+        const answerBy = Date.now() + 20_000;
+        let answeredAt = Infinity;
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId }).finally(() => {
+            answeredAt = Date.now();
+        });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.(stallingBrowser(close, sessionId));
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        expect(answeredAt).toBeLessThanOrEqual(answerBy);
+        expect(close).toHaveBeenCalledOnce();
+        const answer = await response;
+
+        await expect(answer.json()).resolves.toMatchObject({ ...expected, success: false });
     });
 
     it.each([
