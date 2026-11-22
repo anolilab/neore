@@ -32,8 +32,9 @@ popups) passes the same check, and a redirect to a blocked URL closes the browse
 
 The body is validated by `actionSchema` in `src/index.ts` (`action`, plus
 `url`, `selector`, `text`, `direction`, `fullPage` and `sessionId` as the action
-needs). A new launch is started with `keepAlive` of 60 s, and the response
-carries a `sessionId`; passing it on the next call reconnects, so
+needs). A new browser is started with `@cloudflare/playwright`'s `launch(env.BROWSER, { keep_alive })`
+of 60 s, and the response carries a `sessionId`; passing it on the next call reconnects through
+`connect(env.BROWSER, sessionId)` (the binding's own methods are never called directly), so
 `navigate`, `click` and `extract` can be separate tool calls. An expired
 session falls back to a fresh launch. The Worker never closes a kept-alive
 browser itself. Most page operations time out at 30 s and navigation at 60 s; `extract`

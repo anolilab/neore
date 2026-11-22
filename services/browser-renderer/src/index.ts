@@ -12,6 +12,8 @@
  * route), so the backend's service binding (`SERVICE_BROWSER_RENDERER`) is the
  * only way in.
  */
+import type { BrowserWorker } from "@cloudflare/playwright";
+import { connect, launch } from "@cloudflare/playwright";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -22,14 +24,9 @@ import { holdSession, LEASE_MS } from "./session-lock";
 // The Durable Object the `SESSION_LOCK` binding names: exported by the Worker's main module.
 export { SessionLock } from "./session-lock";
 
-// @cloudflare/playwright types — the binding provides launch() and connect()
-interface BrowserBinding {
-    connect: (sessionId: string) => Promise<import("@cloudflare/playwright").Browser>;
-    launch: (options?: { keepAlive?: number }) => Promise<import("@cloudflare/playwright").Browser>;
-}
-
 interface Env {
-    BROWSER: BrowserBinding;
+    /** The Browser Run binding: opened through `@cloudflare/playwright`'s `launch` and `connect`, never called directly. */
+    BROWSER: BrowserWorker;
     NODE_ENV: string;
     /** The hold on each browser session every isolate sees (`src/session-lock.ts`). */
     SESSION_LOCK: DurableObjectNamespace;
@@ -300,14 +297,14 @@ const openBrowser = async (
 ): Promise<{ browser: import("@cloudflare/playwright").Browser; isLaunched: boolean; sessionId: string }> => {
     if (sessionId) {
         try {
-            return { browser: await env.BROWSER.connect(sessionId), isLaunched: false, sessionId };
+            return { browser: await connect(env.BROWSER, sessionId), isLaunched: false, sessionId };
         } catch {
             // Session expired or invalid — fall back to new launch. Said at once: the launch may never finish.
             onSessionGone?.();
         }
     }
 
-    const browser = await env.BROWSER.launch({ keepAlive: KEEP_ALIVE_MS });
+    const browser = await launch(env.BROWSER, { keep_alive: KEEP_ALIVE_MS });
 
     return { browser, isLaunched: true, sessionId: browser.sessionId() };
 };

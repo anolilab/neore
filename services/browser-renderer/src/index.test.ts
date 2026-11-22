@@ -1,7 +1,22 @@
+import { connect, launch } from "@cloudflare/playwright";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import app from "./index";
 import { SessionLock } from "./session-lock";
+
+/** The fake binding's RPCs, which the real launcher calls: `launch` to start a browser, `connectSession` to reconnect. */
+interface FakeBinding {
+    connectSession: (sessionId: string) => Promise<unknown>;
+    launch: (options: unknown) => Promise<unknown>;
+}
+
+// eslint-disable-next-line no-restricted-syntax -- @cloudflare/playwright imports `cloudflare:workers`, which Node cannot load; the Worker takes the launcher from it, not from Env
+vi.mock("@cloudflare/playwright", () => {
+    return {
+        connect: vi.fn(async (endpoint: FakeBinding, sessionId: string) => await endpoint.connectSession(sessionId)),
+        launch: vi.fn(async (endpoint: FakeBinding, options: unknown) => await endpoint.launch(options)),
+    };
+});
 
 /**
  * The `SESSION_LOCK` namespace: one `SessionLock` per session id, on storage kept in memory, which every app instance
@@ -49,7 +64,7 @@ const lockNamespace = () => {
     return { control, namespace };
 };
 
-/** A browser binding whose `connect` and `launch` answer only when the test says so; `started` says which ran. */
+/** A browser binding whose `connectSession` and `launch` answer only when the test says so; `started` says which ran. */
 const binding = (lock = lockNamespace()) => {
     const pending: ((browser: unknown) => void)[] = [];
     const started: string[] = [];
@@ -59,7 +74,12 @@ const binding = (lock = lockNamespace()) => {
             pending.push(resolve);
         });
 
-    return { env: { BROWSER: { connect: start("connect"), launch: start("launch") }, NODE_ENV: "test", SESSION_LOCK: lock.namespace }, lock, pending, started };
+    return {
+        env: { BROWSER: { connectSession: start("connect"), launch: start("launch") }, NODE_ENV: "test", SESSION_LOCK: lock.namespace },
+        lock,
+        pending,
+        started,
+    };
 };
 
 /** A browser whose page cannot be set up: it has no page, and opening one fails. */
@@ -160,7 +180,7 @@ describe("POST /login", () => {
     it("says the caller's session is closed when its reconnect failed and the new browser does not start in time", async () => {
         const env = {
             BROWSER: {
-                connect: async () => {
+                connectSession: async () => {
                     throw new Error("session gone");
                 },
                 launch: async () => await new Promise(() => {}),
@@ -181,7 +201,7 @@ describe("POST /login", () => {
     it("says the caller's session is closed when its reconnect failed and launching a new browser fails", async () => {
         const env = {
             BROWSER: {
-                connect: async () => {
+                connectSession: async () => {
                     throw new Error("session gone");
                 },
                 launch: async () => {
@@ -195,6 +215,9 @@ describe("POST /login", () => {
 
         expect(answer.status).toBe(500);
         await expect(answer.json()).resolves.toMatchObject({ sessionClosed: true });
+        // Through the Playwright launcher, never the binding's own methods: it reconnects by id, and launches with a 60 s keep_alive.
+        expect(vi.mocked(connect)).toHaveBeenLastCalledWith(env.BROWSER, "gone");
+        expect(vi.mocked(launch)).toHaveBeenLastCalledWith(env.BROWSER, { keep_alive: 60_000 });
     });
 
     it("leaves the caller's session open when its reconnect is late, and says nothing of it closing", async () => {
@@ -246,7 +269,7 @@ describe("POST /login", () => {
     it("says the caller's session is closed when its reconnect failed and the browser launched instead cannot be set up", async () => {
         const { env, pending } = binding();
 
-        env.BROWSER.connect = async () => {
+        env.BROWSER.connectSession = async () => {
             throw new Error("session gone");
         };
 
