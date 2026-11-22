@@ -426,7 +426,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
 
                 // None came: the editor still says how many were not read, as it does once the panel is closed.
                 if (came.length === 0) {
-                    return missed > 0 ? { duplicates: 0, imported: [], notRead: missed, skipped: [], unreadable: [] } : null;
+                    return missed > 0 ? { duplicates: 0, imported: [], notRead: missed, refused: [], skipped: [], unreadable: [] } : null;
                 }
 
                 const one = onePerText(came);
@@ -441,7 +441,7 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     MAX_RULE_FILES,
                 );
 
-                return { ...imported, duplicates: duplicateOf.size, notRead: missed, unreadable: [] };
+                return { ...imported, duplicates: duplicateOf.size, notRead: missed, refused: [], unreadable: [] };
             },
             (added) => {
                 // A copy left out is done once the file kept for it was added.

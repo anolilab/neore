@@ -555,7 +555,10 @@ const ProjectRuleFiles: FC<{
         }
 
         const toSet = added.filter((file) => needsMode(file)).length;
-        const noneFound = read.imported.length === 0 && read.unreadable.length === 0 && read.notRead === 0 ? [t`No Markdown files were found to import.`] : [];
+        const noneFound =
+            read.imported.length === 0 && read.unreadable.length === 0 && read.refused.length === 0 && read.notRead === 0
+                ? [t`No Markdown files were found to import.`]
+                : [];
         const addedNote =
             added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
         const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
@@ -574,7 +577,11 @@ const ProjectRuleFiles: FC<{
         const left = t`${plural(skippedCount, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files. Left out: ${skippedNames}.`;
         const unreadableCount = read.unreadable.length;
         const unreadableNames = named(read.unreadable);
-        const unreadable = t`${plural(unreadableCount, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large. Not read: ${unreadableNames}.`;
+        // The reason inside each form: in some languages its words agree with how many files there are.
+        const unreadable = t`${plural(unreadableCount, { one: "# file could not be read: it is gone from the repository or too large.", other: "# files could not be read: they are gone from the repository or too large." })} Not read: ${unreadableNames}.`;
+        const refusedCount = read.refused.length;
+        const refusedNames = named(read.refused);
+        const refusedNote = t`${plural(refusedCount, { one: "# link was not followed: it no longer leads to a file the repository listed.", other: "# links were not followed: they no longer lead to a file the repository listed." })} Not read: ${refusedNames}.`;
         const { duplicates } = read;
         const duplicatesNote = t`${plural(duplicates, { one: "# file was left out as the same file as another picked", other: "# files were left out as the same file as another picked" })}: the same text would apply twice.`;
         const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;
@@ -599,6 +606,7 @@ const ProjectRuleFiles: FC<{
                 ...(tooLarge.length > 0 ? [tooLargeNote] : []),
                 ...(duplicates > 0 ? [duplicatesNote] : []),
                 ...(read.unreadable.length > 0 ? [unreadable] : []),
+                ...(read.refused.length > 0 ? [refusedNote] : []),
                 ...(read.notRead > 0 ? [notRead] : []),
             ].join(" "),
         );
@@ -675,7 +683,7 @@ const ProjectRuleFiles: FC<{
 
         if (picked.length > 0) {
             runImport(async () => {
-                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, unreadable: [] };
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, refused: [], unreadable: [] };
             });
         }
     };

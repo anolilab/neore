@@ -68,7 +68,7 @@ export const MAX_LINKS_FOLLOWED = 16;
  * links to them (the root links to `AGENTS.md`: 6 + 1 + one per link); past 28 the last picks are `not_read`. A redirect (a renamed
  * repository answers each request with one, at most two hops) spends from the same count, so it still works while
  * requests are left; past them a link is `budget` and a file `not_read`, and a listing whose own walk is cut short
- * fails as the host's error.
+ * fails as `budget_spent` (`listRepoRuleFiles` in `projects/rule-file-repo.ts`).
  */
 export const HOST_FETCHES_PER_IMPORT = 28;
 
