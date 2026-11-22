@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { FormTarget } from "./served-form";
 import { AMBIGUOUS, MAX_TAG_ATTRIBUTES, servedForms, servedTarget } from "./served-form";
@@ -66,6 +66,22 @@ describe(servedForms, () => {
 
         expect(servedForms(`${tagOf(MAX_TAG_ATTRIBUTES)}${form}`, URL_OF_PAGE)).toStrictEqual([LIVE]);
         expect(servedForms(`${tagOf(MAX_TAG_ATTRIBUTES + 1)}${form}`, URL_OF_PAGE)).toStrictEqual([null]);
+
+        // Repeats of one name are each looked up before the parser drops them.
+        const repeatsOf = (count: number): string => `<div ${"a ".repeat(count)}></div>`;
+
+        expect(servedForms(`${repeatsOf(MAX_TAG_ATTRIBUTES)}${form}`, URL_OF_PAGE)).toStrictEqual([LIVE]);
+        expect(servedForms(`${repeatsOf(MAX_TAG_ATTRIBUTES + 1)}${form}`, URL_OF_PAGE)).toStrictEqual([null]);
+    });
+
+    it("resolves a form's own action once, however many submit buttons send it there", () => {
+        const canParse = vi.spyOn(URL, "canParse");
+        const buttons = "<button>Go</button>".repeat(1000);
+
+        servedForms(`<form method="post" action="/session">${FIELDS}${buttons}</form>`, URL_OF_PAGE);
+
+        expect(canParse.mock.calls.filter(([address]) => address === "/session")).toHaveLength(1);
+        canParse.mockRestore();
     });
 
     it("resolves against the first base address and takes the first base target", () => {

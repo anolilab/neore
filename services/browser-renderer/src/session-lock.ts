@@ -160,16 +160,29 @@ export const holdSession = async (
     namespace: DurableObjectNamespace,
     sessionId: string,
     kind: HoldKind,
-    now: () => number = Date.now,
+    {
+        keep,
+        now = Date.now,
+        takeMs = LOCK_CALL_MS,
+    }: {
+        /** Given the release of a take that did not answer, to run on past the caller's answer (`waitUntil`). */
+        keep?: (work: Promise<unknown>) => void;
+        now?: () => number;
+        /** How long the take may wait for the lock, at most `LOCK_CALL_MS`: a caller's deadline may leave it less. */
+        takeMs?: number;
+    } = {},
 ): Promise<"retired" | "unreachable" | SessionHold | { busy: HoldKind }> => {
     const token = crypto.randomUUID();
     const sentAt = now();
-    const taken = await ask(namespace, sessionId, { kind, leaseMs: LEASE_MS, op: "take", token });
+    const taken = takeMs > 0 ? await ask(namespace, sessionId, { kind, leaseMs: LEASE_MS, op: "take", token }, Math.min(takeMs, LOCK_CALL_MS)) : null;
 
     if (!taken) {
         // Never rejects; not awaited, so the refusal is not held up by a lock that does not answer. The lock keeps the
-        // token as released, so the take, should it arrive after this, holds nothing.
-        ask(namespace, sessionId, { op: "release", token }).catch(() => undefined);
+        // token as released, so the take, should it arrive after this, holds nothing. Kept past the answer: a release
+        // cut off with the request would leave a late take to lapse, and an exclusive one to retire the session.
+        const releasing = ask(namespace, sessionId, { op: "release", token }).catch(() => undefined);
+
+        keep?.(releasing);
 
         return "unreachable";
     }

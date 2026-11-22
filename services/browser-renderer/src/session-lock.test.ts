@@ -156,6 +156,14 @@ const namespaceOf = () => {
 };
 
 describe(SessionLock, () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("refuses a request it cannot read", async () => {
         const { namespace } = namespaceOf();
         const response = await namespace
@@ -166,8 +174,6 @@ describe(SessionLock, () => {
     });
 
     it("keeps a retired session refused across its reads of storage", async () => {
-        vi.useFakeTimers();
-
         const { namespace } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
 
@@ -177,13 +183,9 @@ describe(SessionLock, () => {
 
         await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
         await expect(holdSession(namespace, "s", "exclusive")).resolves.toBe("retired");
-
-        vi.useRealTimers();
     });
 
     it("judges a lapse by the time its read of storage finished, so a release whose read outlasts the hold still retires the session", async () => {
-        vi.useFakeTimers();
-
         const stored = new Map<string, unknown>();
         let readTakes = 0;
         const lock = new SessionLock({
@@ -210,13 +212,9 @@ describe(SessionLock, () => {
 
         await expect(send({ op: "release", token: "login" })).resolves.toMatchObject({ held: false });
         expect(stored.get("state")).toMatchObject({ retired: true });
-
-        vi.useRealTimers();
     });
 
     it("drops a lapsed sign-in's hold and retires the session in one write, so no crash between two loses both", async () => {
-        vi.useFakeTimers();
-
         const { namespace, stored, writes } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
 
@@ -228,8 +226,6 @@ describe(SessionLock, () => {
         await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
         expect(writes).toStrictEqual(["put state"]);
         expect(stored.get("state")).toStrictEqual({ holds: [], retired: true });
-
-        vi.useRealTimers();
     });
 
     it("keeps its holds in storage, and drops the key once none is left", async () => {
@@ -238,7 +234,6 @@ describe(SessionLock, () => {
 
         expect((stored.get("state") as { holds: unknown[] }).holds).toHaveLength(1);
 
-        vi.useFakeTimers();
         await (hold as Taken<typeof hold>).release();
 
         // The release is kept until no hold of its token could still run.
@@ -250,7 +245,6 @@ describe(SessionLock, () => {
             .fetch("https://session-lock/", { body: JSON.stringify({ leaseMs: 1, op: "renew", token: "t" }), method: "POST" });
 
         expect(stored.has("state")).toBe(false);
-        vi.useRealTimers();
     });
 });
 
@@ -273,6 +267,27 @@ describe(holdSession, () => {
         return hold;
     };
 
+    it("waits for the lock no longer than the caller gives a take, and hands the release of one unanswered on past the answer", async () => {
+        const { control, namespace } = namespaceOf();
+        const kept: Promise<unknown>[] = [];
+
+        await expect(holdSession(namespace, "s", "exclusive", { takeMs: 0 })).resolves.toBe("unreachable");
+        expect(control.calls).toStrictEqual([{ op: "release", token: expect.any(String) }]);
+
+        control.reachable = false;
+
+        const taking = holdSession(namespace, "s", "exclusive", {
+            keep: (work) => {
+                kept.push(work);
+            },
+            takeMs: 1000,
+        });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await expect(taking).resolves.toBe("unreachable");
+        expect(kept).toHaveLength(1);
+    });
+
     it("renews its hold while it runs, so another call stays refused past one lease", async () => {
         const { namespace } = namespaceOf();
         const hold = await held(namespace);
@@ -282,7 +297,7 @@ describe(holdSession, () => {
         await expect(holdSession(namespace, "s", "shared")).resolves.toStrictEqual({ busy: "exclusive" });
         expect(hold.isLost()).toBe(false);
         await expect(hold.release()).resolves.toBe(true);
-        await expect(holdSession(namespace, "s", "shared")).resolves.not.toBe("unreachable");
+        await expect(held(namespace, "shared")).resolves.toHaveProperty("release");
     });
 
     it("counts as unreachable a lock that does not answer in time, and releases what the take may have taken", async () => {
@@ -327,7 +342,7 @@ describe(holdSession, () => {
         await expect(late.json()).resolves.toStrictEqual({ held: false });
 
         control.reachable = true;
-        await expect(holdSession(namespace, "s", "exclusive")).resolves.not.toHaveProperty("busy");
+        await expect(held(namespace, "exclusive")).resolves.toHaveProperty("release");
         await vi.advanceTimersByTimeAsync(LEASE_MS * 2);
         await expect(holdSession(namespace, "s", "shared")).resolves.not.toBe("retired");
     });
@@ -492,6 +507,6 @@ describe(holdSession, () => {
 
         await expect(holdSession(namespace, "s", "shared")).resolves.toStrictEqual({ busy: "exclusive" });
         await expect(hold.release()).resolves.toBe(true);
-        await expect(holdSession(namespace, "s", "shared")).resolves.not.toHaveProperty("busy");
+        await expect(held(namespace, "shared")).resolves.toHaveProperty("release");
     });
 });

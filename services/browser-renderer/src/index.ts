@@ -349,7 +349,7 @@ const retiredAnswer = (what: string) =>
  * page the site answered the sign-in with) runs beside it, and it waits for none; an `/action` holds it beside other
  * actions. A session the call launched is held too, before its page is set up. `take` answers why one was not taken.
  */
-const holdsOf = (env: Env, kind: HoldKind) => {
+const holdsOf = (env: Env, kind: HoldKind, keep?: (work: Promise<unknown>) => void) => {
     const held: SessionHold[] = [];
 
     return {
@@ -364,8 +364,9 @@ const holdsOf = (env: Env, kind: HoldKind) => {
         settle: async (): Promise<void> => {
             await Promise.all(held.map(async (hold) => hold.settle()));
         },
-        take: async (sessionId: string): Promise<"busy" | "retired" | "unreachable" | null> => {
-            const taken = await holdSession(env.SESSION_LOCK, sessionId, kind);
+        /** `ms`: how long the take may wait for the lock (`holdSession`'s `takeMs`). */
+        take: async (sessionId: string, ms?: number): Promise<"busy" | "retired" | "unreachable" | null> => {
+            const taken = await holdSession(env.SESSION_LOCK, sessionId, kind, { keep, ...(ms !== undefined && { takeMs: ms }) });
 
             if (taken === "unreachable" || taken === "retired") {
                 return taken;
@@ -389,8 +390,8 @@ const holdsOf = (env: Env, kind: HoldKind) => {
  * before the lease ends, so the action drives the page no further; a release the lock is merely slow to answer, after
  * an action whose hold held throughout, keeps the result.
  */
-const act = async (env: Env, body: z.infer<typeof actionSchema>): Promise<Response> => {
-    const holds = holdsOf(env, "shared");
+const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: Promise<unknown>) => void): Promise<Response> => {
+    const holds = holdsOf(env, "shared", keep);
 
     // Taken before it connects: a session signing in is never reached.
     const refused = body.sessionId ? await holds.take(body.sessionId) : null;
@@ -679,7 +680,9 @@ app.post("/action", async (c) => {
         return c.json({ error: `Invalid request: ${parsed.error.message}`, success: false }, 400);
     }
 
-    return act(c.env, parsed.data);
+    return act(c.env, parsed.data, (work) => {
+        afterAnswer(c, work);
+    });
 });
 
 // ─── Saved-login fill ────────────────────────────────────────────────────────────
@@ -709,6 +712,38 @@ const loginSchema = z.object({
 });
 
 type Browser = import("@cloudflare/playwright").Browser;
+
+/**
+ * Ends the browser session itself: whether it confirmably did. `close()` ends a browser this call launched, but only
+ * disconnects from one it reconnected to (Playwright's `close()` on a connected browser), whose session would go on
+ * with the page: that one is sent the browser's own `Browser.close`, and counts as ended once the browser takes it.
+ */
+const endSession = async (browser: Browser, isLaunched: boolean): Promise<boolean> => {
+    if (isLaunched) {
+        try {
+            await browser.close();
+
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    let isEnded = false;
+
+    try {
+        const cdp = await browser.newBrowserCDPSession();
+
+        await cdp.send("Browser.close");
+        isEnded = true;
+    } catch {
+        // Not taken: the session may go on.
+    }
+
+    await browser.close().catch(() => undefined);
+
+    return isEnded;
+};
 
 /** A sentence's closing full stop, dropped before more is said after it. */
 const TRAILING_STOP_RE = /\.$/u;
@@ -839,7 +874,9 @@ app.post("/login", async (c) => {
     }
 
     const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - LOGIN_MARGIN_MS;
-    const holds = holdsOf(c.env, "exclusive");
+    const holds = holdsOf(c.env, "exclusive", (work) => {
+        afterAnswer(c, work);
+    });
     // Taken before it connects, and refused while any other call holds the session: nothing is typed unheld.
     const refused = sessionId ? await holds.take(sessionId) : null;
 
@@ -955,7 +992,8 @@ const logIn = async (
 
     const { browser, page } = ready;
     // A session launched here is held as well, before anything is typed: its id is out once this answers.
-    const refused = ready.isLaunched ? await holds.take(ready.sessionId) : null;
+    // Within the sign-in's deadline: a setup that ended late leaves the take no time past it.
+    const refused = ready.isLaunched ? await holds.take(ready.sessionId, deadline - Date.now()) : null;
 
     if (refused) {
         await settledWithin(
@@ -986,12 +1024,7 @@ const logIn = async (
         }
 
         isHoldLost = true;
-        hold(
-            browser
-                .close()
-                .then(() => true)
-                .catch(() => false),
-        );
+        hold(endSession(browser, ready.isLaunched));
     };
 
     for (const held of holds.held) {
@@ -1047,7 +1080,7 @@ const signInHeld = async (
         opened: { sessionId: string } | undefined;
         origin: string;
         password: string;
-        ready: { sessionId: string };
+        ready: { isLaunched: boolean; sessionId: string };
         scrub: (error: unknown) => string;
         url: string;
         username: string;
@@ -1069,10 +1102,7 @@ const signInHeld = async (
 
     // Closed only once the browser says so: a close that fails or does not end in time leaves a session that may
     // still be open, which this isolate never lends out again.
-    const closing = browser
-        .close()
-        .then(() => true)
-        .catch(() => false);
+    const closing = endSession(browser, ready.isLaunched);
     const isClosed = await settledWithin(closing, deadline - Date.now());
     const reason = result.error.replace(TRAILING_STOP_RE, "");
 

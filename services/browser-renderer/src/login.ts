@@ -494,7 +494,14 @@ const withoutFragment = (url: string): string => url.split("#", 1)[0] ?? url;
 
 const armGuard = async (
     page: Page,
-    { form, lock, origin, password, stand }: { form: FormTarget; lock: ChannelLock; origin: string; password: string; stand: string },
+    {
+        form,
+        isStopped = () => false,
+        lock,
+        origin,
+        password,
+        stand,
+    }: { form: FormTarget; isStopped?: () => boolean; lock: ChannelLock; origin: string; password: string; stand: string },
 ) => {
     let isExpecting = false;
     let isCounting = true;
@@ -544,8 +551,19 @@ const armGuard = async (
      * a claim that was refused: the password never left, and the page's scripts, still running, could put guesses in
      * addresses and learn from which one is stopped whether a guess is the password.
      */
-    const isSecretAddress = (url: string): boolean =>
-        hasSecretInAddress(url, stand) || ((forwarding !== null || sent !== null) && hasSecretInAddress(url, password));
+    const isSecretAddress = (url: string): boolean => {
+        if (hasSecretInAddress(url, stand)) {
+            return true;
+        }
+
+        if (forwarding === null && sent === null) {
+            return false;
+        }
+
+        // Its path as well once the address leaves the site (a 303 to another site carries no body, but can carry the
+        // password echoed into the path): no word of the site's own paths stands in the way there.
+        return hasSecretInAddress(url, password) || (originOf(url) !== origin && URL.canParse(url) && hasSecret(new URL(url).pathname, password));
+    };
 
     const onRoute = async (route: Route): Promise<void> => {
         const request = route.request();
@@ -584,6 +602,9 @@ const armGuard = async (
                 isChanged = true;
             } else if (!(await shield())) {
                 isUnshielded = true;
+            } else if (isStopped()) {
+                // The caller's hold may have lapsed while the shield was set: the password is not handed on.
+                isUnsent = true;
             } else if (isExpecting) {
                 try {
                     // It rejects only for a route already handled, when nothing is handed on. Once it resolves, the
@@ -982,7 +1003,10 @@ interface Answer {
  * Throws when the load fails; `detach(ms)` lets go of it, `false` when that did not end within `ms` (the session may
  * still hold it).
  */
-const loadServed = async (page: Page, { now, origin, timeout, url }: { now: () => number; origin: string; timeout: number; url: string }) => {
+const loadServed = async (
+    page: Page,
+    { now, onHeld, origin, timeout, url }: { now: () => number; onHeld: () => void; origin: string; timeout: number; url: string },
+) => {
     const until = now() + timeout;
     /** `promise`, or the load given up once its time is out. */
     const inTime = async <T>(promise: Promise<T>): Promise<T> => {
@@ -1073,7 +1097,10 @@ const loadServed = async (page: Page, { now, origin, timeout, url }: { now: () =
         }
     } catch (error) {
         // Stopping the load and letting go of it share one second, the part of the cleanup's time a failed load takes.
-        await detach((stopAt ?? now() + CLOSE_MS) - now());
+        // One not let go of is told (`onHeld`): its session would keep the tab's cache off and its network watched.
+        if (!(await detach((stopAt ?? now() + CLOSE_MS) - now()))) {
+            onHeld();
+        }
 
         throw error;
     }
@@ -1331,7 +1358,15 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
     const findFields = async () => {
-        const load = await loadServed(page, { now, origin, timeout: left(navTimeout), url });
+        const load = await loadServed(page, {
+            now,
+            onHeld: () => {
+                isLoadHeld = true;
+            },
+            origin,
+            timeout: left(navTimeout),
+            url,
+        });
 
         try {
             const landed = offSite();
@@ -1400,8 +1435,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                         (candidate): candidate is HTMLInputElement =>
                             candidate instanceof HTMLInputElement &&
                             ["", "email", "tel", "text"].includes(candidate.getAttribute("type")?.toLowerCase() ?? "") &&
-                            // One that takes no typing (disabled, read-only) is not the username field, however close.
-                            !candidate.disabled &&
+                            // One that takes no typing (disabled, by a fieldset too, or read-only) is not the username field, however close.
+                            !candidate.matches(":disabled") &&
                             !candidate.readOnly &&
                             candidate.getClientRects().length > 0 &&
                             Boolean(candidate.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -1508,7 +1543,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         let isGuardLate = false;
 
         guard = await settle(async () => {
-            const arming = armGuard(page, { form: target, lock: locked, origin, password, stand });
+            const arming = armGuard(page, { form: target, isStopped, lock: locked, origin, password, stand });
 
             arming.then(async (late) => (isGuardLate ? late.disarm() : undefined)).catch(() => undefined);
 
@@ -1656,8 +1691,9 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     // The guard is armed right before the password is typed: without it, the password never reached the page.
     if (!guard) {
-        // A setup that may still finish would lock or route the session's later pages.
-        if (isStalled && !result.success) {
+        // A setup that may still finish would lock or route the session's later pages, and a load whose DevTools
+        // session was not let go of would keep watching them: the page is closed with the session instead.
+        if ((isStalled || isLoadHeld) && !result.success) {
             await within(
                 page.close().catch(() => undefined),
                 1000,

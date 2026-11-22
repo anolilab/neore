@@ -73,6 +73,28 @@ const brokenBrowser = (close: () => Promise<void>, sessionId: string) => {
     };
 };
 
+/** A browser whose page never sets up its lock: the sign-in on it runs until its budget ends. */
+const stallingBrowser = (close: () => Promise<void>, sessionId: string) => {
+    const context = {
+        route: async () => undefined,
+        routeWebSocket: async () =>
+            new Promise<void>(() => {
+                // Never settles.
+            }),
+    };
+    const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
+
+    // Reconnected: `close` stands for the browser's own `Browser.close`, which ends the session; `close()` only disconnects.
+    return {
+        close: async () => undefined,
+        contexts: () => [{ pages: () => [page] }],
+        newBrowserCDPSession: async () => {
+            return { send: close };
+        },
+        sessionId: () => sessionId,
+    };
+};
+
 interface Body {
     action?: string;
     budgetMs?: number;
@@ -241,18 +263,10 @@ describe("POST /login", () => {
     /** Signs in on `sessionId` with a page whose lock never sets up (its sockets are never gated), so the session must be closed. */
     const mustClose = async (close: () => Promise<void>, sessionId: string) => {
         const { env, pending, started } = binding();
-        const context = {
-            route: async () => undefined,
-            routeWebSocket: async () =>
-                new Promise<void>(() => {
-                    // Never settles.
-                }),
-        };
-        const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
         const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId });
 
         await vi.advanceTimersByTimeAsync(0);
-        pending[0]?.({ close, contexts: () => [{ pages: () => [page] }], sessionId: () => sessionId });
+        pending[0]?.(stallingBrowser(close, sessionId));
         await vi.advanceTimersByTimeAsync(20_000);
 
         return { answer: await response, env, started };
@@ -281,6 +295,32 @@ describe("POST /login", () => {
         });
         expect(close).toHaveBeenCalledOnce();
         await expect(isFree(signedIn, "closed")).resolves.toBe(true);
+    });
+
+    it("never counts a reconnected session closed because it disconnected: only the browser's own close ends it", async () => {
+        const { env, pending } = binding();
+        const { contexts } = stallingBrowser(async () => undefined, "kept");
+        const disconnect = vi.fn(async () => undefined);
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "kept" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        // `close()` resolves, but the browser takes no `Browser.close`: its session may go on with the page.
+        pending[0]?.({
+            close: disconnect,
+            contexts,
+            newBrowserCDPSession: async () => {
+                throw new Error("no CDP session");
+            },
+            sessionId: () => "kept",
+        });
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        const answer = await response;
+        const answered = (await answer.json()) as { sessionClosed?: boolean; sessionCloseUnconfirmed?: boolean; success?: boolean };
+
+        expect(answered).toMatchObject({ sessionCloseUnconfirmed: true, success: false });
+        expect(answered).not.toHaveProperty("sessionClosed", true);
+        expect(disconnect).toHaveBeenCalled();
     });
 
     it("keeps a session whose close ends after the answer held until it ends", async () => {
@@ -368,28 +408,6 @@ describe("POST /login", () => {
 
         expect(action.status).toBe(409);
     });
-
-    it("holds its session alone: an action on it is refused, and a sign-in waits for no running action", async () => {
-        const { env } = binding();
-        const signingIn = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "one" });
-
-        await vi.advanceTimersByTimeAsync(0);
-
-        const action = await post(env, "/action", { action: "extract", sessionId: "one" });
-
-        expect(action.status).toBe(409);
-
-        // An action that never ends: its session stays in use.
-        post(env, "/action", { action: "extract", sessionId: "two" }).catch(() => undefined);
-        await vi.advanceTimersByTimeAsync(0);
-
-        const login = await post(env, "/login", { ...LOGIN, sessionId: "two" });
-
-        expect(login.status).toBe(409);
-
-        await vi.advanceTimersByTimeAsync(18_000);
-        await signingIn;
-    });
 });
 
 describe("the session hold every isolate shares", () => {
@@ -408,20 +426,6 @@ describe("the session hold every isolate shares", () => {
         const other = await import("./index");
 
         return other.default;
-    };
-
-    /** A browser whose page never sets up its lock: the sign-in on it runs until its budget ends. */
-    const stallingBrowser = (close: () => Promise<void>, sessionId: string) => {
-        const context = {
-            route: async () => undefined,
-            routeWebSocket: async () =>
-                new Promise<void>(() => {
-                    // Never settles.
-                }),
-        };
-        const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
-
-        return { close, contexts: () => [{ pages: () => [page] }], sessionId: () => sessionId };
     };
 
     it("refuses an action another isolate is asked for while a sign-in holds the session, before it connects", async () => {

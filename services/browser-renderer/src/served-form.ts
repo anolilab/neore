@@ -26,10 +26,13 @@ const TOO_LARGE = new Error("The served page is too large to read");
 
 /**
  * The parser's tokenizer: tells `onTag` of each tag before the parser takes it, and refuses a tag of more than
- * `MAX_TAG_ATTRIBUTES` attributes before it looks the next one up.
+ * `MAX_TAG_ATTRIBUTES` attributes, repeats of one name included, before it looks the next one up.
  */
 class BoundedTokenizer extends Tokenizer {
     private readonly onTag: (attributes: number) => void;
+
+    /** The attribute names of the current tag looked up so far, a repeated one included (which the parser drops). */
+    private attributeNames = 0;
 
     public constructor(
         options: ConstructorParameters<typeof Tokenizer>[0],
@@ -40,13 +43,23 @@ class BoundedTokenizer extends Tokenizer {
         this.onTag = onTag;
     }
 
-    protected override _leaveAttrName(): void {
-        const token = this.currentToken;
+    protected override _createStartTagToken(): void {
+        this.attributeNames = 0;
+        super._createStartTagToken();
+    }
 
-        if (token && "attrs" in token && token.attrs.length >= MAX_TAG_ATTRIBUTES) {
+    protected override _createEndTagToken(): void {
+        this.attributeNames = 0;
+        super._createEndTagToken();
+    }
+
+    protected override _leaveAttrName(): void {
+        // Each name is looked up among the tag's own before a repeat is dropped: repeats count toward the limit too.
+        if (this.attributeNames >= MAX_TAG_ATTRIBUTES) {
             throw TOO_LARGE;
         }
 
+        this.attributeNames += 1;
         super._leaveAttrName();
     }
 
@@ -258,11 +271,24 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
         }
     }
 
+    // Each action address resolved once: a form's own one is shared by every submit button that does not override it.
+    const resolvedActions = new Map<string, string>();
+    const resolve = (action: string): string => {
+        let resolved = resolvedActions.get(action);
+
+        if (resolved === undefined) {
+            resolved = URL.canParse(action, base) ? new URL(action, base).href : `unparsable:${action}`;
+            resolvedActions.set(action, resolved);
+        }
+
+        return resolved;
+    };
+
     /** Where `form` goes when `button` (the first enabled submit button, or none) sends it. */
     const destinationOf = (form: Element, button: Element | undefined): Omit<FormTarget, "name"> => {
         const override = (name: string): string | null => (button ? attribute(button, name) : null);
         const action = override("formaction") ?? attribute(form, "action") ?? "";
-        const resolved = URL.canParse(action, base) ? new URL(action, base).href : `unparsable:${action}`;
+        const resolved = resolve(action);
         // An empty action is the document's own address, whatever its base.
         const address = action === "" ? url : resolved;
 

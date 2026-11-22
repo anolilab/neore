@@ -10,11 +10,11 @@ export type BrowserLoginRequest = {
      */
     budgetMs?: number;
     /**
-     * The login page; must be on `origin`
+     * The login page; its origin must be exactly `origin`
      */
     url: string;
     /**
-     * The exact origin the login was saved for; nothing is typed on any other
+     * The exact `https://` origin the login was saved for (scheme, host and port, no path); nothing is typed on any other
      */
     origin: string;
     username: string;
@@ -146,6 +146,15 @@ export type SessionRetiredResponse = {
     success: false;
 };
 
+export type ActionWithheldResponse = {
+    success?: boolean;
+    error?: string;
+    /**
+     * The browser session the action ran on, kept for the caller; absent when the lost hold closed it
+     */
+    sessionId?: string;
+};
+
 export type ErrorResponse = {
     success?: boolean;
     error?: string;
@@ -180,9 +189,9 @@ export type BrowserActionErrors = {
      */
     500: ErrorResponse;
     /**
-     * The browser session's lock did not answer in time, so nothing was run, or the action's hold could not be confirmed for its whole run, so its result is withheld; it can be tried again
+     * With the `x-browser-action: not-run` header, nothing was run (the browser session's lock did not answer in time, or the session was refused) and the action can be tried again. Without it, the action's hold could not be confirmed for its whole run, so its result is withheld: the action may have run, so look at the page (a screenshot or an extract on `sessionId`, the browser it kept, when given) before repeating it
      */
-    503: ErrorResponse;
+    503: ActionWithheldResponse;
 };
 
 export type BrowserActionError = BrowserActionErrors[keyof BrowserActionErrors];

@@ -841,15 +841,6 @@ export const navigateInControl = authAction
         // The renderer retired the browser for good: the row forgets it, so the next action opens a new one.
         const isRetired = response?.status === 410;
 
-        // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for this
-        // navigation is given back, as the agent's is (`chat/tools/browser-node.ts`).
-        if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
-            await ctx.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
-                identifier: userId,
-                key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
-            });
-        }
-
         // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
         // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
         const mayStillLoad = signal !== undefined && result === undefined && (signal.aborted || Date.now() >= startedAt + budget);
@@ -883,6 +874,18 @@ export const navigateInControl = authAction
                     userId,
                 });
             }
+        }
+
+        // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for this
+        // navigation is given back, as the agent's is (`chat/tools/browser-node.ts`). After the row is logged and the hold
+        // ended, and a refund that fails is let go: it never keeps a hold or a retired browser on the row.
+        if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
+            await ctx
+                .runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
+                    identifier: userId,
+                    key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
+                })
+                .catch(() => undefined);
         }
 
         // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened

@@ -66,10 +66,16 @@
                         }
                     },
                     "503": {
-                        "description": "The browser session's lock did not answer in time, so nothing was run, or the action's hold could not be confirmed for its whole run, so its result is withheld; it can be tried again",
+                        "description": "With the `x-browser-action: not-run` header, nothing was run (the browser session's lock did not answer in time, or the session was refused) and the action can be tried again. Without it, the action's hold could not be confirmed for its whole run, so its result is withheld: the action may have run, so look at the page (a screenshot or an extract on `sessionId`, the browser it kept, when given) before repeating it",
+                        "headers": {
+                            "x-browser-action": {
+                                "description": "`not-run` when the renderer ran nothing for this call",
+                                "schema": { "type": "string", "enum": ["not-run"] }
+                            }
+                        },
                         "content": {
                             "application/json": {
-                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                                "schema": { "$ref": "#/components/schemas/ActionWithheldResponse" }
                             }
                         }
                     },
@@ -189,12 +195,17 @@
                         "maximum": 120000,
                         "description": "The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left"
                     },
-                    "url": { "type": "string", "description": "The login page; must be on `origin`" },
-                    "origin": { "type": "string", "description": "The exact origin the login was saved for; nothing is typed on any other" },
-                    "username": { "type": "string" },
+                    "url": { "type": "string", "maxLength": 8192, "description": "The login page; its origin must be exactly `origin`" },
+                    "origin": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "description": "The exact `https://` origin the login was saved for (scheme, host and port, no path); nothing is typed on any other"
+                    },
+                    "username": { "type": "string", "minLength": 1, "maxLength": 320 },
                     "password": {
                         "type": "string",
                         "minLength": 4,
+                        "maxLength": 1024,
                         "description": "Typed into a password field only; never returned. A shorter one is refused: it could not be kept out of the results"
                     },
                     "sessionId": { "type": "string", "description": "Reconnect to an existing browser session" }
@@ -327,6 +338,17 @@
                     "code": { "type": "string", "enum": ["SESSION_RETIRED"] },
                     "error": { "type": "string" },
                     "success": { "type": "boolean", "enum": [false] }
+                }
+            },
+            "ActionWithheldResponse": {
+                "type": "object",
+                "properties": {
+                    "success": { "type": "boolean" },
+                    "error": { "type": "string" },
+                    "sessionId": {
+                        "type": "string",
+                        "description": "The browser session the action ran on, kept for the caller; absent when the lost hold closed it"
+                    }
                 }
             },
             "ErrorResponse": {

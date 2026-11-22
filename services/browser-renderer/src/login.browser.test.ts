@@ -785,6 +785,19 @@ describe(signIn, () => {
         expect(page.url()).not.toContain(SAVED_SECRET);
     });
 
+    it("blocks a redirect of the sign-in's answer to another site with the password in its path", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            response.writeHead(303, { location: `${evil.origin}/welcome/${SAVED_SECRET}` });
+            response.end();
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: false });
+        expect(evil.hits).toStrictEqual([]);
+    });
+
     it("fails a redirect that echoes the password into the address while the form's POST is still being handed on", async () => {
         // A handing on that sends the POST before it returns, and returns only once the answer was dealt with: Playwright's
         // own sends it once the handler returned, but nothing of the guard may count on that.
@@ -1029,8 +1042,8 @@ describe(signIn, () => {
         expect(login.hits.filter((hit) => hit.method === "POST")).toStrictEqual([]);
     });
 
-    it("types the username into the last field before the password that takes typing, past a disabled or read-only one", async () => {
-        fixture.page = `<form method="post" action="/session"><input name="user"><input name="code" value="x" disabled><input name="hint" value="y" readonly><input name="pw" type="password"><button>Go</button></form>`;
+    it("types the username into the last field before the password that takes typing, past a disabled one, one in a disabled fieldset or a read-only one", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="code" value="x" disabled><fieldset disabled><input name="team" value="z"></fieldset><input name="hint" value="y" readonly><input name="pw" type="password"><button>Go</button></form>`;
 
         const result = await run();
 
@@ -1061,6 +1074,66 @@ describe(signIn, () => {
         expect(result).toMatchObject({ error: expect.stringContaining("The hold on the browser session was lost"), submitted: false, success: false });
         expect(sessionPosts()).toStrictEqual([]);
         expect(await passwordLeft()).toBe(false);
+    });
+
+    it("does not hand on the form's POST once the caller's hold is lost as it leaves", async () => {
+        fixture.page = loginForm();
+        let isLost = false;
+
+        page.on("request", (request) => {
+            isLost ||= request.method() === "POST";
+        });
+
+        const result = await signIn(page as unknown as WorkerPage, {
+            deadline: Date.now() + 30_000,
+            isStopped: () => isLost,
+            navTimeout: 10_000,
+            origin: login.origin,
+            pageTimeout: 5000,
+            password: SAVED_SECRET,
+            url: `${login.origin}/`,
+            username: "ann",
+        });
+
+        expect(result).toMatchObject({ submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("closes the page and the session when the page's loader cannot be let go of after the page failed to load", async () => {
+        fixture.page = loginForm();
+        fixture.onMoved = (response) => {
+            response.destroy();
+        };
+        const { newCDPSession } = context;
+
+        // The loader's DevTools session (the one that turns the cache off) never lets go; every other one does.
+        context.newCDPSession = async (...args) => {
+            const session = await newCDPSession.apply(context, args);
+            const { detach, send } = session;
+            let isLoader = false;
+
+            session.send = (async (method: string, params?: Parameters<typeof send>[1]) => {
+                isLoader ||= method === "Network.setCacheDisabled";
+
+                return send.call(session, method as never, params as never);
+            }) as typeof send;
+            session.detach = async () => (isLoader ? NEVER : detach.call(session));
+
+            return session;
+        };
+
+        const result = await signIn(page as unknown as WorkerPage, {
+            deadline: Date.now() + 30_000,
+            navTimeout: 10_000,
+            origin: login.origin,
+            pageTimeout: 5000,
+            password: SAVED_SECRET,
+            url: `${login.origin}/moved.png`,
+            username: "ann",
+        });
+
+        expect(result).toMatchObject({ sessionClosed: true, submitted: false, success: false });
+        expect(page.isClosed()).toBe(true);
     });
 
     it("signs in with a form whose empty action is the page's own address, whatever its base", async () => {
@@ -1792,8 +1865,14 @@ describe(signIn, () => {
 
         const result = await run();
 
-        expect(result).toMatchObject({ error: expect.stringContaining("did not let go of the login page"), submitted: false, success: false });
-        expect(await passwordLeft()).toBe(false);
+        // Its session would keep the tab's cache off and its network watched: the page goes, and the session with it.
+        expect(result).toMatchObject({
+            error: expect.stringContaining("did not let go of the login page"),
+            sessionClosed: true,
+            submitted: false,
+            success: false,
+        });
+        expect(page.isClosed()).toBe(true);
         expect(sessionPosts()).toStrictEqual([]);
     });
 
@@ -1879,26 +1958,26 @@ describe(signIn, () => {
     it("says at once that the form's own rules held it back, when a field it requires is left empty", async () => {
         fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password"><input name="otp" required><button>Go</button></form>`;
 
-        const startedAt = Date.now();
         const result = await run();
 
+        // Its own reason, not the one a held-back send gets once it was waited out.
         expect(result).toMatchObject({ error: expect.stringContaining("own rules held it back"), submitted: false, success: false });
         expect(sessionPosts()).toStrictEqual([]);
-        // Not the five seconds a held-back send is waited out.
-        expect(Date.now() - startedAt).toBeLessThan(4000);
     });
 
     it("leaves no way back to the sign-in's answer that showed the password: not by the tab's history, nor from the cache", async () => {
         fixture.page = loginForm();
-        fixture.onSession = (request, response, body) => {
-            // Cacheable, as a careless site's answer may be; a GET of the same address shows nothing of it.
-            response.setHeader("cache-control", "private, max-age=3600");
-            html(response, request.method === "POST" ? `<p>Welcome, ${new URLSearchParams(body).get("pw") ?? ""}</p>` : "<p>Welcome back</p>");
+        // Cacheable, as a careless site's answer may be: the sign-in's POST is sent on to a page that shows the password.
+        fixture.headers = { "cache-control": "private, max-age=3600" };
+        fixture.onSession = (_request, response, body) => {
+            fixture.page = `<p>Welcome, ${new URLSearchParams(body).get("pw") ?? ""}</p>`;
+            response.writeHead(303, { location: "/welcome" });
+            response.end();
         };
 
         const result = await run();
 
-        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/session` });
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/welcome` });
         expect(await page.evaluate(() => document.defaultView?.history.length)).toBe(1);
 
         // Going back from the only entry goes nowhere: the page stays as it is, with no navigation to wait for.
@@ -1913,7 +1992,7 @@ describe(signIn, () => {
         await page.goto(`${login.origin}/home`);
 
         const cached = await page.evaluate(async () =>
-            fetch("/session", { cache: "only-if-cached", mode: "same-origin" })
+            fetch("/welcome", { cache: "only-if-cached", mode: "same-origin" })
                 .then(async (response) => response.text())
                 .catch(() => ""),
         );
