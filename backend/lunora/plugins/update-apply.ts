@@ -18,6 +18,7 @@ import { internalMutation } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { deleteSkillRows } from "../skills/functions";
+import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { LEASE_MS, markerFor } from "./logic";
 
 const STALE = "STALE_LEASE: this install was taken over by another action";
@@ -98,6 +99,15 @@ export const updateSkillChild = internalMutation
         if ((await skillRowHash(skill)) !== link.contentHash) {
             throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept as it is`);
         }
+
+        // The planned slug gets the same checks skill creation gives it: a reserved or malformed slug is refused, and so is one another skill now holds.
+        const slugValidation = validateSlug(args.slug);
+
+        if (!slugValidation.valid) {
+            throw new LunoraError("BAD_REQUEST", slugValidation.errors.join(", "));
+        }
+
+        await ensureSlugUnique(ctx, skill.userId, args.slug, skill._id);
 
         // Pending first: if the write below stops, repair sees a child that matches neither hash and knows an update was half done.
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
