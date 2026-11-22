@@ -18,7 +18,7 @@ import { useProjectConfirm } from "./use-projects";
 
 const harness = vi.hoisted(() => {
     return {
-        query: vi.fn(async (): Promise<unknown> => null),
+        query: vi.fn(async (..._args: unknown[]): Promise<unknown> => null),
     };
 });
 
@@ -309,5 +309,36 @@ describe("useProjectConfirm", () => {
         await flush();
 
         expect(container.textContent).toBe("gone");
+    });
+
+    it("reports nothing for a read the connection dropped out from under, even if it answers late", async () => {
+        const deferred = Promise.withResolvers<unknown>();
+
+        // The query honours its abort signal, as the client does: an aborted read rejects.
+        harness.query.mockImplementationOnce(async (...args: unknown[]) => {
+            const { signal } = args[2] as { signal: AbortSignal };
+            const aborted = new Promise<never>((_resolve, reject) => {
+                signal.addEventListener(
+                    "abort",
+                    () => {
+                        reject(new Error("aborted"));
+                    },
+                    { once: true },
+                );
+            });
+
+            return await Promise.race([aborted, deferred.promise]);
+        });
+        await render();
+        await flush();
+
+        offline = connection({ isOffline: true });
+        await render();
+        await flush();
+
+        deferred.resolve({ _id: "p1" });
+        await flush();
+
+        expect(reportRead).not.toHaveBeenCalledWith("succeeded");
     });
 });

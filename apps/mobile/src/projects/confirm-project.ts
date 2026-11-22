@@ -33,6 +33,30 @@ const classify = (error: unknown): ConfirmOutcome => {
 };
 
 /**
+ * A controller that aborts when `source` does (at once, if it already has). `unlink` removes that listener, for a read that
+ * finished before its source did.
+ */
+const linkAbort = (source: AbortSignal | undefined): { controller: AbortController; unlink: () => void } => {
+    const controller = new AbortController();
+    const abort = (): void => {
+        controller.abort();
+    };
+
+    if (source?.aborted === true) {
+        abort();
+    } else {
+        source?.addEventListener("abort", abort, { once: true });
+    }
+
+    return {
+        controller,
+        unlink: () => {
+            source?.removeEventListener("abort", abort);
+        },
+    };
+};
+
+/**
  * One direct read of one project, bounded by `timeoutMs`. It asks the server instead of waiting for a live subscription,
  * which after a reconnect may only resume without answering. `cancel` is the caller giving up (its screen moved on): the
  * read is aborted then, not left to run until its deadline.
@@ -43,16 +67,7 @@ export const confirmProject = async (
     timeoutMs = CONFIRM_READ_TIMEOUT_MS,
     cancel?: AbortSignal,
 ): Promise<ConfirmOutcome> => {
-    const controller = new AbortController();
-    const abortRead = (): void => {
-        controller.abort();
-    };
-
-    if (cancel?.aborted === true) {
-        abortRead();
-    } else {
-        cancel?.addEventListener("abort", abortRead, { once: true });
-    }
+    const { controller, unlink } = linkAbort(cancel);
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<ConfirmOutcome>((resolve) => {
@@ -82,7 +97,7 @@ export const confirmProject = async (
         return await Promise.race([read(), deadline]);
     } finally {
         clearTimeout(timer);
-        cancel?.removeEventListener("abort", abortRead);
+        unlink();
     }
 };
 
@@ -90,23 +105,27 @@ export const confirmProject = async (
  * What one refresh tick does for a screen whose write controls wait: one read, reported to the connection and to the
  * screen. An answer for a missing project is still a successful read, but the screen is told the project is gone.
  * `show(undefined)` clears what was shown. The returned function drops the result when the screen moves on first.
+ * `interrupt` aborts the read when the connection drops while it is out: that read reports nothing, so a success that
+ * arrives late cannot clear an offline state that came after it.
  */
 export const confirmOnTick = ({
     client,
+    interrupt,
     projectId,
     reportRead,
     show,
 }: {
     client: ConfirmClient;
+    interrupt?: AbortSignal;
     projectId: string;
     reportRead: (outcome: "failed" | "succeeded") => void;
     show: (view: ConfirmView | undefined) => void;
 }): () => void => {
     let isCancelled = false;
-    const leaving = new AbortController();
+    const reading = linkAbort(interrupt);
 
     settleQuietly(async () => {
-        const outcome = await confirmProject(client, projectId, CONFIRM_READ_TIMEOUT_MS, leaving.signal);
+        const outcome = await confirmProject(client, projectId, CONFIRM_READ_TIMEOUT_MS, reading.controller.signal);
 
         if (isCancelled) {
             return;
@@ -123,6 +142,7 @@ export const confirmOnTick = ({
     return () => {
         isCancelled = true;
         // The screen moved on: the read itself stops now, not at its deadline.
-        leaving.abort();
+        reading.controller.abort();
+        reading.unlink();
     };
 };

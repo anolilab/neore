@@ -71,6 +71,8 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
     const [shown, setShown] = useState<ConfirmShown>({});
     // The read decides from the state at the tick it runs on; the tick's own render is the one that holds it.
     const connection = useRef({ isChecking, isOffline, liveRows });
+    // The abort of the read in flight: the connection dropping while it is out aborts it.
+    const readAbortRef = useRef<AbortController | undefined>(undefined);
     // One reconnect (a refresh tick) or one minted token. A refusal describes only the epoch it was read in.
     const epoch = `${refreshTick}:${tokenSerial}`;
 
@@ -86,8 +88,13 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
         }
 
         // The rows are those on screen when the read starts: rows that arrive while it runs are newer than its answer.
-        return confirmOnTick({
+        // Going offline aborts this read (`readAbortRef`), so a late answer cannot clear the offline state.
+        const readAbort = new AbortController();
+
+        readAbortRef.current = readAbort;
+        const reading = confirmOnTick({
             client: getClient(),
+            interrupt: readAbort.signal,
             projectId,
             reportRead,
             show: (view) => {
@@ -105,7 +112,15 @@ export const useProjectConfirm = (projectId: string, liveRows: unknown): Project
                 });
             },
         });
+
+        return reading;
     }, [epoch, projectId, reportRead, scope]);
+
+    useEffect(() => {
+        if (isOffline) {
+            readAbortRef.current?.abort();
+        }
+    }, [isOffline]);
 
     // "Gone" holds for the live rows it was read against: newer live rows supersede it, a refusal does not.
     const isGone = shown.gone !== undefined && shown.gone.scope === scope && shown.gone.rows === liveRows;
