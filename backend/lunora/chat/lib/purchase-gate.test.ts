@@ -55,11 +55,11 @@ describe("the purchase gate on browser actions", () => {
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: ".next" }, look)).toBe(false);
     });
 
-    it("judges an element with no text by its selector", async () => {
+    it("asks for an element with no readable text, whatever its selector", async () => {
         const look = vi.fn(() => Promise.resolve({ content: "  ", success: true }));
 
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#checkout" }, look)).toBe(true);
-        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#menu" }, look)).toBe(false);
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#menu" }, look)).toBe(true);
     });
 
     it("asks when the target cannot be read", async () => {

@@ -199,6 +199,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             async (selector) =>
                 (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
                     action: "extract",
+                    approvalLook: true,
                     browserSettings: (context as { browserSettings?: unknown }).browserSettings,
                     selector,
                     threadId: threadId as Id<"threads">,

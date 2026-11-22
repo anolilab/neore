@@ -42,10 +42,11 @@ export const browserActionNeedsPurchaseApproval = async (
             return true;
         }
 
-        // An element with no text (an icon button) is judged by its selector, which is often where its name is.
+        // An element with no text (an icon button, a control named by aria-label or value) has no name the gate can read,
+        // so it asks: the selector says nothing about what the click does.
         const text = target.content?.trim() ?? "";
 
-        return isPurchaseText(text === "" ? input.selector : text);
+        return text === "" || isPurchaseText(text);
     } catch {
         return true;
     }

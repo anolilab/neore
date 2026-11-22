@@ -25,6 +25,12 @@ export const BROWSER_RENDERER_CONNECT = "service:browserRenderer";
 export const executeBrowserAction = internalAction
     .input({
         action: v.union(v.literal("navigate"), v.literal("screenshot"), v.literal("click"), v.literal("type"), v.literal("extract"), v.literal("scroll")),
+        /**
+         * The approval preread of a click (`chat/tools/browser.ts`): a read of the target before the person says yes. It is a
+         * look the agent did not ask for, so it does not end a person's hand-back lease, and the agent's next action still
+         * looks first. Only `chat/tools/browser.ts` sets it, as `ladderLook` is set.
+         */
+        approvalLook: v.optional(v.boolean()),
         browserSettings: v.optional(v.any()),
         direction: v.optional(v.string()),
         fullPage: v.optional(v.boolean()),
@@ -303,7 +309,7 @@ export const executeBrowserAction = internalAction
                     errorMessage: result.error,
                     heldReaped: held.reaped,
                     heldUntil: held.until,
-                    ...(inspecting !== undefined && result.success === true && { inspected: inspecting }),
+                    ...(inspecting !== undefined && result.success === true && args.approvalLook !== true && { inspected: inspecting }),
                     providerSessionId: returnedSessionId,
                     sessionId,
                     startedAt: startTime,

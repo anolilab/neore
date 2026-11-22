@@ -743,6 +743,36 @@ describe("a browser a person took control of", () => {
         );
     };
 
+    it("an approval preread after a hand back does not end the lease: the agent's next action still looks first", async () => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended: "handed_back", until: NOW - 1 });
+        renderer.mockResolvedValueOnce(answered({ content: "Pay now", sessionId: "s-1", success: true, url: "https://example.com/person" }));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    selector: "#pay",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        // The preread read the page, and the person's lease is still there for the agent to hear of.
+        await expect(row()).resolves.toMatchObject({ control: { ended: "handed_back" } });
+
+        renderer.mockResolvedValueOnce(
+            answered({ screenshot: "png", screenshotFormat: "png", sessionId: "s-1", success: true, url: "https://example.com/person" }),
+        );
+
+        const next = (await act("click")) as Record<string, unknown>;
+
+        expect(renderer.mock.calls[1]?.[0]).toMatchObject({ body: { action: "screenshot", sessionId: "s-1" } });
+        expect(next).toMatchObject({ handedBack: true, success: false });
+    });
+
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
         await addSession(NOW - 1000);
         await giveControl({ until: NOW + CONTROL_IDLE_MS });
