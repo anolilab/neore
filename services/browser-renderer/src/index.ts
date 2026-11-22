@@ -862,8 +862,13 @@ const actHeld = async (
 
                     // `innerText` leaves out hidden descendants (display: none, visibility: hidden), so a purchase word
                     // the person cannot see does not count. An ordinary extract keeps the raw text it always returned.
-                    // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
-                    extractedText = visibleOnly === true ? await element.innerText() : ((await element.textContent()) ?? "");
+                    // An SVG element has no innerText (a handle's `innerText()` fails on one), so its text is read from the element.
+                    // The rendered text is read on purpose: textContent keeps hidden descendants.
+                    extractedText =
+                        visibleOnly === true
+                            ? // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose, see above
+                              await element.evaluate((node) => (node instanceof HTMLElement ? node.innerText : (node.textContent ?? "")))
+                            : ((await element.textContent()) ?? "");
 
                     if (visibleOnly === true) {
                         const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
