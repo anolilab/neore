@@ -281,8 +281,11 @@ function readTarget(
         // path moves the same attribute to another site.
         const link = node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement ? node.href : "";
         const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
+        // A button's type decides whether its click submits the form ("submit" by default, "button" does not): a change to it
+        // is a change of what the click does.
+        const kind = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.type : "";
 
-        destinations += `${link}|${formTarget}|`;
+        destinations += `${link}|${formTarget}|${kind}|`;
     }
 
     destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
