@@ -314,11 +314,9 @@ export interface RoutingAnalytics {
  */
 export const getRoutingAnalytics = async (context: ActionContext, period: "24h" | "7d" = "24h"): Promise<RoutingAnalytics> => {
     // Defense-in-depth: pass the requesting admin's user ID so the gateway can
-    // verify against its GATEWAY_ADMIN_USER_IDS allowlist.
-    const identity = await context.auth.getIdentity();
-    // `getIdentity()` resolves to `Record<string, unknown> | null`, so `subject`
-    // is `unknown` — and it goes straight into the request's query string.
-    const adminUserId = identity?.subject;
+    // verify against its GATEWAY_ADMIN_USER_IDS allowlist. From `context.auth.userId`,
+    // as in `getProviderCacheReadings`: the identity claims carry no `subject`.
+    const adminUserId = context.auth.userId;
 
     if (typeof adminUserId !== "string") {
         throw new TypeError("Gateway analytics requires an authenticated admin user");

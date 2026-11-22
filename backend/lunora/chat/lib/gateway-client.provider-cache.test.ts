@@ -1,11 +1,12 @@
 /**
- * The admin provider prompt-cache readings call the gateway with the caller's
- * user id, read from `context.auth.userId`: Lunora's identity claims
- * (`auth.getIdentity()`) carry neither `subject` nor `userId`.
+ * The admin gateway reads (provider prompt-cache readings, routing analytics)
+ * call the gateway with the caller's user id, read from `context.auth.userId`:
+ * Lunora's identity claims (`auth.getIdentity()`) carry neither `subject` nor
+ * `userId`.
  */
 import { describe, expect, it } from "vitest";
 
-import { getProviderCacheReadings } from "./gateway-client";
+import { getProviderCacheReadings, getRoutingAnalytics } from "./gateway-client";
 
 class FakeBinding {
     public readonly calls: string[] = [];
@@ -51,6 +52,23 @@ describe("getProviderCacheReadings", () => {
         const gateway = new FakeBinding();
 
         await expect(getProviderCacheReadings(contextFor(null, gateway), 1)).rejects.toThrow("authenticated admin user");
+        expect(gateway.calls).toHaveLength(0);
+    });
+});
+
+describe("getRoutingAnalytics", () => {
+    it("sends the signed-in admin's user id, read from auth.userId", async () => {
+        const gateway = new FakeBinding();
+
+        await getRoutingAnalytics(contextFor("admin-1", gateway), "7d");
+
+        expect(new URL(gateway.calls[0] ?? "").searchParams.get("adminUserId")).toBe("admin-1");
+    });
+
+    it("refuses a caller with no user id, before calling the gateway", async () => {
+        const gateway = new FakeBinding();
+
+        await expect(getRoutingAnalytics(contextFor(null, gateway))).rejects.toThrow("authenticated admin user");
         expect(gateway.calls).toHaveLength(0);
     });
 });
