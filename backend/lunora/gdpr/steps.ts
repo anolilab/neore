@@ -561,6 +561,9 @@ export const generateExportFile = internalAction
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         bots: v.optional(v.any()),
+        // Browser sessions, actions, human checks and extensions (`browser/gdpr.ts`). Optional for the same
+        // in-flight-replay reason as `threadTags`.
+        browser: v.optional(v.any()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -692,6 +695,7 @@ export const generateExportFile = internalAction
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
+            browser: args.browser ?? { actions: [], extensions: [], humanChecks: [], sessions: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {

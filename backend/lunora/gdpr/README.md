@@ -129,6 +129,10 @@ Users can request a complete export of all their personal data in JSON format. T
 4. **Files** - File metadata (actual files stored separately)
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
+7. **Browser** - Browser sessions (started, status, last page), their actions (action, target, time, success),
+   the sites a run asked the user to clear, and paired extensions (`browser/gdpr.ts#collectBrowserForExport`, a
+   page per workflow step). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
+   `control` claim, a typed action's `value` (it can be a password) and an extension's pairing code
 
 **Workflow Steps:**
 
@@ -169,7 +173,8 @@ const { url } = await ctx.runAction(api.gdpr.functions.getExportDownloadUrl, {})
   "conversations": [ ... ],
   "files": { ... },
   "prompts": { ... },
-  "usageHistory": [ ... ]
+  "usageHistory": [ ... ],
+  "browser": { "sessions": [ ... ], "actions": [ ... ], "humanChecks": [ ... ], "extensions": [ ... ] }
 }
 ```
 
@@ -410,6 +415,7 @@ The following tables contain user personal data and are included in exports/dele
 | `promptHistory`     | `schema.ts` | Prompt versions              |
 | `threadAccess`      | `schema.ts` | Shared thread permissions    |
 | `threadInvites`     | `schema.ts` | Thread sharing invites       |
+| `browser*` tables   | `schema.ts` | Browser sessions and use     |
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id

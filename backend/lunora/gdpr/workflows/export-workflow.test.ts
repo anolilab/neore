@@ -339,3 +339,32 @@ describe("data export workflow: the usage object", () => {
         expect(calls[recorded]?.args["storageId"]).toBe("storage-1");
     });
 });
+
+describe("data export workflow: browser data", () => {
+    it("reads the browser tables a page per step and hands every page to the export file", async () => {
+        const pages = [
+            { actions: [], extensions: [], humanChecks: [], next: { phase: "actions" }, sessions: [{ id: "s1" }] },
+            { actions: [{ action: "click" }], extensions: [{ extensionId: "e1" }], humanChecks: [], sessions: [] },
+        ];
+        let page = 0;
+
+        stubs["browser_gdpr:collectBrowserForExport"] = () => {
+            page += 1;
+
+            return pages[page - 1];
+        };
+
+        await execute();
+
+        const reads = ran("browser_gdpr:collectBrowserForExport");
+
+        expect(reads.map((call) => call.args["cursor"])).toEqual([undefined, { phase: "actions" }]);
+        expect(stepNames).toEqual(expect.arrayContaining(["collect-browser-0", "collect-browser-1"]));
+        expect(ran("gdpr_steps:generateExportFile")[0]?.args["browser"]).toEqual({
+            actions: [{ action: "click" }],
+            extensions: [{ extensionId: "e1" }],
+            humanChecks: [],
+            sessions: [{ id: "s1" }],
+        });
+    });
+});

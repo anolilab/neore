@@ -22,6 +22,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
+import { collectAllBrowserPages } from "../../browser/export-pages";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
 import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
@@ -199,6 +200,15 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             "collect-devices",
             async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-devices") }),
         );
+        // Browser sessions, their actions, the sites a run asked to clear and the extensions: a page per step.
+        const browser = await collectAllBrowserPages(async (cursor, page) => {
+            const name = `collect-browser-${String(page)}`;
+
+            return await context.step.do(
+                name,
+                async () => await context.run(internal.browser.gdpr.collectBrowserForExport, { cursor, userId }, { dedupId: stepDedupId(scope, name) }),
+            );
+        });
         const activity = await context.step.do(
             "collect-activity",
             async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
@@ -334,6 +344,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         {
                             activity,
                             bots,
+                            browser,
                             codingAgentRuns,
                             conversations,
                             devices,
