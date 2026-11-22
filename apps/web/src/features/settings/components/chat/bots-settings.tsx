@@ -21,6 +21,7 @@ import type { FC, FormEvent } from "react";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import { BotToolSelectionFields, useToolCatalog } from "@/features/settings/components/chat/bot-tool-selection";
@@ -179,6 +180,7 @@ const BotsSettings = () => {
     const createMutation = useMutation(crpc.bots.functions.createBot.mutationOptions());
     const deleteMutation = useMutation(crpc.bots.functions.deleteBot.mutationOptions());
     const updateMutation = useMutation(crpc.bots.functions.updateBot.mutationOptions());
+    const keepMutation = useMutation(crpc.bots.functions.keepBotInstructions.mutationOptions());
     const chatMutation = useMutation(crpc.chat.functions.createThread.mutationOptions());
     // The server refuses a mode change from an admin acting as the owner; held off too while the session is not read yet.
     const impersonating = useImpersonating();
@@ -466,6 +468,12 @@ const BotsSettings = () => {
                                 {bot.description && <p className="text-muted-foreground truncate text-sm">{bot.description}</p>}
                                 {bot.computerEnabled && <p className="text-muted-foreground text-xs">{t`Has a computer`}</p>}
                                 {bot.toolSelection && <p className="text-muted-foreground text-xs">{t`Custom tools`}</p>}
+                                {bot.instructionsByImpersonator && (
+                                    <ChangedByAdminMark
+                                        fieldLabel={t`Name and instructions of ${bot.name}`}
+                                        onKeep={async () => await keepMutation.mutateAsync({ botId: bot._id as Id<"bots"> })}
+                                    />
+                                )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <PermissionModeSelect

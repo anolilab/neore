@@ -288,6 +288,34 @@ export const updateBot = authMutation
         return { toolSelection: nextSelection ?? null };
     });
 
+/**
+ * The owner's review of a bot an admin wrote while acting as them: "Keep as mine" drops `instructionsByImpersonator`, so
+ * the bot's name and instructions count as the owner's own again (`chat/lib/system-context-kinds.ts`). An own edit never
+ * clears the mark; only this does, and never from an impersonated session.
+ */
+export const keepBotInstructions = authMutation
+    .use(rateLimit("bots/update"))
+    .input({ botId: v.id("bots") })
+    .output(v.null())
+    .mutation(async ({ args: { botId }, ctx: context }) => {
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "A bot cannot be kept as the owner's while impersonating");
+        }
+
+        const bot = await context.db.get("bots", botId as Id<"bots">);
+
+        if (!bot || bot.userId !== context.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        if (bot.instructionsByImpersonator) {
+            await patchRow(context.db, "bots", bot, { instructionsByImpersonator: undefined });
+            context.log.event("bots.keep_bot_instructions", { botId: bot._id });
+        }
+
+        return null;
+    });
+
 export const deleteBot = authMutation
     .use(rateLimit("bots/delete"))
     .input({

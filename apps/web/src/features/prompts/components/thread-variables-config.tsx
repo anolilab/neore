@@ -13,6 +13,7 @@ import { Braces, HelpCircle, Loader2, Plus, Save, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { PromptVariable } from "../lib/prompt-variables";
@@ -46,6 +47,9 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
 
     // Mutations
     const { mutateAsync: setThreadVariables } = useMutation(crpc.prompts.functions.setThreadVariables.mutationOptions());
+    const { mutateAsync: keepVariableValue } = useMutation(crpc.prompts.functions.keepVariableValue.mutationOptions());
+    // The saved values an admin wrote while acting as the owner: read off the stored row, never the edited copy.
+    const impersonatedNames = new Set(threadVariables && "variablesByImpersonator" in threadVariables ? threadVariables.variablesByImpersonator : undefined);
 
     // Sync local state with query results (filter out system-managed variables).
     // Adjusted during render rather than in an effect, so the list never paints
@@ -233,6 +237,14 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                                         <X aria-hidden="true" className="size-3" />
                                     </Button>
                                 </div>
+                                {impersonatedNames.has(variable.name) && (
+                                    <ChangedByAdminMark
+                                        fieldLabel={variable.name}
+                                        onKeep={async () =>
+                                            await keepVariableValue({ name: variable.name, scope: "thread", threadId: threadId as Id<"threads"> })
+                                        }
+                                    />
+                                )}
                                 <Input
                                     id={`var-${index}`}
                                     onChange={(e) => handleVariableChange(index, e.target.value)}

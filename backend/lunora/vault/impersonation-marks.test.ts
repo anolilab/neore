@@ -11,10 +11,20 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
-import { getUserPreferencesQuery, initializeUserSettings, updateUserSettings } from "../auth/functions";
-import { createBot, getBotForRun, updateBot } from "../bots/functions";
-import { getResolvedVariables, setOrganizationVariableDefaults, setThreadVariables, setUserVariableDefaults, updateThreadVariable } from "../prompts/functions";
+import { getUserPreferencesQuery, initializeUserSettings, keepPersonalization, updateUserSettings } from "../auth/functions";
+import { createBot, getBotForRun, keepBotInstructions, updateBot } from "../bots/functions";
+import {
+    getResolvedVariables,
+    getUserVariableDefaults,
+    keepVariableValue,
+    setOrganizationVariableDefaults,
+    setThreadVariables,
+    setUserVariableDefaults,
+    updateThreadVariable,
+} from "../prompts/functions";
 import { createThread } from "../chat/functions";
+import { systemContextKinds } from "../chat/lib/system-context-kinds";
+import { SAFE_SYSTEM_CONTEXT } from "./site-login-turn";
 
 const OWNER = "user-owner";
 
@@ -85,6 +95,7 @@ afterEach(() => {
 });
 
 const owner = () => harness.withIdentity({ userId: OWNER });
+const stranger = () => harness.withIdentity({ userId: "user-stranger" });
 
 const BOT = { computerEnabled: false, instructions: "Be brief.", model: DEFAULT_CHAT_MODEL, name: "Helper" };
 
@@ -276,5 +287,119 @@ describe("variable values", () => {
         impersonation.by = undefined;
 
         await expect(sources()).resolves.toEqual({ brand: "impersonated" });
+    });
+});
+
+describe("Keep as mine", () => {
+    /** Whether the saved-login verdict takes a run's system prompt with this bot and personalization in it. */
+    const verdictTakes = (pieces: { bot: boolean | undefined; personalization: boolean }): boolean =>
+        systemContextKinds({
+            bot: { instructionsByImpersonator: pieces.bot === true },
+            knowledge: false,
+            memories: false,
+            personalization: true,
+            personalizationByImpersonator: pieces.personalization,
+            project: false,
+            systemPrompt: undefined,
+            threadLanguage: false,
+        }).every((kind) => SAFE_SYSTEM_CONTEXT.has(kind));
+
+    const sources = async (threadId?: string) =>
+        ((await owner().query(getResolvedVariables as never, (threadId ? { threadId } : {}) as never)) as { sources: Record<string, string> }).sources;
+
+    it("clears a bot's mark for its owner, and the verdict then takes the bot's instructions", async () => {
+        impersonation.by = "admin-1";
+
+        const botId = (await owner().mutation(createBot as never, BOT as never)) as string;
+
+        await owner().mutation(updateUserSettings as never, { nickname: "Boss" } as never);
+        impersonation.by = undefined;
+
+        expect(verdictTakes({ bot: await botMark(botId), personalization: await personalizationMark() })).toBe(false);
+
+        await owner().mutation(keepBotInstructions as never, { botId } as never);
+
+        // Only the bot's mark went: the personalization an admin wrote is still refused.
+        await expect(botMark(botId)).resolves.toBe(false);
+        await expect(personalizationMark()).resolves.toBe(true);
+        expect(verdictTakes({ bot: false, personalization: true })).toBe(false);
+
+        await owner().mutation(keepPersonalization as never, {} as never);
+
+        await expect(personalizationMark()).resolves.toBe(false);
+        expect(verdictTakes({ bot: await botMark(botId), personalization: await personalizationMark() })).toBe(true);
+    });
+
+    it("is refused while impersonating, and to anyone but the bot's owner", async () => {
+        impersonation.by = "admin-1";
+
+        const botId = (await owner().mutation(createBot as never, BOT as never)) as string;
+
+        await owner().mutation(updateUserSettings as never, { nickname: "Boss" } as never);
+
+        await expect(owner().mutation(keepBotInstructions as never, { botId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(owner().mutation(keepPersonalization as never, {} as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(owner().mutation(keepVariableValue as never, { name: "site", scope: "user" } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        impersonation.by = undefined;
+        await expect(stranger().mutation(keepBotInstructions as never, { botId } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        await expect(botMark(botId)).resolves.toBe(true);
+        await expect(personalizationMark()).resolves.toBe(true);
+    });
+
+    it("clears only the named variable value, and the owner's defaults show which are marked", async () => {
+        impersonation.by = "admin-1";
+        await owner().mutation(
+            setUserVariableDefaults as never,
+            {
+                variables: [
+                    { name: "site", value: "bank" },
+                    { name: "who", value: "Bob" },
+                ],
+            } as never,
+        );
+        impersonation.by = undefined;
+
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: ["site", "who"] });
+
+        await owner().mutation(keepVariableValue as never, { name: "site", scope: "user" } as never);
+
+        await expect(sources()).resolves.toEqual({ site: "user", who: "impersonated" });
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: ["who"] });
+    });
+
+    it("clears a chat's value for the chat's owner only", async () => {
+        const threadId = (await owner().mutation(createThread as never, { model: DEFAULT_CHAT_MODEL } as never)) as string;
+
+        impersonation.by = "admin-1";
+        await owner().mutation(updateThreadVariable as never, { name: "site", threadId, value: "bank" } as never);
+        impersonation.by = undefined;
+
+        await expect(stranger().mutation(keepVariableValue as never, { name: "site", scope: "thread", threadId } as never)).rejects.toMatchObject({
+            code: "NOT_FOUND",
+        });
+        await expect(sources(threadId)).resolves.toEqual({ site: "impersonated" });
+
+        await owner().mutation(keepVariableValue as never, { name: "site", scope: "thread", threadId } as never);
+
+        await expect(sources(threadId)).resolves.toEqual({ site: "thread" });
+    });
+
+    it("clears an organization's value only for its owners and admins", async () => {
+        session.organization = { id: "org-1", name: "Acme", role: "owner", slug: null };
+        impersonation.by = "admin-1";
+        await owner().mutation(setOrganizationVariableDefaults as never, { variables: [{ name: "brand", value: "Acme" }] } as never);
+        impersonation.by = undefined;
+
+        session.organization = { ...session.organization, role: "member" };
+        await expect(owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization" } as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+        });
+
+        session.organization = { ...session.organization, role: "admin" };
+        await owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization" } as never);
+
+        await expect(sources()).resolves.toEqual({ brand: "organization" });
     });
 });

@@ -2198,7 +2198,7 @@ msgstr "Uruchomienie nigdy nie zapisuje do czatu zablokowanego lub udostępnione
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "Wątek uruchomienia trafia do tego projektu. Przeniesienie zadania do innego projektu zaczyna nowy wątek."
 
-#: src/features/settings/components/chat/bots-settings.tsx:436
+#: src/features/settings/components/chat/bots-settings.tsx:438
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Piaskownica, którą bot zachowuje między czatami. Wstrzymywana, gdy jest bezczynna, w czasie wstrzymania nie jest rozliczana."
 
@@ -2250,8 +2250,8 @@ msgstr "Narzędzie nie może być jednocześnie dodane i wyłączone"
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "Narzędzie wymagające zatwierdzenia wstrzymuje turę kartą. Odpowiada tylko właściciel, a mówcy w kolejce kontynuują potem."
 
-#: src/features/settings/components/chat/bots-settings.tsx:220
-#: src/features/settings/components/chat/bots-settings.tsx:272
+#: src/features/settings/components/chat/bots-settings.tsx:222
+#: src/features/settings/components/chat/bots-settings.tsx:274
 msgid "A tool you typed was not added. Add it or clear the field first."
 msgstr "Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść pole."
 
@@ -2306,7 +2306,7 @@ msgstr "o {0} (otwiera się w nowej karcie)"
 msgid "about me"
 msgstr "o mnie"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:213
+#: src/features/settings/components/personalization/personalization-settings.tsx:218
 #: src/features/settings/lib/settings-keywords.ts:87
 #: src/features/settings/lib/settings-keywords.ts:88
 #: src/features/settings/lib/settings-keywords.ts:89
@@ -2831,7 +2831,7 @@ msgstr "Dodaj do oznaczonych gwiazdką"
 msgid "Add to thread"
 msgstr "Dodaj do wątku"
 
-#: src/features/prompts/components/thread-variables-config.tsx:195
+#: src/features/prompts/components/thread-variables-config.tsx:199
 msgid "Add variable"
 msgstr "Dodaj zmienną"
 
@@ -4730,7 +4730,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:509
-#: src/features/settings/components/chat/bots-settings.tsx:131
+#: src/features/settings/components/chat/bots-settings.tsx:132
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "Auto"
@@ -5442,11 +5442,11 @@ msgstr "Bośniacki"
 msgid "Bosnian (Bosnia)"
 msgstr "Bośniacki (Bośnia)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:240
+#: src/features/settings/components/chat/bots-settings.tsx:242
 msgid "Bot created"
 msgstr "Utworzono bota"
 
-#: src/features/settings/components/chat/bots-settings.tsx:362
+#: src/features/settings/components/chat/bots-settings.tsx:364
 msgid "Bot deleted"
 msgstr "Usunięto bota"
 
@@ -6023,7 +6023,7 @@ msgstr "Kanada"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:439
-#: src/features/settings/components/chat/bots-settings.tsx:549
+#: src/features/settings/components/chat/bots-settings.tsx:557
 #: src/features/settings/components/chat/custom-providers-settings.tsx:638
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:709
@@ -6058,7 +6058,7 @@ msgstr "Anuluj"
 msgid "Cancel deep work"
 msgstr "Anuluj głęboką pracę"
 
-#: src/features/settings/components/privacy/data-export.tsx:108
+#: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "Anuluj eksport"
 
@@ -6097,7 +6097,7 @@ msgstr "Anulowano"
 msgid "Cancelled on this computer."
 msgstr "Anulowano na tym komputerze."
 
-#: src/features/settings/components/privacy/data-export.tsx:108
+#: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancelling..."
 msgstr "Anulowanie..."
 
@@ -6315,6 +6315,10 @@ msgstr "Zmień unikalny identyfikator organizacji"
 msgid "Changed"
 msgstr "Zmienione"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:59
+msgid "Changed by an admin"
+msgstr "Zmienione przez administratora"
+
 #: src/features/skills/components/skill-builder-diff.tsx:44
 msgid "Changes from the last refinement"
 msgstr "Zmiany z ostatniego dopracowania"
@@ -6383,7 +6387,7 @@ msgstr "czat"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:341
-#: src/features/settings/components/chat/bots-settings.tsx:499
+#: src/features/settings/components/chat/bots-settings.tsx:507
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:100
 msgid "Chat"
@@ -7784,7 +7788,7 @@ msgstr "Kompresowanie kontekstu..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
 #: src/features/projects/components/computer-rule-file-import.tsx:502
-#: src/features/settings/components/chat/bots-settings.tsx:435
+#: src/features/settings/components/chat/bots-settings.tsx:437
 msgid "Computer"
 msgstr "Komputer"
 
@@ -7845,7 +7849,7 @@ msgstr "Skonfiguruj progi i limity partii dla czyszczenia anonimowych użytkowni
 msgid "Configure UI preferences and display options."
 msgstr "Skonfiguruj preferencje interfejsu i opcje wyświetlania."
 
-#: src/features/prompts/components/thread-variables-config.tsx:181
+#: src/features/prompts/components/thread-variables-config.tsx:185
 msgid "Configure variable values for this thread. These values will replace {VARIABLE_PLACEHOLDER} placeholders when you use prompts."
 msgstr "Skonfiguruj wartości zmiennych dla tego wątku. Te wartości zastąpią symbole zastępcze {VARIABLE_PLACEHOLDER}, gdy użyjesz promptów."
 
@@ -8804,7 +8808,7 @@ msgstr "Nie udało się zmienić ustawienia Auto. Spróbuj ponownie."
 msgid "Could not change push notifications. Try again."
 msgstr "Nie udało się zmienić powiadomień push. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:262
+#: src/features/settings/components/chat/bots-settings.tsx:264
 msgid "Could not change the bot's permission mode."
 msgstr "Nie udało się zmienić trybu uprawnień bota."
 
@@ -8834,7 +8838,7 @@ msgstr "Nie udało się skompresować rozmowy. Spróbuj ponownie."
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr "Nie udało się potwierdzić, że {0} zostało uruchomione ponownie. Sprawdź w {hostLabel}, zanim spróbujesz ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:325
+#: src/features/settings/components/chat/bots-settings.tsx:327
 msgid "Could not confirm that the bot's tools were saved. Check them and try again."
 msgstr "Nie udało się potwierdzić, że narzędzia bota zostały zapisane. Sprawdź je i spróbuj ponownie."
 
@@ -8893,7 +8897,7 @@ msgstr "Nie udało się skopiować; zaznacz tekst ręcznie"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Nie udało się utworzyć kolekcji dla tego importu. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:242
+#: src/features/settings/components/chat/bots-settings.tsx:244
 msgid "Could not create the bot."
 msgstr "Nie udało się utworzyć bota."
 
@@ -8906,7 +8910,7 @@ msgstr "Nie udało się utworzyć czatu grupowego"
 msgid "Could not create the page"
 msgstr "Nie udało się utworzyć strony"
 
-#: src/features/settings/components/chat/bots-settings.tsx:364
+#: src/features/settings/components/chat/bots-settings.tsx:366
 msgid "Could not delete the bot."
 msgstr "Nie udało się usunąć bota."
 
@@ -8941,6 +8945,10 @@ msgstr "Nie udało się wygenerować szkicu. Spróbuj ponownie."
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
 msgstr "Nie udało się zaimportować przepływu pracy"
+
+#: src/features/admin/components/changed-by-admin-mark.tsx:51
+msgid "Could not keep this as yours. Try again."
+msgstr "Nie udało się zachować tego jako twojego. Spróbuj ponownie."
 
 #: src/features/develop/components/thread-pull-requests.tsx:149
 msgid "Could not link. Try again."
@@ -9147,7 +9155,7 @@ msgstr "Nie udało się ponowić próby. Spróbuj ponownie."
 msgid "Could not save that choice. Try again."
 msgstr "Nie udało się zapisać tego wyboru. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:317
+#: src/features/settings/components/chat/bots-settings.tsx:319
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Nie udało się zapisać narzędzi bota. Jego narzędzia pozostają bez zmian."
 
@@ -9223,7 +9231,7 @@ msgstr "Nie udało się wylogować"
 msgid "Could not snooze the thread. Please try again."
 msgstr "Nie udało się odłożyć wątku. Spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:252
+#: src/features/settings/components/chat/bots-settings.tsx:254
 msgid "Could not start a chat with this bot."
 msgstr "Nie udało się rozpocząć czatu z tym botem."
 
@@ -9418,7 +9426,7 @@ msgstr "Twórz klucze API do programowego dostępu do konta i zarządzaj nimi."
 msgid "Create API Key"
 msgstr "Utwórz klucz API"
 
-#: src/features/settings/components/chat/bots-settings.tsx:446
+#: src/features/settings/components/chat/bots-settings.tsx:448
 msgid "Create bot"
 msgstr "Utwórz bota"
 
@@ -9583,8 +9591,8 @@ msgstr "Utworzono: {createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "Tworzy jednorazowy link ważny przez 7 dni. Kto otworzy go po zalogowaniu, otrzyma dostęp."
 
-#: src/features/settings/components/chat/bots-settings.tsx:446
-#: src/features/settings/components/chat/bots-settings.tsx:449
+#: src/features/settings/components/chat/bots-settings.tsx:448
+#: src/features/settings/components/chat/bots-settings.tsx:451
 msgid "Creating bot…"
 msgstr "Tworzenie bota…"
 
@@ -9819,8 +9827,8 @@ msgstr "niestandardowe instrukcje"
 msgid "Custom instructions"
 msgstr "Własne instrukcje"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:274
-#: src/features/settings/components/personalization/personalization-settings.tsx:289
+#: src/features/settings/components/personalization/personalization-settings.tsx:283
+#: src/features/settings/components/personalization/personalization-settings.tsx:298
 #: src/features/settings/lib/settings-keywords.ts:93
 msgid "Custom Instructions"
 msgstr "Własne instrukcje"
@@ -9849,7 +9857,7 @@ msgstr "własne style"
 msgid "Custom System Prompt"
 msgstr "Własny prompt systemowy"
 
-#: src/features/settings/components/chat/bots-settings.tsx:468
+#: src/features/settings/components/chat/bots-settings.tsx:470
 msgid "Custom tools"
 msgstr "Własny wybór narzędzi"
 
@@ -10011,7 +10019,7 @@ msgstr "Dane i analiza"
 msgid "Data Access Summary"
 msgstr "Podsumowanie dostępu do danych"
 
-#: src/features/settings/components/privacy/data-export.tsx:95
+#: src/features/settings/components/privacy/data-export.tsx:99
 #: src/features/settings/lib/settings-keywords.ts:106
 msgid "Data Export"
 msgstr "Eksport danych"
@@ -10326,7 +10334,7 @@ msgstr "Domyślny głos"
 msgid "Define default values and descriptions for variables used in your prompt. These help others understand what values to provide."
 msgstr "Określ domyślne wartości i opisy zmiennych używanych w prompcie. Pomagają innym zrozumieć, jakie wartości podać."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:274
+#: src/features/settings/components/personalization/personalization-settings.tsx:283
 msgid "Define how you want the AI to respond. These instructions apply to all conversations."
 msgstr "Określ, jak AI ma odpowiadać. Te instrukcje dotyczą wszystkich rozmów."
 
@@ -10372,8 +10380,8 @@ msgstr "Delegowana praca z zakresu {0} działa na tym modelu."
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:751
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:890
-#: src/features/settings/components/chat/bots-settings.tsx:508
-#: src/features/settings/components/chat/bots-settings.tsx:562
+#: src/features/settings/components/chat/bots-settings.tsx:516
+#: src/features/settings/components/chat/bots-settings.tsx:570
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:311
@@ -10401,7 +10409,7 @@ msgstr "Usunąć „{pendingDeleteTitle}”?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:502
+#: src/features/settings/components/chat/bots-settings.tsx:510
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:190
 msgid "Delete {0}"
@@ -10415,7 +10423,7 @@ msgstr "Usuń użytkowników: {0}"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:572
+#: src/features/settings/components/chat/bots-settings.tsx:580
 msgid "Delete {0}?"
 msgstr "Usunąć {0}?"
 
@@ -10899,7 +10907,7 @@ msgstr "Opisz swój przepływ pracy... np. „Wygeneruj obraz z tekstu, powięks
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:385
+#: src/features/settings/components/chat/bots-settings.tsx:387
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -11448,7 +11456,7 @@ msgstr "Pobierz {fileName}"
 msgid "Download {name} ({size})"
 msgstr "Pobierz {name} ({size})"
 
-#: src/features/settings/components/privacy/data-export.tsx:94
+#: src/features/settings/components/privacy/data-export.tsx:98
 msgid "Download a copy of all your personal data in JSON format (GDPR Article 20 - Right to Data Portability)"
 msgstr "Pobierz kopię wszystkich swoich danych osobowych w formacie JSON (art. 20 RODO – prawo do przenoszenia danych)"
 
@@ -11477,7 +11485,7 @@ msgstr "Pobierz zawartość"
 msgid "Download document"
 msgstr "Pobierz dokument"
 
-#: src/features/settings/components/privacy/data-export.tsx:152
+#: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Download Export"
 msgstr "Pobierz eksport"
 
@@ -11517,7 +11525,7 @@ msgstr "Pobierz PDF"
 msgid "Download PNG"
 msgstr "Pobierz PNG"
 
-#: src/features/settings/components/privacy/data-export.tsx:62
+#: src/features/settings/components/privacy/data-export.tsx:66
 msgid "Download started"
 msgstr "Rozpoczęto pobieranie"
 
@@ -11770,7 +11778,7 @@ msgstr "np. Skróć, wymagaj odpowiedzi w Markdown, dodaj zasady bezpieczeństwa
 msgid "e.g., Make it stricter about JSON output, add a code example..."
 msgstr "np. Zaostrz wymagania dotyczące wyjścia JSON, dodaj przykład kodu..."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:237
+#: src/features/settings/components/personalization/personalization-settings.tsx:246
 msgid "e.g., Product Designer, Software Developer"
 msgstr "np. Product Designer, programista"
 
@@ -12695,7 +12703,7 @@ msgstr "Enter, aby wysłać, Shift+Enter, aby dodać nowy wiersz."
 msgid "Enter URL..."
 msgstr "Wpisz URL..."
 
-#: src/features/prompts/components/thread-variables-config.tsx:239
+#: src/features/prompts/components/thread-variables-config.tsx:251
 #: src/features/prompts/components/variable-fill-dialog.tsx:162
 msgid "Enter value..."
 msgstr "Wpisz wartość..."
@@ -12712,7 +12720,7 @@ msgstr "Wpisz obecne hasło"
 msgid "Enter your current password and choose a new one"
 msgstr "Wpisz obecne hasło i wybierz nowe"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:294
+#: src/features/settings/components/personalization/personalization-settings.tsx:303
 msgid "Enter your custom instructions..."
 msgstr "Wpisz swoje własne instrukcje..."
 
@@ -12778,7 +12786,7 @@ msgstr "Wpisz poniżej nowy adres e-mail"
 msgid "Enter your new password below"
 msgstr "Wpisz poniżej nowe hasło"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:229
+#: src/features/settings/components/personalization/personalization-settings.tsx:238
 msgid "Enter your nickname"
 msgstr "Wpisz swój pseudonim"
 
@@ -12801,7 +12809,7 @@ msgstr "Wpisz hasło, aby wyłączyć uwierzytelnianie dwuskładnikowe"
 msgid "Enter your password to enable two-factor authentication"
 msgstr "Wpisz hasło, aby włączyć uwierzytelnianie dwuskładnikowe"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:248
+#: src/features/settings/components/personalization/personalization-settings.tsx:257
 msgid "Enter your profession"
 msgstr "Wpisz swój zawód"
 
@@ -12809,7 +12817,7 @@ msgstr "Wpisz swój zawód"
 msgid "Enter your prompt content here... Use {VARIABLE_PLACEHOLDER} for dynamic content."
 msgstr "Wpisz tutaj treść promptu... Użyj {VARIABLE_PLACEHOLDER} dla treści dynamicznej."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:320
+#: src/features/settings/components/personalization/personalization-settings.tsx:329
 msgid "Enter your title instructions..."
 msgstr "Wpisz instrukcje dotyczące tytułów..."
 
@@ -13001,7 +13009,7 @@ msgstr "Wydarzenie kończy się"
 msgid "Every 6 hours"
 msgstr "Co 6 godzin"
 
-#: src/features/settings/components/chat/bots-settings.tsx:527
+#: src/features/settings/components/chat/bots-settings.tsx:535
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "Każdy czat i zaplanowane uruchomienie tego bota dostaje tylko te narzędzia. Twoje uprawnienia narzędzi nadal obowiązują."
 
@@ -13374,7 +13382,7 @@ msgid "Expires in {remainingTime}"
 msgstr "Wygasa za {remainingTime}"
 
 #. placeholder {0}: formatDate(exportStatus.expiresAt, i18n.locale)
-#: src/features/settings/components/privacy/data-export.tsx:116
+#: src/features/settings/components/privacy/data-export.tsx:120
 msgid "Expires on {0}"
 msgstr "Wygasa {0}"
 
@@ -13431,7 +13439,7 @@ msgstr "Eksportuj jako SKILL.md"
 msgid "Export bundle"
 msgstr "Eksportuj pakiet"
 
-#: src/features/settings/components/privacy/data-export.tsx:75
+#: src/features/settings/components/privacy/data-export.tsx:79
 msgid "Export cancelled"
 msgstr "Anulowano eksport"
 
@@ -13439,11 +13447,11 @@ msgstr "Anulowano eksport"
 msgid "Export chat"
 msgstr "Eksportuj czat"
 
-#: src/features/settings/components/privacy/data-export.tsx:122
+#: src/features/settings/components/privacy/data-export.tsx:126
 msgid "Export failed"
 msgstr "Eksport nie powiódł się"
 
-#: src/features/settings/components/privacy/data-export.tsx:138
+#: src/features/settings/components/privacy/data-export.tsx:144
 msgid "Export incomplete"
 msgstr "Eksport niekompletny"
 
@@ -13452,11 +13460,11 @@ msgstr "Eksport niekompletny"
 msgid "Export presentation"
 msgstr "Eksportuj prezentację"
 
-#: src/features/settings/components/privacy/data-export.tsx:115
+#: src/features/settings/components/privacy/data-export.tsx:119
 msgid "Export ready!"
 msgstr "Eksport gotowy!"
 
-#: src/features/settings/components/privacy/data-export.tsx:47
+#: src/features/settings/components/privacy/data-export.tsx:51
 msgid "Export request submitted. You will receive an email when it's ready."
 msgstr "Wysłano żądanie eksportu. Otrzymasz e-mail, gdy będzie gotowy."
 
@@ -13661,7 +13669,7 @@ msgstr "Nie udało się dołączyć pliku"
 msgid "Failed to ban user"
 msgstr "Nie udało się zablokować użytkownika"
 
-#: src/features/settings/components/privacy/data-export.tsx:77
+#: src/features/settings/components/privacy/data-export.tsx:81
 msgid "Failed to cancel export"
 msgstr "Nie udało się anulować eksportu"
 
@@ -13858,7 +13866,7 @@ msgstr "Nie udało się rozłączyć konektora"
 msgid "Failed to dismiss the digest"
 msgstr "Nie udało się zamknąć podsumowania"
 
-#: src/features/settings/components/privacy/data-export.tsx:65
+#: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
 msgstr "Nie udało się pobrać eksportu"
 
@@ -14055,7 +14063,7 @@ msgstr "Nie udało się zmienić nazwy tagu"
 msgid "Failed to reorder tags"
 msgstr "Nie udało się zmienić kolejności tagów"
 
-#: src/features/settings/components/privacy/data-export.tsx:49
+#: src/features/settings/components/privacy/data-export.tsx:53
 msgid "Failed to request export"
 msgstr "Nie udało się wysłać żądania eksportu"
 
@@ -14147,8 +14155,8 @@ msgstr "Nie udało się zapisać oceny"
 #: src/features/settings/components/account/account-settings.tsx:141
 #: src/features/settings/components/account/account-settings.tsx:149
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:40
-#: src/features/settings/components/personalization/personalization-settings.tsx:113
-#: src/features/settings/components/personalization/personalization-settings.tsx:190
+#: src/features/settings/components/personalization/personalization-settings.tsx:118
+#: src/features/settings/components/personalization/personalization-settings.tsx:195
 msgid "Failed to save settings"
 msgstr "Nie udało się zapisać ustawień"
 
@@ -14170,7 +14178,7 @@ msgstr "Nie udało się zapisać przypadku"
 msgid "Failed to save the dataset"
 msgstr "Nie udało się zapisać zbioru danych"
 
-#: src/features/prompts/components/thread-variables-config.tsx:154
+#: src/features/prompts/components/thread-variables-config.tsx:158
 msgid "Failed to save variables"
 msgstr "Nie udało się zapisać zmiennych"
 
@@ -15277,11 +15285,11 @@ msgstr "Aby uzyskać szczegółowe informacje, w tym rozmowy i wiadomości, uży
 msgid "For each message from you, the chat decides who answers. A routed or mentioned turn has at most three speakers."
 msgstr "Dla każdej Twojej wiadomości czat decyduje, kto odpowie. Tura z routingiem lub wzmianką ma co najwyżej trzech mówców."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:285
+#: src/features/settings/components/personalization/personalization-settings.tsx:294
 msgid "For example: \"Focus on Python best practices\", \"Maintain a professional tone\", or \"Always cite sources for key conclusions\"."
 msgstr "Na przykład: „Skup się na dobrych praktykach Pythona”, „Zachowaj profesjonalny ton” lub „Zawsze podawaj źródła kluczowych wniosków”."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:311
+#: src/features/settings/components/personalization/personalization-settings.tsx:320
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "Na przykład: „Tytuły krótsze niż cztery słowa”, „Pisz tytuły po niemiecku” lub „Zaczynaj od czasownika”."
 
@@ -15692,7 +15700,7 @@ msgstr "Pełne wideo w wysokiej rozdzielczości 1080p"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
-#: src/features/settings/components/chat/bots-settings.tsx:132
+#: src/features/settings/components/chat/bots-settings.tsx:133
 msgid "Full access"
 msgstr "Pełny dostęp"
 
@@ -16770,7 +16778,7 @@ msgstr "Zaktualizowano głos trybu bez użycia rąk"
 msgid "Happens on"
 msgstr "Odbywa się"
 
-#: src/features/settings/components/chat/bots-settings.tsx:467
+#: src/features/settings/components/chat/bots-settings.tsx:469
 msgid "Has a computer"
 msgstr "Ma komputer"
 
@@ -16839,7 +16847,7 @@ msgstr "Pomóż mi napisać profesjonalny e-mail, w którym przedstawię się no
 msgid "Help me write a professional email to my manager"
 msgstr "Pomóż mi napisać profesjonalny e-mail do mojego przełożonego"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:212
+#: src/features/settings/components/personalization/personalization-settings.tsx:217
 msgid "Help the AI understand you better by sharing some information about yourself. This information is used to personalize responses across all tasks."
 msgstr "Pomóż AI lepiej cię zrozumieć, dzieląc się informacjami o sobie. Są one używane do personalizowania odpowiedzi we wszystkich zadaniach."
 
@@ -17224,7 +17232,7 @@ msgstr "Jak długo czaty tymczasowe są przechowywane przed automatycznym usuni�
 msgid "How often the agent retries with the verifier's feedback before asking you to review."
 msgstr "Ile razy agent ponawia próbę z uwagami weryfikatora, zanim poprosi cię o przejrzenie."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:310
+#: src/features/settings/components/personalization/personalization-settings.tsx:319
 #: src/features/settings/lib/settings-keywords.ts:95
 msgid "How should titles be written?"
 msgstr "Jak mają być pisane tytuły?"
@@ -17237,7 +17245,7 @@ msgstr "Jak scalić"
 msgid "How Triggers Work"
 msgstr "Jak działają wyzwalacze"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:278
+#: src/features/settings/components/personalization/personalization-settings.tsx:287
 #: src/features/settings/lib/settings-keywords.ts:92
 msgid "How would you like the AI to respond?"
 msgstr "Jak AI ma ci odpowiadać?"
@@ -18150,7 +18158,7 @@ msgid "instructions"
 msgstr "instrukcje"
 
 #: src/features/projects/components/project-rule-files.tsx:347
-#: src/features/settings/components/chat/bots-settings.tsx:395
+#: src/features/settings/components/chat/bots-settings.tsx:397
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -18646,6 +18654,10 @@ msgstr "Kazachstan"
 msgid "Keep accepting the old secret for 24 hours"
 msgstr "Akceptuj stary sekret jeszcze przez 24 godziny"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:64
+msgid "Keep as mine"
+msgstr "Zachowaj jako moje"
+
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1009
 msgid "Keep control"
 msgstr "Zachowaj sterowanie"
@@ -18689,6 +18701,10 @@ msgstr "Zachowaj pełną historię"
 #: src/features/chat/core/utils/language-utilities.ts:370
 msgid "Kenya"
 msgstr "Kenia"
+
+#: src/features/admin/components/changed-by-admin-mark.tsx:49
+msgid "Kept as yours"
+msgstr "Zachowano jako twoje"
 
 #: src/features/devices/components/devices-settings.tsx:495
 msgid "Key file (optional, absolute path)"
@@ -19971,7 +19987,7 @@ msgstr "Wczytywanie..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:457
+#: src/features/settings/components/chat/bots-settings.tsx:459
 #: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
@@ -21322,7 +21338,7 @@ msgstr "Tryb:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:405
+#: src/features/settings/components/chat/bots-settings.tsx:407
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:278
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
@@ -21574,8 +21590,8 @@ msgstr "Multimodalny Kimi K2.5 od Moonshot w Workers AI"
 msgid "More"
 msgstr "Więcej"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:255
-#: src/features/settings/components/personalization/personalization-settings.tsx:259
+#: src/features/settings/components/personalization/personalization-settings.tsx:264
+#: src/features/settings/components/personalization/personalization-settings.tsx:268
 #: src/features/settings/lib/settings-keywords.ts:89
 msgid "More About You"
 msgstr "Więcej o tobie"
@@ -21935,7 +21951,7 @@ msgstr "nazwa"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:375
+#: src/features/settings/components/chat/bots-settings.tsx:377
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21952,6 +21968,11 @@ msgstr "Nazwa"
 #: src/components/model-picker/model-picker.tsx:1303
 msgid "Name (A to Z)"
 msgstr "Nazwa (A do Z)"
+
+#. placeholder {0}: bot.name
+#: src/features/settings/components/chat/bots-settings.tsx:473
+msgid "Name and instructions of {0}"
+msgstr "Nazwa i instrukcje: {0}"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:74
 msgid "Name and prompt are required"
@@ -22317,7 +22338,7 @@ msgstr "Nowy"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "Nowe boty Azure są single-tenant: ustaw klucz Teams Tenant ID, w przeciwnym razie odpowiedzi nie przejdą uwierzytelnienia."
 
-#: src/features/settings/components/chat/bots-settings.tsx:373
+#: src/features/settings/components/chat/bots-settings.tsx:375
 msgid "New bot"
 msgstr "Nowy bot"
 
@@ -22362,7 +22383,7 @@ msgstr "Nowe czaty są domyślnie trwałe"
 msgid "New chats start temporary"
 msgstr "Nowe czaty są domyślnie tymczasowe"
 
-#: src/features/settings/components/chat/bots-settings.tsx:260
+#: src/features/settings/components/chat/bots-settings.tsx:262
 msgid "New chats with this bot start in the chosen mode"
 msgstr "Nowe czaty z tym botem zaczynają się w wybranym trybie"
 
@@ -22380,7 +22401,7 @@ msgstr "Nowy kontekst"
 msgid "New dataset"
 msgstr "Nowy zbiór danych"
 
-#: src/features/settings/components/privacy/data-export.tsx:158
+#: src/features/settings/components/privacy/data-export.tsx:164
 msgid "New Export"
 msgstr "Nowy eksport"
 
@@ -22631,7 +22652,7 @@ msgid "Nicaragua"
 msgstr "Nikaragua"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:53
-#: src/features/settings/components/personalization/personalization-settings.tsx:217
+#: src/features/settings/components/personalization/personalization-settings.tsx:226
 #: src/features/settings/lib/settings-keywords.ts:87
 msgid "Nickname"
 msgstr "Pseudonim"
@@ -22689,7 +22710,7 @@ msgstr "Nie znaleziono wpisów dziennika audytu"
 msgid "No bot"
 msgstr "Brak bota"
 
-#: src/features/settings/components/chat/bots-settings.tsx:460
+#: src/features/settings/components/chat/bots-settings.tsx:462
 msgid "No bots yet."
 msgstr "Brak botów."
 
@@ -23325,7 +23346,7 @@ msgstr "Nie znaleziono użytkowników"
 msgid "No users found matching \"{search}\""
 msgstr "Nie znaleziono użytkowników pasujących do „{search}”"
 
-#: src/features/prompts/components/thread-variables-config.tsx:248
+#: src/features/prompts/components/thread-variables-config.tsx:260
 msgid "No variables configured. Add variables to customize prompt content for this thread."
 msgstr "Nie skonfigurowano zmiennych. Dodaj zmienne, aby dostosować treść promptów w tym wątku."
 
@@ -23847,7 +23868,7 @@ msgstr "Scraping stron na żądanie i przepisy ekstrakcji danych"
 msgid "On-premise option"
 msgstr "Opcja on-premise"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:341
+#: src/features/settings/components/personalization/personalization-settings.tsx:350
 #: src/features/settings/lib/settings-keywords.ts:97
 msgid "Onboarding"
 msgstr "Wprowadzenie"
@@ -23868,7 +23889,7 @@ msgstr "Postęp wprowadzenia"
 msgid "Onboarding steps"
 msgstr "Kroki wprowadzenia"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:346
+#: src/features/settings/components/personalization/personalization-settings.tsx:355
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "Wprowadzenie uruchomi się ponownie przy następnej wizycie w czacie."
 
@@ -24769,11 +24790,11 @@ msgstr "Styl optymalizacji"
 #: src/features/chat/sidebar/thread-sidebar.tsx:180
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:218
-#: src/features/settings/components/personalization/personalization-settings.tsx:281
+#: src/features/settings/components/personalization/personalization-settings.tsx:290
 msgid "Optimize"
 msgstr "Optymalizuj"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:335
+#: src/features/settings/components/personalization/personalization-settings.tsx:344
 msgid "Optimize custom instructions"
 msgstr "Optymalizuj własne instrukcje"
 
@@ -25657,12 +25678,12 @@ msgid "Permission Level"
 msgstr "Poziom uprawnień"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
-#: src/features/settings/components/chat/bots-settings.tsx:413
+#: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "Permission mode"
 msgstr "Tryb uprawnień"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:472
+#: src/features/settings/components/chat/bots-settings.tsx:480
 msgid "Permission mode for {0}"
 msgstr "Tryb uprawnień dla {0}"
 
@@ -26287,7 +26308,7 @@ msgstr "Przygotowywanie prośby…"
 msgid "Preparing the import…"
 msgstr "Przygotowywanie importu…"
 
-#: src/features/settings/components/privacy/data-export.tsx:152
+#: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Preparing..."
 msgstr "Przygotowywanie..."
 
@@ -26466,7 +26487,7 @@ msgstr "Poprzedni"
 msgid "Previous branch"
 msgstr "Poprzednia gałąź"
 
-#: src/features/settings/components/privacy/data-export.tsx:132
+#: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
 msgstr "Poprzedni eksport został anulowany"
 
@@ -26655,7 +26676,7 @@ msgstr "Przetwarzanie wejścia głosowego"
 #: src/features/chat/header/temporary-chat-dropdown.tsx:211
 #: src/features/chat/thread-list/thread-node.tsx:114
 #: src/features/chat/thread-list/thread-node.tsx:122
-#: src/features/settings/components/privacy/data-export.tsx:101
+#: src/features/settings/components/privacy/data-export.tsx:105
 msgid "Processing..."
 msgstr "Przetwarzanie..."
 
@@ -26696,7 +26717,7 @@ msgstr "4K klasy produkcyjnej do 50 FPS z synchronizacją ust i efektami foley"
 msgid "Productivity"
 msgstr "Produktywność"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:236
+#: src/features/settings/components/personalization/personalization-settings.tsx:245
 #: src/features/settings/lib/settings-keywords.ts:88
 msgid "Profession"
 msgstr "Zawód"
@@ -27236,7 +27257,7 @@ msgstr "Wiadomości w kolejce są wysyłane po kolei, gdy odpowiedź się zakoń
 msgid "Queued messages: {queuedTotal}"
 msgstr "Wiadomości w kolejce: {queuedTotal}"
 
-#: src/features/prompts/components/thread-variables-config.tsx:202
+#: src/features/prompts/components/thread-variables-config.tsx:206
 msgid "Quick Add"
 msgstr "Szybkie dodawanie"
 
@@ -28157,7 +28178,7 @@ msgstr "Usunąć „{0}”?"
 #. placeholder {0}: provider.name
 #: src/features/chat/group/group-participant-bar.tsx:210
 #: src/features/chat/thread/ask-user-prompt.tsx:287
-#: src/features/prompts/components/thread-variables-config.tsx:232
+#: src/features/prompts/components/thread-variables-config.tsx:236
 #: src/features/settings/components/chat/custom-providers-settings.tsx:408
 #: src/features/settings/components/chat/native-providers-settings.tsx:439
 msgid "Remove {0}"
@@ -28457,11 +28478,11 @@ msgstr "Powtarza się ({0} UTC)"
 msgid "Replace"
 msgstr "Zastąp"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:352
+#: src/features/settings/components/personalization/personalization-settings.tsx:361
 msgid "Replay Onboarding"
 msgstr "Powtórz wprowadzenie"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:341
+#: src/features/settings/components/personalization/personalization-settings.tsx:350
 msgid "Replay the welcome tour to review the core features of Neore."
 msgstr "Powtórz powitalną prezentację, aby przejrzeć najważniejsze funkcje Neore."
 
@@ -28556,7 +28577,7 @@ msgstr "Poproś o zmiany"
 msgid "Request count"
 msgstr "Liczba żądań"
 
-#: src/features/settings/components/privacy/data-export.tsx:146
+#: src/features/settings/components/privacy/data-export.tsx:152
 msgid "Request Data Export"
 msgstr "Poproś o eksport danych"
 
@@ -28581,8 +28602,8 @@ msgstr "Liczba żądań, koszt i liczba błędów dla każdego modelu"
 msgid "Requested permissions"
 msgstr "Żądane uprawnienia"
 
-#: src/features/settings/components/privacy/data-export.tsx:125
-#: src/features/settings/components/privacy/data-export.tsx:146
+#: src/features/settings/components/privacy/data-export.tsx:130
+#: src/features/settings/components/privacy/data-export.tsx:152
 msgid "Requesting..."
 msgstr "Wysyłanie żądania..."
 
@@ -28903,7 +28924,7 @@ msgstr "ponów"
 msgid "Retry"
 msgstr "Ponów"
 
-#: src/features/settings/components/privacy/data-export.tsx:125
+#: src/features/settings/components/privacy/data-export.tsx:130
 msgid "Retry Export"
 msgstr "Ponów eksport"
 
@@ -29627,11 +29648,11 @@ msgstr "Zapisz umiejętność"
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "Zapisz te kody zapasowe w bezpiecznym miejscu. Możesz ich użyć, aby uzyskać dostęp do konta, jeśli stracisz urządzenie do uwierzytelniania dwuskładnikowego."
 
-#: src/features/settings/components/chat/bots-settings.tsx:552
+#: src/features/settings/components/chat/bots-settings.tsx:560
 msgid "Save tools"
 msgstr "Zapisz narzędzia"
 
-#: src/features/prompts/components/thread-variables-config.tsx:263
+#: src/features/prompts/components/thread-variables-config.tsx:275
 msgid "Save Variables"
 msgstr "Zapisz zmienne"
 
@@ -29668,6 +29689,10 @@ msgstr "Zapisano — asystent może tego użyć raz, w tej odpowiedzi"
 msgid "Saved as preset"
 msgstr "Zapisano jako ustawienie wstępne"
 
+#: src/features/admin/components/changed-by-admin-mark.tsx:61
+msgid "Saved logins stay off for it until you keep it as yours."
+msgstr "Zapisane logowania pozostają wyłączone, dopóki nie zachowasz tego jako swojego."
+
 #: src/features/marketing/use-cases/visuals/memory-visual.tsx:16
 msgid "Saved memories"
 msgstr "Zapisane wspomnienia"
@@ -29681,8 +29706,8 @@ msgstr "Zapisano w {hostLabel}."
 msgid "Saved to \"{0}\""
 msgstr "Zapisano w „{0}”"
 
-#: src/features/settings/components/chat/bots-settings.tsx:552
-#: src/features/settings/components/chat/bots-settings.tsx:555
+#: src/features/settings/components/chat/bots-settings.tsx:560
+#: src/features/settings/components/chat/bots-settings.tsx:563
 msgid "Saving tools…"
 msgstr "Zapisywanie narzędzi…"
 
@@ -29691,7 +29716,7 @@ msgstr "Zapisywanie narzędzi…"
 #: src/features/projects/components/project-form-dialog.tsx:491
 #: src/features/projects/components/project-rule-files.tsx:1018
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
-#: src/features/prompts/components/thread-variables-config.tsx:258
+#: src/features/prompts/components/thread-variables-config.tsx:270
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
@@ -30757,8 +30782,8 @@ msgstr "Skonfiguruj wyzwalacze, aby automatyzować zadania według harmonogramu,
 msgid "Settings"
 msgstr "Ustawienia"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:111
-#: src/features/settings/components/personalization/personalization-settings.tsx:186
+#: src/features/settings/components/personalization/personalization-settings.tsx:116
+#: src/features/settings/components/personalization/personalization-settings.tsx:191
 msgid "Settings saved"
 msgstr "Zapisano ustawienia"
 
@@ -33176,7 +33201,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "Znakomite rozumienie złożonych koncepcji wizualnych"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
-#: src/features/settings/components/chat/bots-settings.tsx:133
+#: src/features/settings/components/chat/bots-settings.tsx:134
 msgid "Supervised"
 msgstr "Nadzorowany"
 
@@ -33686,7 +33711,7 @@ msgstr "Teleobiektyw"
 msgid "Telephoto, elegant distance"
 msgstr "Teleobiektyw, elegancki dystans"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:305
+#: src/features/settings/components/personalization/personalization-settings.tsx:314
 msgid "Tell the AI how to word the titles it gives new conversations. This adds to the default title style."
 msgstr "Powiedz AI, jak ma formułować tytuły nowych rozmów. To uzupełnia domyślny styl tytułów."
 
@@ -33698,7 +33723,7 @@ msgstr "Powiedz asystentowi dokładnie, co ma robić. Używaj {VARIABLE_PLACEHOL
 msgid "Tell us about an idea or a problem. You can paste or drop screenshots too."
 msgstr "Opowiedz nam o pomyśle lub problemie. Możesz też wkleić lub upuścić zrzuty ekranu."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:264
+#: src/features/settings/components/personalization/personalization-settings.tsx:273
 msgid "Tell us about yourself..."
 msgstr "Opowiedz nam o sobie..."
 
@@ -34283,7 +34308,7 @@ msgstr "Asystent prosi o sekret"
 msgid "The assistant needs a secret"
 msgstr "Asystent potrzebuje sekretu"
 
-#: src/features/settings/components/chat/bots-settings.tsx:563
+#: src/features/settings/components/chat/bots-settings.tsx:571
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "Bot i jego komputer zostaną usunięte. Jego czaty pozostaną jako zwykłe czaty."
 
@@ -34295,7 +34320,7 @@ msgstr "Bot dostaje tylko narzędzia, na które pozwolisz. Bez żadnego dozwolon
 msgid "The bot sets the model for this chat."
 msgstr "Bot ustawia model dla tego czatu."
 
-#: src/features/settings/components/chat/bots-settings.tsx:351
+#: src/features/settings/components/chat/bots-settings.tsx:353
 msgid "The bot's tools were saved"
 msgstr "Zapisano narzędzia bota"
 
@@ -34484,7 +34509,7 @@ msgstr "Edytor nie jest jeszcze gotowy"
 msgid "The endpoint listed no models — add model ids by hand"
 msgstr "Endpoint nie zwrócił żadnych modeli — dodaj identyfikatory modeli ręcznie"
 
-#: src/features/settings/components/privacy/data-export.tsx:139
+#: src/features/settings/components/privacy/data-export.tsx:145
 msgid "The export file was not generated. Please request a new export."
 msgstr "Plik eksportu nie został wygenerowany. Poproś o nowy eksport."
 
@@ -34752,7 +34777,7 @@ msgstr "Rejestr MCP jest teraz niedostępny. Zamiast tego wyświetlane są popul
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Nie udało się wysłać wiadomości. Sprawdź połączenie i spróbuj ponownie."
 
-#: src/features/settings/components/chat/bots-settings.tsx:415
+#: src/features/settings/components/chat/bots-settings.tsx:417
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "Tryb, w którym zaczyna się każdy nowy czat z tym botem. Nadal możesz go zmienić w każdym czacie. Zaplanowane uruchomienia używają go tylko wtedy, gdy wymaga więcej potwierdzeń."
 
@@ -35264,11 +35289,11 @@ msgstr "Tej operacji nie można cofnąć. Organizacja i wszystkie powiązane dan
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr "Ten agent nie może wznowić własnej sesji, więc rozmowa została przekazana dalej"
 
-#: src/features/settings/components/chat/bots-settings.tsx:296
+#: src/features/settings/components/chat/bots-settings.tsx:298
 msgid "This bot's tools were changed elsewhere. Close this dialog and open it again to see them."
 msgstr "Narzędzia tego bota zostały zmienione gdzie indziej. Zamknij to okno i otwórz je ponownie, aby je zobaczyć."
 
-#: src/features/settings/components/chat/bots-settings.tsx:310
+#: src/features/settings/components/chat/bots-settings.tsx:312
 msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
 msgstr "Narzędzia tego bota zostały zmienione gdzie indziej. Teraz widać je w zapisanej postaci; wprowadź zmianę ponownie."
 
@@ -36061,7 +36086,7 @@ msgstr "Podsumowanie wątku"
 msgid "thread titles"
 msgstr "tytuły wątków"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:306
+#: src/features/settings/components/personalization/personalization-settings.tsx:315
 #: src/features/settings/lib/settings-keywords.ts:95
 msgid "Thread Titles"
 msgstr "Tytuły wątków"
@@ -36074,7 +36099,7 @@ msgstr "Odpięto wątek"
 msgid "Thread unsnoozed"
 msgstr "Wątek przywrócono z odłożenia"
 
-#: src/features/prompts/components/thread-variables-config.tsx:175
+#: src/features/prompts/components/thread-variables-config.tsx:179
 msgid "Thread Variables"
 msgstr "Zmienne wątku"
 
@@ -36430,7 +36455,7 @@ msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "Wyniki narzędzi o rozmiarze co najmniej 64 KB w wątkach bezczynnych od co najmniej {0} dni"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
-#: src/features/settings/components/chat/bots-settings.tsx:496
+#: src/features/settings/components/chat/bots-settings.tsx:504
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
@@ -36440,8 +36465,8 @@ msgstr "Narzędzia"
 
 #. placeholder {0}: bot.name
 #. placeholder {0}: editingTools?.name ?? ""
-#: src/features/settings/components/chat/bots-settings.tsx:478
-#: src/features/settings/components/chat/bots-settings.tsx:526
+#: src/features/settings/components/chat/bots-settings.tsx:486
+#: src/features/settings/components/chat/bots-settings.tsx:534
 msgid "Tools for {0}"
 msgstr "Narzędzia dla {0}"
 
@@ -38059,11 +38084,11 @@ msgid "Vancouver"
 msgstr "Vancouver"
 
 #. placeholder {0}: variable.name
-#: src/features/prompts/components/thread-variables-config.tsx:123
+#: src/features/prompts/components/thread-variables-config.tsx:127
 msgid "Variable \"{0}\" already exists"
 msgstr "Zmienna „{0}” już istnieje"
 
-#: src/features/prompts/components/thread-variables-config.tsx:109
+#: src/features/prompts/components/thread-variables-config.tsx:113
 msgid "Variable \"{sanitized}\" already exists"
 msgstr "Zmienna „{sanitized}” już istnieje"
 
@@ -38071,7 +38096,7 @@ msgstr "Zmienna „{sanitized}” już istnieje"
 msgid "Variable focal length"
 msgstr "Zmienna ogniskowa"
 
-#: src/features/prompts/components/thread-variables-config.tsx:192
+#: src/features/prompts/components/thread-variables-config.tsx:196
 msgid "Variable name..."
 msgstr "Nazwa zmiennej..."
 
@@ -38088,11 +38113,11 @@ msgstr "Zmienne"
 msgid "Variables ({0})"
 msgstr "Zmienne ({0})"
 
-#: src/features/prompts/components/thread-variables-config.tsx:151
+#: src/features/prompts/components/thread-variables-config.tsx:155
 msgid "Variables saved"
 msgstr "Zapisano zmienne"
 
-#: src/features/prompts/components/thread-variables-config.tsx:102
+#: src/features/prompts/components/thread-variables-config.tsx:106
 msgid "Variables starting with \"context.\" or \"user.\" are system-managed and cannot be edited"
 msgstr "Zmienne zaczynające się od „context.” lub „user.” są zarządzane przez system i nie można ich edytować"
 
@@ -39137,7 +39162,7 @@ msgstr "Co agent powinien zmienić?"
 msgid "What should the agent do?"
 msgstr "Co ma robić agent?"
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:218
+#: src/features/settings/components/personalization/personalization-settings.tsx:227
 msgid "What should the AI call you?"
 msgstr "Jak AI ma się do ciebie zwracać?"
 
@@ -39971,11 +39996,11 @@ msgstr "Klucz API został utworzony. Skopiuj go teraz, ponieważ nie będzie mo�
 msgid "Your Azure OpenAI resource: endpoint, API version and deployment names."
 msgstr "Twój zasób Azure OpenAI: punkt końcowy, wersja API i nazwy wdrożeń."
 
-#: src/features/settings/components/personalization/personalization-settings.tsx:256
+#: src/features/settings/components/personalization/personalization-settings.tsx:265
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Twoje doświadczenie, preferencje lub lokalizacja, aby AI lepiej cię rozumiało"
 
-#: src/features/settings/components/chat/bots-settings.tsx:454
+#: src/features/settings/components/chat/bots-settings.tsx:456
 msgid "Your bots"
 msgstr "Twoje boty"
 
@@ -40077,7 +40102,7 @@ msgstr "Twoja nazwa wyświetlana na koncie"
 msgid "Your draft is kept. The prompt from the link was not added."
 msgstr "Twoja wersja robocza została zachowana. Prompt z linku nie został dodany."
 
-#: src/features/settings/components/privacy/data-export.tsx:164
+#: src/features/settings/components/privacy/data-export.tsx:174
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "Twój eksport będzie zawierał: profil, ustawienia, rozmowy, metadane plików, prompty i historię użycia. Link do pobrania wygasa po 7 dniach."
 
@@ -40209,6 +40234,10 @@ msgstr "Twój własny klucz OpenAI — używany dla modeli OpenAI i wymagany do 
 #: src/features/pages/components/pages-sidebar.tsx:215
 msgid "Your pages"
 msgstr "Twoje strony"
+
+#: src/features/settings/components/personalization/personalization-settings.tsx:223
+msgid "Your personalization"
+msgstr "Twoja personalizacja"
 
 #: src/features/billing/components/personal-plan-card.tsx:22
 msgid "Your plan"

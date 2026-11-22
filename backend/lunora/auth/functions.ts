@@ -1027,6 +1027,33 @@ export const setSubAgentRole = authMutation
     });
 
 /**
+ * The user's review of personalization an admin wrote while acting as them: "Keep as mine" drops
+ * `personalizationByImpersonator`, so it counts as their own words again (`auth/lib/personalization.ts`). An own edit
+ * never clears the mark; only this does, and never from an impersonated session.
+ */
+export const keepPersonalization = authMutation
+    .use(rateLimit("settings/update"))
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "Personalization cannot be kept as the user's while impersonating");
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        if (settings?.personalizationByImpersonator) {
+            await patchRow(ctx.db, "userSettings", settings, { personalizationByImpersonator: undefined });
+            ctx.log.event("auth.keep_personalization", {});
+        }
+
+        return null;
+    });
+
+/**
  * The user's web-search blocklist, for the search tool. Unlike `getUserPreferencesQuery`
  * it has no fallback: a failed read throws, so the tool fails closed rather than searching unfiltered.
  */
