@@ -15,7 +15,7 @@ import { internal } from "../../_generated/internal";
 import type { BetterAuthUser } from "../../auth/lib/types";
 import { getUserTier, type RateLimitKey } from "../../lib/rate-limiter";
 
-export type DailyLimitKind = "Audio" | "Image" | "Text" | "Video";
+export type DailyLimitKind = "Audio" | "Image" | "Suggestion" | "Text" | "Video";
 
 export type DailyLimitTier = "anonymous" | "free" | "premium";
 
@@ -26,6 +26,8 @@ export type DailyLimitTier = "anonymous" | "free" | "premium";
 const DAILY_LIMIT_KEYS: Record<DailyLimitKind, Partial<Record<DailyLimitTier, RateLimitKey>>> = {
     Audio: { anonymous: "chat/dailyAudio:anonymous", free: "chat/dailyAudio:free", premium: "chat/dailyAudio:premium" },
     Image: { anonymous: "chat/dailyImage:anonymous", free: "chat/dailyImage:free", premium: "chat/dailyImage:premium" },
+    // Follow-up suggestions have their own bucket, so one never takes a unit a real send needs. Guests get none (no entry).
+    Suggestion: { free: "chat/dailySuggestion:free", premium: "chat/dailySuggestion:premium" },
     Text: { anonymous: "chat/dailyText:anonymous", free: "chat/dailyText:free", premium: "chat/dailyText:premium" },
     Video: { free: "chat/dailyVideo:free", premium: "chat/dailyVideo:premium" },
 };

@@ -10,10 +10,10 @@
  */
 import { v } from "lunorash/server";
 
-import { internalMutation } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 import { getMembersByUserId, getOrganization, getUser } from "../auth/lib/better-auth-queries";
 import { resolveUserPlan } from "../auth/lib/plan";
-import { claimOnce, releaseClaim } from "../lib/claim-once";
+import { claimOnce, hasClaim, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
 import { applyLimit } from "../lib/rate-limiter-mutations";
 import { MAX_LENGTH } from "../lib/validators";
@@ -24,6 +24,76 @@ export const DAILY_CHARGE_SCOPE = "daily-charge";
 
 /** A retry of the same request must find its unit still claimed: it outlasts any retry of one run node. */
 const DAILY_CHARGE_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How a user's `kind` of work is metered: exempt (an admin, as on the HTTP routes), limited by a daily `key`, or refused outright
+ * (no such user, or the tier may not generate `kind`). Shared by the charge and by the read-only check of what is left.
+ */
+type DailyLimit = { exempt: true } | { exempt: false; key: string } | null;
+
+const dailyLimitFor = async (
+    ctx: MutationCtx,
+    { kind, organizationId, userId }: { kind: "Audio" | "Image" | "Suggestion" | "Text" | "Video"; organizationId?: string; userId: string },
+): Promise<DailyLimit> => {
+    const user = await getUser(ctx, userId);
+
+    if (!user) {
+        return null;
+    }
+
+    if (user.role === "admin") {
+        return { exempt: true };
+    }
+
+    let organization = null;
+
+    if (organizationId) {
+        const memberships = await getMembersByUserId(ctx, userId);
+        const isMember = memberships.some((member) => member.organizationId === organizationId);
+
+        organization = isMember ? await getOrganization(ctx, organizationId) : null;
+    }
+
+    const plan = resolveUserPlan(user, [organization]);
+
+    const key = dailyLimitKeyOf(kind, dailyLimitTierOf({ isAnonymous: user.isAnonymous === true, plan, role: user.role ?? null }));
+
+    return key ? { exempt: false, key } : null;
+};
+
+/**
+ * Whether one unit of `kind` is left for the user, read without taking it. The model is not called for a reply the quota cannot pay
+ * for; the charge after the call still settles it, so a race can still refuse, but a spent quota no longer buys a model call.
+ * With a `requestId` whose unit is already taken, the answer is `true`: a retry of a charged reply (after its cache write failed)
+ * is not refused for want of a unit it has already paid for.
+ */
+export const dailyUnitAvailable = internalMutation
+    .input({
+        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Suggestion"), v.literal("Text"), v.literal("Video")),
+        organizationId: v.optional(v.string()),
+        requestId: v.optional(v.string().max(MAX_LENGTH.long)),
+        userId: v.string(),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args: { kind, organizationId, requestId, userId }, ctx }) => {
+        const limit = await dailyLimitFor(ctx, { kind, organizationId, userId });
+
+        if (!limit) {
+            return false;
+        }
+
+        if (limit.exempt) {
+            return true;
+        }
+
+        if (requestId !== undefined && (await hasClaim(ctx, DAILY_CHARGE_SCOPE, requestId))) {
+            return true;
+        }
+
+        const { remaining } = await createRatelimit(limit.key, ctx.db as never).getRemaining(userId);
+
+        return remaining >= 1;
+    });
 
 /**
  * Charge `count` units (default one) of `kind` to `userId`'s daily quota, all or nothing. `false` when they
@@ -37,39 +107,24 @@ const DAILY_CHARGE_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 export const chargeDailyUnit = internalMutation
     .input({
         count: v.optional(v.number()),
-        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Text"), v.literal("Video")),
+        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Suggestion"), v.literal("Text"), v.literal("Video")),
         organizationId: v.optional(v.string()),
         requestId: v.optional(v.string().max(MAX_LENGTH.long)),
         userId: v.string(),
     })
     .output(v.boolean())
     .mutation(async ({ args: { count = 1, kind, organizationId, requestId, userId }, ctx }) => {
-        const user = await getUser(ctx, userId);
+        const limit = await dailyLimitFor(ctx, { kind, organizationId, userId });
 
-        if (!user) {
+        if (!limit) {
             return false;
         }
 
-        if (user.role === "admin") {
+        if (limit.exempt) {
             return true;
         }
 
-        let organization = null;
-
-        if (organizationId) {
-            const memberships = await getMembersByUserId(ctx, userId);
-            const isMember = memberships.some((member) => member.organizationId === organizationId);
-
-            organization = isMember ? await getOrganization(ctx, organizationId) : null;
-        }
-
-        const plan = resolveUserPlan(user, [organization]);
-
-        const key = dailyLimitKeyOf(kind, dailyLimitTierOf({ isAnonymous: user.isAnonymous === true, plan, role: user.role ?? null }));
-
-        if (!key) {
-            return false;
-        }
+        const { key } = limit;
 
         // A request whose unit is already claimed was charged by an earlier attempt: it is not charged again.
         if (requestId !== undefined && !(await claimOnce(ctx, DAILY_CHARGE_SCOPE, requestId, DAILY_CHARGE_CLAIM_TTL_MS, userId))) {

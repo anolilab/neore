@@ -16,7 +16,7 @@ import schema from "../schema";
 import {
     branchThread,
     generateSummary,
-    getFollowupSuggestions,
+    generateFollowupSuggestionsForThread,
     autoTitleChargeKey,
     chargeToGiveBackOnLostAnswer,
     firstResultOf,
@@ -135,10 +135,10 @@ describe("a host-run thread", () => {
         });
     });
 
-    it("gets no follow-up suggestions, and no error for asking", async () => {
-        await expect(harness.withIdentity({ userId: OWNER }).action(getFollowupSuggestions as never, { threadId } as never)).resolves.toEqual({
-            suggestions: [],
-        });
+    it("runs its suggestions job without error and reaches no cloud model", async () => {
+        await expect(
+            harness.action(async (context: any) => await context.runAction(generateFollowupSuggestionsForThread, { threadId, userId: OWNER })),
+        ).resolves.toBeUndefined();
     });
 
     it("cannot be forked into a cloud thread", async () => {

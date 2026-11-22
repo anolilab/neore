@@ -44,6 +44,9 @@ const SYSTEM_DB_IMPORTERS = [
     "projects/functions.ts",
     // Whether the thread OWNER has a tool approval open, which a collaborator's scope cannot see: a refusal, never rows.
     "chat/agent-switch.ts",
+    // The owner's suggestion setting (one row, absent = on), read as the cache gate reads it: a shared thread's cached suggestion is shown
+    // only while the owner keeps it on. Only the boolean is used; the owner's row is never returned.
+    "chat/composite.ts",
     // Decisions only: a lock check drops rows the caller already passed RLS for; the proof check reads a passcode row to verify it.
     "agent/messages.ts",
     "agent/thread-passcode.ts",
