@@ -347,7 +347,9 @@ const retiredAnswer = (what: string) =>
  * The holds one call keeps on the sessions it uses (`src/session-lock.ts`), shared by every isolate: a `/login` holds
  * its session alone from before it connects until its cleanup ends, so no `/action` of any isolate (an `extract` of the
  * page the site answered the sign-in with) runs beside it, and it waits for none; an `/action` holds it beside other
- * actions. A session the call launched is held too, before its page is set up. `take` answers why one was not taken.
+ * actions. A session an `/action` launched is held too, before its page is set up; one a `/login` launched once its
+ * browser and page are set up (its id has not left the call yet), before the holds are armed (`arm`) and the sign-in
+ * starts. `take` answers why one was not taken.
  */
 const holdsOf = (env: Env, kind: HoldKind, keep?: (work: Promise<unknown>) => void) => {
     const held: SessionHold[] = [];
