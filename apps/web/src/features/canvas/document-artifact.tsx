@@ -72,8 +72,9 @@ const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentI
     const { data: document } = useQuery({
         ...crpc.agent.documents.getDocument.queryOptions({
             documentId: documentId as Id<"documents">,
+            threadId: threadId as Id<"threads">,
         }),
-        enabled: kind === "sheet",
+        enabled: kind === "sheet" && threadId !== undefined,
     });
 
     return (

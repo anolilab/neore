@@ -11,7 +11,7 @@ import { authMutation, query, rateLimit } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { assert } from "../lib/error-helpers";
 import { withoutUndefined } from "../lib/patch";
-import { requireOwnedThread } from "./thread-read-access";
+import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-access";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { throwThreadLocked } from "../lib/thread-lock";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
@@ -53,7 +53,12 @@ const publicDocument = (documentRow: Doc<"documents">): DocumentDoc => {
 };
 
 export const getDocument = query
-    .input({ documentId: v.id("documents"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .input({
+        documentId: v.id("documents"),
+        // The document's thread: the call routes to the thread's owner's shard, where the document lives.
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(v.from(v.union(vDocumentDoc, v.null())))
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
@@ -62,14 +67,22 @@ export const getDocument = query
             return null;
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
+        // The thread's read grant is read first: it admits the thread's rows to this request, so a member reads the document.
+        // A locked thread answers THREAD_LOCKED to its owner until the proof is given.
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
 
-        if (!documentRow || documentRow.userId !== identity.userId) {
+        if (access?.kind === "locked") {
+            return throwThreadLocked();
+        }
+
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
             return null;
         }
 
-        if (await isLockedWithoutProof(ctx, documentRow.threadId, args.unlockProof)) {
-            return throwThreadLocked();
+        const documentRow = await ctx.db.get("documents", args.documentId);
+
+        if (!documentRow || documentRow.threadId !== args.threadId) {
+            return null;
         }
 
         return publicDocument(documentRow);
@@ -99,13 +112,16 @@ export const getDocumentsByThread = query
             return [];
         }
 
-        const thread = await ctx.db.get("threads", args.threadId);
+        // A thread's documents are readable by whoever holds its read grant, as its messages are.
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
 
-        if (!thread || thread.userId !== identity.userId) {
-            return [];
+        if (access?.kind === "locked") {
+            return throwThreadLocked();
         }
 
-        await requireOwnedThread(ctx, args.threadId, identity.userId, args.unlockProof);
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+            return [];
+        }
 
         const docs = await ctx.db
             .query("documents")

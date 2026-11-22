@@ -170,9 +170,9 @@ for a schema table that is neither policed nor listed:
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
 | `agent_document_history.listVersions` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
-| `agent_documents.getDocument` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
+| `agent_documents.getDocument` | query | query | documents | identity (self-resolved); thread read grant (owner or member; lock proof) and the document of that thread | ok |
 | `agent_documents.getDocumentByMessage` | query | query | — | identity (self-resolved); row.userId == caller | ok |
-| `agent_documents.getDocumentsByThread` | query | query | threads | identity (self-resolved); row.userId == caller | ok |
+| `agent_documents.getDocumentsByThread` | query | query | threads | identity (self-resolved); thread read grant (owner or member; lock proof) | ok |
 | `agent_documents.updateDocument` | mutation | authMutation | documentVersions, documents | identity (self-resolved); row.userId == caller | accepted — owner-only; no rate limit, `v.any()` commit/contentJson (low) |
 | `agent_messages.listMessagesByThreadId` | query | query | — | thread access (owner/grant); identity (self-resolved) | ok |
 | `agent_projects.getProject` | query | query | projects | identity (self-resolved); row.userId == caller | **fixed** (low) — owner-only; public projects are served by the gallery projection |
