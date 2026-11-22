@@ -14,6 +14,8 @@ export interface AuthValue {
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
     status: AuthStatus;
+    /** Moves each time a JWT is minted, so a read that failed on a lapsed token can run again once a new one is held. */
+    tokenSerial: number;
     user: GrantUser | null;
 }
 

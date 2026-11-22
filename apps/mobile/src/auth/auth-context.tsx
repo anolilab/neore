@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [session, dispatch] = useReducer(reduceSession, INITIAL_SESSION);
     const { hasToken, isConfirming, status, user } = session;
     const [refreshTick, setRefreshTick] = useState(0);
+    const [tokenSerial, setTokenSerial] = useState(0);
     // Bumped by every sign-in and sign-out: a mint still out from before applies nothing.
     const [epoch] = useState(createAuthEpoch);
 
@@ -127,6 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
+            setTokenSerial(nextTick);
             dispatch({ type: "token", user: storedUser });
             timer = setTimeout(setRefreshTick, tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS, nextTick);
         };
@@ -208,8 +210,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const value = useMemo(() => {
-        return { hasToken, isConfirming, retryToken, signIn, signOut, status, user };
-    }, [hasToken, isConfirming, retryToken, signIn, signOut, status, user]);
+        return { hasToken, isConfirming, retryToken, signIn, signOut, status, tokenSerial, user };
+    }, [hasToken, isConfirming, retryToken, signIn, signOut, status, tokenSerial, user]);
 
     return <AuthContext value={value}>{children}</AuthContext>;
 };
