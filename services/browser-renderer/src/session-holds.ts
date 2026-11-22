@@ -25,6 +25,8 @@ export interface HoldAnswer {
 
 /** What a session's lock stores, in one value, so no write of it lands half. */
 export interface SessionState {
+    /** Tokens released, with when each record ends (`SessionHolds.release`). */
+    cancelled?: [string, number][];
     /** Until when an exclusive take is refused after a shared hold lapsed (`SessionHolds.drainUntil`). */
     drainUntil?: number;
     holds: [string, Hold][];
@@ -48,10 +50,25 @@ export class SessionHolds {
 
     #drainUntil: number;
 
-    public constructor(holds: Iterable<[string, Hold]> = [], isRetired = false, drainUntil = 0) {
+    /** Released tokens, until when each is kept: a take that arrives after its own release creates no hold. */
+    readonly #cancelled: Map<string, number>;
+
+    public constructor(holds: Iterable<[string, Hold]> = [], isRetired = false, drainUntil = 0, cancelled: Iterable<[string, number]> = []) {
         this.#holds = new Map(holds);
         this.#isRetired = isRetired;
         this.#drainUntil = drainUntil;
+        this.#cancelled = new Map(cancelled);
+    }
+
+    /** The released tokens still kept at `now`. */
+    #cancelledAt(now: number): [string, number][] {
+        for (const [token, until] of this.#cancelled) {
+            if (until <= now) {
+                this.#cancelled.delete(token);
+            }
+        }
+
+        return [...this.#cancelled];
     }
 
     /** Drops each hold lapsed at `now`: an exclusive one retires the session, a shared one starts a drain. */
@@ -75,12 +92,18 @@ export class SessionHolds {
     public state(now: number): SessionState | undefined {
         const holds = this.entries(now);
         const drainUntil = this.#drainUntil > now ? this.#drainUntil : undefined;
+        const cancelled = this.#cancelledAt(now);
 
-        if (drainUntil === undefined && !this.#isRetired && holds.length === 0) {
+        if (drainUntil === undefined && !this.#isRetired && holds.length === 0 && cancelled.length === 0) {
             return undefined;
         }
 
-        return { holds, ...(drainUntil !== undefined && { drainUntil }), ...(this.#isRetired && { retired: true as const }) };
+        return {
+            ...(cancelled.length > 0 && { cancelled }),
+            holds,
+            ...(drainUntil !== undefined && { drainUntil }),
+            ...(this.#isRetired && { retired: true as const }),
+        };
     }
 
     /**
@@ -102,7 +125,8 @@ export class SessionHolds {
     /**
      * An exclusive hold is refused while any other hold is in force, or for `SHARED_DRAIN_MS` after a shared one
      * lapsed, and a shared one while an exclusive one is; both are refused for good on a retired session (`isRetired`).
-     * The same token asking again (its first answer lost) renews the hold it has.
+     * The same token asking again (its first answer lost) renews the hold it has. A token already released is refused,
+     * and holds nothing: its take arrived after the release its caller sent when the take went unanswered.
      */
     public take(token: string, kind: HoldKind, leaseMs: number, now: number): HoldAnswer {
         // First: a lapse it drops may retire the session.
@@ -110,6 +134,10 @@ export class SessionHolds {
 
         if (this.#isRetired) {
             return { held: false, retired: true };
+        }
+
+        if (this.#cancelledAt(now).some(([cancelled]) => cancelled === token)) {
+            return { held: false };
         }
 
         const others = this.entries(now).filter(([held]) => held !== token);
@@ -140,15 +168,20 @@ export class SessionHolds {
         return { held: true };
     }
 
-    /** Ends the hold; `held` says whether it was still in force. */
+    /**
+     * Ends the hold; `held` says whether it was still in force. The token is kept as released for `MAX_LEASE_MS`, the
+     * longest a hold of it could run, so a take of it that the release overtook holds nothing.
+     */
     public release(token: string, now: number): HoldAnswer {
         const held = this.entries(now).some(([candidate]) => candidate === token);
 
         this.#holds.delete(token);
+        this.#cancelled.set(token, now + MAX_LEASE_MS);
 
         return { held };
     }
 }
 
 /** The holds of a stored state. */
-export const holdsOf = (state: SessionState | undefined): SessionHolds => new SessionHolds(state?.holds ?? [], state?.retired === true, state?.drainUntil ?? 0);
+export const holdsOf = (state: SessionState | undefined): SessionHolds =>
+    new SessionHolds(state?.holds ?? [], state?.retired === true, state?.drainUntil ?? 0, state?.cancelled ?? []);

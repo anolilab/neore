@@ -84,6 +84,16 @@ describe(SessionHolds, () => {
         expect(holds.entries(1400)).toStrictEqual([["login", { expiresAt: 1500, kind: "exclusive" }]]);
     });
 
+    it("holds nothing for a take that arrives after its own release, and forgets the release once no hold of it could run", () => {
+        const holds = new SessionHolds();
+
+        expect(holds.release("late", 0)).toStrictEqual({ held: false });
+        expect(holds.take("late", "exclusive", 1000, 1)).toStrictEqual({ held: false });
+        expect(holds.take("other", "shared", 1000, 2)).toStrictEqual({ held: true });
+        expect(holds.state(MAX_LEASE_MS - 1)?.cancelled).toStrictEqual([["late", MAX_LEASE_MS]]);
+        expect(holds.state(MAX_LEASE_MS)?.cancelled).toBeUndefined();
+    });
+
     it("caps a lease", () => {
         const holds = new SessionHolds();
 
@@ -180,9 +190,19 @@ describe(SessionLock, () => {
 
         expect((stored.get("state") as { holds: unknown[] }).holds).toHaveLength(1);
 
+        vi.useFakeTimers();
         await (hold as Taken<typeof hold>).release();
 
+        // The release is kept until no hold of its token could still run.
+        expect(stored.get("state")).toStrictEqual({ cancelled: [[expect.any(String), expect.any(Number)]], holds: [] });
+
+        vi.advanceTimersByTime(MAX_LEASE_MS);
+        await namespace
+            .get(namespace.idFromName("s"))
+            .fetch("https://session-lock/", { body: JSON.stringify({ leaseMs: 1, op: "renew", token: "t" }), method: "POST" });
+
         expect(stored.has("state")).toBe(false);
+        vi.useRealTimers();
     });
 });
 
@@ -228,6 +248,40 @@ describe(holdSession, () => {
 
         await expect(taking).resolves.toBe("unreachable");
         expect(control.calls).toStrictEqual([expect.objectContaining({ op: "take" }), expect.objectContaining({ op: "release" })]);
+    });
+
+    it("leaves no hold when the release sent on a take's timeout reaches the lock before the take", async () => {
+        const { control, namespace, stored } = namespaceOf();
+        const lock = new SessionLock({
+            storage: {
+                delete: async (key: string) => stored.delete(key),
+                get: async (key: string) => structuredClone(stored.get(key)),
+                put: async (key: string, value: unknown) => {
+                    stored.set(key, structuredClone(value));
+                },
+            },
+        } as never);
+
+        control.reachable = false;
+
+        const taking = holdSession(namespace, "s", "exclusive");
+
+        await vi.advanceTimersByTimeAsync(3000);
+        await expect(taking).resolves.toBe("unreachable");
+
+        // The release arrives first, then the delayed take.
+        const [take, release] = control.calls as unknown[];
+        const send = async (body: unknown) => lock.fetch(new Request("https://session-lock/", { body: JSON.stringify(body), method: "POST" }));
+
+        await send(release);
+        const late = await send(take);
+
+        await expect(late.json()).resolves.toStrictEqual({ held: false });
+
+        control.reachable = true;
+        await expect(holdSession(namespace, "s", "exclusive")).resolves.not.toHaveProperty("busy");
+        await vi.advanceTimersByTimeAsync(LEASE_MS * 2);
+        await expect(holdSession(namespace, "s", "shared")).resolves.not.toBe("retired");
     });
 
     it("gives its hold up as lost 10 s before the lease could lapse when renewals go unanswered, and says so at release", async () => {
@@ -303,7 +357,7 @@ describe(holdSession, () => {
         await vi.advanceTimersByTimeAsync(500 + 3000);
         await settling;
 
-        expect(stored.get("state")).toBeUndefined();
+        expect(stored.get("state")).toMatchObject({ holds: [] });
 
         await vi.advanceTimersByTimeAsync(LEASE_MS);
 

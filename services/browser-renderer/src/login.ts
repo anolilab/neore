@@ -2,7 +2,7 @@
  * Saved-login fill: the browser half of `/login`. Kept apart from the Worker so a test can drive it against a local
  * Chromium (`login.browser.test.ts`).
  */
-import type { BrowserContext, CDPSession, Frame, Page, Request, Response, Route, WebSocketRoute } from "@cloudflare/playwright";
+import type { BrowserContext, CDPSession, Page, Request, Response, Route, WebSocketRoute } from "@cloudflare/playwright";
 
 import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
@@ -98,16 +98,12 @@ const base64Pattern = (secret: string): RegExp | null => {
         }
     }
 
-    return runs.size === 0 ? null : new RegExp([...runs].join("|"), "g");
+    return runs.size === 0 ? null : new RegExp([...runs].join("|"));
 };
 
-/** `text` with `secret` replaced in each spelling `characterPattern` and `base64Pattern` know, one layer deep: `hasSecret` reads the deeper ones. */
-const replaceSecret = (text: string, secret: string): string => {
-    const scrubbed = text.replaceAll(new RegExp([...secret].map((character) => characterPattern(character)).join(""), "g"), "[password]");
-    const base64 = base64Pattern(secret);
-
-    return base64 ? scrubbed.replaceAll(base64, "[password]") : scrubbed;
-};
+/** Whether `text` holds `secret` in a spelling `characterPattern` or `base64Pattern` knows, one layer deep: `hasSecret` reads the deeper ones. */
+const isSpelledIn = (text: string, secret: string): boolean =>
+    new RegExp([...secret].map((character) => characterPattern(character)).join("")).test(text) || (base64Pattern(secret)?.test(text) ?? false);
 
 const PERCENT_RUN_RE = /(?:%[\da-f]{2})+/gi;
 
@@ -160,7 +156,7 @@ const hasSecret = (text: string, secret: string): boolean => {
     for (let round = 0; round <= MAX_DECODE_ROUNDS && budget >= decoded.length; round++) {
         budget -= decoded.length;
 
-        if (decoded.includes(escaped) || replaceSecret(decoded, secret) !== decoded) {
+        if (decoded.includes(escaped) || isSpelledIn(decoded, secret)) {
             return true;
         }
 
@@ -176,15 +172,15 @@ const hasSecret = (text: string, secret: string): boolean => {
     return true;
 };
 
-/**
- * `text` with the password replaced in every spelling a page could echo it in: raw, URL- or form-encoded, HTML-escaped,
- * base64 or base64url. A text that still carries it after that, at any depth of percent-encoding, is withheld whole.
- */
-export const withoutSecret = (text: string, secret: string): string => {
-    const scrubbed = replaceSecret(text, secret);
+/** What a result says in place of a text (an address, a title, an error) that carries the password. */
+export const WITHHELD = "[withheld: it holds the password]";
 
-    return hasSecret(scrubbed, secret) ? "[withheld: it holds the password]" : scrubbed;
-};
+/**
+ * `text`, or `WITHHELD` in its place when it carries the password in any spelling a page could echo it in (raw, URL- or
+ * form-encoded, HTML-escaped, base64 or base64url, at any depth of percent-encoding). Withheld whole, never marked where
+ * it matched: a page that put guesses in its address or title would learn from the mark which guess is the password.
+ */
+export const withoutSecret = (text: string, secret: string): string => (hasSecret(text, secret) ? WITHHELD : text);
 
 // ─── Stand-in ───────────────────────────────────────────────────────────────────
 
@@ -514,7 +510,6 @@ const armGuard = async (
     let isOversized = false;
     let isScripted = false;
     let attempt: string | null = null;
-    let admitted: string | null = null;
     let answerStatus = 0;
 
     /** A service worker's request has no frame: it is not the page's. */
@@ -558,8 +553,6 @@ const armGuard = async (
         const body = request.postDataBuffer();
         const isLarge = body !== null && body.length > MAX_GUARDED_BODY_BYTES;
         const isOwn = frameOf(request)?.page() === page && originOf(request.url()) === origin;
-        const isAdmitted =
-            body === null && withoutFragment(request.url()) === admitted && request.isNavigationRequest() && frameOf(request) === page.mainFrame();
 
         if (isSecretAddress(request.url())) {
             attempt ??= "the password in an address";
@@ -609,25 +602,30 @@ const armGuard = async (
         } else if (isOwn && (isLarge || body?.includes(stand))) {
             // A body too large to look into is aborted unread.
             isScripted ||= !isLarge && ["fetch", "xhr"].includes(request.resourceType());
-        } else if (isOwn || isAdmitted) {
+        } else if (isOwn) {
             await route.fallback();
 
             return;
         } else if (isCounting && (body !== null || request.isNavigationRequest())) {
-            attempt ??= `a request to ${originOf(request.url()) ?? "another site"}`;
+            attempt ??= "a request to another site";
         }
 
         await route.abort("blockedbyclient").catch(() => undefined);
     };
 
-    /** The final answer to the form's own navigation, after any redirects: what loads from here is the next page's. */
+    /** The `Set-Cookie` lines of each answer in the chain of the form's own POST, its redirects included; `null` for one that could not be read. */
+    const answerCookies: Promise<string[] | null>[] = [];
+
+    /**
+     * Each answer to the form's own navigation: its `Set-Cookie` lines are kept, and the final one, after any redirects,
+     * ends the counting (what loads from here is the next page's).
+     */
     const onResponse = (response: Response): void => {
         let request: Request | null = response.request();
         const status = response.status();
-
         const claimed = sent ?? forwarding;
 
-        if (!claimed || (status >= 300 && status < 400)) {
+        if (!claimed) {
             return;
         }
 
@@ -635,7 +633,13 @@ const armGuard = async (
             request = request.redirectedFrom();
         }
 
-        if (request) {
+        if (!request) {
+            return;
+        }
+
+        answerCookies.push(response.headerValues("set-cookie").catch(() => null));
+
+        if (status < 300 || status >= 400) {
             isCounting = false;
             answerStatus = status;
         }
@@ -703,7 +707,7 @@ const armGuard = async (
             }
 
             if (isCounting) {
-                attempt ??= `a WebSocket to ${socketOrigin(url) ?? "another site"}`;
+                attempt ??= "a WebSocket to another site";
             }
 
             return false;
@@ -745,7 +749,7 @@ const armGuard = async (
                 session.send("Fetch.failRequest", { errorReason: "BlockedByClient", requestId: event.requestId }).catch(() => undefined);
             } else if (isRedirectElsewhere({ hasBody: event.request.hasPostData === true, status: event.responseStatusCode, target }, origin)) {
                 if (isCounting) {
-                    attempt ??= `a redirect to ${target ?? "another site"}`;
+                    attempt ??= "a redirect to another site";
                 }
 
                 session.send("Fetch.failRequest", { errorReason: "BlockedByClient", requestId: event.requestId }).catch(() => undefined);
@@ -761,11 +765,8 @@ const armGuard = async (
     }
 
     return {
-        /** Lets the main frame load `url` by GET, wherever it is: the cleanup's reload of the page the sign-in landed on. */
-        admit: (url: string): void => {
-            // Without its fragment: a request's address never carries one, so an admitted page with a fragment would match nothing.
-            admitted = withoutFragment(url);
-        },
+        /** The `Set-Cookie` lines the site answered the form's own POST with, along its redirects; `null` for one that could not be read. */
+        answerCookies: async (): Promise<(string[] | null)[]> => Promise.all(answerCookies),
         /** Whether the final answer to the form's own navigation arrived. */
         answered: () => !isCounting,
         /** The HTTP status of that answer, 0 before it arrived. */
@@ -832,20 +833,27 @@ export const TYPE_RESERVE_MS = 12_000;
 /** The end of the hold kept for the cleanup: no step before it runs into this time. */
 const CLEANUP_MS = 4000;
 
-/** The part of the cleanup's time kept for the look at the reloaded page. */
-const CHECK_MS = 1000;
-
 /** The end of the hold kept for closing the page when it cannot be cleared. */
 const CLOSE_MS = 1000;
 
 /** The longest wait for the form's request to go out, and then for the page it leads to. */
 const SEND_WAIT_MS = 5000;
 
-const ASCII_RE = /^[\u{20}-\u{7E}]*$/u;
-
 const LINE_BREAK_RE = /[\n\r]/;
 
-class OutOfTimeError extends Error {}
+/** A `Set-Cookie` line's `HttpOnly` attribute: such a cookie no script reads. */
+const HTTP_ONLY_RE = /;\s*httponly\s*(?:;|$)/iu;
+
+/** A sign-in stopped for a reason of its own, whose message names nothing the page chose. */
+class SignInStop extends Error {}
+
+/**
+ * What a result may say of an error raised before the site has the password: one of the sign-in's own reasons, or a
+ * fixed text. A browser error can carry an address or selector the page chose, and whether such a text is withheld for
+ * holding the password would tell of a guess put there.
+ */
+export const ownMessage = (error: unknown): string =>
+    error instanceof SignInStop ? error.message : "The browser stopped the sign-in on an error before the password was sent";
 
 /**
  * Where the form `input` belongs to would send it (the `formaction`/`formmethod`/`formtarget`/`formenctype` of its first
@@ -854,12 +862,12 @@ class OutOfTimeError extends Error {}
  * handlers is not sent (`re-encoded`). Those handlers can still change where it goes; the request guard is what keeps it on `origin`. No method is
  * GET, which would put the password in the address: such a form is sent by POST. A form for another window (any target
  * but this one, `_parent` and `_top` only when it is the top window) is refused: it would post from a page the guard does
- * not watch. So is a `text/plain` form, and one in another charset than UTF-8
- * when the password is not ASCII (`isAscii`): the guard puts the password into URL-encoded or multipart UTF-8 only.
+ * not watch. So is a `text/plain` form, and one in another charset than UTF-8, whatever the password: the guard puts it
+ * into URL-encoded or multipart UTF-8 only, and a refusal that hung on the password would tell the page about it.
  */
 const checkForm = (
     input: Element,
-    { expected, isAscii, origin }: { expected?: { charset: string; enctype: string }; isAscii: boolean; origin: string },
+    { expected, origin }: { expected?: { charset: string; enctype: string }; origin: string },
 ): "encoding" | "invalid" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
     const { form, isConnected, name, type } = input as HTMLInputElement;
 
@@ -909,7 +917,7 @@ const checkForm = (
         .toLowerCase()
         .replace("-", "");
 
-    if (encoding === "text/plain" || (!isAscii && charset !== "utf8")) {
+    if (encoding === "text/plain" || charset !== "utf8") {
         return "encoding";
     }
 
@@ -985,7 +993,7 @@ const loadServed = async (page: Page, { now, origin, timeout, url }: { now: () =
         );
 
         if (!settled) {
-            throw new Error("The login page did not load in time");
+            throw new SignInStop("The login page did not load in time");
         }
 
         return settled.value;
@@ -1048,18 +1056,18 @@ const loadServed = async (page: Page, { now, origin, timeout, url }: { now: () =
                 undefined,
             );
 
-            throw new Error("The login page did not load in time");
+            throw new SignInStop("The login page did not load in time");
         }
 
         loaderId = navigated.loaderId;
 
         // No loader: a navigation within the document the tab already shows, whose HTML was not sent for this load.
         if (loaderId === undefined || navigated.errorText) {
-            throw new Error(`The login page did not load${navigated.errorText ? ` (${navigated.errorText})` : ""}`);
+            throw new SignInStop(`The login page did not load${navigated.errorText ? ` (${navigated.errorText})` : ""}`);
         }
 
         if (!(await loaded)) {
-            throw new Error("The login page did not load in time");
+            throw new SignInStop("The login page did not load in time");
         }
     } catch (error) {
         // Stopping the load and letting go of it share one second, the part of the cleanup's time a failed load takes.
@@ -1108,172 +1116,38 @@ const hasPasswordField = async (page: Page): Promise<boolean> => {
     return false;
 };
 
-/** A frame Playwright reaches only through its parent's DevTools session: that session's document holds it. */
-const IN_PARENT_SESSION = "part of the parent frame's session";
-
-/** How deep one read of a document's tree goes: Chromium cannot send a tree nested much more than 120 deep whole. */
-const READ_DEPTH = 64;
-
-/** DevTools' node types (the DOM's): a Worker has no `Node` to read them from. */
-const TEXT_NODE = 3;
-
-const CDATA_SECTION_NODE = 4;
-
-/**
- * The text and attribute values of every node of `frame`'s documents as DevTools reads them, every shadow root included:
- * a closed one is out of a script's reach, `isClean`'s too, but not of a later read of the page; then each tree's text
- * as its `textContent` rebuilds it, a password split over text nodes whole again. Frames in the same
- * process are read with their parent's (`[]`). Throws when it cannot read them.
- */
-const nodeTexts = async (page: Page, frame: Frame): Promise<string[]> => {
-    let session: CDPSession;
+/** The id of the document the main frame shows (its loader), which a new document load changes; throws when it cannot be read. */
+const documentOf = async (page: Page): Promise<string> => {
+    const session = await page.context().newCDPSession(page);
 
     try {
-        session = await page.context().newCDPSession(frame);
-    } catch (error) {
-        if (frame !== page.mainFrame() && error instanceof Error && error.message.includes(IN_PARENT_SESSION)) {
-            return [];
-        }
+        const { frameTree } = (await session.send("Page.getFrameTree")) as { frameTree: { frame: { loaderId: string } } };
 
-        throw error;
-    }
-
-    try {
-        const { root } = await session.send("DOM.getDocument", { depth: READ_DEPTH, pierce: true });
-        const found: string[] = [];
-        // A stack, not recursion or a spread: a page can nest deeper, or hold more children, than the call stack takes.
-        const nodes = [root];
-        /** Nodes where a read stopped: read on from them together once the stack is empty, not one round trip each. */
-        const cut: typeof nodes = [];
-        const readOn = (node: (typeof nodes)[number]): void => {
-            for (const inner of [...(node.children ?? []), ...(node.shadowRoots ?? []), node.contentDocument, node.templateContent]) {
-                if (inner) {
-                    nodes.push(inner);
-                }
-            }
-        };
-
-        while (nodes.length > 0 || cut.length > 0) {
-            const node = nodes.pop();
-
-            if (!node) {
-                const reading = cut.map(async ({ backendNodeId }) => session.send("DOM.describeNode", { backendNodeId, depth: READ_DEPTH, pierce: true }));
-                const stopped = [...cut];
-
-                cut.length = 0;
-
-                const reads = await Promise.all(reading);
-
-                for (const [index, read] of reads.entries()) {
-                    // Kept on the node where the read stopped, so the tree is whole for the texts below.
-                    const { children, contentDocument, shadowRoots, templateContent } = read.node;
-
-                    readOn(Object.assign(stopped[index] as (typeof nodes)[number], { children, contentDocument, shadowRoots, templateContent }));
-                }
-
-                continue;
-            }
-
-            found.push(node.nodeValue, ...(node.attributes ?? []));
-
-            if ((node.childNodeCount ?? 0) > (node.children?.length ?? 0)) {
-                cut.push(node);
-            } else {
-                readOn(node);
-            }
-        }
-
-        // Each tree's text nodes joined in order with nothing between them, as its `textContent` rebuilds them: a password
-        // split over several text nodes (of a closed shadow root too) is whole there. A shadow root, template content or
-        // frame document is a tree of its own.
-        const trees = [root];
-
-        for (let tree = trees.pop(); tree; tree = trees.pop()) {
-            let text = "";
-            const inOrder = [tree];
-
-            for (let node = inOrder.pop(); node; node = inOrder.pop()) {
-                if (node.nodeType === TEXT_NODE || node.nodeType === CDATA_SECTION_NODE) {
-                    text += node.nodeValue;
-                }
-
-                for (const inner of [...(node.shadowRoots ?? []), node.contentDocument, node.templateContent]) {
-                    if (inner) {
-                        trees.push(inner);
-                    }
-                }
-
-                const children = node.children ?? [];
-
-                // Last first, so the first child is the next one read.
-                for (let index = children.length - 1; index >= 0; index--) {
-                    inOrder.push(children[index] as (typeof nodes)[number]);
-                }
-            }
-
-            found.push(text);
-        }
-
-        return found;
+        return frameTree.frame.loaderId;
     } finally {
         await session.detach().catch(() => undefined);
     }
 };
 
 /**
- * Whether no frame of the page shows `password` in any spelling: in a field, the markup or text (closed shadow roots
- * included), the address, or the frame's storage and script-readable cookies, where a later read of the page or a
- * script could find it. Throws when it cannot look.
+ * Whether no cookie a script could read that the site set in answer to the form's own POST (along its redirects) holds
+ * `password` in any spelling. It is all of the answer that outlives the tab's documents: no script runs once the password
+ * is typed, so only the site's `Set-Cookie` can put it anywhere the session keeps. Never the whole cookie jar: a page
+ * that planted guesses there would learn from the outcome whether one is the password, while the site that set these
+ * lines was sent the password. An answer whose lines could not be read counts as holding it.
  */
-const isClean = async (page: Page, password: string): Promise<boolean> => {
-    for (const frame of page.frames()) {
-        const nodes = await nodeTexts(page, frame);
+const isClean = async (guard: Guard, password: string): Promise<boolean> => {
+    const answers = await guard.answerCookies();
 
-        // One text, as the markup below is.
-        if (hasSecret(nodes.join("\n"), password)) {
-            return false;
-        }
-
-        const texts = await frame.evaluate(() => {
-            const found = [document.location.href, document.documentElement.outerHTML];
-            // A stack, not a named inner function: a bundler that keeps names wraps one in a helper the page lacks.
-            const roots: (Document | ShadowRoot)[] = [document];
-
-            for (let root = roots.pop(); root; root = roots.pop()) {
-                for (const field of root.querySelectorAll<HTMLInputElement>("input, textarea, select")) {
-                    found.push(field.value);
-                }
-
-                for (const { shadowRoot } of root.querySelectorAll("*")) {
-                    if (!shadowRoot) {
-                        continue;
-                    }
-
-                    found.push(shadowRoot.getHTML());
-                    roots.push(shadowRoot);
-                }
-            }
-
-            // A sandboxed frame has no storage to read.
-            try {
-                for (const store of [localStorage, sessionStorage]) {
-                    found.push(...Object.values(store));
-                }
-
-                found.push(document.cookie);
-            } catch {
-                // Nothing a script there can read either.
-            }
-
-            return found;
-        });
-
-        if (texts.some((text) => hasSecret(text, password))) {
-            return false;
-        }
+    if (answers.includes(null)) {
+        return false;
     }
 
-    return true;
+    // Every line looked through, whatever an earlier one held: the look takes no shorter for a hit.
+    return !answers
+        .flat()
+        .map((line) => line !== null && !HTTP_ONLY_RE.test(line) && hasSecret(line.split(";", 1)[0] ?? "", password))
+        .includes(true);
 };
 
 /**
@@ -1304,96 +1178,60 @@ const forgetAnswer = async (page: Page, ms: number): Promise<boolean> => {
 /**
  * Takes the password out of the page before `deadline`, with the guard and the channel lock still holding and the tab's
  * scripts off: leaves the document that had it for `about:blank` (its `pagehide` and `unload` handlers run under them,
- * and the workers it started go with it), loads the address again by GET when the hold leaves time for it, never
- * resending the form, and looks (`isClean`) before any script of it runs. The tab's history and the HTTP cache are then
- * dropped (`forgetAnswer`), so no script goes back to the answer. Only a clean page has the lock lifted
- * (`release`, which must end within a second), and is then loaded once more with its scripts, time allowing. An address
- * that carries the password is not loaded again: the page stays blank, which is clean. Whether the page is verifiably
- * clean in time: when it is not, it must not be used again.
+ * and the workers it started go with it) and drops the tab's history and the HTTP cache (`forgetAnswer`), so no script goes back to the answer. The page is never loaded again: the session goes on from that
+ * blank tab. Only then, where nothing of the site runs to see it, the cookies are looked at (`isClean`): clean, the lock
+ * lifts (`release`, which must end within a second) and the tab is left for a blank page loaded without it; not, the
+ * caller closes the tab and its browser. Every step up to the look is the same whatever the look finds, so nothing the
+ * page or its site sees hangs on the password. Whether the session may go on: when it may not, it must not be used again.
  */
 const clearPassword = async (
     page: Page,
-    {
-        deadline,
-        guard,
-        navTimeout,
-        now,
-        password,
-        release,
-    }: { deadline: number; guard: Guard; navTimeout: number; now: () => number; password: string; release: () => Promise<void> },
+    { deadline, guard, now, password, release }: { deadline: number; guard: Guard; now: () => number; password: string; release: () => Promise<void> },
 ): Promise<boolean> => {
-    const address = page.url();
-    // The end of the time the reload and the look may take: the release has the last second.
+    // The end of the time the steps and the look may take: the release has the last second.
     const lookUntil = deadline - CLOSE_MS;
+    /** Leaves the tab's document for a blank one, within `ms`; whether it did. */
+    const toBlank = async (ms: number): Promise<boolean> =>
+        // Refused at zero: Playwright reads a timeout of 0 as no time limit at all.
+        ms > 0 &&
+        page
+            .goto("about:blank", { timeout: ms })
+            .then(() => true)
+            .catch(() => false);
 
-    try {
-        // The command can stall: the hold ends regardless, and the page is closed.
-        if (now() >= lookUntil || !(await within(guard.shield(), lookUntil - now(), false))) {
-            return false;
-        }
-
-        // Taken once and refused at zero: Playwright reads a timeout of 0 as no time limit at all.
-        const blankWithin = lookUntil - now();
-
-        if (blankWithin <= 0) {
-            return false;
-        }
-
-        await page.goto("about:blank", { timeout: blankWithin });
-    } catch {
+    // The command can stall: the hold ends regardless, and the page is closed.
+    if (now() >= lookUntil || !(await within(guard.shield(), lookUntil - now(), false)) || !(await toBlank(lookUntil - now()))) {
         return false;
     }
 
-    const reloadMs = lookUntil - CHECK_MS - now();
-    const isReloaded = reloadMs >= 1000 && originOf(address) !== null && !hasSecret(address, password);
-
-    if (isReloaded) {
-        guard.admit(address);
-
-        try {
-            await page.goto(address, { timeout: Math.min(navTimeout, reloadMs), waitUntil: "domcontentloaded" });
-        } catch {
-            return false;
-        }
-
-        if (
-            !(await within(
-                isClean(page, password).catch(() => false),
-                lookUntil - now(),
-                false,
-            ))
-        ) {
-            return false;
-        }
-    }
-
     // The answer to the form's POST is still an entry of the tab's history and of the browser's cache, which a script
-    // could go back to or load once scripts run again: both are dropped first, or the page is not handed on.
+    // could go back to or load once scripts run again.
     if (!(await forgetAnswer(page, lookUntil - now()))) {
         return false;
     }
 
-    // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
-    if (
-        !(await within(
-            release()
-                .then(() => true)
-                .catch(() => false),
-            CLOSE_MS,
-            false,
-        ))
-    ) {
+    const isClear = await within(
+        isClean(guard, password).catch(() => false),
+        lookUntil - now(),
+        false,
+    );
+
+    if (!isClear) {
         return false;
     }
 
-    // The page as the session goes on with it, scripts and all: it was clean without them.
-    const reloadWithin = deadline - now();
+    // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
+    const isReleased = await within(
+        release()
+            .then(() => true)
+            .catch(() => false),
+        CLOSE_MS,
+        false,
+    );
 
-    if (isReloaded && reloadWithin >= 1000) {
-        await page.reload({ timeout: reloadWithin, waitUntil: "domcontentloaded" }).catch(() => undefined);
-    }
-
-    return true;
+    // The blank document was loaded under the lock and keeps its locked APIs: the session goes on from a fresh one. No
+    // site sees either load.
+    return isReleased && toBlank(Math.min(1000, deadline - now()));
 };
 
 /**
@@ -1401,22 +1239,21 @@ const clearPassword = async (
  * on `origin` (after redirects, and again right before each field is typed), type the username into the text field
  * before the first visible password field of the main frame and the password into that password field only, and send
  * that field's own form, only by POST and only to `origin`, while every request elsewhere is blocked. Whatever happens
- * once the password is typed, the page leaves that document and is loaded again; when that cannot be confirmed clean
- * before `deadline` the page is closed and the result says the session must be closed. The URL, title and error are
- * scrubbed of the password. The steps before the cleanup end `CLEANUP_MS` before `deadline`, so the cleanup has its own
+ * once the password is typed, the page leaves that document, is loaded again to be looked at, and is left for a blank
+ * tab, the same way whatever the look finds; when it cannot be confirmed clean before `deadline` the page is closed and
+ * the result says the session must be closed. The URL, title and error are withheld whole when they carry the password. The steps before the cleanup end `CLEANUP_MS` before `deadline`, so the cleanup has its own
  * time inside the hold.
  */
 export const signIn = async (page: Page, options: SignInOptions): Promise<SignInResult> => {
     const { deadline, navTimeout, now = Date.now, origin, pageTimeout, password, url, username } = options;
     const scrub = (text: string): string => withoutSecret(text, password);
-    const isAscii = ASCII_RE.test(password);
 
     /** The time a step may take: never into the cleanup's time, and no step at all once that began. */
     const left = (cap: number): number => {
         const ms = deadline - CLEANUP_MS - now();
 
         if (ms <= 0) {
-            throw new OutOfTimeError("The sign-in ran out of time");
+            throw new SignInStop("The sign-in ran out of time");
         }
 
         return Math.min(cap, ms);
@@ -1425,10 +1262,13 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     const offSite = (): string | null => {
         const at = originOf(page.url());
 
-        return at === origin ? null : `The page left ${origin} (it is on ${at ?? "no site"})`;
+        // Not where it went: the page picks that name, and a result that is withheld for holding the password would say so.
+        return at === origin ? null : `The page left ${origin}`;
     };
 
     let guard: Guard | undefined;
+    /** The main frame's document the password was typed into (`documentOf`), `null` when it could not be read. */
+    let typedIn: string | null = null;
     let lock: ChannelLock | undefined;
     let isLocking = false;
     let isStalled = false;
@@ -1449,7 +1289,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         if (!settled) {
             isStalled = true;
 
-            throw new Error(why);
+            throw new SignInStop(why);
         }
 
         return settled.value;
@@ -1467,7 +1307,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         );
 
         if (!settled) {
-            throw new Error("The login page did not answer in time, so the password was not typed");
+            throw new SignInStop("The login page did not answer in time, so the password was not typed");
         }
 
         return settled.value;
@@ -1477,7 +1317,9 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         const refused = guard ? null : lock?.refused();
         const why = refused ? `${error} (the page tried to start ${refused}, which is off while a saved login signs in, so it may not have loaded)` : error;
 
-        return { error: scrub(why), submitted: Boolean(guard?.submitted()), success: false, url: scrub(page.url()) };
+        // No address here: until the site answers with a page of its own, the page chooses it, and whether it is withheld
+        // would tell of a guess put there. The sign-in's end adds the answer's (`isAnswerShown`).
+        return { error: scrub(why), submitted: Boolean(guard?.submitted()), success: false };
     };
 
     /** Opens the page and finds the fields; the password field, or why nothing will be typed. */
@@ -1502,7 +1344,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return "No password field is on the page";
             }
 
-            const form = await answered(async () => field.evaluate(checkForm, { isAscii, origin }));
+            const form = await answered(async () => field.evaluate(checkForm, { origin }));
 
             if (form === "no-form") {
                 return "The password field is not in a form, so nothing was typed or sent";
@@ -1666,6 +1508,19 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
             throw error;
         });
+
+        // A frame whose lock failed stays paused; the password is not typed beside it.
+        if (locked.unlocked()) {
+            return failed("A frame of the login page could not be locked down, so the password was not typed");
+        }
+
+        // The document the page holds now: an answer that loads none (a 204) leaves it, and its title and address with it.
+        typedIn = await within(
+            documentOf(page).catch(() => null),
+            left(1000),
+            null,
+        );
+
         // One call sets the whole value: no keystroke can land after the hold.
         await field.fill(stand, { timeout: left(pageTimeout) });
         // A page with an unload listener is never kept in the back/forward cache, where the filled form would wait.
@@ -1686,7 +1541,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         // The page's submit handlers run inside this call: one that never returns must not hold it past the deadline.
         const form = await within<ReturnType<typeof checkForm> | "busy">(
-            field.evaluate(checkForm, { expected: { charset: target.charset, enctype: target.enctype }, isAscii, origin }),
+            field.evaluate(checkForm, { expected: { charset: target.charset, enctype: target.enctype }, origin }),
             left(pageTimeout),
             "busy",
         );
@@ -1782,7 +1637,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         );
     };
 
-    const result = await attempt().catch((error: unknown) => failed(error instanceof Error ? error.message : String(error)));
+    const result = await attempt().catch((error: unknown) => {
+        // Once the site has the password, the browser's own words may stand: the page learns nothing it does not have.
+        const message = error instanceof Error ? error.message : String(error);
+
+        return failed(guard?.submitted() ? message : ownMessage(error));
+    });
 
     // The guard is armed right before the password is typed: without it, the password never reached the page.
     if (!guard) {
@@ -1799,11 +1659,14 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         if (isLocking && !result.success) {
             // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
-            const isReleased = await within(
-                (lock?.release() ?? Promise.resolve()).then(() => true).catch(() => false),
-                CLOSE_MS,
-                false,
-            );
+            // A cross-site frame left paused because its lock failed would run once the lock lets go: closed instead.
+            const isReleased =
+                !lock?.unlocked() &&
+                (await within(
+                    (lock?.release() ?? Promise.resolve()).then(() => true).catch(() => false),
+                    CLOSE_MS,
+                    false,
+                ));
             // The document loaded under the lock keeps its locked APIs: the session goes on from a blank page, or none.
             const isBlank =
                 isReleased &&
@@ -1842,6 +1705,11 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         if (scripts.status !== "fulfilled" || !scripts.value) {
             throw new Error("The tab's scripts could not be turned back on");
         }
+
+        // A frame whose lock failed was left paused; it is gone with the page it was in, but the session is not lent on.
+        if (lock?.unlocked()) {
+            throw new Error("A frame of the page could not be locked");
+        }
     };
 
     // Read before the cleanup leaves the page, in the time the cleanup does not need: where the sign-in landed, and
@@ -1852,10 +1720,21 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
               true,
           ])
         : ["", false];
-    const landedAt = scrub(page.url());
+    // The answer's title and address only when the form was sent and the answer is a document of its own: one that
+    // loaded none (a 204) leaves the page's own, which a script set before the send, and whether it is withheld would
+    // tell of a guess put there.
+    const isAnswerShown =
+        armed.submitted() &&
+        typedIn !== null &&
+        (await within(
+            documentOf(page).catch(() => typedIn),
+            Math.max(0, Math.min(1000, deadline - CLEANUP_MS - now())),
+            typedIn,
+        )) !== typedIn;
+    const landedAt = isAnswerShown ? scrub(page.url()) : origin;
 
     // Whatever happened once the password was typed, it leaves the page before anything else can read the page.
-    if (!(await clearPassword(page, { deadline, guard: armed, navTimeout, now, password, release }))) {
+    if (!(await clearPassword(page, { deadline, guard: armed, now, password, release }))) {
         // Closed before the lock lifts: a worker it holds would run once let go.
         await within(
             page
@@ -1868,7 +1747,9 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         );
 
         return {
-            error: "The password could not be cleared from the page in time",
+            error: lock?.unlocked()
+                ? "A frame of the login page could not be locked down, so it was kept from running"
+                : "The password could not be cleared from the page in time",
             sessionClosed: true,
             submitted: guard.submitted(),
             success: false,
@@ -1877,8 +1758,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
     if (!result.success) {
         // A send handed on while the result was being settled counts.
-        return { ...result, submitted: armed.submitted() };
+        return { ...result, submitted: armed.submitted(), ...(isAnswerShown && { url: landedAt }) };
     }
 
-    return { ...result, passwordFieldRemains, title: scrub(title), url: landedAt };
+    return { ...result, passwordFieldRemains, title: isAnswerShown ? scrub(title) : "", url: landedAt };
 };

@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { originOf, signIn, TYPE_RESERVE_MS, withoutSecret } from "./login";
+import { originOf, ownMessage, signIn, TYPE_RESERVE_MS, withoutSecret } from "./login";
 import type { HoldKind, SessionHold } from "./session-lock";
 import { holdSession, LEASE_MS } from "./session-lock";
 
@@ -328,13 +328,19 @@ const BUSY_IN_USE = "The browser session is busy with another call; try the sign
 
 const LOCK_UNREACHABLE = "The browser session's lock did not answer in time, so nothing was run; try it again in a moment";
 
+/**
+ * The header on an `/action` answer that ran nothing (a session held by a sign-in, retired, or whose lock did not
+ * answer): the backend gives back the rate-limit charge such an action took.
+ */
+const NOT_RUN = { "x-browser-action": "not-run" } as const;
+
 /** A session refused for good (`SessionHolds.isRetired`): the caller starts a new one, with no `sessionId`. */
 const SESSION_RETIRED = "SESSION_RETIRED";
 
 const retiredAnswer = (what: string) =>
     Response.json(
         { code: SESSION_RETIRED, error: `The browser session was retired and is never used again, so ${what}; start a new session`, success: false },
-        { status: 410 },
+        { headers: NOT_RUN, status: 410 },
     );
 
 /**
@@ -395,8 +401,8 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>): Promise<Respon
 
     if (refused) {
         return refused === "busy"
-            ? Response.json({ error: BUSY_SIGNING_IN, success: false }, { status: 409 })
-            : Response.json({ error: LOCK_UNREACHABLE, success: false }, { status: 503 });
+            ? Response.json({ error: BUSY_SIGNING_IN, success: false }, { headers: NOT_RUN, status: 409 })
+            : Response.json({ error: LOCK_UNREACHABLE, success: false }, { headers: NOT_RUN, status: 503 });
     }
 
     let response: Response | undefined;
@@ -407,9 +413,23 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>): Promise<Respon
         const isHeld = await holds.release();
 
         if (!isHeld && response) {
+            // The action may have run: the caller is told to look before it repeats it, and keeps the browser it has
+            // (a browser the lost hold closed has no id in the answer any more).
+            const { sessionId: kept } = (await response
+                .clone()
+                .json()
+                .catch(() => {
+                    return {};
+                })) as { sessionId?: unknown };
+
             response = Response.json(
-                { error: "The browser session's hold could not be confirmed for the whole action, so its result is withheld; try it again", success: false },
-                { status: 503 },
+                {
+                    error: "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it",
+                    ...(typeof kept === "string" && { sessionId: kept }),
+                    success: false,
+                },
+                // An answer that ran nothing still says so: its rate-limit charge is given back.
+                { status: 503, ...(response.headers.get("x-browser-action") === "not-run" && { headers: NOT_RUN }) },
             );
         }
     }
@@ -479,7 +499,7 @@ const actHeld = async (
 
             return Response.json(
                 { error: refused === "busy" ? BUSY_SIGNING_IN : LOCK_UNREACHABLE, success: false },
-                { status: refused === "busy" ? 409 : 503 },
+                { headers: NOT_RUN, status: refused === "busy" ? 409 : 503 },
             );
         }
 
@@ -1028,7 +1048,8 @@ const signInHeld = async (
         result = await signIn(page, { deadline, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
     } catch (error) {
         // Before anything was typed (`signIn` handles every error after): the session holds no password.
-        return { body: { error: scrub(error), sessionId: opened?.sessionId, success: false }, status: 500 } as const;
+        // Its own reason, or a fixed text: a browser error can name what the page chose.
+        return { body: { error: scrub(ownMessage(error)), sessionId: opened?.sessionId, success: false }, status: 500 } as const;
     }
 
     if (result.success || !result.sessionClosed) {

@@ -1,7 +1,7 @@
 import type { Page } from "@cloudflare/playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { signIn, standIn, standInFor, withoutSecret, withPassword } from "./login";
+import { signIn, standIn, standInFor, WITHHELD, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -10,8 +10,6 @@ const NEVER = new Promise<never>(() => {
 });
 
 const PERCENT_ESCAPE_RE = /%[0-9A-F]{2}/g;
-
-const LEFT_AROUND_RE = /^token=[\w%+/-]{0,6}\[password\][\w%+/=-]{0,9}$/;
 
 const base64 = (text: string): string => Buffer.from(text).toString("base64");
 
@@ -27,48 +25,51 @@ describe(withoutSecret, () => {
         ["HTML-escaped", SECRET.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")],
         ["HTML numeric entities", [...SECRET].map((character) => `&#${character.codePointAt(0)};`).join("")],
         ["HTML hex entities", [...SECRET].map((character) => `&#X${character.codePointAt(0)?.toString(16).toUpperCase()};`).join("")],
-    ])("hides the %s password", (_name, spelling) => {
-        const scrubbed = withoutSecret(`Welcome ${spelling} back`, SECRET);
+    ])("withholds a text with the %s password whole", (_name, spelling) => {
+        expect(withoutSecret(`Welcome ${spelling} back`, SECRET)).toBe(WITHHELD);
+    });
 
-        expect(scrubbed).toBe("Welcome [password] back");
+    it("withholds an address whole, never marking which of the guesses in it is the password", () => {
+        const address = `https://example.com/home?a=wrong-guess&b=${encodeURIComponent(SECRET)}&c=other`;
+
+        expect(withoutSecret(address, SECRET)).toBe(WITHHELD);
     });
 
     it.each([
         ["base64", (text: string) => base64(text)],
         ["base64url", (text: string) => base64(text).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")],
         ["URL-encoded base64", (text: string) => encodeURIComponent(base64(text))],
-    ])("hides a %s password at every byte alignment", (_name, encode) => {
+    ])("withholds a text with a %s password at every byte alignment", (_name, encode) => {
         for (const prefix of ["", "a", "ab"]) {
-            // What is left either side is the prefix's and the suffix's own characters, at most a few.
-            expect(withoutSecret(`token=${encode(`${prefix}${SECRET}!`)}`, SECRET)).toMatch(LEFT_AROUND_RE);
+            expect(withoutSecret(`token=${encode(`${prefix}${SECRET}!`)}`, SECRET)).toBe(WITHHELD);
         }
     });
 
     it.each([2, 6, 10])("withholds a text that carries the password encoded %i times, which no replacement reaches", (depth) => {
-        expect(withoutSecret(`/home?returnTo=${encodedTimes(SECRET, depth)} at 100%`, SECRET)).toBe("[withheld: it holds the password]");
+        expect(withoutSecret(`/home?returnTo=${encodedTimes(SECRET, depth)} at 100%`, SECRET)).toBe(WITHHELD);
     });
 
     it("withholds a text whose encoded password sits in a run of escapes with a byte that is no UTF-8", () => {
         const everyByteEscaped = [...new TextEncoder().encode(SECRET)].map((byte) => `%${byte.toString(16)}`).join("");
 
-        expect(withoutSecret(`/home?returnTo=%FF${encodedTimes(everyByteEscaped, 2)}`, SECRET)).toBe("[withheld: it holds the password]");
+        expect(withoutSecret(`/home?returnTo=%FF${encodedTimes(everyByteEscaped, 2)}`, SECRET)).toBe(WITHHELD);
     });
 
     it.each([1, 2, 4])("withholds a password that holds an escape of its own, encoded %i more times", (depth) => {
         const secret = "x%41y";
 
-        expect(withoutSecret(`q=${encodedTimes(secret, depth)}`, secret)).toBe(depth === 1 ? "q=[password]" : "[withheld: it holds the password]");
+        expect(withoutSecret(`q=${encodedTimes(secret, depth)}`, secret)).toBe(WITHHELD);
     });
 
     it("withholds a large text whose layers take longer to read through than its budget", () => {
-        expect(withoutSecret(`${"a".repeat(1_000_000)}${encodedTimes("a b", 8)}`, SECRET)).toBe("[withheld: it holds the password]");
+        expect(withoutSecret(`${"a".repeat(1_000_000)}${encodedTimes("a b", 8)}`, SECRET)).toBe(WITHHELD);
     });
 
     it("withholds a text encoded more deeply than it is read through", () => {
         // Each layer escapes the first hex digit of the one below: no escape of `%` alone, so every layer takes a round.
         const layers = 40;
 
-        expect(withoutSecret(`${"%".repeat(layers + 1)}${"3".repeat(layers)}41`, SECRET)).toBe("[withheld: it holds the password]");
+        expect(withoutSecret(`${"%".repeat(layers + 1)}${"3".repeat(layers)}41`, SECRET)).toBe(WITHHELD);
     });
 
     it("keeps text without the password", () => {

@@ -816,6 +816,34 @@ export const createRatelimit = (
             }
         },
 
+        /**
+         * Gives back `count` units a charge took for work that was then refused before it ran, up to the window's
+         * capacity. The limiter takes no negative count, so the stored value is changed directly, under the storage key
+         * the limiter writes (`name` and key, each URI-encoded); a window that has rolled over since is left alone.
+         */
+        refund: async (identifier: string, count = 1) => {
+            const storageKey = `${encodeURIComponent(name)}:${encodeURIComponent(`neore:${name}:${identifier}`)}`;
+            const stored = await store.get(storageKey);
+
+            if (!stored) {
+                return;
+            }
+
+            if (config.kind === "sliding window") {
+                await store.set(storageKey, { ...stored, value: Math.max(0, stored.value - count) });
+
+                return;
+            }
+
+            const windowStart = config.kind === "fixed window" ? Math.floor(Date.now() / config.period) * config.period : stored.ts;
+
+            if (stored.ts !== windowStart) {
+                return;
+            }
+
+            await store.set(storageKey, { ...stored, value: Math.min(config.capacity ?? config.rate, stored.value + count) });
+        },
+
         resetUsedTokens: async (identifier: string) => {
             await limiter.reset(name, { key: `neore:${name}:${identifier}` });
         },

@@ -114,8 +114,12 @@ const PAGE_LOCK = `(() => {
 const KINDS = new Map([
     ["page", "a new window"],
     ["shared_worker", "a shared worker"],
+    ["unlocked_frame", "a cross-site frame that could not be locked"],
     ["worker", "a worker"],
 ]);
+
+/** How long a cross-site frame's lock commands may take to be confirmed: past it, the frame stays paused. */
+const FRAME_LOCK_MS = 5000;
 
 /**
  * The targets of a tab's context the browser session closes: windows and shared workers. Not a service worker: closing
@@ -159,6 +163,7 @@ export interface ChannelLock {
     onRefused: (listener: ((what: string) => void) | null) => void;
     /** The first target stopped since the lock was set, for an error message. */
     refused: () => string | null;
+
     /** Lifts the lock: every session it holds is detached, which drops its script and settings with it. */
     release: () => Promise<void>;
 
@@ -173,6 +178,12 @@ export interface ChannelLock {
      * no script reached): the browser would prefetch what they match itself.
      */
     speculates: () => Promise<boolean>;
+
+    /**
+     * Whether a cross-site frame's lock was not confirmed: the frame is left paused, and the page must not be handed on,
+     * since letting go of the lock lets the frame run.
+     */
+    unlocked: () => boolean;
 }
 
 /**
@@ -198,6 +209,9 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
     let decide: ((route: Route) => Promise<void>) | null = null;
     let isRouted = false;
     let id = 0;
+    let isUnlocked = false;
+    /** The commands sent into a child session, by id, waiting for its answer: whether it was carried out. */
+    const answers = new Map<number, (isDone: boolean) => void>();
     const sessions: CDPSession[] = [];
     let own: CDPSession | undefined;
     /** The speculation rule sets of the tab's documents, by id: the loader of the document each is in. */
@@ -237,17 +251,41 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
             session.send(method as "Runtime.evaluate", params as never).catch(() => undefined);
         };
 
+    /** Sends into a child session; the command's id, by which `answers` hears how it went. */
     const into =
-        (parent: Post, sessionId: string): Post =>
-        (method, params = {}) => {
+        (parent: Post, sessionId: string) =>
+        (method: string, params: Record<string, boolean | string> = {}): number => {
             id += 1;
             parent("Target.sendMessageToTarget", { message: JSON.stringify({ id, method, params }), sessionId });
+
+            return id;
         };
 
-    const lockDocuments = (post: Post): void => {
-        post("Page.enable");
-        post("Page.addScriptToEvaluateOnNewDocument", { runImmediately: true, source: PAGE_LOCK });
-        post("Target.setAutoAttach", { autoAttach: true, flatten: false, waitForDebuggerOnStart: true });
+    /** Whether a cross-site frame took its lock (the lock script for each new document, its own frames held), within `FRAME_LOCK_MS`. */
+    const lockDocuments = async (post: ReturnType<typeof into>): Promise<boolean> => {
+        const confirmed = [
+            post("Page.enable"),
+            post("Page.addScriptToEvaluateOnNewDocument", { runImmediately: true, source: PAGE_LOCK }),
+            post("Target.setAutoAttach", { autoAttach: true, flatten: false, waitForDebuggerOnStart: true }),
+        ].map(
+            async (sent) =>
+                new Promise<boolean>((resolve) => {
+                    const timer = setTimeout(() => {
+                        answers.delete(sent);
+                        resolve(false);
+                    }, FRAME_LOCK_MS);
+
+                    answers.set(sent, (isDone) => {
+                        clearTimeout(timer);
+                        answers.delete(sent);
+                        resolve(isDone);
+                    });
+                }),
+        );
+
+        const answered = await Promise.all(confirmed);
+
+        return answered.every(Boolean);
     };
 
     /**
@@ -259,8 +297,19 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
         const post = into(parent, sessionId);
 
         if (targetInfo.type === "iframe") {
-            lockDocuments(post);
-            post("Runtime.runIfWaitingForDebugger");
+            // Let run only once every lock command is confirmed: one that failed leaves the frame paused, never unlocked.
+            lockDocuments(post)
+                .then((isLocked) => {
+                    if (isLocked) {
+                        post("Runtime.runIfWaitingForDebugger");
+                    } else {
+                        isUnlocked = true;
+                        refuse("unlocked_frame");
+                    }
+
+                    return isLocked;
+                })
+                .catch(() => undefined);
         } else if (isNested && waitingForDebugger) {
             refuse(targetInfo.type);
         }
@@ -268,7 +317,7 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
 
     /** A message from a child session: its own children are attached and talked to through it. */
     const onMessage = (parent: Post, { message, sessionId }: { message: string; sessionId: string }): void => {
-        let parsed: { method?: string; params?: unknown };
+        let parsed: { error?: unknown; id?: unknown; method?: string; params?: unknown };
 
         try {
             parsed = JSON.parse(message) as typeof parsed;
@@ -276,7 +325,9 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
             return;
         }
 
-        if (parsed.method === "Target.attachedToTarget") {
+        if (typeof parsed.id === "number") {
+            answers.get(parsed.id)?.(parsed.error === undefined);
+        } else if (parsed.method === "Target.attachedToTarget") {
             onChild(into(parent, sessionId), parsed.params as Attached, true);
         } else if (parsed.method === "Target.receivedMessageFromTarget") {
             onMessage(into(parent, sessionId), parsed.params as { message: string; sessionId: string });
@@ -399,5 +450,6 @@ export const lockChannels = async (page: Page): Promise<ChannelLock> => {
 
             return false;
         },
+        unlocked: () => isUnlocked,
     };
 };

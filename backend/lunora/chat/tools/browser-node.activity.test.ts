@@ -291,6 +291,32 @@ describe("a browser action on a running browser", () => {
         expect(after.inUseHolds).toBeUndefined();
     });
 
+    it.each([
+        ["a sign-in holds the browser", { data: undefined, error: { error: "signing in", success: false }, response: { ok: false, status: 409 } }],
+        [
+            "its session lock did not answer",
+            {
+                data: undefined,
+                error: { error: "lock", success: false },
+                response: { headers: new Headers({ "x-browser-action": "not-run" }), ok: false, status: 503 },
+            },
+        ],
+    ])("gives back the rate-limit charge of an action the renderer ran none of because %s", async (_why, refused) => {
+        await addSession(NOW - 1000);
+        // One unit left of the hour's 200.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 199, identifier: OWNER, key: "browser/action:premium" }));
+        renderer.mockResolvedValueOnce(refused);
+
+        await act().catch(() => undefined);
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/" }));
+
+        await expect(act()).resolves.toMatchObject({ success: true });
+        // That unit is now spent: the next one is refused before the renderer is called.
+        await expect(act()).resolves.toMatchObject({ error: "Browser automation rate limit exceeded.", success: false });
+        expect(renderer).toHaveBeenCalledTimes(2);
+    });
+
     it("drops a session the renderer retired, so the next action opens a new browser, and tells the agent to navigate first", async () => {
         await addSession(NOW - 1000);
         renderer.mockResolvedValueOnce({

@@ -110,14 +110,12 @@ export const executeBrowserAction = internalAction
                 const { inspecting } = use;
 
                 // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser,
-                // nor one of the human-check ladder's own reads.
+                // nor one of the human-check ladder's own reads, nor one the renderer refused unrun (`refund`).
+                const rateKey = `browser/action:${args.userTier ?? "free"}`;
                 const rlResult =
                     args.ladderLook === true
                         ? { ok: true }
-                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
-                              identifier: userId,
-                              key: `browser/action:${args.userTier ?? "free"}`,
-                          });
+                        : await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key: rateKey });
 
                 if (!rlResult.ok) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
@@ -132,6 +130,13 @@ export const executeBrowserAction = internalAction
                         success: false,
                     };
                 }
+
+                /** Gives back the charge of an action the renderer ran none of (a sign-in held it, it was retired, its lock did not answer). */
+                const refund = async (): Promise<void> => {
+                    if (args.ladderLook !== true) {
+                        await ctx.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key: rateKey });
+                    }
+                };
 
                 // After a hand back the page is not the one the agent planned against: it looks before it acts. A
                 // navigate to a browser that was closed runs as asked: there is no page left to look at.
@@ -183,6 +188,7 @@ export const executeBrowserAction = internalAction
                     // Another action moved the row on meanwhile: its browser is the thread's, and this one opens none beside it.
                     if (dropped.closed === true || dropped.replaced) {
                         await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                        await refund();
 
                         const discarded =
                             dropped.closed === true ? { error: BROWSER_CLOSED_DURING_ACTION, success: false } : browserReplacedResult(dropped.currentUrl);
@@ -209,6 +215,8 @@ export const executeBrowserAction = internalAction
                         success: false,
                     });
 
+                    await refund();
+
                     const retired = { error: BROWSER_SESSION_RETIRED, success: false };
 
                     return returned === undefined ? retired : handedBackResult(retired, returned);
@@ -217,6 +225,7 @@ export const executeBrowserAction = internalAction
                 // A sign-in with a saved login holds the browser: the renderer ran nothing, so the hold ends here.
                 if (response?.status === 409) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                    await refund();
 
                     const busy = { error: BROWSER_BUSY_SIGNING_IN, success: false };
 
@@ -224,6 +233,11 @@ export const executeBrowserAction = internalAction
                 }
 
                 if (error || !response?.ok || !data) {
+                    // The renderer says it ran nothing (its session lock did not answer): the charge is given back.
+                    if (response?.headers?.get?.("x-browser-action") === "not-run") {
+                        await refund();
+                    }
+
                     throw new LunoraError("INTERNAL", `Browser renderer returned ${response?.status ?? "no response"}: ${JSON.stringify(error)}`);
                 }
 

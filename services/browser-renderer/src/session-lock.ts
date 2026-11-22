@@ -165,7 +165,8 @@ export const holdSession = async (
     const taken = await ask(namespace, sessionId, { kind, leaseMs: LEASE_MS, op: "take", token });
 
     if (!taken) {
-        // Never rejects; not awaited, so the refusal is not held up by a lock that does not answer.
+        // Never rejects; not awaited, so the refusal is not held up by a lock that does not answer. The lock keeps the
+        // token as released, so the take, should it arrive after this, holds nothing.
         ask(namespace, sessionId, { op: "release", token }).catch(() => undefined);
 
         return "unreachable";

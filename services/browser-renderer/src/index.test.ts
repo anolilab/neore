@@ -478,6 +478,8 @@ describe("the session hold every isolate shares", () => {
         const response = await answer;
 
         expect(response.status).toBe(503);
+        // Nothing ran: the backend gives the action's rate-limit charge back.
+        expect(response.headers.get("x-browser-action")).toBe(path === "/action" ? "not-run" : null);
         expect(started).toStrictEqual([]);
     });
 
