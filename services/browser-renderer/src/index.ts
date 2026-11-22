@@ -21,6 +21,7 @@ import type { SecretScan } from "./login";
 import { originOf, ownMessage, secretScan, signIn, TYPE_RESERVE_MS } from "./login";
 import type { HoldKind, SessionHold } from "./session-lock";
 import { holdSession, LEASE_MS } from "./session-lock";
+import { readTarget, TARGET_READ_OPTIONS } from "./target-read";
 
 // The Durable Object the `SESSION_LOCK` binding names: exported by the Worker's main module.
 export { SessionLock } from "./session-lock";
@@ -55,353 +56,14 @@ const actionSchema = z.object({
 /** Hoisted so they are compiled once, not on every request. */
 const DIGITS_RE = /^\d+$/;
 
-/** The longest accessible name the approval read returns; a longer one is cut and reported (`labelTruncated`). */
-const LABEL_MAX_LENGTH = 15_000;
-
-const WHITESPACE_RE = /\s+/u;
-
-/** A label that is only a submit word (with optional punctuation): "Confirm", "Weiter.", never "Continue shopping". */
-const SUBMIT_WORD_RE = /^(?:confirm|submit|continue|complete|place|weiter|bestätigen|absenden)[.!]?$/iu;
-
-/** A host of a payment provider: a card form whose frame or post goes there is a checkout. A captcha or a contact form's host is not. */
-const PAYMENT_HOST_RE = /pay|stripe|adyen|braintree|checkout|klarna|mollie|sumup|worldpay|saferpay|sofort|wirecard/iu;
-
-/** Splits a URL path into its words, so "cart" is a word of its own and not part of "cartoon". */
-const PATH_SPLIT_RE = /\P{L}+/u;
-
 /** A disabled control is not clicked on an approved target: it is not clicked until it is enabled, on a fresh look. */
 const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at the page again before you click.";
 
+/** The target is not drawn (hidden), so an approved click is not dispatched to it. */
+const NOT_VISIBLE_TARGET = "The target is not visible, so nothing was clicked. Look at the page again before you click.";
+
 /** The click found another element, or this one with other text: the person's yes was for what they were shown. */
 const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
-
-/**
- * Reads a control the way a click reaches it, in the page: `label`, its accessible name (capped; `labelTruncated` when cut),
- * and `target`, a fingerprint of the element (its place in the page, its name and its shown text). A click given that
- * `target` runs only on the element that still has it. The read is one function, so the check and the read agree.
- */
-function readTarget(
-    control: Element,
-    options: { max: number; pathSplitter: RegExp; payment: RegExp; splitter: RegExp; submit: RegExp },
-): { canonical: string; checkout: boolean; label: string; labelTruncated: boolean; shown: string; submitLike: boolean } {
-    // This function is serialized into the page by Playwright (`element.evaluate`). A bundler wraps a named inner function in a
-    // helper the page does not have, so this function declares none: every step is written out in its body.
-    // The elements the click lands in: the control, then each actionable ancestor. A visible child (an icon in a button, a
-    // span in a clickable div) is clicked as those ancestors too. A shadow root is crossed to its host.
-    const actionableSelector =
-        "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
-    const nodes: Element[] = [control];
-    let climb: Element | null = control;
-
-    while (climb !== null) {
-        const root = climb.getRootNode();
-        const parent: Element | null = climb.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
-
-        if (parent !== null && parent.matches(actionableSelector) && !nodes.includes(parent)) {
-            nodes.push(parent);
-        }
-
-        climb = parent;
-    }
-
-    // The nearest actionable element is the one the click lands on, so its text and content count. A farther one (a clickable
-    // list or grid around other items) contributes only its names: its text would make every item in it read as a purchase.
-    const scope = control.matches(actionableSelector) ? control : (nodes[1] ?? control);
-    const names: string[] = [];
-
-    // The elements between the control and the scope (a span with an aria-label around an icon inside a button): their names
-    // count, so an icon named that way does not read as unnamed. Their text does not, as the scope's is what the click reads.
-    const between: Element[] = [];
-    let climbing: Element | null = control;
-
-    while (climbing !== null && climbing !== scope) {
-        const root = climbing.getRootNode();
-        const parent: Element | null = climbing.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
-
-        if (parent !== null && parent !== scope) {
-            between.push(parent);
-        }
-
-        climbing = parent;
-    }
-
-    for (const node of [...nodes, ...between]) {
-        names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
-
-        // Ids are separated by any ASCII whitespace, not only a space.
-        const ids = (node.getAttribute("aria-labelledby") ?? "").split(options.splitter).filter(Boolean);
-
-        for (const id of ids) {
-            const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
-
-            if (target !== null) {
-                // The referenced element's own name (an image's alt, its aria-label or title), its text, and the names inside it.
-                names.push(
-                    target.getAttribute("alt") ?? "",
-                    target.getAttribute("aria-label") ?? "",
-                    target.getAttribute("title") ?? "",
-                    target.textContent ?? "",
-                );
-
-                for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
-                    names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
-                }
-            }
-        }
-
-        // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
-        if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
-            names.push(node.value);
-        }
-
-        // A label is clicked as the control it labels (a submit input, or a button): that control's name and value count too.
-        const labelled = node instanceof HTMLLabelElement ? node.control : null;
-
-        if (labelled !== null) {
-            names.push(labelled.getAttribute("aria-label") ?? "", labelled.getAttribute("title") ?? "");
-
-            if (labelled instanceof HTMLInputElement && ["button", "reset", "submit"].includes(labelled.type)) {
-                names.push(labelled.value);
-            }
-        }
-
-        // The rendered text of the control and of the element it lands on: a child with ordinary text can sit beside a purchase
-        // word the person sees.
-        if ((node === control || node === scope) && node instanceof HTMLElement) {
-            // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
-            names.push(node.innerText);
-        }
-    }
-
-    // The elements inside the scope, including those in an open shadow root (a shadow tree is part of the button it draws).
-    // querySelectorAll stops at a shadow root, so each root found is walked too.
-    const roots: (Element | ShadowRoot)[] = [scope];
-
-    if (scope.shadowRoot !== null) {
-        roots.push(scope.shadowRoot);
-    }
-
-    // A large control is not walked in full: each node costs style and layout reads, so past this many the scan stops and the
-    // read says so (`labelTruncated`), which makes the gate ask rather than clear a target it did not finish reading.
-    const inside: Element[] = [];
-    let isScanCapped = false;
-
-    for (let index = 0; index < roots.length; index++) {
-        // A walk, not querySelectorAll: that lists every descendant before the cap is checked, so a huge control would be listed whole.
-        const walker = document.createTreeWalker(roots[index], NodeFilter.SHOW_ELEMENT);
-
-        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-            if (inside.length >= 2000) {
-                isScanCapped = true;
-                break;
-            }
-
-            const element = node as Element;
-
-            inside.push(element);
-
-            if (element.shadowRoot !== null) {
-                roots.push(element.shadowRoot);
-            }
-        }
-
-        if (isScanCapped) {
-            break;
-        }
-    }
-
-    // Names that come from inside the scope: an image's alt, a child's aria-label or title, an SVG title.
-    const scanned = [scope, ...inside];
-
-    for (const node of scanned) {
-        // What is drawn names the control: a hidden element's aria-label or title does not (only a referenced one does, below).
-        const isDrawn = node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
-
-        // An image (`img`) or an image button (`input type="image"`) names itself by its alt text.
-        if (isDrawn && node.matches("img[alt], input[type='image'][alt], [aria-label], [title]")) {
-            names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
-        }
-
-        // An SVG's title names the drawn SVG (a `<title>` itself is never drawn, so its parent is what is checked).
-        if (node.localName === "title" && node.parentElement?.localName === "svg" && node.parentElement.getClientRects().length > 0) {
-            names.push(node.textContent ?? "");
-        }
-
-        // A descendant's aria-labelledby names its text from elsewhere in the page (or its shadow tree): that text is its name.
-        const referenced = (node.getAttribute("aria-labelledby") ?? "").split(options.splitter).filter(Boolean);
-
-        for (const id of referenced) {
-            const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
-
-            if (target !== null) {
-                // The referenced element's own name (an image's alt, its aria-label or title), its text, and the names inside it.
-                names.push(
-                    target.getAttribute("alt") ?? "",
-                    target.getAttribute("aria-label") ?? "",
-                    target.getAttribute("title") ?? "",
-                    target.textContent ?? "",
-                );
-
-                for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
-                    names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
-                }
-            }
-        }
-    }
-
-    // Generated text (CSS `content`) drawn by the control, the scope, and the elements inside the scope: it is on screen but in
-    // neither innerText nor textContent. An element nothing is drawn for shows none of its own. Stops once past the cap.
-    let generatedLength = 0;
-    const drawn = new Set<Element>([control, scope, ...inside]);
-
-    for (const node of drawn) {
-        if (node.getClientRects().length === 0 || getComputedStyle(node).visibility === "hidden") {
-            continue;
-        }
-
-        // `::marker` is a list item's bullet, which the stylesheet can set to words (a "Buy" marker); it is drawn text too.
-        for (const pseudo of ["::before", "::after", "::marker"]) {
-            const { content } = getComputedStyle(node, pseudo);
-
-            if (content !== "none" && content !== "normal") {
-                // CSS `content` is a sequence of quoted strings (their text) and attr(name) calls (the attribute's value). url()
-                // and counters draw no words of their own, so they add nothing.
-                // A url("...") holds a file name, not text: its quoted part is dropped before the quoted strings are read.
-                const withoutUrls = content
-                    .split("url(")
-                    .map((part, index) => (index === 0 ? part : part.slice(part.indexOf(")") + 1)))
-                    .join("");
-                const quoted = withoutUrls.split('"').filter((_, index) => index % 2 === 1);
-                const attributes = content
-                    .split("attr(")
-                    .slice(1)
-                    .map((part) => node.getAttribute(part.split(")", 1)[0]?.trim() ?? "") ?? "");
-
-                for (const text of [...quoted, ...attributes]) {
-                    names.push(text);
-                    generatedLength += text.length;
-                }
-            }
-        }
-
-        if (generatedLength > options.max) {
-            break;
-        }
-    }
-
-    // Each name source on its own: a submit word is a name only when a source is exactly that word (joined names never are).
-    const isSubmitLike = names.some((part) => options.submit.test(part.trim()));
-    const joined = names.filter(Boolean).join(" ");
-    const label = joined.slice(0, options.max);
-    // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
-    const shown = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
-
-    // The element's place: the tag and position of each ancestor, from the root down, crossing shadow roots like the walk above.
-    const steps: string[] = [];
-    let current: Element | null = control;
-
-    while (current !== null && current !== document.documentElement) {
-        // The position among its siblings, in the parent node: a child of a shadow root has no parent element, so its
-        // siblings are the root's children (indexing those as zero would make two different controls share a place).
-        const { parentNode } = current;
-        const index = parentNode === null ? 0 : [...(parentNode as Element | ShadowRoot).children].indexOf(current);
-        const root = current.getRootNode();
-
-        steps.unshift(`${current.localName}.${index}`);
-        current = current.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
-    }
-
-    // Where the click goes: a link's href, a button's formaction, and the form it submits to. Changing one changes what the
-    // click does, so it is part of the fingerprint.
-    // The form a click submits: a button's own form (its `form` attribute can name one outside it), else the enclosing form.
-    let enclosingForm: HTMLFormElement | null = control.closest("form");
-
-    for (const node of nodes) {
-        if ((node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.form !== null) {
-            enclosingForm = node.form;
-        }
-    }
-
-    let destinations = "";
-
-    for (const node of nodes) {
-        // The resolved address (the `href` and `formAction` properties), not the raw attribute: a `<base>` change or a relative
-        // path moves the same attribute to another site.
-        const link = node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement ? node.href : "";
-        const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
-        // A button's type decides whether its click submits the form ("submit" by default, "button" does not): a change to it
-        // is a change of what the click does.
-        // What a submit sends with the form: a submit control's name and value (an order intent is often a value), and how it
-        // submits (its method). A text field's value is never read: a person may have typed into it.
-        const submitter = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node : null;
-        const isSubmitValued =
-            submitter instanceof HTMLButtonElement ||
-            (submitter instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(submitter.type));
-        const kind = submitter === null ? "" : [submitter.type, submitter.name, isSubmitValued ? submitter.value : "", submitter.formMethod].join("#");
-
-        destinations += `${link}|${formTarget}|${kind}|`;
-    }
-
-    // The form's destination is the browser's own resolved `action` (its native getter, through the prototype): a field named
-    // "action" (or "querySelector") in the form would otherwise shadow the form's own property, and a `<base>` change moves
-    // the destination the browser submits to, which resolving the raw attribute against the page address would miss.
-    const formActionGetter = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "action")?.get;
-    const formAction = enclosingForm === null || formActionGetter === undefined ? "" : String(formActionGetter.call(enclosingForm));
-
-    // The form's method is part of what a submit does (a GET form puts its fields in the address).
-    destinations += enclosingForm === null ? "" : `|${Element.prototype.getAttribute.call(enclosingForm, "method") ?? ""}`;
-
-    destinations += formAction;
-
-    // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
-    // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
-    // there pays, so the gate reads a submit-like label on a checkout as a purchase.
-    // A card form is also one whose fields sit in a frame the page cannot read (a hosted card element), or one that posts to
-    // another site: its fields are not in the DOM, so the field check alone misses it. Only a payment provider's frame or
-    // host counts: a login or contact form with a captcha frame, or one that posts to another site, is not a checkout.
-    // Card fields are read in the form when there is one, and on the page when there is not (a card form built from divs).
-    // A frame or a cross-origin action only counts inside a form, since those are what a hosted card form is.
-    const cardSelector =
-        "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i]";
-    const hasCardFields =
-        (enclosingForm === null ? document.querySelector(cardSelector) : Element.prototype.querySelector.call(enclosingForm, cardSelector)) !== null;
-    const frameSources =
-        enclosingForm === null
-            ? []
-            : [...Element.prototype.querySelectorAll.call(enclosingForm, "iframe")].map((frame) => Element.prototype.getAttribute.call(frame, "src") ?? "");
-    const isPaymentFrame = frameSources.some((source) => source !== "" && options.payment.test(new URL(source, document.URL).hostname));
-    const formUrl = new URL(formAction, document.URL);
-    const isPaymentPost = formUrl.origin !== new URL(document.URL).origin && options.payment.test(formUrl.hostname);
-    const isCardFields = hasCardFields || isPaymentFrame || isPaymentPost;
-    // The address's path words, not the whole address: "cart" is a page's word, "cartoon" or a host name containing it is not.
-    const pathWords = new URL(document.URL).pathname.toLowerCase().split(options.pathSplitter);
-    const isCheckoutPage = pathWords.some(
-        (word) => ["basket", "cart", "checkout", "kasse", "payment", "warenkorb"].includes(word) || word.startsWith("bestell"),
-    );
-
-    // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
-    // different targets share a fingerprint. `targetOf` digests it outside the page.
-    const isCheckout = isCardFields || isCheckoutPage;
-    // The submit-like flag is part of it too: a name change that makes a control submit-like (an arrow named "Review" with a
-    // title "Confirm") invalidates an earlier approval, as the checkout flag does.
-    const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout), String(isSubmitLike)].join("\u{0}");
-
-    return {
-        canonical,
-        checkout: isCheckout,
-        label,
-        labelTruncated: joined.length > options.max || isScanCapped,
-        shown,
-        submitLike: isSubmitLike,
-    };
-}
-
-/** The fingerprint of a read: SHA-256 of its canonical string, computed here (outside the page), where it is compared. */
-const targetOf = async (canonical: string): Promise<string> => {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-
-    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-};
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
 
@@ -885,8 +547,8 @@ const actHeld = async (
                 if (expectTarget === undefined) {
                     await page.click(selector, { timeout: PAGE_TIMEOUT });
                 } else {
-                    // The element is held as a handle from the check to the click: a page change after the check moves
-                    // nothing under it, and a different element (or the same one with other text) is refused.
+                    // The check and the click run as one step in the page (`readTarget` with `click`): the fingerprint is compared
+                    // and the element clicked with nothing in between, so a page change after the check cannot reach the click.
                     const element = await page.$(selector);
 
                     if (!element) {
@@ -895,25 +557,25 @@ const actHeld = async (
                     }
 
                     const read = await element.evaluate(readTarget, {
-                        max: LABEL_MAX_LENGTH,
-                        pathSplitter: PATH_SPLIT_RE,
-                        payment: PAYMENT_HOST_RE,
-                        splitter: WHITESPACE_RE,
-                        submit: SUBMIT_WORD_RE,
+                        click: true,
+                        expect: expectTarget,
+                        ...TARGET_READ_OPTIONS,
                     });
 
-                    if ((await targetOf(read.canonical)) !== expectTarget) {
+                    if (read.refused === "changed") {
                         result = { error: TARGET_CHANGED, success: false, targetChanged: true };
                         break;
                     }
 
-                    // A disabled control is not clicked: its wait for enabling would let the page change under the check.
-                    if (await element.isDisabled()) {
+                    if (read.refused === "disabled") {
                         result = { error: DISABLED_TARGET, success: false };
                         break;
                     }
 
-                    await element.click({ timeout: PAGE_TIMEOUT });
+                    if (read.refused === "hidden") {
+                        result = { error: NOT_VISIBLE_TARGET, success: false };
+                        break;
+                    }
                 }
 
                 await page.waitForTimeout(500);
@@ -943,17 +605,13 @@ const actHeld = async (
                         // The text is `innerText` (hidden descendants left out, so a purchase word the person cannot see does not count),
                         // or the element's own text for an SVG, which has no innerText. The rendered text is read on purpose.
                         const read = await element.evaluate(readTarget, {
-                            max: LABEL_MAX_LENGTH,
-                            pathSplitter: PATH_SPLIT_RE,
-                            payment: PAYMENT_HOST_RE,
-                            splitter: WHITESPACE_RE,
-                            submit: SUBMIT_WORD_RE,
+                            ...TARGET_READ_OPTIONS,
                         });
 
                         extractedText = read.shown;
                         label = read.label;
                         isLabelTruncated = read.labelTruncated;
-                        target = await targetOf(read.canonical);
+                        target = read.target;
                         isCheckout = read.checkout;
                         isSubmitLike = read.submitLike;
                     } else {
