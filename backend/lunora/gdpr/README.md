@@ -129,13 +129,26 @@ Users can request a complete export of all their personal data in JSON format. T
 4. **Files** - File metadata (actual files stored separately)
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
+7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),
+   the sites a run asked the user to clear, and paired extensions (`browser/gdpr.ts#collectBrowserForExport`, a
+   page per workflow step, each stored as an object under the run's prefix and read back by `generateExportFile`, so no
+   call carries the whole history past Lunora's 1 MiB dispatch body; the objects are deleted once the export file's step ends,
+   whatever the outcome, before the steps that follow it; no page is stored once the account's deletion has begun, and a page
+   whose write ends after it began is deleted again). The pages sit under `gdpr-exports/browser-<user>/<run>/`, and the run's record (`usageExportRuns`) is written
+   before the first page, so a run killed before its ending is still cleaned up: the usage sweep deletes a dead run's pages
+   with its usage object, and keeps the record until the pages are gone (a deletion that exhausts its retries is tried again a day on), and account erasure deletes the user's whole prefix (`delete-user-browser-export-pages`). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
+   `control` claim, a typed action's `value` (it can be a password) and an extension's pairing code. A string field
+   over 4 KiB is cut and named in the row's `truncated` (a list keeps every item, the cut ones named: `capabilities[1]`). The
+   section is held to 8 MiB of the file (measured as written, indented) and 256 pages (workflow steps): past either no further
+   page is stored, the rest is left out and the section says `truncated: true`, and the rest of the export is written. The
+   actions are read last, as by far the largest, so a cut drops the newest actions before any session, site or extension is dropped.
 
 **Workflow Steps:**
 
 1. User requests export via `requestDataExport` mutation
 2. Workflow collects data from all tables (parallel queries)
-3. Data is formatted as JSON
-4. JSON is uploaded to R2
+3. `open-export-run` records the run (`usageExportRuns`), then `collect-browser-<n>` stores the browser section a page at a time
+4. Data is formatted as JSON and uploaded to R2; `delete-browser-pages` then deletes the run's browser pages, either way
 5. Signed download URL is generated (7-day expiry)
 6. Email notification sent to user
 
@@ -169,7 +182,8 @@ const { url } = await ctx.runAction(api.gdpr.functions.getExportDownloadUrl, {})
   "conversations": [ ... ],
   "files": { ... },
   "prompts": { ... },
-  "usageHistory": [ ... ]
+  "usageHistory": [ ... ],
+  "browser": { "sessions": [ ... ], "actions": [ ... ], "humanChecks": [ ... ], "extensions": [ ... ] }
 }
 ```
 
@@ -410,6 +424,7 @@ The following tables contain user personal data and are included in exports/dele
 | `promptHistory`     | `schema.ts` | Prompt versions              |
 | `threadAccess`      | `schema.ts` | Shared thread permissions    |
 | `threadInvites`     | `schema.ts` | Thread sharing invites       |
+| `browser*` tables   | `schema.ts` | Browser sessions and use     |
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id
