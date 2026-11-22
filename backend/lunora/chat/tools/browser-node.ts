@@ -7,7 +7,7 @@
  *
  * Supports: navigate, screenshot, click, type, extract, scroll.
  */
-import { browserAction, type BrowserActionResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
+import { browserAction, type BrowserActionRequest, type BrowserActionResponse, createBrowserRendererClient } from "@neore/service-sdk/browser-renderer";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
@@ -149,21 +149,44 @@ export const executeBrowserAction = internalAction
                 callSignal = AbortSignal.timeout(budget);
                 callEndsBy = Date.now() + budget;
 
-                const { data, error, response } = await browserAction({
-                    body: looksFirst
-                        ? { action: "screenshot", sessionId: cfSessionId }
-                        : {
-                              action,
-                              direction: args.direction as "up" | "down" | undefined,
-                              fullPage: args.fullPage,
-                              selector: args.selector,
-                              sessionId: cfSessionId,
-                              text: args.text,
-                              url: args.url,
-                          },
-                    client,
-                    signal: callSignal,
-                });
+                const sent: BrowserActionRequest = looksFirst
+                    ? { action: "screenshot", sessionId: cfSessionId }
+                    : {
+                          action,
+                          direction: args.direction as "up" | "down" | undefined,
+                          fullPage: args.fullPage,
+                          selector: args.selector,
+                          sessionId: cfSessionId,
+                          text: args.text,
+                          url: args.url,
+                      };
+                let { data, error, response } = await browserAction({ body: sent, client, signal: callSignal });
+
+                // The renderer retired the session for good (a sign-in on it could not confirm its page clean): its id is
+                // never sent again. A navigate runs at once on a new browser; any other action needs a page first.
+                if (response?.status === 410 && sent.action === "navigate" && sent.sessionId !== undefined) {
+                    ({ data, error, response } = await browserAction({ body: { ...sent, sessionId: undefined }, client, signal: callSignal }));
+                }
+
+                if (response?.status === 410) {
+                    await ctx.runMutation(internal.browser.functions.logAction, {
+                        action: sent.action,
+                        durationMs: Date.now() - startTime,
+                        errorMessage: BROWSER_SESSION_RETIRED,
+                        heldReaped: held.reaped,
+                        heldUntil: held.until,
+                        // No reusable browser: the next action opens a new one.
+                        providerSessionId: NO_PROVIDER_SESSION,
+                        sessionId,
+                        startedAt: startTime,
+                        startedWithProviderSessionId,
+                        success: false,
+                    });
+
+                    const retired = { error: BROWSER_SESSION_RETIRED, success: false };
+
+                    return returned === undefined ? retired : handedBackResult(retired, returned);
+                }
 
                 // A sign-in with a saved login holds the browser: the renderer ran nothing, so the hold ends here.
                 if (response?.status === 409) {
@@ -285,6 +308,10 @@ export const BROWSER_CLOSED_BEFORE_ACTION =
 
 /** The renderer refused the action: a sign-in with a saved login holds the browser for now. */
 export const BROWSER_BUSY_SIGNING_IN = "The browser is busy signing in with a saved login, so this action was not run. Try it again in a moment.";
+
+/** The renderer retired the session for good: its browser is never used again, and the next action opens a new one. */
+export const BROWSER_SESSION_RETIRED =
+    "The browser session was retired and cannot be used again, so this action was not run. The next action opens a new, empty browser: navigate to the page you need first.";
 
 /** The session was closed while the action ran: a later action starts from a new, empty browser. */
 export const BROWSER_CLOSED_DURING_ACTION =

@@ -140,6 +140,12 @@ export type HealthResponse = {
     service?: string;
 };
 
+export type SessionRetiredResponse = {
+    code: 'SESSION_RETIRED';
+    error: string;
+    success: false;
+};
+
 export type ErrorResponse = {
     success?: boolean;
     error?: string;
@@ -165,6 +171,10 @@ export type BrowserActionErrors = {
      * The browser session is signing in with a saved login; nothing was run, and the action can be tried again once that is done
      */
     409: ErrorResponse;
+    /**
+     * The browser session was retired for good (a sign-in on it ended without confirming its page clean); nothing was run. Start a new session: call again without `sessionId`
+     */
+    410: SessionRetiredResponse;
     /**
      * Internal server error
      */
@@ -202,6 +212,10 @@ export type BrowserLoginErrors = {
      * The browser session is busy with another call, of any isolate; nothing was typed
      */
     409: BrowserLoginErrorResponse;
+    /**
+     * The browser session was retired for good; nothing was typed. Start a new session: call again without `sessionId`
+     */
+    410: SessionRetiredResponse;
     /**
      * Internal server error
      */

@@ -826,17 +826,19 @@ export const navigateInControl = authAction
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
         const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
         const signal = budget === 0 ? undefined : AbortSignal.timeout(budget);
-        const { data } =
+        const { data, response } =
             signal === undefined
-                ? { data: undefined }
+                ? { data: undefined, response: undefined }
                 : await browserAction({
                       body: { action: "navigate", sessionId: navigation.providerSessionId, url },
                       client,
                       signal,
                   }).catch(() => {
-                      return { data: undefined };
+                      return { data: undefined, response: undefined };
                   });
         const result = data as BrowserActionResponse | undefined;
+        // The renderer retired the browser for good: the row forgets it, so the next action opens a new one.
+        const isRetired = response?.status === 410;
         // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
         // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
         const mayStillLoad = signal !== undefined && result === undefined && (signal.aborted || Date.now() >= startedAt + budget);
@@ -854,7 +856,7 @@ export const navigateInControl = authAction
                 actor: navigation.byOwner ? "owner" : "collaborator",
                 durationMs: Date.now() - startedAt,
                 ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
-                ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
+                ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
                 sessionId: navigation.sessionId,
                 startedAt,
                 startedWithProviderSessionId: navigation.providerSessionId,
@@ -874,7 +876,11 @@ export const navigateInControl = authAction
 
         // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened
         // the page in a new browser (the old one expired), which ended the lease: the person's view shows a browser gone.
-        if (logged?.replaced === true || (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)) {
+        if (
+            logged?.replaced === true ||
+            isRetired ||
+            (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)
+        ) {
             return { status: "closed" as const };
         }
 

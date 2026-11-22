@@ -1,7 +1,7 @@
 import type { Page } from "@cloudflare/playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { signIn, standIn, withoutSecret, withPassword } from "./login";
+import { signIn, standIn, standInFor, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -121,6 +121,79 @@ describe(standIn, () => {
         });
 
         expect(standIn(4, "secret")).toBe("AAAA");
+    });
+});
+
+const FOUR_DIGITS_RE = /^\d{4}$/u;
+
+describe(standInFor, () => {
+    const lengths = { length: 64, max: Infinity, min: 0 };
+    // Run in the test only, on what the Worker built: the Worker itself never runs a page's pattern.
+    const isMet = (pattern: string, value: string): boolean => new RegExp(`^(?:${pattern})$`, "v").test(value);
+
+    it.each([
+        ["A[A-Za-z0-9]{63}", 64],
+        ["[0-9]*", 64],
+        [String.raw`\d{4,8}`, 8],
+        [".{8,}", 64],
+        [String.raw`^[a-z]+\d?$`, 64],
+        ["[A-Z]{2}[a-z0-9]{10,}?", 64],
+    ])("builds a stand-in %s takes, every time", (pattern, length) => {
+        for (let index = 0; index < 200; index++) {
+            const stand = standInFor(pattern, "secret", lengths);
+
+            expect(stand).toHaveLength(length);
+            expect(isMet(pattern, stand ?? "")).toBe(true);
+        }
+    });
+
+    it("refuses a pattern with groups at once, without running it, however it would backtrack", () => {
+        const startedAt = performance.now();
+
+        expect(standInFor("(.+)+!", "secret", lengths)).toBeNull();
+        expect(standInFor("(a|aa)*b", "secret", lengths)).toBeNull();
+        expect(standInFor(`${"[a-z]*".repeat(80)}!`, "secret", lengths)).toBeNull();
+        expect(standInFor("a".repeat(5000), "secret", lengths)).toBeNull();
+        expect(performance.now() - startedAt).toBeLessThan(50);
+    });
+
+    it.each([".*[!@#].*", "[^a-z]{8}", String.raw`(?=.*\d).{8,}`, String.raw`\p{L}+`])("refuses %s, the same way each time", (pattern) => {
+        for (let index = 0; index < 20; index++) {
+            expect(standInFor(pattern, "secret", lengths)).toBeNull();
+        }
+    });
+
+    it("ignores a pattern the browser does not compile, as the browser does", () => {
+        expect(standInFor(String.raw`[\w-]+`, "secret", lengths)).toHaveLength(64);
+    });
+
+    it("keeps to the field's minlength and maxlength", () => {
+        expect(standInFor("[0-9]*", "1234", { length: 64, max: 6, min: 0 })).toHaveLength(6);
+        expect(standInFor(String.raw`\d{4}`, "1234", { length: 64, max: 4, min: 0 })).toMatch(FOUR_DIGITS_RE);
+        expect(standInFor(null, "secret", { length: 64, max: Infinity, min: 80 })).toHaveLength(80);
+        expect(standInFor(String.raw`\d{4}`, "secret", { length: 64, max: Infinity, min: 6 })).toBeNull();
+    });
+
+    it("refuses a stand-in a pattern or minlength would stretch past 1024 characters, or keep under 4", () => {
+        const startedAt = performance.now();
+
+        expect(standInFor(String.raw`\d{9999}`.repeat(50), "secret", lengths)).toBeNull();
+        expect(standInFor(null, "secret", { length: 64, max: Infinity, min: 2 ** 31 - 1 })).toBeNull();
+        expect(standInFor(String.raw`\d{2000,}`, "secret", lengths)).toBeNull();
+        expect(standInFor("[0-9]*", "secret", lengths)).toHaveLength(64);
+        expect(standInFor(String.raw`\d+`, "secret", { length: 64, max: Infinity, min: 1500 })).toBeNull();
+        expect(performance.now() - startedAt).toBeLessThan(50);
+
+        for (const pattern of ["", "^$", "a{0}", "[0-9]{3}", String.raw`\d`]) {
+            expect(standInFor(pattern, "secret", lengths)).toBeNull();
+        }
+
+        expect(standInFor(".*", "secret", { length: 64, max: 2, min: 0 })).toBeNull();
+    });
+
+    it("refuses a pattern of literals alone that spells the password", () => {
+        expect(standInFor("hunter2", "hunter2", lengths)).toBeNull();
+        expect(standInFor("hunter2", "other", lengths)).toBe("hunter2");
     });
 });
 

@@ -57,6 +57,14 @@
                             }
                         }
                     },
+                    "410": {
+                        "description": "The browser session was retired for good (a sign-in on it ended without confirming its page clean); nothing was run. Start a new session: call again without `sessionId`",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/SessionRetiredResponse" }
+                            }
+                        }
+                    },
                     "503": {
                         "description": "The browser session's lock did not answer in time, so nothing was run, or the action's hold could not be confirmed for its whole run, so its result is withheld; it can be tried again",
                         "content": {
@@ -111,6 +119,14 @@
                         "content": {
                             "application/json": {
                                 "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "The browser session was retired for good; nothing was typed. Start a new session: call again without `sessionId`",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/SessionRetiredResponse" }
                             }
                         }
                     },
@@ -302,6 +318,15 @@
                 "properties": {
                     "status": { "type": "string" },
                     "service": { "type": "string" }
+                }
+            },
+            "SessionRetiredResponse": {
+                "type": "object",
+                "required": ["code", "error", "success"],
+                "properties": {
+                    "code": { "type": "string", "enum": ["SESSION_RETIRED"] },
+                    "error": { "type": "string" },
+                    "success": { "type": "boolean", "enum": [false] }
                 }
             },
             "ErrorResponse": {

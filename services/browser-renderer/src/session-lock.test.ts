@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MAX_LEASE_MS, SessionHolds } from "./session-holds";
+import { MAX_LEASE_MS, SessionHolds, SHARED_DRAIN_MS } from "./session-holds";
 import { holdSession, LEASE_MS, SessionLock } from "./session-lock";
+
+/** A hold that was taken: what is left once every refusal is set aside. */
+type Taken<T> = Exclude<T, "retired" | "unreachable" | { busy: unknown }>;
 
 describe(SessionHolds, () => {
     it("refuses an exclusive hold while any other is in force, and a shared one only beside an exclusive one", () => {
@@ -27,7 +30,7 @@ describe(SessionHolds, () => {
         expect(holds.take("login", "exclusive", 1000, 999)).toStrictEqual({ busy: "shared", held: false });
         expect(holds.renew("a", 1000, 1000)).toStrictEqual({ held: false });
         expect(holds.release("a", 1000)).toStrictEqual({ held: false });
-        expect(holds.take("login", "exclusive", 1000, 1000)).toStrictEqual({ held: true });
+        expect(holds.take("login", "exclusive", 1000, 1000 + SHARED_DRAIN_MS)).toStrictEqual({ held: true });
         expect(holds.isRetired).toBe(false);
     });
 
@@ -36,10 +39,29 @@ describe(SessionHolds, () => {
 
         holds.take("login", "exclusive", 1000, 0);
 
-        expect(holds.take("a", "shared", 1000, 1000)).toStrictEqual({ busy: "exclusive", held: false });
+        expect(holds.take("a", "shared", 1000, 1000)).toStrictEqual({ held: false, retired: true });
         expect(holds.isRetired).toBe(true);
-        expect(holds.take("other-login", "exclusive", 1000, 1_000_000)).toStrictEqual({ busy: "exclusive", held: false });
-        expect(new SessionHolds([], true).take("a", "shared", 1000, 0)).toStrictEqual({ busy: "exclusive", held: false });
+        expect(holds.take("other-login", "exclusive", 1000, 1_000_000)).toStrictEqual({ held: false, retired: true });
+        expect(new SessionHolds([], true).take("a", "shared", 1000, 0)).toStrictEqual({ held: false, retired: true });
+    });
+
+    it("refuses a sign-in until a lapsed action's lease is waited out, while other actions still go on", () => {
+        const holds = new SessionHolds();
+
+        holds.take("a", "shared", 1000, 0);
+        holds.release("released", 0);
+
+        expect(holds.take("login", "exclusive", 1000, 1000)).toStrictEqual({ busy: "shared", held: false });
+        expect(holds.take("login", "exclusive", 1000, 1000 + SHARED_DRAIN_MS - 1)).toStrictEqual({ busy: "shared", held: false });
+        expect(holds.take("b", "shared", 1000, 1000 + SHARED_DRAIN_MS - 1)).toStrictEqual({ held: true });
+
+        const released = new SessionHolds();
+
+        released.take("a", "shared", 1000, 0);
+        released.release("a", 500);
+
+        // Released, not lapsed: nothing to wait out.
+        expect(released.take("login", "exclusive", 1000, 500)).toStrictEqual({ held: true });
     });
 
     it("runs a renewed hold on from the renewal, and says a release of one in force was held all along", () => {
@@ -74,12 +96,18 @@ describe(SessionHolds, () => {
 /** A `SESSION_LOCK` namespace of one lock on memory storage; `reachable` false has its calls never answer. */
 const namespaceOf = () => {
     const stored = new Map<string, unknown>();
+    const writes: string[] = [];
     const lock = new SessionLock({
         storage: {
-            delete: async (key: string) => stored.delete(key),
-            get: async (key: string) => stored.get(key),
+            delete: async (key: string) => {
+                writes.push(`delete ${key}`);
+
+                return stored.delete(key);
+            },
+            get: async (key: string) => structuredClone(stored.get(key)),
             put: async (key: string, value: unknown) => {
-                stored.set(key, value);
+                writes.push(`put ${key}`);
+                stored.set(key, structuredClone(value));
             },
         },
     } as never);
@@ -101,7 +129,7 @@ const namespaceOf = () => {
         idFromName: (name: string) => name,
     };
 
-    return { control, namespace: namespace as unknown as DurableObjectNamespace, stored };
+    return { control, namespace: namespace as unknown as DurableObjectNamespace, stored, writes };
 };
 
 describe(SessionLock, () => {
@@ -120,11 +148,28 @@ describe(SessionLock, () => {
         const { namespace } = namespaceOf();
         const hold = await holdSession(namespace, "s", "exclusive");
 
-        await (hold as Exclude<typeof hold, "unreachable" | { busy: unknown }>).linger(1000);
+        await (hold as Taken<typeof hold>).linger(1000);
         await vi.advanceTimersByTimeAsync(1000);
 
-        await expect(holdSession(namespace, "s", "shared")).resolves.toStrictEqual({ busy: "exclusive" });
-        await expect(holdSession(namespace, "s", "shared")).resolves.toStrictEqual({ busy: "exclusive" });
+        await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
+        await expect(holdSession(namespace, "s", "exclusive")).resolves.toBe("retired");
+
+        vi.useRealTimers();
+    });
+
+    it("drops a lapsed sign-in's hold and retires the session in one write, so no crash between two loses both", async () => {
+        vi.useFakeTimers();
+
+        const { namespace, stored, writes } = namespaceOf();
+        const hold = await holdSession(namespace, "s", "exclusive");
+
+        await (hold as Taken<typeof hold>).linger(1000);
+        await vi.advanceTimersByTimeAsync(1000);
+        writes.length = 0;
+
+        await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
+        expect(writes).toStrictEqual(["put state"]);
+        expect(stored.get("state")).toStrictEqual({ holds: [], retired: true });
 
         vi.useRealTimers();
     });
@@ -133,11 +178,11 @@ describe(SessionLock, () => {
         const { namespace, stored } = namespaceOf();
         const hold = await holdSession(namespace, "s", "shared");
 
-        expect(stored.get("holds")).toHaveLength(1);
+        expect((stored.get("state") as { holds: unknown[] }).holds).toHaveLength(1);
 
-        await (hold as Exclude<typeof hold, "unreachable" | { busy: unknown }>).release();
+        await (hold as Taken<typeof hold>).release();
 
-        expect(stored.has("holds")).toBe(false);
+        expect(stored.has("state")).toBe(false);
     });
 });
 
@@ -153,7 +198,7 @@ describe(holdSession, () => {
     const held = async (namespace: DurableObjectNamespace, kind: "exclusive" | "shared" = "exclusive") => {
         const hold = await holdSession(namespace, "s", kind);
 
-        if (hold === "unreachable" || "busy" in hold) {
+        if (hold === "unreachable" || hold === "retired" || "busy" in hold) {
             throw new Error("not held");
         }
 
@@ -212,10 +257,31 @@ describe(holdSession, () => {
         const onLost = vi.fn();
 
         hold.onLost(onLost);
-        stored.delete("holds");
+        stored.delete("state");
         await vi.advanceTimersByTimeAsync(5000);
 
         expect(onLost).toHaveBeenCalledOnce();
+    });
+
+    it("says a hold was in force all along when the lock is only slow to answer its release, and not once the lock says it lapsed", async () => {
+        const { control, namespace, stored } = namespaceOf();
+        const slow = await held(namespace, "shared");
+
+        control.reachable = false;
+
+        const releasing = slow.release();
+
+        await vi.advanceTimersByTimeAsync(3000);
+
+        await expect(releasing).resolves.toBe(true);
+
+        control.reachable = true;
+
+        const dropped = await held(namespace, "shared");
+
+        stored.delete("state");
+
+        await expect(dropped.release()).resolves.toBe(false);
     });
 
     it("keeps a lingering hold for the time it is given, renewing it no more, and frees the session when released in it", async () => {

@@ -1037,6 +1037,15 @@ describe("opening a page while in control", () => {
         expect(after.control).not.toHaveProperty("navigatingUntil");
     });
 
+    it("forgets a browser the renderer retired for good, and tells the person it is gone", async () => {
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
+    });
+
     it("refuses someone who does not hold control, and a page the owner's lists or the address guard block", async () => {
         await addSession();
         await take(OWNER);

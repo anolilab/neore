@@ -1650,6 +1650,24 @@ describe(signIn, () => {
         expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
     });
 
+    it("signs in through a field whose pattern fixes a prefix and a length, every time", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password" pattern="A[A-Za-z0-9]{63}"><button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
+    });
+
+    it("refuses a field whose pattern would backtrack, at once, without running it", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password" pattern="(.+)+!"><button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("only takes a format"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
     it("types no password into a field whose pattern no stand-in it can make meets", async () => {
         fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password" pattern=".*[!@#].*"><button>Go</button></form>`;
 

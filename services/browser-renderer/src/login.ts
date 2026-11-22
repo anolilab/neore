@@ -6,6 +6,7 @@ import type { BrowserContext, CDPSession, Frame, Page, Request, Response, Route,
 
 import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
+import { MAX_PATTERN_LENGTH, readPattern } from "./field-pattern";
 import type { FormTarget } from "./served-form";
 import { AMBIGUOUS, MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
 
@@ -192,30 +193,17 @@ const STAND_IN_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 /** The shortest stand-in: no other text of a request matches it by chance, and it hides the length of most passwords. */
 const STAND_IN_LENGTH = 64;
 
-/**
- * The alphabets a stand-in is drawn from, the first a password field's `pattern` takes: a numeric PIN field takes only
- * digits, and the page's own rules would hold back a form whose field breaks its pattern.
- */
-const STAND_IN_ALPHABETS = [STAND_IN_CHARACTERS, "0123456789", "abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-
-/**
- * What the page is given in place of the password: `length` random characters of `characters`, each as likely as any
- * other (a byte past the last whole multiple of the alphabet's size is drawn again), never the password itself.
- */
-export const standIn = (length: number, password: string, characters = STAND_IN_CHARACTERS): string => {
+/** `length` random characters of `characters`, each as likely as any other: a byte past the last whole multiple of the alphabet's size is drawn again. */
+const draw = (length: number, characters: string): string => {
     const limit = 256 - (256 % characters.length);
-    let value = password;
+    let value = "";
 
-    while (value === password) {
-        value = "";
+    while (value.length < length) {
+        const bytes = crypto.getRandomValues(new Uint8Array(length));
 
-        while (value.length < length) {
-            const bytes = crypto.getRandomValues(new Uint8Array(length));
-
-            for (const byte of bytes) {
-                if (byte < limit && value.length < length) {
-                    value += characters[byte % characters.length];
-                }
+        for (const byte of bytes) {
+            if (byte < limit && value.length < length) {
+                value += characters[byte % characters.length];
             }
         }
     }
@@ -223,30 +211,92 @@ export const standIn = (length: number, password: string, characters = STAND_IN_
     return value;
 };
 
-/** The stand-ins of each alphabet tried against a field's pattern before the next alphabet is. */
-const STAND_IN_TRIES = 4;
+/** What the page is given in place of the password: `length` random characters of `characters`, never the password itself. */
+export const standIn = (length: number, password: string, characters = STAND_IN_CHARACTERS): string => {
+    let value = password;
 
-/**
- * A stand-in of `length` the password field's `pattern` takes, as the browser reads that pattern (whole, with the `v`
- * flag; one it cannot read checks nothing), drawn from the first alphabet that gives one: `null` when none does, as
- * for a pattern that asks for a symbol, so the page's own rules would hold back the form.
- */
-export const standInFor = (pattern: string | null, length: number, password: string): string | null => {
-    let rule: RegExp | undefined;
-
-    try {
-        rule = pattern === null ? undefined : new RegExp(`^(?:${pattern})$`, "v");
-    } catch {
-        rule = undefined;
+    while (value === password) {
+        value = draw(length, characters);
     }
 
-    for (const characters of STAND_IN_ALPHABETS) {
-        for (let index = 0; index < STAND_IN_TRIES; index++) {
-            const stand = standIn(length, password, characters);
+    return value;
+};
 
-            if (!rule || rule.test(stand)) {
-                return stand;
-            }
+/**
+ * The longest and shortest stand-in: the guard looks for it in every request the page makes, so one a pattern or a
+ * `minlength` stretches without end would cost the Worker its time; the longest password `/login` takes fits. A shorter
+ * one than the shortest password filled would be found in almost any request, refusing it.
+ */
+const STAND_IN_BOUNDS = { max: 1024, min: 4 } as const;
+
+/** The draws of a pattern's stand-in that may come out as the password before the field is refused (a pattern of literals alone). */
+const STAND_IN_TRIES = 4;
+
+/** Whether the browser compiles `pattern` as it reads a field's (whole, with the `v` flag): compiled only, never run. */
+const isCompiled = (pattern: string): boolean => {
+    try {
+        return new RegExp(`^(?:${pattern})$`, "v").source !== "";
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * A stand-in for a password field with `pattern`, built from the pattern's steps rather than tested against it, so no
+ * regular expression of the page runs in the Worker: `length` long where the pattern allows it, else the length nearest
+ * it the pattern and the field's `minLength` and `maxLength` (`min`, `max`) allow. A pattern the browser does not
+ * compile checks nothing, so it is ignored; `null` for one that is not a plain sequence of letters, digits and classes
+ * (`readPattern`), or whose lengths cannot meet the field's: the field is refused, the same way each time.
+ */
+export const standInFor = (pattern: string | null, password: string, { length, max, min }: { length: number; max: number; min: number }): string | null => {
+    if (pattern !== null && pattern.length > MAX_PATTERN_LENGTH) {
+        return null;
+    }
+
+    const steps = pattern !== null && isCompiled(pattern) ? readPattern(pattern) : [{ characters: STAND_IN_CHARACTERS, max: Infinity, min: 0 }];
+
+    if (!steps) {
+        return null;
+    }
+
+    const lowest = Math.max(
+        steps.reduce((sum, step) => sum + step.min, 0),
+        min,
+        STAND_IN_BOUNDS.min,
+    );
+    const highest = Math.min(
+        steps.reduce((sum, step) => sum + step.max, 0),
+        max,
+        STAND_IN_BOUNDS.max,
+    );
+
+    if (lowest > highest) {
+        return null;
+    }
+
+    const counts = steps.map((step) => step.min);
+    let extra = Math.min(Math.max(length, lowest), highest) - counts.reduce((sum, count) => sum + count, 0);
+    // The widest steps take the rest first: they make the stand-in hardest to guess.
+    const widestFirst = steps.map((_, at) => at).toSorted((a, b) => (steps[b]?.characters.length ?? 0) - (steps[a]?.characters.length ?? 0));
+
+    for (const index of widestFirst) {
+        const step = steps[index];
+
+        if (!step || extra <= 0) {
+            break;
+        }
+
+        const added = Math.min(extra, step.max - step.min);
+
+        counts[index] = (counts[index] ?? 0) + added;
+        extra -= added;
+    }
+
+    for (let index = 0; index < STAND_IN_TRIES; index++) {
+        const stand = steps.map((step, at) => draw(counts[at] ?? 0, step.characters)).join("");
+
+        if (stand !== password) {
+            return stand;
         }
     }
 
@@ -1576,8 +1626,11 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 };
             }),
         );
-        const longest = rules.maxLength > 0 ? Math.max(rules.maxLength, password.length) : Infinity;
-        const stand = standInFor(rules.pattern, Math.min(Math.max(password.length, STAND_IN_LENGTH, rules.minLength), longest), password);
+        const stand = standInFor(rules.pattern, password, {
+            length: Math.max(password.length, STAND_IN_LENGTH),
+            max: rules.maxLength > 0 ? Math.max(rules.maxLength, password.length) : Infinity,
+            min: Math.max(rules.minLength, 0),
+        });
 
         if (stand === null) {
             return failed("The password field only takes a format the agent's browser cannot fill in for it safely, so the password was not typed");

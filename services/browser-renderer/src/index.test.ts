@@ -481,19 +481,103 @@ describe("the session hold every isolate shares", () => {
         expect(started).toStrictEqual([]);
     });
 
-    it("withholds an action's result when its hold cannot be confirmed for the whole action", async () => {
+    it("keeps an action's result when only the release is slow to answer, its hold intact all along", async () => {
         const { env, lock, pending } = binding();
-        const answer = post(env, "/action", { action: "extract", sessionId: "lapsed" });
+        const answer = post(env, "/action", { action: "extract", sessionId: "slow" });
 
         await vi.advanceTimersByTimeAsync(0);
         lock.control.reachable = false;
-        pending[0]?.(brokenBrowser(async () => undefined, "lapsed"));
+        pending[0]?.(brokenBrowser(async () => undefined, "slow"));
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const response = await answer;
+
+        // The action's own answer (its page could not be set up), not a withheld one.
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toStrictEqual({ error: "no page", success: false });
+    });
+
+    it("stops an action whose hold may lapse, closing its browser before the lease ends, and withholds its result", async () => {
+        const { env, lock, pending } = binding();
+        const evaluating = Promise.withResolvers<string>();
+        const close = vi.fn(async () => {
+            evaluating.reject(new Error("Target page, context or browser has been closed"));
+        });
+        const context = { route: async () => undefined };
+        const page = {
+            context: () => context,
+            evaluate: async () => evaluating.promise,
+            setDefaultTimeout: () => undefined,
+        };
+        const answer = post(env, "/action", { action: "extract", sessionId: "lost" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.({ close, contexts: () => [{ pages: () => [page] }], sessionId: () => "lost" });
+        await vi.advanceTimersByTimeAsync(0);
+        lock.control.reachable = false;
+        // Given up 10 s before the 30 s lease could lapse: a sign-in can take the session only after it (and its drain).
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        expect(close).toHaveBeenCalled();
+
         await vi.advanceTimersByTimeAsync(3000);
 
         const response = await answer;
 
         expect(response.status).toBe(503);
         await expect(response.json()).resolves.toStrictEqual({ error: expect.stringContaining("result is withheld"), success: false });
+    });
+
+    it("answers 410 with SESSION_RETIRED, not a busy 409, for a session retired for good", async () => {
+        const { env, pending } = binding();
+        const lingering = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "old" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        // A close that never ends: the hold lingers, then lapses, and retires the session.
+        pending[0]?.(
+            stallingBrowser(
+                async () =>
+                    new Promise<void>(() => {
+                        // Never settles.
+                    }),
+                "old",
+            ),
+        );
+        await vi.advanceTimersByTimeAsync(20_000);
+        await lingering;
+        await vi.advanceTimersByTimeAsync(200_000);
+
+        for (const [path, body] of [
+            ["/action", { action: "extract", sessionId: "old" }],
+            ["/login", { ...LOGIN, sessionId: "old" }],
+        ] as const) {
+            const response = await post(env, path, body);
+
+            expect(response.status).toBe(410);
+            await expect(response.json()).resolves.toMatchObject({ code: "SESSION_RETIRED", success: false });
+        }
+    });
+
+    it("keeps a sign-in's hold past its answer while a reconnect it gave up on is still setting up", async () => {
+        const { env, pending } = binding();
+        const signingIn = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "late" });
+
+        await vi.advanceTimersByTimeAsync(18_000);
+
+        const answered = await signingIn;
+        // The reconnect is still pending: no action reaches the session.
+        const refused = await post(env, "/action", { action: "extract", sessionId: "late" });
+
+        expect(answered.status).toBe(504);
+        expect(refused.status).toBe(409);
+
+        pending[0]?.(brokenBrowser(async () => undefined, "late"));
+        await vi.advanceTimersByTimeAsync(0);
+
+        post(env, "/action", { action: "extract", sessionId: "late" }).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(pending).toHaveLength(2);
     });
 
     it("closes the browser when the sign-in's hold can no longer be renewed, before it could lapse, and says the session may be open", async () => {

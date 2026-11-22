@@ -16,6 +16,7 @@ import {
     browserAliveUntil,
     browserIdOf,
     CONTROL_IDLE_MS,
+    NO_PROVIDER_SESSION,
     RENDERER_CALL_SETTLE_MS,
     rendererCallHold,
     watchableSessionId,
@@ -23,7 +24,14 @@ import {
 import { getActiveSession, logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { applyLimit } from "../../lib/rate-limiter-mutations";
-import { BROWSER_BUSY_SIGNING_IN, BROWSER_CLOSED_BEFORE_ACTION, BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
+import {
+    BROWSER_BUSY_SIGNING_IN,
+    BROWSER_CLOSED_BEFORE_ACTION,
+    BROWSER_CLOSED_DURING_ACTION,
+    BROWSER_SESSION_RETIRED,
+    executeBrowserAction,
+    PERSON_HAS_CONTROL,
+} from "./browser-node";
 
 const { registry, renderer, rendererStart } = vi.hoisted(() => {
     // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
@@ -281,6 +289,43 @@ describe("a browser action on a running browser", () => {
 
         expect(after).toMatchObject({ lastActivityAt });
         expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it("drops a session the renderer retired, so the next action opens a new browser, and tells the agent to navigate first", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { code: "SESSION_RETIRED", error: "retired", success: false },
+            response: { ok: false, status: 410 },
+        });
+
+        await expect(act("extract")).resolves.toStrictEqual({ error: BROWSER_SESSION_RETIRED, success: false });
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe(NO_PROVIDER_SESSION);
+        expect(after.currentUrl).toBeUndefined();
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+        await act();
+
+        expect(renderer.mock.lastCall?.[0]).toMatchObject({ body: { action: "navigate", sessionId: undefined } });
+    });
+
+    it("runs a navigate on a new browser at once when the renderer retired the session", async () => {
+        await addSession(NOW - 1000);
+        renderer
+            .mockResolvedValueOnce({
+                data: undefined,
+                error: { code: "SESSION_RETIRED", error: "retired", success: false },
+                response: { ok: false, status: 410 },
+            })
+            .mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+
+        await expect(act()).resolves.toMatchObject({ sessionId: "s-2", success: true });
+        expect(renderer.mock.calls.map(([options]) => (options as { body: { sessionId?: string } }).body.sessionId)).toStrictEqual(["s-1", undefined]);
+        await expect(row()).resolves.toMatchObject({ providerSessionId: "s-2" });
     });
 
     it("stops offering the browser the renderer closed after a blocked redirect, and forgets its page", async () => {

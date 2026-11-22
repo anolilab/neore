@@ -8,15 +8,16 @@
  * where the unit tests import the Worker.
  */
 
-import type { Hold, HoldAnswer, HoldKind, HoldRequest } from "./session-holds";
-import { SessionHolds } from "./session-holds";
+import type { HoldAnswer, HoldKind, HoldRequest, SessionState } from "./session-holds";
+import { holdsOf } from "./session-holds";
 
 export type { HoldKind } from "./session-holds";
 
-const HOLDS_KEY = "holds";
-
-/** Kept for good once set: a retired session's id is never handed to a call again. */
-const RETIRED_KEY = "retired";
+/**
+ * The session's whole state, holds and retired flag together, in one key: one write stores both, so a crash between two
+ * writes cannot drop a lapsed sign-in's hold without keeping the session retired. The flag, once set, is kept for good.
+ */
+const STATE_KEY = "state";
 
 const isHoldRequest = (value: unknown): value is HoldRequest => {
     const { kind, leaseMs, op, token } = (value ?? {}) as { kind?: unknown; leaseMs?: unknown; op?: unknown; token?: unknown };
@@ -51,8 +52,7 @@ export class SessionLock {
 
         // Read, changed and written with no other I/O between: the object's input gate keeps another call out meanwhile.
         const now = Date.now();
-        const stored = await this.#state.storage.get<[string, Hold][]>(HOLDS_KEY);
-        const holds = new SessionHolds(stored ?? [], (await this.#state.storage.get<boolean>(RETIRED_KEY)) === true);
+        const holds = holdsOf(await this.#state.storage.get<SessionState>(STATE_KEY));
         let answer: HoldAnswer;
 
         switch (asked.op) {
@@ -71,13 +71,9 @@ export class SessionLock {
             }
         }
 
-        const left = holds.entries(now);
+        const left = holds.state(now);
 
-        await (left.length > 0 ? this.#state.storage.put(HOLDS_KEY, left) : this.#state.storage.delete(HOLDS_KEY));
-
-        if (holds.isRetired) {
-            await this.#state.storage.put(RETIRED_KEY, true);
-        }
+        await (left === undefined ? this.#state.storage.delete(STATE_KEY) : this.#state.storage.put(STATE_KEY, left));
 
         return Response.json(answer);
     }
@@ -124,7 +120,7 @@ export interface SessionHold {
     linger: (ms: number) => Promise<void>;
     /** Has `onLost` run, once, as soon as the hold may lapse. */
     onLost: (onLost: () => void) => void;
-    /** Ends it, within `ms`: whether it was in force all along, up to its end, as the lock confirmed. */
+    /** Ends it, within `ms`: whether it was in force all along, up to the release, as the lock answers it; one it does not answer in time is judged by the last lease it confirmed. */
     release: (ms?: number) => Promise<boolean>;
 }
 
@@ -145,14 +141,15 @@ const ask = async (namespace: DurableObjectNamespace, sessionId: string, request
 
 /**
  * Takes a `kind` hold on `sessionId` and renews it until it is released: the hold, `busy` with the kind of hold that
- * refused it, or `unreachable` when the lock did not answer in time (a take whose answer was lost is released too).
+ * refused it, `retired` for a session refused for good, or `unreachable` when the lock did not answer in time (a take
+ * whose answer was lost is released too).
  */
 export const holdSession = async (
     namespace: DurableObjectNamespace,
     sessionId: string,
     kind: HoldKind,
     now: () => number = Date.now,
-): Promise<"unreachable" | SessionHold | { busy: HoldKind }> => {
+): Promise<"retired" | "unreachable" | SessionHold | { busy: HoldKind }> => {
     const token = crypto.randomUUID();
     const sentAt = now();
     const taken = await ask(namespace, sessionId, { kind, leaseMs: LEASE_MS, op: "take", token });
@@ -162,6 +159,10 @@ export const holdSession = async (
         ask(namespace, sessionId, { op: "release", token }).catch(() => undefined);
 
         return "unreachable";
+    }
+
+    if (taken.retired) {
+        return "retired";
     }
 
     if (!taken.held) {
@@ -237,9 +238,12 @@ export const holdSession = async (
             clearInterval(timer);
 
             const wasLost = isLost;
+            // Read before the release is sent: while it holds, no other call can have taken the session up to now.
+            const wasIntact = !wasLost && now() < confirmedUntil - LOST_MARGIN_MS;
             const released = await ask(namespace, sessionId, { op: "release", token }, ms);
 
-            return !wasLost && released?.held === true;
+            // No answer in time: the last confirmed lease decides. A lock that answers decides by its own word.
+            return released === null ? wasIntact : !wasLost && released.held;
         },
     };
 };

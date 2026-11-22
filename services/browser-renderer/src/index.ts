@@ -328,6 +328,15 @@ const BUSY_IN_USE = "The browser session is busy with another call; try the sign
 
 const LOCK_UNREACHABLE = "The browser session's lock did not answer in time, so nothing was run; try it again in a moment";
 
+/** A session refused for good (`SessionHolds.isRetired`): the caller starts a new one, with no `sessionId`. */
+const SESSION_RETIRED = "SESSION_RETIRED";
+
+const retiredAnswer = (what: string) =>
+    Response.json(
+        { code: SESSION_RETIRED, error: `The browser session was retired and is never used again, so ${what}; start a new session`, success: false },
+        { status: 410 },
+    );
+
 /**
  * The holds one call keeps on the sessions it uses (`src/session-lock.ts`), shared by every isolate: a `/login` holds
  * its session alone from before it connects until its cleanup ends, so no `/action` of any isolate (an `extract` of the
@@ -345,10 +354,10 @@ const holdsOf = (env: Env, kind: HoldKind) => {
 
             return released.every(Boolean);
         },
-        take: async (sessionId: string): Promise<"busy" | "unreachable" | null> => {
+        take: async (sessionId: string): Promise<"busy" | "retired" | "unreachable" | null> => {
             const taken = await holdSession(env.SESSION_LOCK, sessionId, kind);
 
-            if (taken === "unreachable") {
+            if (taken === "unreachable" || taken === "retired") {
                 return taken;
             }
 
@@ -366,13 +375,19 @@ const holdsOf = (env: Env, kind: HoldKind) => {
 /**
  * One browser action, on the session `sessionId` or a new one, held beside other actions for its whole run. Its answer
  * goes out only when every hold was in force all along: one that may have lapsed could have let a sign-in onto the
- * session meanwhile, whose page the answer may show.
+ * session meanwhile, whose page the answer may show. A hold that may lapse closes the action's browser at once, well
+ * before the lease ends, so the action drives the page no further; a release the lock is merely slow to answer, after
+ * an action whose hold held throughout, keeps the result.
  */
 const act = async (env: Env, body: z.infer<typeof actionSchema>): Promise<Response> => {
     const holds = holdsOf(env, "shared");
 
     // Taken before it connects: a session signing in is never reached.
     const refused = body.sessionId ? await holds.take(body.sessionId) : null;
+
+    if (refused === "retired") {
+        return retiredAnswer("nothing was run");
+    }
 
     if (refused) {
         return refused === "busy"
@@ -428,9 +443,31 @@ const actHeld = async (
         );
     }
 
+    // A hold that may lapse stops the action where it is: its browser connection is closed, and every page call with it.
+    const opened = browser;
+    const stopOnLost = (): void => {
+        activeSessionId = undefined;
+        opened.close().catch(() => undefined);
+    };
+
+    for (const hold of holds.held) {
+        hold.onLost(stopOnLost);
+    }
+
     try {
         // A session launched here is held as well, before its page is set up: its id is out once this answers.
         const refused = isLaunched ? await holds.take(activeSessionId) : null;
+
+        if (isLaunched && !refused) {
+            holds.held.at(-1)?.onLost(stopOnLost);
+        }
+
+        if (refused === "retired") {
+            await browser.close().catch(() => {});
+            activeSessionId = undefined;
+
+            return retiredAnswer("nothing was run");
+        }
 
         if (refused) {
             await browser.close().catch(() => {});
@@ -697,23 +734,25 @@ const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: nu
         return result;
     });
     const isSessionClosed = (): boolean => Boolean(sessionId && (isSessionGone || opened?.isLaunched));
-    const ready = await settledWithin(
-        opening.then(async (result) => {
-            try {
-                return { ...result, page: await pageOf(result.browser) };
-            } catch (error) {
-                // A late one was closed as it opened.
-                if (!isLate) {
-                    close(result);
-                }
-
-                throw error;
+    const setting = opening.then(async (result) => {
+        try {
+            return { ...result, page: await pageOf(result.browser) };
+        } catch (error) {
+            // A late one was closed as it opened.
+            if (!isLate) {
+                close(result);
             }
-        }),
-        deadline - Date.now(),
-    ).catch((error: unknown) => {
+
+            throw error;
+        }
+    });
+    const ready = await settledWithin(setting, deadline - Date.now()).catch((error: unknown) => {
         throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), { sessionClosed: isSessionClosed() });
     });
+
+    // Settles once nothing of the setup runs any more (a late one's browser closed when it launched it): until then a
+    // late setup still drives the session, so its hold is kept.
+    let settling: Promise<boolean> | undefined;
 
     if (!ready) {
         isLate = true;
@@ -721,9 +760,11 @@ const setUpWithin = async (env: Env, sessionId: string | undefined, deadline: nu
         if (opened) {
             close(opened);
         }
+
+        settling = setting.then(() => true).catch(() => true);
     }
 
-    return { isSessionClosed: isSessionClosed(), opened, ready };
+    return { isSessionClosed: isSessionClosed(), opened, ready, settling };
 };
 
 app.post("/login", async (c) => {
@@ -768,6 +809,10 @@ app.post("/login", async (c) => {
     const holds = holdsOf(c.env, "exclusive");
     // Taken before it connects, and refused while any other call holds the session: nothing is typed unheld.
     const refused = sessionId ? await holds.take(sessionId) : null;
+
+    if (refused === "retired") {
+        return retiredAnswer("nothing was typed");
+    }
 
     if (refused) {
         return refused === "busy"
@@ -858,9 +903,15 @@ const logIn = async (
         } as const;
     }
 
-    const { isSessionClosed, opened, ready } = setup;
+    const { isSessionClosed, opened, ready, settling } = setup;
 
     if (!ready) {
+        // A setup still under way keeps the session held until it ends, as a close does; one that never ends lets the
+        // hold lapse, which retires the session.
+        if (settling) {
+            hold(settling);
+        }
+
         return {
             body: {
                 error: "The browser did not start in time, so nothing was typed. Try it again.",
