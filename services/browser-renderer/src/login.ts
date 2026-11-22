@@ -8,7 +8,7 @@ import type { ChannelLock } from "./channels";
 import { lockChannels } from "./channels";
 import { MAX_PATTERN_LENGTH, readPattern } from "./field-pattern";
 import type { FormTarget } from "./served-form";
-import { AMBIGUOUS, MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
+import { AMBIGUOUS, FILE_INPUT, MAX_SERVED_BYTES, servedForms, servedTarget } from "./served-form";
 
 /** The exact origin of a URL (`URL#origin`: punycode host, default port dropped), or `null` when it has none. */
 export const originOf = (url: string): string | null => {
@@ -119,19 +119,31 @@ const isSpelledIn = (text: string, secret: string): boolean =>
 const PERCENT_RUN_RE = /(?:%[\da-f]{2})+/gi;
 
 /**
- * How many layers of percent-encoding are taken off: past them, a text is taken to hold the password. A site that echoes
+ * How many layers of percent-encoding are taken off: past them, a text is not read (`unchecked`). A site that echoes
  * what it was sent encodes it once more each time; no page of a site is read through that many.
  */
 const MAX_DECODE_ROUNDS = 32;
 
 /**
- * How many characters the layers of a text may take to read through, as times its length, at least
- * `MIN_DECODE_BUDGET`: each layer is scanned whole, and a scan costs more the longer the password. A large page is read
- * through as many layers as a fixed depth of four spent; one with more is taken to hold the password.
+ * How many characters the layers of a text may take to read through when it is checked alone, as times its length, at
+ * least `MIN_DECODE_BUDGET`: the stand-in checks, which the page holds anyway. A text past it is taken to hold it.
  */
 const DECODE_BUDGET_FACTOR = 5;
 
 const MIN_DECODE_BUDGET = 1_000_000;
+
+/**
+ * How many characters one sign-in reads for the password in each kind of text it checks (the result's texts, the
+ * addresses and redirects once the password is sent, the answer's cookies), every layer counted, the ones decoding built
+ * for a text that then did not fit included; for a password of up to `SCAN_BUDGET_LENGTH` characters, and less in step
+ * for a longer one: a scan costs about the text's length times the password's. Each kind has its own, so a landing page
+ * heavy with addresses leaves the cookie check and the result theirs. A text that does not fit in what is left is
+ * `unchecked`, never taken for one that holds the password.
+ */
+export const SCAN_BUDGET = 1_000_000;
+
+/** The longest password `SCAN_BUDGET` is for whole. */
+export const SCAN_BUDGET_LENGTH = 64;
 
 const UTF8 = new TextDecoder();
 
@@ -154,44 +166,117 @@ const decodeRun = (run: string): string => {
 };
 
 /**
- * Whether `text` carries `secret`: in a form, URL, HTML, JS-escaped or base64 spelling, escaped as a JSON string, or under any
- * number of further layers of percent-encoding, each read in turn until one changes nothing. Each run of escapes is
- * decoded alone, so a stray `%` elsewhere (a "100%") does not stop the rest from being read. A text with more layers
- * than `MAX_DECODE_ROUNDS` or its budget reaches is taken to carry it.
+ * The layers of `text`: itself, then each with every run of escapes decoded, until one changes nothing; with what
+ * building them took (`cost`, the characters of every layer made, the one past `budget` included). `null` when they are
+ * more than `MAX_DECODE_ROUNDS` or take more than `budget` characters; a text longer than `budget` is not decoded at all,
+ * and costs nothing. Each run of escapes is decoded alone, so a stray `%` elsewhere (a "100%") does not stop the rest
+ * from being read. Read without the password: the cost is the text's alone.
  */
-const hasSecret = (text: string, secret: string): boolean => {
-    const escaped = JSON.stringify(secret).slice(1, -1);
-    let budget = Math.max(MIN_DECODE_BUDGET, DECODE_BUDGET_FACTOR * text.length);
-    let decoded = text;
+const layersOf = (text: string, budget: number): { cost: number; layers: string[] | null } => {
+    if (text.length > budget) {
+        return { cost: 0, layers: null };
+    }
 
-    for (let round = 0; round <= MAX_DECODE_ROUNDS && budget >= decoded.length; round++) {
-        budget -= decoded.length;
+    const layers = [text];
+    let cost = text.length;
 
-        if (decoded.includes(escaped) || isSpelledIn(decoded, secret)) {
-            return true;
-        }
-
+    for (let decoded = text; cost <= budget;) {
         const next = decoded.replaceAll(PERCENT_RUN_RE, (run) => decodeRun(run));
 
         if (next === decoded) {
-            return false;
+            return { cost, layers };
         }
 
+        if (layers.length > MAX_DECODE_ROUNDS) {
+            return { cost, layers: null };
+        }
+
+        layers.push(next);
+        cost += next.length;
         decoded = next;
     }
 
-    return true;
+    return { cost, layers: null };
 };
+
+/** What a check found in a text: not the password, the password, or too much to read (more layers or characters than it may). */
+export type Verdict = "clean" | "held" | "unchecked";
+
+/**
+ * Whether `text` carries `secret`: in a form, URL, HTML, JS-escaped or base64 spelling, escaped as a JSON string, or under any
+ * number of further layers of percent-encoding; with the characters that took (`cost`). A text with more layers than
+ * `MAX_DECODE_ROUNDS`, or whose layers take more than `budget`, is `unchecked`, and costs what was decoded of it. The
+ * layers are counted before any is scanned: the cost hangs on the text alone, never on whether it held `secret`.
+ */
+const readFor = (text: string, secret: string, budget: number): { cost: number; verdict: Verdict } => {
+    const { cost, layers } = layersOf(text, budget);
+
+    if (!layers) {
+        return { cost, verdict: "unchecked" };
+    }
+
+    const escaped = JSON.stringify(secret).slice(1, -1);
+
+    return { cost, verdict: layers.some((layer) => layer.includes(escaped) || isSpelledIn(layer, secret)) ? "held" : "clean" };
+};
+
+/** Whether `text` carries `secret` (`readFor`), checked alone: the stand-in checks, on a budget of the text's own. Too much to read counts as held. */
+const hasSecret = (text: string, secret: string): boolean =>
+    readFor(text, secret, Math.max(MIN_DECODE_BUDGET, DECODE_BUDGET_FACTOR * text.length)).verdict !== "clean";
+
+/** The worse of what each part of a text was found to hold, every part read whatever an earlier one held. */
+const worstOf = (verdicts: Verdict[]): Verdict => (["held", "unchecked"] as const).find((verdict) => verdicts.includes(verdict)) ?? "clean";
 
 /** What a result says in place of a text (an address, a title, an error) that carries the password. */
 export const WITHHELD = "[withheld: it holds the password]";
 
-/**
- * `text`, or `WITHHELD` in its place when it carries the password in any spelling a page could echo it in (raw, URL- or
- * form-encoded, HTML- or JS-escaped, base64 or base64url, at any depth of percent-encoding). Withheld whole, never marked where
- * it matched: a page that put guesses in its address or title would learn from the mark which guess is the password.
- */
-export const withoutSecret = (text: string, secret: string): string => (hasSecret(text, secret) ? WITHHELD : text);
+/** What a result says in place of a text past what is left of the sign-in's budget: it was not read. */
+export const UNCHECKED = "[withheld: too much to check for the password]";
+
+/** The password checks of one sign-in: each kind of text on its own `SCAN_BUDGET`, scaled to the password's length. */
+export interface SecretScan {
+    /** An address (a request's, a redirect's) once the password is sent. */
+    address: (text: string) => Verdict;
+    /** A cookie the site answered the sign-in with. */
+    cookie: (text: string) => Verdict;
+    /** A text of the result (an address, a title, an error). */
+    text: (text: string) => Verdict;
+
+    /**
+     * `text`, or `WITHHELD` in its place when it carries the password in any spelling a page could echo it in (raw, URL- or
+     * form-encoded, HTML- or JS-escaped, base64 or base64url, at any depth of percent-encoding), or `UNCHECKED` when it is
+     * past the budget. Withheld whole, never marked where it matched: a page that put guesses in its address or title
+     * would learn from the mark which guess is the password.
+     */
+    without: (text: string) => string;
+}
+
+export const secretScan = (secret: string): SecretScan => {
+    // The length is the caller's, not the page's: what is left never says anything of the password itself.
+    const size = Math.floor((SCAN_BUDGET * SCAN_BUDGET_LENGTH) / Math.max(SCAN_BUDGET_LENGTH, secret.length));
+    const pool = (): ((text: string) => Verdict) => {
+        let left = size;
+
+        return (text) => {
+            const { cost, verdict } = readFor(text, secret, left);
+
+            left = Math.max(0, left - cost);
+
+            return verdict;
+        };
+    };
+    const text = pool();
+
+    return {
+        address: pool(),
+        cookie: pool(),
+        text,
+        without: (value) => ({ clean: value, held: WITHHELD, unchecked: UNCHECKED })[text(value)],
+    };
+};
+
+/** `text` checked alone, on a budget of its own: `SecretScan#without`. */
+export const withoutSecret = (text: string, secret: string): string => secretScan(secret).without(text);
 
 // ─── Stand-in ───────────────────────────────────────────────────────────────────
 
@@ -405,14 +490,14 @@ const isRedirectElsewhere = (
  * Whether an address carries `secret` in its query, fragment or user info, where a form sent by GET, a script or a
  * server's redirect puts it. Not the path: a short password could be a word of the site's own paths.
  */
-const hasSecretInAddress = (url: string, secret: string): boolean => {
+const secretInAddress = (url: string, check: (text: string) => Verdict): Verdict => {
     if (!URL.canParse(url)) {
-        return hasSecret(url, secret);
+        return check(url);
     }
 
     const address = new URL(url);
 
-    return [address.username, address.password, address.search + address.hash].some((part) => hasSecret(part, secret));
+    return worstOf([address.username, address.password, address.search + address.hash].map((part) => check(part)));
 };
 
 /** Where a `Location` header points, against the address it answers; `null` (another site) when it does not parse. */
@@ -506,6 +591,16 @@ const gateSockets = async (context: BrowserContext): Promise<SocketGate> => {
  */
 const withoutFragment = (url: string): string => url.split("#", 1)[0] ?? url;
 
+/** Why a session whose password could not be confirmed cleared is closed. */
+const CLEAR_FAILURES = {
+    failed: "The password could not be cleared from the page in time",
+    unchecked:
+        "The site answered the sign-in with more cookies than the agent's browser can check for the password (too much to check), so the session was closed",
+} as const;
+
+/** What the guard stopped when an address, once the password is sent, was too much to check for it: not a sign that it held it. */
+const UNCHECKED_ADDRESS = "unchecked-address";
+
 const armGuard = async (
     page: Page,
     {
@@ -514,8 +609,9 @@ const armGuard = async (
         lock,
         origin,
         password,
+        scan,
         stand,
-    }: { form: FormTarget; isStopped?: () => boolean; lock: ChannelLock; origin: string; password: string; stand: string },
+    }: { form: FormTarget; isStopped?: () => boolean; lock: ChannelLock; origin: string; password: string; scan: SecretScan; stand: string },
 ) => {
     let isExpecting = false;
     let isCounting = true;
@@ -565,18 +661,32 @@ const armGuard = async (
      * a claim that was refused: the password never left, and the page's scripts, still running, could put guesses in
      * addresses and learn from which one is stopped whether a guess is the password.
      */
-    const isSecretAddress = (url: string): boolean => {
-        if (hasSecretInAddress(url, stand)) {
-            return true;
+    const secretAddress = (url: string): Verdict => {
+        if (secretInAddress(url, (text) => (hasSecret(text, stand) ? "held" : "clean")) === "held") {
+            return "held";
         }
 
         if (forwarding === null && sent === null) {
-            return false;
+            return "clean";
         }
 
         // Its path as well once the address leaves the site (a 303 to another site carries no body, but can carry the
         // password echoed into the path): no word of the site's own paths stands in the way there.
-        return hasSecretInAddress(url, password) || (originOf(url) !== origin && URL.canParse(url) && hasSecret(new URL(url).pathname, password));
+        const inAddress = secretInAddress(url, scan.address);
+        const inPath = originOf(url) !== origin && URL.canParse(url) ? scan.address(new URL(url).pathname) : "clean";
+
+        return worstOf([inAddress, inPath]);
+    };
+
+    /** Whether an address may go: one that holds the password, or is too much to check for it, is stopped, and said why. */
+    const isAddressBlocked = (url: string): boolean => {
+        const verdict = secretAddress(url);
+
+        if (verdict !== "clean") {
+            attempt ??= verdict === "held" ? "the password in an address" : UNCHECKED_ADDRESS;
+        }
+
+        return verdict !== "clean";
     };
 
     const onRoute = async (route: Route): Promise<void> => {
@@ -586,8 +696,8 @@ const armGuard = async (
         const isLarge = body !== null && body.length > MAX_GUARDED_BODY_BYTES;
         const isOwn = frameOf(request)?.page() === page && originOf(request.url()) === origin;
 
-        if (isSecretAddress(request.url())) {
-            attempt ??= "the password in an address";
+        if (isAddressBlocked(request.url())) {
+            // Stopped below.
         } else if (
             isExpecting &&
             !isClaimed &&
@@ -780,8 +890,7 @@ const armGuard = async (
             const location = event.responseHeaders?.find((header) => header.name.toLowerCase() === "location")?.value;
             const target = location === undefined ? undefined : redirectOrigin(location, event.request.url);
 
-            if (location !== undefined && isSecretAddress(URL.canParse(location, event.request.url) ? new URL(location, event.request.url).href : location)) {
-                attempt ??= "the password in an address";
+            if (location !== undefined && isAddressBlocked(URL.canParse(location, event.request.url) ? new URL(location, event.request.url).href : location)) {
                 session.send("Fetch.failRequest", { errorReason: "BlockedByClient", requestId: event.requestId }).catch(() => undefined);
             } else if (isRedirectElsewhere({ hasBody: event.request.hasPostData === true, status: event.responseStatusCode, target }, origin)) {
                 if (isCounting) {
@@ -849,6 +958,8 @@ export interface SignInOptions {
     origin: string;
     pageTimeout: number;
     password: string;
+    /** The password checks of the whole call, whose budget the sign-in shares: one of its own when not given. */
+    scan?: SecretScan;
     url: string;
     username: string;
 }
@@ -873,6 +984,9 @@ const CLEANUP_MS = 4000;
 
 /** The end of the hold kept for closing the page when it cannot be cleared. */
 const CLOSE_MS = 1000;
+
+/** Why a login form with a file input is not filled: the browser's request interception drops a body built from a file. */
+const FILE_REFUSAL = "The login form has a file input, whose file the agent's browser would drop when it puts the saved password in, so nothing was typed";
 
 /** The longest wait for the form's request to go out, and then for the page it leads to. */
 const SEND_WAIT_MS = 5000;
@@ -906,7 +1020,7 @@ export const ownMessage = (error: unknown): string =>
 const checkForm = (
     input: Element,
     { expected, origin }: { expected?: { charset: string; enctype: string }; origin: string },
-): "encoding" | "invalid" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
+): "encoding" | "file" | "invalid" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
     const { form, isConnected, name, type } = input as HTMLInputElement;
 
     if (!form || !isConnected || type !== "password") {
@@ -959,6 +1073,14 @@ const checkForm = (
         return "encoding";
     }
 
+    // A file input among the form's controls (a `form` attribute's included): request interception drops a body built
+    // from a file, so the form could not be sent whole with the password in it.
+    const controls = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "elements")?.get?.call(form) as HTMLFormControlsCollection;
+
+    if ([...controls].some((control) => Element.prototype.matches.call(control, 'input[type="file" i]'))) {
+        return "file";
+    }
+
     const accepted = getAttribute.call(form, "accept-charset") ?? "";
 
     if (expected && (encoding !== expected.enctype || accepted !== expected.charset)) {
@@ -989,6 +1111,13 @@ const checkForm = (
             stop?.call(view);
 
             return "re-encoded";
+        }
+
+        // One a submit handler added: the body it builds would be dropped with the password.
+        if ([...controls].some((control) => Element.prototype.matches.call(control, 'input[type="file" i]'))) {
+            stop?.call(view);
+
+            return "file";
         }
     }
 
@@ -1178,20 +1307,23 @@ const documentOf = async (page: Page): Promise<string> => {
  * `password` in any spelling. It is all of the answer that outlives the tab's documents: no script runs once the password
  * is typed, so only the site's `Set-Cookie` can put it anywhere the session keeps. Never the whole cookie jar: a page
  * that planted guesses there would learn from the outcome whether one is the password, while the site that set these
- * lines was sent the password. An answer whose lines could not be read counts as holding it.
+ * lines was sent the password. An answer whose lines could not be read counts as holding it; lines past the sign-in's
+ * budget are `unchecked`, which keeps the session from going on as well.
  */
-const isClean = async (guard: Guard, password: string): Promise<boolean> => {
+const cookiesOf = async (guard: Guard, scan: SecretScan): Promise<Verdict> => {
     const answers = await guard.answerCookies();
 
     if (answers.includes(null)) {
-        return false;
+        return "held";
     }
 
     // Every line looked through, whatever an earlier one held: the look takes no shorter for a hit.
-    return !answers
-        .flat()
-        .map((line) => line !== null && !HTTP_ONLY_RE.test(line) && hasSecret(line.split(";", 1)[0] ?? "", password))
-        .includes(true);
+    return worstOf(
+        answers
+            .flat()
+            .filter((line): line is string => line !== null && !HTTP_ONLY_RE.test(line))
+            .map((line) => scan.cookie(line.split(";", 1)[0] ?? "")),
+    );
 };
 
 /**
@@ -1223,15 +1355,16 @@ const forgetAnswer = async (page: Page, ms: number): Promise<boolean> => {
  * Takes the password out of the page before `deadline`, with the guard and the channel lock still holding and the tab's
  * scripts off: leaves the document that had it for `about:blank` (its `pagehide` and `unload` handlers run under them,
  * and the workers it started go with it) and drops the tab's history and the HTTP cache (`forgetAnswer`), so no script goes back to the answer. The page is never loaded again: the session goes on from that
- * blank tab. Only then, where nothing of the site runs to see it, the cookies are looked at (`isClean`): clean, the lock
+ * blank tab. Only then, where nothing of the site runs to see it, the cookies are looked at (`cookiesOf`): clean, the lock
  * lifts (`release`, which must end within a second) and the tab is left for a blank page loaded without it; not, the
  * caller closes the tab and its browser. Every step up to the look is the same whatever the look finds, so nothing the
- * page or its site sees hangs on the password. Whether the session may go on: when it may not, it must not be used again.
+ * page or its site sees hangs on the password. Whether the session may go on (`cleared`; `unchecked` when the cookies
+ * were too much to check): when it may not, it must not be used again.
  */
 const clearPassword = async (
     page: Page,
-    { deadline, guard, now, password, release }: { deadline: number; guard: Guard; now: () => number; password: string; release: () => Promise<void> },
-): Promise<boolean> => {
+    { deadline, guard, now, release, scan }: { deadline: number; guard: Guard; now: () => number; release: () => Promise<void>; scan: SecretScan },
+): Promise<"cleared" | "failed" | "unchecked"> => {
     // The end of the time the steps and the look may take: the release has the last second.
     const lookUntil = deadline - CLOSE_MS;
     /** Leaves the tab's document for a blank one, within `ms`; whether it did. */
@@ -1245,23 +1378,23 @@ const clearPassword = async (
 
     // The command can stall: the hold ends regardless, and the page is closed.
     if (now() >= lookUntil || !(await within(guard.shield(), lookUntil - now(), false)) || !(await toBlank(lookUntil - now()))) {
-        return false;
+        return "failed";
     }
 
     // The answer to the form's POST is still an entry of the tab's history and of the browser's cache, which a script
     // could go back to or load once scripts run again.
     if (!(await forgetAnswer(page, lookUntil - now()))) {
-        return false;
+        return "failed";
     }
 
-    const isClear = await within(
-        isClean(guard, password).catch(() => false),
+    const cookies = await within(
+        cookiesOf(guard, scan).catch((): Verdict => "held"),
         lookUntil - now(),
-        false,
+        "held",
     );
 
-    if (!isClear) {
-        return false;
+    if (cookies !== "clean") {
+        return cookies === "held" ? "failed" : "unchecked";
     }
 
     // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
@@ -1275,7 +1408,7 @@ const clearPassword = async (
 
     // The blank document was loaded under the lock and keeps its locked APIs: the session goes on from a fresh one. No
     // site sees either load.
-    return isReleased && toBlank(Math.min(1000, deadline - now()));
+    return isReleased && (await toBlank(Math.min(1000, deadline - now()))) ? "cleared" : "failed";
 };
 
 /**
@@ -1290,7 +1423,8 @@ const clearPassword = async (
  */
 export const signIn = async (page: Page, options: SignInOptions): Promise<SignInResult> => {
     const { deadline, isStopped = () => false, navTimeout, now = Date.now, origin, pageTimeout, password, url, username } = options;
-    const scrub = (text: string): string => withoutSecret(text, password);
+    const scan = options.scan ?? secretScan(password);
+    const scrub = scan.without;
 
     /** The time a step may take: never into the cleanup's time, and no step at all once that began. */
     const left = (cap: number): number => {
@@ -1411,6 +1545,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return `The login form would not send the password to ${origin} by POST in this window, so nothing was typed`;
             }
 
+            if (form === "file") {
+                return FILE_REFUSAL;
+            }
+
             // `encoding` (`re-encoded` and `invalid` only at the send, which compares the form with the one the site served).
             if (typeof form === "string") {
                 return "The login form encodes what it sends in a way the agent's browser cannot put a saved password into, so nothing was typed";
@@ -1423,6 +1561,10 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             const html = await within(load.served(), left(SEND_WAIT_MS), null);
             const served = html ? servedForms(html.text, html.url) : [];
             const target = servedTarget(served, form);
+
+            if (served.includes(FILE_INPUT)) {
+                return FILE_REFUSAL;
+            }
 
             if (served.includes(AMBIGUOUS)) {
                 return "A form of the login page has submit buttons that send it to different places, so the agent's browser cannot check where the password goes; nothing was typed";
@@ -1558,7 +1700,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         let isGuardLate = false;
 
         guard = await settle(async () => {
-            const arming = armGuard(page, { form: target, isStopped, lock: locked, origin, password, stand });
+            const arming = armGuard(page, { form: target, isStopped, lock: locked, origin, password, scan, stand });
 
             arming.then(async (late) => (isGuardLate ? late.disarm() : undefined)).catch(() => undefined);
 
@@ -1617,6 +1759,14 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             return failed("The login form changed how it encodes what it sends from the form the site served, so the password was not sent");
         }
 
+        if (form === "file") {
+            guard.giveUp();
+
+            return failed(
+                "A script added a file input to the login form, whose file the agent's browser would drop with the password, so the password was not sent",
+            );
+        }
+
         if (form === "invalid") {
             return failed(
                 "The login form's own rules held it back (a field it requires is empty, or one is not in the format it asks for), so the password was not sent",
@@ -1655,6 +1805,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         }
 
         const blocked = guard.attempt();
+
+        if (blocked === UNCHECKED_ADDRESS) {
+            return failed(
+                "The site's answer led to an address the agent's browser could not check for the password (too much to check: too long, too many layers of encoding, or past what this sign-in may check), so it was stopped; the form was sent",
+            );
+        }
 
         if (blocked) {
             return failed(`The page tried to send ${blocked} while the password was in it, so it was stopped`);
@@ -1795,7 +1951,9 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
     const landedAt = isAnswerShown ? scrub(page.url()) : origin;
 
     // Whatever happened once the password was typed, it leaves the page before anything else can read the page.
-    if (!(await clearPassword(page, { deadline, guard: armed, now, password, release }))) {
+    const cleared = await clearPassword(page, { deadline, guard: armed, now, release, scan });
+
+    if (cleared !== "cleared") {
         // Closed before the lock lifts: a worker it holds would run once let go.
         await within(
             page
@@ -1808,9 +1966,7 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
         );
 
         return {
-            error: lock?.unlocked()
-                ? "A frame of the login page could not be locked down, so it was kept from running"
-                : "The password could not be cleared from the page in time",
+            error: lock?.unlocked() ? "A frame of the login page could not be locked down, so it was kept from running" : CLEAR_FAILURES[cleared],
             sessionClosed: true,
             submitted: guard.submitted(),
             success: false,

@@ -17,7 +17,8 @@ import { connect, launch } from "@cloudflare/playwright";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { originOf, ownMessage, signIn, TYPE_RESERVE_MS, withoutSecret } from "./login";
+import type { SecretScan } from "./login";
+import { originOf, ownMessage, secretScan, signIn, TYPE_RESERVE_MS } from "./login";
 import type { HoldKind, SessionHold } from "./session-lock";
 import { holdSession, LEASE_MS } from "./session-lock";
 
@@ -695,6 +696,15 @@ app.post("/action", async (c) => {
 /** The hold `/login` keeps after its deadline, for the response to get back. */
 const LOGIN_MARGIN_MS = 2000;
 
+/**
+ * The least wait for a close the sign-in asks for, taken from the margin when the sign-in ends at its deadline: a close
+ * that ends that quickly is confirmed (`sessionClosed`) rather than answered as unconfirmed.
+ */
+const MIN_CLOSE_WAIT_MS = 500;
+
+/** The end of the margin kept for the release and the answer once a close is confirmed: no close wait runs into it. */
+const RELEASE_MS = 500;
+
 /** The least budget a sign-in can succeed in: the margin, a page load, and the time typing and the cleanup need. */
 const MIN_LOGIN_BUDGET_MS = LOGIN_MARGIN_MS + 6000 + TYPE_RESERVE_MS;
 
@@ -929,7 +939,7 @@ app.post("/login", async (c) => {
         } else {
             // The rest of the margin is the answer's. A release whose answer is lost there is sent again past the
             // answer, while the lease runs: left to lapse, the hold would retire a session the cleanup left clean.
-            await holds.release(Math.max(500, deadline + LOGIN_MARGIN_MS - Date.now()));
+            await holds.release(Math.max(RELEASE_MS, deadline + LOGIN_MARGIN_MS - Date.now()));
             afterAnswer(c, holds.settle());
         }
     }
@@ -937,7 +947,8 @@ app.post("/login", async (c) => {
 
 /**
  * The sign-in of `/login`, the browser setup included, ended by `deadline`; the browser is closed when it must be. A close
- * that has not ended by `deadline` (the margin after it is the answer's), or that failed, is handed to `hold` (`false` when it fails) and the answer
+ * that has not ended by `deadline` (or `MIN_CLOSE_WAIT_MS` after it was asked for, inside the margin, when the sign-in
+ * ended late; the rest of the margin is the answer's), or that failed, is handed to `hold` (`false` when it fails) and the answer
  * goes out without waiting for it, saying `sessionCloseUnconfirmed` instead of `sessionClosed`.
  */
 const logIn = async (
@@ -962,7 +973,9 @@ const logIn = async (
         username: string;
     },
 ) => {
-    const scrub = (error: unknown): string => withoutSecret(error instanceof Error ? error.message : String(error), password);
+    // One budget for every text the call checks for the password, the sign-in's own included.
+    const scan = secretScan(password);
+    const scrub = (error: unknown): string => scan.without(error instanceof Error ? error.message : String(error));
     let setup: Awaited<ReturnType<typeof setUpWithin>>;
 
     try {
@@ -1072,7 +1085,19 @@ const logIn = async (
     }
 
     // A loss during the sign-in stops its next step (`isStopped`), the send included, without waiting for the close.
-    const answer = await signInHeld(browser, page, { deadline, hold, isStopped: () => isHoldLost, opened, origin, password, ready, scrub, url, username });
+    const answer = await signInHeld(browser, page, {
+        deadline,
+        hold,
+        isStopped: () => isHoldLost,
+        opened,
+        origin,
+        password,
+        ready,
+        scan,
+        scrub,
+        url,
+        username,
+    });
 
     isAnswered = true;
 
@@ -1094,6 +1119,7 @@ const signInHeld = async (
         origin,
         password,
         ready,
+        scan,
         scrub,
         url,
         username,
@@ -1105,6 +1131,7 @@ const signInHeld = async (
         origin: string;
         password: string;
         ready: { isLaunched: boolean; sessionId: string };
+        scan: SecretScan;
         scrub: (error: unknown) => string;
         url: string;
         username: string;
@@ -1113,7 +1140,7 @@ const signInHeld = async (
     let result: Awaited<ReturnType<typeof signIn>>;
 
     try {
-        result = await signIn(page, { deadline, isStopped, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, url, username });
+        result = await signIn(page, { deadline, isStopped, navTimeout: NAV_TIMEOUT, origin, pageTimeout: PAGE_TIMEOUT, password, scan, url, username });
     } catch (error) {
         // Before anything was typed (`signIn` handles every error after): the session holds no password.
         // Its own reason, or a fixed text: a browser error can name what the page chose.
@@ -1127,7 +1154,11 @@ const signInHeld = async (
     // Closed only once the browser says so: a close that fails or does not end in time leaves a session that may
     // still be open, which this isolate never lends out again.
     const closing = endSession(browser, ready.isLaunched);
-    const isClosed = await settledWithin(closing, deadline - Date.now());
+    // Until the deadline, and at least `MIN_CLOSE_WAIT_MS` from the margin, but never into its last `RELEASE_MS`.
+    const isClosed = await settledWithin(
+        closing,
+        Math.min(Math.max(MIN_CLOSE_WAIT_MS, deadline - Date.now()), deadline + LOGIN_MARGIN_MS - RELEASE_MS - Date.now()),
+    );
     const reason = result.error.replace(TRAILING_STOP_RE, "");
 
     if (isClosed) {
