@@ -360,7 +360,8 @@ const ComputerImportPanel: FC<{ disabled: boolean; onClose: () => void; runImpor
                     return null;
                 }
 
-                came = answer.filter((file) => isRead(file));
+                // Only the files asked for: one the answer adds, even a known one left unticked, is not imported.
+                came = answer.filter((file) => files.includes(file.id) && isRead(file));
                 // Each file asked for, not each the answer names: one it left out stays ticked, with a note.
                 allRead = files.every((id) => came.some((file) => file.id === id));
 

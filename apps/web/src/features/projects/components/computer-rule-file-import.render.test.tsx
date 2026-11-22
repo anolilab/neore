@@ -368,6 +368,8 @@ describe("import from this computer", () => {
     });
 
     it("drops a read the person closed the panel on, or discarded the drafts during, and frees the editor", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["Date", "setInterval", "clearInterval"] });
+
         const user = userEvent.setup();
         const answer = backend.start.getMockImplementation()!;
         let finish: () => void = () => undefined;
@@ -394,10 +396,8 @@ describe("import from this computer", () => {
         finish();
 
         await waitFor(() => expect(screen.getByRole("button", { name: "Import files" }).hasAttribute("disabled")).toBe(false));
-        // Given time to be pushed: the answer that came after the close adds nothing.
-        await new Promise((resolve) => {
-            setTimeout(resolve, 60);
-        });
+        // Ten pushes later, the answer that came after the close adds nothing.
+        await vi.advanceTimersByTimeAsync(100);
         expect(screen.queryByRole("listitem", { name: "CLAUDE.md" })).toBeNull();
 
         // A Discard while the read waits drops it too.
@@ -414,9 +414,7 @@ describe("import from this computer", () => {
         await waitFor(() => expect(screen.getByRole("button", { name: "Import files" }).hasAttribute("disabled")).toBe(false));
         expect(isDisabled(screen.getByRole("button", { name: "Import selected" }))).toBe(false);
         finish();
-        await new Promise((resolve) => {
-            setTimeout(resolve, 60);
-        });
+        await vi.advanceTimersByTimeAsync(100);
         expect(screen.queryByRole("listitem", { name: "CLAUDE.md" })).toBeNull();
     });
 
@@ -461,7 +459,6 @@ describe("import from this computer", () => {
 
             // Waiting on the person at first, then no longer readable.
             backend.calls.set("vanished", { phase: "prompting", status: "claimed" });
-            setTimeout(() => backend.lost.add("vanished"), 50);
 
             return { callId: "vanished" };
         });
@@ -470,6 +467,7 @@ describe("import from this computer", () => {
         await user.click(screen.getByRole("button", { name: "Import selected" }));
 
         await screen.findByText("Approve the request in the desktop app on Studio.");
+        backend.lost.add("vanished");
 
         const lost = await screen.findByRole("alert");
 
@@ -667,6 +665,27 @@ describe("import from this computer", () => {
         expect(screen.getByRole("list", { name: "Files not imported" })).toBeDefined();
     });
 
+    it("imports only the files asked for, even when the answer carries another it listed", async () => {
+        const user = userEvent.setup();
+
+        backend.start.mockImplementation(async ({ files }: { files?: string[] }) => {
+            const callId = `extra-${String(backend.start.mock.calls.length)}`;
+
+            // Asked for CLAUDE.md alone, the computer sends AGENTS.md too.
+            backend.calls.set(callId, files ? readAll(["claude", "codex"]) : { files: LISTED, status: "completed" });
+
+            return { callId };
+        });
+        renderEditor();
+        await openAndList(user);
+        await user.click(within(screen.getByRole("list", { name: "Instruction files" })).getAllByRole("checkbox")[1]!);
+        await user.click(screen.getByRole("button", { name: "Import selected" }));
+
+        expect(await screen.findByRole("listitem", { name: "CLAUDE.md" })).toBeDefined();
+        expect(screen.getByText("1 rule file imported. Review, then save.")).toBeDefined();
+        expect(screen.queryByRole("listitem", { name: "AGENTS.md" })).toBeNull();
+    });
+
     it("names the computer a read went to, even once it is unpaired and another is chosen", async () => {
         const user = userEvent.setup();
         let deny: () => void = () => undefined;
@@ -755,10 +774,8 @@ describe("import from this computer", () => {
 
         expect(await screen.findByRole("list", { name: "Instruction files" })).toBeDefined();
 
-        // The live query's refetches, still answering "claimed", do not put the call back to waiting.
-        await new Promise((resolve) => {
-            setTimeout(resolve, 100);
-        });
+        // Ten refetches of the live query, each still answering "claimed", do not put the call back to waiting.
+        await vi.advanceTimersByTimeAsync(100);
         expect(screen.getByRole("list", { name: "Instruction files" })).toBeDefined();
         expect(screen.queryByText("Approve the request in the desktop app on Studio.")).toBeNull();
 

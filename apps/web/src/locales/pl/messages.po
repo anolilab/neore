@@ -189,7 +189,7 @@ msgstr "(brak)"
 
 #: src/features/projects/components/computer-rule-file-import.tsx:404
 msgid "(not in the computer's answer: try again)"
-msgstr "{'de': '(nicht in der Antwort des Computers: versuche es erneut)', 'es': '(no está en la respuesta del ordenador: inténtalo de nuevo)', 'fr': '(absent de la réponse de l’ordinateur : réessayez)', 'it': '(non presente nella risposta del computer: riprova)', 'ja': '（コンピューターの応答に含まれていません：もう一度お試しください）', 'pl': '(brak w odpowiedzi komputera: spróbuj ponownie)', 'pt': '(não está na resposta do computador: tente novamente)', 'zh': '（不在电脑的回应中：请重试）'}"
+msgstr "(brak w odpowiedzi komputera: spróbuj ponownie)"
 
 #: src/features/projects/components/computer-rule-file-import.tsx:400
 msgid "(not on this computer)"
@@ -657,7 +657,7 @@ msgstr "Wejście: {0}, wyjście: {1} za 1 mln tokenów"
 #. placeholder {0}: chosen.name
 #: src/features/projects/components/computer-rule-file-import.tsx:511
 msgid "{0} is offline. Open the desktop app on it to continue."
-msgstr "{'de': '{0} ist offline. Öffne dort die Desktop-App, um fortzufahren.', 'es': '{0} está sin conexión. Abre la aplicación de escritorio en él para continuar.', 'fr': '{0} est hors ligne. Ouvrez l’application de bureau sur cet ordinateur pour continuer.', 'it': '{0} è offline. Apri l’app desktop su di esso per continuare.', 'ja': '{0} はオフラインです。続けるには、そのコンピューターでデスクトップアプリを開いてください。', 'pl': '{0} jest offline. Otwórz na nim aplikację desktopową, aby kontynuować.', 'pt': '{0} está offline. Abra o aplicativo para desktop nele para continuar.', 'zh': '{0} 已离线。请在该电脑上打开桌面应用以继续。'}"
+msgstr "{0} jest offline. Otwórz na nim aplikację desktopową, aby kontynuować."
 
 #. placeholder {0}: model.name
 #: src/features/marketing/components/model-detail-page.tsx:209
@@ -2241,7 +2241,7 @@ msgstr "Narzędzie wymagające zatwierdzenia wstrzymuje turę kartą. Odpowiada 
 #: src/features/settings/components/chat/bots-settings.tsx:220
 #: src/features/settings/components/chat/bots-settings.tsx:272
 msgid "A tool you typed was not added. Add it or clear the field first."
-msgstr "{'de': 'Ein eingegebenes Tool wurde nicht hinzugefügt. Füge es hinzu oder leere das Feld zuerst.', 'es': 'Una herramienta que escribiste no se añadió. Añádela o vacía el campo primero.', 'fr': 'Un outil que vous avez saisi n’a pas été ajouté. Ajoutez-le ou videz d’abord le champ.', 'it': 'Uno strumento che hai digitato non è stato aggiunto. Aggiungilo o svuota prima il campo.', 'ja': '入力したツールが追加されていません。先に追加するか、入力欄を空にしてください。', 'pl': 'Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść pole.', 'pt': 'Uma ferramenta que você digitou não foi adicionada. Adicione-a ou limpe o campo primeiro.', 'zh': '你输入的工具尚未添加。请先添加它或清空输入框。'}"
+msgstr "Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść pole."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:344
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
@@ -35493,7 +35493,7 @@ msgstr "Ten link nie przyjmuje teraz wiadomości. Spróbuj ponownie później."
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:365
 msgid "This list is full: remove a tool before adding another."
-msgstr "{'de': 'Diese Liste ist voll: Entferne ein Tool, bevor du ein weiteres hinzufügst.', 'es': 'Esta lista está llena: quita una herramienta antes de añadir otra.', 'fr': 'Cette liste est pleine : retirez un outil avant d’en ajouter un autre.', 'it': 'Questo elenco è pieno: rimuovi uno strumento prima di aggiungerne un altro.', 'ja': 'このリストは上限に達しています。別のツールを追加する前に、ツールを1つ削除してください。', 'pl': 'Ta lista jest pełna: usuń narzędzie, zanim dodasz kolejne.', 'pt': 'Esta lista está cheia: remova uma ferramenta antes de adicionar outra.', 'zh': '此列表已满：请先移除一个工具，再添加新的。'}"
+msgstr "Ta lista jest pełna: usuń narzędzie, zanim dodasz kolejne."
 
 #: src/features/vault/components/site-logins.tsx:307
 msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
@@ -39573,7 +39573,7 @@ msgstr "Brak połączenia z internetem. Neore połączy się ponownie, gdy sieć
 
 #: src/features/projects/components/computer-rule-file-import.tsx:253
 msgid "You are offline. Reconnect and try again."
-msgstr "{'de': 'Du bist offline. Stelle die Verbindung wieder her und versuche es erneut.', 'es': 'Estás sin conexión. Vuelve a conectarte e inténtalo de nuevo.', 'fr': 'Vous êtes hors ligne. Reconnectez-vous et réessayez.', 'it': 'Sei offline. Riconnettiti e riprova.', 'ja': 'オフラインです。再接続してからもう一度お試しください。', 'pl': 'Jesteś offline. Połącz się ponownie i spróbuj jeszcze raz.', 'pt': 'Você está offline. Reconecte-se e tente novamente.', 'zh': '你已离线。请重新连接后重试。'}"
+msgstr "Jesteś offline. Połącz się ponownie i spróbuj jeszcze raz."
 
 #: src/features/chat/thread/composer-input.tsx:1116
 #: src/features/chat/thread/composer-input.tsx:1241
