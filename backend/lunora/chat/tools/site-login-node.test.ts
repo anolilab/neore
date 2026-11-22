@@ -389,6 +389,7 @@ describe("what the renderer answers", () => {
     it.each([
         ["another call holds the session", 409, "busy with another call"],
         ["the session's lock does not answer", 503, "lock did not answer"],
+        ["the renderer refuses the request before it reaches a browser", 400, "not on the site the login was saved for"],
     ])("types nothing, ends the hold and gives the charge back when %s", async (_why, status, words) => {
         await insertApprovalRow();
         await withBrowser();

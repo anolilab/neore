@@ -422,10 +422,11 @@ export const fillSavedLogin = internalAction
             }
 
             // Refused before anything was typed: another call holds the session (409), its lock did not answer or the sign-in
-            // could not be armed (503), the browser did not start in time (504), or the session was retired on the new browser too
+            // could not be armed (503), the browser did not start in time (504), the request was refused before any browser was
+            // reached (400: the page, its origin or the request itself), or the session was retired on the new browser too
             // (410). A session it says is gone
             // (retired, or a reconnect that failed) is dropped from the row first.
-            if (response?.status === 409 || response?.status === 410 || response?.status === 503 || response?.status === 504) {
+            if (response?.status === 400 || response?.status === 409 || response?.status === 410 || response?.status === 503 || response?.status === 504) {
                 if (response.status === 410 || data.sessionClosed === true) {
                     await ctx.runMutation(internal.browser.functions.logAction, {
                         action: "login",
