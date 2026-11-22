@@ -127,6 +127,7 @@ export const startCodingAgentRun = internalAction
                 providerKey,
                 repo,
                 runId,
+                skipRepoSetup: claim.fixesSetupStep === "repo-setup",
                 timeoutMs: RUN_TIMEOUT_MS,
             },
             {

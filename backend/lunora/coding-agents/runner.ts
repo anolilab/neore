@@ -90,6 +90,8 @@ export interface RunSpec {
     providerKey: string;
     repo: ParsedRepo;
     runId: string;
+    /** A fix run for a failed repository setup step: the script leaves that step out so the agent can repair it. */
+    skipRepoSetup?: boolean;
     /** Wall-clock budget for the whole run; also the sandbox's own lifetime. */
     timeoutMs: number;
 }
@@ -152,6 +154,7 @@ export const startRun = async (
             agent: spec.agent,
             ...(spec.branch !== undefined && { branch: spec.branch }),
             repo: spec.repo,
+            skipRepoSetup: spec.skipRepoSetup === true,
             timeoutSeconds: (spec.timeoutMs - WRAP_UP_MS) / 1000,
         });
 

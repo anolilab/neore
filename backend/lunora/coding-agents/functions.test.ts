@@ -7,6 +7,7 @@ import {
     beginPullRequest,
     canOpenPullRequest,
     claimPoll,
+    claimRun,
     commitAuthorFor,
     commitAuthorOf,
     completePullRequest,
@@ -500,6 +501,28 @@ describe("setup fix", () => {
         const run = await harness.run(async (ctx: any) => await ctx.db.get("codingAgentRuns", runId));
 
         expect(run.setupFailure).toStrictEqual({ logTail: "$ setup\npnpm: not found", step: "repo-setup" });
+    });
+
+    it("hands the fixed step to the run that starts, so its script can leave that step out", async () => {
+        const runId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("codingAgentRuns", {
+                    agent: "claude_code",
+                    createdAt: 1,
+                    fixesSetupStep: "repo-setup",
+                    log: "",
+                    openPr: false,
+                    prompt: "Fix it",
+                    repoUrl: "https://github.com/a/b.git",
+                    status: "queued",
+                    updatedAt: 1,
+                    userId: USER,
+                }),
+        );
+
+        const claim = await harness.run(async (ctx: any) => await ctx.runMutation(claimRun, { runId }));
+
+        expect(claim).toMatchObject({ fixesSetupStep: "repo-setup" });
     });
 
     it("answers NOT_FOUND for another user's run", async () => {

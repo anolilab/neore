@@ -359,7 +359,14 @@ const INSTALL_TIMEOUT_S = 300;
  * deletes it, and exports it only to `git`, which has exited before the agent
  * starts.
  */
-export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; repo: ParsedRepo; timeoutSeconds: number }): string => {
+export const buildRunScript = (input: {
+    agent: CodingAgentId;
+    branch?: string;
+    repo: ParsedRepo;
+    /** Leaves the repository's own setup step out of the run (a fix run for that step). */
+    skipRepoSetup?: boolean;
+    timeoutSeconds: number;
+}): string => {
     const { label } = CODING_AGENTS[input.agent];
     const agentSeconds = Math.max(60, Math.floor(input.timeoutSeconds));
 

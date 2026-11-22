@@ -415,6 +415,7 @@ export const claimRun = internalMutation
             v.object({
                 agent: vCodingAgentId,
                 branch: v.optional(v.string()),
+                fixesSetupStep: v.optional(v.string()),
                 openPr: v.boolean(),
                 prompt: v.string(),
                 repoUrl: v.string(),
@@ -437,6 +438,7 @@ export const claimRun = internalMutation
         return {
             agent: run.agent,
             ...(run.branch !== undefined && { branch: run.branch }),
+            ...(run.fixesSetupStep !== undefined && { fixesSetupStep: run.fixesSetupStep }),
             openPr: run.openPr,
             prompt: run.prompt,
             repoUrl: run.repoUrl,
