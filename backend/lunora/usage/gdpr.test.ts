@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { browserExportPrefix } from "../browser/export-pages";
 import { dispatchDueShards } from "../lib/shard-housekeeping";
 import schema from "../schema";
 import {
@@ -22,7 +23,7 @@ import {
 
 /** Object keys the purges were scheduled for, and the shards the scheduler was asked to run a tick on, captured in place of the scheduler. */
 const scheduled = vi.hoisted(() => {
-    return { keys: [] as string[], shards: [] as string[] };
+    return { keys: [] as string[], prefixes: [] as string[], shards: [] as string[] };
 });
 
 vi.mock("../lib/shard-scheduler", async (importOriginal) => {
@@ -31,6 +32,10 @@ vi.mock("../lib/shard-scheduler", async (importOriginal) => {
         runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>, shardKey: string) => {
             if (typeof args["key"] === "string") {
                 scheduled.keys.push(args["key"]);
+            }
+
+            if (typeof args["prefix"] === "string") {
+                scheduled.prefixes.push(args["prefix"]);
             }
 
             scheduled.shards.push(shardKey);
@@ -107,6 +112,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date("2026-11-12T12:00:00.000Z"));
     harness = lunoraTest(schema as never);
     scheduled.keys = [];
+    scheduled.prefixes = [];
     scheduled.shards = [];
 });
 
@@ -370,6 +376,39 @@ describe("a retried erasure", () => {
 });
 
 describe("the sweep and the clear", () => {
+    it("deletes the browser pages of an export killed before its cleanup, once its request is no longer in flight", async () => {
+        const runKey = await harness.run(async (ctx: any) => {
+            const request = await ctx.db.insert("gdprRequests", {
+                requestedAt: 1,
+                requestType: "export",
+                status: "processing",
+                userEmail: "a@example.com",
+                userId: A,
+            });
+
+            // The record the export writes before its first browser page; nothing of the usage was stored yet.
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: `${request}:1`, userId: A });
+
+            return { key: `${request}:1`, request };
+        });
+
+        // Still processing: the pages may yet be read, so they stay.
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(scheduled.prefixes).toStrictEqual([]);
+
+        // The request timed out, as one whose workflow was killed does, and the run is due again.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("gdprRequests", runKey.request, { status: "failed" });
+            const run = await ctx.db.usageExportRuns.findFirst({ where: { userId: A } });
+
+            await ctx.db.patch("usageExportRuns", run._id, { deleteAt: 0 });
+        });
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+
+        expect(scheduled.prefixes).toStrictEqual([browserExportPrefix(A, runKey.key)]);
+        expect(await countOf("usageExportRuns", A)).toBe(0);
+    });
+
     it("removes a dead run's pieces at the time its last live sweep set, and not before", async () => {
         const t0 = Date.now();
         const setAt = t0 + EXPORT_PIECE_TTL_MS;

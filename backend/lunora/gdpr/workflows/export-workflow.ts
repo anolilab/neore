@@ -202,7 +202,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             async () => await context.run(internal.devices.gdpr.collectDevicesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-devices") }),
         );
         // Where this run stores its browser pages (`browser/export-pages.ts`).
-        const browserPrefix = browserExportPrefix(scope);
+        const browserPrefix = browserExportPrefix(userId, scope);
         const activity = await context.step.do(
             "collect-activity",
             async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
@@ -327,6 +327,12 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // object under the run's prefix. Only the page count reaches the export file's action, which reads the pages itself, so no
             // dispatch body (Lunora's 1 MiB) or step result carries the whole history. Inside the try, so a page that fails for good
             // fails the export, whose cleanup deletes the pages already stored.
+            // The run's record comes first, so a run killed before its cleanup leaves pages the sweep finds (`usage/gdpr.ts`).
+            await context.step.do(
+                "open-export-run",
+                async () =>
+                    await context.run(internal.usage.gdpr.openUsageExportRun, { requestId: scope, userId }, { dedupId: stepDedupId(scope, "open-export-run") }),
+            );
             const browserPages = await storeAllBrowserPages(async (cursor, page) => {
                 const name = `collect-browser-${String(page)}`;
 

@@ -14,6 +14,7 @@ import { internalAction, internalQuery } from "../_generated/server";
 import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { withDependency } from "../lib/dependency";
 import { MAX_LENGTH } from "../lib/validators";
+import { browserExportUserPrefix } from "./export-pages";
 
 /**
  * Deletes one batch of the sites a deleted thread's runs asked the person to clear; `true` when none are left. The
@@ -465,18 +466,44 @@ export const storeBrowserExportPage = internalAction
         return next === undefined ? {} : { next };
     });
 
-/** Deletes every page object under a run's `prefix`, a listing at a time; none left is not an error, so any terminal path calls it. */
+/** Deletes every object under `prefix`, a listing at a time; none left is not an error. */
+export const deleteObjectsUnder = async (
+    storage: {
+        delete: (key: string) => Promise<unknown>;
+        list: (prefix: string, options: { limit: number }) => Promise<{ objects: { key: string }[]; truncated?: boolean }>;
+    },
+    prefix: string,
+): Promise<void> => {
+    for (;;) {
+        const listing = await storage.list(prefix, { limit: 100 });
+
+        await Promise.all(listing.objects.map(async (object) => await storage.delete(object.key)));
+
+        if (!listing.truncated) {
+            return;
+        }
+    }
+};
+
+/** Deletes every page object under a run's `prefix`; any terminal path of the export, and the sweep of a dead run, call it. */
 export const deleteBrowserExportPages = internalAction
     .input({ prefix: v.string() })
     .output(v.null())
     .action(async ({ args: { prefix }, ctx }) => {
-        for (;;) {
-            const listing = await ctx.storage.list(prefix, { limit: 100 });
+        await deleteObjectsUnder(ctx.storage, prefix);
 
-            await Promise.all(listing.objects.map(async (object) => await ctx.storage.delete(object.key)));
+        return null;
+    });
 
-            if (!listing.truncated) {
-                return null;
-            }
-        }
+/**
+ * Account erasure: every browser page any of the user's export runs stored, under the user's prefix, so a run that was killed before
+ * its cleanup leaves nothing past the deletion.
+ */
+export const deleteUserBrowserExportPages = internalAction
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .action(async ({ args: { userId }, ctx }) => {
+        await deleteObjectsUnder(ctx.storage, browserExportUserPrefix(userId));
+
+        return null;
     });

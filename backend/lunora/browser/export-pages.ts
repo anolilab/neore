@@ -14,8 +14,13 @@ export interface BrowserExport {
     sessions: unknown[];
 }
 
+const safe = (value: string): string => value.replaceAll(/[^\w-]/g, "_");
+
+/** Every browser page of a user's export runs sits under this prefix, so account erasure deletes whatever a dead run left. */
+export const browserExportUserPrefix = (userId: string): string => `gdpr-exports/browser-${safe(userId)}/`;
+
 /** Where a run's browser pages are stored; one prefix per run, so the cleanup lists and deletes every page it wrote. */
-export const browserExportPrefix = (runKey: string): string => `gdpr-exports/browser-${runKey.replaceAll(/[^\w-]/g, "_")}/`;
+export const browserExportPrefix = (userId: string, runKey: string): string => `${browserExportUserPrefix(userId)}${safe(runKey)}/`;
 
 export const browserExportPageKey = (prefix: string, page: number): string => `${prefix}${String(page)}.json`;
 

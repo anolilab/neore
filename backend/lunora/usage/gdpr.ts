@@ -10,6 +10,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { browserExportPrefix } from "../browser/export-pages";
 import { BATCH, full, type BatchResult } from "../gdpr/batch";
 import { isExportRequestInFlight } from "../gdpr/export-requests";
 import { patchRow } from "../lib/patch";
@@ -340,6 +341,18 @@ export const sweepUsageExportPieces = internalMutation
 
                 const more = pieces.page.length >= limit || fullPieces(projects.page);
 
+                // A dead run's browser pages, which the export stores under a prefix derived from the run (`browser/export-pages.ts`).
+                if (!more) {
+                    await runAfterOnShard(
+                        ctx.scheduler,
+                        0,
+                        internal.browser.gdpr.deleteBrowserExportPages,
+                        { prefix: browserExportPrefix(run.userId, run.requestId) },
+                        run.userId,
+                        RECORD_RETRY,
+                    );
+                }
+
                 // Scheduled once the run's pieces and index rows are drained, not on every pass that clears some: a run with pieces
                 // left is due again at once, and a purge per pass would queue duplicates while the first one is still running.
                 if (run.usageKey !== undefined && !more) {
@@ -445,6 +458,23 @@ const ensureRun = async (ctx: MutationCtx, requestId: string, userId: string): P
         await noteShardDue(ctx, deleteAt, userId);
     }
 };
+
+/**
+ * The run's record, written before the export stores anything else of its own (its browser pages), so a run killed before its
+ * cleanup is found by the sweep. Refused once the account's deletion has begun, as every write of the run is.
+ */
+export const openUsageExportRun = internalMutation
+    .input({ requestId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args: { requestId, userId }, ctx }) => {
+        if (await deletionUnderwayOnPrimary(ctx, userId)) {
+            throw new LunoraError("CONFLICT", "Account deletion is underway; the export stops");
+        }
+
+        await ensureRun(ctx, requestId, userId);
+
+        return null;
+    });
 
 const pageSummary = v.object({
     backfill: v.string(),

@@ -6,8 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
-import { collectBrowserForExport } from "./gdpr";
+import { browserExportPageKey, browserExportPrefix, type BrowserExport, readAllBrowserPages, storeAllBrowserPages } from "./export-pages";
+import { collectBrowserForExport, deleteUserBrowserExportPages } from "./gdpr";
 
 const A = "user-a";
 const B = "user-b";
@@ -140,6 +140,36 @@ describe("browser data in the GDPR export", () => {
         expect(pages).toBeGreaterThan(4);
         expect(result.actions).toHaveLength(MANY);
         expect(timestamps.size).toBe(MANY);
+    });
+});
+
+describe("browser export pages left by a killed export", () => {
+    it("are deleted by account erasure for the user, and another user's are kept", async () => {
+        // A run of each user that never reached its cleanup, and A's second run, each with stored pages.
+        const keys = [
+            browserExportPageKey(browserExportPrefix(A, "request-1:instance-1"), 0),
+            browserExportPageKey(browserExportPrefix(A, "request-1:instance-1"), 1),
+            browserExportPageKey(browserExportPrefix(A, "request-2:instance-2"), 0),
+            browserExportPageKey(browserExportPrefix(B, "request-3:instance-3"), 0),
+        ];
+        const stored = new Set(keys);
+        // A listing of two at a time, so the erasure is shown to follow a truncated listing.
+        const storage = {
+            delete: async (key: string) => stored.delete(key),
+            list: async (prefix: string) => {
+                const objects = [...stored]
+                    .filter((key) => key.startsWith(prefix))
+                    .map((key) => {
+                        return { key };
+                    });
+
+                return { objects: objects.slice(0, 2), truncated: objects.length > 2 };
+            },
+        };
+
+        await (deleteUserBrowserExportPages as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler({ storage }, { userId: A });
+
+        expect([...stored]).toStrictEqual([keys[3]]);
     });
 });
 

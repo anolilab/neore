@@ -133,7 +133,9 @@ Users can request a complete export of all their personal data in JSON format. T
    the sites a run asked the user to clear, and paired extensions (`browser/gdpr.ts#collectBrowserForExport`, a
    page per workflow step, each stored as an object under the run's prefix and read back by `generateExportFile`, so no
    call carries the whole history past Lunora's 1 MiB dispatch body; the objects are deleted when the export ends, whatever
-   the outcome). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
+   the outcome). The pages sit under `gdpr-exports/browser-<user>/<run>/`, and the run's record (`usageExportRuns`) is written
+   before the first page, so a run killed before its ending is still cleaned up: the usage sweep deletes a dead run's pages
+   with its usage object, and account erasure deletes the user's whole prefix (`delete-user-browser-export-pages`). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
    `control` claim, a typed action's `value` (it can be a password) and an extension's pairing code. A string field
    over 4 KiB is cut and named in the row's `truncated`, so every page fits a workflow step's result
 
