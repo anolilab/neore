@@ -36,7 +36,8 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 const { default: schema } = await import("../../schema");
 const { encryptKey } = await import("../../lib/encryption");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
-const { NO_USABLE_LOGIN, PASSWORD_TOO_SHORT, SCRIPT_SIGN_IN, SIGN_IN_RETIRED, withoutPassword } = await import("./site-login-node");
+const { NO_USABLE_LOGIN, PASSWORD_TOO_SHORT, SCRIPT_SIGN_IN, SIGN_IN_RETIRED, WITHHELD_FIELD, withoutLogin, withoutPassword } =
+    await import("./site-login-node");
 const { applyLimit } = await import("../../lib/rate-limiter-mutations");
 const { PERSON_HAS_CONTROL } = await import("./browser-node");
 const { default: signInWithSavedLoginTool } = await import("./site-login");
@@ -58,7 +59,7 @@ const insert = async (table: string, row: Record<string, unknown>) => (await har
 const all = async (table: string) => (await harness.run(async (ctx: any) => await ctx.db.query(table).collect())) as Record<string, unknown>[];
 
 /** The lead model's reply that asked to sign in: its tool call and the call's approval request (`tool-approval.ts` reads both). */
-const insertApprovalRow = async (callId = CALL_ID, extra: Record<string, unknown>[] = []) =>
+const insertApprovalRow = async (callId = CALL_ID, extra: Record<string, unknown>[] = [], stepOrder = 2) =>
     await insert("messages", {
         agentName: DEFAULT_CHAT_MODEL,
         message: {
@@ -71,11 +72,27 @@ const insertApprovalRow = async (callId = CALL_ID, extra: Record<string, unknown
         },
         order: 0,
         status: "success",
-        stepOrder: 2,
+        stepOrder,
         threadId,
         tool: true,
         userId: OWNER,
     });
+
+/** The lead model's own text replies in the turn, at the given steps: rows a sign-in's path may hold. */
+const insertReplies = async (steps: number[]) => {
+    for (const stepOrder of steps) {
+        await insert("messages", {
+            agentName: DEFAULT_CHAT_MODEL,
+            message: { content: [{ text: `Step ${stepOrder}`, type: "text" }], role: "assistant" },
+            order: 0,
+            status: "success",
+            stepOrder,
+            threadId,
+            tool: false,
+            userId: OWNER,
+        });
+    }
+};
 
 interface Call {
     context?: Record<string, unknown>;
@@ -201,6 +218,25 @@ describe("an approved sign-in in the owner's own turn", () => {
         expect(action?.["value"]).toBeUndefined();
     });
 
+    it("keeps the saved username out of what the site sends back, and withholds a title that spells the password in escapes", async () => {
+        await insertApprovalRow();
+        renderer.mockResolvedValue(
+            answered({
+                error: `Signed in as ${USERNAME}`,
+                sessionId: "s-1",
+                submitted: true,
+                success: true,
+                title: [...PASSWORD].map((character) => String.raw`\u` + (character.codePointAt(0) ?? 0).toString(16).padStart(4, "0")).join(""),
+                url: `${SITE}/account?user=${encodeURIComponent(USERNAME)}`,
+            }),
+        );
+
+        const result = await signIn();
+
+        expect(result.output).toMatchObject({ error: "Signed in as [username]", title: WITHHELD_FIELD, url: `${SITE}/account?user=[username]` });
+        await expectNoSecret(result);
+    });
+
     it("scrubs the password from a renderer failure too", async () => {
         await insertApprovalRow();
         renderer.mockResolvedValue({ data: undefined, error: { error: `fill failed near ${PASSWORD}`, success: false }, response: { ok: false, status: 500 } });
@@ -230,6 +266,34 @@ describe("an approved sign-in in the owner's own turn", () => {
 
         expect(result.output).toMatchObject({ error: PERSON_HAS_CONTROL, success: false });
         expect(renderer).not.toHaveBeenCalled();
+    });
+});
+
+describe("an approved call in a long turn", () => {
+    const steps = (from: number, count: number): number[] => Array.from({ length: count }, (_, at) => from + at);
+
+    it.each([
+        [
+            "its request sits below more than a page of newer rows",
+            async () => {
+                await insertApprovalRow(CALL_ID, [], 1);
+                await insertReplies(steps(2, 150));
+            },
+        ],
+        [
+            "more than a page of rows lies between the prompt and its request",
+            async () => {
+                await insertReplies(steps(1, 150));
+                await insertApprovalRow(CALL_ID, [], 151);
+            },
+        ],
+    ])("still signs in when %s", async (_why, setup) => {
+        await setup();
+
+        const result = await signIn();
+
+        expect(result.output).toMatchObject({ success: true });
+        expect(renderer).toHaveBeenCalledOnce();
     });
 });
 
@@ -549,6 +613,35 @@ describe("withoutPassword", () => {
         const text = `${password} ${encodeURIComponent(password)} ${new URLSearchParams({ p: password }).toString().slice(2)}`;
 
         expect(withoutPassword(text, password)).toBe("[password] [password] [password]");
+    });
+});
+
+describe("withoutLogin", () => {
+    /** `text` with every character written as a JS `\\uXXXX` escape. */
+    const escapedAll = (text: string): string =>
+        [...text].map((character) => String.raw`\u` + (character.codePointAt(0) ?? 0).toString(16).padStart(4, "0")).join("");
+
+    it("replaces the username too, as typed and URI-encoded in either case", () => {
+        const lower = encodeURIComponent(USERNAME).replaceAll(/%[\dA-F]{2}/g, (escape) => escape.toLowerCase());
+
+        expect(withoutLogin(`Hi ${USERNAME} (${lower})`, { password: PASSWORD, username: USERNAME })).toBe("Hi [username] ([username])");
+    });
+
+    it.each([
+        ["the password", PASSWORD],
+        ["the username", USERNAME],
+    ])("withholds a field that spells %s in escapes, whole", (_what, secret) => {
+        expect(withoutLogin(`Welcome back, ${escapedAll(secret)}`, { password: PASSWORD, username: USERNAME })).toBe(WITHHELD_FIELD);
+        expect(
+            withoutLogin(`Signed in &#x2014; ${[...secret].map((character) => `&#${character.codePointAt(0)};`).join("")}`, {
+                password: PASSWORD,
+                username: USERNAME,
+            }),
+        ).toBe(WITHHELD_FIELD);
+    });
+
+    it("leaves a field with escapes that spell neither as it is", () => {
+        expect(withoutLogin(String.raw`Caf\u00e9 &#233;`, { password: PASSWORD, username: USERNAME })).toBe(String.raw`Caf\u00e9 &#233;`);
     });
 });
 

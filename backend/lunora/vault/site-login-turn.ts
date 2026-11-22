@@ -331,28 +331,56 @@ const approvedStepRefusal = async (
     callId: string,
     userId: string,
 ): Promise<string | null> => {
-    const below = await ctx.db
-        .query("messages")
-        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId).gte("order", prompt.order))
-        .order("desc")
-        .take(PATH_PAGE);
-    const asking = below.find((row) => {
+    const holdsRequest = (row: Doc<"messages">): boolean => {
         const content = (row.message as SiteLoginMessage | undefined)?.content;
 
         return Array.isArray(content) && (content as ReadonlyArray<Part>).some((part) => part.type === "tool-approval-request" && part.toolCallId === callId);
-    });
+    };
+
+    // Paged, newest first, as far as a turn's path is ever read (`PATH_ROWS`): a busy turn's request may sit below a page.
+    let asking: Doc<"messages"> | undefined;
+    let cursor: string | null = null;
+    let searched = 0;
+
+    do {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId).gte("order", prompt.order))
+            .order("desc")
+            .paginate({ cursor, numItems: PATH_PAGE });
+        const rows = page.page as unknown as Doc<"messages">[];
+
+        asking = rows.find((row) => holdsRequest(row));
+        searched += rows.length;
+        cursor = page.isDone ? null : page.continueCursor;
+    } while (!asking && cursor !== null && searched < PATH_ROWS);
 
     if (!asking) {
         return "approval-not-found";
     }
 
-    const { next, rows } = await walkPath(ctx, threadId, asking, { limit: PATH_PAGE, stopAtId: prompt._id });
+    // Up from the request to the prompt, a page at a time within the same limit; every row read is classified, and a path
+    // that does not reach the prompt in it refuses.
+    let from: Doc<"messages"> | null = asking;
+    let walked = 0;
 
-    if (next?._id !== prompt._id) {
-        return "approval-path";
+    while (from && from._id !== prompt._id) {
+        if (walked >= PATH_ROWS) {
+            return "approval-path";
+        }
+
+        const { next, rows } = await walkPath(ctx, threadId, from, { limit: PATH_PAGE, stopAtId: prompt._id });
+        const reason = rows.map((row) => pathRowRefusal(row, userId, callId)).find((refusal) => refusal !== null);
+
+        if (reason) {
+            return reason;
+        }
+
+        walked += rows.length;
+        from = next;
     }
 
-    return rows.map((row) => pathRowRefusal(row, userId, callId)).find((reason) => reason !== null) ?? null;
+    return from?._id === prompt._id ? null : "approval-path";
 };
 
 /**

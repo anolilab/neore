@@ -49,20 +49,72 @@ export interface SiteLoginFillResult {
 export const NO_USABLE_LOGIN =
     "No saved login can be used for this site here. Logins are used only in the person's own chat, in a turn they typed themselves, for the exact site they were saved for. Ask the person to sign in themselves in the live view, or to save a login for this site.";
 
-/** `text` with the password, and the forms an address or a form body encodes it in, replaced. */
-export const withoutPassword = (text: string | undefined, password: string): string | undefined => {
+/** What a field read back says in its place when an escaped spelling of the login is in it: withheld whole. */
+export const WITHHELD_FIELD = "[withheld: it holds the saved login]";
+
+/** The JS escapes a page may spell a character with in a title, an address or an error: `\u0070`, `\u{70}`, `\x70`. */
+const JS_ESCAPE_RE = /\\u\{([\da-f]{1,6})\}|\\u([\da-f]{4})|\\x([\da-f]{2})/gi;
+
+/** The numeric HTML entities a page may spell a character with: `&#x70;`, `&#112;`. */
+const ENTITY_RE = /&#(?:x([\da-f]{1,6})|(\d{1,7}));?/gi;
+
+/** The character `code` names, or `escape` itself when it names none. */
+const characterOf = (code: number, escape: string): string => (Number.isSafeInteger(code) && code <= 0x10_ff_ff ? String.fromCodePoint(code) : escape);
+
+/** `text` with each JS escape and numeric HTML entity read as its character. */
+const unescaped = (text: string): string =>
+    text
+        .replaceAll(JS_ESCAPE_RE, (escape, braced?: string, four?: string, byte?: string) =>
+            characterOf(Number.parseInt(braced ?? four ?? byte ?? "", 16), escape),
+        )
+        .replaceAll(ENTITY_RE, (escape, hex?: string, decimal?: string) =>
+            characterOf(hex === undefined ? Number.parseInt(decimal ?? "", 10) : Number.parseInt(hex, 16), escape),
+        );
+
+/** The spellings an address, a form body or a page gives `secret`: raw, URI- (either case) and form-encoded. */
+const spellingsOf = (secret: string): string[] => {
+    const uri = encodeURIComponent(secret);
+
+    return [
+        ...new Set([new URLSearchParams({ p: secret }).toString().slice(2), secret, uri, uri.replaceAll(/%[\dA-F]{2}/g, (escape) => escape.toLowerCase())]),
+    ];
+};
+
+/** The shortest username scrubbed: a shorter one would blank ordinary words, and tells nothing of the account. */
+const MIN_SCRUBBED_USERNAME = 3;
+
+/**
+ * `text` with the password and the username, in the forms an address or a form body encodes them in, replaced; withheld
+ * whole when an escaped spelling of either is in it, which no replacement could find.
+ */
+export const withoutLogin = (text: string | undefined, { password, username }: { password?: string; username: string }): string | undefined => {
     if (text === undefined) {
         return undefined;
     }
 
+    const secrets = [
+        ...(password === undefined ? [] : [{ marker: "[password]", value: password }]),
+        ...(username.length >= MIN_SCRUBBED_USERNAME ? [{ marker: "[username]", value: username }] : []),
+    ];
+    const read = unescaped(text);
+
+    if (read !== text && secrets.some(({ value }) => spellingsOf(value).some((spelling) => read.includes(spelling)))) {
+        return WITHHELD_FIELD;
+    }
+
     let scrubbed = text;
 
-    for (const form of [password, encodeURIComponent(password), new URLSearchParams({ p: password }).toString().slice(2)]) {
-        scrubbed = scrubbed.replaceAll(form, "[password]");
+    for (const { marker, value } of secrets) {
+        for (const spelling of spellingsOf(value)) {
+            scrubbed = scrubbed.replaceAll(spelling, () => marker);
+        }
     }
 
     return scrubbed;
 };
+
+/** `text` with the password, and the forms an address or a form body encodes it in, replaced. */
+export const withoutPassword = (text: string | undefined, password: string): string | undefined => withoutLogin(text, { password, username: "" });
 
 /** The saved password is too short for the renderer to keep out of what it returns (`/login` refuses it too). */
 export const MIN_FILL_PASSWORD_LENGTH = 4;
@@ -136,9 +188,9 @@ export const fillSavedLogin = internalAction
         let held: { reaped?: boolean; sessionId: Id<"browserSessions">; until: number } | undefined;
         let returned: BrowserReturn | undefined;
         let callEndsBy: number | undefined;
-        // Set once decrypted; every string read back passes through it.
+        // Set once decrypted; every string read back passes through it, the username scrubbed from the start.
         let password: string | undefined;
-        const scrub = (text: string | undefined): string | undefined => (password === undefined ? text : withoutPassword(text, password));
+        const scrub = (text: string | undefined): string | undefined => withoutLogin(text, { password, username: login.username });
         const told = (result: SiteLoginFillResult): SiteLoginFillResult => (returned === undefined ? result : handedBackResult(result, returned));
 
         /** Nothing was typed: the hold ends and the charge is given back. */
