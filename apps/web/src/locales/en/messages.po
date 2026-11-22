@@ -5782,11 +5782,11 @@ msgstr "By hour, oldest first. A drop that starts at one hour across models poin
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:169
+#: src/features/admin/components/admin-provider-cache-row.tsx:171
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:170
+#: src/features/admin/components/admin-provider-cache-row.tsx:172
 msgid "By model, most prompt tokens first."
 msgstr "By model, most prompt tokens first."
 
@@ -21307,7 +21307,7 @@ msgstr "Mode {0}, on {1}. Nothing starts when it is created."
 msgid "Mode:"
 msgstr "Mode:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:174
+#: src/features/admin/components/admin-provider-cache-row.tsx:176
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26930,7 +26930,7 @@ msgstr "Prompt to run on all models..."
 #: src/features/admin/components/admin-provider-cache-row.tsx:98
 #: src/features/admin/components/admin-provider-cache-row.tsx:117
 #: src/features/admin/components/admin-provider-cache-row.tsx:141
-#: src/features/admin/components/admin-provider-cache-row.tsx:177
+#: src/features/admin/components/admin-provider-cache-row.tsx:179
 msgid "Prompt tokens"
 msgstr "Prompt tokens"
 
@@ -26999,7 +26999,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Proven reliability from previous generation"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:175
+#: src/features/admin/components/admin-provider-cache-row.tsx:177
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -28583,7 +28583,7 @@ msgstr "Requesting…"
 #: src/features/admin/components/admin-provider-cache-row.tsx:102
 #: src/features/admin/components/admin-provider-cache-row.tsx:116
 #: src/features/admin/components/admin-provider-cache-row.tsx:140
-#: src/features/admin/components/admin-provider-cache-row.tsx:176
+#: src/features/admin/components/admin-provider-cache-row.tsx:178
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30622,7 +30622,7 @@ msgstr "Serif"
 #: src/features/admin/components/admin-provider-cache-row.tsx:94
 #: src/features/admin/components/admin-provider-cache-row.tsx:118
 #: src/features/admin/components/admin-provider-cache-row.tsx:142
-#: src/features/admin/components/admin-provider-cache-row.tsx:178
+#: src/features/admin/components/admin-provider-cache-row.tsx:180
 msgid "Served from cache"
 msgstr "Served from cache"
 

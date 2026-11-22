@@ -5783,11 +5783,11 @@ msgstr "按小时，最早的在前。如果各模型在同一小时开始下降
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:169
+#: src/features/admin/components/admin-provider-cache-row.tsx:171
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "按模型，提示词 token 最多的在前：{1} 个提供商与模型组合中的前 {0} 个。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:170
+#: src/features/admin/components/admin-provider-cache-row.tsx:172
 msgid "By model, most prompt tokens first."
 msgstr "按模型，提示词 token 最多的在前。"
 
@@ -21308,7 +21308,7 @@ msgstr "模式 {0}，使用 {1}。创建时不会启动任何内容。"
 msgid "Mode:"
 msgstr "模式："
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:174
+#: src/features/admin/components/admin-provider-cache-row.tsx:176
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
@@ -26931,7 +26931,7 @@ msgstr "要在所有模型上运行的提示词..."
 #: src/features/admin/components/admin-provider-cache-row.tsx:98
 #: src/features/admin/components/admin-provider-cache-row.tsx:117
 #: src/features/admin/components/admin-provider-cache-row.tsx:141
-#: src/features/admin/components/admin-provider-cache-row.tsx:177
+#: src/features/admin/components/admin-provider-cache-row.tsx:179
 msgid "Prompt tokens"
 msgstr "提示词 token"
 
@@ -27000,7 +27000,7 @@ msgid "Proven reliability from previous generation"
 msgstr "上一代久经验证的可靠性"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:175
+#: src/features/admin/components/admin-provider-cache-row.tsx:177
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -28584,7 +28584,7 @@ msgstr "正在请求…"
 #: src/features/admin/components/admin-provider-cache-row.tsx:102
 #: src/features/admin/components/admin-provider-cache-row.tsx:116
 #: src/features/admin/components/admin-provider-cache-row.tsx:140
-#: src/features/admin/components/admin-provider-cache-row.tsx:176
+#: src/features/admin/components/admin-provider-cache-row.tsx:178
 #: src/features/settings/components/chat/usage-settings.tsx:272
 #: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:89
@@ -30623,7 +30623,7 @@ msgstr "衬线"
 #: src/features/admin/components/admin-provider-cache-row.tsx:94
 #: src/features/admin/components/admin-provider-cache-row.tsx:118
 #: src/features/admin/components/admin-provider-cache-row.tsx:142
-#: src/features/admin/components/admin-provider-cache-row.tsx:178
+#: src/features/admin/components/admin-provider-cache-row.tsx:180
 msgid "Served from cache"
 msgstr "来自缓存"
 
