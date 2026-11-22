@@ -496,6 +496,30 @@ describe("endSession", () => {
         await page.unmount();
     });
 
+    it("shows no warning in another panel while a sign-out runs there, and shows it once that removal fails", async () => {
+        store.set(GRANT_KEY, grant);
+        const page = await mount(createElement(AuthPage));
+        const revoke = deferred();
+
+        fetchMock.mockReturnValueOnce(revoke.promise);
+        // Another panel's sign-out: this panel runs no removal of its own.
+        const signingOut = signOutGrant(USER.id);
+
+        await vi.waitFor(() => expect(store.get(SIGNED_OUT_KEY)).toBe(USER.id));
+        await settle();
+        expect(warningOf(page)).toBeUndefined();
+
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+        revoke.resolve(new Response(null, { status: 204 }));
+        await act(async () => {
+            await expect(signingOut).rejects.toThrow("storage unavailable");
+        });
+        await settle();
+
+        expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
     it("shows the warning in a second panel whose retry fails too", async () => {
         const { sync } = await signedIn();
 

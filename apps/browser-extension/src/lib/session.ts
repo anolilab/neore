@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { holdAccessTokens, releaseAccessTokens } from "./access-token";
 import type { SuspendedSession } from "./auth-token-sync";
 import type { GrantUser, StoredGrant } from "./extension-grant";
-import { finishPendingSignOut, grantKey, readGrant, readGrantState, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
+import { finishPendingSignOut, grantKey, readGrant, readGrantState, SIGN_OUT_FAILED_KEY, SIGNED_OUT_KEY, signOutGrant, STORAGE_KEY } from "./extension-grant";
 import { GrantRemovalError } from "./grant-removal-error";
 
 /**
@@ -41,8 +41,8 @@ const signingOut = new Map<string, Promise<void>>();
 
 /**
  * Removals of a marked grant running in this panel (a sign-out, or the retry
- * `finishPendingSignOut` makes): the mark is written before the revoke, so a
- * stored marked grant reads as unfinished only once they are done.
+ * `finishPendingSignOut` makes): a failure an earlier one stored is not shown
+ * while this panel tries again.
  */
 let removing = 0;
 /** Reads storage again for the session watch, when one runs. */
@@ -127,14 +127,14 @@ export const endSession = async (authTokenSync: { suspend: () => SuspendedSessio
 
 /** What every `useSession` in this panel shows: `undefined` until the first read. */
 let shown: GrantSession | null | undefined;
-/** Whether that read found a grant marked signed out still stored, with no removal of it running here. */
+/** Whether that read found a grant whose removal failed (`SIGN_OUT_FAILED_KEY`), with no removal of it running here. */
 let unfinished = false;
 const sessionWatchers = new Set<() => void>();
 let stopWatching: (() => void) | undefined;
 
-const publish = (next: GrantSession | null, removalPending: boolean): void => {
+const publish = (next: GrantSession | null, removalFailed: boolean): void => {
     shown = next;
-    unfinished = removalPending && removing === 0;
+    unfinished = removalFailed && removing === 0;
 
     for (const watcher of sessionWatchers) {
         watcher();
@@ -164,13 +164,13 @@ const watchGrantSession = (): (() => void) => {
 
         const read = reads;
         let loaded: GrantSession | null;
-        let pending = false;
+        let failed = false;
 
         try {
             const state = await readGrantState();
 
             loaded = toGrantSession(state.grant);
-            pending = state.removalPending;
+            failed = state.removalFailed;
         } catch {
             if (stopped || read !== reads) {
                 return;
@@ -192,12 +192,12 @@ const watchGrantSession = (): (() => void) => {
         }
 
         if (!stopped && read === reads) {
-            publish(loaded, pending);
+            publish(loaded, failed);
         }
     };
 
     const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-        if (area === "local" && (Object.hasOwn(changes, STORAGE_KEY) || Object.hasOwn(changes, SIGNED_OUT_KEY))) {
+        if (area === "local" && [STORAGE_KEY, SIGNED_OUT_KEY, SIGN_OUT_FAILED_KEY].some((key) => Object.hasOwn(changes, key))) {
             void load();
         }
     };
@@ -249,9 +249,10 @@ export const useSession = (): { data: ExtensionSession | null; isPending: boolea
 };
 
 /**
- * Whether a sign-out left its grant stored (marked, never used again), in this
- * panel or any other: read from storage through the shared watch, so every panel
- * shows it, and it clears once a removal succeeds or a sign-in replaces the
- * grant. Not while this panel is still removing it.
+ * Whether a sign-out failed to remove its grant (marked, never used again), in
+ * this panel or any other: read from storage through the shared watch, so every
+ * panel shows it, and it clears once a removal succeeds or a sign-in replaces
+ * the grant. Not while a sign-out is still running, here or in another panel,
+ * nor while this panel tries the removal again.
  */
 export const useSignOutUnfinished = (): boolean => useSyncExternalStore(subscribeGrantSession, () => unfinished);

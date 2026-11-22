@@ -61,6 +61,13 @@ export const RECONNECT_KEY = "neore.reconnectNeeded";
  */
 export const SIGNED_OUT_KEY = "neore.signedOutGrant";
 
+/**
+ * The key of a marked grant whose removal failed: its revoke failed or ran out
+ * of time, or storage kept it. Every panel warns while it names the stored
+ * grant; a sign-out still running has only `SIGNED_OUT_KEY` written.
+ */
+export const SIGN_OUT_FAILED_KEY = "neore.signOutFailed";
+
 /** How long a sign-out waits on the revoke before forgetting the grant anyway. */
 export const REVOKE_TIMEOUT_MS = 10_000;
 
@@ -163,22 +170,23 @@ const postBackend = async (path: string, body: unknown, signal?: AbortSignal): P
         signal,
     });
 
-/** The grant in storage and the sign-out mark, as stored: also a grant signed out but not yet removed. */
-const readStored = async (): Promise<{ grant: StoredGrant | undefined; signedOut: unknown }> => {
-    const stored = await chrome.storage.local.get([STORAGE_KEY, SIGNED_OUT_KEY]);
+/** The grant in storage and the sign-out marks, as stored: also a grant signed out but not yet removed. */
+const readStored = async (): Promise<{ failed: unknown; grant: StoredGrant | undefined; signedOut: unknown }> => {
+    const stored = await chrome.storage.local.get([STORAGE_KEY, SIGNED_OUT_KEY, SIGN_OUT_FAILED_KEY]);
 
-    return { grant: stored[STORAGE_KEY] as StoredGrant | undefined, signedOut: stored[SIGNED_OUT_KEY] };
+    return { failed: stored[SIGN_OUT_FAILED_KEY], grant: stored[STORAGE_KEY] as StoredGrant | undefined, signedOut: stored[SIGNED_OUT_KEY] };
 };
 
 /**
  * The stored grant as `readGrant` shows it, and whether a grant marked signed
- * out (`SIGNED_OUT_KEY`) is still stored: its removal has not finished.
+ * out (`SIGNED_OUT_KEY`) is still stored after its removal failed
+ * (`SIGN_OUT_FAILED_KEY`). One still being removed is hidden, not failed.
  */
-export const readGrantState = async (): Promise<{ grant: StoredGrant | undefined; removalPending: boolean }> => {
-    const { grant, signedOut } = await readStored();
+export const readGrantState = async (): Promise<{ grant: StoredGrant | undefined; removalFailed: boolean }> => {
+    const { failed, grant, signedOut } = await readStored();
     const marked = grant !== undefined && grantKey(grant) === signedOut;
 
-    return { grant: marked ? undefined : grant, removalPending: marked };
+    return { grant: marked ? undefined : grant, removalFailed: marked && failed === signedOut };
 };
 
 /** The stored grant, or none when its sign-out began (`SIGNED_OUT_KEY`): that one is never used again. */
@@ -212,7 +220,7 @@ const withGrantLock = async <T>(step: () => Promise<T>): Promise<T> => {
 const writeGrant = async (grant: StoredGrant): Promise<void> => {
     await withGrantLock(async () => {
         await chrome.storage.local.set({ [STORAGE_KEY]: grant });
-        await chrome.storage.local.remove(SIGNED_OUT_KEY).catch(() => undefined);
+        await chrome.storage.local.remove([SIGNED_OUT_KEY, SIGN_OUT_FAILED_KEY]).catch(() => undefined);
     });
 };
 
@@ -322,13 +330,17 @@ const clearGrant = async (token: string): Promise<void> => {
 };
 
 /**
- * Forget the grant `key` names together with its sign-out mark. Another grant
+ * Forget the grant `key` names together with its sign-out marks. Another grant
  * stored since keeps its place; a mark for this key goes either way.
  */
 const forgetSignedOutGrant = async (token: string, key: string): Promise<void> => {
     await withGrantLock(async () => {
-        const { grant, signedOut } = await readStored();
-        const keys = [...(grant?.token === token ? [STORAGE_KEY] : []), ...(signedOut === key ? [SIGNED_OUT_KEY] : [])];
+        const { failed, grant, signedOut } = await readStored();
+        const keys = [
+            ...(grant?.token === token ? [STORAGE_KEY] : []),
+            ...(signedOut === key ? [SIGNED_OUT_KEY] : []),
+            ...(failed === key ? [SIGN_OUT_FAILED_KEY] : []),
+        ];
 
         if (keys.length > 0) {
             await chrome.storage.local.remove(keys);
@@ -349,6 +361,37 @@ const revokeGrant = async (token: string): Promise<boolean> => {
     }
 };
 
+/** Record that the removal of the grant `key` names failed, while its mark still stands. Best effort. */
+const markSignOutFailed = async (key: string): Promise<void> => {
+    await withGrantLock(async () => {
+        const { signedOut } = await readStored();
+
+        if (signedOut === key) {
+            await chrome.storage.local.set({ [SIGN_OUT_FAILED_KEY]: key });
+        }
+    }).catch(() => undefined);
+};
+
+/**
+ * Revoke a grant marked signed out, then forget it with its marks, even when
+ * the revoke fails. A revoke that fails or runs out of time, or storage that
+ * keeps the grant, writes the failure mark first; a removal that succeeds drops
+ * it. Storage that keeps the grant rejects with `GrantRemovalError`.
+ */
+const removeSignedOutGrant = async (token: string, key: string): Promise<void> => {
+    if (!(await revokeGrant(token))) {
+        await markSignOutFailed(key);
+    }
+
+    try {
+        await forgetSignedOutGrant(token, key);
+    } catch (error) {
+        await markSignOutFailed(key);
+
+        throw new GrantRemovalError(error);
+    }
+};
+
 /**
  * Finish a sign-out whose removal failed earlier (`SIGNED_OUT_KEY` still names
  * the stored grant): revoke it once more, best effort, and forget it. Run when
@@ -361,8 +404,7 @@ export const finishPendingSignOut = async (): Promise<void> => {
         return;
     }
 
-    await revokeGrant(grant.token);
-    await forgetSignedOutGrant(grant.token, signedOut);
+    await removeSignedOutGrant(grant.token, signedOut);
 };
 
 /**
@@ -484,13 +526,7 @@ export const signOutGrant = async (key: string): Promise<"replaced" | "signed-ou
     }
 
     // Offline or out of time: the session expires on its own; the local copy goes regardless.
-    await revokeGrant(grant.token);
-
-    try {
-        await forgetSignedOutGrant(grant.token, key);
-    } catch (error) {
-        throw new GrantRemovalError(error);
-    }
+    await removeSignedOutGrant(grant.token, key);
 
     return "signed-out";
 };
