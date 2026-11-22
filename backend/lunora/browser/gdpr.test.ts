@@ -377,6 +377,38 @@ describe("browser export pages stay within the export's limits", () => {
         expect((result.extensions[0] as { truncated: string[] }).truncated[0]).toMatch(CUT_CAPABILITIES);
     });
 
+    it("cuts a long field to as much text as fits the cap, ASCII or multi-byte, never splitting a character", async () => {
+        const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
+
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { status: "active", title: "T", userId: A });
+
+            await ctx.db.insert("browserSessions", {
+                currentUrl: `https://a.example.com/${"x".repeat(20_000)}`,
+                lastActivityAt: 1,
+                startedAt: 1,
+                status: "completed",
+                threadId,
+                userId: A,
+            });
+            // Two-byte "é" and four-byte "😀" (a surrogate pair), so the cap falls inside a character at some point.
+            await ctx.db.insert("browserHumanChecks", { askedAt: 1, run: "r", site: "é😀".repeat(5000), threadId, userId: A });
+        });
+
+        const { result } = await exportOf(A);
+        const { currentUrl } = result.sessions[0] as { currentUrl: string };
+        const { site } = result.humanChecks[0] as { site: string };
+
+        // ASCII: every byte of the cap is used.
+        expect(bytesOf(currentUrl)).toBe(EXPORT_FIELD_BYTES);
+
+        // Multi-byte: short of the cap by less than one character, never over it, and still well-formed text.
+        expect(bytesOf(site)).toBeLessThanOrEqual(EXPORT_FIELD_BYTES);
+        expect(bytesOf(site)).toBeGreaterThan(EXPORT_FIELD_BYTES - 4);
+        expect(new TextDecoder().decode(new TextEncoder().encode(site))).toBe(site);
+        expect(site.endsWith("é") || site.endsWith("😀")).toBe(true);
+    });
+
     it("keeps every capability of an oversized list, each cut to fit, and names the ones cut", async () => {
         // One capability that fits a string's cap alone, but not inside the list's brackets, among short ones.
         const capabilities = ["tabs", "c".repeat(EXPORT_FIELD_BYTES - 2), "scripting"];

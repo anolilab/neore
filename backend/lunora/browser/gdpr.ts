@@ -114,15 +114,32 @@ const jsonBytes = (value: unknown): number => ENCODER.encode(JSON.stringify(valu
 
 const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF]$/u;
 
-/** `text` cut so its JSON fits `maxBytes`, never inside a surrogate pair. */
-const cutText = (text: string, maxBytes = EXPORT_FIELD_BYTES): string => {
-    let cut = text.slice(0, maxBytes);
+/** The first `length` UTF-16 units of `text`, one fewer when the last would split a surrogate pair. */
+const prefixOf = (text: string, length: number): string => {
+    const prefix = text.slice(0, length);
 
-    while (jsonBytes(cut) > maxBytes) {
-        cut = cut.slice(0, Math.floor(cut.length * 0.75));
+    return LONE_HIGH_SURROGATE.test(prefix) ? prefix.slice(0, -1) : prefix;
+};
+
+/**
+ * The longest prefix of `text` whose JSON fits `maxBytes`, never inside a surrogate pair. A prefix's JSON only grows with its length,
+ * so a binary search over the length finds it; each unit is at least one JSON byte and the quotes take two, so no longer prefix fits.
+ */
+const cutText = (text: string, maxBytes = EXPORT_FIELD_BYTES): string => {
+    let low = 0;
+    let high = Math.min(text.length, Math.max(0, maxBytes - 2));
+
+    while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+
+        if (jsonBytes(prefixOf(text, middle)) <= maxBytes) {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
     }
 
-    return LONE_HIGH_SURROGATE.test(cut) ? cut.slice(0, -1) : cut;
+    return prefixOf(text, low);
 };
 
 /** The most items a list keeps: each needs its quotes and a comma, an empty string at the least. */
