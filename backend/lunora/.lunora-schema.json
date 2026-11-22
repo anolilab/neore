@@ -29751,6 +29751,27 @@
           "optional": true,
           "unique": false
         },
+        "pinnedGoal": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "maxRounds": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "text": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            }
+          }
+        },
         "projectId": {
           "kind": "id",
           "nullable": false,

@@ -15,7 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
-import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
+import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
 import { vToolRunConfig } from "./chat/lib/tool-run-config";
@@ -3536,6 +3536,8 @@ export const schema = defineSchema({
         // behaviour. Never set on a host thread, whose approvals keep their own rules.
         permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         pinnedAt: v.optional(v.number()),
+        // The goal every following message in this chat runs with, until it is cleared (`chat/goals/functions.ts`).
+        pinnedGoal: v.optional(vPinnedGoal),
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),

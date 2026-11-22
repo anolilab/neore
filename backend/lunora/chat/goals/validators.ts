@@ -9,6 +9,7 @@
 import { v } from "lunorash/server";
 
 import { MAX_LENGTH } from "../../lib/validators";
+import { GOAL_TEXT_MAX } from "./shared";
 
 export const vGoalStatus = v.union(v.literal("active"), v.literal("met"), v.literal("stopped"));
 
@@ -52,4 +53,10 @@ export const vGoalRunConfig = v.object({
     searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
     skill: v.optional(v.object({ rawArgs: v.string().max(MAX_LENGTH.text), slug: v.string().max(MAX_LENGTH.short) })),
     statelessMode: v.optional(v.boolean()),
+});
+
+/** A thread's pinned goal: the text and review rounds every following message runs with (`chat/goals/functions.ts`). */
+export const vPinnedGoal = v.object({
+    maxRounds: v.number(),
+    text: v.string().max(GOAL_TEXT_MAX),
 });

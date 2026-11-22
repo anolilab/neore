@@ -1268,7 +1268,7 @@ msgstr "{label} をスター付きから削除しました"
 msgid "{maxReviewers, plural, one {Request at most # reviewer at a time.} other {Request at most # reviewers at a time.}}"
 msgstr "{maxReviewers, plural, other {一度にリクエストできるレビュアーは最大 # 人です。}}"
 
-#: src/features/chat/goal/composer-goal.tsx:95
+#: src/features/chat/goal/composer-goal.tsx:98
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} ラウンド"
 
@@ -6247,6 +6247,11 @@ msgstr "パスコードを変更"
 msgid "Change Password"
 msgstr "パスワードを変更"
 
+#. placeholder {0}: pinned.text
+#: src/features/chat/goal/pinned-goal.tsx:79
+msgid "Change the pinned goal: {0}"
+msgstr "ピン留めした目標を変更: {0}"
+
 #: src/features/canvas/components/canvas-toolbar.tsx:37
 msgid "Change tone"
 msgstr "トーンを変更"
@@ -6847,6 +6852,10 @@ msgstr "マスクをクリア"
 #: src/features/tasks/components/task-form-dialog.tsx:413
 msgid "Clear model"
 msgstr "モデルをクリア"
+
+#: src/features/chat/goal/pinned-goal.tsx:125
+msgid "Clear pinned goal"
+msgstr "ピン留めした目標をクリア"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
@@ -16204,12 +16213,16 @@ msgstr "ページ一覧へ移動"
 msgid "Go up to {parent}"
 msgstr "{parent} へ上る"
 
-#: src/features/chat/goal/composer-goal.tsx:75
+#: src/features/chat/goal/composer-goal.tsx:78
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
 #: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "目標"
+
+#: src/features/chat/goal/pinned-goal.tsx:103
+msgid "Goal for this chat"
+msgstr "このチャットの目標"
 
 #: src/features/chat/goal/goal-notes.tsx:63
 msgid "Goal met"
@@ -16224,7 +16237,7 @@ msgstr "目標達成: {0}"
 msgid "Goal: {goalTitle}"
 msgstr "目標：{goalTitle}"
 
-#: src/features/chat/goal/composer-goal.tsx:63
+#: src/features/chat/goal/composer-goal.tsx:66
 msgid "Goal: run until done"
 msgstr "目標: 完了するまで実行"
 
@@ -25787,6 +25800,11 @@ msgstr "ピン留め"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "メモリをピン留めすると、薄れたり、統合されたり、昇格されたりしなくなります。アクティビティのメモリだけが自然に薄れます。"
 
+#: src/features/chat/goal/pinned-goal.tsx:89
+#: src/features/chat/goal/pinned-goal.tsx:95
+msgid "Pin goal"
+msgstr "目標をピン留め"
+
 #: src/features/chat/pins/pinnable-image.tsx:74
 #: src/features/chat/pins/pinnable-image.tsx:80
 msgid "Pin image"
@@ -28923,7 +28941,7 @@ msgstr "プルリクエストでレビューがリクエストされました"
 msgid "Review requests in {0}"
 msgstr "{0} のレビューリクエスト"
 
-#: src/features/chat/goal/composer-goal.tsx:89
+#: src/features/chat/goal/composer-goal.tsx:92
 msgid "Review rounds: {maxRounds}. Change"
 msgstr "レビューのラウンド数: {maxRounds}。変更"
 
@@ -29264,7 +29282,7 @@ msgstr "PowerShell で次のコマンドを実行してください。"
 msgid "Run this dataset against at least two models to compare them."
 msgstr "比較するには、このデータセットを 2 つ以上のモデルで実行してください。"
 
-#: src/features/chat/goal/composer-goal.tsx:80
+#: src/features/chat/goal/composer-goal.tsx:83
 msgid "Run until done"
 msgstr "完了するまで実行"
 
@@ -29310,6 +29328,10 @@ msgstr "実行しています..."
 #: src/features/evals/components/dataset-panel.tsx:131
 msgid "Runs ({0})"
 msgstr "実行（{0}）"
+
+#: src/features/chat/goal/pinned-goal.tsx:114
+msgid "Runs for every message you send here, up to {maxRounds} review rounds each, until you clear it."
+msgstr "ここで送るメッセージごとに実行されます。各メッセージのレビューは最大 {maxRounds} ラウンドで、解除するまで続きます。"
 
 #: src/features/tasks/components/task-form-dialog.tsx:293
 msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} API key (Settings → API keys). Private GitHub repositories need the GitHub connector."
@@ -29437,6 +29459,7 @@ msgstr "サウジアラビア"
 #: src/features/auth/components/settings/security/change-email-card.tsx:135
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
+#: src/features/chat/goal/pinned-goal.tsx:117
 #: src/features/chat/host/host-composer.tsx:961
 #: src/features/chat/pins/pin-item.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
@@ -34707,7 +34730,7 @@ msgstr "OpenAI の最高のコーディング能力を必要とする、最も�
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "Anthropic の最新フロンティアの推論と能力を必要とする、最も要求の厳しいタスク"
 
-#: src/features/chat/goal/composer-goal.tsx:100
+#: src/features/chat/goal/composer-goal.tsx:103
 msgid "The most review rounds before it stops"
 msgstr "停止するまでの最大レビューラウンド数"
 
@@ -40052,7 +40075,7 @@ msgstr "あなたのメッセージ"
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
 msgstr "次のチャットは一時チャットです。保持するには、設定でこれをオフにしてください。"
 
-#: src/features/chat/goal/composer-goal.tsx:81
+#: src/features/chat/goal/composer-goal.tsx:84
 msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr "次のメッセージは目標になります。レビューで達成が確認されるまで、エージェントは作業を続けます。"
 

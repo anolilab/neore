@@ -1268,7 +1268,7 @@ msgstr "{label} quitado de destacados"
 msgid "{maxReviewers, plural, one {Request at most # reviewer at a time.} other {Request at most # reviewers at a time.}}"
 msgstr "{maxReviewers, plural, one {Solicita como máximo # revisor a la vez.} other {Solicita como máximo # revisores a la vez.}}"
 
-#: src/features/chat/goal/composer-goal.tsx:95
+#: src/features/chat/goal/composer-goal.tsx:98
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} rondas"
 
@@ -6247,6 +6247,11 @@ msgstr "Cambiar código de acceso"
 msgid "Change Password"
 msgstr "Cambiar contraseña"
 
+#. placeholder {0}: pinned.text
+#: src/features/chat/goal/pinned-goal.tsx:79
+msgid "Change the pinned goal: {0}"
+msgstr "Cambiar el objetivo fijado: {0}"
+
 #: src/features/canvas/components/canvas-toolbar.tsx:37
 msgid "Change tone"
 msgstr "Cambiar tono"
@@ -6847,6 +6852,10 @@ msgstr "Borrar máscara"
 #: src/features/tasks/components/task-form-dialog.tsx:413
 msgid "Clear model"
 msgstr "Quitar modelo"
+
+#: src/features/chat/goal/pinned-goal.tsx:125
+msgid "Clear pinned goal"
+msgstr "Quitar el objetivo fijado"
 
 #: ../../packages/ui/src/components/spreadsheet/csv-table.tsx:177
 #: src/features/chat/thread-list/search-bar.tsx:82
@@ -16204,12 +16213,16 @@ msgstr "Ir a tus páginas"
 msgid "Go up to {parent}"
 msgstr "Subir a {parent}"
 
-#: src/features/chat/goal/composer-goal.tsx:75
+#: src/features/chat/goal/composer-goal.tsx:78
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
 #: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "Objetivo"
+
+#: src/features/chat/goal/pinned-goal.tsx:103
+msgid "Goal for this chat"
+msgstr "Objetivo para este chat"
 
 #: src/features/chat/goal/goal-notes.tsx:63
 msgid "Goal met"
@@ -16224,7 +16237,7 @@ msgstr "Objetivo cumplido: {0}"
 msgid "Goal: {goalTitle}"
 msgstr "Objetivo: {goalTitle}"
 
-#: src/features/chat/goal/composer-goal.tsx:63
+#: src/features/chat/goal/composer-goal.tsx:66
 msgid "Goal: run until done"
 msgstr "Objetivo: ejecutar hasta terminar"
 
@@ -25787,6 +25800,11 @@ msgstr "Fijar"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Fija un recuerdo para evitar que se desvanezca, se fusione o se promueva. Solo los recuerdos de actividad se desvanecen por sí solos."
 
+#: src/features/chat/goal/pinned-goal.tsx:89
+#: src/features/chat/goal/pinned-goal.tsx:95
+msgid "Pin goal"
+msgstr "Fijar objetivo"
+
 #: src/features/chat/pins/pinnable-image.tsx:74
 #: src/features/chat/pins/pinnable-image.tsx:80
 msgid "Pin image"
@@ -28923,7 +28941,7 @@ msgstr "Revisión solicitada en una pull request"
 msgid "Review requests in {0}"
 msgstr "Solicitudes de revisión en {0}"
 
-#: src/features/chat/goal/composer-goal.tsx:89
+#: src/features/chat/goal/composer-goal.tsx:92
 msgid "Review rounds: {maxRounds}. Change"
 msgstr "Rondas de revisión: {maxRounds}. Cambiar"
 
@@ -29264,7 +29282,7 @@ msgstr "Ejecuta esto en PowerShell."
 msgid "Run this dataset against at least two models to compare them."
 msgstr "Ejecuta este conjunto de datos con al menos dos modelos para compararlos."
 
-#: src/features/chat/goal/composer-goal.tsx:80
+#: src/features/chat/goal/composer-goal.tsx:83
 msgid "Run until done"
 msgstr "Ejecutar hasta terminar"
 
@@ -29310,6 +29328,10 @@ msgstr "Ejecutando..."
 #: src/features/evals/components/dataset-panel.tsx:131
 msgid "Runs ({0})"
 msgstr "Ejecuciones ({0})"
+
+#: src/features/chat/goal/pinned-goal.tsx:114
+msgid "Runs for every message you send here, up to {maxRounds} review rounds each, until you clear it."
+msgstr "Se ejecuta con cada mensaje que envíes aquí, con hasta {maxRounds} rondas de revisión cada uno, hasta que lo quites."
 
 #: src/features/tasks/components/task-form-dialog.tsx:293
 msgid "Runs in a cloud sandbox for up to 20 minutes on your own {keyProvider} API key (Settings → API keys). Private GitHub repositories need the GitHub connector."
@@ -29437,6 +29459,7 @@ msgstr "Arabia Saudí"
 #: src/features/auth/components/settings/security/change-email-card.tsx:135
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
+#: src/features/chat/goal/pinned-goal.tsx:117
 #: src/features/chat/host/host-composer.tsx:961
 #: src/features/chat/pins/pin-item.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
@@ -34707,7 +34730,7 @@ msgstr "Las tareas de ingeniería de software más exigentes, que requieren la m
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "Las tareas más exigentes, que requieren el razonamiento y las capacidades de vanguardia más recientes de Anthropic"
 
-#: src/features/chat/goal/composer-goal.tsx:100
+#: src/features/chat/goal/composer-goal.tsx:103
 msgid "The most review rounds before it stops"
 msgstr "El máximo de rondas de revisión antes de detenerse"
 
@@ -40052,7 +40075,7 @@ msgstr "Tus mensajes"
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
 msgstr "Tu próximo chat es temporal. Desactívalo en Ajustes para conservarlo."
 
-#: src/features/chat/goal/composer-goal.tsx:81
+#: src/features/chat/goal/composer-goal.tsx:84
 msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr "Tu próximo mensaje es un objetivo. El agente sigue trabajando hasta que una revisión confirme que se ha cumplido."
 
