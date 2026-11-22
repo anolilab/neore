@@ -224,8 +224,16 @@ export const followupInFlight = internalQuery
     .output(v.boolean())
     .query(async ({ args: { threadId }, ctx }) => await followupDispatchInFlight(ctx, threadId));
 
+/** How many replies' suggestions a thread keeps: the newest, so a branch the person can switch back to keeps its own row. */
+export const FOLLOWUP_CACHE_ROWS = 20;
+
+/** Newer replies first: the later turn, then the later sibling of the same turn, then the row written later. */
+export const newerFirst = <Row extends { createdAt: number; order?: number; replyAt?: number }>(a: Row, b: Row): number =>
+    (b.order ?? -1) - (a.order ?? -1) || (b.replyAt ?? -1) - (a.replyAt ?? -1) || b.createdAt - a.createdAt;
+
 export const getCachedFollowupSuggestions = internalQuery
     .input({
+        lastMessageId: v.optional(v.string()),
         threadId: v.string(),
     })
     .output(
@@ -243,11 +251,19 @@ export const getCachedFollowupSuggestions = internalQuery
  * Direct handler for cached follow-up suggestions.
  * Exported for hot-path queries to bypass runQuery validator overhead.
  */
-export const getCachedFollowupSuggestionsHandler = async (context: QueryContext, args: { threadId: string }) => {
-    const cached = await context.db
-        .query("followupSuggestions")
-        .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-        .first();
+export const getCachedFollowupSuggestionsHandler = async (context: QueryContext, { lastMessageId, threadId }: { lastMessageId?: string; threadId: string }) => {
+    // With a reply id, that reply's own row (one per reply); without one, the thread's newest reply.
+    const rows =
+        lastMessageId === undefined
+            ? await context.db
+                  .query("followupSuggestions")
+                  .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+                  .collect()
+            : await context.db
+                  .query("followupSuggestions")
+                  .withIndex("by_thread_and_message", (q) => q.eq("threadId", threadId).eq("lastMessageId", lastMessageId))
+                  .collect();
+    const cached = rows.toSorted(newerFirst)[0];
 
     if (!cached) {
         return null;
@@ -260,9 +276,10 @@ export const getCachedFollowupSuggestionsHandler = async (context: QueryContext,
 };
 
 /**
- * Stores the suggestions for one reply. The check and the write run in one mutation, so a run for an older reply that
- * finishes late is refused when a newer reply's suggestions are already stored. A reply is older than the stored one when
- * its turn is older, or when it is a sibling of the same turn that was created earlier (siblings share `order`).
+ * Stores the suggestions for one reply, in that reply's own row. The check and the write run in one mutation, so a run for an
+ * older reply that finishes late is refused when a newer reply on the same branch already has suggestions. A reply is older than
+ * a stored one when its turn is older, or when it is a sibling of the same turn that was created earlier (siblings share `order`).
+ * A reply's own row is always rewritten, so its clear or retry is not refused.
  *
  * `pathIds` is the active path of a branched thread, the rows the composer shows. A stored reply counts only when it is on that
  * path: a reply on an inactive branch never blocks the branch being written. Without it the thread has one branch, and every
@@ -287,39 +304,47 @@ export const cacheFollowupSuggestions = internalMutation
             return false;
         }
 
-        const existing = await context.db
+        const stored = await context.db
             .query("followupSuggestions")
             .withIndex("by_thread", (q) => q.eq("threadId", threadId))
-            .first();
+            .collect();
+        const own = stored.find((row) => row.lastMessageId === lastMessageId);
 
-        if (existing) {
-            const onBranch = pathIds === undefined || pathIds.includes(existing.lastMessageId);
-            const olderTurn = onBranch && existing.order !== undefined && existing.order > order;
-            const olderSibling = onBranch && existing.order === order && existing.replyAt !== undefined && existing.replyAt > replyAt;
+        // A reply's own row is rewritten in place, so its clear or retry is never refused by another reply's row.
+        if (own) {
+            await context.db.patch("followupSuggestions", own._id, { lastMessageId, order, replyAt, suggestions, updatedAt: now });
 
-            // A newer reply's suggestions are already stored: this older run must not replace them.
-            if (olderTurn || olderSibling) {
-                return false;
-            }
-
-            await context.db.patch("followupSuggestions", existing._id, {
-                lastMessageId,
-                order,
-                replyAt,
-                suggestions,
-                updatedAt: now,
-            });
-        } else {
-            await context.db.insert("followupSuggestions", {
-                createdAt: now,
-                lastMessageId,
-                order,
-                replyAt,
-                suggestions,
-                threadId,
-                updatedAt: now,
-            });
+            return true;
         }
+
+        // A newer reply on this branch already has its suggestions: this older run must not be written, so it is not charged.
+        const newerOnBranch = stored.some(
+            (row) =>
+                (pathIds === undefined || pathIds.includes(row.lastMessageId)) &&
+                ((row.order !== undefined && row.order > order) || (row.order === order && row.replyAt !== undefined && row.replyAt > replyAt)),
+        );
+
+        if (newerOnBranch) {
+            return false;
+        }
+
+        // The thread keeps its newest replies: the oldest rows make room for this one.
+        await Promise.all(
+            stored
+                .toSorted(newerFirst)
+                .slice(FOLLOWUP_CACHE_ROWS - 1)
+                .map(async (row) => await context.db.delete("followupSuggestions", row._id)),
+        );
+
+        await context.db.insert("followupSuggestions", {
+            createdAt: now,
+            lastMessageId,
+            order,
+            replyAt,
+            suggestions,
+            threadId,
+            updatedAt: now,
+        });
 
         return true;
     });

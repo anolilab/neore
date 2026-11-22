@@ -27,6 +27,7 @@ import { vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import type { ThreadDoc } from "../agent/validators";
 import type { UIMessage } from "../agent/ui-messages";
 import { listMessagesByThreadIdHandler, toUIMessages } from "../agent/client";
+import { FOLLOWUP_CACHE_ROWS, newerFirst } from "../agent/followup-suggestions";
 import { type StepUsage, sumStepUsage } from "../agent/message-cost";
 import { type RedactedThread, redactThreadForPublicViewer, resolveThreadReadAccess, type ThreadPermission } from "../agent/thread-read-access";
 import { getThreadListDataBatchHandler, readThreadRelationship, threadForViewer } from "../agent/threads";
@@ -109,7 +110,7 @@ export const getThreadWithData = liteAuthQuery
         const { thread } = access;
 
         // All data fetches in parallel — zero runQuery overhead
-        const [rawMessages, usageMessages, cachedSuggestions] = await Promise.all([
+        const [rawMessages, usageMessages, cachedRows] = await Promise.all([
             listMessagesByThreadIdHandler(context, {
                 order: "desc" as const,
                 paginationOpts: {
@@ -133,8 +134,8 @@ export const getThreadWithData = liteAuthQuery
                 select: ["usage"],
                 where: { threadId: threadId as Id<"threads">, usage: { isNull: false } },
             }),
-            // Inline getCachedFollowupSuggestions: direct lookup
-            context.db.followupSuggestions.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { threadId } }),
+            // Inline getCachedFollowupSuggestions: the thread's stored replies, newest picked below (one row per reply).
+            context.db.followupSuggestions.findMany({ limit: FOLLOWUP_CACHE_ROWS, where: { threadId } }),
         ]);
 
         // `Doc<"messages">[]` vs the parameter's wire shape: `toUIMessages`
@@ -158,6 +159,8 @@ export const getThreadWithData = liteAuthQuery
             totalTokens: summed?.totalTokens ?? 0,
         };
 
+        // The newest reply's suggestions seed the composer; another reply's are read by its id when it is on screen.
+        const cachedSuggestions = cachedRows.page.toSorted(newerFirst)[0];
         const suggestions: FollowupSuggestions = cachedSuggestions
             ? { lastMessageId: cachedSuggestions.lastMessageId, suggestions: cachedSuggestions.suggestions }
             : { suggestions: [] };

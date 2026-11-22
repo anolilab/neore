@@ -225,7 +225,7 @@ export const deleteThreadAccess = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const access = await ctx.db.get("threadAccess", args.accessId);
+        const access = await ctx.db.threadAccess.findFirst({ where: { _id: args.accessId } });
 
         // A suggestion job takes its dispatch claim before it reads the grant. A claim held here is checked in this same transaction,
         // so the grant is refused (and kept for a retry) rather than deleted under a job that may send the thread to a model.

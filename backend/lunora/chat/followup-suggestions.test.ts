@@ -14,6 +14,7 @@ import {
     beginFollowupDispatch,
     cacheFollowupSuggestions,
     endFollowupDispatch,
+    FOLLOWUP_CACHE_ROWS,
     followupDispatchInFlight,
     holdFollowupClaim,
     followupInFlight,
@@ -214,7 +215,9 @@ describe("a late run cannot replace a newer cache", () => {
                 }),
         );
 
-    const cached = async () => await harness.run(async (ctx: any) => await getCachedFollowupSuggestionsHandler(ctx, { threadId }));
+    // Without a reply id, the thread's newest reply; with one, that reply's own row.
+    const cached = async (lastMessageId?: string) =>
+        await harness.run(async (ctx: any) => await getCachedFollowupSuggestionsHandler(ctx, { threadId, ...(lastMessageId && { lastMessageId }) }));
 
     it("an older turn that finishes after a newer one is refused", async () => {
         await cache("reply-new", 5, ["newer?"]);
@@ -285,19 +288,44 @@ describe("a late run cannot replace a newer cache", () => {
         ).resolves.toBe(false);
     });
 
-    // A branched thread's composer shows its active path. A stored reply on another branch is not a newer reply on this one.
+    // A branched thread's composer shows its active path. A stored reply on another branch is not a newer reply on this one, and
+    // each reply keeps its own row: the selected branch is read by its id, and the inactive one still shows when switched back to.
     it("a stored reply on an inactive branch does not block a reply on the selected branch", async () => {
         await cache("reply-inactive", 5, ["inactive?"]);
         await cache("reply-selected", 3, ["selected?"], 3, ["root", "reply-selected"]);
 
-        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-selected", suggestions: ["selected?"] });
+        await expect(cached("reply-selected")).resolves.toEqual({ lastMessageId: "reply-selected", suggestions: ["selected?"] });
+        await expect(cached("reply-inactive")).resolves.toEqual({ lastMessageId: "reply-inactive", suggestions: ["inactive?"] });
     });
 
     it("an earlier sibling on an inactive branch does not block the selected branch's sibling", async () => {
         await cache("sibling-later", 5, ["later?"], 2000);
         await cache("sibling-earlier", 5, ["earlier?"], 1000, ["root", "sibling-earlier"]);
 
-        await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-earlier", suggestions: ["earlier?"] });
+        await expect(cached("sibling-earlier")).resolves.toEqual({ lastMessageId: "sibling-earlier", suggestions: ["earlier?"] });
+        await expect(cached("sibling-later")).resolves.toEqual({ lastMessageId: "sibling-later", suggestions: ["later?"] });
+    });
+
+    it("each reply's suggestions are read by its own id, and a reply with none reads nothing", async () => {
+        await cache("reply-a", 3, ["a?"]);
+        await cache("reply-b", 5, ["b?"]);
+
+        await expect(cached("reply-a")).resolves.toEqual({ lastMessageId: "reply-a", suggestions: ["a?"] });
+        await expect(cached("reply-b")).resolves.toEqual({ lastMessageId: "reply-b", suggestions: ["b?"] });
+        await expect(cached("reply-none")).resolves.toBeNull();
+    });
+
+    // A thread keeps its newest replies: the oldest row makes room, so the cache does not grow with every reply.
+    it("keeps the newest replies, dropping the oldest once the thread is full", async () => {
+        for (let order = 0; order <= FOLLOWUP_CACHE_ROWS; order += 1) {
+            await cache(`reply-${order}`, order, [`s${order}?`]);
+        }
+
+        await expect(cached("reply-0")).resolves.toBeNull();
+        await expect(cached(`reply-${FOLLOWUP_CACHE_ROWS}`)).resolves.toEqual({
+            lastMessageId: `reply-${FOLLOWUP_CACHE_ROWS}`,
+            suggestions: [`s${FOLLOWUP_CACHE_ROWS}?`],
+        });
     });
 
     it("a newer reply on the selected branch still refuses an older one on it", async () => {

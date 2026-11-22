@@ -99,7 +99,11 @@ const ComposerFollowupSuggestions: FC = () => {
 
     // Read the suggestions the backend cached after the reply. Reactive, so they appear when the generator writes them. Nothing here calls a model.
     const { data: cachedFollowups, isFetching: isFetchingCached } = useQuery({
-        ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions({ threadId: validThreadId as Id<"threads">, unlockProof }),
+        ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions({
+            lastMessageId: lastMessage?.id,
+            threadId: validThreadId as Id<"threads">,
+            unlockProof,
+        }),
         // A locked chat without its proof is not read (see `use-next-prompt-suggestion.ts`).
         enabled: Boolean(shouldFetchConditions) && !lockedWithoutProof,
     });

@@ -4519,16 +4519,19 @@ export const getMessageRateLimit = optionalAuthQuery
  */
 export const getCachedFollowupSuggestions = authQuery
     .input({
+        // The reply on screen: its own row is read, so a branch the person switched back to still shows its suggestions.
+        lastMessageId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ lastMessageId: v.optional(v.string()), suggestions: v.array(v.string()) }))
-    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+    .query(async ({ args: { lastMessageId, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }), "Access denied to this thread");
 
         const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
+            lastMessageId,
             threadId,
         });
 
@@ -4817,6 +4820,7 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             // Check cache first
             const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
+                lastMessageId,
                 threadId,
             });
 

@@ -38,7 +38,7 @@ const useNextPromptSuggestion = (): string | null => {
     const { data: cached } = useQuery({
         ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions(
             validThreadId && enabled && !isRunning && lastReplyId !== undefined && !lockedWithoutProof
-                ? { threadId: validThreadId as Id<"threads">, unlockProof }
+                ? { lastMessageId: lastReplyId, threadId: validThreadId as Id<"threads">, unlockProof }
                 : skipToken,
         ),
     });
