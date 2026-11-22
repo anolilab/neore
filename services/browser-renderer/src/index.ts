@@ -253,8 +253,12 @@ function readTarget(
 
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
     // there pays, so the gate reads a submit-like label on a checkout as a purchase.
+    // A card form is also one whose fields sit in a frame the page cannot read (a hosted card element), or one that posts to
+    // another site: its fields are not in the DOM, so the field check alone misses it.
     const isCardFields =
-        enclosingForm !== null && enclosingForm.querySelector("input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i]") !== null;
+        enclosingForm !== null &&
+        (enclosingForm.querySelector("input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i], iframe") !== null ||
+            new URL(enclosingForm.action, document.URL).origin !== new URL(document.URL).origin);
     const address = document.URL.toLowerCase();
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
 
