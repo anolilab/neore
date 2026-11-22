@@ -36,12 +36,12 @@ export const isPurchaseText = (text: string): boolean => {
  * as `content`.
  */
 export interface ClickTargetLook {
-    /** The renderer cut the accessible name short: a purchase word may sit past the cut, so the gate cannot clear it. */
     /** The element is on a checkout (a form with card fields, or a checkout page): a submit-like label there asks. */
     checkout?: boolean;
     content?: string;
     /** The control's accessible name (aria-label, labelled-by text, title), when it is not its text. */
     label?: string;
+    /** The renderer cut the accessible name short: a purchase word may sit past the cut, so the gate cannot clear it. */
     labelTruncated?: boolean;
     success: boolean;
     /** The renderer cut the text short: a purchase word may sit past the cut, so the gate cannot clear it. */

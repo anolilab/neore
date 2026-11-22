@@ -27,6 +27,8 @@ const CLICK_NEEDS_APPROVAL =
 export interface BrowserResult {
     /** The browser the page is on (`browser-node.ts`); for the ladder's ask only, never the model. */
     browserId?: string;
+    /** The element is on a checkout (`visibleOnly` reads only): a submit-like label there asks. */
+    checkout?: boolean;
     clickedSelector?: string;
     content?: string;
     direction?: string;
@@ -41,7 +43,6 @@ export interface BrowserResult {
     humanCheck?: { browserId?: string; site: string; status: "already_asked" | "asked" };
     /** The accessible name of the element a look read (`visibleOnly`). */
     label?: string;
-    checkout?: boolean;
     labelTruncated?: boolean;
     /** A navigate, or an interactive action that left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
     navigated?: boolean;
