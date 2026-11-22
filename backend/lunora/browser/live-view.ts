@@ -26,6 +26,7 @@ import { validateDomain } from "../chat/tools/utilities";
 import { activeThreadSession } from "./functions";
 import { claimIdOf, releaseTokenFor } from "./release-token";
 import { patchRow } from "../lib/patch";
+import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import {
     browserAliveUntil,
     browserIdOf,
@@ -53,6 +54,11 @@ type ReaderBrowser =
           kind: "watchable";
           providerSessionId: string;
           session: Doc<"browserSessions">;
+          /**
+           * The shard the session row is on: the one serving this read (the thread owner's). Never the row's `userId`, which names whoever opened
+           * the browser (a collaborator's first action in a shared thread opens it on the owner's shard).
+           */
+          shardKey: string;
       }
     | { kind: "denied" }
     | { kind: "none" };
@@ -150,6 +156,7 @@ const readerBrowser = async (
         kind: "watchable",
         providerSessionId,
         session,
+        shardKey: currentShard() ?? access.thread.userId ?? ROOT_SHARD_KEY,
     };
 };
 
@@ -456,7 +463,7 @@ export const claimControl = internalMutation
                 kind: "ok" as const,
                 previousClaim: current.renewing ?? current.claim,
                 providerSessionId: browser.providerSessionId,
-                shardKey: browser.session.userId,
+                shardKey: browser.shardKey,
                 until,
                 ...(current.ended !== undefined && { handedBack: current.ended }),
             };
@@ -474,7 +481,7 @@ export const claimControl = internalMutation
             fresh: true,
             kind: "ok" as const,
             providerSessionId: browser.providerSessionId,
-            shardKey: browser.session.userId,
+            shardKey: browser.shardKey,
             until,
             ...(returned !== undefined && { returned }),
         };
@@ -837,16 +844,17 @@ export const handBack = authMutation
 /**
  * A closing page's hand back (`POST /browser/release`), which carries no session: the route verified the release token
  * `takeControl` gave the claim's holder alone, and this runs on the shard it names. It ends only the lease that claim
- * names (`left`), as `handBack` would; a newer claim, or a lease already ended, is left as it is.
+ * names, as `handBack` would: `left`, or `handed_back` for a page that closed while the person's own hand back was
+ * still out. A newer claim, or a lease already ended, is left as it is.
  */
 export const releaseControl = internalMutation
-    .input({ claim: v.string(), threadId: v.id("threads") })
+    .input({ claim: v.string(), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
     .output(v.boolean())
-    .mutation(async ({ args: { claim, threadId }, ctx }) => {
-        const ended = await returnLease(ctx.db, await activeThreadSession(ctx.db, threadId), claim, "left", ctx.now, async () => true);
+    .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
+        const ended = await returnLease(ctx.db, await activeThreadSession(ctx.db, threadId), claim, reason, ctx.now, async () => true);
 
         if (ended === "ended") {
-            ctx.log.event("browser.control_returned", { reason: "left" });
+            ctx.log.event("browser.control_returned", { reason });
         }
 
         return ended === "ended" || ended === "again";

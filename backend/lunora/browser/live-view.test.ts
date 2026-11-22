@@ -15,6 +15,7 @@ import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
 import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
 import { releaseControlHttpAction } from "./release-http";
+import { runInShard } from "../lib/shard-context";
 import { releaseTokenFor } from "./release-token";
 import { BROWSER_IDLE_REAP_MS, browserIdOf, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
@@ -1097,6 +1098,24 @@ describe("a closing page's hand back", () => {
         await expect(lease()).resolves.toEqual(ended);
     });
 
+    it("ends a collaborator's lease on the owner's shard when the collaborator opened the shared thread's browser", async () => {
+        // The collaborator's first action opened the browser: the row names them, but it lives on the owner's shard.
+        await addSession({ userId: WRITER });
+        const taken = await take(WRITER);
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual([OWNER]);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "left" });
+    });
+
+    it("names the shard serving the claim, where the session row is, in the token", async () => {
+        await addSession({ userId: WRITER });
+        const taken = await runInShard("owner-shard", async () => await take(WRITER));
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual(["owner-shard"]);
+    });
+
     it("never ends a newer claim: another tab's of the same person, or someone else's", async () => {
         await addSession();
         const first = await take(OWNER);
@@ -1132,6 +1151,30 @@ describe("a closing page's hand back", () => {
         await expect(lease()).resolves.toMatchObject({ claim: "claim-renewal", renewingEnded: "left" });
         await expect(lease()).resolves.not.toHaveProperty("ended");
         await expect(lease()).resolves.not.toHaveProperty("renewing");
+    });
+
+    it("ends the lease as handed back when the page closed while the person's own hand back was out, once", async () => {
+        await addSession();
+        const taken = await take(WRITER);
+
+        await expect(release(`${taken.release}\nhanded_back`)).resolves.toBe(204);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "handed_back", until: NOW });
+
+        // The hand back's own mutation lands after the beacon: it changes nothing, and still answers for its claim.
+        const ended = await lease();
+
+        await expect(giveBack(WRITER, "handed_back", taken.claim)).resolves.toBe(true);
+        await expect(lease()).resolves.toEqual(ended);
+    });
+
+    it("refuses a body that names any other way to close, and ends nothing", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+        const held = await lease();
+
+        await expect(release(`${taken.release}\nidle`)).resolves.toBe(401);
+        await expect(release(`${taken.release}\nleft\nleft`)).resolves.toBe(401);
+        await expect(lease()).resolves.toEqual(held);
     });
 
     it("leaves a lease that already lapsed as it is", async () => {

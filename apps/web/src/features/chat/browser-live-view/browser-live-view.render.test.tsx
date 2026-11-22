@@ -1014,9 +1014,9 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack).not.toHaveBeenCalled();
         });
 
-        it("sends no beacon while the person's own hand back is out, so the agent hears it was handed back", async () => {
+        it("sends a hand back beacon when the page closes while the person's own hand back is out", async () => {
             controllable();
-            const beacon = vi.fn(() => true);
+            const beacon = vi.fn((_url: string | globalThis.URL, _body?: BodyInit | null) => true);
 
             Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: beacon });
             const handedBack: ((value: boolean) => void)[] = [];
@@ -1048,7 +1048,11 @@ describe("BrowserLiveView", () => {
                 globalThis.dispatchEvent(new Event("pagehide"));
             });
 
-            expect(beacon).not.toHaveBeenCalled();
+            // The close may cut the hand back's mutation off: the beacon outlives the page, and says it was handed back.
+            expect(beacon).toHaveBeenCalledOnce();
+            expect(beacon.mock.calls[0]?.[1]).toBe("release-1\nhanded_back");
+            // The page's own leave says so too, so neither request that lands first tells the agent the person left.
+            expect(backend.handBack.mock.calls.map(([args]) => args.reason)).toEqual(["handed_back", "handed_back"]);
 
             await act(async () => {
                 for (const resolve of handedBack) {

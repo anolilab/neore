@@ -126,14 +126,15 @@ type Held = { claim: string; claimId?: string; confirmedUntil?: number; release?
 
 /**
  * The hand back of a page that is closing: a beacon outlives the page, a mutation may not. It carries no session (a
- * beacon cannot), only the claim's release token, as plain text (no preflight). `false`: it could not be queued.
+ * beacon cannot), only the claim's release token, as plain text (no preflight), and on a second line `handed_back` when
+ * the person's own hand back was still out. `false`: it could not be queued.
  */
-const sendReleaseBeacon = (release: string): boolean => {
+const sendReleaseBeacon = (release: string, reason: "handed_back" | "left"): boolean => {
     if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") {
         return false;
     }
 
-    return navigator.sendBeacon(new URL("/browser/release", env.VITE_LUNORA_URL), release);
+    return navigator.sendBeacon(new URL("/browser/release", env.VITE_LUNORA_URL), reason === "left" ? release : `${release}\nhanded_back`);
 };
 
 /**
@@ -372,8 +373,13 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
 
     /**
      * The tab is leaving the lease it holds, if any (its view is gone or going): the claim goes at once, and the server
-     * ends only the lease that claim names. A hand back that does not arrive leaves the lease to its idle timeout.
+     * ends only the lease that claim names. A hand back that does not arrive leaves the lease to its idle timeout. While
+     * the person's own hand back of that claim is out, this says `handed_back` too: whichever lands first decides what
+     * the agent is told.
      */
+    const leavingReason = (holding: string | undefined): "handed_back" | "left" =>
+        holding !== undefined && returningRef.current === holding ? "handed_back" : "left";
+
     const giveBack = (): void => {
         const holding = claimRef.current;
 
@@ -381,8 +387,10 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
             return;
         }
 
+        const reason = leavingReason(holding);
+
         setClaim(undefined);
-        leaveLease.mutate({ claim: holding, reason: "left", threadId });
+        leaveLease.mutate({ claim: holding, reason, threadId });
     };
 
     /**
@@ -655,9 +663,10 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const pageLeft = useEffectEvent((): void => {
         wantedControl.current = undefined;
 
-        // Not while the person's own hand back is out: the agent is told it was handed back, not left.
-        if (releaseRef.current !== undefined && returningRef.current !== claimRef.current) {
-            sendReleaseBeacon(releaseRef.current);
+        // The person's own hand back may be out still, and the close may cut it off too: the beacon says so, so the agent
+        // is told it was handed back, not left.
+        if (releaseRef.current !== undefined) {
+            sendReleaseBeacon(releaseRef.current, leavingReason(claimRef.current));
         }
 
         giveBack();
