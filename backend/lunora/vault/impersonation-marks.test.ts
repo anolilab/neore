@@ -90,6 +90,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     impersonation.by = undefined;
     session.organization = null;
     harness.close();
@@ -364,12 +365,17 @@ describe("Keep as mine", () => {
         );
         impersonation.by = undefined;
 
-        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: ["site", "who"] });
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({
+            impersonated: [
+                { name: "site", scope: "user" },
+                { name: "who", scope: "user" },
+            ],
+        });
 
         await owner().mutation(keepVariableValue as never, { name: "site", scope: "user", value: "bank" } as never);
 
         await expect(sources()).resolves.toEqual({ site: "user", who: "impersonated" });
-        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: ["who"] });
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonated: [{ name: "who", scope: "user" }] });
     });
 
     it("clears a chat's value for the chat's owner only", async () => {
@@ -401,8 +407,13 @@ describe("Keep as mine", () => {
         await expect(owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization", value: "Acme" } as never)).rejects.toMatchObject({
             code: "FORBIDDEN",
         });
+        // A member is shown no mark they cannot clear; an admin is told which scope clears it.
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonated: [] });
 
         session.organization = { ...session.organization, role: "admin" };
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({
+            impersonated: [{ name: "brand", scope: "organization" }],
+        });
         await owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization", value: "Acme" } as never);
 
         await expect(sources()).resolves.toEqual({ brand: "organization" });
@@ -447,7 +458,13 @@ describe("Keep as mine", () => {
 
         // Outside the organization the row still turns up by `userId`: its values show, but no keepable mark.
         session.organization = null;
-        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: [] });
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonated: [] });
+
+        // As the organization's admin, the row they created is shown as the organization's, kept with that scope.
+        session.organization = { id: "org-1", name: "Acme", role: "admin", slug: null };
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({
+            impersonated: [{ name: "brand", scope: "organization" }],
+        });
     });
 
     it("compares the value filled in when a name is listed twice: the last one", async () => {
@@ -472,34 +489,34 @@ describe("Keep as mine", () => {
         await expect(sources()).resolves.toEqual({ site: "user" });
     });
 
-    it("refuses a keep when the organization's row was written after it was checked, and undoes nothing of that write", async () => {
+    it("refuses a keep when the organization's row was written after it was checked, even in the same millisecond, and undoes nothing of that write", async () => {
+        // Both writes land in one millisecond: `updatedAt` alone cannot tell them apart.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(1_700_000_000_000);
         session.organization = { id: "org-1", name: "Acme", role: "owner", slug: null };
         impersonation.by = "admin-1";
         await owner().mutation(setOrganizationVariableDefaults as never, { variables: [{ name: "brand", value: "Acme" }] } as never);
-        impersonation.by = undefined;
 
         const stored = async () => await harness.run(async (ctx: any) => await ctx.db.userVariableDefaults.findFirst({ where: { organizationId: "org-1" } }));
         const checked = await stored();
-        const later = {
-            updatedAt: checked.updatedAt + 1,
-            variables: [...checked.variables, { name: "tone", value: "dry" }],
-            variablesByImpersonator: ["brand", "tone"],
-        };
+        const later = [
+            { name: "brand", value: "Acme" },
+            { name: "tone", value: "dry" },
+        ];
 
         // Another admin's write lands between the keep's read and its write.
-        await harness.run(async (ctx: any) => {
-            await ctx.db.patch("userVariableDefaults", checked._id, later);
-        });
+        await owner().mutation(setOrganizationVariableDefaults as never, { variables: later } as never);
+        impersonation.by = undefined;
 
-        await expect(harness.run(async (ctx: any) => await clearDefaultsMark(ctx.db, checked, "brand", checked.updatedAt + 2))).rejects.toMatchObject({
+        await expect(harness.run(async (ctx: any) => await clearDefaultsMark(ctx.db, checked, "brand", Date.now()))).rejects.toMatchObject({
             code: "CONFLICT",
         });
-        await expect(stored()).resolves.toMatchObject(later);
+        await expect(stored()).resolves.toMatchObject({ updatedAt: checked.updatedAt, variables: later, variablesByImpersonator: ["brand", "tone"] });
 
         // On the row as it is now, only the one mark goes and the values stay.
         const current = await stored();
 
-        await harness.run(async (ctx: any) => await clearDefaultsMark(ctx.db, current, "brand", checked.updatedAt + 3));
-        await expect(stored()).resolves.toMatchObject({ variables: later.variables, variablesByImpersonator: ["tone"] });
+        await harness.run(async (ctx: any) => await clearDefaultsMark(ctx.db, current, "brand", Date.now()));
+        await expect(stored()).resolves.toMatchObject({ variables: later, variablesByImpersonator: ["tone"] });
     });
 });

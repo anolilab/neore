@@ -4102,6 +4102,9 @@ export const schema = defineSchema({
         // The names of the values an admin acting as the user changed or added, and kept (`prompts/functions.ts#markedNames`):
         // filled into a prompt, such a value marks the draft (`impersonated`).
         variablesByImpersonator: v.optional(v.array(v.string())),
+        // A fresh id from every write of the values or marks (`updatedAt` can repeat within a millisecond): a "Keep as mine"
+        // clears a mark only while it is still the one read (`clearDefaultsMark`). Absent on a row no such write has had yet.
+        writeId: v.optional(v.string()),
     })
         // `.global()`, not `.shardBy("userId")`: read across users.
         .global()

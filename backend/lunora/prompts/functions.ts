@@ -1319,8 +1319,9 @@ export const getUserVariableDefaults = authQuery
     .input({})
     .output(
         v.object({
-            // The names of the shown values an admin wrote while acting as a user (`markedNames`), for "Keep as mine".
-            impersonatedNames: v.array(v.string()),
+            // The shown values an admin wrote while acting as a user (`markedNames`) that the caller may keep as theirs, and the
+            // `keepVariableValue` scope that does it.
+            impersonated: v.array(v.object({ name: v.string(), scope: v.union(v.literal("user"), v.literal("organization")) })),
             organizationId: v.optional(v.string()),
             userId: v.string(),
             variables: v.array(v.object({ name: v.string(), value: v.string() })),
@@ -1359,18 +1360,27 @@ export const getUserVariableDefaults = authQuery
             }
         }
 
+        const role = ctx.user.activeOrganization?.role;
+        const keepsOrganization = role === "owner" || role === "admin";
+
         return {
             // Each shown value's mark, from the row it was shown from: a user's own value hides the organization's.
             // A row found by `userId` can be an organization's row the caller created: never theirs to keep, so its marks are
-            // reported only when it is the active organization's row (kept with `scope: "organization"`).
-            impersonatedNames: mergedVariables
-                .map(({ name }) => name)
-                .filter((name) => {
-                    const source = seen.has(name) ? userDefaults : orgDefaults;
-                    const keepable = source?.organizationId === undefined || source._id === orgDefaults?._id;
+            // reported only when it is the active organization's row, and then, as `keepVariableValue` allows, to its
+            // owners and admins only, with `scope: "organization"`.
+            impersonated: mergedVariables.flatMap(({ name }): { name: string; scope: "organization" | "user" }[] => {
+                const source = seen.has(name) ? userDefaults : orgDefaults;
 
-                    return keepable && isMarked(source ?? {}, name);
-                }),
+                if (!source || !isMarked(source, name)) {
+                    return [];
+                }
+
+                if (source.organizationId === undefined) {
+                    return [{ name, scope: "user" }];
+                }
+
+                return keepsOrganization && source._id === orgDefaults?._id ? [{ name, scope: "organization" }] : [];
+            }),
             organizationId,
             userId,
             variables: mergedVariables,
@@ -1398,6 +1408,7 @@ export const setUserVariableDefaults = authMutation
                 ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
+                writeId: crypto.randomUUID(),
             });
 
             ctx.log.event("prompts.set_user_variable_defaults", { created: false, variableCount: variables.length });
@@ -1411,6 +1422,7 @@ export const setUserVariableDefaults = authMutation
             updatedAt: now,
             userId,
             variables,
+            writeId: crypto.randomUUID(),
         });
 
         ctx.log.event("prompts.set_user_variable_defaults", { created: true, variableCount: variables.length });
@@ -1455,6 +1467,7 @@ export const setOrganizationVariableDefaults = authMutation
                 ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
+                writeId: crypto.randomUUID(),
             });
 
             ctx.log.event("prompts.set_organization_variable_defaults", { created: false, organizationId, variableCount: variables.length });
@@ -1469,6 +1482,7 @@ export const setOrganizationVariableDefaults = authMutation
             updatedAt: now,
             userId,
             variables,
+            writeId: crypto.randomUUID(),
         });
 
         ctx.log.event("prompts.set_organization_variable_defaults", { created: true, organizationId, variableCount: variables.length });
@@ -1496,18 +1510,23 @@ const assertSeenValue = (row: { variables: { name: string; value: string }[] }, 
 /**
  * Drops the mark on `name` from a defaults row checked a moment ago. The row is `.global()`, so another write (an admin
  * setting the organization's defaults) can land between that read and this write: it is written only while it is still
- * the row checked (`patchIf` on `updatedAt`, which every write moves), else CONFLICT. Only the marks column is written
- * (an empty list for none), never the whole row, so a value written meanwhile is never undone.
+ * the row checked (`patchIf` on `writeId`, which every write replaces; `updatedAt` can repeat within a millisecond),
+ * else CONFLICT. Only the marks column is written (an empty list for none), never the whole row, so a value written
+ * meanwhile is never undone.
  */
 export const clearDefaultsMark = async (
     db: Pick<MutationContext["db"], "patchIf">,
-    row: { _id: Id<"userVariableDefaults">; updatedAt: number; variablesByImpersonator?: string[] },
+    row: { _id: Id<"userVariableDefaults">; variablesByImpersonator?: string[]; writeId?: string },
     name: string,
     now: number,
 ): Promise<void> => {
     const { applied } = await db.patchIf("userVariableDefaults", row._id, {
-        patch: { updatedAt: now, variablesByImpersonator: (row.variablesByImpersonator ?? []).filter((marked) => marked !== name) },
-        where: { updatedAt: row.updatedAt },
+        patch: {
+            updatedAt: now,
+            variablesByImpersonator: (row.variablesByImpersonator ?? []).filter((marked) => marked !== name),
+            writeId: crypto.randomUUID(),
+        },
+        where: { writeId: row.writeId ?? null },
     });
 
     if (!applied) {
