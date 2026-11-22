@@ -1,6 +1,7 @@
 /**
  * "Keep as mine" on a chat's variable an admin wrote: the badge sits on that value only, the keep sends the stored value
- * (the server refuses one changed since), and the row's refresh after the keep leaves unsaved edits in place.
+ * (the server refuses one changed since) and waits while the field shows an unsaved edit or a save is in flight, and the
+ * row's refresh after the keep leaves unsaved edits in place.
  */
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -13,6 +14,8 @@ type Row = { threadId: string; userId: string; variables: { name: string; value:
 const harness = vi.hoisted(() => {
     return {
         keep: vi.fn(async (_args: unknown) => null),
+        // A save that never settles, so the panel stays "saving".
+        save: vi.fn(async (_args: unknown) => await new Promise<null>(() => {})),
         listeners: new Set<() => void>(),
         row: undefined as Row | undefined,
     };
@@ -66,7 +69,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                         setThreadVariables: {
                             mutationOptions: () => {
-                                return { mutationFn: vi.fn() };
+                                return { mutationFn: harness.save };
                             },
                         },
                     },
@@ -109,6 +112,7 @@ const push = (row: Row) => {
 afterEach(() => {
     cleanup();
     harness.keep.mockClear();
+    harness.save.mockClear();
 });
 
 describe("ThreadVariablesConfig's admin marks", () => {
@@ -123,12 +127,19 @@ describe("ThreadVariablesConfig's admin marks", () => {
 
         expect(screen.getAllByText("Changed by an admin")).toHaveLength(1);
 
-        // An unsaved edit of the marked value: the keep still sends what is stored.
         const [site, who] = screen.getAllByPlaceholderText("Enter value...") as HTMLInputElement[];
+        const keep = () => screen.getByRole("button", { name: "Keep as mine: site" }) as HTMLButtonElement;
 
+        // An unsaved edit of the marked value: the stored value is no longer on screen, so the keep waits.
         fireEvent.change(site!, { target: { value: "bank2" } });
+        expect(keep().disabled).toBe(true);
+        expect(screen.getByText("Save or undo your change first.")).toBeTruthy();
+
+        // Undone, it keeps the value shown, which is the stored one; another field's edit does not hold it.
+        fireEvent.change(site!, { target: { value: "bank" } });
         fireEvent.change(who!, { target: { value: "Bob" } });
-        fireEvent.click(screen.getByRole("button", { name: "Keep as mine: site" }));
+        expect(keep().disabled).toBe(false);
+        fireEvent.click(keep());
 
         await waitFor(() => {
             expect(harness.keep).toHaveBeenCalledWith({ name: "site", scope: "thread", threadId: "t1", value: "bank" });
@@ -140,6 +151,25 @@ describe("ThreadVariablesConfig's admin marks", () => {
         });
 
         expect(screen.queryByText("Changed by an admin")).toBeNull();
-        expect((screen.getAllByPlaceholderText("Enter value...") as HTMLInputElement[]).map((input) => input.value)).toEqual(["bank2", "Bob"]);
+        expect((screen.getAllByPlaceholderText("Enter value...") as HTMLInputElement[]).map((input) => input.value)).toEqual(["bank", "Bob"]);
+    });
+
+    it("holds the keep while a save of the panel is in flight", () => {
+        harness.row = {
+            threadId: "t1",
+            userId: "u1",
+            variables: [
+                { name: "site", value: "bank" },
+                { name: "who", value: "Ann" },
+            ],
+            variablesByImpersonator: ["site"],
+        };
+        render(<ThreadVariablesConfig threadId="t1" />);
+
+        fireEvent.change(screen.getAllByPlaceholderText("Enter value...")[1]!, { target: { value: "Bob" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save Variables" }));
+
+        expect((screen.getByRole("button", { name: "Keep as mine: site" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(harness.keep).not.toHaveBeenCalled();
     });
 });

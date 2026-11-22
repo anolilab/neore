@@ -14,6 +14,7 @@ import schema from "../schema";
 import { getUserPreferencesQuery, initializeUserSettings, keepPersonalization, updateUserSettings } from "../auth/functions";
 import { createBot, getBotForRun, keepBotInstructions, updateBot } from "../bots/functions";
 import {
+    clearDefaultsMark,
     getResolvedVariables,
     getUserVariableDefaults,
     keepVariableValue,
@@ -438,8 +439,67 @@ describe("Keep as mine", () => {
         impersonation.by = undefined;
         session.organization = { ...session.organization, role: "member" };
 
-        await owner().mutation(keepVariableValue as never, { name: "brand", scope: "user", value: "Acme" } as never);
-
+        // Refused, never a silent no-op the client would report as kept.
+        await expect(owner().mutation(keepVariableValue as never, { name: "brand", scope: "user", value: "Acme" } as never)).rejects.toMatchObject({
+            code: "NOT_FOUND",
+        });
         await expect(sources()).resolves.toEqual({ brand: "impersonated" });
+
+        // Outside the organization the row still turns up by `userId`: its values show, but no keepable mark.
+        session.organization = null;
+        await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: [] });
+    });
+
+    it("compares the value filled in when a name is listed twice: the last one", async () => {
+        impersonation.by = "admin-1";
+        await owner().mutation(
+            setUserVariableDefaults as never,
+            {
+                variables: [
+                    { name: "site", value: "bank" },
+                    { name: "site", value: "evil" },
+                ],
+            } as never,
+        );
+        impersonation.by = undefined;
+
+        await expect(owner().mutation(keepVariableValue as never, { name: "site", scope: "user", value: "bank" } as never)).rejects.toMatchObject({
+            code: "CONFLICT",
+        });
+
+        await owner().mutation(keepVariableValue as never, { name: "site", scope: "user", value: "evil" } as never);
+
+        await expect(sources()).resolves.toEqual({ site: "user" });
+    });
+
+    it("refuses a keep when the organization's row was written after it was checked, and undoes nothing of that write", async () => {
+        session.organization = { id: "org-1", name: "Acme", role: "owner", slug: null };
+        impersonation.by = "admin-1";
+        await owner().mutation(setOrganizationVariableDefaults as never, { variables: [{ name: "brand", value: "Acme" }] } as never);
+        impersonation.by = undefined;
+
+        const stored = async () => await harness.run(async (ctx: any) => await ctx.db.userVariableDefaults.findFirst({ where: { organizationId: "org-1" } }));
+        const checked = await stored();
+        const later = {
+            updatedAt: checked.updatedAt + 1,
+            variables: [...checked.variables, { name: "tone", value: "dry" }],
+            variablesByImpersonator: ["brand", "tone"],
+        };
+
+        // Another admin's write lands between the keep's read and its write.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("userVariableDefaults", checked._id, later);
+        });
+
+        await expect(harness.run(async (ctx: any) => await clearDefaultsMark(ctx.db, checked, "brand", checked.updatedAt + 2))).rejects.toMatchObject({
+            code: "CONFLICT",
+        });
+        await expect(stored()).resolves.toMatchObject(later);
+
+        // On the row as it is now, only the one mark goes and the values stay.
+        const current = await stored();
+
+        await harness.run(async (ctx: any) => await clearDefaultsMark(ctx.db, current, "brand", checked.updatedAt + 3));
+        await expect(stored()).resolves.toMatchObject({ variables: later.variables, variablesByImpersonator: ["tone"] });
     });
 });

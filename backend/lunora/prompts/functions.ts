@@ -1361,7 +1361,16 @@ export const getUserVariableDefaults = authQuery
 
         return {
             // Each shown value's mark, from the row it was shown from: a user's own value hides the organization's.
-            impersonatedNames: mergedVariables.map(({ name }) => name).filter((name) => isMarked((seen.has(name) ? userDefaults : orgDefaults) ?? {}, name)),
+            // A row found by `userId` can be an organization's row the caller created: never theirs to keep, so its marks are
+            // reported only when it is the active organization's row (kept with `scope: "organization"`).
+            impersonatedNames: mergedVariables
+                .map(({ name }) => name)
+                .filter((name) => {
+                    const source = seen.has(name) ? userDefaults : orgDefaults;
+                    const keepable = source?.organizationId === undefined || source._id === orgDefaults?._id;
+
+                    return keepable && isMarked(source ?? {}, name);
+                }),
             organizationId,
             userId,
             variables: mergedVariables,
@@ -1474,9 +1483,34 @@ const withoutMark = (marks: string[], name: string): { variablesByImpersonator: 
     return { variablesByImpersonator: kept.length > 0 ? kept : undefined };
 };
 
-/** Refuses a review of a value that is no longer the one the owner saw (an admin still acting as them changed it). */
+/**
+ * Refuses a review of a value that is no longer the one the owner saw (an admin still acting as them changed it). With a
+ * name listed twice, the last entry is the one filled in (`getResolvedVariables`, `markedNames`), so that is the one compared.
+ */
 const assertSeenValue = (row: { variables: { name: string; value: string }[] }, name: string, value: string): void => {
-    if (row.variables.find((variable) => variable.name === name)?.value !== value) {
+    if (row.variables.findLast((variable) => variable.name === name)?.value !== value) {
+        throw new LunoraError("CONFLICT", "This value changed since you looked at it. Review it again.");
+    }
+};
+
+/**
+ * Drops the mark on `name` from a defaults row checked a moment ago. The row is `.global()`, so another write (an admin
+ * setting the organization's defaults) can land between that read and this write: it is written only while it is still
+ * the row checked (`patchIf` on `updatedAt`, which every write moves), else CONFLICT. Only the marks column is written
+ * (an empty list for none), never the whole row, so a value written meanwhile is never undone.
+ */
+export const clearDefaultsMark = async (
+    db: Pick<MutationContext["db"], "patchIf">,
+    row: { _id: Id<"userVariableDefaults">; updatedAt: number; variablesByImpersonator?: string[] },
+    name: string,
+    now: number,
+): Promise<void> => {
+    const { applied } = await db.patchIf("userVariableDefaults", row._id, {
+        patch: { updatedAt: now, variablesByImpersonator: (row.variablesByImpersonator ?? []).filter((marked) => marked !== name) },
+        where: { updatedAt: row.updatedAt },
+    });
+
+    if (!applied) {
         throw new LunoraError("CONFLICT", "This value changed since you looked at it. Review it again.");
     }
 };
@@ -1562,11 +1596,18 @@ export const keepVariableValue = authMutation
             row = own?.organizationId === undefined ? own : null;
         }
 
-        if (row && isMarked(row, name)) {
-            assertSeenValue(row, name, value);
-            await patchRow(ctx.db, "userVariableDefaults", row, withoutMark(row.variablesByImpersonator ?? [], name));
-            ctx.log.event("prompts.keep_variable_value", { scope });
+        if (!row) {
+            throw new LunoraError("NOT_FOUND", "Variables not found");
         }
+
+        // Already kept (a second click, another tab): nothing left to clear.
+        if (!isMarked(row, name)) {
+            return null;
+        }
+
+        assertSeenValue(row, name, value);
+        await clearDefaultsMark(ctx.db, row, name, ctx.now);
+        ctx.log.event("prompts.keep_variable_value", { scope });
 
         return null;
     });

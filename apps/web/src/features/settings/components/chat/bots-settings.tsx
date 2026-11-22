@@ -464,7 +464,8 @@ const BotsSettings = () => {
                     {bots.map((bot) => (
                         <li className="flex flex-wrap items-center justify-between gap-4 py-3" key={bot._id}>
                             <div className="min-w-0">
-                                <p className="truncate font-medium">{bot.name}</p>
+                                {/* A marked bot's name is shown whole, as its instructions below: the owner sees all they keep. */}
+                                <p className={bot.instructionsByImpersonator ? "font-medium break-words" : "truncate font-medium"}>{bot.name}</p>
                                 {bot.description && <p className="text-muted-foreground truncate text-sm">{bot.description}</p>}
                                 {bot.computerEnabled && <p className="text-muted-foreground text-xs">{t`Has a computer`}</p>}
                                 {bot.toolSelection && <p className="text-muted-foreground text-xs">{t`Custom tools`}</p>}
@@ -477,7 +478,9 @@ const BotsSettings = () => {
                                                 seen: { instructions: bot.instructions, name: bot.name },
                                             })
                                         }
-                                    />
+                                    >
+                                        <pre className="bg-muted w-full rounded p-2 font-sans text-xs break-words whitespace-pre-wrap">{bot.instructions}</pre>
+                                    </ChangedByAdminMark>
                                 )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">

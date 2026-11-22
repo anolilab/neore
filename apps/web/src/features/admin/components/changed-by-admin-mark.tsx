@@ -5,7 +5,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { ShieldAlert } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { useImpersonationState } from "@/features/admin/hooks/use-is-impersonating";
@@ -30,6 +30,8 @@ interface ChangedByAdminMarkProps {
     fieldLabel: string;
     /** Clears this one field's mark on the server. */
     onKeep: () => Promise<unknown>;
+    /** The field shows an unsaved edit: the keep would carry stored text the person no longer sees, so it waits for a save or undo. */
+    unsavedEdit?: boolean;
 }
 
 /**
@@ -37,10 +39,11 @@ interface ChangedByAdminMarkProps {
  * "Keep as mine" clears that one mark; the server refuses it to an impersonated session, so the button shows only once
  * the session reads as the person's own.
  */
-const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, disabled = false, fieldLabel, onKeep }) => {
+const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, disabled = false, fieldLabel, onKeep, unsavedEdit = false }) => {
     const { t } = useLingui();
     const own = useImpersonationState() === "self";
     const [pending, setPending] = useState(false);
+    const hintId = useId();
 
     const handleKeep = async () => {
         setPending(true);
@@ -64,11 +67,19 @@ const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, disabled = 
             </Badge>
             <span className="text-muted-foreground text-xs">{t`Saved logins stay off for it until you keep it as yours.`}</span>
             {own && (
-                <Button disabled={disabled || pending} onClick={handleKeep} size="sm" type="button" variant="outline">
+                <Button
+                    aria-describedby={unsavedEdit ? hintId : undefined}
+                    disabled={disabled || unsavedEdit || pending}
+                    onClick={handleKeep}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
                     {t`Keep as mine`}
                     <span className="sr-only">: {fieldLabel}</span>
                 </Button>
             )}
+            {own && unsavedEdit && <span className="text-muted-foreground text-xs" id={hintId}>{t`Save or undo your change first.`}</span>}
             {children}
         </div>
     );

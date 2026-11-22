@@ -48,8 +48,9 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
     // Mutations
     const { mutateAsync: setThreadVariables } = useMutation(crpc.prompts.functions.setThreadVariables.mutationOptions());
     const { mutateAsync: keepVariableValue } = useMutation(crpc.prompts.functions.keepVariableValue.mutationOptions());
-    // The stored values, which a keep sends (the server refuses one changed since; an unsaved edit here is not stored), and
-    // the names of those an admin wrote while acting as the owner: read off the stored row, never the edited copy.
+    // The stored values, which a keep sends (the server refuses one changed since), and the names of those an admin wrote
+    // while acting as the owner: read off the stored row, never the edited copy. A keep waits while this field shows an
+    // unsaved edit or a save is in flight, so it never carries a value other than the one on screen.
     const storedValues = new Map((threadVariables?.variables ?? []).map((entry) => [entry.name, entry.value]));
     const impersonatedNames = new Set(threadVariables && "variablesByImpersonator" in threadVariables ? threadVariables.variablesByImpersonator : undefined);
 
@@ -247,6 +248,7 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                                 </div>
                                 {impersonatedNames.has(variable.name) && (
                                     <ChangedByAdminMark
+                                        disabled={isSaving}
                                         fieldLabel={variable.name}
                                         onKeep={async () =>
                                             await keepVariableValue({
@@ -256,6 +258,7 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                                                 value: storedValues.get(variable.name) ?? "",
                                             })
                                         }
+                                        unsavedEdit={variable.value !== storedValues.get(variable.name)}
                                     />
                                 )}
                                 <Input

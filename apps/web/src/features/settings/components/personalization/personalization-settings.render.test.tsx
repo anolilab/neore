@@ -294,6 +294,22 @@ describe("PersonalizationSettings thread title instructions", () => {
         });
     });
 
+    it("holds the keep while a field shows text other than the stored one", () => {
+        harness.store.settings = { nickname: "Boss", personalizationByImpersonator: true };
+        render(<PersonalizationSettings />);
+
+        const keep = () => screen.getByRole("button", { name: "Keep as mine: Your personalization" }) as HTMLButtonElement;
+        const nickname = screen.getByLabelText("Nickname");
+
+        // A draft not saved (a failed save leaves one on screen): the keep would carry the stored "Boss" unseen.
+        fireEvent.change(nickname, { target: { value: "Bossy" } });
+        expect(keep().disabled).toBe(true);
+        expect(screen.getByText("Save or undo your change first.")).toBeTruthy();
+
+        fireEvent.change(nickname, { target: { value: "Boss" } });
+        expect(keep().disabled).toBe(false);
+    });
+
     it("shows no mark on personalization the person wrote", () => {
         render(<PersonalizationSettings />);
 

@@ -157,6 +157,13 @@ const PersonalizationSettings: FC = () => {
         setDraftState(null);
     }
 
+    // A field's draft that differs from its stored value (a failed save leaves one on screen): "Keep as mine" waits for it.
+    const hasUnsavedPersonalization =
+        nickname.trim() !== (userSettings?.nickname ?? "").trim() ||
+        profession.trim() !== (userSettings?.profession ?? "").trim() ||
+        aboutMe.trim() !== (userSettings?.aboutMe ?? "").trim() ||
+        customInstructions.trim() !== (userSettings?.customInstructions ?? "").trim();
+
     const titleInstructionsDraft = draftState && draftState.ownerId === ownerId ? draftState.text : null;
     const threadTitleInstructions = titleInstructionsDraft ?? userSettings?.threadTitleInstructions ?? "";
 
@@ -236,6 +243,7 @@ const PersonalizationSettings: FC = () => {
                                     },
                                 })
                             }
+                            unsavedEdit={hasUnsavedPersonalization}
                         >
                             {userSettings.language && <p className="text-muted-foreground w-full text-xs">{t`Language: ${userSettings.language}`}</p>}
                             {userSettings.location && <p className="text-muted-foreground w-full text-xs">{t`Location: ${userSettings.location}`}</p>}
