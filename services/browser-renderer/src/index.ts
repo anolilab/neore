@@ -582,6 +582,12 @@ const actHeld = async (
                                     }
                                 }
 
+                                // The button's rendered text: a child with ordinary text can sit beside a purchase word the person sees.
+                                if (actionable instanceof HTMLElement) {
+                                    // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
+                                    names.push(actionable.innerText);
+                                }
+
                                 // Names that come from inside the button: an image's alt, a child's aria-label or title, an SVG title.
                                 for (const node of actionable.querySelectorAll("img[alt], [aria-label], [title]")) {
                                     names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
