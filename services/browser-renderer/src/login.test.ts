@@ -1,7 +1,7 @@
 import type { Page } from "@cloudflare/playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { signIn, standIn, standInFor, WITHHELD, withoutSecret, withPassword } from "./login";
+import { SCAN_BUDGET, secretScan, signIn, standIn, standInFor, UNCHECKED, WITHHELD, withoutSecret, withPassword } from "./login";
 
 const SECRET = "p@ss wörd{1}&<x>";
 
@@ -67,19 +67,73 @@ describe(withoutSecret, () => {
         expect(withoutSecret(`q=${encodedTimes(secret, depth)}`, secret)).toBe(WITHHELD);
     });
 
-    it("withholds a large text whose layers take longer to read through than its budget", () => {
-        expect(withoutSecret(`${"a".repeat(1_000_000)}${encodedTimes("a b", 8)}`, SECRET)).toBe(WITHHELD);
+    it("withholds, unread, a large text whose layers take longer to read through than its budget", () => {
+        expect(withoutSecret(`${"a".repeat(1_000_000)}${encodedTimes("a b", 8)}`, SECRET)).toBe(UNCHECKED);
     });
 
-    it("withholds a text encoded more deeply than it is read through", () => {
+    it("withholds, unread, a text encoded more deeply than it is read through", () => {
         // Each layer escapes the first hex digit of the one below: no escape of `%` alone, so every layer takes a round.
         const layers = 40;
 
-        expect(withoutSecret(`${"%".repeat(layers + 1)}${"3".repeat(layers)}41`, SECRET)).toBe(WITHHELD);
+        expect(withoutSecret(`${"%".repeat(layers + 1)}${"3".repeat(layers)}41`, SECRET)).toBe(UNCHECKED);
     });
 
     it("keeps text without the password", () => {
         expect(withoutSecret("https://example.com/home?p=other", SECRET)).toBe("https://example.com/home?p=other");
+    });
+});
+
+describe(secretScan, () => {
+    const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    /** A password of `length` letters and digits, built here. */
+    const passwordOf = (length: number): string => Array.from({ length }, (_, index) => ALPHABET[(index * 37 + 11) % 62]).join("");
+    const long = passwordOf(64);
+    /** A 2 MB page that repeats all of the password but its last character, then holds it whole, or not. */
+    const page = (isHeld: boolean): string => `${long.slice(0, -1).repeat(32_000)}${isHeld ? long : ""}`.slice(-2_000_000);
+
+    it("withholds a page past a sign-in's budget unread, the password in it or not, as too much to check", () => {
+        expect(secretScan(long).without(page(true))).toBe(UNCHECKED);
+        expect(secretScan(long).without(page(false))).toBe(UNCHECKED);
+        expect(secretScan(long).address(page(true))).toBe("unchecked");
+    });
+
+    it.each([true, false])("leaves a later text the same budget whether an earlier one held the password (%s)", (isHeld) => {
+        const scan = secretScan(long);
+        const half = SCAN_BUDGET / 2;
+        const first = isHeld ? `${long}${"x".repeat(half - long.length)}` : "x".repeat(half);
+
+        expect(scan.text(first)).toBe(isHeld ? "held" : "clean");
+        // The rest of the budget, then one character more: withheld unread.
+        expect(scan.without("y".repeat(half))).toBe("y".repeat(half));
+        expect(scan.without("z")).toBe(UNCHECKED);
+    });
+
+    it("spends what decoding a text that then did not fit took, so a later one is not decoded for free", () => {
+        const scan = secretScan(long);
+        // 13 characters whose six layers take 49: the text fits, its layers do not.
+        const deep = "%252525252541".repeat(25_000);
+
+        expect(scan.address(deep)).toBe("unchecked");
+        expect(scan.address("?q=1")).toBe("unchecked");
+    });
+
+    it("gives the addresses, the cookies and the result's texts a budget each", () => {
+        const scan = secretScan(long);
+
+        expect(scan.text("x".repeat(SCAN_BUDGET))).toBe("clean");
+        expect(scan.address("?q=1")).toBe("clean");
+        expect(scan.cookie("sid=1")).toBe("clean");
+        expect(scan.without("z")).toBe(UNCHECKED);
+    });
+
+    it("reads less for a longer password, in step with its length", () => {
+        // A 1024-character one: a sixteenth of the budget, the scan of which ends quickly.
+        const scan = secretScan(passwordOf(1024));
+        const prefixes = passwordOf(1024).slice(0, -1).repeat(61);
+
+        expect(prefixes.length).toBeLessThan(SCAN_BUDGET / 16);
+        expect(scan.address(prefixes)).toBe("clean");
+        expect(scan.address("?q=1".repeat(1000))).toBe("unchecked");
     });
 });
 

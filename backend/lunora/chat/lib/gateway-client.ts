@@ -314,11 +314,9 @@ export interface RoutingAnalytics {
  */
 export const getRoutingAnalytics = async (context: ActionContext, period: "24h" | "7d" = "24h"): Promise<RoutingAnalytics> => {
     // Defense-in-depth: pass the requesting admin's user ID so the gateway can
-    // verify against its GATEWAY_ADMIN_USER_IDS allowlist.
-    const identity = await context.auth.getIdentity();
-    // `getIdentity()` resolves to `Record<string, unknown> | null`, so `subject`
-    // is `unknown` — and it goes straight into the request's query string.
-    const adminUserId = identity?.subject;
+    // verify against its GATEWAY_ADMIN_USER_IDS allowlist. From `context.auth.userId`,
+    // as in `getProviderCacheReadings`: the identity claims carry no `subject`.
+    const adminUserId = context.auth.userId;
 
     if (typeof adminUserId !== "string") {
         throw new TypeError("Gateway analytics requires an authenticated admin user");
@@ -338,6 +336,51 @@ export const getRoutingAnalytics = async (context: ActionContext, period: "24h" 
     }
 
     return (await response.json()) as RoutingAnalytics;
+};
+
+/** Prompt tokens a provider was sent, and how many it served from its own prompt cache. */
+export interface ProviderCacheCounts {
+    cachedTokens: number;
+    promptTokens: number;
+    requests: number;
+}
+
+/** The gateway's provider prompt-cache readings (`services/llm-gateway/src/usage/provider-cache-readings.ts`). */
+export interface ProviderCacheReadings {
+    /** Every answered row in the window, caching pair or not. */
+    all: ProviderCacheCounts;
+    days: 1 | 7 | 30;
+    models: (ProviderCacheCounts & { modelId: string; provider: string })[];
+    /** Provider/model pairs with traffic in the window; more than `models.length` when the list was cut. */
+    pairs: number;
+    /** Quarter hours from caching pairs, oldest first; `start` is the UTC start, so the card can sum them into any zone's hours. */
+    quarters: (ProviderCacheCounts & { start: string })[];
+    since: string;
+}
+
+/** Fetch the provider prompt-cache readings from the gateway admin endpoint, for the last `days`. */
+export const getProviderCacheReadings = async (context: ActionContext, days: 1 | 7 | 30): Promise<ProviderCacheReadings> => {
+    // `context.auth.userId`, as every action reads the caller (`auth/lib/helper.ts`): the identity claims carry neither
+    // `subject` nor `userId`, so reading either made every call refuse.
+    const adminUserId = context.auth.userId;
+
+    if (typeof adminUserId !== "string") {
+        throw new TypeError("Provider cache readings require an authenticated admin user");
+    }
+
+    const params = new URLSearchParams({ adminUserId, days: String(days) });
+    const response = await fetchWithDeadline(gatewayUrl(`/internal/admin/provider-cache?${params.toString()}`), {
+        method: "GET",
+        via: gatewayFetch(context),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+
+        throw new Error(`Provider cache readings failed (${response.status}): ${errorBody}`);
+    }
+
+    return (await response.json()) as ProviderCacheReadings;
 };
 
 // ── User Usage ────────────────────────────────────────────────────────────────

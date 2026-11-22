@@ -165,6 +165,7 @@ for a schema table that is neither policed nor listed:
 | `admin_cleanup.previewCleanup` | query | adminQuery | cleanupConfigs | admin role | ok |
 | `admin_cleanup.updateCleanupConfig` | mutation | adminMutation | cleanupConfigs | admin role | ok |
 | `admin_gateway_analytics.getGatewayAnalytics` | action | adminAction | — | admin role | ok |
+| `admin_gateway_analytics.getProviderCacheReadingsForAdmin` | action | adminAction | — | admin role; the gateway checks the caller against `GATEWAY_ADMIN_USER_IDS` again; token counts by hour and model only, no user or thread | ok |
 | `agent_branches.editAssistantReply` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |

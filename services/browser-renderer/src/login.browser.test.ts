@@ -602,6 +602,41 @@ describe(signIn, () => {
         expect(await leftBlank()).toBe(true);
     });
 
+    it.each([
+        ["holds one", `<form method="post" action="/session">${FIELDS}<input type="file" name="avatar"><button>Go</button></form>`],
+        [
+            "is tied one by a form attribute",
+            `<form id="f" method="post" action="/session">${FIELDS}<button>Go</button></form><input type="file" name="avatar" form="f">`,
+        ],
+        [
+            "had one the site sent, which a script took out",
+            `<form method="post" action="/session">${FIELDS}<input type="file" name="avatar"><button>Go</button></form><script>document.querySelector("[type=file]").remove();</script>`,
+        ],
+        ["is given one by a script", loginForm('document.forms[0].append(Object.assign(document.createElement("input"), { name: "avatar", type: "file" }));')],
+    ])("types nothing into a login form that %s file input, whose file the guard would drop", async (_how, markup) => {
+        fixture.page = markup;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("has a file input"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+        expect(await leftBlank()).toBe(true);
+    });
+
+    it.each([
+        ["once the password is typed", 'pw.addEventListener("input", add);'],
+        ["in a submit handler", 'document.forms[0].addEventListener("submit", add);'],
+    ])("sends nothing when a script adds a file input to the login form %s", async (_when, listen) => {
+        fixture.page = loginForm(
+            `const pw = document.forms[0].pw; const add = () => document.forms[0].append(Object.assign(document.createElement("input"), { name: "avatar", type: "file" })); ${listen}`,
+        );
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("added a file input"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
     it("signs in when the page it lands on embeds another site", async () => {
         fixture.page = loginForm();
         fixture.home = `<h1>Home</h1><iframe src="${evil.origin}/widget"></iframe>`;
@@ -795,6 +830,23 @@ describe(signIn, () => {
         expect(result).toMatchObject({ error: expect.stringContaining("the password in an address"), submitted: true, success: false });
         expect(login.hits.filter((hit) => hit.url.startsWith("/home"))).toStrictEqual([]);
         expect(page.url()).not.toContain(SAVED_SECRET);
+    });
+
+    it("stops a redirect of the sign-in too long to check for a long password, saying so rather than calling it a leak", async () => {
+        // 1024 characters, built here: its budget is a sixteenth of a short one's, which a 70,000-character address passes.
+        const password = Array.from({ length: 1024 }, (_, index) => String.fromCodePoint(97 + ((index * 7) % 26))).join("");
+
+        fixture.page = loginForm();
+        fixture.onSession = (_request, response) => {
+            response.writeHead(303, { location: `/home?pad=${"x".repeat(70_000)}` });
+            response.end();
+        };
+
+        const result = await run(Date.now, `${login.origin}/`, Date.now() + 30_000, password);
+
+        expect(result).toMatchObject({ error: expect.stringContaining("too much to check"), submitted: true, success: false });
+        expect(result).not.toMatchObject({ error: expect.stringContaining("the password in an address") });
+        expect(login.hits.filter((hit) => hit.url.startsWith("/home"))).toStrictEqual([]);
     });
 
     it("blocks a redirect of the sign-in's answer to another site with the password in its path", async () => {

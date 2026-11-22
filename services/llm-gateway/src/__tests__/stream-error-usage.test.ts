@@ -269,6 +269,44 @@ describe("a cancelled stream bills the tokens it already produced", () => {
         expect(report).toMatchObject(ESTIMATED_REPORT);
     });
 
+    it("POST /internal/model/proxy marks a generate call cancelled before any response as an estimate", async () => {
+        vi.mocked(createProviderModelForEnv).mockResolvedValueOnce({
+            // The provider call is under way and ends only when the caller's cancel aborts it.
+            doGenerate: async ({ abortSignal }: { abortSignal: AbortSignal }) =>
+                await new Promise((_resolve, reject) => {
+                    abortSignal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+                }),
+        } as never);
+        const controller = new AbortController();
+
+        const pending = fetchApp(
+            new Request("http://localhost/internal/model/proxy", {
+                body: JSON.stringify({
+                    action: "generate",
+                    callOptions: { prompt: [{ content: [{ text: PROMPT, type: "text" }], role: "user" }] },
+                    modelApiId: "gpt-test-1",
+                    modelId: "gpt-test",
+                    provider: "openai",
+                    requestId: "req-proxy-generate-cancel",
+                    userId: "user-1",
+                }),
+                headers: { "Content-Type": "application/json" },
+                method: "POST",
+                signal: controller.signal,
+            }),
+            bindingEnv(createMockEnv()),
+        );
+
+        await vi.waitFor(() => expect(createProviderModelForEnv).toHaveBeenCalled());
+        controller.abort("user stopped");
+        await pending.catch(() => undefined);
+        const { entry } = await billed();
+
+        // `provider-cache-readings.ts` leaves `finish_reason = 'cancelled'` out, so this estimate is not booked as a cache miss.
+        expect(entry).toMatchObject({ cachedTokens: 0, completionTokens: 0, finishReason: "cancelled", promptTokens: 100 });
+        expect(entry).not.toHaveProperty("errorCode");
+    });
+
     it("POST /internal/model/proxy bills a completed tool call's arguments when cancelled before finish", async () => {
         const args = JSON.stringify({ query: "z".repeat(40) });
 

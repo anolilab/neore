@@ -555,6 +555,8 @@ modelProxyRouter.openapi(
                                     cachedTokens: 0,
                                     completionTokens: 0,
                                     costMicrodollars,
+                                    // Marks the row as an estimate, as the stream path does: no cache count came back, so readers leave it out.
+                                    finishReason: "cancelled",
                                     isStreaming: false,
                                     latencyMs: Date.now() - startTime,
                                     modelApiId: body.modelApiId,
