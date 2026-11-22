@@ -311,6 +311,7 @@
                     "screenshot": { "type": "string", "description": "Base64-encoded JPEG" },
                     "screenshotFormat": { "type": "string" },
                     "content": { "type": "string", "description": "Extracted text content" },
+                    "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },

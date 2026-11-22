@@ -122,6 +122,10 @@ export type BrowserActionResponse = {
      * Extracted text content
      */
     content?: string;
+    /**
+     * Accessible name of the extracted control, when it is not its text (visibleOnly reads only)
+     */
+    label?: string;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;

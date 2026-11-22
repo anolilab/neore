@@ -86,6 +86,18 @@ describe("the purchase gate on browser actions", () => {
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#next" }, thrown)).toBe(true);
     });
 
+    it("asks for a control whose accessible name is a purchase, though its visible text is not", async () => {
+        const look = vi.fn(() => Promise.resolve({ content: "→", label: "Buy now", success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, look)).toBe(true);
+    });
+
+    it("does not ask for an ordinary control whose name is ordinary too", async () => {
+        const look = vi.fn(() => Promise.resolve({ content: "→", label: "Next page", success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#go" }, look)).toBe(false);
+    });
+
     it("asks for a truncated read, since a purchase word may sit past the cut", async () => {
         const look = vi.fn(() => Promise.resolve({ content: "Next", success: true, truncated: true }));
 

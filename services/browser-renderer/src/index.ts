@@ -244,6 +244,8 @@ interface ActionResult {
     content?: string;
     direction?: string;
     error?: string;
+    /** The control's accessible name when it is not its text (`visibleOnly` reads only): aria-label, labelled-by text, title, a submit button's value. */
+    label?: string;
     screenshot?: string;
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
@@ -530,6 +532,7 @@ const actHeld = async (
 
             case "extract": {
                 let extractedText: string;
+                let label: string | undefined;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -543,6 +546,22 @@ const actHeld = async (
                     // the person cannot see does not count. An ordinary extract keeps the raw text it always returned.
                     // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
                     extractedText = visibleOnly === true ? await element.innerText() : ((await element.textContent()) ?? "");
+
+                    if (visibleOnly === true) {
+                        // The name a control is announced by, when it is not its text. A text field's value is never read:
+                        // a person may have typed into it.
+                        label = await element.evaluate((control) => {
+                            const labelledBy = (control.getAttribute("aria-labelledby") ?? "")
+                                .split(" ")
+                                .filter(Boolean)
+                                .map((id) => (control.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`)?.textContent ?? "")
+                                .join(" ");
+                            const submitValue =
+                                control instanceof HTMLInputElement && ["button", "reset", "submit"].includes(control.type) ? control.value : "";
+
+                            return [control.getAttribute("aria-label"), labelledBy, control.getAttribute("title"), submitValue].filter(Boolean).join(" ");
+                        });
+                    }
                 } else {
                     extractedText = await page.evaluate(() => {
                         const clone = document.body.cloneNode(true) as HTMLElement;
@@ -561,7 +580,14 @@ const actHeld = async (
                 const isTruncated = extractedText.length > maxLength;
                 const content = isTruncated ? `${extractedText.slice(0, maxLength)}\n\n[Content truncated]` : extractedText;
 
-                result = { content, success: true, title: await page.title(), truncated: isTruncated, url: page.url() };
+                result = {
+                    content,
+                    success: true,
+                    title: await page.title(),
+                    truncated: isTruncated,
+                    url: page.url(),
+                    ...(label !== undefined && { label }),
+                };
                 break;
             }
 

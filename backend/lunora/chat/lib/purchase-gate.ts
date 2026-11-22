@@ -33,6 +33,8 @@ export const isPurchaseText = (text: string): boolean => {
  */
 export interface ClickTargetLook {
     content?: string;
+    /** The control's accessible name (aria-label, labelled-by text, title), when it is not its text. */
+    label?: string;
     success: boolean;
     /** The renderer cut the text short: a purchase word may sit past the cut, so the gate cannot clear it. */
     truncated?: boolean;
@@ -59,9 +61,10 @@ export const browserActionNeedsPurchaseApproval = async (
 
         // An element with no text (an icon button, a control named by aria-label or value) has no name the gate can read,
         // so it asks: the selector says nothing about what the click does.
+        // A purchase name counts even when the text beside it does not say so: an arrow icon with aria-label "Buy now".
         const text = target.content?.trim() ?? "";
 
-        return text === "" || isPurchaseText(text);
+        return text === "" || isPurchaseText(text) || isPurchaseText(target.label ?? "");
     } catch {
         return true;
     }
