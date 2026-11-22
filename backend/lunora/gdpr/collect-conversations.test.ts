@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { registeredApi } from "../../test/registered-api";
 
 import { listGuestLinksForExport, listGuestNotesForExport } from "../chat/guest-links";
+import { listPinsForExport } from "../chat/pins/functions";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
@@ -42,6 +43,7 @@ describe("collectConversations", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -64,6 +66,20 @@ describe("collectConversations", () => {
                                 userId: "user-1",
                             });
                         }
+
+                        // The owner's note on a message, and a pin a collaborator made on the same thread: only the owner's comes out.
+                        await context.db.insert("threadPins", {
+                            createdAt: 7,
+                            messageId: "t0-m1",
+                            messageRole: "assistant",
+                            note: "keep this",
+                            selectedText: "t0-m1",
+                            threadId,
+                            updatedAt: 8,
+                            userId: "user-1",
+                        });
+
+                        await context.db.insert("threadPins", { createdAt: 9, messageRole: "user", threadId, updatedAt: 9, userId: "user-2" });
                     } else if (t === 1) {
                         // A link no guest has written on yet is still the owner's data.
                         await context.db.insert("threadGuestLinks", { createdAt: 5, expiresAt: 6, linkHash: "h1", threadId, userId: "user-1" });
@@ -101,7 +117,7 @@ describe("collectConversations", () => {
             // Internal functions are unreachable from the harness's external
             // boundary, as in production — dispatch it the way the workflow does.
             const conversations = await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-1" }));
-            const exported = conversations as { messages: { text?: string }[]; thread: { title?: string } }[];
+            const exported = conversations as { messages: { text?: string }[]; pins: unknown[]; thread: { title?: string } }[];
 
             expect(exported).toHaveLength(THREADS);
             expect(exported.flatMap((conversation) => conversation.messages)).toHaveLength(THREADS * MESSAGES_PER_THREAD);
@@ -124,6 +140,11 @@ describe("collectConversations", () => {
             expect(new Set(guestNotes?.map((note) => JSON.stringify(note)))).toEqual(
                 new Set([JSON.stringify({ createdAt: 0, status: "held", text: "a guest note" })]),
             );
+            // The owner's pins go with the thread: its note and the message it quotes, and not a collaborator's pin.
+            expect(first?.pins).toStrictEqual([
+                expect.objectContaining({ createdAt: 7, messageId: "t0-m1", messageRole: "assistant", note: "keep this", selectedText: "t0-m1" }),
+            ]);
+            expect(exported.find((conversation) => conversation.messages[0]?.text === "t1-m0")?.pins).toStrictEqual([]);
             // Each thread's links go with it, without their token hashes.
             expect((first as { guestLinks?: unknown[] } | undefined)?.guestLinks).toEqual([{ createdAt: 0, expiresAt: 1 }]);
             expect(exported.find((conversation) => conversation.messages[0]?.text === "t1-m0")).toMatchObject({ guestLinks: [{ createdAt: 5, expiresAt: 6 }] });
@@ -145,6 +166,7 @@ describe("collectConversations", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -197,6 +219,7 @@ describe("collectConversations", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -308,6 +331,7 @@ describe("collectConversations: a locked chat", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
     };
 
     it("exports the owner's locked chat with its title and every message", async () => {

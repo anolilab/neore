@@ -1,7 +1,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
-import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
+import { authMutation, authQuery, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
@@ -65,6 +65,69 @@ export const getThreadPins = authQuery
             .take(200);
 
         return pins;
+    });
+
+const PIN_EXPORT_PAGE = 100;
+
+/**
+ * One page of the caller's pins on a thread, for the owner's data export (`gdpr/steps.ts#collectConversations`), which reads
+ * pages until `isDone`. A pin is the author's own record, so only the caller's pins are read: someone else's pin on the
+ * thread is theirs.
+ */
+export const listPinsForExport = internalQuery
+    .input({
+        cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()),
+        threadId: v.id("threads"),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            page: v.array(
+                v.object({
+                    _id: v.string(),
+                    createdAt: v.number(),
+                    documentId: v.optional(v.string()),
+                    documentKind: v.optional(v.string()),
+                    imageIndex: v.optional(v.number()),
+                    imageKey: v.optional(v.string()),
+                    kind: v.optional(vStoredPinKind),
+                    messageId: v.optional(v.string()),
+                    messageRole: v.string(),
+                    note: v.optional(v.string()),
+                    selectedText: v.optional(v.string()),
+                    updatedAt: v.number(),
+                }),
+            ),
+        }),
+    )
+    .query(async ({ args, ctx: context }) => {
+        const result = await context.db
+            .query("threadPins")
+            .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
+            .paginate({ cursor: args.cursor, numItems: PIN_EXPORT_PAGE });
+
+        return {
+            continueCursor: result.continueCursor,
+            isDone: result.isDone,
+            page: result.page.map((pin) => {
+                return {
+                    _id: pin._id,
+                    createdAt: pin.createdAt,
+                    documentId: pin.documentId,
+                    documentKind: pin.documentKind,
+                    imageIndex: pin.imageIndex,
+                    imageKey: pin.imageKey,
+                    kind: pin.kind,
+                    messageId: pin.messageId,
+                    messageRole: pin.messageRole,
+                    note: pin.note,
+                    selectedText: pin.selectedText,
+                    updatedAt: pin.updatedAt,
+                };
+            }),
+        };
     });
 
 export const createPin = authMutation

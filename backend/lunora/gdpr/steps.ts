@@ -240,6 +240,21 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             text?: string;
             tool?: boolean;
         }[];
+        /** The owner's own pins on the thread: what each pins, the note on it and the text it quotes (`chat/pins/functions.ts`). */
+        pins: {
+            _id: string;
+            createdAt: number;
+            documentId?: string;
+            documentKind?: string;
+            imageIndex?: number;
+            imageKey?: string;
+            kind?: "document" | "image" | "message";
+            messageId?: string;
+            messageRole: string;
+            note?: string;
+            selectedText?: string;
+            updatedAt: number;
+        }[];
         thread: {
             _id: string;
             activeLeafMessageId?: string;
@@ -274,7 +289,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
-            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes" | "pins"> | undefined;
 
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
@@ -338,7 +353,12 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                         ? []
                         : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
 
-                conversations.push({ ...collected, guestLinks, guestNotes });
+                // The owner's pins, read by the owner's id: a pin someone else made on a shared thread is theirs to export.
+                const pins = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.pins.functions.listPinsForExport, { cursor, threadId, userId }),
+                );
+
+                conversations.push({ ...collected, guestLinks, guestNotes, pins });
             }
         }
 
