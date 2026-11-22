@@ -15,6 +15,12 @@ describe("isPurchaseText", () => {
         "Bezahlen",
         "Zahlungspflichtig bestellen",
         "Submit order",
+        "Confirm payment",
+        "Submit payment",
+        "Proceed to payment",
+        "Jetzt zahlen",
+        "Bestellung aufgeben",
+        "Kauf abschließen",
         "Zur Kasse",
         "Place\norder",
         "Place order",
@@ -35,6 +41,7 @@ describe("isPurchaseText", () => {
         "Bestellungen",
         "Kaufbedingungen",
         "Kaufhaus",
+        "Zahlungsarten",
     ])("does not read %s as a purchase", (text) => {
         expect(isPurchaseText(text)).toBe(false);
     });
@@ -74,6 +81,12 @@ describe("the purchase gate on browser actions", () => {
 
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#checkout" }, look)).toBe(true);
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#menu" }, look)).toBe(true);
+    });
+
+    it("does not ask for an ordinary control with no text but an ordinary name", async () => {
+        const look = vi.fn(() => Promise.resolve({ content: "", label: "Next", success: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#next" }, look)).toBe(false);
     });
 
     it("asks when the target cannot be read", async () => {

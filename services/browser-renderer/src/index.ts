@@ -559,14 +559,25 @@ const actHeld = async (
                         // a person may have typed into it.
                         const labelled = await element.evaluate(
                             (control, { max, splitter }) => {
-                                // A visible child (an icon in a button) is clicked as its button, so the button's name counts too.
-                                const actionable =
-                                    control.closest(
-                                        "button, a[href], [role='button'], [role='link'], input[type='button'], input[type='submit'], input[type='reset']",
-                                    ) ?? control;
+                                // The elements the click lands in: the control, then each actionable ancestor up to the outermost. A visible
+                                // child (an icon in a button, a span in a clickable div) is clicked as those ancestors too.
+                                const actionableSelector =
+                                    "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
+                                const nodes: Element[] = [control];
+                                let ancestor = control.closest(actionableSelector);
+
+                                while (ancestor) {
+                                    if (!nodes.includes(ancestor)) {
+                                        nodes.push(ancestor);
+                                    }
+
+                                    ancestor = ancestor.parentElement?.closest(actionableSelector) ?? null;
+                                }
+
+                                const outermost = nodes.at(-1) ?? control;
                                 const names: string[] = [];
 
-                                for (const node of [control, actionable]) {
+                                for (const node of nodes) {
                                     names.push(node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
 
                                     // Ids are separated by any ASCII whitespace, not only a space.
@@ -580,20 +591,25 @@ const actHeld = async (
                                     if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
                                         names.push(node.value);
                                     }
+
+                                    // Text the stylesheet draws (CSS `content`) is on screen but in neither innerText nor textContent.
+                                    for (const pseudo of ["::before", "::after"]) {
+                                        names.push(getComputedStyle(node, pseudo).content);
+                                    }
+
+                                    // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
+                                    if (node instanceof HTMLElement) {
+                                        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
+                                        names.push(node.innerText);
+                                    }
                                 }
 
-                                // The button's rendered text: a child with ordinary text can sit beside a purchase word the person sees.
-                                if (actionable instanceof HTMLElement) {
-                                    // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
-                                    names.push(actionable.innerText);
-                                }
-
-                                // Names that come from inside the button: an image's alt, a child's aria-label or title, an SVG title.
-                                for (const node of actionable.querySelectorAll("img[alt], [aria-label], [title]")) {
+                                // Names that come from inside the outermost element: an image's alt, a child's aria-label or title, an SVG title.
+                                for (const node of outermost.querySelectorAll("img[alt], [aria-label], [title]")) {
                                     names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
                                 }
 
-                                for (const node of actionable.querySelectorAll(":scope svg title")) {
+                                for (const node of outermost.querySelectorAll(":scope svg title")) {
                                     names.push(node.textContent ?? "");
                                 }
 

@@ -16,7 +16,11 @@ const PURCHASE_PATTERNS: ReadonlyArray<RegExp> = [
     /\b(?:pay|buy|purchase|checkout|check out)\b/iu,
     /\b(?:place|complete|confirm|submit) (?:your )?(?:order|purchase)\b/iu,
     /\border now\b/iu,
+    /\b(?:confirm|submit|complete|make|proceed to|continue to) (?:the )?payment\b/iu,
     /\b(?:bezahlen|bezahle|kaufen|kaufe|bestellen|bestelle)\b/iu,
+    /\b(?:zahlen|zahle)\b/iu,
+    /\bbestellung (?:aufgeben|abschicken|absenden|abschließen)\b/iu,
+    /\bkauf abschließen\b/iu,
     /\bzur kasse\b/iu,
     /\bzahlungspflichtig\w*\b/iu,
 ];
@@ -61,12 +65,13 @@ export const browserActionNeedsPurchaseApproval = async (
             return true;
         }
 
-        // An element with no text (an icon button, a control named by aria-label or value) has no name the gate can read,
-        // so it asks: the selector says nothing about what the click does.
-        // A purchase name counts even when the text beside it does not say so: an arrow icon with aria-label "Buy now".
+        // A control with neither text nor a name (an icon button with no aria-label, title or value) has nothing the gate can
+        // read, so it asks: the selector says nothing about what the click does. A control with an ordinary name asks only
+        // when a purchase word is in its text or its name: an arrow icon with aria-label "Buy now" asks.
         const text = target.content?.trim() ?? "";
+        const name = target.label?.trim() ?? "";
 
-        return text === "" || isPurchaseText(text) || isPurchaseText(target.label ?? "");
+        return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name);
     } catch {
         return true;
     }
