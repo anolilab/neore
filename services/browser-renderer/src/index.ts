@@ -283,7 +283,7 @@ function readTarget(
     const isCardFields =
         enclosingForm !== null &&
         (enclosingForm.querySelector(
-            "input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i], iframe",
+            "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i], iframe",
         ) !== null ||
             new URL(enclosingForm.action, document.URL).origin !== new URL(document.URL).origin);
     const address = document.URL.toLowerCase();
