@@ -16,7 +16,7 @@ const harness = vi.hoisted(() => {
         pendingSaves: [] as { land: () => void; resolve: () => void; value: string }[],
         keep: vi.fn(async () => null),
         settings: { threadTitleInstructions: undefined as string | undefined } as
-            | { personalizationByImpersonator?: true; threadTitleInstructions?: string }
+            | { language?: string; nickname?: string; personalizationByImpersonator?: true; threadTitleInstructions?: string }
             | undefined,
         userId: "user-1" as string | null,
     };
@@ -278,15 +278,18 @@ describe("PersonalizationSettings thread title instructions", () => {
     });
 
     it("marks personalization an admin wrote, and keeps it as the person's on request", async () => {
-        harness.store.settings = { personalizationByImpersonator: true };
+        harness.store.settings = { language: "German", nickname: "Boss", personalizationByImpersonator: true };
         render(<PersonalizationSettings />);
 
         expect(screen.getByText("Changed by an admin")).toBeTruthy();
+        // Set elsewhere, so shown beside the mark: the person sees all they keep.
+        expect(screen.getByText("Language: German")).toBeTruthy();
 
         fireEvent.click(screen.getByRole("button", { name: "Keep as mine: Your personalization" }));
 
+        // The stored text goes with the keep, so the server refuses it if an admin changed any field since.
         await waitFor(() => {
-            expect(harness.store.keep).toHaveBeenCalledWith({});
+            expect(harness.store.keep).toHaveBeenCalledWith({ seen: { language: "German", nickname: "Boss" } });
         });
     });
 

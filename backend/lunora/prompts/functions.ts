@@ -1474,10 +1474,17 @@ const withoutMark = (marks: string[], name: string): { variablesByImpersonator: 
     return { variablesByImpersonator: kept.length > 0 ? kept : undefined };
 };
 
+/** Refuses a review of a value that is no longer the one the owner saw (an admin still acting as them changed it). */
+const assertSeenValue = (row: { variables: { name: string; value: string }[] }, name: string, value: string): void => {
+    if (row.variables.find((variable) => variable.name === name)?.value !== value) {
+        throw new LunoraError("CONFLICT", "This value changed since you looked at it. Review it again.");
+    }
+};
+
 /** `keepVariableValue` on a chat's row: the row's owner only, past the chat's lock. Whether a mark was cleared. */
 const keepThreadValue = async (
     ctx: MutationContext,
-    { name, threadId, unlockProof, userId }: { name: string; threadId: Id<"threads">; unlockProof: string | undefined; userId: string },
+    { name, threadId, unlockProof, userId, value }: { name: string; threadId: Id<"threads">; unlockProof: string | undefined; userId: string; value: string },
 ): Promise<boolean> => {
     const row = await ctx.db
         .query("threadVariables")
@@ -1496,6 +1503,7 @@ const keepThreadValue = async (
         return false;
     }
 
+    assertSeenValue(row, name, value);
     await patchRow(ctx.db, "threadVariables", row, withoutMark(row.variablesByImpersonator ?? [], name));
 
     return true;
@@ -1514,9 +1522,11 @@ export const keepVariableValue = authMutation
         scope: v.union(v.literal("user"), v.literal("organization"), v.literal("thread")),
         threadId: v.optional(v.id("threads")),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        // The value the owner reviewed: one changed since is refused, never kept unseen.
+        value: v.string().max(MAX_LENGTH.document),
     })
     .output(v.null())
-    .mutation(async ({ args: { name, scope, threadId, unlockProof }, ctx }) => {
+    .mutation(async ({ args: { name, scope, threadId, unlockProof, value }, ctx }) => {
         if (ctx.user.impersonatedBy) {
             throw new LunoraError("FORBIDDEN", "A variable value cannot be kept as the user's while impersonating");
         }
@@ -1528,7 +1538,7 @@ export const keepVariableValue = authMutation
                 throw new LunoraError("BAD_REQUEST", "A chat's variable needs its thread");
             }
 
-            if (await keepThreadValue(ctx, { name, threadId, unlockProof, userId })) {
+            if (await keepThreadValue(ctx, { name, threadId, unlockProof, userId, value })) {
                 ctx.log.event("prompts.keep_variable_value", { scope, threadId });
             }
 
@@ -1546,10 +1556,14 @@ export const keepVariableValue = authMutation
 
             row = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId: organization.id } }));
         } else {
-            row = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }));
+            const own = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }));
+
+            // An organization's row names the member who created it: never theirs to review as their own.
+            row = own?.organizationId === undefined ? own : null;
         }
 
         if (row && isMarked(row, name)) {
+            assertSeenValue(row, name, value);
             await patchRow(ctx.db, "userVariableDefaults", row, withoutMark(row.variablesByImpersonator ?? [], name));
             ctx.log.event("prompts.keep_variable_value", { scope });
         }

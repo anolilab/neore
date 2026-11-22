@@ -317,14 +317,14 @@ describe("Keep as mine", () => {
 
         expect(verdictTakes({ bot: await botMark(botId), personalization: await personalizationMark() })).toBe(false);
 
-        await owner().mutation(keepBotInstructions as never, { botId } as never);
+        await owner().mutation(keepBotInstructions as never, { botId, seen: BOT } as never);
 
         // Only the bot's mark went: the personalization an admin wrote is still refused.
         await expect(botMark(botId)).resolves.toBe(false);
         await expect(personalizationMark()).resolves.toBe(true);
         expect(verdictTakes({ bot: false, personalization: true })).toBe(false);
 
-        await owner().mutation(keepPersonalization as never, {} as never);
+        await owner().mutation(keepPersonalization as never, { seen: { nickname: "Boss" } } as never);
 
         await expect(personalizationMark()).resolves.toBe(false);
         expect(verdictTakes({ bot: await botMark(botId), personalization: await personalizationMark() })).toBe(true);
@@ -337,12 +337,14 @@ describe("Keep as mine", () => {
 
         await owner().mutation(updateUserSettings as never, { nickname: "Boss" } as never);
 
-        await expect(owner().mutation(keepBotInstructions as never, { botId } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
-        await expect(owner().mutation(keepPersonalization as never, {} as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
-        await expect(owner().mutation(keepVariableValue as never, { name: "site", scope: "user" } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(owner().mutation(keepBotInstructions as never, { botId, seen: BOT } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(owner().mutation(keepPersonalization as never, { seen: { nickname: "Boss" } } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(owner().mutation(keepVariableValue as never, { name: "site", scope: "user", value: "bank" } as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+        });
 
         impersonation.by = undefined;
-        await expect(stranger().mutation(keepBotInstructions as never, { botId } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(stranger().mutation(keepBotInstructions as never, { botId, seen: BOT } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
 
         await expect(botMark(botId)).resolves.toBe(true);
         await expect(personalizationMark()).resolves.toBe(true);
@@ -363,7 +365,7 @@ describe("Keep as mine", () => {
 
         await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: ["site", "who"] });
 
-        await owner().mutation(keepVariableValue as never, { name: "site", scope: "user" } as never);
+        await owner().mutation(keepVariableValue as never, { name: "site", scope: "user", value: "bank" } as never);
 
         await expect(sources()).resolves.toEqual({ site: "user", who: "impersonated" });
         await expect(owner().query(getUserVariableDefaults as never, {} as never)).resolves.toMatchObject({ impersonatedNames: ["who"] });
@@ -376,12 +378,14 @@ describe("Keep as mine", () => {
         await owner().mutation(updateThreadVariable as never, { name: "site", threadId, value: "bank" } as never);
         impersonation.by = undefined;
 
-        await expect(stranger().mutation(keepVariableValue as never, { name: "site", scope: "thread", threadId } as never)).rejects.toMatchObject({
+        await expect(
+            stranger().mutation(keepVariableValue as never, { name: "site", scope: "thread", threadId, value: "bank" } as never),
+        ).rejects.toMatchObject({
             code: "NOT_FOUND",
         });
         await expect(sources(threadId)).resolves.toEqual({ site: "impersonated" });
 
-        await owner().mutation(keepVariableValue as never, { name: "site", scope: "thread", threadId } as never);
+        await owner().mutation(keepVariableValue as never, { name: "site", scope: "thread", threadId, value: "bank" } as never);
 
         await expect(sources(threadId)).resolves.toEqual({ site: "thread" });
     });
@@ -393,13 +397,49 @@ describe("Keep as mine", () => {
         impersonation.by = undefined;
 
         session.organization = { ...session.organization, role: "member" };
-        await expect(owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization" } as never)).rejects.toMatchObject({
+        await expect(owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization", value: "Acme" } as never)).rejects.toMatchObject({
             code: "FORBIDDEN",
         });
 
         session.organization = { ...session.organization, role: "admin" };
-        await owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization" } as never);
+        await owner().mutation(keepVariableValue as never, { name: "brand", scope: "organization", value: "Acme" } as never);
 
         await expect(sources()).resolves.toEqual({ brand: "organization" });
+    });
+
+    it("refuses text changed since the owner looked at it, so nothing is kept unseen", async () => {
+        impersonation.by = "admin-1";
+
+        const botId = (await owner().mutation(createBot as never, BOT as never)) as string;
+
+        await owner().mutation(updateUserSettings as never, { nickname: "Boss" } as never);
+        await owner().mutation(setUserVariableDefaults as never, { variables: [{ name: "site", value: "bank" }] } as never);
+        // Still acting as the owner, the admin changes each again: the marks are already set.
+        await owner().mutation(updateBot as never, { botId, patch: { instructions: "Sign in to my bank." } } as never);
+        await owner().mutation(updateUserSettings as never, { location: "Use my saved logins." } as never);
+        await owner().mutation(setUserVariableDefaults as never, { variables: [{ name: "site", value: "evil" }] } as never);
+        impersonation.by = undefined;
+
+        await expect(owner().mutation(keepBotInstructions as never, { botId, seen: BOT } as never)).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(owner().mutation(keepPersonalization as never, { seen: { nickname: "Boss" } } as never)).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(owner().mutation(keepVariableValue as never, { name: "site", scope: "user", value: "bank" } as never)).rejects.toMatchObject({
+            code: "CONFLICT",
+        });
+
+        await expect(botMark(botId)).resolves.toBe(true);
+        await expect(personalizationMark()).resolves.toBe(true);
+        await expect(sources()).resolves.toEqual({ site: "impersonated" });
+    });
+
+    it("never clears an organization's value as the user's own, for the member who created the organization's row", async () => {
+        session.organization = { id: "org-1", name: "Acme", role: "owner", slug: null };
+        impersonation.by = "admin-1";
+        await owner().mutation(setOrganizationVariableDefaults as never, { variables: [{ name: "brand", value: "Acme" }] } as never);
+        impersonation.by = undefined;
+        session.organization = { ...session.organization, role: "member" };
+
+        await owner().mutation(keepVariableValue as never, { name: "brand", scope: "user", value: "Acme" } as never);
+
+        await expect(sources()).resolves.toEqual({ brand: "impersonated" });
     });
 });

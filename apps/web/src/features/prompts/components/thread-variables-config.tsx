@@ -48,7 +48,9 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
     // Mutations
     const { mutateAsync: setThreadVariables } = useMutation(crpc.prompts.functions.setThreadVariables.mutationOptions());
     const { mutateAsync: keepVariableValue } = useMutation(crpc.prompts.functions.keepVariableValue.mutationOptions());
-    // The saved values an admin wrote while acting as the owner: read off the stored row, never the edited copy.
+    // The stored values, which a keep sends (the server refuses one changed since; an unsaved edit here is not stored), and
+    // the names of those an admin wrote while acting as the owner: read off the stored row, never the edited copy.
+    const storedValues = new Map((threadVariables?.variables ?? []).map((entry) => [entry.name, entry.value]));
     const impersonatedNames = new Set(threadVariables && "variablesByImpersonator" in threadVariables ? threadVariables.variablesByImpersonator : undefined);
 
     // Sync local state with query results (filter out system-managed variables).
@@ -56,9 +58,15 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
     // once with the previous thread's variables.
     const [syncedVariables, setSyncedVariables] = useState<typeof threadVariables | undefined>(undefined);
 
+    // The same chat's row with the values already synced changed only its marks ("Keep as mine"): unsaved edits here stay.
+    const sameValues =
+        threadVariables?.threadId === syncedVariables?.threadId && JSON.stringify(threadVariables?.variables) === JSON.stringify(syncedVariables?.variables);
+
     if (threadVariables?.variables && threadVariables !== syncedVariables) {
         setSyncedVariables(threadVariables);
+    }
 
+    if (threadVariables?.variables && threadVariables !== syncedVariables && !sameValues) {
         const { variables } = threadVariables;
 
         setLocalVariables(
@@ -241,7 +249,12 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                                     <ChangedByAdminMark
                                         fieldLabel={variable.name}
                                         onKeep={async () =>
-                                            await keepVariableValue({ name: variable.name, scope: "thread", threadId: threadId as Id<"threads"> })
+                                            await keepVariableValue({
+                                                name: variable.name,
+                                                scope: "thread",
+                                                threadId: threadId as Id<"threads">,
+                                                value: storedValues.get(variable.name) ?? "",
+                                            })
                                         }
                                     />
                                 )}

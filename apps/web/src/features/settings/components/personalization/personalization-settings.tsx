@@ -219,8 +219,26 @@ const PersonalizationSettings: FC = () => {
             >
                 <CardContent className="space-y-6">
                     {userSettings?.personalizationByImpersonator && (
-                        // One mark for every field the system prompt carries (`auth/lib/personalization.ts`), language and location too.
-                        <ChangedByAdminMark fieldLabel={t`Your personalization`} onKeep={async () => await keepMutation.mutateAsync({})} />
+                        // One mark for every field the system prompt carries (`auth/lib/personalization.ts`): language and location
+                        // are set elsewhere, so they are shown here. The keep sends the stored text, refused if it changed since.
+                        <ChangedByAdminMark
+                            fieldLabel={t`Your personalization`}
+                            onKeep={async () =>
+                                await keepMutation.mutateAsync({
+                                    seen: {
+                                        aboutMe: userSettings.aboutMe,
+                                        customInstructions: userSettings.customInstructions,
+                                        language: userSettings.language,
+                                        location: userSettings.location,
+                                        nickname: userSettings.nickname,
+                                        profession: userSettings.profession,
+                                    },
+                                })
+                            }
+                        >
+                            {userSettings.language && <p className="text-muted-foreground w-full text-xs">{t`Language: ${userSettings.language}`}</p>}
+                            {userSettings.location && <p className="text-muted-foreground w-full text-xs">{t`Location: ${userSettings.location}`}</p>}
+                        </ChangedByAdminMark>
                     )}
                     <Field>
                         <FieldLabel htmlFor="nickname">{t`Nickname`}</FieldLabel>

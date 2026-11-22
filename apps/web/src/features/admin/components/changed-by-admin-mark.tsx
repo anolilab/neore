@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { ShieldAlert } from "lucide-react";
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -22,6 +22,8 @@ const runKeep = async (keep: () => Promise<unknown>): Promise<boolean> => {
 };
 
 interface ChangedByAdminMarkProps {
+    /** Marked text the field's own form does not show, so the person sees everything they keep. */
+    children?: ReactNode;
     /** What was changed, read after the button's text by a screen reader ("Keep as mine: Helper"). */
     fieldLabel: string;
     /** Clears this one field's mark on the server. */
@@ -33,7 +35,7 @@ interface ChangedByAdminMarkProps {
  * "Keep as mine" clears that one mark; the server refuses it to an impersonated session, so the button shows only once
  * the session reads as the person's own.
  */
-const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ fieldLabel, onKeep }) => {
+const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ children, fieldLabel, onKeep }) => {
     const { t } = useLingui();
     const own = useImpersonationState() === "self";
     const [pending, setPending] = useState(false);
@@ -65,6 +67,7 @@ const ChangedByAdminMark: FC<ChangedByAdminMarkProps> = ({ fieldLabel, onKeep })
                     <span className="sr-only">: {fieldLabel}</span>
                 </Button>
             )}
+            {children}
         </div>
     );
 };

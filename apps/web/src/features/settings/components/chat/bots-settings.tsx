@@ -471,7 +471,12 @@ const BotsSettings = () => {
                                 {bot.instructionsByImpersonator && (
                                     <ChangedByAdminMark
                                         fieldLabel={t`Name and instructions of ${bot.name}`}
-                                        onKeep={async () => await keepMutation.mutateAsync({ botId: bot._id as Id<"bots"> })}
+                                        onKeep={async () =>
+                                            await keepMutation.mutateAsync({
+                                                botId: bot._id as Id<"bots">,
+                                                seen: { instructions: bot.instructions, name: bot.name },
+                                            })
+                                        }
                                     />
                                 )}
                             </div>

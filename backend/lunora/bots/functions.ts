@@ -295,9 +295,10 @@ export const updateBot = authMutation
  */
 export const keepBotInstructions = authMutation
     .use(rateLimit("bots/update"))
-    .input({ botId: v.id("bots") })
+    // The name and instructions the owner reviewed: a bot changed since (an admin still acting as them) is refused, never kept unseen.
+    .input({ botId: v.id("bots"), seen: v.object({ instructions: v.string().max(MAX_LENGTH.document), name: v.string().max(MAX_LENGTH.short) }) })
     .output(v.null())
-    .mutation(async ({ args: { botId }, ctx: context }) => {
+    .mutation(async ({ args: { botId, seen }, ctx: context }) => {
         if (context.user.impersonatedBy) {
             throw new LunoraError("FORBIDDEN", "A bot cannot be kept as the owner's while impersonating");
         }
@@ -306,6 +307,10 @@ export const keepBotInstructions = authMutation
 
         if (!bot || bot.userId !== context.user.userId) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        if (bot.instructions !== seen.instructions || bot.name !== seen.name) {
+            throw new LunoraError("CONFLICT", "The bot changed since you looked at it. Review it again.");
         }
 
         if (bot.instructionsByImpersonator) {
