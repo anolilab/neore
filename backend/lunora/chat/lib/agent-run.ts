@@ -1183,6 +1183,20 @@ export const finishRun = async (
 
     await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
 
+    // Each row the run saved is stamped with whether the run ran on the device, now: the suggestion job reads that stamp (`stampRunLocality`).
+    // Best effort, as the tool-call stamp is: a row left unstamped falls back to its endpoint's current type, and the reply is kept.
+    if (savedMessages?.length) {
+        try {
+            await ctx.runMutation(internal.agent.followup_suggestions.stampRunLocality, {
+                messageIds: savedMessages.map((m) => m._id),
+                model: snapshot.model,
+                userId,
+            });
+        } catch (error) {
+            streamLogger.warn("[AgentRun] Could not stamp the run's locality:", error);
+        }
+    }
+
     // With no step left to answer it, a request is not a pause: nothing could resume the run past it.
     const approvalIds = noStepLeft ? [] : collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = noStepLeft ? [] : collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);

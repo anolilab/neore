@@ -7,7 +7,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimFence, claimRow, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
+import { claimFence, claimRow, holdClaim, holdTtlFrom, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { isLocalBrowserModel, LOCAL_BROWSER_PROVIDER, loadCustomProviders } from "../chat/lib/local-turn";
 import { contextResetOf } from "./context-reset-read";
@@ -27,7 +27,8 @@ export const localBrowserRowIds = internalQuery
                 const row = await context.db.get("messages", messageId as Id<"messages">);
 
                 // A saved local reply carries the provider tag (its model is a bare id); a custom endpoint's reply carries `custom:<id>/…`.
-                const local = row !== null && (row.provider === LOCAL_BROWSER_PROVIDER || isLocalBrowserModel(row.model, providers));
+                // A row the run stamped is judged by that stamp, as the run saw its provider. Older rows fall back to the endpoint's current type.
+                const local = row !== null && (row.localRun ?? (row.provider === LOCAL_BROWSER_PROVIDER || isLocalBrowserModel(row.model, providers)));
 
                 return local ? messageId : null;
             }),
@@ -86,14 +87,10 @@ export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
  */
 const FOLLOWUP_CLAIM_TTL_MS = 60 * 60 * 1000;
 
-/** A grant's removal in progress for a chat: no suggestion request may start on the chat until it is released (`holdFollowupRevoke`). */
-export const FOLLOWUP_REVOKE_SCOPE = "followup-revoke";
-/** Long enough for one grant delete; a removal that dies lets requests resume after this. */
+/** Long enough for one grant delete; a removal that dies lets requests resume after this (`holdFollowupRevoke`, on the chat's row). */
 export const FOLLOWUP_REVOKE_TTL_MS = 60 * 1000;
 
-/** A model request in flight for a chat: a lock waits for it, and the claim goes as soon as the request settles. */
-export const FOLLOWUP_DISPATCH_SCOPE = "followup-dispatch";
-/** Long enough for one model call; a job that dies lets the chat be locked again after this. The model call itself is cut off at half of it. */
+/** Long enough for one model call; a job that dies lets the chat be locked again after this (`beginFollowupDispatch`, on the chat's row). */
 export const FOLLOWUP_DISPATCH_TTL_MS = 2 * 60 * 1000;
 
 /** The fields of a message row that decide which row a reply is keyed by. */
@@ -218,54 +215,65 @@ export const releaseFollowupSuggestions = internalMutation
         return null;
     });
 
-/**
- * Lets one follow-up model request leave: checks the thread is still open and takes the request's dispatch claim, in one
- * transaction. Locking a chat refuses while the claim is held (`agent/thread-lock.ts`), so either the lock lands first and
- * nothing is sent, or the request goes out first and the lock waits for it. `null` when the request must not be sent.
- */
+/** A lease on the chat's row is live until its `expiresAt`; `0` (or the past) is no lease. */
+const liveLease = (lease: { expiresAt: number } | undefined, now: number): boolean => lease !== undefined && lease.expiresAt > now;
+
+/** Lets one follow-up model request leave. The request takes a lease on the chat's own row, in the same transaction that checks the chat is open. */
 export const beginFollowupDispatch = internalMutation
     .input({ requestId: v.string(), threadId: v.string() })
     .output(v.union(v.null(), v.number()))
     .mutation(async ({ args: { requestId, threadId }, ctx: context }) => {
         const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const { now } = context;
 
         if (!thread || thread.deletedAt || thread.deletingAt !== undefined || isThreadLocked(thread)) {
             return null;
         }
 
-        // A grant being removed for this chat holds new requests back, so the removal is not raced by one that starts after it checked.
-        if (await hasClaimWithPrefix(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:`)) {
+        // One request at a time on a chat, and none while a grant removal holds it. Both leases sit on this row, as the lock does, so the
+        // check and the claim are one transaction with the lock (`agent/thread-lock.ts`): a lock either sees the lease or lands first.
+        if (liveLease(thread.followupRevoke, now) || liveLease(thread.followupDispatch, now)) {
             return null;
         }
 
-        // Dispatches whose end never landed are cleared here, so the lock's check reads a short range.
-        await dropExpiredClaimsWithPrefix(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:`);
+        await context.db.patch("threads", threadId as Id<"threads">, {
+            followupDispatch: { claimedAt: now, expiresAt: now + FOLLOWUP_DISPATCH_TTL_MS, requestId },
+        });
 
-        return await claimFence(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:${requestId}`, { ttlMs: FOLLOWUP_DISPATCH_TTL_MS });
+        return now;
     });
 
 /**
  * Holds the chat's suggestion requests back while a grant is removed. Refused (`null`) while a request is in flight: the removal then
  * waits for it. Once held, no request can start on the chat until the hold is released, so the grant is gone before any later request
- * reads it. The hold is taken on the chat's own shard, where the claims are.
+ * reads it. The hold is a lease on the chat's own row, the same row a request's lease is checked against.
  */
 export const holdFollowupRevoke = internalMutation
     .input({ threadId: v.string() })
     .output(v.union(v.null(), v.number()))
     .mutation(async ({ args: { threadId }, ctx: context }) => {
-        if (await followupDispatchInFlight(context, threadId)) {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const { now } = context;
+
+        if (!thread || liveLease(thread.followupDispatch, now) || liveLease(thread.followupRevoke, now)) {
             return null;
         }
 
-        return await claimFence(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:revoke`, { ttlMs: FOLLOWUP_REVOKE_TTL_MS });
+        await context.db.patch("threads", threadId as Id<"threads">, { followupRevoke: { claimedAt: now, expiresAt: now + FOLLOWUP_REVOKE_TTL_MS } });
+
+        return now;
     });
 
-/** The grant's removal has returned: requests may start on the chat again. */
+/** The grant's removal has returned: requests may start on the chat again. Only the hold this removal took is cleared. */
 export const releaseFollowupRevoke = internalMutation
     .input({ claimedAt: v.number(), threadId: v.string() })
     .output(v.null())
     .mutation(async ({ args: { claimedAt, threadId }, ctx: context }) => {
-        await releaseClaim(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:revoke`, claimedAt);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        if (thread?.followupRevoke?.claimedAt === claimedAt) {
+            await context.db.patch("threads", threadId as Id<"threads">, { followupRevoke: { claimedAt: 0, expiresAt: 0 } });
+        }
 
         return null;
     });
@@ -278,16 +286,18 @@ export const renewFollowupRevoke = internalMutation
     .input({ claimedAt: v.number(), threadId: v.string() })
     .output(v.boolean())
     .mutation(async ({ args: { claimedAt, threadId }, ctx: context }) => {
-        const key = `${threadId}:revoke`;
-        // Renewed only while this removal's own hold is live. A hold that lapsed (its row expired) is not recreated: a dispatch may have
-        // started in the gap, so the removal stops rather than deleting the grant under it.
-        const live = await claimRow(context, FOLLOWUP_REVOKE_SCOPE, key);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const { now } = context;
+        const lease = thread?.followupRevoke;
 
-        if (live?.claimedAt !== claimedAt) {
+        // Renewed only while this removal's own hold is live. A lapsed hold is not brought back: a dispatch may have started in the gap.
+        if (!lease || lease.claimedAt !== claimedAt || !liveLease(lease, now)) {
             return false;
         }
 
-        return await holdClaim(context, FOLLOWUP_REVOKE_SCOPE, key, claimedAt, holdTtlFrom(claimedAt, FOLLOWUP_REVOKE_TTL_MS, context.now));
+        await context.db.patch("threads", threadId as Id<"threads">, { followupRevoke: { claimedAt, expiresAt: now + FOLLOWUP_REVOKE_TTL_MS } });
+
+        return true;
     });
 
 /**
@@ -310,25 +320,56 @@ export const markFollowupCharged = internalMutation
         return null;
     });
 
-/** The request has settled: its dispatch claim goes, and the chat may be locked again. */
+/** The request has settled: its lease goes, and the chat may be locked again. Only the lease this request took is cleared. */
 export const endFollowupDispatch = internalMutation
     .input({ claimedAt: v.number(), requestId: v.string(), threadId: v.string() })
     .output(v.null())
     .mutation(async ({ args: { claimedAt, requestId, threadId }, ctx: context }) => {
-        await releaseClaim(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:${requestId}`, claimedAt);
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+        const lease = thread?.followupDispatch;
+
+        if (lease?.claimedAt === claimedAt && lease.requestId === requestId) {
+            await context.db.patch("threads", threadId as Id<"threads">, { followupDispatch: { claimedAt: 0, expiresAt: 0 } });
+        }
 
         return null;
     });
 
-/** Whether a follow-up model request is in flight for this chat. */
-export const followupDispatchInFlight = async (context: Pick<QueryContext, "db">, threadId: string): Promise<boolean> =>
-    await hasClaimWithPrefix(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:`);
+/** Whether a follow-up model request is in flight for this chat: the chat's lease, read on the chat's own row. */
+export const followupDispatchInFlight = async (context: Pick<QueryContext, "db">, threadId: string): Promise<boolean> => {
+    const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+    return liveLease(thread?.followupDispatch, Date.now());
+};
 
 /** Whether a suggestion for this chat is being sent to a model now: the chat's delete actions wait for it (`chat/functions.ts`). */
 export const followupInFlight = internalQuery
     .input({ threadId: v.string() })
     .output(v.boolean())
     .query(async ({ args: { threadId }, ctx }) => await followupDispatchInFlight(ctx, threadId));
+
+/**
+ * Stamps the rows a run saved with whether it ran on the device, judged now, while the provider is what the run used. A provider changed later
+ * does not change these rows (`localBrowserRowIds` reads the stamp). Called when a run finishes (`chat/lib/agent-run.ts`).
+ */
+export const stampRunLocality = internalMutation
+    .input({ messageIds: v.array(v.string()), model: v.optional(v.string()), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { messageIds, model, userId }, ctx: context }) => {
+        const local = isLocalBrowserModel(model, await loadCustomProviders(context, userId));
+
+        await Promise.all(
+            messageIds.map(async (messageId) => {
+                const row = await context.db.get("messages", messageId as Id<"messages">);
+
+                if (row && row.localRun !== local) {
+                    await context.db.patch("messages", row._id, { localRun: local });
+                }
+            }),
+        );
+
+        return null;
+    });
 
 /** How many replies' suggestions a thread keeps: the newest, so a branch the person can switch back to keeps its own row. */
 export const FOLLOWUP_CACHE_ROWS = 20;

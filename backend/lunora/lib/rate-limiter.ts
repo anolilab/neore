@@ -180,10 +180,14 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/dailyRetrieve:anonymous": Ratelimit.fixedWindow(5, DAY),
     "chat/dailyRetrieve:free": Ratelimit.fixedWindow(50, DAY),
     "chat/dailyRetrieve:premium": Ratelimit.fixedWindow(500, DAY),
+    // Daily cap on follow-up suggestions (`chat/functions.ts`): its own bucket, so a suggestion never takes a unit a real send needs.
+    "chat/dailySuggestion:free": Ratelimit.fixedWindow(50, DAY),
+    "chat/dailySuggestion:premium": Ratelimit.fixedWindow(300, DAY),
+
     // Daily content limits per user tier - TEXT
     "chat/dailyText:anonymous": Ratelimit.fixedWindow(10, DAY),
-    "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
 
+    "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
     "chat/dailyText:premium": Ratelimit.fixedWindow(1000, DAY),
 
     // Daily content limits per user tier - VIDEO

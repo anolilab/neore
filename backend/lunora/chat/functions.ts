@@ -4691,7 +4691,7 @@ export const retryFollowupCache = internalAction
         try {
             charged = await callOnShard(
                 internal.chat.daily_charge.chargeDailyUnit,
-                { kind: "Text", organizationId, requestId, userId: chargedUserId },
+                { kind: "Suggestion", organizationId, requestId, userId: chargedUserId },
                 { shardKey: chargedUserId },
             );
         } catch (chargeError) {
@@ -5022,7 +5022,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                     !(await callOnShard(
                         internal.chat.daily_charge.dailyUnitAvailable,
                         {
-                            kind: "Text",
+                            kind: "Suggestion",
                             organizationId: threadData.organizationId ?? undefined,
                             requestId: replyChargeKey,
                             userId: chargedUserId,
@@ -5181,7 +5181,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                     charged = await callOnShard(
                         internal.chat.daily_charge.chargeDailyUnit,
                         {
-                            kind: "Text",
+                            kind: "Suggestion",
                             organizationId: threadData.organizationId ?? undefined,
                             requestId: replyChargeKey,
                             // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.

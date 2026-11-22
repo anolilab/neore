@@ -1647,6 +1647,9 @@ export const schema = defineSchema({
         error: v.optional(v.string()),
         fileIds: v.optional(v.array(v.id("chatFiles"))),
         finishReason: v.optional(v.string()),
+        // Whether the run that wrote this row ran on the device, stamped when the run finishes (`agent/followup-suggestions.ts`).
+        // Unset on rows from before the stamp, which fall back to the endpoint's current type.
+        localRun: v.optional(v.boolean()),
         message: v.optional(v.any()),
         model: v.optional(v.string()),
         order: v.number(),
@@ -3482,6 +3485,11 @@ export const schema = defineSchema({
         dictationLanguage: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         externalThreadId: v.optional(v.string()),
+        // The suggestion request in flight on this chat, and the grant removal holding requests back: a short lease on the chat's own
+        // row, so admission, the lock and the deletes read one shard's row in one transaction (`agent/followup-suggestions.ts`).
+        // `expiresAt` 0 (or in the past) is no lease.
+        followupDispatch: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number(), requestId: v.optional(v.string()) })),
+        followupRevoke: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number() })),
         // Multi-agent group chat: participants (skill ids) and who-speaks mode.
         // Written only by `chat/group/functions.ts`, which checks access.
         groupChat: v.optional(vGroupChat),

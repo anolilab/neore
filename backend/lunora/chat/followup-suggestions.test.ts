@@ -18,7 +18,9 @@ import {
     followupDispatchInFlight,
     holdFollowupClaim,
     holdFollowupRevoke,
+    localBrowserRowIds,
     markFollowupCharged,
+    stampRunLocality,
     newestShownRowIdHandler,
     releaseFollowupRevoke,
     followupInFlight,
@@ -449,6 +451,15 @@ describe("a model request in flight holds the chat's lock", () => {
 
     const inFlight = async () => await harness.run(async (ctx: any) => await followupDispatchInFlight(ctx, threadId));
 
+    // The lease sits on the chat's own row: one request at a time per chat, and the lock sees the same row (`agent/thread-lock.ts`).
+    it("admits one request at a time on a chat, and the next waits for the lease to settle", async () => {
+        const first = (await begin("reply-a")) as number;
+
+        await expect(begin("reply-b")).resolves.toBeNull();
+        await end("reply-a", first);
+        await expect(begin("reply-b")).resolves.toEqual(expect.any(Number));
+    });
+
     it("is taken for an open thread, and holds until the request settles", async () => {
         const claimedAt = await begin("reply-1");
 
@@ -573,6 +584,57 @@ describe("withDeadline", () => {
             }),
         ).rejects.toThrow("provider failed");
         expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+// A run's rows keep where the run ran, whatever its provider is later changed to. An unstamped row (written before the stamp) follows the endpoint.
+describe("a run's rows keep where the run ran", () => {
+    const row = async (extra: Record<string, unknown> = {}) =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: { role: "assistant" },
+                    model: "custom:p1/m1",
+                    order: 1,
+                    status: "complete",
+                    stepOrder: 0,
+                    threadId,
+                    ...extra,
+                }),
+        );
+    const localIds = async (messageIds: string[]) =>
+        await harness.action(async (context: any) => await context.runQuery(localBrowserRowIds, { messageIds, userId: OWNER }));
+    const localEndpoint = async () =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("aiUserPreferences", {
+                    customAIProviders: { p1: { name: "Local", type: "local-browser" } },
+                    userId: OWNER,
+                }),
+        );
+
+    it("a row stamped as cloud stays cloud after its endpoint becomes local-browser", async () => {
+        await localEndpoint();
+        const stamped = await row({ localRun: false });
+
+        await expect(localIds([stamped])).resolves.toEqual([]);
+    });
+
+    it("a row stamped as local stays local, and an unstamped row follows the endpoint", async () => {
+        await localEndpoint();
+        const local = await row({ localRun: true });
+        const unstamped = await row();
+
+        await expect(localIds([local, unstamped])).resolves.toEqual([local, unstamped]);
+    });
+
+    it("the stamp takes the run's locality when the run finishes", async () => {
+        await localEndpoint();
+        const id = await row();
+
+        await harness.action(async (context: any) => await context.runMutation(stampRunLocality, { messageIds: [id], model: "custom:p1/m1", userId: OWNER }));
+
+        await expect(localIds([id])).resolves.toEqual([id]);
     });
 });
 

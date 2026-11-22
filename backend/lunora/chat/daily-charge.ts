@@ -33,7 +33,7 @@ type DailyLimit = { exempt: true } | { exempt: false; key: string } | null;
 
 const dailyLimitFor = async (
     ctx: MutationCtx,
-    { kind, organizationId, userId }: { kind: "Audio" | "Image" | "Text" | "Video"; organizationId?: string; userId: string },
+    { kind, organizationId, userId }: { kind: "Audio" | "Image" | "Suggestion" | "Text" | "Video"; organizationId?: string; userId: string },
 ): Promise<DailyLimit> => {
     const user = await getUser(ctx, userId);
 
@@ -69,7 +69,7 @@ const dailyLimitFor = async (
  */
 export const dailyUnitAvailable = internalMutation
     .input({
-        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Text"), v.literal("Video")),
+        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Suggestion"), v.literal("Text"), v.literal("Video")),
         organizationId: v.optional(v.string()),
         requestId: v.optional(v.string().max(MAX_LENGTH.long)),
         userId: v.string(),
@@ -107,7 +107,7 @@ export const dailyUnitAvailable = internalMutation
 export const chargeDailyUnit = internalMutation
     .input({
         count: v.optional(v.number()),
-        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Text"), v.literal("Video")),
+        kind: v.union(v.literal("Audio"), v.literal("Image"), v.literal("Suggestion"), v.literal("Text"), v.literal("Video")),
         organizationId: v.optional(v.string()),
         requestId: v.optional(v.string().max(MAX_LENGTH.long)),
         userId: v.string(),
