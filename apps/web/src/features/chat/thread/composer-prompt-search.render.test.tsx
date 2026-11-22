@@ -128,7 +128,10 @@ describe("ComposerPromptSearch", () => {
 
         fireEvent.keyDown(input, { key: "Enter" });
 
-        expect(onPick).toHaveBeenCalledTimes(1);
+        await waitFor(() => {
+            expect(onPick).toHaveBeenCalledTimes(1);
+        });
+
         expect(onPick).toHaveBeenCalledWith("deploy the staging build");
     });
 
@@ -137,28 +140,30 @@ describe("ComposerPromptSearch", () => {
 
         Element.prototype.scrollIntoView = scrollIntoView;
 
-        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+        try {
+            render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
 
-        const input = screen.getByRole("combobox");
+            const input = screen.getByRole("combobox");
 
-        fireEvent.change(input, { target: { value: "deploy" } });
+            fireEvent.change(input, { target: { value: "deploy" } });
 
-        await waitFor(() => {
-            expect(screen.getAllByRole("option")).toHaveLength(2);
-        });
+            await waitFor(() => {
+                expect(screen.getAllByRole("option")).toHaveLength(2);
+            });
 
-        fireEvent.keyDown(input, { key: "ArrowDown" });
+            fireEvent.keyDown(input, { key: "ArrowDown" });
 
-        const options = screen.getAllByRole("option");
+            const options = screen.getAllByRole("option");
 
-        expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
-        expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[1]);
+            expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+            expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[1]);
 
-        fireEvent.keyDown(input, { key: "ArrowUp" });
+            fireEvent.keyDown(input, { key: "ArrowUp" });
 
-        expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
-
-        Element.prototype.scrollIntoView = () => {};
+            expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
+        } finally {
+            Element.prototype.scrollIntoView = () => {};
+        }
     });
 
     it("waits out the debounce before it searches what was typed", async () => {
@@ -233,7 +238,39 @@ describe("ComposerPromptSearch", () => {
             fireEvent.keyDown(input, { key: "ArrowDown" });
             fireEvent.keyDown(input, { key: "Enter" });
 
-            expect(onPick).toHaveBeenCalledTimes(1);
+            await waitFor(() => {
+                expect(onPick).toHaveBeenCalledTimes(1);
+            });
+
+            expect(reached).toEqual([]);
+        } finally {
+            document.removeEventListener("keydown", listener);
+        }
+    });
+
+    it("closes on Escape, and Escape does not reach a global shortcut", async () => {
+        const onClose = vi.fn();
+        const reached: string[] = [];
+        const listener = (event: KeyboardEvent) => {
+            reached.push(event.key);
+        };
+
+        document.addEventListener("keydown", listener);
+
+        try {
+            render(<ComposerPromptSearch onClose={onClose} onPick={vi.fn()} />, { wrapper });
+
+            const input = screen.getByRole("combobox");
+
+            fireEvent.change(input, { target: { value: "deploy" } });
+
+            await waitFor(() => {
+                expect(screen.getAllByRole("option")).toHaveLength(2);
+            });
+
+            fireEvent.keyDown(input, { key: "Escape" });
+
+            expect(onClose).toHaveBeenCalledTimes(1);
             expect(reached).toEqual([]);
         } finally {
             document.removeEventListener("keydown", listener);
@@ -253,7 +290,38 @@ describe("ComposerPromptSearch", () => {
 
         fireEvent.click(screen.getAllByRole("option")[0]!);
 
-        expect(onPick).toHaveBeenCalledWith("deploy to production");
+        await waitFor(() => {
+            expect(onPick).toHaveBeenCalledWith("deploy to production");
+        });
+    });
+
+    it("refuses a prompt that the re-check no longer finds, and says so", async () => {
+        const onPick = vi.fn();
+
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "deploy" } });
+
+        await waitFor(() => {
+            expect(screen.getAllByRole("option")).toHaveLength(2);
+        });
+
+        // The prompt leaves the search after the list was drawn, as when its thread is locked. It must not reach the composer.
+        const index = prompts.findIndex((prompt) => prompt.messageId === "m-notes");
+        const [removed] = prompts.splice(index, 1);
+
+        try {
+            fireEvent.click(screen.getAllByRole("option")[0]!);
+
+            await waitFor(() => {
+                expect(screen.getByText("That prompt is no longer available. Pick another.")).toBeTruthy();
+            });
+
+            expect(onPick).not.toHaveBeenCalled();
+            expect(screen.getAllByRole("option")).toHaveLength(1);
+        } finally {
+            prompts.splice(index, 0, removed!);
+        }
     });
 
     it("does nothing on Enter while nothing matches", async () => {

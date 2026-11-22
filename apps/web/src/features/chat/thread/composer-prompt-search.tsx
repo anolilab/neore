@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
@@ -26,11 +26,15 @@ export interface ComposerPromptSearchProps {
 const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const queryClient = useQueryClient();
     const inputId = useId();
     const listId = useId();
     const listRef = useRef<HTMLDivElement>(null);
+    const pickingRef = useRef(false);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
+    // Set when a pick is refused or could not be checked; cleared by the next keystroke.
+    const [pickNotice, setPickNotice] = useState<"gone" | "failed" | null>(null);
     const searched = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
     const { data, isError, isFetching } = useQuery(
         crpc.chat.functions.searchSentPrompts.queryOptions(searched === "" ? skipToken : { searchQuery: searched }, { live: false }),
@@ -45,13 +49,40 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         listRef.current?.children.item(position)?.scrollIntoView({ block: "nearest" });
     };
 
+    // The list on screen is one search old: a thread locked since then drops its prompts from a new search. So a pick runs
+    // the same search again first, and a prompt that is no longer in it is not put in the composer.
+    const pick = async (prompt: { messageId: string; text: string }) => {
+        if (searched === "" || pickingRef.current) {
+            return;
+        }
+
+        pickingRef.current = true;
+
+        const options = crpc.chat.functions.searchSentPrompts.queryOptions({ searchQuery: searched }, { live: false });
+
+        try {
+            const fresh = await queryClient.fetchQuery({ ...options, staleTime: 0 });
+
+            if (fresh.prompts.some((item) => item.messageId === prompt.messageId)) {
+                onPick(prompt.text);
+            } else {
+                queryClient.setQueryData(options.queryKey, fresh);
+                setPickNotice("gone");
+            }
+        } catch {
+            setPickNotice("failed");
+        }
+
+        pickingRef.current = false;
+    };
+
     const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.nativeEvent.isComposing) {
             return;
         }
 
         // A key the search handles stops here: a global shortcut on the same key (Escape blurs the focused input) must not
-        // run as well. Radix still closes the dialog on Escape: it listens in the capture phase.
+        // run as well. The dialog's own dismissal listens on the document, which this key no longer reaches, so Escape closes here.
         if (SEARCH_KEYS.has(event.key)) {
             event.stopPropagation();
         }
@@ -72,9 +103,14 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
 
                 if (picked) {
                     event.preventDefault();
-                    onPick(picked.text);
+                    pick(picked);
                 }
 
+                break;
+            }
+            case "Escape": {
+                event.preventDefault();
+                onClose();
                 break;
             }
             default: {
@@ -85,7 +121,11 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
 
     let status = t`Type to search the prompts you have sent.`;
 
-    if (searched !== "") {
+    if (pickNotice === "gone") {
+        status = t`That prompt is no longer available. Pick another.`;
+    } else if (pickNotice === "failed") {
+        status = t`The prompt could not be checked. Try again.`;
+    } else if (searched !== "") {
         if (isError) {
             status = t`The search failed. Try again.`;
         } else if (isFetching && prompts.length === 0) {
@@ -123,6 +163,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                     onChange={(event) => {
                         setQuery(event.target.value);
                         setActive(0);
+                        setPickNotice(null);
                     }}
                     onKeyDown={onKeyDown}
                     placeholder={t`Search sent prompts`}
@@ -139,7 +180,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                             }`}
                             id={optionId(position)}
                             key={prompt.messageId}
-                            onClick={() => onPick(prompt.text)}
+                            onClick={() => pick(prompt)}
                             role="option"
                             tabIndex={-1}
                             type="button"

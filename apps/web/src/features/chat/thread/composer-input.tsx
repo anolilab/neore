@@ -549,23 +549,19 @@ const ComposerInput = ({
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
     // Ctrl+R opens the search over the person's sent prompts (`composer-prompt-search.tsx`). Only a thread composer has one.
     const [promptSearchOpen, setPromptSearchOpen] = useState(false);
+
+    // A composer disabled while the search is open closes it: a pick must not change a draft that is locked.
+    // Adjusted during render, as `useDebouncedValue` does, so the search is never shown again on re-enable.
+    if (disabled && promptSearchOpen) {
+        setPromptSearchOpen(false);
+    }
+
     const openPromptSearch = useCallback((): boolean => {
         setPromptSearchOpen(true);
 
         return true;
     }, []);
     const closePromptSearch = useCallback(() => setPromptSearchOpen(false), []);
-    const pickSentPrompt = useCallback(
-        (prompt: string) => {
-            // The prompt becomes the draft, and is never sent. Text already typed stays, with the prompt below it.
-            const current = useChatUIStore.getState().composerText;
-
-            setText(current.trim() === "" ? prompt : `${current}\n${prompt}`);
-            setPromptSearchOpen(false);
-            inputAreaRef.current?.focus();
-        },
-        [setText],
-    );
 
     // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
     useEffect(() => {
@@ -602,6 +598,41 @@ const ComposerInput = ({
 
     const getComposerText = useCallback(() => useChatUIStore.getState().composerText, []);
     const promptHistory = usePromptHistory(getComposerText);
+
+    // The prompt becomes the draft, and is never sent. Text already typed stays, with the prompt below it.
+    const pickSentPrompt = useCallback(
+        (prompt: string) => {
+            const draft = useChatUIStore.getState().composerText;
+
+            // A picked prompt is a new draft: an ArrowUp recall ends here, so Escape keeps the picked text.
+            promptHistory.reset();
+
+            if (draft.trim() === "") {
+                setText(prompt);
+            } else {
+                const addition = `\n${prompt}`;
+                const editor = inputAreaRef.current?.getEditor();
+                const shown = editor?.getEditor();
+
+                // While the editor shows the store's draft, the prompt goes in only through an editor transaction, so the draft's
+                // quote chips stay chips; a rebuild from the text would flatten them. Otherwise the store takes the whole draft.
+                const appendedInEditor =
+                    editor &&
+                    shown &&
+                    !shown.isDestroyed &&
+                    shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft &&
+                    editor.appendText(addition);
+
+                if (!appendedInEditor) {
+                    setText(`${draft}${addition}`);
+                }
+            }
+
+            setPromptSearchOpen(false);
+            inputAreaRef.current?.focus();
+        },
+        [promptHistory, setText],
+    );
 
     // Reference images attached for the next outgoing message — rendered as a numbered strip
     // above the attachments row so the user can see (and the model will receive) them in order.

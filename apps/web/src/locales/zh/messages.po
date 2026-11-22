@@ -25,11 +25,11 @@ msgstr " · 模型：{modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}，{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:859
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:872
 msgid "-- INSERT --"
 msgstr "-- 插入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:859
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:872
 msgid "-- NORMAL --"
 msgstr "-- 普通 --"
 
@@ -61,27 +61,27 @@ msgstr "“{0}” 将在其依赖项完成后开始"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "“{badLogin}”不是有效的登录名。登录名须以字母或数字开头，最多 {0} 个字符，且只能包含字母、数字以及单个连字符或下划线。"
 
-#: src/features/chat/thread/composer-input.tsx:646
+#: src/features/chat/thread/composer-input.tsx:697
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:639
+#: src/features/chat/thread/composer-input.tsx:690
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:1167
+#: src/features/chat/thread/composer-input.tsx:1218
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "\"{fileName}\" 无法上传，因此消息未发送。"
 
-#: src/features/chat/thread/composer-input.tsx:641
+#: src/features/chat/thread/composer-input.tsx:692
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:644
+#: src/features/chat/thread/composer-input.tsx:695
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:645
+#: src/features/chat/thread/composer-input.tsx:696
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -780,6 +780,11 @@ msgstr "{0}，位于 {1}，目录 {2}"
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
+#. placeholder {0}: prompts.length
+#: src/features/chat/thread/composer-prompt-search.tsx:136
+msgid "{0} prompts found"
+msgstr "找到 {0} 条提示词"
+
 #. placeholder {0}: String(data.regressed)
 #. placeholder {1}: String(data.improved)
 #. placeholder {2}: String(data.unchanged)
@@ -1118,7 +1123,7 @@ msgstr "{handoff} 积分"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, other {另有 # 列未显示。}}"
 
-#: src/features/chat/thread/composer-input-area.tsx:197
+#: src/features/chat/thread/composer-input-area.tsx:200
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr "{hiddenRemoved, plural, other {已从你的消息中移除 # 个不可见字符。}}"
 
@@ -2065,7 +2070,7 @@ msgstr "列表中的某个内置工具已不存在。请在保存前将其移除
 msgid "A locked chat cannot have a guest link."
 msgstr "已锁定的聊天不能有访客链接。"
 
-#: src/features/vault/components/site-logins.tsx:593
+#: src/features/vault/components/site-logins.tsx:623
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "一个登录信息最多可指定 {MAX_TEAMMATES} 个机器人。"
 
@@ -2576,10 +2581,10 @@ msgstr "至少添加一个模型——使用“获取模型”或手动输入 ID
 msgid "Add at least one model id"
 msgstr "请至少添加一个模型 ID"
 
-#: src/features/chat/thread/composer-input-area.tsx:242
-#: src/features/chat/thread/composer-input-area.tsx:276
-#: src/features/chat/thread/composer-input-area.tsx:283
-#: src/features/chat/thread/composer-input-area.tsx:297
+#: src/features/chat/thread/composer-input-area.tsx:245
+#: src/features/chat/thread/composer-input-area.tsx:279
+#: src/features/chat/thread/composer-input-area.tsx:286
+#: src/features/chat/thread/composer-input-area.tsx:300
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "添加附件"
@@ -5452,7 +5457,7 @@ msgstr "来自 Discord Developer Portal 的机器人 token"
 msgid "Bots"
 msgstr "机器人"
 
-#: src/features/vault/components/site-logins.tsx:588
+#: src/features/vault/components/site-logins.tsx:618
 msgid "Bots that may use it"
 msgstr "可以使用它的机器人"
 
@@ -6006,7 +6011,7 @@ msgstr "加拿大"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:617
+#: src/features/vault/components/site-logins.tsx:647
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -6133,7 +6138,7 @@ msgstr "说明文字"
 msgid "Caption text"
 msgstr "说明文字"
 
-#: src/features/chat/thread/composer-input-area.tsx:271
+#: src/features/chat/thread/composer-input-area.tsx:274
 msgid "Capture screen"
 msgstr "截取屏幕"
 
@@ -6923,7 +6928,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:325
+#: src/features/chat/thread/composer-input.tsx:326
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -8400,8 +8405,8 @@ msgstr "此列表未显示的文件上的对话和待提交评论"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "此差异不再显示的行上的对话"
 
-#: src/features/chat/thread/composer-input.tsx:830
-#: src/features/chat/thread/composer-input.tsx:1748
+#: src/features/chat/thread/composer-input.tsx:881
+#: src/features/chat/thread/composer-input.tsx:1799
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -8731,7 +8736,7 @@ msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 msgid "Could not attach {0}. Try those again."
 msgstr "无法附加 {0}。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1778
+#: src/features/chat/thread/composer-input.tsx:1829
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -8865,7 +8870,7 @@ msgstr "无法删除机器人。"
 msgid "Could not delete the comment"
 msgstr "无法删除评论"
 
-#: src/features/vault/components/site-logins.tsx:419
+#: src/features/vault/components/site-logins.tsx:453
 msgid "Could not delete the login."
 msgstr "无法删除登录信息。"
 
@@ -9039,11 +9044,11 @@ msgstr "无法连接服务器以开始生成。请检查网络连接后重试。
 msgid "Could not reach the server. Try again."
 msgstr "无法连接服务器。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1781
+#: src/features/chat/thread/composer-input.tsx:1832
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1782
+#: src/features/chat/thread/composer-input.tsx:1833
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -9109,7 +9114,7 @@ msgstr "无法保存每日简报设置。"
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
 
-#: src/features/vault/components/site-logins.tsx:368
+#: src/features/vault/components/site-logins.tsx:396
 msgid "Could not save the login."
 msgstr "无法保存登录信息。"
 
@@ -9816,7 +9821,7 @@ msgstr "客户消息与支持平台"
 msgid "Customization"
 msgstr "个性化"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:144
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
 msgid "Customize"
 msgstr "自定义"
 
@@ -10329,7 +10334,7 @@ msgstr ""
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:625
+#: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "删除"
 
@@ -10448,7 +10453,7 @@ msgid "Delete group and children"
 msgstr "删除分组及其子节点"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:495
+#: src/features/vault/components/site-logins.tsx:525
 msgid "Delete login for {0}"
 msgstr "删除 {0} 的登录信息"
 
@@ -10582,7 +10587,7 @@ msgstr "确认后删除当前对话（{0}）"
 msgid "Delete this case?"
 msgstr "删除此用例？"
 
-#: src/features/vault/components/site-logins.tsx:635
+#: src/features/vault/components/site-logins.tsx:665
 msgid "Delete this login?"
 msgstr "删除此登录信息？"
 
@@ -11540,7 +11545,7 @@ msgstr "将文件拖到此处"
 msgid "Draw an image"
 msgstr "绘制图像"
 
-#: src/features/chat/thread/composer-input-area.tsx:265
+#: src/features/chat/thread/composer-input-area.tsx:268
 msgid "Draw image"
 msgstr "绘制图像"
 
@@ -11562,7 +11567,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1975
+#: src/features/chat/thread/composer-input.tsx:2028
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -11880,8 +11885,8 @@ msgstr "编辑集合"
 msgid "Edit comment"
 msgstr "编辑评论"
 
-#: src/features/chat/thread/composer-input.tsx:332
-#: src/features/chat/thread/composer-input.tsx:344
+#: src/features/chat/thread/composer-input.tsx:333
+#: src/features/chat/thread/composer-input.tsx:345
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -11919,12 +11924,12 @@ msgstr "编辑图片"
 msgid "Edit Image"
 msgstr "编辑图片"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "Edit login"
 msgstr "编辑登录信息"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:485
+#: src/features/vault/components/site-logins.tsx:515
 msgid "Edit login for {0}"
 msgstr "编辑 {0} 的登录信息"
 
@@ -12602,6 +12607,10 @@ msgstr "输入组织 slug"
 #: src/features/develop/components/thread-pull-requests.tsx:91
 msgid "Enter pull requests as owner/name#123."
 msgstr "请按 owner/name#123 的格式输入拉取请求。"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:152
+msgid "Enter puts the prompt in the composer. It is not sent."
+msgstr "按 Enter 将提示词放入输入框，不会发送。"
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:199
 msgid "Enter seed..."
@@ -13602,7 +13611,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1589
+#: src/features/chat/thread/composer-input.tsx:1640
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -14012,7 +14021,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1621
+#: src/features/chat/thread/composer-input.tsx:1672
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -14965,8 +14974,8 @@ msgstr "筛选路径"
 msgid "Filter rules updated"
 msgstr "筛选规则已更新"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:150
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:156
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:151
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:157
 msgid "Filter shortcuts"
 msgstr "筛选快捷键"
 
@@ -16159,7 +16168,7 @@ msgstr "上一页"
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:372
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:385
 msgid "Go to reply"
 msgstr "转到回复"
 
@@ -18157,11 +18166,11 @@ msgstr "强度"
 msgid "Interface, user experience and visual design."
 msgstr ""
 
-#: src/features/chat/thread/composer-input-area.tsx:361
+#: src/features/chat/thread/composer-input-area.tsx:365
 msgid "Interrupt and restart"
 msgstr "中断并重新开始"
 
-#: src/features/chat/thread/composer-input-area.tsx:377
+#: src/features/chat/thread/composer-input-area.tsx:381
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "中断并重新开始——停止当前回复并发送此内容"
 
@@ -18641,7 +18650,7 @@ msgstr "密钥文件（可选，绝对路径）"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:145
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:136
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:137
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
@@ -18793,7 +18802,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/vault/components/site-logins.tsx:565
+#: src/features/vault/components/site-logins.tsx:595
 msgid "Label (optional)"
 msgstr "标签（可选）"
 
@@ -19210,7 +19219,7 @@ msgstr "留空表示“任意模型”。"
 msgid "Leave empty for transparent background"
 msgstr "留空则使用透明背景"
 
-#: src/features/vault/components/site-logins.tsx:558
+#: src/features/vault/components/site-logins.tsx:588
 msgid "Leave empty to keep the saved password"
 msgstr "留空以保留已保存的密码"
 
@@ -20008,7 +20017,7 @@ msgstr "退出登录"
 msgid "Login"
 msgstr "登录"
 
-#: src/features/vault/components/site-logins.tsx:415
+#: src/features/vault/components/site-logins.tsx:449
 msgid "Login deleted"
 msgstr "登录信息已删除"
 
@@ -20016,11 +20025,11 @@ msgstr "登录信息已删除"
 msgid "login refused"
 msgstr "登录被拒绝"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login saved"
 msgstr "登录信息已保存"
 
-#: src/features/vault/components/site-logins.tsx:367
+#: src/features/vault/components/site-logins.tsx:395
 msgid "Login updated"
 msgstr "登录信息已更新"
 
@@ -20028,7 +20037,7 @@ msgstr "登录信息已更新"
 msgid "Logins"
 msgstr "登录名"
 
-#: src/features/vault/components/site-logins.tsx:431
+#: src/features/vault/components/site-logins.tsx:465
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "为智能体浏览器保存的登录信息。使用它们登录将在后续更新中提供：届时由服务器在网站上输入密码，AI 永远看不到它。"
 
@@ -20092,7 +20101,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:906
+#: src/features/chat/thread/composer-input.tsx:957
 msgid "Long text was attached as a file."
 msgstr "长文本已作为文件附加。"
 
@@ -20530,6 +20539,10 @@ msgstr "匹配布局和结构"
 msgid "Matching messages"
 msgstr "匹配的消息"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:174
+msgid "Matching prompts"
+msgstr "匹配的提示词"
+
 #: src/features/chat/tags/thread-categories.ts:16
 #: src/features/chat/tags/thread-category-filter.tsx:22
 msgid "Math"
@@ -20891,8 +20904,8 @@ msgstr "已在 {hostLabel} 上合并。"
 msgid "Merging…"
 msgstr "正在合并…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:322
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:643
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:331
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:656
 msgid "Message"
 msgstr "消息"
 
@@ -22346,11 +22359,11 @@ msgstr "新建群聊"
 msgid "New high quality model for photorealism and text rendering"
 msgstr "擅长照片级写实和文字渲染的新款高质量模型"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:102
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:103
 msgid "New line in message"
 msgstr "消息中换行"
 
-#: src/features/vault/components/site-logins.tsx:512
+#: src/features/vault/components/site-logins.tsx:542
 msgid "New login"
 msgstr "新建登录信息"
 
@@ -23119,6 +23132,10 @@ msgstr "未找到结果。"
 msgid "No runs yet. Start one to score every case."
 msgstr "还没有运行记录。开始一次运行来为每个用例评分。"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:134
+msgid "No sent prompts match \"{searched}\"."
+msgstr "没有与\"{searched}\"匹配的已发送提示词。"
+
 #: src/features/settings/components/chat/bot-tool-selection.tsx:218
 msgid "No server, connector or computer matches {unknownServer}."
 msgstr "没有与 {unknownServer} 匹配的服务器、连接器或电脑。"
@@ -23135,7 +23152,7 @@ msgstr "电子表格中未找到工作表"
 msgid "No shortcuts found"
 msgstr "未找到快捷键"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:183
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:184
 msgid "No shortcuts match \"{query}\"."
 msgstr "没有与“{query}”匹配的快捷键。"
 
@@ -23985,6 +24002,10 @@ msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
 #: src/components/command-palette.tsx:631
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "仅按状态筛选此处已加载的 {0} 个对话；更早的对话不包括在内。"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:198
+msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
+msgstr "只搜索最相关的结果，因此较早或较新的提示词可能不会列出。添加一个词可缩小搜索范围。"
 
 #: src/features/knowledge/hooks/use-knowledge-import.ts:156
 msgid "Only the first {MAX_DOCUMENTS_PER_IMPORT} documents were imported."
@@ -25335,7 +25356,7 @@ msgstr "通行密钥让你可以使用设备的生物识别或安全密钥安全
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:552
+#: src/features/vault/components/site-logins.tsx:582
 msgid "Password"
 msgstr "密码"
 
@@ -25382,7 +25403,7 @@ msgstr "重置密码邮件已发送"
 msgid "Password reset successful"
 msgstr "密码重置成功"
 
-#: src/features/vault/components/site-logins.tsx:474
+#: src/features/vault/components/site-logins.tsx:508
 msgid "Password set"
 msgstr "已设置密码"
 
@@ -27130,11 +27151,11 @@ msgstr "问题"
 msgid "Queue"
 msgstr "队列"
 
-#: src/features/chat/thread/composer-input-area.tsx:388
+#: src/features/chat/thread/composer-input-area.tsx:392
 msgid "Queue message"
 msgstr "排队消息"
 
-#: src/features/chat/thread/composer-input-area.tsx:407
+#: src/features/chat/thread/composer-input-area.tsx:411
 msgid "Queue message — sends when the current reply finishes"
 msgstr "排队消息——当前回复完成后发送"
 
@@ -27420,7 +27441,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:289
+#: src/features/chat/thread/composer-input.tsx:290
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -28051,10 +28072,10 @@ msgstr "记住我"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:351
-#: src/features/chat/thread/composer-input.tsx:363
-#: src/features/chat/thread/composer-input.tsx:417
-#: src/features/chat/thread/composer-input.tsx:426
+#: src/features/chat/thread/composer-input.tsx:352
+#: src/features/chat/thread/composer-input.tsx:364
+#: src/features/chat/thread/composer-input.tsx:418
+#: src/features/chat/thread/composer-input.tsx:427
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:323
@@ -28840,11 +28861,11 @@ msgstr "立即重试"
 msgid "Retry the device check"
 msgstr "重新检查设备"
 
-#: src/features/chat/thread/composer-input.tsx:440
+#: src/features/chat/thread/composer-input.tsx:441
 msgid "Retry upload"
 msgstr "重试上传"
 
-#: src/features/chat/thread/composer-input.tsx:435
+#: src/features/chat/thread/composer-input.tsx:436
 msgid "Retry upload of {attachmentName}"
 msgstr "重试上传 {attachmentName}"
 
@@ -29494,7 +29515,7 @@ msgstr "保存用例"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "保存更改"
@@ -29511,7 +29532,7 @@ msgstr "保存失败"
 msgid "Save Image"
 msgstr "保存图像"
 
-#: src/features/vault/components/site-logins.tsx:613
+#: src/features/vault/components/site-logins.tsx:643
 msgid "Save login"
 msgstr "保存登录信息"
 
@@ -29696,7 +29717,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1548
+#: src/features/chat/thread/composer-input.tsx:1599
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -29898,6 +29919,16 @@ msgstr "搜索结果"
 msgid "Search Results ({0})"
 msgstr "搜索结果（{0}）"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:151
+#: src/features/chat/thread/composer-prompt-search.tsx:155
+#: src/features/chat/thread/composer-prompt-search.tsx:169
+msgid "Search sent prompts"
+msgstr "搜索已发送的提示词"
+
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:97
+msgid "Search sent prompts (in the composer)"
+msgstr "搜索已发送的提示词（在输入框中）"
+
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:175
 msgid "Search servers…"
 msgstr "搜索服务器…"
@@ -29997,6 +30028,10 @@ msgstr "搜索..."
 #: src/features/chat/thread/find/thread-find-bar.tsx:184
 msgid "Searched the latest messages only"
 msgstr "仅搜索了最新消息"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:132
+msgid "Searching"
+msgstr "正在搜索"
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:929
 msgid "Searching..."
@@ -30382,7 +30417,7 @@ msgstr "在编程代理的轮次中发送"
 msgid "Send feedback"
 msgstr "发送反馈"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:103
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:104
 msgid "Send from any mode"
 msgstr "在任何模式下发送"
 
@@ -30396,13 +30431,13 @@ msgid "Send Magic Link"
 msgstr "发送魔法链接"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:192
-#: src/features/chat/thread/composer-input-area.tsx:442
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:104
+#: src/features/chat/thread/composer-input-area.tsx:195
+#: src/features/chat/thread/composer-input-area.tsx:446
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:105
 msgid "Send message"
 msgstr "发送消息"
 
-#: src/features/chat/thread/composer-input-area.tsx:192
+#: src/features/chat/thread/composer-input-area.tsx:195
 msgid "Send message ({sendShortcut})"
 msgstr "发送消息（{sendShortcut}）"
 
@@ -30457,7 +30492,7 @@ msgstr "发送验证码"
 msgid "Send Verification Code"
 msgstr "发送验证码"
 
-#: src/features/chat/thread/composer-input-area.tsx:214
+#: src/features/chat/thread/composer-input-area.tsx:217
 msgid "Send when uploads finish"
 msgstr "上传完成后发送"
 
@@ -30465,9 +30500,9 @@ msgstr "上传完成后发送"
 msgid "Send: {snippet}"
 msgstr "发送：{snippet}"
 
-#: src/features/chat/thread/composer-input-area.tsx:214
-#: src/features/chat/thread/composer-input-area.tsx:216
-#: src/features/chat/thread/composer-input-area.tsx:472
+#: src/features/chat/thread/composer-input-area.tsx:217
+#: src/features/chat/thread/composer-input-area.tsx:219
+#: src/features/chat/thread/composer-input-area.tsx:476
 msgid "Sending once uploads finish…"
 msgstr "上传完成后发送…"
 
@@ -31177,12 +31212,12 @@ msgstr "注册以解锁所有模型"
 msgid "Sign-in expired"
 msgstr "登录已过期"
 
-#: src/features/vault/components/site-logins.tsx:526
+#: src/features/vault/components/site-logins.tsx:556
 msgid "Sign-in page (optional)"
 msgstr "登录页面（可选）"
 
 #. placeholder {0}: login.signInUrl
-#: src/features/vault/components/site-logins.tsx:478
+#: src/features/vault/components/site-logins.tsx:510
 msgid "Sign-in page: {0}"
 msgstr "登录页面：{0}"
 
@@ -31268,15 +31303,15 @@ msgstr "僧伽罗语"
 msgid "Sinhala (Sri Lanka)"
 msgstr "僧伽罗语（斯里兰卡）"
 
-#: src/features/vault/components/site-logins.tsx:514
+#: src/features/vault/components/site-logins.tsx:544
 msgid "Site"
 msgstr "网站"
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:463
 msgid "Site logins"
 msgstr "网站登录信息"
 
-#: src/features/vault/components/site-logins.tsx:452
+#: src/features/vault/components/site-logins.tsx:486
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "模拟用户期间无法保存、更改或删除网站登录信息。"
 
@@ -32350,11 +32385,11 @@ msgstr "状态"
 msgid "Status Page"
 msgstr "状态页"
 
-#: src/features/chat/thread/composer-input-area.tsx:378
+#: src/features/chat/thread/composer-input-area.tsx:382
 msgid "Steer — the current reply reads this at its next step"
 msgstr "引导——当前回复会在下一步读取此内容"
 
-#: src/features/chat/thread/composer-input-area.tsx:361
+#: src/features/chat/thread/composer-input-area.tsx:365
 msgid "Steer the reply"
 msgstr "引导回复"
 
@@ -32435,8 +32470,8 @@ msgstr "停止浏览器会话"
 
 #: src/features/chat/thread-list/thread-node.tsx:633
 #: src/features/chat/thread-list/thread-node.tsx:655
-#: src/features/chat/thread/composer-input-area.tsx:415
-#: src/features/chat/thread/composer-input-area.tsx:428
+#: src/features/chat/thread/composer-input-area.tsx:419
+#: src/features/chat/thread/composer-input-area.tsx:432
 msgid "Stop generating"
 msgstr "停止生成"
 
@@ -32990,11 +33025,11 @@ msgstr "推荐"
 msgid "Suggested answers"
 msgstr "建议的答案"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:674
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:687
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "建议的下一条提示：{nextPromptSuggestion}。按 Tab 键插入。"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:665
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:678
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
@@ -33785,7 +33820,7 @@ msgstr "文字方向已设为 LTR"
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:325
+#: src/features/chat/thread/composer-input.tsx:326
 msgid "Text document"
 msgstr "文本文档"
 
@@ -33997,6 +34032,10 @@ msgstr "口令不正确。"
 msgid "That path is a file."
 msgstr "该路径是文件。"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:125
+msgid "That prompt is no longer available. Pick another."
+msgstr "该提示词已不可用，请选择其他提示词。"
+
 #: src/features/chat/host/host-composer.tsx:879
 msgid "That request is no longer waiting."
 msgstr "该请求已不再等待处理。"
@@ -34143,7 +34182,7 @@ msgid "The agent's browser was replaced, and control went back to the agent. You
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:626
+#: src/features/vault/components/site-logins.tsx:656
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "智能体的浏览器将无法用它登录 {0}。"
 
@@ -34264,7 +34303,7 @@ msgstr "更改被拒绝"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技能。"
 
-#: src/features/chat/thread/composer-input.tsx:1006
+#: src/features/chat/thread/composer-input.tsx:1057
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "粘贴内容准备好之前聊天已切换，因此未插入。"
 
@@ -34300,8 +34339,8 @@ msgstr "命令行未登录。你可以关闭此标签页。"
 msgid "The comparison could not be loaded."
 msgstr "无法加载对比结果。"
 
-#: src/features/chat/thread/composer-input.tsx:1014
-#: src/features/chat/thread/composer-input.tsx:1036
+#: src/features/chat/thread/composer-input.tsx:1065
+#: src/features/chat/thread/composer-input.tsx:1087
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "粘贴准备好之前输入框已被锁定，因此未插入。"
 
@@ -34577,7 +34616,7 @@ msgstr "导入的文件似乎是空的。"
 msgid "The improved prompt will appear here..."
 msgstr "优化后的提示词将显示在这里..."
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:138
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:139
 msgid "The keys you have set now."
 msgstr "你当前设置的按键。"
 
@@ -34679,7 +34718,7 @@ msgstr "链接中的模型不可用。聊天将保留其原有模型。"
 msgid "The model picker now lists {0} models from {1}"
 msgstr "模型选择器现已列出 {1} 的 {0} 个模型"
 
-#: src/features/chat/thread/composer-input.tsx:1483
+#: src/features/chat/thread/composer-input.tsx:1534
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "上传期间模型选择已更改，因此消息未发送。请按发送按钮发送。"
 
@@ -34744,7 +34783,7 @@ msgstr "页面智能体无法编辑此页面"
 msgid "The page now shows the other version. Copy anything you want to keep from yours."
 msgstr "页面现在显示的是另一个版本。请从你的版本中复制想保留的内容。"
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:567
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "包含登录表单的页面。留空则从网站首页开始。"
 
@@ -34756,7 +34795,7 @@ msgstr "你打开的页面仍在加载。"
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "该页面、所有子页面、评论及版本历史都将被删除。此操作无法撤销。"
 
-#: src/features/chat/thread/composer-input.tsx:1062
+#: src/features/chat/thread/composer-input.tsx:1113
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "粘贴的文本无法附加，也未被插入。"
 
@@ -34784,6 +34823,10 @@ msgstr "无法加载项目的仓库，因此暂时无法从仓库导入。"
 #: src/features/evals/components/save-eval-case-action.tsx:81
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "提示词将作为用例输入，此回答将作为预期答案。保存前可以编辑两者。"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:127
+msgid "The prompt could not be checked. Try again."
+msgstr "无法检查该提示词，请重试。"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:719
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
@@ -34886,6 +34929,10 @@ msgstr "运行将按你的选择进行：每次新建聊天、沿用之前的聊
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:130
+msgid "The search failed. Try again."
+msgstr "搜索失败，请重试。"
+
 #: src/features/settings/components/chat/custom-providers-settings.tsx:142
 msgid "The server lists no models yet — pull or load one first"
 msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
@@ -34894,7 +34941,7 @@ msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 msgid "The shard footprint could not be measured."
 msgstr "无法测量分片占用。"
 
-#: src/features/vault/components/site-logins.tsx:394
+#: src/features/vault/components/site-logins.tsx:428
 msgid "The sign-in page must be an https:// address on the same site, with no username or password in it."
 msgstr "登录页面必须是同一网站的 https:// 地址，且不含用户名或密码。"
 
@@ -34955,11 +35002,11 @@ msgstr "两次输入的口令不一致。"
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:691
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
-#: src/features/chat/thread/composer-input.tsx:1496
+#: src/features/chat/thread/composer-input.tsx:1547
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "上传已完成，但消息未发送。请按发送按钮发送。"
 
@@ -35521,11 +35568,11 @@ msgstr "此列表已满：请先移除一个工具，再添加新的。"
 #~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 #~ msgstr "此登录信息已在别处更改，并已重新加载。你对用户名和标签的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
 
-#: src/features/vault/components/site-logins.tsx:334
+#: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "此登录信息已在别处更改，并已重新加载。你对用户名、标签和登录页面的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
 
-#: src/features/vault/components/site-logins.tsx:344
+#: src/features/vault/components/site-logins.tsx:372
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "此登录信息已在别处更改。请先刷新页面查看，再重新保存。"
 
@@ -36136,7 +36183,7 @@ msgstr "切换元素面板"
 msgid "Toggle interactivity"
 msgstr "切换交互性"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:97
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:98
 msgid "Toggle left sidebar"
 msgstr "切换左侧边栏"
 
@@ -36159,7 +36206,7 @@ msgstr "切换菜单"
 msgid "Toggle property panel"
 msgstr "切换属性面板"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:98
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:99
 msgid "Toggle right sidebar"
 msgstr "切换右侧边栏"
 
@@ -36683,8 +36730,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:181
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:446
-#: src/features/vault/components/site-logins.tsx:582
+#: src/features/vault/components/site-logins.tsx:480
+#: src/features/vault/components/site-logins.tsx:612
 msgid "Try again"
 msgstr "重试"
 
@@ -36864,14 +36911,18 @@ msgstr "再输入一次"
 msgid "Type to search"
 msgstr "输入以搜索"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:122
+msgid "Type to search the prompts you have sent."
+msgstr "输入以搜索已发送的提示词。"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:269
 #: src/features/chat/thread/ask-user-questions.tsx:64
 msgid "Type your answer…"
 msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:1965
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
+#: src/features/chat/thread/composer-input.tsx:2018
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:231
 msgid "Type your message..."
 msgstr "输入你的消息..."
 
@@ -37040,7 +37091,7 @@ msgstr "下划线"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:908
+#: src/features/chat/thread/composer-input.tsx:959
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -37292,7 +37343,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1817
+#: src/features/chat/thread/composer-input.tsx:1868
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -37490,18 +37541,18 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:432
-#: src/features/chat/thread/composer-input.tsx:685
-#: src/features/chat/thread/composer-input.tsx:1723
+#: src/features/chat/thread/composer-input.tsx:433
+#: src/features/chat/thread/composer-input.tsx:736
+#: src/features/chat/thread/composer-input.tsx:1774
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1716
+#: src/features/chat/thread/composer-input.tsx:1767
 msgid "Upload failed: {0}"
 msgstr "上传失败：{0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:260
+#: src/features/chat/thread/composer-input-area.tsx:263
 msgid "Upload file"
 msgstr "上传文件"
 
@@ -37547,7 +37598,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:369
+#: src/features/chat/thread/composer-input.tsx:370
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -37867,7 +37918,7 @@ msgstr "用户名"
 msgid "Username is required"
 msgstr "请输入用户名"
 
-#: src/features/vault/components/site-logins.tsx:541
+#: src/features/vault/components/site-logins.tsx:571
 msgid "Username or email"
 msgstr "用户名或邮箱"
 
@@ -38714,8 +38765,8 @@ msgstr "正在等待所有者回答"
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
-#: src/features/chat/thread/composer-input-area.tsx:216
-#: src/features/chat/thread/composer-input-area.tsx:388
+#: src/features/chat/thread/composer-input-area.tsx:219
+#: src/features/chat/thread/composer-input-area.tsx:392
 msgid "Waiting for uploads to complete…"
 msgstr "正在等待上传完成…"
 
@@ -39601,8 +39652,8 @@ msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 msgid "You are offline. Reconnect and try again."
 msgstr "你已离线。请重新连接后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1121
-#: src/features/chat/thread/composer-input.tsx:1246
+#: src/features/chat/thread/composer-input.tsx:1172
+#: src/features/chat/thread/composer-input.tsx:1297
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"
@@ -39867,7 +39918,7 @@ msgstr "你的背景、偏好或所在地，帮助 AI 更好地了解你"
 msgid "Your bots"
 msgstr "你的机器人"
 
-#: src/features/vault/components/site-logins.tsx:571
+#: src/features/vault/components/site-logins.tsx:601
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "无法加载你的机器人。加载完成后才能保存对已保存登录信息的更改，以便保留其机器人。"
 
@@ -39888,11 +39939,11 @@ msgid "Your changes to this project's rule files are not saved. Closing drops th
 msgstr "你对此项目规则文件的更改尚未保存。关闭后将丢失这些更改。"
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:463
+#: src/features/vault/components/site-logins.tsx:497
 msgid "Your chats and {0}"
 msgstr "你的聊天和 {0}"
 
-#: src/features/vault/components/site-logins.tsx:465
+#: src/features/vault/components/site-logins.tsx:499
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
@@ -39990,12 +40041,12 @@ msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Con
 msgstr "你的 GitHub 登录已过期。请在“设置 → 连接器”中重新连接 GitHub。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:750
+#: src/features/chat/thread/composer-input.tsx:801
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:743
+#: src/features/chat/thread/composer-input.tsx:794
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
@@ -40028,7 +40079,7 @@ msgstr "你的位置（例如“New York, USA”“Berlin, Germany”）。"
 msgid "Your message"
 msgstr "你的消息"
 
-#: src/features/chat/thread/composer-input.tsx:1468
+#: src/features/chat/thread/composer-input.tsx:1519
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "上传期间消息已更改，因此未发送。请按发送按钮发送。"
 
@@ -40082,11 +40133,11 @@ msgstr "无法加载你的概览。"
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "你自己的 Anthropic 密钥。将工作委派给 Claude Code 时必需。"
 
-#: src/features/vault/components/site-logins.tsx:590
+#: src/features/vault/components/site-logins.tsx:620
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "你自己的聊天始终可以使用它。机器人的聊天只有在你在此勾选该机器人时才能使用。共享、公开、群组和消息应用聊天永远不能使用。"
 
-#: src/features/vault/components/site-logins.tsx:460
+#: src/features/vault/components/site-logins.tsx:494
 msgid "Your own chats only"
 msgstr "仅限你自己的聊天"
 
@@ -40145,7 +40196,7 @@ msgstr "有人请求了你的审查"
 msgid "Your rule files are still saving."
 msgstr "你的规则文件仍在保存中。"
 
-#: src/features/vault/components/site-logins.tsx:437
+#: src/features/vault/components/site-logins.tsx:471
 msgid "Your saved logins could not be loaded."
 msgstr "无法加载你保存的登录信息。"
 
