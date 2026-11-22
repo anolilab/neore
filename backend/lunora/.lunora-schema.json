@@ -9284,6 +9284,12 @@
     "followupSuggestions": {
       "commitOrdered": false,
       "fields": {
+        "charged": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -9337,6 +9343,13 @@
         "by_thread": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_message": {
+          "fields": [
+            "threadId",
+            "lastMessageId"
           ],
           "unique": false
         }
@@ -11314,6 +11327,12 @@
         },
         "finishReason": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "localRun": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -24761,6 +24780,13 @@
           "unique": false,
           "refined": true
         },
+        "signInUrl": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "refined": true
+        },
         "teammateIds": {
           "kind": "array",
           "nullable": false,
@@ -29432,6 +29458,52 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "followupDispatch": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "claimedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "requestId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            }
+          }
+        },
+        "followupRevoke": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "claimedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
         },
         "groupChat": {
           "kind": "object",
