@@ -23,11 +23,14 @@ The reference behind the sign-out rules in `apps/browser-extension/AGENTS.md`. C
 
 - A marked grant stays hidden, so a failed removal never signs back in, in this panel or a later one. Settings is gone
   by then, so the sign-in page shows the failure (`useSignOutUnfinished`).
-- The next panel to load removes the leftover (`finishPendingSignOut`), once per panel: every `useSession` shares one
-  storage watch. One whose storage read fails runs again on the first good read after its own capped backoff, never
-  sooner.
-- That cleanup waits on the sign-out lock and reads again, so a sign-out still running in another panel is never
-  revoked or removed twice. A panel closed mid-way releases the lock, and the waiting cleanup finishes the job.
+- Every panel whose storage watch reads a marked grant still stored removes the leftover (`finishPendingSignOut`), once
+  per grant: a panel that loads later, and the panels already open when the mark is written. Every `useSession` in a
+  panel shares one watch. A cleanup whose storage read fails runs again on the first good read after its own capped
+  backoff, never sooner.
+- That cleanup waits on the grant's sign-out lock and reads again, so a sign-out still running anywhere is never
+  revoked or removed twice. A panel closed mid-way releases the lock and writes nothing more; the open panels waiting on
+  the lock take it in turn, and the first removes the grant, so the rest read nothing left.
+- A panel skips the cleanup for a grant it is signing out itself, or failed to remove: its own sign-out reports that.
 
 ## The warning
 
@@ -36,8 +39,10 @@ The reference behind the sign-out rules in `apps/browser-extension/AGENTS.md`. C
   on a removal or a new sign-in.
 - The failure mark is written only when storage keeps the grant, never for a failed revoke alone: an offline revoke is
   not a failure the user can act on, since the session expires on its own.
-- The panel whose own removal failed also keeps that grant's key in memory (`failedHere`) and warns while it stays
-  stored, since storage that keeps the grant often refuses the failure mark too.
+- A panel whose own removal failed, in its sign-out or in its cleanup, also keeps that grant's key in memory
+  (`failedHere`) and warns while it stays stored, since storage that keeps the grant often refuses the failure mark
+  too. Every open panel retries after a sign-out ends with the grant still stored, so when storage refuses both, each
+  one warns from its own failed retry, and none warns before the lock is free. The key is dropped when the watch stops.
 - A sign-in drops the mark; one it fails to drop names an older key and hides nothing.
 
 ## Storage reads after a change

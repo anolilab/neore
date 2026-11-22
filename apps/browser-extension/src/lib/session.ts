@@ -103,8 +103,8 @@ const runEndSession = async (authTokenSync: { suspend: () => SuspendedSession },
  * changed: this rejects and the session comes back for it (its tokens flow and
  * the loop restarts, the queue intact). Once marked, the grant is never used
  * again: when only its removal fails this still rejects, the sign-in page says
- * so (`useSignOutUnfinished`), tokens stay held, and the next panel to load
- * removes the leftover (`finishPendingSignOut`). When another grant is stored
+ * so (`useSignOutUnfinished`), tokens stay held, and another open or later
+ * panel removes the leftover (`finishPendingSignOut`). When another grant is stored
  * by now, it is left signed in and this resolves.
  *
  * One sign-out per grant: a second call for the same key, from a reopened
@@ -171,18 +171,23 @@ const watchGrantSession = (): (() => void) => {
     let retry: ReturnType<typeof setTimeout> | undefined;
 
     /**
-     * The leftover cleanup: `pending` until one ran past its storage read, never two at once;
-     * `waiting` out its backoff after a failed read, whatever reads succeed meanwhile.
+     * The leftover cleanup: `running` while one runs (never two at once), `waiting` out its backoff after a
+     * failed read, whatever reads succeed meanwhile. `cleaned` holds the marked grants it already ran for.
      */
-    let cleanup: "done" | "pending" | "running" | "waiting" = "pending";
+    let cleanup: "idle" | "running" | "waiting" = "idle";
+    const cleaned = new Set<string>();
     let cleanupFailures = 0;
     let cleanupRetry: ReturnType<typeof setTimeout> | undefined;
 
-    // A sign-out whose removal failed in an earlier panel: remove its leftover grant, once per watch.
-    // A storage read that fails first retries it on the first good read after a backoff like the
-    // watch's; any other failure leaves it stored, and the sign-in page says so (`useSignOutUnfinished`).
-    const finishLeftover = () => {
-        if (cleanup !== "pending") {
+    // A grant marked signed out and still stored: remove it, once per grant and watch. The cleanup waits on
+    // that grant's sign-out lock, so it acts only once no sign-out of it runs anywhere: one that finished
+    // left nothing, one whose panel closed mid-way left the grant, which this removes. Panels waiting
+    // together take the lock in turn; each reads again, so only the first removes. Not for a grant this
+    // panel is signing out, or failed to: its own sign-out reports that. A storage read that fails first
+    // retries it on the first good read after a backoff like the watch's; any other failure leaves it
+    // stored, and the sign-in page says so (`useSignOutUnfinished`).
+    const finishLeftover = (markedKey: string) => {
+        if (cleanup !== "idle" || failedHere === markedKey || cleaned.has(markedKey) || signingOut.has(markedKey)) {
             return;
         }
 
@@ -190,25 +195,28 @@ const watchGrantSession = (): (() => void) => {
         void trackRemoval(async () => {
             try {
                 await finishPendingSignOut();
-                cleanup = "done";
+                cleaned.add(markedKey);
+                cleanup = "idle";
             } catch (error) {
                 if (!(error instanceof GrantReadError)) {
-                    cleanup = "done";
+                    cleaned.add(markedKey);
+                    cleanup = "idle";
 
-                    return;
+                    // `trackRemoval` records a failed removal (`failedHere`): this panel warns even when storage refused the failure mark.
+                    throw error;
                 }
 
                 cleanup = "waiting";
                 cleanupRetry = setTimeout(
                     () => {
-                        cleanup = "pending";
+                        cleanup = "idle";
                         void load();
                     },
                     Math.min(READ_RETRY_FIRST_MS * 2 ** cleanupFailures, READ_RETRY_MAX_MS),
                 );
                 cleanupFailures += 1;
             }
-        });
+        }).catch(() => undefined);
     };
 
     const load = async (attempt = 0) => {
@@ -227,8 +235,8 @@ const watchGrantSession = (): (() => void) => {
             failed = state.removalFailed;
             markedKey = state.markedKey;
 
-            if (!stopped) {
-                finishLeftover();
+            if (!stopped && state.markedKey !== undefined) {
+                finishLeftover(state.markedKey);
             }
         } catch {
             if (stopped || read !== reads) {
@@ -265,7 +273,6 @@ const watchGrantSession = (): (() => void) => {
         void load();
     };
     void load();
-    finishLeftover();
 
     return () => {
         stopped = true;
@@ -273,6 +280,8 @@ const watchGrantSession = (): (() => void) => {
         clearTimeout(cleanupRetry);
         shown = undefined;
         unfinished = false;
+        // A watch started later runs its own cleanup, which records its own failure.
+        failedHere = undefined;
         reloadGrantSession = undefined;
         chrome.storage.onChanged.removeListener(listener);
     };

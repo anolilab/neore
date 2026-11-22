@@ -12,10 +12,10 @@ The rules for working in `apps/browser-extension/`. The protocol and the reasoni
   [the reference](../../docs/agents/extension-sign-out.md):
     - Hold new tokens by count (`releaseAccessTokens`), then check and write the mark (`neore.signedOutGrant`) under the grant lock; the bearer stays until the mark is written.
     - Never report a rejected sign-out as done: a failed grant read or mark write brings the session back and shows the error.
-    - Never sign back in after a failed removal: `readGrant` hides a marked grant; the next panel removes it (`finishPendingSignOut`), reading again once it holds the sign-out lock.
+    - Never sign back in after a failed removal: `readGrant` hides a marked grant; every open or later panel removes it (`finishPendingSignOut`), once per grant, reading again once it holds the sign-out lock. So a sign-out whose panel closed mid-way is finished by the panels still open, one at a time, never during a sign-out still running.
     - A storage read that fails after a change keeps the session shown and retries with capped backoff; only the first read counts a failure as signed out.
     - Lock order: the sign-out lock (`neore.signOut:<key>`) first, then the grant lock inside it.
-    - Warn only from the storage failure mark (`neore.signOutFailed`) or this panel's own failed removal (`failedHere`), never for a failed revoke alone, and not while a removal runs here or a sign-out runs elsewhere.
+    - Warn only from the storage failure mark (`neore.signOutFailed`) or a removal this panel tried and failed (`failedHere`, its sign-out or its cleanup), never for a failed revoke alone, and not while a removal runs here or a sign-out runs elsewhere.
     - Bound the revoke (`REVOKE_TIMEOUT_MS`) and never await its body: only the status counts. Out of time is a failed revoke; the grant goes either way.
     - Act on the grant Settings shows (`grantKey`), one sign-out per grant; leave a newer grant or session alone.
 - A Chrome install updated from the cookie build is told once to connect (`migrateFromCookieSession` on `runtime.onInstalled`, `neore.reconnectNeeded`), only when the old build's Lunora read cache holds something (`hasCookieBuildReads`): that build queried only when signed in. Keep the migration mark (`neore.authMigration`) so it runs once per install.
