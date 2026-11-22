@@ -183,7 +183,17 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
     }
 
     // FNV-1a over the three parts, the whole name included: a click compares the same string the read built.
-    const fingerprintOf = [steps.join(">"), joined, shown].join("\u{0}");
+    // Where the click goes: a link's href, a button's formaction, and the form it submits to. Changing one changes what the
+    // click does, so it is part of the fingerprint.
+    let destinations = "";
+
+    for (const node of nodes) {
+        destinations += `${node.getAttribute("href") ?? ""}|${node.getAttribute("formaction") ?? ""}|`;
+    }
+
+    destinations += control.closest("form")?.getAttribute("action") ?? "";
+
+    const fingerprintOf = [steps.join(">"), joined, shown, destinations].join("\u{0}");
     let hash = 0x81_1c_9d_c5;
 
     for (const character of fingerprintOf) {
