@@ -252,6 +252,8 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
         }
 
         const { threadId, userId } = context;
+        // In `ask` mode (`looksBeforeAsk`) the call asks whatever the read says, but the read still keeps its target for the click.
+        const asking = (options as { asking?: boolean }).asking === true;
 
         return await browserActionNeedsPurchaseApproval(
             input,
@@ -259,6 +261,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
                     action: "extract",
                     approvalLook: true,
+                    ...(asking && { askDecision: true }),
                     browserSettings: (context as { browserSettings?: unknown }).browserSettings,
                     decisionCallId: options.toolCallId,
                     selector,
@@ -296,4 +299,5 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
     },
 });
 
-export default browserTool;
+// `ask` mode reads a click's target before it asks, and keeps it for the approved click (`lib/tool-permissions.ts`).
+export default Object.assign(browserTool, { looksBeforeAsk: true as const });

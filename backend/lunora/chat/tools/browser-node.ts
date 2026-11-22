@@ -37,6 +37,8 @@ export const executeBrowserAction = internalAction
          * for this tool call (`decisionCallId`), so a page that changed since they were shown it is refused.
          */
         approvedCallId: v.optional(v.string()),
+        /** An `ask`-mode decision look (`chat/tools/browser.ts`): every target it reads is recorded, since every call asks. */
+        askDecision: v.optional(v.boolean()),
         browserSettings: v.optional(v.any()),
         /** The approval look of this tool call: its target is recorded for the decision, so the approved click can be checked against it. */
         decisionCallId: v.optional(v.string()),
@@ -340,7 +342,7 @@ export const executeBrowserAction = internalAction
                 // The decision look of a tool call: a look that reads as a purchase (or cannot be read) keeps its target, so the click
                 // the person approves is checked against it. A look that read no target keeps an empty one, so that click is refused.
                 // An ordinary look keeps nothing: its click is not approved, so there is no record to clear later.
-                if (args.decisionCallId !== undefined && purchaseTargetNeedsApproval(result as ClickTargetLook)) {
+                if (args.decisionCallId !== undefined && (args.askDecision === true || purchaseTargetNeedsApproval(result as ClickTargetLook))) {
                     await ctx.runMutation(internal.browser.functions.recordPurchaseLook, {
                         sessionId,
                         target: result.success === true && result.target !== undefined ? result.target : "",

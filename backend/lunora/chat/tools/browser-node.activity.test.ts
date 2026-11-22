@@ -838,6 +838,38 @@ describe("a browser a person took control of", () => {
         expect(renderer).toHaveBeenCalledTimes(1);
     });
 
+    it("in ask mode a click's decision look keeps its target, so the approved click is checked against it", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValue(answered({ content: "Next", label: "Next", success: true, target: "T-ask", url: "https://example.com/a" }));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    askDecision: true,
+                    decisionCallId: "call-ask",
+                    selector: "#next",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    approvedCallId: "call-ask",
+                    selector: "#next",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(renderer.mock.calls[1]?.[0]).toMatchObject({ body: { action: "click", expectTarget: "T-ask" } });
+    });
+
     it("an approved click whose decision look failed outright is refused, and nothing is clicked", async () => {
         await addSession(NOW - 1000);
         renderer.mockRejectedValueOnce(new Error("renderer unreachable"));

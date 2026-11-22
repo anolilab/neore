@@ -342,6 +342,24 @@ const needsApprovalUnless =
     };
 
 /**
+ * An `ask` tool that reads its target before it asks (`looksBeforeAsk`, the browser's clicks): its own `needsApproval` runs with
+ * `asking` set, so its read is kept for the approved click, and the call always asks. A read that throws still asks; its
+ * empty record then refuses the approved click.
+ */
+const askAfterLook = (own: OwnApproval): OwnApproval =>
+    async function needsApprovalAfterLook(this: unknown, input: unknown, options: NeedsApprovalOptions): Promise<boolean> {
+        try {
+            if (typeof own === "function") {
+                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true });
+            }
+        } catch {
+            // The read failed: the call still asks, and its record stays empty.
+        }
+
+        return true;
+    } as OwnApproval;
+
+/**
  * A timed allow's check: once the grant has lapsed the call asks (unless the quick check clears it), and it still asks
  * whenever the tool's own check does. A tool can decide per call that a person must click (a message to a worker on a
  * computer), and neither a grant nor the quick check lifts that.
@@ -407,7 +425,16 @@ export const applyToolPermissions = (
 
         if (mode === "ask") {
             requiresApproval.push(name);
-            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor) : true } as ToolSet[string];
+
+            let askAnswer: OwnApproval = true;
+
+            if (check) {
+                askAnswer = needsApprovalUnless(check, descriptor);
+            } else if ((tool as { looksBeforeAsk?: boolean }).looksBeforeAsk === true) {
+                askAnswer = askAfterLook(tool.needsApproval);
+            }
+
+            result[name] = { ...tool, needsApproval: askAnswer } as ToolSet[string];
             continue;
         }
 
