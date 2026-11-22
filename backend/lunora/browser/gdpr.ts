@@ -298,6 +298,8 @@ const vExportHumanCheck = v.object({
     askedAt: v.number(),
     inText: v.optional(v.boolean()),
     reported: v.optional(v.boolean()),
+    resolution: v.optional(v.union(v.literal("declined"), v.literal("done"))),
+    resolvedAt: v.optional(v.number()),
     site: v.string(),
     threadId: v.string(),
     truncated: vTruncated,
@@ -362,6 +364,8 @@ const exportedHumanCheck = (row: Doc<"browserHumanChecks">): Infer<typeof vExpor
         threadId: row.threadId as string,
         ...(row.inText !== undefined && { inText: row.inText }),
         ...(row.reported !== undefined && { reported: row.reported }),
+        ...(row.resolution !== undefined && { resolution: row.resolution }),
+        ...(row.resolvedAt !== undefined && { resolvedAt: row.resolvedAt }),
     });
 
 const exportedExtension = (row: Doc<"browserExtensions">): Infer<typeof vExportExtension> =>

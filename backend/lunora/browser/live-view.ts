@@ -86,7 +86,7 @@ const settled = <C extends { renewing?: string; renewingEnded?: string }>({
  * Takes, keeps and drives no browser while an admin acts as the owner: the browser is signed in to the owner's sites,
  * and what is opened in it is recorded as the owner's own. `handBack` stays open, so a lease can always be ended.
  */
-const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+export const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
     if (impersonatedBy) {
         throw new LunoraError("FORBIDDEN", "The browser cannot be controlled while impersonating");
     }

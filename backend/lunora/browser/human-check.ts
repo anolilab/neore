@@ -23,6 +23,16 @@ export const HUMAN_CHECK_HAND_BACK_WINDOW_MS = 60 * 60_000;
  */
 export const HUMAN_CHECK_LOOK_BUDGET = 4;
 
+/**
+ * How long `wait_for_person` waits for the person's answer on the card before the agent hears there is none yet: under
+ * the run's minute beat, so a reply that dies in it resumes like any other, and short enough that a person who walked
+ * away holds no reply open. They can still answer later and ask the agent to carry on.
+ */
+export const HUMAN_CHECK_ANSWER_WAIT_MS = 45_000;
+
+/** How often that wait reads the answer: a database read, no renderer call. */
+export const HUMAN_CHECK_ANSWER_POLL_MS = 3000;
+
 /** Extracted text longer than this is a real page that merely mentions a check, never the check itself. */
 const SHORT_PAGE_CHARS = 3000;
 
@@ -142,8 +152,16 @@ export const humanCheckMessages = {
         `The person handed the browser back after you asked them about ${siteName(site)}. Check whether what you asked them for is done before you act.`,
     alreadyAsked: (site: string): string =>
         `${siteName(site)} still shows a check that needs a person. The person was already asked to clear it during this task, so they are not asked again. Do not try to solve or get around it: move on, or reach what you need another way.`,
+    answerDeclined: (site: string): string =>
+        `The person declined to clear the check on ${siteName(site)}. Do not use the browser on this site again in this task and do not try to get around the check: tell them what you could not do, or reach what you need another way.`,
+    answerDone: (site: string): string =>
+        `The person marked the check on ${siteName(site)} as done. Look at the page before you act; if it still shows the check, do not try to get around it.`,
+    answerNone: "There is no open request to a person in this reply to wait for.",
+    answerPending: (site: string): string =>
+        `The person has not answered the check on ${siteName(site)} yet. End your reply by telling them what you need. They can clear it, mark it done or decline it on the card, then ask you to carry on.`,
+    answerStopped: "The wait for the person's answer was stopped.",
     asked: (site: string): string =>
-        `${siteName(site)} shows a check that needs a person (a human verification or a sign-in you cannot pass), and it did not clear on its own. The person was asked in the chat to clear it in the live view. Do not try to solve or get around it, and do not use the browser on this site until they hand it back: tell them what you are waiting for, or carry on with other work. The browser closes about a minute after its last action: if they ask you to try again later, the next action opens a new browser, so navigate to the page again.`,
+        `${siteName(site)} shows a check that needs a person (a human verification or a sign-in you cannot pass), and it did not clear on its own. The person was asked in the chat to clear it in the live view. Do not try to solve or get around it, and do not use the browser on this site until they hand it back: tell them what you are waiting for, carry on with other work, or wait briefly for their answer on the card with wait_for_person. The browser closes about a minute after its last action: if they ask you to try again later, the next action opens a new browser, so navigate to the page again.`,
     clearedAfterHandBack: (site: string): string => `The check on ${siteName(site)} no longer shows: the page looks clear. Look at it before you act.`,
     clearedOnItsOwn: (site: string): string =>
         `${siteName(site)} showed a check page, which cleared on its own after a short wait. This is the page now: look at it before you act.`,
@@ -173,7 +191,8 @@ export interface LadderResult extends PageSignals {
     error?: string;
     /** The person had driven the browser and gave it back; this is the first look at the page since. */
     handedBack?: boolean;
-    humanCheck?: { browserId?: string; site: string; status: "already_asked" | "asked" };
+    /** `checkId`: the ask's row (`browserHumanChecks`), which the card answers; only on `asked`. */
+    humanCheck?: { browserId?: string; checkId?: string; site: string; status: "already_asked" | "asked" | "declined" };
     screenshot?: string;
     screenshotFormat?: string;
     success?: boolean;
