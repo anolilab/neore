@@ -40,7 +40,7 @@ const readableCheck = async (
     checkId: Id<"browserHumanChecks">,
     userId: string,
     options: { primary?: boolean } = {},
-): Promise<{ canWrite: boolean; row: Doc<"browserHumanChecks"> } | null> => {
+): Promise<{ accessUntil?: number; canWrite: boolean; row: Doc<"browserHumanChecks"> } | null> => {
     const access = await resolveThreadReadAccess(ctx, threadId, userId, undefined, options);
 
     if (access?.kind !== "full" || access.thread.deleted === true) {
@@ -53,16 +53,29 @@ const readableCheck = async (
         return null;
     }
 
-    return { canWrite: meetsThreadPermission(access.permission, "write"), row };
+    return { ...(access.expiresAt !== undefined && { accessUntil: access.expiresAt }), canWrite: meetsThreadPermission(access.permission, "write"), row };
 };
 
 /**
  * The ask's state for its card: `canResolve` when the caller may answer it now, `expiresAt` when an unanswered one
- * expires, on the server's clock (`now`, this answer's time). `null`: no such ask they can read.
+ * expires, `accessUntil` when a grantee's grant ends (the card then shows nothing and reads again, which answers
+ * `null`), both on the server's clock (`now`, this answer's time). `null`: no such ask they can read.
  */
 export const getHumanCheck = authQuery
     .input({ checkId: v.id("browserHumanChecks"), threadId: v.id("threads") })
-    .output(v.union(v.null(), v.object({ canResolve: v.boolean(), expiresAt: v.number(), now: v.number(), site: v.string(), status: vCheckStatus })))
+    .output(
+        v.union(
+            v.null(),
+            v.object({
+                accessUntil: v.optional(v.number()),
+                canResolve: v.boolean(),
+                expiresAt: v.number(),
+                now: v.number(),
+                site: v.string(),
+                status: vCheckStatus,
+            }),
+        ),
+    )
     .query(async ({ args: { checkId, threadId }, ctx }) => {
         const check = await readableCheck(ctx, threadId, checkId, ctx.user.userId);
 
@@ -72,8 +85,10 @@ export const getHumanCheck = authQuery
 
         const status = humanCheckStatusOf(check.row, ctx.now);
 
-        // A live query re-runs on a write, not on the clock: `expiresAt` lets the card close an ask nobody answered.
+        // A live query re-runs on a write, not on the clock: `expiresAt` lets the card close an ask nobody answered,
+        // `accessUntil` a grant that ended.
         return {
+            ...(check.accessUntil !== undefined && { accessUntil: check.accessUntil }),
             canResolve: status === "open" && check.canWrite && !ctx.user.impersonatedBy,
             expiresAt: check.row.askedAt + HUMAN_CHECK_HAND_BACK_WINDOW_MS,
             now: ctx.now,

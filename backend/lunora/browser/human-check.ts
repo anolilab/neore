@@ -156,6 +156,8 @@ export const humanCheckMessages = {
         `The person declined to clear the check on ${siteName(site)}. Do not use the browser on this site again in this task and do not try to get around the check: tell them what you could not do, or reach what you need another way.`,
     answerDone: (site: string): string =>
         `The person marked the check on ${siteName(site)} as done. Look at the page before you act; if it still shows the check, do not try to get around it.`,
+    answerDoneStillShows: (site: string): string =>
+        `The person marked the check on ${siteName(site)} as done, but it still shows. They are not asked again. Do not try to solve or get around it: move on, or reach what you need another way.`,
     answerNone: "There is no open request to a person in this reply to wait for.",
     answerPending: (site: string): string =>
         `The person has not answered the check on ${siteName(site)} yet. End your reply by telling them what you need. They can clear it, mark it done or decline it on the card, then ask you to carry on.`,

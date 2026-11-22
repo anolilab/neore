@@ -361,9 +361,6 @@ export const closeSession = internalMutation
 
 // ── Human checks (`human-check.ts`) ──────────────────────────────────────
 
-/** How many of a thread's latest asks are searched for a run's own: a reply asks about a few sites at most. */
-const HUMAN_CHECK_RECENT_ASKS = 20;
-
 const askKind = (row: { inText?: boolean; reported?: boolean } | null): "detected" | "detected_in_text" | "reported" | null => {
     if (row === null) {
         return null;
@@ -464,13 +461,11 @@ const runAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, 
             .first();
     }
 
-    const recent = await db
+    return await db
         .query("browserHumanChecks")
-        .withIndex("by_threadId_askedAt", (q) => q.eq("threadId", threadId).gte("askedAt", askedSince))
+        .withIndex("by_threadId_run_askedAt", (q) => q.eq("threadId", threadId).eq("run", run).gte("askedAt", askedSince))
         .order("desc")
-        .take(HUMAN_CHECK_RECENT_ASKS);
-
-    return recent.find((ask) => ask.run === run) ?? null;
+        .first();
 };
 
 const vAnswer = v.union(v.null(), v.object({ answer: v.union(v.literal("declined"), v.literal("done"), v.literal("open")), site: v.string() }));

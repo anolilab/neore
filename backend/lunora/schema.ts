@@ -459,7 +459,7 @@ export const schema = defineSchema({
         /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
         reported: v.optional(v.boolean()),
         /**
-         * The person's answer on the card (`browser/functions.ts#resolveHumanCheck`): `done` (cleared it), `declined`
+         * The person's answer on the card (`browser/human-check-card.ts#resolveHumanCheck`): `done` (cleared it), `declined`
          * (will not; the agent is told so and asks nobody about the site again in that reply). Set once, never changed.
          */
         resolution: v.optional(v.union(v.literal("declined"), v.literal("done"))),
@@ -478,8 +478,8 @@ export const schema = defineSchema({
         .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
         // An earlier reply's recent ask, for the first look after a hand back (`browser/human-check.ts#afterHandBack`).
         .index("by_threadId_site_askedAt", ["threadId", "site", "askedAt"])
-        // The thread's latest ask on any site, which the agent's `wait_for_person` waits on.
-        .index("by_threadId_askedAt", ["threadId", "askedAt"])
+        // The run's latest ask on any site, which the agent's `wait_for_person` waits on.
+        .index("by_threadId_run_askedAt", ["threadId", "run", "askedAt"])
         .index("by_userId", ["userId"]),
 
     browserSessions: defineTable({

@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { waitForAnswer, withAnswer } from "../chat/tools/browser";
+import browserTool, { waitForAnswer, withAnswer } from "../chat/tools/browser";
 import schema from "../schema";
 import { claimHumanCheckAsk, humanCheckAnswer } from "./functions";
 import { HUMAN_CHECK_ANSWER_WAIT_MS, HUMAN_CHECK_HAND_BACK_WINDOW_MS, humanCheckMessages } from "./human-check";
@@ -17,6 +17,7 @@ const READER = "user-reader";
 const STRANGER = "user-stranger";
 const WRITER = "user-writer";
 const NOW = Date.UTC(2026, 10, 22, 12);
+const GRANT_ENDS = NOW + 30 * 60_000;
 
 const { impersonation, registry, sessionFrom } = vi.hoisted(() => {
     const state: { by?: string } = {};
@@ -72,7 +73,7 @@ beforeEach(async () => {
         const id = await ctx.db.insert("threads", { status: "active", title: "T", userId: OWNER });
 
         await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId: id, userId: READER });
-        await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId: id, userId: WRITER });
+        await ctx.db.insert("threadAccess", { expiresAt: GRANT_ENDS, grantedAt: 0, grantedBy: OWNER, permission: "write", threadId: id, userId: WRITER });
 
         return id;
     })) as string;
@@ -91,7 +92,15 @@ describe("the card's read", () => {
         const expiresAt = NOW + HUMAN_CHECK_HAND_BACK_WINDOW_MS;
 
         await expect(read(OWNER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, now: NOW, site: "shop.example", status: "open" });
-        await expect(read(WRITER, checkId)).resolves.toStrictEqual({ canResolve: true, expiresAt, now: NOW, site: "shop.example", status: "open" });
+        // A grantee's card knows when the grant ends: a live answer is not re-read on the clock.
+        await expect(read(WRITER, checkId)).resolves.toStrictEqual({
+            accessUntil: GRANT_ENDS,
+            canResolve: true,
+            expiresAt,
+            now: NOW,
+            site: "shop.example",
+            status: "open",
+        });
         await expect(read(READER, checkId)).resolves.toStrictEqual({ canResolve: false, expiresAt, now: NOW, site: "shop.example", status: "open" });
         await expect(read(STRANGER, checkId)).resolves.toBeNull();
 
@@ -186,6 +195,15 @@ describe("after an answer", () => {
         await expect(answerOf({ run: "r1", site: "a.example" })).resolves.toStrictEqual({ answer: "done", site: "a.example" });
         await expect(answerOf({ run: "r2", site: "a.example" })).resolves.toBeNull();
         await expect(answerOf({ run: "r9" })).resolves.toBeNull();
+
+        // Many newer asks of other runs in the thread do not hide the run's own.
+        vi.setSystemTime(NOW + 2000);
+
+        for (let index = 0; index < 30; index += 1) {
+            await claim(`other-${index}`, "d.example");
+        }
+
+        await expect(answerOf({ run: "r1" })).resolves.toStrictEqual({ answer: "open", site: "b.example" });
     });
 });
 
@@ -239,6 +257,72 @@ describe("the browser result", () => {
 
         await withAnswer(context(), threadId as never, "r2", later, new Map());
         expect(later.humanCheck.status).toBe("already_asked");
+
+        // A page on the site that looks clear still carries the decline: the card told the person the agent stays off it.
+        const clear: any = { success: true, title: "Shop", url: "https://SHOP.example/cart" };
+
+        await withAnswer(context(), threadId as never, "r1", clear, new Map());
+        expect(clear).toStrictEqual({
+            error: humanCheckMessages.answerDeclined("shop.example"),
+            humanCheck: { site: "shop.example", status: "declined" },
+            success: true,
+            title: "Shop",
+            url: "https://SHOP.example/cart",
+        });
+    });
+
+    it("tells the agent a check the person marked done still shows", async () => {
+        const checkId = (await claim("r1", "shop.example"))!;
+
+        await resolve(OWNER, checkId, "done");
+
+        const result: any = {
+            error: humanCheckMessages.alreadyAsked("shop.example"),
+            humanCheck: { site: "shop.example", status: "already_asked" },
+            success: false,
+        };
+
+        await withAnswer(context(), threadId as never, "r1", result, new Map());
+        expect(result.error).toBe(humanCheckMessages.answerDoneStillShows("shop.example"));
+
+        // A clear page after a done needs no note.
+        const clear: any = { success: true, url: "https://shop.example/" };
+
+        await withAnswer(context(), threadId as never, "r1", clear, new Map());
+        expect(clear).toStrictEqual({ success: true, url: "https://shop.example/" });
+    });
+
+    it("keeps the action's result when the answer cannot be read", async () => {
+        const result: any = { error: "x", humanCheck: { site: "shop.example", status: "already_asked" }, screenshot: "png", success: false };
+        const failing = {
+            runQuery: async () => {
+                throw new Error("read failed");
+            },
+        } as never;
+
+        await expect(withAnswer(failing, threadId as never, "r1", result, new Map())).resolves.toBeUndefined();
+        expect(result).toStrictEqual({ error: "x", humanCheck: { site: "shop.example", status: "already_asked" }, screenshot: "png", success: false });
+    });
+
+    it("opens no page on a site the person declined in this reply", async () => {
+        const checkId = (await claim("r1", "shop.example"))!;
+
+        await resolve(OWNER, checkId, "declined");
+
+        const runAction = vi.fn(async () => {
+            return { success: true, url: "https://other.example/" };
+        });
+        const tool = { ...browserTool, ctx: { ...(context() as object), replyKey: "r1", runAction, threadId, userId: OWNER } } as unknown as {
+            execute: (input: { action: string; url?: string }, options: unknown) => Promise<unknown>;
+        };
+        const options = { messages: [], toolCallId: "call-1" };
+
+        await expect(tool.execute({ action: "navigate", url: "https://shop.example/cart" }, options)).resolves.toStrictEqual({
+            error: humanCheckMessages.answerDeclined("shop.example"),
+            humanCheck: { site: "shop.example", status: "declined" },
+            success: false,
+        });
+        expect(runAction).not.toHaveBeenCalled();
     });
 });
 
@@ -306,6 +390,21 @@ describe("wait_for_person", () => {
         });
         expect(Date.now()).toBe(startedAt);
         expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("keeps to the ask it began on when the run asks about another site meanwhile", async () => {
+        vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+        vi.setSystemTime(NOW);
+
+        const checkId = (await claim("r1", "a.example"))!;
+        const waiting = waitForAnswer(context(), threadId as never, "r1", undefined);
+
+        await vi.advanceTimersByTimeAsync(4000);
+        await claim("r1", "b.example");
+        await resolve(OWNER, checkId, "declined");
+        await vi.advanceTimersByTimeAsync(4000);
+
+        await expect(waiting).resolves.toStrictEqual({ error: humanCheckMessages.answerDeclined("a.example"), success: false });
     });
 
     it("ends on Stop", async () => {

@@ -22,6 +22,7 @@ import {
     HUMAN_CHECK_HAND_BACK_WINDOW_MS,
     humanCheckLadder,
     humanCheckMessages,
+    humanCheckSite,
     waitUnlessStopped,
 } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
@@ -58,9 +59,37 @@ export interface BrowserResult {
 
 type AnswerContext = Pick<ToolContext, "runMutation" | "runQuery">;
 
+/** The person's answer on this reply's ask about `site`, `null` when there is none. */
+const answerOn = async (context: Pick<ToolContext, "runQuery">, threadId: Id<"threads">, run: string, site: string) =>
+    await context.runQuery(internal.browser.functions.humanCheckAnswer, { askedSince: Date.now() - HUMAN_CHECK_HAND_BACK_WINDOW_MS, run, site, threadId });
+
+/** A navigate to a site the person declined in this reply opens nothing: their card said the agent stays off it. */
+const declinedTarget = async (
+    context: Pick<ToolContext, "runQuery">,
+    threadId: Id<"threads">,
+    run: string,
+    url: string | undefined,
+): Promise<BrowserResult | undefined> => {
+    const site = humanCheckSite(url);
+    const answer = site === "" ? null : await answerOn(context, threadId, run, site);
+
+    return answer?.answer === "declined"
+        ? { error: humanCheckMessages.answerDeclined(site), humanCheck: { site, status: "declined" }, success: false }
+        : undefined;
+};
+
+/** Puts `note` in place of the "already asked" text in the result's error, else after it. */
+const replaceAlreadyAsked = (result: BrowserResult, site: string, note: string): void => {
+    const rest = (result.error ?? "").replace(humanCheckMessages.alreadyAsked(site), "").trim();
+
+    result.error = rest === "" ? note : `${rest} ${note}`;
+};
+
 /**
  * Names the card a result asks the person on (`checkId`, set only for an ask this call recorded), and tells the agent
- * when a site it was not asked about again is one the person declined recently, never that they were "already asked".
+ * the person's answer on this reply's ask about the site: a decline (the card told them the agent will not use the site
+ * again in this reply), also on a page that looks clear, and a done on a check that still shows. A failed read of the
+ * answer leaves the result as it is: the action already ran.
  */
 export const withAnswer = async (
     context: Pick<ToolContext, "runQuery">,
@@ -71,11 +100,7 @@ export const withAnswer = async (
 ): Promise<void> => {
     const check = result.humanCheck;
 
-    if (check === undefined) {
-        return;
-    }
-
-    if (check.status === "asked") {
+    if (check?.status === "asked") {
         const checkId = askIds.get(check.site);
 
         if (checkId !== undefined) {
@@ -85,19 +110,27 @@ export const withAnswer = async (
         return;
     }
 
-    // The person declined this reply's ask on the site: a later reply asks again.
-    const latest = await context.runQuery(internal.browser.functions.humanCheckAnswer, {
-        askedSince: Date.now() - HUMAN_CHECK_HAND_BACK_WINDOW_MS,
-        run,
-        site: check.site,
-        threadId,
-    });
+    const site = check?.site ?? humanCheckSite(result.url);
+
+    if (check === undefined && site === "") {
+        return;
+    }
+
+    let latest: Awaited<ReturnType<typeof answerOn>>;
+
+    try {
+        latest = await answerOn(context, threadId, run, site);
+    } catch (error) {
+        toolsLogger.warn(`[BROWSER] the answer on ${site} could not be read: ${error instanceof Error ? error.message : String(error)}`);
+
+        return;
+    }
 
     if (latest?.answer === "declined") {
-        const rest = (result.error ?? "").replace(humanCheckMessages.alreadyAsked(check.site), "").trim();
-
-        check.status = "declined";
-        result.error = rest === "" ? humanCheckMessages.answerDeclined(check.site) : `${rest} ${humanCheckMessages.answerDeclined(check.site)}`;
+        replaceAlreadyAsked(result, site, humanCheckMessages.answerDeclined(site));
+        result.humanCheck = { ...check, site, status: "declined" };
+    } else if (latest?.answer === "done" && check !== undefined) {
+        replaceAlreadyAsked(result, site, humanCheckMessages.answerDoneStillShows(site));
     }
 };
 
@@ -109,12 +142,14 @@ export const withAnswer = async (
 export const waitForAnswer = async (context: AnswerContext, threadId: Id<"threads">, run: string, signal: AbortSignal | undefined): Promise<BrowserResult> => {
     const deadline = Date.now() + HUMAN_CHECK_ANSWER_WAIT_MS;
     const askedSince = Date.now() - HUMAN_CHECK_HAND_BACK_WINDOW_MS;
-    const read = async () => await context.runQuery(internal.browser.functions.humanCheckAnswer, { askedSince, run, threadId });
     const begun = await context.runMutation(internal.browser.functions.beginHumanCheckWait, { askedSince, run, threadId });
 
     if (begun === null) {
         return { error: humanCheckMessages.answerNone, success: false };
     }
+
+    // The ask the wait was recorded on, even when another action of the run asks about another site meanwhile.
+    const read = async () => await context.runQuery(internal.browser.functions.humanCheckAnswer, { askedSince, run, site: begun.site, threadId });
 
     let latest: { answer: "declined" | "done" | "open"; site: string } = begun;
 
@@ -212,6 +247,12 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
         const askIds = new Map<string, string>();
 
         try {
+            const refused = action === "navigate" ? await declinedTarget(context, threadId, runKey, input.url) : undefined;
+
+            if (refused !== undefined) {
+                return refused;
+            }
+
             const reported = action === "needs_person";
             const first = await run(action === "needs_person" ? { action: "screenshot" } : { ...input, action });
             // A refused or failed action (a person in control, the browser closed) is not a page to judge.

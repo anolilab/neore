@@ -4567,9 +4567,10 @@
         }
       },
       "indexes": {
-        "by_threadId_askedAt": {
+        "by_threadId_run_askedAt": {
           "fields": [
             "threadId",
+            "run",
             "askedAt"
           ],
           "unique": false
