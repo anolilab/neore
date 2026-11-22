@@ -408,4 +408,23 @@ describe("data export workflow: browser data", () => {
 
         expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([firstKey.slice(0, -"0.json".length)]);
     });
+
+    it.each([
+        { exported: true, name: "the ready notice after the file is stored" },
+        { exported: false, name: "the failure notice after the file failed" },
+    ])("deletes the stored pages when $name fails for good", async ({ exported }) => {
+        stubs["notifications_functions:createNotification"] = () => {
+            throw new Error("notification step failed permanently");
+        };
+
+        if (!exported) {
+            generate = () => {
+                throw new Error("boom");
+            };
+        }
+
+        await expect(execute()).rejects.toThrow("notification step failed permanently");
+
+        expect(ran("browser_gdpr:deleteBrowserExportPages")).toHaveLength(1);
+    });
 });

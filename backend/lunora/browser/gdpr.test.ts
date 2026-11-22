@@ -45,7 +45,7 @@ const seed = async (userId: string, actions: number, targetBytes = 0): Promise<v
             });
         }
 
-        await ctx.db.insert("browserHumanChecks", { askedAt: 30, run: "run-1", site: `${userId}.example.com`, threadId, userId });
+        await ctx.db.insert("browserHumanChecks", { askedAt: 30, inText: true, run: "run-1", site: `${userId}.example.com`, threadId, userId });
         await ctx.db.insert("browserExtensions", {
             browserInfo: "Chrome 140",
             extensionId: `ext-${userId}`,
@@ -99,7 +99,7 @@ describe("browser data in the GDPR export", () => {
                 timestamp: 100,
             }),
         );
-        expect(result.humanChecks).toEqual([expect.objectContaining({ askedAt: 30, site: "user-a.example.com" })]);
+        expect(result.humanChecks).toEqual([expect.objectContaining({ askedAt: 30, inText: true, site: "user-a.example.com" })]);
         expect(result.extensions).toEqual([expect.objectContaining({ browserInfo: "Chrome 140", extensionId: "ext-user-a", pairedAt: 40, status: "paired" })]);
     });
 
@@ -195,11 +195,18 @@ describe("browser export pages read back", () => {
     });
 });
 
+type StoreHandler = { handler: (ctx: unknown, args: unknown) => Promise<unknown> };
+
 describe("browser export page stored", () => {
     it("reads a page again cautiously when its read passed the transaction's limit", async () => {
         const reads: unknown[] = [];
         const ctx = {
-            runQuery: async (_reference: unknown, args: { cautious: boolean }) => {
+            runQuery: async (_reference: unknown, args: { cautious?: boolean }) => {
+                // The deletion check, before and after the write.
+                if (args.cautious === undefined) {
+                    return false;
+                }
+
                 reads.push(args.cautious);
 
                 if (!args.cautious) {
@@ -211,9 +218,30 @@ describe("browser export page stored", () => {
             storage: { store: async () => "key" },
         };
 
-        await (storeBrowserExportPage as unknown as { handler: (ctx: unknown, args: unknown) => Promise<unknown> }).handler(ctx, { key: "k", userId: A });
+        await (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", userId: A });
 
         expect(reads).toEqual([false, true]);
+    });
+
+    it.each([
+        { begun: [true], name: "stores nothing once the account's deletion has begun", stored: [] },
+        { begun: [false, true], name: "deletes its page again when the deletion began during the write", stored: [] },
+        { begun: [false, false], name: "keeps its page when no deletion began", stored: ["k"] },
+    ])("$name", async ({ begun, stored }) => {
+        const objects = new Set<string>();
+        const checks = [...begun];
+        const ctx = {
+            runQuery: async (_reference: unknown, args: { cautious?: boolean }) =>
+                args.cautious === undefined ? checks.shift() : { actions: [], extensions: [], humanChecks: [], sessions: [] },
+            storage: {
+                delete: async (key: string) => objects.delete(key),
+                store: async (key: string) => objects.add(key),
+            },
+        };
+        const run = (storeBrowserExportPage as unknown as StoreHandler).handler(ctx, { key: "k", userId: A });
+
+        await (stored.length > 0 ? expect(run).resolves.toEqual({}) : expect(run).rejects.toThrow("Account deletion is underway"));
+        expect([...objects]).toEqual(stored);
     });
 });
 

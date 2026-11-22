@@ -223,7 +223,8 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             );
         };
 
-        // The run's stored browser pages, deleted on every terminal path like the usage object.
+        // The run's stored browser pages. Deleted once the export file's step has ended, either way, before any step that can fail for
+        // good, so no later failure leaves them; a run killed before then is left to the sweep (`usage/gdpr.ts`).
         const deleteBrowserPages = async (): Promise<void> => {
             await context.step.do(
                 "delete-browser-pages",
@@ -242,7 +243,6 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // Refused once the export was cancelled: nothing is announced, and the usage is cleared all the same.
             if (failed === false) {
                 await deleteUsageObject();
-                await deleteBrowserPages();
                 await clearUsagePieces(usageIo);
 
                 return;
@@ -269,7 +269,6 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // A failed export keeps nothing: its usage object and its pieces hold the user's usage, and no file was stored from them.
             // The object goes first, so a failed clear cannot leave it behind.
             await deleteUsageObject();
-            await deleteBrowserPages();
             await clearUsagePieces(usageIo);
         };
 
@@ -326,7 +325,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             // Browser sessions, their actions, the sites a run asked to clear and the extensions: a page per step, each stored as an
             // object under the run's prefix. Only the page count reaches the export file's action, which reads the pages itself, so no
             // dispatch body (Lunora's 1 MiB) or step result carries the whole history. Inside the try, so a page that fails for good
-            // fails the export, whose cleanup deletes the pages already stored.
+            // fails the export, and the pages already stored are deleted.
             // The run's record comes first, so a run killed before its cleanup leaves pages the sweep finds (`usage/gdpr.ts`).
             await context.step.do(
                 "open-export-run",
@@ -406,11 +405,14 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                     ),
             )) as Id<"_storage"> | undefined;
         } catch (error) {
+            await deleteBrowserPages();
             // Do not rethrow: the row is already failed, and a rethrow would make the runtime retry the whole handler.
             await failExport(exportFailureMessage(error));
 
             return;
         }
+
+        await deleteBrowserPages();
 
         if (!storageId) {
             await failExport("Failed to generate export file");
@@ -425,7 +427,6 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // Refused once the export was cancelled: nothing is announced, and the usage is cleared as a failed export's is.
         if ((await progress({ progress: 100, status: "completed", storageId })) === false) {
             await deleteUsageObject();
-            await deleteBrowserPages();
             await clearUsagePieces(usageIo);
 
             return;
@@ -471,7 +472,6 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // The usage object it was read from, and the run's pieces, are no longer needed. They go after the audit: a cleanup that fails
         // permanently leaves the sweep to remove them, and must not hide the export's record.
         await deleteUsageObject();
-        await deleteBrowserPages();
         await clearUsagePieces(usageIo);
     },
 };

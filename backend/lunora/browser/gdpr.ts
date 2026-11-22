@@ -5,7 +5,7 @@
  * action reads back (`export-pages.ts`).
  */
 import type { Infer } from "lunorash/server";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -273,6 +273,7 @@ const vExportAction = v.object({
 
 const vExportHumanCheck = v.object({
     askedAt: v.number(),
+    inText: v.optional(v.boolean()),
     reported: v.optional(v.boolean()),
     site: v.string(),
     threadId: v.string(),
@@ -334,6 +335,7 @@ const exportedHumanCheck = (row: Doc<"browserHumanChecks">): Infer<typeof vExpor
         askedAt: row.askedAt,
         site: row.site,
         threadId: row.threadId as string,
+        ...(row.inText !== undefined && { inText: row.inText }),
         ...(row.reported !== undefined && { reported: row.reported }),
     });
 
@@ -505,11 +507,29 @@ export const collectBrowserForExport = internalQuery
         return { ...EMPTY_PAGE, extensions: rows, ...(next !== undefined && { next: { page: next, phase: "extensions" as const } }) };
     });
 
-/** One page of the export, read in this action's own request and stored at `key`; only its `next` cursor goes back to the workflow. */
+/**
+ * One page of the export, read in this action's own request and stored at `key`; only its `next` cursor goes back to the workflow.
+ * Nothing is stored once the account's deletion has begun, and a page whose write ends after it began is deleted again: erasure
+ * lists the user's prefix only after its deletion began, so it finds every page written before then, and this removes the rest.
+ */
 export const storeBrowserExportPage = internalAction
     .input({ cursor: v.optional(vBrowserExportCursor), key: v.string(), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.object({ next: v.optional(vBrowserExportCursor) }))
     .action(async ({ args: { cursor, key, userId }, ctx }) => {
+        const stopIfDeleting = async (written: boolean): Promise<void> => {
+            if ((await ctx.runQuery(internal.usage.gdpr.exportDeletionBegun, { userId })) !== true) {
+                return;
+            }
+
+            if (written) {
+                await withDependency("file storage", () => ctx.storage.delete(key));
+            }
+
+            throw new LunoraError("CONFLICT", "Account deletion is underway; the export stops");
+        };
+
+        await stopIfDeleting(false);
+
         const read = async (cautious: boolean): Promise<BrowserExportPage> =>
             (await ctx.runQuery(internal.browser.gdpr.collectBrowserForExport, { cautious, cursor, userId })) as BrowserExportPage;
         // A page whose rows were larger than any read before them can pass the transaction's read limit: read again, cautiously
@@ -520,6 +540,8 @@ export const storeBrowserExportPage = internalAction
         await withDependency("file storage", () =>
             ctx.storage.store(key, blob, { allowedContentTypes: ["application/json"], contentType: "application/json", maxSize: PAGE_MAX_BYTES }),
         );
+
+        await stopIfDeleting(true);
 
         return next === undefined ? {} : { next };
     });

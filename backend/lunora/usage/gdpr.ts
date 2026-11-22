@@ -515,6 +515,12 @@ export const deletionUnderwayOnPrimary = async (ctx: MutationCtx | QueryCtx, use
     return Boolean(request);
 };
 
+/** {@link deletionUnderwayOnPrimary} for an action of the export run, which checks it before and after each browser page it stores. */
+export const exportDeletionBegun = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args: { userId }, ctx }) => await deletionUnderwayOnPrimary(ctx, userId));
+
 /** The user's backfill row as the export compares it: a change to any of these during the export is history written meanwhile. */
 const backfillFingerprint = async (ctx: MutationCtx | QueryCtx, userId: string): Promise<string> => {
     const row = await ctx.db.usageBackfill.findFirst({ consistency: "primary", where: { userId } });
