@@ -69,7 +69,7 @@ const TARGET_CHANGED = "The target changed since it was checked, so nothing was 
  * `target` runs only on the element that still has it. The read is one function, so the check and the read agree.
  */
 function readTarget(control: Element, options: { max: number; splitter: RegExp }): { label: string; labelTruncated: boolean; target: string } {
-    // The elements the click lands in: the control, then each actionable ancestor up to the outermost. A visible child (an
+    // The elements the click lands in: the control, then each actionable ancestor. A visible child (an
     // icon in a button, a span in a clickable div) is clicked as those ancestors too.
     const actionableSelector =
         "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
@@ -106,7 +106,9 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
         }
     }
 
-    const outermost = nodes.at(-1) ?? control;
+    // The nearest actionable element is the one the click lands on, so its text and content count. A farther one (a clickable
+    // list or grid around other items) contributes only its names: its text would make every item in it read as a purchase.
+    const scope = control.matches(actionableSelector) ? control : (nodes[1] ?? control);
     const names: string[] = [];
 
     for (const node of nodes) {
@@ -124,30 +126,33 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
             names.push(node.value);
         }
 
-        // Text the stylesheet draws (CSS `content`) is on screen but in neither innerText nor textContent.
-        names.push(...generatedText(node));
+        // The control and the element it lands on: their text, and the text the stylesheet draws (CSS `content`), which is on
+        // screen but in neither innerText nor textContent.
+        if (node === control || node === scope) {
+            names.push(...generatedText(node));
 
-        // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
-        if (node instanceof HTMLElement) {
-            // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
-            names.push(node.innerText);
+            // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
+            if (node instanceof HTMLElement) {
+                // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose: textContent keeps hidden descendants
+                names.push(node.innerText);
+            }
         }
     }
 
-    // Names that come from inside the outermost element: an image's alt, a child's aria-label or title, an SVG title.
-    for (const node of outermost.querySelectorAll("img[alt], [aria-label], [title]")) {
+    // Names that come from inside the scope: an image's alt, a child's aria-label or title, an SVG title.
+    for (const node of scope.querySelectorAll("img[alt], [aria-label], [title]")) {
         names.push(node.getAttribute("alt") ?? "", node.getAttribute("aria-label") ?? "", node.getAttribute("title") ?? "");
     }
 
-    for (const node of outermost.querySelectorAll(":scope svg title")) {
+    for (const node of scope.querySelectorAll(":scope svg title")) {
         names.push(node.textContent ?? "");
     }
 
-    // Generated text drawn by the elements inside the outermost one: a purchase word in a descendant's ::before is shown too.
+    // Generated text drawn by the elements inside the scope: a purchase word in a descendant's ::before is shown too.
     // Stops once the name is past its cap, which the read reports as cut short.
     let generatedLength = 0;
 
-    for (const node of outermost.querySelectorAll("*")) {
+    for (const node of scope.querySelectorAll("*")) {
         for (const text of generatedText(node)) {
             names.push(text);
             generatedLength += text.length;
