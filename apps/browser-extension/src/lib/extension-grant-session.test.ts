@@ -630,9 +630,6 @@ describe("endSession", () => {
 
         await vi.waitFor(() => expect(store.get(SIGNED_OUT_KEY)).toBe(USER.id));
         vi.spyOn(chrome.storage.local, "remove").mockRejectedValue(storageUnavailable);
-        await settle();
-        expect(warningOf(page)).toBeUndefined();
-
         revoke.resolve(new Response(null, { status: 204 }));
         await act(async () => {
             await expect(signingOut).rejects.toThrow("storage unavailable");
@@ -736,6 +733,30 @@ describe("endSession", () => {
         await settle();
 
         expect(store.get(GRANT_KEY)).toEqual(grant);
+        expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
+    it("warns from another panel's failure mark alone, while this panel's own retry waits out a failed read", async () => {
+        store.set(GRANT_KEY, grant);
+        store.set(SIGNED_OUT_KEY, USER.id);
+        store.set("neore.signOutFailed", USER.id);
+        const { get } = chrome.storage.local;
+
+        // The watch's reads succeed; the cleanup's (`finishPendingSignOut`, on the call stack) fail, so this panel tries no removal yet.
+        chrome.storage.local.get = vi.fn().mockImplementation(async (keys: string[]) => {
+            if (new Error("stack").stack?.includes("finishPendingSignOut")) {
+                throw storageUnavailable;
+            }
+
+            return await get(keys);
+        });
+
+        const page = await mount(createElement(AuthPage));
+
+        await settle();
+
+        expect(fetchMock).not.toHaveBeenCalled();
         expect(warningOf(page)).toBeDefined();
         await page.unmount();
     });
