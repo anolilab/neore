@@ -275,8 +275,13 @@ export const executeBrowserAction = internalAction
                 }
 
                 if (error || !response?.ok || !data) {
-                    // The renderer says it ran nothing (its session lock did not answer): the charge is given back.
+                    // The renderer says it ran nothing (its session lock did not answer): the charge is given back, and
+                    // the hold ends here, however late the answer came: no call of this action can still be acting.
                     if (response?.headers?.get?.("x-browser-action") === "not-run") {
+                        const ended = held;
+
+                        held = undefined;
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, ended).catch(() => undefined);
                         await refund();
                     }
 

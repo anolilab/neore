@@ -191,7 +191,11 @@ export class SessionHolds {
             return { busy: "shared", held: false };
         }
 
-        this.#holds.set(token, { expiresAt: now + Math.min(leaseMs, MAX_LEASE_MS), kind });
+        const known = this.#holds.get(token);
+        const expiresAt = now + Math.min(leaseMs, MAX_LEASE_MS);
+
+        // The same token again (a take delivered twice) renews the hold it has: its kind, its arm and its later end stay.
+        this.#holds.set(token, known ? { ...known, expiresAt: Math.max(known.expiresAt, expiresAt) } : { expiresAt, kind });
 
         return { held: true };
     }

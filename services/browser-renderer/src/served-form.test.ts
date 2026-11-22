@@ -92,6 +92,15 @@ describe(servedForms, () => {
         split.mockRestore();
     });
 
+    it("does not read a page whose actions, resolved against a long base, take past the parse budget", () => {
+        const base = `<base href="https://id.example/${"a".repeat(1_000_000)}/">`;
+        const forms = Array.from({ length: 20 }, (_, at) => `<form method="post" action="s${at}">${FIELDS}<button>Go</button></form>`).join("");
+
+        expect(servedForms(`${base}${forms}`, URL_OF_PAGE)).toStrictEqual([null]);
+        // An ordinary base and as many forms read as before.
+        expect(servedForms(`<base href="https://id.example/a/">${forms}`, URL_OF_PAGE)).toHaveLength(20);
+    });
+
     it("resolves against the first base address and takes the first base target", () => {
         const html = `<base target="_top"><base href="https://id.example/a/"><base href="https://other.example/"><form action="s">${FIELDS}</form>`;
 

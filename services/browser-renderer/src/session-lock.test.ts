@@ -47,6 +47,19 @@ describe(SessionHolds, () => {
         expect(new SessionHolds([], true).take("a", "shared", 1000, 0)).toStrictEqual({ held: false, retired: true });
     });
 
+    it("renews a hold when its take arrives twice, keeping its arm and its later end", () => {
+        const holds = new SessionHolds();
+
+        holds.take("login", "exclusive", 1000, 0);
+        holds.renew("login", 5000, 0, true);
+        // The take delivered again, later, with a shorter lease than the hold already has.
+        expect(holds.take("login", "exclusive", 1000, 100)).toStrictEqual({ held: true });
+        expect(holds.entries(100)).toStrictEqual([["login", { armed: true, expiresAt: 5000, kind: "exclusive" }]]);
+
+        // It lapses armed: the session is retired.
+        expect(holds.take("a", "shared", 1000, 5000)).toStrictEqual({ held: false, retired: true });
+    });
+
     it("does not retire a session when a sign-in's hold lapses before it was armed: its call never started on the page", () => {
         const holds = new SessionHolds();
 
@@ -327,11 +340,18 @@ describe(SessionLock, () => {
         await vi.advanceTimersByTimeAsync(LEASE_MS + 1000);
         await expect(holdSession(namespace, "s", "shared")).resolves.toBe("retired");
 
-        vi.setSystemTime(alarms.at(-1) ?? 0);
+        // Kept from the lapse that retired it: the hold's last lease end, plus the hour.
+        const { retiredUntil } = stored.get("state") as { retiredUntil: number };
+        const leaseEnd = retiredUntil - RETIRED_KEEP_MS;
+
+        expect(leaseEnd).toBeGreaterThan(Date.now() - LEASE_MS - 1000);
+        expect(leaseEnd).toBeLessThanOrEqual(Date.now());
+        expect(alarms.at(-1)).toBe(retiredUntil);
+
+        vi.setSystemTime(retiredUntil);
         await lock.alarm();
 
         expect(stored.has("state")).toBe(false);
-        expect(alarms.at(-1)).toBeGreaterThanOrEqual(Date.now() - RETIRED_KEEP_MS);
         await expect(holdSession(namespace, "s", "shared")).resolves.toHaveProperty("release");
     });
 

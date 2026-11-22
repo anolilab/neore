@@ -342,8 +342,9 @@
             },
             "ActionWithheldResponse": {
                 "type": "object",
+                "required": ["error", "success"],
                 "properties": {
-                    "success": { "type": "boolean" },
+                    "success": { "type": "boolean", "enum": [false] },
                     "error": { "type": "string" },
                     "sessionId": {
                         "type": "string",

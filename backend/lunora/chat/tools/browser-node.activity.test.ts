@@ -317,6 +317,23 @@ describe("a browser action on a running browser", () => {
         expect(renderer).toHaveBeenCalledTimes(2);
     });
 
+    it("ends the hold of an action the renderer ran none of, even when its answer came past the call's deadline", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockImplementationOnce(async () => {
+            // The lock's refusal answers only once the call's whole budget is spent.
+            vi.setSystemTime(Date.now() + FETCH_TIMEOUT_LONG_MS * 2);
+
+            return {
+                data: undefined,
+                error: { error: "lock", success: false },
+                response: { headers: new Headers({ "x-browser-action": "not-run" }), ok: false, status: 503 },
+            };
+        });
+
+        await expect(act("extract")).resolves.toMatchObject({ success: false });
+        await expect(row()).resolves.not.toHaveProperty("inUseHolds");
+    });
+
     it("keeps the new browser of an action whose hold the renderer lost, and tells the agent it may have run", async () => {
         await addSession(NOW - 1000);
         await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { providerSessionId: NO_PROVIDER_SESSION }));

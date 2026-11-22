@@ -9,7 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { applyLimit } from "../lib/rate-limiter-mutations";
-import { internalQuery } from "../lib/crpc";
+import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
@@ -1046,6 +1046,33 @@ describe("opening a page while in control", () => {
 
         await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
         await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
+    });
+
+    it("gives back the charge of a navigation the renderer ran none of even when logging it fails", async () => {
+        const key = "browser_functions:logAction";
+        const logging = registry.get(key);
+
+        await addSession();
+        await take(OWNER);
+        // The hour's 240 spent, this navigation's unit with them (the guard that takes it is stubbed here).
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 240, identifier: OWNER, key: "browser/control:free" }));
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+        registry.set(
+            key,
+            internalMutation.input({ sessionId: v.string() }).mutation(async () => {
+                throw new Error("log failed");
+            }),
+        );
+
+        try {
+            await expect(navigate(OWNER)).rejects.toThrow("log failed");
+        } finally {
+            registry.set(key, logging);
+        }
+
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/control:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
     });
 
     it("keeps the browser a navigation whose hold the renderer lost names, and tells the person the page may have opened", async () => {

@@ -861,40 +861,43 @@ export const navigateInControl = authAction
         let logged: { replaced: boolean } | undefined;
 
         try {
-            logged = await ctx.runMutation(internal.browser.functions.logAction, {
-                action: "navigate",
-                actor: navigation.byOwner ? "owner" : "collaborator",
-                durationMs: Date.now() - startedAt,
-                ...(result?.success !== true && { errorMessage: result?.error ?? withheldError ?? "The page could not be opened." }),
-                ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
-                ...(withheldSessionId !== undefined && { providerSessionId: withheldSessionId }),
-                sessionId: navigation.sessionId,
-                startedAt,
-                startedWithProviderSessionId: navigation.providerSessionId,
-                success: result?.success === true,
-                target: url,
-            });
-        } finally {
-            if (!mayStillLoad) {
-                await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
-                    at: Date.now(),
-                    navigatingUntil: navigation.navigatingUntil,
+            try {
+                logged = await ctx.runMutation(internal.browser.functions.logAction, {
+                    action: "navigate",
+                    actor: navigation.byOwner ? "owner" : "collaborator",
+                    durationMs: Date.now() - startedAt,
+                    ...(result?.success !== true && { errorMessage: result?.error ?? withheldError ?? "The page could not be opened." }),
+                    ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
+                    ...(withheldSessionId !== undefined && { providerSessionId: withheldSessionId }),
                     sessionId: navigation.sessionId,
-                    userId,
+                    startedAt,
+                    startedWithProviderSessionId: navigation.providerSessionId,
+                    success: result?.success === true,
+                    target: url,
                 });
+            } finally {
+                if (!mayStillLoad) {
+                    await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
+                        at: Date.now(),
+                        navigatingUntil: navigation.navigatingUntil,
+                        sessionId: navigation.sessionId,
+                        userId,
+                    });
+                }
             }
-        }
-
-        // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for this
-        // navigation is given back, as the agent's is (`chat/tools/browser-node.ts`). After the row is logged and the hold
-        // ended, and a refund that fails is let go: it never keeps a hold or a retired browser on the row.
-        if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
-            await ctx
-                .runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
-                    identifier: userId,
-                    key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
-                })
-                .catch(() => undefined);
+        } finally {
+            // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for
+            // this navigation is given back, as the agent's is (`chat/tools/browser-node.ts`). After the row is logged and
+            // the hold ended, whether or not those writes succeed, and a refund that fails is let go: it never keeps a
+            // hold or a retired browser on the row, nor hides their error.
+            if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
+                await ctx
+                    .runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
+                        identifier: userId,
+                        key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
+                    })
+                    .catch(() => undefined);
+            }
         }
 
         // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened

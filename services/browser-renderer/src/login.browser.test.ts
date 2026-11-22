@@ -1107,6 +1107,8 @@ describe(signIn, () => {
             username: "ann",
         });
 
+        // The POST did leave the page: the hold was lost as it went, and the check before its hand-on stopped it.
+        expect(isLost).toBe(true);
         expect(result).toMatchObject({ submitted: false, success: false });
         expect(sessionPosts()).toStrictEqual([]);
     });
@@ -1148,14 +1150,15 @@ describe(signIn, () => {
         expect(page.isClosed()).toBe(true);
     });
 
-    it("takes out a rule set however its type is cased or spaced, and leaves a data block whose type only names rules", async () => {
-        const probe = `addEventListener("DOMContentLoaded", () => { fetch("/probe?data=" + Boolean(document.getElementById("data")) + "&rules=" + Boolean(document.getElementById("rules"))); });`;
+    it("takes out a rule set however its type is cased, and leaves a data block whose type only names rules", async () => {
+        const probe = `addEventListener("DOMContentLoaded", () => { fetch("/probe?data=" + Boolean(document.getElementById("data")) + "&padded=" + Boolean(document.getElementById("padded")) + "&rules=" + Boolean(document.getElementById("rules"))); });`;
 
-        fixture.page = `<script id="data" type="application/speculationrules+json">{}</script><script id="rules" type=" SpeculationRules ">{}</script>${loginForm(probe)}`;
+        // Chromium reads a rule set from neither data block: one names rules in a longer type, one pads the type.
+        fixture.page = `<script id="data" type="application/speculationrules+json">{}</script><script id="padded" type=" speculationrules ">{}</script><script id="rules" type="SpeculationRules">{}</script>${loginForm(probe)}`;
 
         await run();
 
-        expect(login.hits.filter((hit) => hit.url.startsWith("/probe")).map((hit) => hit.url)).toStrictEqual(["/probe?data=true&rules=false"]);
+        expect(login.hits.filter((hit) => hit.url.startsWith("/probe")).map((hit) => hit.url)).toStrictEqual(["/probe?data=true&padded=true&rules=false"]);
     });
 
     it("signs in with a form whose empty action is the page's own address, whatever its base", async () => {

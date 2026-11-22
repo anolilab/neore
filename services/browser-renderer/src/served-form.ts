@@ -213,8 +213,8 @@ const isSameDestination = (one: Omit<FormTarget, "name">, other: Omit<FormTarget
  * `checkForm` reads the live page: the form owner by the `form` attribute or the nearest form around it, the first enabled
  * submit button of that form, and the addresses against the first `<base href>` or `url`. A form the parser ties to a field
  * it does not hold (a form in a table) is not seen, so that field is in no form here. A page with a tag of more than
- * `MAX_TAG_ATTRIBUTES` attributes, or that takes more than `MAX_PARSE_WORK` to parse, is not read: its first field
- * counts as in no form.
+ * `MAX_TAG_ATTRIBUTES` attributes, or that takes more than `MAX_PARSE_WORK` to parse or to resolve its actions against
+ * its base, is not read: its first field counts as in no form.
  */
 export const servedForms = (html: string, url: string): (FormTarget | typeof AMBIGUOUS | null)[] => {
     const document = parseBounded(html);
@@ -274,10 +274,19 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
     // Each action address resolved once, to where it sends the form without its fragment: a form's own one is shared by
     // every submit button that does not override it. An empty action is the document's own address, whatever its base.
     const resolvedActions = new Map<string, string>();
+    // Each resolution reads the base address and the action twice (a check, then the parse): counted against the same
+    // budget as the parse, so a long base with many distinct actions cannot stall the Worker either.
+    let resolveWork = 0;
     const resolve = (action: string): string => {
         let resolved = resolvedActions.get(action);
 
         if (resolved === undefined) {
+            resolveWork += 2 * (base.length + action.length);
+
+            if (resolveWork > MAX_PARSE_WORK) {
+                throw TOO_LARGE;
+            }
+
             let address = url;
 
             if (action !== "") {
@@ -324,19 +333,28 @@ export const servedForms = (html: string, url: string): (FormTarget | typeof AMB
         return found;
     };
 
-    return html5
-        .filter(({ element }) => isHtml(element, "input") && typeOf(element) === "password")
-        .map((entry) => {
-            const form = ownerOf(entry);
+    try {
+        return html5
+            .filter(({ element }) => isHtml(element, "input") && typeOf(element) === "password")
+            .map((entry) => {
+                const form = ownerOf(entry);
 
-            if (!form) {
-                return null;
-            }
+                if (!form) {
+                    return null;
+                }
 
-            const destination = destinationOfForm(form);
+                const destination = destinationOfForm(form);
 
-            return destination === AMBIGUOUS ? AMBIGUOUS : { ...destination, name: attribute(entry.element, "name") ?? "" };
-        });
+                return destination === AMBIGUOUS ? AMBIGUOUS : { ...destination, name: attribute(entry.element, "name") ?? "" };
+            });
+    } catch (error) {
+        // Past the budget resolving its actions: read as a page too large to read, its first field in no form.
+        if (error === TOO_LARGE) {
+            return [null];
+        }
+
+        throw error;
+    }
 };
 
 /**

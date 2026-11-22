@@ -147,8 +147,8 @@ export type SessionRetiredResponse = {
 };
 
 export type ActionWithheldResponse = {
-    success?: boolean;
-    error?: string;
+    success: false;
+    error: string;
     /**
      * The browser session the action ran on, kept for the caller; absent when the lost hold closed it
      */
