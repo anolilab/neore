@@ -627,6 +627,9 @@ export const BrowserRenderer = Cloudflare.Worker("browser-renderer", {
     env: {
         BROWSER: Cloudflare.Browser(),
         NODE_ENV: stage === "production" ? "production" : "development",
+        // The hold on each browser session every isolate sees (`src/session-lock.ts`); created SQLite-backed, as
+        // `wrangler.jsonc`'s migration declares it.
+        SESSION_LOCK: Cloudflare.DurableObject("SessionLock"),
     },
     main: "./services/browser-renderer/src/index.ts",
     name: named("browser-renderer"),

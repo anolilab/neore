@@ -192,14 +192,18 @@ const STAND_IN_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 /** The shortest stand-in: no other text of a request matches it by chance, and it hides the length of most passwords. */
 const STAND_IN_LENGTH = 64;
 
-/** The low six bits of a random byte: a uniform pick from 64, of which the alphabet's 62 are kept. */
-const SIX_BITS = 0b11_1111;
+/**
+ * The alphabets a stand-in is drawn from, the first a password field's `pattern` takes: a numeric PIN field takes only
+ * digits, and the page's own rules would hold back a form whose field breaks its pattern.
+ */
+const STAND_IN_ALPHABETS = [STAND_IN_CHARACTERS, "0123456789", "abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
 
 /**
- * What the page is given in place of the password: `length` random letters and digits, each as likely as any other
- * (a byte's low six bits, drawn again when they fall past the alphabet), never the password itself.
+ * What the page is given in place of the password: `length` random characters of `characters`, each as likely as any
+ * other (a byte past the last whole multiple of the alphabet's size is drawn again), never the password itself.
  */
-export const standIn = (length: number, password: string): string => {
+export const standIn = (length: number, password: string, characters = STAND_IN_CHARACTERS): string => {
+    const limit = 256 - (256 % characters.length);
     let value = password;
 
     while (value === password) {
@@ -209,16 +213,44 @@ export const standIn = (length: number, password: string): string => {
             const bytes = crypto.getRandomValues(new Uint8Array(length));
 
             for (const byte of bytes) {
-                const character = STAND_IN_CHARACTERS[byte & SIX_BITS];
-
-                if (character !== undefined && value.length < length) {
-                    value += character;
+                if (byte < limit && value.length < length) {
+                    value += characters[byte % characters.length];
                 }
             }
         }
     }
 
     return value;
+};
+
+/** The stand-ins of each alphabet tried against a field's pattern before the next alphabet is. */
+const STAND_IN_TRIES = 4;
+
+/**
+ * A stand-in of `length` the password field's `pattern` takes, as the browser reads that pattern (whole, with the `v`
+ * flag; one it cannot read checks nothing), drawn from the first alphabet that gives one: `null` when none does, as
+ * for a pattern that asks for a symbol, so the page's own rules would hold back the form.
+ */
+export const standInFor = (pattern: string | null, length: number, password: string): string | null => {
+    let rule: RegExp | undefined;
+
+    try {
+        rule = pattern === null ? undefined : new RegExp(`^(?:${pattern})$`, "v");
+    } catch {
+        rule = undefined;
+    }
+
+    for (const characters of STAND_IN_ALPHABETS) {
+        for (let index = 0; index < STAND_IN_TRIES; index++) {
+            const stand = standIn(length, password, characters);
+
+            if (!rule || rule.test(stand)) {
+                return stand;
+            }
+        }
+    }
+
+    return null;
 };
 
 const FORM_SAFE_RE = /[\w*.-]/;
@@ -765,7 +797,7 @@ class OutOfTimeError extends Error {}
 const checkForm = (
     input: Element,
     { expected, isAscii, origin }: { expected?: { charset: string; enctype: string }; isAscii: boolean; origin: string },
-): "encoding" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
+): "encoding" | "invalid" | "no-form" | "off-site" | "re-encoded" | FormTarget => {
     const { form, isConnected, name, type } = input as HTMLInputElement;
 
     if (!form || !isConnected || type !== "password") {
@@ -776,7 +808,7 @@ const checkForm = (
     // and a form or image named `URL` or `querySelectorAll` the document's. No helper function: a bundler that keeps
     // names wraps one in a helper the page lacks.
     const { getAttribute, setAttribute } = Element.prototype;
-    const { acceptCharset, enctype } = Object.getOwnPropertyDescriptors(HTMLFormElement.prototype);
+    const { acceptCharset, enctype, noValidate } = Object.getOwnPropertyDescriptors(HTMLFormElement.prototype);
     const { characterSet, defaultView, URL: address } = Object.getOwnPropertyDescriptors(Document.prototype);
     const baseUri = Object.getOwnPropertyDescriptor(Node.prototype, "baseURI");
 
@@ -825,6 +857,12 @@ const checkForm = (
     }
 
     if (expected) {
+        // The form's own rules (a pattern, a required field left empty) would stop the submission before anything is
+        // sent: said at once, not waited out. A form or button that turns them off is sent regardless.
+        if (!(noValidate?.get?.call(form) as boolean) && !button?.hasAttribute("formnovalidate") && !HTMLFormElement.prototype.checkValidity.call(form)) {
+            return "invalid";
+        }
+
         // Read before the page's submit handlers run, which could replace it.
         const stop = view ? (Object.getOwnPropertyDescriptor(view, "stop")?.value as (() => void) | undefined) : undefined;
 
@@ -1013,9 +1051,15 @@ const IN_PARENT_SESSION = "part of the parent frame's session";
 /** How deep one read of a document's tree goes: Chromium cannot send a tree nested much more than 120 deep whole. */
 const READ_DEPTH = 64;
 
+/** DevTools' node types (the DOM's): a Worker has no `Node` to read them from. */
+const TEXT_NODE = 3;
+
+const CDATA_SECTION_NODE = 4;
+
 /**
  * The text and attribute values of every node of `frame`'s documents as DevTools reads them, every shadow root included:
- * a closed one is out of a script's reach, `isClean`'s too, but not of a later read of the page. Frames in the same
+ * a closed one is out of a script's reach, `isClean`'s too, but not of a later read of the page; then each tree's text
+ * as its `textContent` rebuilds it, a password split over text nodes whole again. Frames in the same
  * process are read with their parent's (`[]`). Throws when it cannot read them.
  */
 const nodeTexts = async (page: Page, frame: Frame): Promise<string[]> => {
@@ -1051,13 +1095,17 @@ const nodeTexts = async (page: Page, frame: Frame): Promise<string[]> => {
 
             if (!node) {
                 const reading = cut.map(async ({ backendNodeId }) => session.send("DOM.describeNode", { backendNodeId, depth: READ_DEPTH, pierce: true }));
+                const stopped = [...cut];
 
                 cut.length = 0;
 
                 const reads = await Promise.all(reading);
 
-                for (const read of reads) {
-                    readOn(read.node);
+                for (const [index, read] of reads.entries()) {
+                    // Kept on the node where the read stopped, so the tree is whole for the texts below.
+                    const { children, contentDocument, shadowRoots, templateContent } = read.node;
+
+                    readOn(Object.assign(stopped[index] as (typeof nodes)[number], { children, contentDocument, shadowRoots, templateContent }));
                 }
 
                 continue;
@@ -1070,6 +1118,37 @@ const nodeTexts = async (page: Page, frame: Frame): Promise<string[]> => {
             } else {
                 readOn(node);
             }
+        }
+
+        // Each tree's text nodes joined in order with nothing between them, as its `textContent` rebuilds them: a password
+        // split over several text nodes (of a closed shadow root too) is whole there. A shadow root, template content or
+        // frame document is a tree of its own.
+        const trees = [root];
+
+        for (let tree = trees.pop(); tree; tree = trees.pop()) {
+            let text = "";
+            const inOrder = [tree];
+
+            for (let node = inOrder.pop(); node; node = inOrder.pop()) {
+                if (node.nodeType === TEXT_NODE || node.nodeType === CDATA_SECTION_NODE) {
+                    text += node.nodeValue;
+                }
+
+                for (const inner of [...(node.shadowRoots ?? []), node.contentDocument, node.templateContent]) {
+                    if (inner) {
+                        trees.push(inner);
+                    }
+                }
+
+                const children = node.children ?? [];
+
+                // Last first, so the first child is the next one read.
+                for (let index = children.length - 1; index >= 0; index--) {
+                    inOrder.push(children[index] as (typeof nodes)[number]);
+                }
+            }
+
+            found.push(text);
         }
 
         return found;
@@ -1135,10 +1214,36 @@ const isClean = async (page: Page, password: string): Promise<boolean> => {
 };
 
 /**
+ * Drops every entry of the tab's session history but the one it shows (with any page the back/forward cache kept of
+ * them) and the browser's HTTP cache, within `ms`: whether both were done.
+ */
+const forgetAnswer = async (page: Page, ms: number): Promise<boolean> => {
+    if (ms <= 0) {
+        return false;
+    }
+
+    const forgetting = (async () => {
+        const session = await page.context().newCDPSession(page);
+
+        try {
+            await session.send("Page.resetNavigationHistory");
+            await session.send("Network.clearBrowserCache");
+
+            return true;
+        } finally {
+            await session.detach().catch(() => undefined);
+        }
+    })().catch(() => false);
+
+    return within(forgetting, ms, false);
+};
+
+/**
  * Takes the password out of the page before `deadline`, with the guard and the channel lock still holding and the tab's
  * scripts off: leaves the document that had it for `about:blank` (its `pagehide` and `unload` handlers run under them,
  * and the workers it started go with it), loads the address again by GET when the hold leaves time for it, never
- * resending the form, and looks (`isClean`) before any script of it runs. Only a clean page has the lock lifted
+ * resending the form, and looks (`isClean`) before any script of it runs. The tab's history and the HTTP cache are then
+ * dropped (`forgetAnswer`), so no script goes back to the answer. Only a clean page has the lock lifted
  * (`release`, which must end within a second), and is then loaded once more with its scripts, time allowing. An address
  * that carries the password is not loaded again: the page stays blank, which is clean. Whether the page is verifiably
  * clean in time: when it is not, it must not be used again.
@@ -1197,6 +1302,12 @@ const clearPassword = async (
         ) {
             return false;
         }
+    }
+
+    // The answer to the form's POST is still an entry of the tab's history and of the browser's cache, which a script
+    // could go back to or load once scripts run again: both are dropped first, or the page is not handed on.
+    if (!(await forgetAnswer(page, lookUntil - now()))) {
+        return false;
     }
 
     // A lock still letting go would hold the next page's workers and WebRTC: the session is not handed back like that.
@@ -1338,8 +1449,8 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
                 return `The login form would not send the password to ${origin} by POST in this window, so nothing was typed`;
             }
 
-            // `re-encoded` only at the send, which compares the form with the one the site served.
-            if (form === "encoding" || form === "re-encoded") {
+            // `encoding` (`re-encoded` and `invalid` only at the send, which compares the form with the one the site served).
+            if (typeof form === "string") {
                 return "The login form encodes what it sends in a way the agent's browser cannot put a saved password into, so nothing was typed";
             }
 
@@ -1452,9 +1563,25 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
 
         // The page gets a stand-in, never the password: the guard puts the password into the form's own POST as it
         // leaves, so no script of the page (nor a request it makes the browser send) can read it.
-        const maxLength = await answered(async () => field.evaluate((input) => (input as HTMLInputElement).maxLength));
-        const longest = maxLength > 0 ? Math.max(maxLength, password.length) : Infinity;
-        const stand = standIn(Math.min(Math.max(password.length, STAND_IN_LENGTH), longest), password);
+        // Its rules read by the prototype's getters, which a script of the page cannot shadow on the element.
+        const rules = await answered(async () =>
+            field.evaluate((input) => {
+                const read = (name: "maxLength" | "minLength" | "pattern"): unknown =>
+                    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, name)?.get?.call(input);
+
+                return {
+                    maxLength: read("maxLength") as number,
+                    minLength: read("minLength") as number,
+                    pattern: Element.prototype.hasAttribute.call(input, "pattern") ? (read("pattern") as string) : null,
+                };
+            }),
+        );
+        const longest = rules.maxLength > 0 ? Math.max(rules.maxLength, password.length) : Infinity;
+        const stand = standInFor(rules.pattern, Math.min(Math.max(password.length, STAND_IN_LENGTH, rules.minLength), longest), password);
+
+        if (stand === null) {
+            return failed("The password field only takes a format the agent's browser cannot fill in for it safely, so the password was not typed");
+        }
 
         // A guard that is armed only after its time is taken down as it arrives; the tab goes with the session meanwhile.
         let isGuardLate = false;
@@ -1504,6 +1631,12 @@ export const signIn = async (page: Page, options: SignInOptions): Promise<SignIn
             guard.giveUp();
 
             return failed("The login form changed how it encodes what it sends from the form the site served, so the password was not sent");
+        }
+
+        if (form === "invalid") {
+            return failed(
+                "The login form's own rules held it back (a field it requires is empty, or one is not in the format it asks for), so the password was not sent",
+            );
         }
 
         if (typeof form === "string") {

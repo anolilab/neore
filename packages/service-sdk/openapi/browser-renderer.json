@@ -57,6 +57,14 @@
                             }
                         }
                     },
+                    "503": {
+                        "description": "The browser session's lock did not answer in time, so nothing was run, or the action's hold could not be confirmed for its whole run, so its result is withheld; it can be tried again",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
@@ -99,10 +107,18 @@
                         }
                     },
                     "409": {
-                        "description": "The browser session is busy with another call; nothing was typed",
+                        "description": "The browser session is busy with another call, of any isolate; nothing was typed",
                         "content": {
                             "application/json": {
-                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The browser session's lock did not answer in time; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
                             }
                         }
                     },

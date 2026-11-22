@@ -18,18 +18,29 @@
     "browser": {
         "binding": "BROWSER"
     },
+    // The hold on each browser session every isolate sees (src/session-lock.ts). Not inherited by an `env`: each repeats it.
+    "durable_objects": {
+        "bindings": [{ "name": "SESSION_LOCK", "class_name": "SessionLock" }]
+    },
+    "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionLock"] }],
     "vars": {
         "NODE_ENV": "development"
     },
     "env": {
         "production": {
             "name": "browser-renderer",
+            "durable_objects": {
+                "bindings": [{ "name": "SESSION_LOCK", "class_name": "SessionLock" }]
+            },
             "vars": {
                 "NODE_ENV": "production"
             }
         },
         "preview": {
             "name": "browser-renderer-preview",
+            "durable_objects": {
+                "bindings": [{ "name": "SESSION_LOCK", "class_name": "SessionLock" }]
+            },
             "vars": {
                 "NODE_ENV": "development"
             }

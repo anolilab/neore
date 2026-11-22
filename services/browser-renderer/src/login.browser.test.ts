@@ -837,6 +837,16 @@ describe(signIn, () => {
             "in a closed shadow root nested deeper than one read of the page goes",
             (echoed: string) => `${"<div>".repeat(200)}<span><template shadowrootmode="closed"><p>Signed in with ${echoed}</p></template></span>`,
         ],
+        // No one text node holds it, but the root's text content, which a custom element reads once scripts run, does.
+        [
+            "split over text nodes in a closed shadow root",
+            (echoed: string) => `<div><template shadowrootmode="closed"><p>Signed in with ${echoed.slice(0, 3)}<!---->${echoed.slice(3)}</p></template></div>`,
+        ],
+        [
+            "split over elements in a closed shadow root",
+            (echoed: string) =>
+                `<div><template shadowrootmode="closed"><p>Signed in with ${echoed.slice(0, 3)}<b>${echoed.slice(3, 6)}</b>${echoed.slice(6)}</p></template></div>`,
+        ],
     ])("closes the session, and runs none of its script, when the reloaded page shows the password %s", async (_where, shown) => {
         let echoed = "";
 
@@ -1629,5 +1639,65 @@ describe(signIn, () => {
         const result = await run();
 
         expect(result).toMatchObject({ error: expect.stringContaining("did not finish"), submitted: false, success: false });
+    });
+
+    it("signs in through a numeric PIN field, giving its pattern a stand-in of digits", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password" pattern="[0-9]*" inputmode="numeric"><button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true });
+        expect(sessionPosts()).toStrictEqual([{ body: `user=ann&pw=${SAVED_SECRET}`, method: "POST", url: "/session" }]);
+    });
+
+    it("types no password into a field whose pattern no stand-in it can make meets", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password" pattern=".*[!@#].*"><button>Go</button></form>`;
+
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("only takes a format"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+    });
+
+    it("says at once that the form's own rules held it back, when a field it requires is left empty", async () => {
+        fixture.page = `<form method="post" action="/session"><input name="user"><input name="pw" type="password"><input name="otp" required><button>Go</button></form>`;
+
+        const startedAt = Date.now();
+        const result = await run();
+
+        expect(result).toMatchObject({ error: expect.stringContaining("own rules held it back"), submitted: false, success: false });
+        expect(sessionPosts()).toStrictEqual([]);
+        // Not the five seconds a held-back send is waited out.
+        expect(Date.now() - startedAt).toBeLessThan(4000);
+    });
+
+    it("leaves no way back to the sign-in's answer that showed the password: not by the tab's history, nor from the cache", async () => {
+        fixture.page = loginForm();
+        fixture.onSession = (request, response, body) => {
+            // Cacheable, as a careless site's answer may be; a GET of the same address shows nothing of it.
+            response.setHeader("cache-control", "private, max-age=3600");
+            html(response, request.method === "POST" ? `<p>Welcome, ${new URLSearchParams(body).get("pw") ?? ""}</p>` : "<p>Welcome back</p>");
+        };
+
+        const result = await run();
+
+        expect(result).toMatchObject({ submitted: true, success: true, url: `${login.origin}/session` });
+        expect(await page.evaluate(() => document.defaultView?.history.length)).toBe(1);
+
+        // Going back from the only entry goes nowhere: the page stays as it is, with no navigation to wait for.
+        await page.evaluate(() => {
+            document.defaultView?.history.go(-2);
+        });
+        await expect(page.waitForEvent("framenavigated", { timeout: 1000 })).rejects.toThrow();
+
+        expect(await page.content()).not.toContain(SAVED_SECRET);
+
+        const cached = await page.evaluate(async () =>
+            fetch("/session", { cache: "only-if-cached", mode: "same-origin" })
+                .then(async (response) => response.text())
+                .catch(() => ""),
+        );
+
+        expect(cached).not.toContain(SAVED_SECRET);
     });
 });

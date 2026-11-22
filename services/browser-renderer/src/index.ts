@@ -16,6 +16,11 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { originOf, signIn, TYPE_RESERVE_MS, withoutSecret } from "./login";
+import type { HoldKind, SessionHold } from "./session-lock";
+import { holdSession, LEASE_MS } from "./session-lock";
+
+// The Durable Object the `SESSION_LOCK` binding names: exported by the Worker's main module.
+export { SessionLock } from "./session-lock";
 
 // @cloudflare/playwright types — the binding provides launch() and connect()
 interface BrowserBinding {
@@ -26,6 +31,8 @@ interface BrowserBinding {
 interface Env {
     BROWSER: BrowserBinding;
     NODE_ENV: string;
+    /** The hold on each browser session every isolate sees (`src/session-lock.ts`). */
+    SESSION_LOCK: DurableObjectNamespace;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -315,17 +322,87 @@ const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promis
     return page;
 };
 
-/**
- * The sessions this isolate's calls are using: a `/login` holds its session alone from before it connects until its
- * cleanup ends, so no `/action` (an `extract` of the filled page) runs beside it, and it waits for none.
- */
-const signingIn = new Set<string>();
-const acting = new Map<string, number>();
-
 const BUSY_SIGNING_IN = "The browser session is signing in with a saved login; try again once that is done";
 
-/** One browser action, on the session `sessionId` or a new one. */
-const act = async (env: Env, { action, direction, fullPage, selector, sessionId, text, url }: z.infer<typeof actionSchema>): Promise<Response> => {
+const BUSY_IN_USE = "The browser session is busy with another call; try the sign-in again once it is done";
+
+const LOCK_UNREACHABLE = "The browser session's lock did not answer in time, so nothing was run; try it again in a moment";
+
+/**
+ * The holds one call keeps on the sessions it uses (`src/session-lock.ts`), shared by every isolate: a `/login` holds
+ * its session alone from before it connects until its cleanup ends, so no `/action` of any isolate (an `extract` of the
+ * page the site answered the sign-in with) runs beside it, and it waits for none; an `/action` holds it beside other
+ * actions. A session the call launched is held too, before its page is set up. `take` answers why one was not taken.
+ */
+const holdsOf = (env: Env, kind: HoldKind) => {
+    const held: SessionHold[] = [];
+
+    return {
+        held,
+        /** Ends every hold, within `ms`: whether each was in force all along. */
+        release: async (ms?: number): Promise<boolean> => {
+            const released = await Promise.all(held.map(async (hold) => hold.release(ms)));
+
+            return released.every(Boolean);
+        },
+        take: async (sessionId: string): Promise<"busy" | "unreachable" | null> => {
+            const taken = await holdSession(env.SESSION_LOCK, sessionId, kind);
+
+            if (taken === "unreachable") {
+                return taken;
+            }
+
+            if ("busy" in taken) {
+                return "busy";
+            }
+
+            held.push(taken);
+
+            return null;
+        },
+    };
+};
+
+/**
+ * One browser action, on the session `sessionId` or a new one, held beside other actions for its whole run. Its answer
+ * goes out only when every hold was in force all along: one that may have lapsed could have let a sign-in onto the
+ * session meanwhile, whose page the answer may show.
+ */
+const act = async (env: Env, body: z.infer<typeof actionSchema>): Promise<Response> => {
+    const holds = holdsOf(env, "shared");
+
+    // Taken before it connects: a session signing in is never reached.
+    const refused = body.sessionId ? await holds.take(body.sessionId) : null;
+
+    if (refused) {
+        return refused === "busy"
+            ? Response.json({ error: BUSY_SIGNING_IN, success: false }, { status: 409 })
+            : Response.json({ error: LOCK_UNREACHABLE, success: false }, { status: 503 });
+    }
+
+    let response: Response | undefined;
+
+    try {
+        response = await actHeld(env, body, holds);
+    } finally {
+        const isHeld = await holds.release();
+
+        if (!isHeld && response) {
+            response = Response.json(
+                { error: "The browser session's hold could not be confirmed for the whole action, so its result is withheld; try it again", success: false },
+                { status: 503 },
+            );
+        }
+    }
+
+    return response;
+};
+
+const actHeld = async (
+    env: Env,
+    { action, direction, fullPage, selector, sessionId, text, url }: z.infer<typeof actionSchema>,
+    holds: ReturnType<typeof holdsOf>,
+): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
     if (action === "navigate" && url) {
         const urlError = validateUrl(url);
@@ -337,9 +414,10 @@ const act = async (env: Env, { action, direction, fullPage, selector, sessionId,
 
     let browser: import("@cloudflare/playwright").Browser | undefined;
     let activeSessionId: string | undefined;
+    let isLaunched: boolean;
 
     try {
-        ({ browser, sessionId: activeSessionId } = await openBrowser(env, sessionId));
+        ({ browser, isLaunched, sessionId: activeSessionId } = await openBrowser(env, sessionId));
     } catch (error) {
         return Response.json(
             {
@@ -351,6 +429,19 @@ const act = async (env: Env, { action, direction, fullPage, selector, sessionId,
     }
 
     try {
+        // A session launched here is held as well, before its page is set up: its id is out once this answers.
+        const refused = isLaunched ? await holds.take(activeSessionId) : null;
+
+        if (refused) {
+            await browser.close().catch(() => {});
+            activeSessionId = undefined;
+
+            return Response.json(
+                { error: refused === "busy" ? BUSY_SIGNING_IN : LOCK_UNREACHABLE, success: false },
+                { status: refused === "busy" ? 409 : 503 },
+            );
+        }
+
         const page = await pageOf(browser);
 
         let result: ActionResult;
@@ -527,29 +618,7 @@ app.post("/action", async (c) => {
         return c.json({ error: `Invalid request: ${parsed.error.message}`, success: false }, 400);
     }
 
-    const { action, direction, fullPage, selector, sessionId, text, url } = parsed.data;
-
-    if (sessionId && signingIn.has(sessionId)) {
-        return c.json({ error: BUSY_SIGNING_IN, success: false }, 409);
-    }
-
-    if (sessionId) {
-        acting.set(sessionId, (acting.get(sessionId) ?? 0) + 1);
-    }
-
-    try {
-        return await act(c.env, { action, direction, fullPage, selector, sessionId, text, url });
-    } finally {
-        if (sessionId) {
-            const left = (acting.get(sessionId) ?? 1) - 1;
-
-            if (left > 0) {
-                acting.set(sessionId, left);
-            } else {
-                acting.delete(sessionId);
-            }
-        }
-    }
+    return act(c.env, parsed.data);
 });
 
 // ─── Saved-login fill ────────────────────────────────────────────────────────────
@@ -695,24 +764,29 @@ app.post("/login", async (c) => {
         return c.json({ error: "The login page is not on the site the login was saved for", success: false }, 400);
     }
 
-    if (sessionId && (signingIn.has(sessionId) || acting.has(sessionId))) {
-        return c.json({ error: "The browser session is busy with another call; try the sign-in again once it is done", success: false }, 409);
-    }
-
-    if (sessionId) {
-        signingIn.add(sessionId);
-    }
-
     const deadline = Date.now() + (budgetMs ?? NAV_TIMEOUT) - LOGIN_MARGIN_MS;
+    const holds = holdsOf(c.env, "exclusive");
+    // Taken before it connects, and refused while any other call holds the session: nothing is typed unheld.
+    const refused = sessionId ? await holds.take(sessionId) : null;
+
+    if (refused) {
+        return refused === "busy"
+            ? c.json({ error: BUSY_IN_USE, success: false }, 409)
+            : c.json({ error: "The browser session's lock did not answer in time, so nothing was typed; try it again in a moment", success: false }, 503);
+    }
 
     let closing: Promise<boolean> | undefined;
 
     try {
         const { body: answer, status } = await logIn(c.env, {
             deadline,
+            // Closed once either close confirmed it.
             hold: (pending) => {
-                closing = pending;
+                const before = closing;
+
+                closing = before ? Promise.all([before, pending]).then((closed) => closed.some(Boolean)) : pending;
             },
+            holds,
             origin,
             password,
             sessionId,
@@ -722,24 +796,23 @@ app.post("/login", async (c) => {
 
         return c.json(answer, status);
     } finally {
-        if (closing) {
-            // A close still under way: the session stays held until it ends, so nothing else uses it meanwhile. One
-            // that fails keeps it held for the isolate's life.
-            const held = closing.then((hasClosed) => {
-                if (hasClosed && sessionId) {
-                    signingIn.delete(sessionId);
-                }
+        const held = closing;
 
-                return hasClosed;
-            });
+        if (held) {
+            // A close still under way: the session stays held past the answer, until the close ends, and at most for
+            // as long as a browser left open idles before Browser Rendering reclaims it. One that fails keeps it held so.
+            const lingering = Promise.all(holds.held.map(async (hold) => hold.linger(KEEP_ALIVE_MS + LEASE_MS)));
+            // After the linger: a release that overtook it would be undone by it.
+            const releasing = Promise.all([held, lingering]).then(async ([hasClosed]) => (hasClosed ? holds.release() : false));
 
             try {
-                c.executionCtx.waitUntil(held);
+                c.executionCtx.waitUntil(releasing);
             } catch {
                 // No execution context (a test's request): the close goes on regardless.
             }
-        } else if (sessionId) {
-            signingIn.delete(sessionId);
+        } else {
+            // The rest of the margin is the answer's; a release that does not end in it ends on its own.
+            await holds.release(Math.max(500, deadline + LOGIN_MARGIN_MS - Date.now()));
         }
     }
 });
@@ -754,6 +827,7 @@ const logIn = async (
     {
         deadline,
         hold,
+        holds,
         origin,
         password,
         sessionId,
@@ -762,6 +836,7 @@ const logIn = async (
     }: {
         deadline: number;
         hold: (closing: Promise<boolean>) => void;
+        holds: ReturnType<typeof holdsOf>;
         origin: string;
         password: string;
         sessionId: string | undefined;
@@ -797,6 +872,94 @@ const logIn = async (
     }
 
     const { browser, page } = ready;
+    // A session launched here is held as well, before anything is typed: its id is out once this answers.
+    const refused = ready.isLaunched ? await holds.take(ready.sessionId) : null;
+
+    if (refused) {
+        await settledWithin(
+            browser.close().catch(() => undefined),
+            deadline - Date.now(),
+        );
+
+        return {
+            body: {
+                error:
+                    refused === "busy"
+                        ? "The browser session is busy with another call, so nothing was typed; try the sign-in again once it is done"
+                        : "The browser session's lock did not answer in time, so nothing was typed; try it again in a moment",
+                success: false,
+                ...(isSessionClosed && { sessionClosed: true }),
+            },
+            status: refused === "busy" ? 409 : 503,
+        } as const;
+    }
+
+    // A hold that may lapse could let another call onto the session, before the cleanup took the password out of the
+    // page: the browser is closed then, and the session with it.
+    let isHoldLost = false;
+    let isAnswered = false;
+    const closeOnLost = (): void => {
+        if (isHoldLost || isAnswered) {
+            return;
+        }
+
+        isHoldLost = true;
+        hold(
+            browser
+                .close()
+                .then(() => true)
+                .catch(() => false),
+        );
+    };
+
+    for (const held of holds.held) {
+        held.onLost(closeOnLost);
+    }
+
+    const answer = await signInHeld(browser, page, { deadline, hold, opened, origin, password, ready, scrub, url, username });
+
+    isAnswered = true;
+
+    if (!isHoldLost) {
+        return answer;
+    }
+
+    return {
+        body: {
+            error: "The hold on the browser session could not be kept for the sign-in, so the session is being closed; do not use it again",
+            sessionCloseUnconfirmed: true,
+            submitted: "submitted" in answer.body ? answer.body.submitted : undefined,
+            success: false,
+        },
+        status: 200,
+    } as const;
+};
+
+const signInHeld = async (
+    browser: Browser,
+    page: import("@cloudflare/playwright").Page,
+    {
+        deadline,
+        hold,
+        opened,
+        origin,
+        password,
+        ready,
+        scrub,
+        url,
+        username,
+    }: {
+        deadline: number;
+        hold: (closing: Promise<boolean>) => void;
+        opened: { sessionId: string } | undefined;
+        origin: string;
+        password: string;
+        ready: { sessionId: string };
+        scrub: (error: unknown) => string;
+        url: string;
+        username: string;
+    },
+) => {
     let result: Awaited<ReturnType<typeof signIn>>;
 
     try {

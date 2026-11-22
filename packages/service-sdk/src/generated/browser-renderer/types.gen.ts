@@ -169,6 +169,10 @@ export type BrowserActionErrors = {
      * Internal server error
      */
     500: ErrorResponse;
+    /**
+     * The browser session's lock did not answer in time, so nothing was run, or the action's hold could not be confirmed for its whole run, so its result is withheld; it can be tried again
+     */
+    503: ErrorResponse;
 };
 
 export type BrowserActionError = BrowserActionErrors[keyof BrowserActionErrors];
@@ -195,13 +199,17 @@ export type BrowserLoginErrors = {
      */
     400: ErrorResponse;
     /**
-     * The browser session is busy with another call; nothing was typed
+     * The browser session is busy with another call, of any isolate; nothing was typed
      */
-    409: ErrorResponse;
+    409: BrowserLoginErrorResponse;
     /**
      * Internal server error
      */
     500: BrowserLoginErrorResponse;
+    /**
+     * The browser session's lock did not answer in time; nothing was typed
+     */
+    503: BrowserLoginErrorResponse;
     /**
      * The browser did not start within the budget; nothing was typed
      */

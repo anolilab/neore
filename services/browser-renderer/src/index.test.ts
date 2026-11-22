@@ -1,9 +1,55 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import app from "./index";
+import { SessionLock } from "./session-lock";
+
+/**
+ * The `SESSION_LOCK` namespace: one `SessionLock` per session id, on storage kept in memory, which every app instance
+ * given it shares, as every isolate shares the Durable Objects. `reachable` false has its calls never answer.
+ */
+const lockNamespace = () => {
+    const locks = new Map<string, SessionLock>();
+    const control = { reachable: true };
+    const storageOf = () => {
+        const stored = new Map<string, unknown>();
+
+        return {
+            delete: async (key: string) => stored.delete(key),
+            get: async (key: string) => stored.get(key),
+            put: async (key: string, value: unknown) => {
+                stored.set(key, value);
+            },
+        };
+    };
+    const namespace = {
+        get: (id: string) => {
+            return {
+                fetch: async (url: string, init: RequestInit) => {
+                    if (!control.reachable) {
+                        return new Promise<Response>(() => {
+                            // Never answers.
+                        });
+                    }
+
+                    let lock = locks.get(id);
+
+                    if (!lock) {
+                        lock = new SessionLock({ storage: storageOf() } as never);
+                        locks.set(id, lock);
+                    }
+
+                    return lock.fetch(new Request(url, init));
+                },
+            };
+        },
+        idFromName: (name: string) => name,
+    };
+
+    return { control, namespace };
+};
 
 /** A browser binding whose `connect` and `launch` answer only when the test says so; `started` says which ran. */
-const binding = () => {
+const binding = (lock = lockNamespace()) => {
     const pending: ((browser: unknown) => void)[] = [];
     const started: string[] = [];
     const start = (how: string) => async () =>
@@ -12,7 +58,7 @@ const binding = () => {
             pending.push(resolve);
         });
 
-    return { env: { BROWSER: { connect: start("connect"), launch: start("launch") }, NODE_ENV: "test" }, pending, started };
+    return { env: { BROWSER: { connect: start("connect"), launch: start("launch") }, NODE_ENV: "test", SESSION_LOCK: lock.namespace }, lock, pending, started };
 };
 
 /** A browser whose page cannot be set up: it has no page, and opening one fails. */
@@ -37,8 +83,9 @@ interface Body {
     username?: string;
 }
 
-const post = async (env: ReturnType<typeof binding>["env"], path: string, body: Body) =>
-    app.request(path, { body: JSON.stringify(body), headers: { "content-type": "application/json" }, method: "POST" }, env);
+/** `body` posted to `path` of the Worker, or of `worker`: another instance of it. */
+const post = async (env: ReturnType<typeof binding>["env"], path: string, body: Body, worker: typeof app = app) =>
+    worker.request(path, { body: JSON.stringify(body), headers: { "content-type": "application/json" }, method: "POST" }, env);
 
 const SAVED_SECRET = "s3cret-pw";
 
@@ -96,6 +143,7 @@ describe("POST /login", () => {
                 launch: async () => await new Promise(() => {}),
             },
             NODE_ENV: "test",
+            SESSION_LOCK: lockNamespace().namespace,
         };
         const response = post(env as never, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "gone" });
 
@@ -118,6 +166,7 @@ describe("POST /login", () => {
                 },
             },
             NODE_ENV: "test",
+            SESSION_LOCK: lockNamespace().namespace,
         };
         const answer = await post(env as never, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "gone" });
 
@@ -242,6 +291,8 @@ describe("POST /login", () => {
         await expect(isFree(signedIn, "late")).resolves.toBe(false);
 
         closed.resolve(undefined);
+        // The hold is let go of once the close ends, by a call to the lock.
+        await vi.advanceTimersByTimeAsync(0);
 
         await expect(isFree(signedIn, "late")).resolves.toBe(true);
     });
@@ -338,5 +389,139 @@ describe("POST /login", () => {
 
         await vi.advanceTimersByTimeAsync(18_000);
         await signingIn;
+    });
+});
+
+describe("the session hold every isolate shares", () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    /** A second instance of the Worker, as another isolate runs it: none of its module state is this one's. */
+    const otherIsolate = async () => {
+        vi.resetModules();
+
+        const other = await import("./index");
+
+        return other.default;
+    };
+
+    /** A browser whose page never sets up its lock: the sign-in on it runs until its budget ends. */
+    const stallingBrowser = (close: () => Promise<void>, sessionId: string) => {
+        const context = {
+            route: async () => undefined,
+            routeWebSocket: async () =>
+                new Promise<void>(() => {
+                    // Never settles.
+                }),
+        };
+        const page = { close: async () => undefined, context: () => context, setDefaultTimeout: () => undefined, url: () => "about:blank" };
+
+        return { close, contexts: () => [{ pages: () => [page] }], sessionId: () => sessionId };
+    };
+
+    it("refuses an action another isolate is asked for while a sign-in holds the session, before it connects", async () => {
+        const { env, pending, started } = binding();
+        const other = await otherIsolate();
+        const signingIn = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "shared" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.(stallingBrowser(async () => undefined, "shared"));
+        await vi.advanceTimersByTimeAsync(0);
+
+        const action = await post(env, "/action", { action: "extract", sessionId: "shared" }, other);
+
+        expect(action.status).toBe(409);
+        await expect(action.json()).resolves.toMatchObject({ error: expect.stringContaining("signing in"), success: false });
+        expect(started).toStrictEqual(["connect"]);
+
+        await vi.advanceTimersByTimeAsync(20_000);
+        await signingIn;
+
+        // Once the sign-in let go, the other isolate's action runs.
+        post(env, "/action", { action: "extract", sessionId: "shared" }, other).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(started).toStrictEqual(["connect", "connect"]);
+    });
+
+    it("refuses a sign-in while another isolate's action holds the session", async () => {
+        const { env, started } = binding();
+        const other = await otherIsolate();
+
+        // An action that never ends: the session stays in use.
+        post(env, "/action", { action: "extract", sessionId: "busy" }, other).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        const login = await post(env, "/login", { ...LOGIN, sessionId: "busy" });
+
+        expect(login.status).toBe(409);
+        expect(started).toStrictEqual(["connect"]);
+    });
+
+    it.each([
+        ["/login", { ...LOGIN, sessionId: "away" }],
+        ["/action", { action: "extract", sessionId: "away" }],
+    ])("refuses %s on a session, before it connects, when the lock does not answer", async (path, body) => {
+        const { env, lock, started } = binding();
+
+        lock.control.reachable = false;
+
+        const answer = post(env, path, body);
+
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const response = await answer;
+
+        expect(response.status).toBe(503);
+        expect(started).toStrictEqual([]);
+    });
+
+    it("withholds an action's result when its hold cannot be confirmed for the whole action", async () => {
+        const { env, lock, pending } = binding();
+        const answer = post(env, "/action", { action: "extract", sessionId: "lapsed" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        lock.control.reachable = false;
+        pending[0]?.(brokenBrowser(async () => undefined, "lapsed"));
+        await vi.advanceTimersByTimeAsync(3000);
+
+        const response = await answer;
+
+        expect(response.status).toBe(503);
+        await expect(response.json()).resolves.toStrictEqual({ error: expect.stringContaining("result is withheld"), success: false });
+    });
+
+    it("closes the browser when the sign-in's hold can no longer be renewed, before it could lapse, and says the session may be open", async () => {
+        const { env, lock, pending } = binding();
+        const close = vi.fn(async () => undefined);
+        const response = post(env, "/login", { ...LOGIN, budgetMs: 60_000, sessionId: "unrenewed" });
+
+        await vi.advanceTimersByTimeAsync(0);
+        pending[0]?.(stallingBrowser(close, "unrenewed"));
+        await vi.advanceTimersByTimeAsync(0);
+        lock.control.reachable = false;
+        // The lease is 30 s from the take: given up 10 s before it.
+        await vi.advanceTimersByTimeAsync(19_000);
+
+        expect(close).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(close).toHaveBeenCalledOnce();
+
+        await vi.advanceTimersByTimeAsync(40_000);
+
+        const answer = await response;
+
+        await expect(answer.json()).resolves.toMatchObject({
+            error: expect.stringContaining("could not be kept"),
+            sessionCloseUnconfirmed: true,
+            success: false,
+        });
     });
 });
