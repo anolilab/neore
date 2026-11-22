@@ -15,16 +15,19 @@ import { findLocalModelTarget } from "@/features/settings/lib/custom-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { GOAL_ROUND_CHOICES, useGoalComposer } from "./goal-store";
+import PinnedGoal from "./pinned-goal";
 
 interface ComposerGoalProps {
     disabled?: boolean;
+    /** The chat the pin belongs to. Unset for a chat not yet created, which cannot be pinned. */
+    threadId?: string;
 }
 
 /**
  * Makes the next message a goal. The agent keeps working, and after each turn a short review decides whether the goal is met;
  * if not, the review's reason is the next instruction. It stops when the goal is met or after the chosen number of review rounds.
  */
-const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
+const ComposerGoal: FC<ComposerGoalProps> = ({ disabled, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const currentModel: string = useCurrentModel();
@@ -101,6 +104,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled }) => {
                     </TooltipContent>
                 </Tooltip>
             )}
+            {threadId !== undefined && <PinnedGoal disabled={disabled} threadId={threadId} />}
         </div>
     );
 };
