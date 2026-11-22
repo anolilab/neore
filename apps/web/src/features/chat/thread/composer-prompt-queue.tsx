@@ -64,15 +64,15 @@ const useSendQueuedPrompt = () => {
 
     return useCallback(
         (prompt: QueuedChatPrompt) => {
-            const { attachedReferences, composerAttachments, composerText } = useChatUIStore.getState();
+            const { attachedReferences, composerAttachments, composerDraftFrom, composerText } = useChatUIStore.getState();
 
             if (prompt.references) {
                 useChatUIStore.setState({ attachedReferences: prompt.references });
             }
 
-            void sendMessage(prompt.text, prompt.attachments);
+            void sendMessage(prompt.text, prompt.attachments, { draftFrom: prompt.draftFrom });
 
-            useChatUIStore.setState({ attachedReferences, composerAttachments, composerText });
+            useChatUIStore.setState({ attachedReferences, composerAttachments, composerDraftFrom, composerText });
         },
         [sendMessage],
     );

@@ -116,8 +116,12 @@ const optionalEnvSchema = z.object({
     APP_NAME: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_ID: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_SECRET: z.string().trim().optional(),
+    // Read-only live view of the agent's cloud browser (`browser/live-view.ts`), with CLOUDFLARE_ACCOUNT_ID.
+    // A token with Browser Rendering Write; unset, the browser card still shows, and Watch live answers "not available".
+    BROWSER_LIVE_VIEW_API_TOKEN: z.string().trim().optional(),
     BROWSERBASE_API_KEY: z.string().trim().optional(),
     BROWSERBASE_PROJECT_ID: z.string().trim().optional(),
+    CLOUDFLARE_ACCOUNT_ID: z.string().trim().optional(),
     // Encrypts connector OAuth tokens; falls back to ENCRYPTION_KEY (own HKDF purpose) when unset.
     CONNECTOR_ENCRYPTION_KEY: z.string().trim().optional(),
     // Creem subscriptions (`billing/`). Without the API key, checkout and the
@@ -162,11 +166,7 @@ const optionalEnvSchema = z.object({
     SIGNUP_INVITE_ONLY: z.string().trim().optional(),
     SLACK_CONNECTOR_CLIENT_ID: z.string().trim().optional(),
     SLACK_CONNECTOR_CLIENT_SECRET: z.string().trim().optional(),
-    // Browser extension origins, comma-separated. Optional: unset means the
-    // extension cannot sign in. Parsed to an exact list by
-    // `lib/extension-origins.ts`, which drops wildcards and malformed entries.
-    TRUSTED_EXTENSION_ORIGINS: z.string().trim().optional(),
-    // `identity.launchWebAuthFlow` redirect URIs for the Firefox extension's sign-in,
+    // `identity.launchWebAuthFlow` redirect URIs for the browser extension's sign-in,
     // comma-separated. Optional: unset means the shipped add-on's URI, `none` means
     // off. Parsed by
     // `lib/extension-origins.ts#parseTrustedExtensionRedirectUris`.

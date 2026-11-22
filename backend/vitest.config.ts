@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url";
 
 import { configDefaults, defineConfig } from "vitest/config";
 
+import { timeSharding } from "../scripts/vitest/time-sharding";
+
 /**
  * The backend ran on Vitest defaults until it needed a stand-in for
  * `cloudflare:workers` (a workerd built-in Node cannot resolve), and then a
@@ -22,6 +24,7 @@ export default defineConfig({
         },
     },
     test: {
+        ...timeSharding(import.meta.url),
         projects: [
             {
                 extends: true,

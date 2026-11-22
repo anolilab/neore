@@ -96,6 +96,7 @@ export const SETTINGS_KEYWORDS: Record<SettingsTab, ReadonlyArray<SettingsKeywor
         { keywords: [msg`remember`, msg`memories`, msg`forget`], label: msg`Memory` },
         { keywords: [msg`welcome tour`, msg`tutorial`, msg`intro`], label: msg`Onboarding` },
     ],
+    "chat-sub-agent-roles": [{ keywords: [msg`delegate`, msg`sub-agent`, msg`roles`, msg`code review`], label: msg`Model per kind of work` }],
     "chat-system-prompts": [{ keywords: [msg`instructions`, msg`persona`, msg`prompt`], label: msg`System Prompt Presets` }],
     "chat-tools": [
         { keywords: [msg`permissions`, msg`ask`, msg`auto`, msg`off`, msg`approval`], label: msg`Built-in tools` },

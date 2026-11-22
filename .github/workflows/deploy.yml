@@ -501,6 +501,8 @@ jobs:
                   VALYU_API_KEY: "${{ secrets.VALYU_API_KEY }}"
                   # Optional backend extras — bound only when non-empty.
                   CONNECTOR_ENCRYPTION_KEY: "${{ secrets.CONNECTOR_ENCRYPTION_KEY }}"
+                  # Read-only live view of the agent's cloud browser; needs CLOUDFLARE_ACCOUNT_ID too.
+                  BROWSER_LIVE_VIEW_API_TOKEN: "${{ secrets.BROWSER_LIVE_VIEW_API_TOKEN }}"
                   # GitHub reserves secret names starting with GITHUB_, hence the swap.
                   GITHUB_CONNECTOR_CLIENT_ID: "${{ secrets.CONNECTOR_GITHUB_CLIENT_ID }}"
                   GITHUB_CONNECTOR_CLIENT_SECRET: "${{ secrets.CONNECTOR_GITHUB_CLIENT_SECRET }}"
@@ -556,14 +558,14 @@ jobs:
                   # The address the account-deletion email names; the web build
                   # shows the same one (VITE_DPO_EMAIL).
                   DPO_EMAIL: "${{ secrets.VITE_DPO_EMAIL }}"
-                  # Published browser-extension origin(s), comma-separated:
-                  # chrome-extension://<store id>. Unset = the extension cannot
-                  # sign in; a wildcard is ignored, never honoured.
-                  TRUSTED_EXTENSION_ORIGINS: "${{ secrets.TRUSTED_EXTENSION_ORIGINS }}"
-                  # Firefox extension sign-in redirect URI(s). Leave the secret
-                  # unset: the backend defaults to the shipped add-on id's URI.
-                  # Set it only for another gecko id, or to "none" to turn the
-                  # Firefox sign-in off. A value replaces the default.
+                  # App-grant sign-in redirect URI(s), comma-separated: the
+                  # browser extension's, and the desktop (neore://auth/callback)
+                  # and mobile (neore-mobile://auth/callback) callbacks when
+                  # those apps sign in. Unset = the shipped Firefox add-on's URI
+                  # only. The Chrome build needs https://<store id>.chromiumapp.org/
+                  # listed, and a value REPLACES the whole list: add it to every
+                  # entry already set, and list the Firefox URI if it was unset
+                  # (lib/extension-origins.ts). "none" turns the sign-in off.
                   TRUSTED_EXTENSION_REDIRECT_URIS: "${{ secrets.TRUSTED_EXTENSION_REDIRECT_URIS }}"
                   WOLFRAM_APP_ID: "${{ secrets.WOLFRAM_APP_ID }}"
                   #

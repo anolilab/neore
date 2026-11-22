@@ -59,6 +59,7 @@ export const shardLocalTables = (source: unknown = schema): string[] =>
  * {@link GLOBAL_USER_TABLES_NOT_REASSIGNED} (`account-merge.test.ts` pins it).
  */
 export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
+    botOwners: ["ownerId"],
     chatFileAccess: ["userId"],
     feedback: ["userId"],
     // Without this a guest's collection stays the guest's: the files that moved
@@ -68,9 +69,10 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
     projectRepositories: ["userId"],
+    projectRuleFiles: ["userId"],
     projects: ["userId"],
-    promptHistory: ["userId"],
-    prompts: ["userId"],
+    promptHistory: ["userId", "contentBy"],
+    prompts: ["userId", "contentBy"],
     shardRoutes: ["ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
@@ -226,23 +228,48 @@ export const deleteShardRows = internalMutation
     });
 
 /** Re-point every `.global()` row naming the guest to the new user, and drop the guest's census row. */
+/**
+ * Global rows one `reassignGlobalRows` call moves: each is one D1 statement, and an invocation may run only so many, so a
+ * guest with more is moved over several calls (`mergeGuestInto` repeats it until `done`).
+ */
+const REASSIGN_BATCH = 200;
+
+/**
+ * Fewer rows per call for a table whose rows are large: each read row is charged whole against the call's read limit,
+ * and a rule-file row may hold up to `MAX_RULE_FILES_BYTES`.
+ */
+const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
+
 export const reassignGlobalRows = internalMutation
     .input({ from: v.string(), to: v.string() })
-    .output(v.object({ reassigned: v.number() }))
+    .output(v.object({ done: v.boolean(), reassigned: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const facades = ctx.db as unknown as Record<
             string,
-            { findMany: (options: { where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
+            {
+                findMany: (options: { consistency: "primary"; limit: number; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }>;
+            }
         >;
         let reassigned = 0;
 
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
             for (const column of columns) {
-                const { page } = await facades[table]!.findMany({ where: { [column]: args.from } });
+                const room = Math.min(REASSIGN_BATCH - reassigned, REASSIGN_BATCH_BY_TABLE[table] ?? REASSIGN_BATCH);
 
-                for (const row of page) {
+                if (room <= 0) {
+                    // Primary reads: a patch moves its row out of the filter, so the next call starts where this one stopped.
+                    return { done: false, reassigned };
+                }
+
+                const { page } = await facades[table]!.findMany({ consistency: "primary", limit: room + 1, where: { [column]: args.from } });
+
+                for (const row of page.slice(0, room)) {
                     await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
                     reassigned += 1;
+                }
+
+                if (page.length > room) {
+                    return { done: false, reassigned };
                 }
             }
         }
@@ -256,7 +283,7 @@ export const reassignGlobalRows = internalMutation
             await ctx.db.delete("shardActivity", row._id);
         }
 
-        return { reassigned };
+        return { done: true, reassigned };
     });
 
 /**
@@ -341,7 +368,14 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         drained &&= emptied;
     }
 
-    await call(references.reassignGlobal, { from, to }, to);
+    // In batches: each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
+    for (;;) {
+        const { done } = await call<{ done: boolean }>(references.reassignGlobal, { from, to }, to);
+
+        if (done) {
+            break;
+        }
+    }
 
     const follows = await moveThreadFollows(call, references, from, to);
 

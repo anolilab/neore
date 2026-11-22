@@ -4,8 +4,8 @@
  * cycle rejection), the verifier's output parsing, the repair-loop decision,
  * goal progress and the recurrence schedule.
  */
-import type { ModelCandidate } from "../skills/builder-logic";
-import { isSelectableTextModel } from "../skills/builder-logic";
+import type { ModelCandidate } from "@neore/ai/models";
+import { isSelectableTextModel } from "@neore/ai/models";
 import type { SkillModelCandidate } from "../skills/slash-command";
 import { resolveSkillModel } from "../skills/slash-command";
 import { findNextCronTime, getNextCronTime } from "../triggers/schedule";

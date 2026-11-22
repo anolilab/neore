@@ -10,11 +10,11 @@ import securityMiddleware from "./middleware/security-middleware";
  * make a request to this origin, so they need an origin check of their own —
  * `securityMiddleware` sets response headers and does not gate the request.
  *
- * Scoped to `serverFn` deliberately. `handlerType === "router"` covers the API
- * routes, and `/api/auth/*` is called cross-origin on purpose: the browser
- * extension authenticates against this app from a `chrome-extension://` origin
- * (see `apps/browser-extension/src/lib/env.ts`). Widening this filter to every
- * request would 403 the extension's entire auth flow.
+ * Scoped to `serverFn`. `handlerType === "router"` covers the API routes, which
+ * this filter leaves alone; widening it means checking every cross-origin caller
+ * of those routes first. The browser extension is not one: it signs in through an
+ * app grant against the backend (`backend/lunora/auth/extension-grant.ts`) and
+ * only opens this app in its sign-in window.
  *
  * The default policy is `Sec-Fetch-Site: same-origin`, falling back to `Origin`
  * and then `Referer`; a request carrying none of the three is rejected

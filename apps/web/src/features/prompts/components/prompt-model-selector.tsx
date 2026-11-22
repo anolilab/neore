@@ -8,13 +8,14 @@ import { ModelPickerButton } from "@/components/model-picker";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 interface PromptModelSelectorProps {
+    disabled?: boolean;
     errorMessage?: string;
     onChange: (modelId: string | undefined) => void;
     showError?: boolean;
     value: string | undefined;
 }
 
-const PromptModelSelector: FC<PromptModelSelectorProps> = ({ errorMessage, onChange, showError, value }) => {
+const PromptModelSelector: FC<PromptModelSelectorProps> = ({ disabled, errorMessage, onChange, showError, value }) => {
     const { t } = useLingui();
     const models = useFeatureFlaggedModels();
     const selectedModel = value ? models.find((m) => m.id === value) : undefined;
@@ -36,6 +37,7 @@ const PromptModelSelector: FC<PromptModelSelectorProps> = ({ errorMessage, onCha
                     "transition-colors",
                     showError && "border-destructive",
                 )}
+                disabled={disabled}
                 model={selectedModel}
                 modelId={value}
                 onSelect={handleSelect}

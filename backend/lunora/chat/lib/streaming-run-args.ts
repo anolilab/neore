@@ -15,6 +15,12 @@ import { v } from "lunorash/server";
 import { MAX_LENGTH } from "../../lib/validators";
 
 export const runStreamingAgentFields = {
+    /**
+     * Whether the turn was sent by an admin acting as the owner or by a browser extension's grant (not the owner typing,
+     * `auth/lib/sign-in-standing.ts`), from the session at `/chat/start`. Kept with a pause's and an interrupted run's
+     * stored arguments. Absent (a goal round, a run queued elsewhere) is not `false`: no saved login.
+     */
+    impersonated: v.optional(v.boolean()),
     /** Anonymous callers are pinned to the free model; a skill must not lift that. */
     isAnonymous: v.optional(v.boolean()),
     messageId: v.string(),
@@ -43,6 +49,12 @@ export const runStreamingAgentFields = {
         shouldAutoContinue: v.optional(v.boolean()),
         statelessMode: v.optional(v.boolean()),
     }),
+    /**
+     * The kinds of the run's system prompt as its first invocation built them (`system-context-kinds.ts`), kept with a
+     * pause's and an interrupted run's stored arguments. A resume rebuilds the prompt and runs on the union with these
+     * (`resumedSystemContext`): a source removed meanwhile cannot make the reply look safe. Absent on the first invocation.
+     */
+    systemContext: v.optional(v.array(v.string().max(40)).max(32)),
     threadId: v.string(),
     userId: v.string(),
     /** The raw composer text, when the start payload had it — where a `/<slug>` command is detected. */

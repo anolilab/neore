@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "vitest/config";
 
+import { timeSharding } from "../../scripts/vitest/time-sharding";
+
 export default defineConfig({
     resolve: {
         alias: {
@@ -12,6 +14,7 @@ export default defineConfig({
         },
     },
     test: {
+        ...timeSharding(import.meta.url),
         environment: "jsdom",
         globals: true,
         include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.{ts,mjs}"],

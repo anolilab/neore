@@ -28,17 +28,21 @@ import { KEY_ENTRY_FIELDS, type KeyEntryInput, mergeKeyEntries, redactPreference
 import { getMembersByUserId, getOrganization, getUser } from "./lib/better-auth-queries";
 import { getCurrentUserInternal } from "./lib/helper";
 import { resolveActiveMembership } from "./lib/organization-helpers";
-import { resolveUserPlan } from "./lib/plan";
+import { readUserRunPlan, resolveUserPlan } from "./lib/plan";
 import roleGuard from "./lib/role-guard";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { withoutUndefined } from "../lib/patch";
+import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { liveTrustedServers } from "../chat/lib/low-risk-trust";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
+import { changesPersonalization } from "./lib/personalization";
 import { isValidShortcut } from "./lib/shortcut";
+import { roleConfigRefusal } from "../sub-agents/role-settings";
+import { withRole } from "../sub-agents/roles";
+import { vSubAgentRoleConfig, vSubAgentRoleName } from "../sub-agents/validators";
 
 /** Any context an auth helper may be called from. */
 type AnyAuthContext = QueryContext | MutationContext | ActionContext;
@@ -292,6 +296,11 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
 
     // The generic settings write is the other way into a locked key: it takes the same refusal as `preference-writes.ts`.
     await assertSettingsWritable(context.db, user?.activeOrganization?.id ?? null, toStore);
+
+    // Words an admin acting as the user put into their system prompt mark the row for good (`auth/lib/personalization.ts`).
+    if (tableName === "userSettings" && user?.impersonatedBy && changesPersonalization(settings as Record<string, unknown> | null, toStore)) {
+        toStore.personalizationByImpersonator = true;
+    }
 
     if (settings) {
         await context.db.patch(tableName, settings._id, withoutUndefined(toStore));
@@ -984,6 +993,40 @@ export const updateUserSettings = authMutation
     });
 
 /**
+ * Sets or clears one of the user's sub-agent roles (`sub-agents/roles.ts`). One role per call, so saving one never
+ * overwrites another; `null` clears it. A model the sub-agent rule refuses is refused here, not at the first run.
+ */
+export const setSubAgentRole = authMutation
+    .use(rateLimit("settings/update"))
+    .input({ config: v.union(vSubAgentRoleConfig, v.null()), role: vSubAgentRoleName })
+    .output(v.null())
+    .mutation(async ({ args: { config, role }, ctx }) => {
+        const { userId } = ctx.user;
+
+        const refusal = await roleConfigRefusal(ctx, userId, config);
+
+        if (refusal) {
+            throw new LunoraError("BAD_REQUEST", refusal);
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+        const subAgentRoles = withRole(settings?.subAgentRoles ?? undefined, role, config);
+
+        if (settings) {
+            await patchRow(ctx.db, "userSettings", settings, { subAgentRoles });
+        } else {
+            await ctx.db.insert("userSettings", { subAgentRoles, userId });
+        }
+
+        ctx.log.event("auth.set_sub_agent_role", { cleared: config === null, role });
+
+        return null;
+    });
+
+/**
  * The user's web-search blocklist, for the search tool. Unlike `getUserPreferencesQuery`
  * it has no fallback: a failed read throws, so the tool fails closed rather than searching unfiltered.
  */
@@ -1033,7 +1076,7 @@ export const initializeUserSettings = authMutation
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .unique();
 
-        const updates: { location?: string; timezone?: string } = {};
+        const updates: { location?: string; personalizationByImpersonator?: true; timezone?: string } = {};
 
         if (existingSettings) {
             // If settings exist, update timezone and location if not set
@@ -1043,6 +1086,11 @@ export const initializeUserSettings = authMutation
 
             if (location && !existingSettings.location) {
                 updates.location = location;
+
+                // The location reaches the system prompt: an admin acting as the user marks it (`auth/lib/personalization.ts`).
+                if (context.user.impersonatedBy) {
+                    updates.personalizationByImpersonator = true;
+                }
             }
 
             if (Object.keys(updates).length > 0) {
@@ -1054,6 +1102,7 @@ export const initializeUserSettings = authMutation
                 timezone,
                 userId,
                 ...(location && { location }),
+                ...(location && context.user.impersonatedBy && { personalizationByImpersonator: true as const }),
             });
         }
 
@@ -1075,6 +1124,7 @@ export const getUserPreferencesQuery = internalQuery
             location: v.optional(v.string()),
             memoryEnabled: v.boolean(),
             nickname: v.optional(v.string()),
+            personalizationByImpersonator: v.boolean(),
             profession: v.optional(v.string()),
             resumeInterruptedRuns: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
@@ -1099,6 +1149,7 @@ export const getUserPreferencesQuery = internalQuery
                 location: userSettings?.location ?? undefined,
                 memoryEnabled: userSettings?.memoryEnabled ?? false, // Opt-in; see memory/functions.ts#isMemoryEnabled
                 nickname: userSettings?.nickname ?? undefined,
+                personalizationByImpersonator: userSettings?.personalizationByImpersonator === true,
                 profession: userSettings?.profession ?? undefined,
                 resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
@@ -1115,6 +1166,8 @@ export const getUserPreferencesQuery = internalQuery
                 location: undefined,
                 memoryEnabled: false,
                 nickname: undefined,
+                // A failed read carries no personalization, so nothing an admin wrote reaches the prompt.
+                personalizationByImpersonator: false,
                 profession: undefined,
                 // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
                 resumeInterruptedRuns: false,
@@ -1397,17 +1450,6 @@ export const getUserAuthFlagsQuery = internalQuery
 
         return { isAnonymous: user?.isAnonymous === true, plan, role: user?.role ?? null };
     });
-
-/** The plan behind `getUserRunPlanQuery`, readable from a mutation's db too. */
-const readUserRunPlan = async (context: QueryContext, userId: string): Promise<{ isAdmin: boolean; plan: "premium" | null }> => {
-    const [user, memberships] = await Promise.all([getUser(context, userId), getMembersByUserId(context, userId)]);
-    const organizations = await Promise.all(memberships.map(async (membership) => await getOrganization(context, membership.organizationId)));
-
-    return {
-        isAdmin: user?.role === "admin",
-        plan: resolveUserPlan(user, organizations),
-    };
-};
 
 /**
  * Whether the caller's plan opens paid-plan models: the rule `settingsUpsert` enforces on a backup model,

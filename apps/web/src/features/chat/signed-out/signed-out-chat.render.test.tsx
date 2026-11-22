@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 
 import SignedOutChat, { askToSignIn, SignedOutComposer } from "./signed-out-chat";
 
@@ -83,8 +84,8 @@ vi.mock("@/features/chat/core/hooks/use-pending-send", async () => {
     const prompt = await import("@/features/auth/stores/login-prompt-store");
 
     return {
-        holdForSignIn: (text: string) => {
-            pending.savePendingSend(text);
+        holdForSignIn: (text: string, draftFrom?: "suggestion") => {
+            pending.savePendingSend(text, undefined, undefined, draftFrom);
             prompt.openLoginPrompt();
         },
     };
@@ -106,6 +107,16 @@ describe("SignedOutComposer", () => {
         expect(useLoginPromptStore.getState().isOpen).toBe(true);
         expect(useChatUIStore.getState().composerText).toBe("hello");
         expect(JSON.parse(sessionStorage.getItem("neore:pending-send") ?? "{}")).toMatchObject({ text: "hello" });
+    });
+
+    it("holds a picked suggestion with its mark, so the send after sign-in is marked", () => {
+        render(<SignedOutComposer />);
+
+        useChatUIStore.getState().setComposerText("Summarize the history of the internet");
+        markComposerDraft("suggestion");
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(JSON.parse(sessionStorage.getItem("neore:pending-send") ?? "{}")).toMatchObject({ draftFrom: "suggestion" });
     });
 
     it("does nothing for an empty draft", () => {

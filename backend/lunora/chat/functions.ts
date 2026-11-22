@@ -3,6 +3,7 @@ import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
+import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -28,7 +29,6 @@ import {
     type SystemOptimizerStyle,
     type UserOptimizerStyle,
 } from "@neore/ai/prompts/optimizer";
-import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
@@ -66,6 +66,8 @@ import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { readChildThreads } from "./lib/child-threads";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { statelessPrompt } from "../lib/not-typed-text";
+import { vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { readableProject } from "../projects/functions";
@@ -773,7 +775,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome; ownerId?: string }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -791,6 +793,7 @@ export const gateThreadActionHandler = async (
         botId: thread?.botId,
         ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
         outcome,
+        ...(thread && { ownerId: thread.userId }),
         ...(isHostRunThread(thread) && { hostRun: true }),
     };
 };
@@ -809,6 +812,7 @@ export const gateThreadAction = internalQuery
             hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
             outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
+            ownerId: v.optional(v.string()),
         }),
     )
     .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));
@@ -1118,64 +1122,6 @@ export const getToolOutput = liteAuthQuery
             raw !== null && typeof raw === "object" && typeof (raw as { type?: unknown }).type === "string" ? (raw as { value?: unknown }).value : raw;
 
         return { output };
-    });
-
-/**
- * Output cap for `continueThread`, which streams a reply into an existing thread.
- * Generation bills per output token, so this bounds one reply the way
- * `pages/agent.ts` caps its own generation.
- */
-const CONTINUE_THREAD_MAX_OUTPUT_TOKENS = 16_000;
-
-export const continueThread = authAction
-    .use(rateLimit("chat/stream"))
-    .input({
-        model: v.string().max(MAX_LENGTH.short),
-        prompt: v.string().max(MAX_LENGTH.text),
-        threadId: v.id("threads"),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-    })
-    // The handler returns a `Response`, whose inferred type drags DOM WebSocket
-    // types into `_generated/` (which then fails to compile). Codegen renders a
-    // `v.any()` output from the handler's return type, hence `Promise<unknown>`.
-    .output(v.any())
-    .action(async ({ args: { model, prompt, threadId, unlockProof }, ctx: context }): Promise<unknown> => {
-        const { userId } = context.user;
-
-        const cleanPrompt = stripHiddenText(prompt).text;
-
-        if (cleanPrompt.trim() === "") {
-            throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
-        }
-
-        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
-
-        throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
-
-        if (gateResult.isWorker) {
-            throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");
-        }
-
-        // A cloud model must never answer in a thread the desktop owns: `runChatStart` refuses it the same way.
-        if (gateResult.hostRun) {
-            throw new LunoraError("CONFLICT", "This thread runs on a paired computer. Send the message from the desktop app.");
-        }
-
-        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-        const threadLanguage = threadData?.language;
-
-        const agent = await getAgentForUser(context, userId, model, threadLanguage);
-
-        const { thread } = await agent.continueThread(context, {
-            threadId,
-            userId,
-        });
-
-        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt: cleanPrompt });
-
-        context.log.event("chat.continue_thread", { model });
-
-        return result.toUIMessageStreamResponse();
     });
 
 export const getThreads = authQuery
@@ -4097,7 +4043,7 @@ export const getBrowserSession = authQuery
  * Returns the most recent actions (up to 50).
  */
 // Projection of `browserActions` rows: `success` is stored as a number and
-// surfaced as a boolean, and the session/user columns are deliberately dropped.
+// surfaced as a boolean, and the session column is deliberately dropped.
 export const getBrowserActions = authQuery
     .input({
         sessionId: v.string().max(MAX_LENGTH.id),
@@ -4114,6 +4060,8 @@ export const getBrowserActions = authQuery
                     v.literal("extract"),
                     v.literal("scroll"),
                 ),
+                /** A person in control of the browser did this: the owner, or someone they shared the chat with; absent: the agent. */
+                actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
                 durationMs: v.optional(v.number()),
                 errorMessage: v.optional(v.string()),
                 success: v.boolean(),
@@ -4142,6 +4090,7 @@ export const getBrowserActions = authQuery
             return {
                 _id: a._id,
                 action: a.action,
+                actor: a.actor,
                 durationMs: a.durationMs,
                 errorMessage: a.errorMessage,
                 success: a.success === 1,
@@ -4766,10 +4715,14 @@ export const streamAsync = internalAction
     .input({
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
+        /** The files the edited message attaches: the project's rule files applied by pattern match their names. */
+        fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_ATTACHED_FILES)),
         /** Set by `runJobOnce` when `/chat/edit` enqueues this; nothing reads it. */
         jobId: v.optional(v.string()),
         messageId: v.string(),
         model: v.string(),
+        /** The edited prompt's not-typed marks (`lib/not-typed-text.ts`): a stateless reply saves its prompt again, marked. */
+        notTyped: v.optional(vNotTypedMarks),
         parentId: v.optional(v.string()),
         prompt: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -4787,7 +4740,7 @@ export const streamAsync = internalAction
             timestamp: streamAsyncStartTime,
         });
 
-        const { customSystemPrompt, messageId, model, prompt, reasoningEffort, statelessMode, threadId } = args;
+        const { customSystemPrompt, messageId, model, notTyped, prompt, reasoningEffort, statelessMode, threadId } = args;
 
         // Get thread to find userId
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -4831,11 +4784,14 @@ export const streamAsync = internalAction
 
         if (appThread?.projectId) {
             // The access `createThread` applied (owner or organization member), not the owner-only read.
-            projectContext =
-                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
-                    projectId: appThread.projectId as Id<"projects">,
-                    userId,
-                })) ?? undefined;
+            // This run has no tools, so the `auto` files are neither listed nor read.
+            const project = await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
+                projectId: appThread.projectId as Id<"projects">,
+                userId,
+            });
+
+            projectContext = project?.textWithoutInstructions ?? project?.text ?? undefined;
         }
 
         // Get model definition
@@ -4861,7 +4817,7 @@ export const streamAsync = internalAction
         const streamTextArgs: any = Object.keys(providerOptions).length > 0 ? { providerOptions } : {};
 
         if (threadStatelessMode) {
-            streamTextArgs.prompt = prompt;
+            streamTextArgs.prompt = statelessPrompt(prompt ?? "", notTyped ?? {});
         } else {
             streamTextArgs.promptMessageId = messageId;
         }

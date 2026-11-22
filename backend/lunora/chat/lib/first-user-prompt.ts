@@ -151,6 +151,14 @@ export const fileOnlyPromptPart = (): { providerOptions: { neore: { fileOnlyProm
     return { providerOptions: { neore: { fileOnlyPrompt: true } }, text: FILE_ONLY_PROMPT, type: "text" };
 };
 
+/**
+ * The text part an image request with no prompt carries ("Generate an image"), tagged as a placeholder so a memory never
+ * quotes it as the person's words (`attached-text.ts#typedTextOf`). The title reader still reads it as the question.
+ */
+export const imagePromptPart = (): { providerOptions: { neore: { placeholder: true } }; text: string; type: "text" } => {
+    return { providerOptions: { neore: { placeholder: true } }, text: "Generate an image", type: "text" };
+};
+
 /** Whether a message's content holds the file-only placeholder. */
 const hasFileOnlyPlaceholder = (content: unknown): boolean => Array.isArray(content) && content.some((part) => isFileOnlyPlaceholder(part));
 

@@ -22,7 +22,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { verifyStreamToken } from "../chat/streaming/persistent/stream-token";
-import { isSelectableTextModel } from "../skills/builder-logic";
+import { isSelectableTextModel } from "@neore/ai/models";
 import { PublicApiError } from "./errors";
 import type { ApiKeyIdentity } from "./identity";
 import { decodeNativeCursor, encodeNativeCursor, paginateArray, parseLimit } from "./pagination";

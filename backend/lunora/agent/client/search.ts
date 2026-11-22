@@ -32,6 +32,14 @@ const DEFAULT_VECTOR_SCORE_THRESHOLD = 0;
 // the 8k token limit for some models.
 const MAX_EMBEDDING_TEXT_LENGTH = 10_000;
 
+/**
+ * A search hit is a row the search found, often in another chat, not one on the prompt's path: it reads like any user or
+ * assistant message, so it carries a mark of its own (`providerOptions.neore.searchHit`) for whoever classifies the text
+ * in front of the model (`vault/site-login-turn.ts#messageRefusal` refuses any message-level `neore` mark).
+ */
+const markSearchHit = (message: ModelMessage): ModelMessage =>
+    ({ ...message, providerOptions: { ...message.providerOptions, neore: { searchHit: true } } }) as ModelMessage;
+
 export type GetEmbedding = (text: string) => Promise<{
     embedding: number[];
     embeddingModel: EmbeddingModel;
@@ -753,7 +761,7 @@ export const fetchContextWithPrompt = async (
         }
     }
 
-    const search = docsToModelMessages(signedSearch);
+    const search = docsToModelMessages(signedSearch).map((hit) => markSearchHit(hit));
     const recent = withHandoff(signedPrePrompt, handoff.blocks);
     const inputMessages = messages.map((item) => toModelMessage(item));
     const inputPrompt = promptArray.map((item) => toModelMessage(item));

@@ -24,6 +24,15 @@ export const MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE = 3;
 /** The coding-agent call kinds, and the only names `isAcpTool` takes for one. A device cannot advertise any of them as a tool. */
 export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer", "acp_set_config"];
 
+export const GLOBAL_INSTRUCTIONS_LIST_TOOL = "instructions_list";
+export const GLOBAL_INSTRUCTIONS_READ_TOOL = "instructions_read";
+
+/**
+ * Whether a device call is one of the two that carry the person's local instruction files (`../global-instructions.ts`).
+ * Only a click in project settings starts one: a manifest never offers them to a chat and `createDeviceCall` never signs one.
+ */
+export const isGlobalInstructionsTool = (toolName: string): boolean => toolName === GLOBAL_INSTRUCTIONS_LIST_TOOL || toolName === GLOBAL_INSTRUCTIONS_READ_TOOL;
+
 /**
  * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed
  * again until its deadline (acp-agent-host.md §4.1). The desktop writes its receipt within a second or two

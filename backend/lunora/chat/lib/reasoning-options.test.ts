@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReasoningProviderOptions, toReasoningLevel } from "./reasoning-options";
+import { buildReasoningProviderOptions, lowReasoningUtilityOptions, toReasoningLevel } from "./reasoning-options";
 
 describe("toReasoningLevel", () => {
     it("collapses the slider's five stops onto three levels", () => {
@@ -41,5 +41,17 @@ describe("buildReasoningProviderOptions", () => {
     it("sends nothing when unset or unsupported", () => {
         expect(buildReasoningProviderOptions(undefined, "openai", true)).toBeUndefined();
         expect(buildReasoningProviderOptions(100, "openai", false)).toBeUndefined();
+    });
+});
+
+describe("lowReasoningUtilityOptions", () => {
+    it("asks a Workers AI reasoning model for low effort", () => {
+        expect(lowReasoningUtilityOptions({ modelId: "cf-gpt-oss-20b" })).toStrictEqual({ "workers-ai": { reasoning_effort: "low" } });
+        expect(lowReasoningUtilityOptions({ modelId: "cf-gpt-oss-120b" })).toStrictEqual({ "workers-ai": { reasoning_effort: "low" } });
+    });
+
+    it("sends nothing to a model that does not reason, which the adapter would otherwise pass the key to", () => {
+        expect(lowReasoningUtilityOptions({ modelId: "cf-llama-3.3-70b" })).toBeUndefined();
+        expect(lowReasoningUtilityOptions({ modelId: "openai/gpt-4.1-mini" })).toBeUndefined();
     });
 });

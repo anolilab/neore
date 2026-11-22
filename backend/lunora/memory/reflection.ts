@@ -62,11 +62,13 @@ import {
     type ReflectionMemory,
     type ReflectionOp,
     revisionToOps,
+    committedReflectionOps,
     countAppliedMerges,
     countResolvedContradictions,
     selectReflectionInputs,
     splitExpired,
 } from "./reflection-logic";
+import { newestEvidence } from "./evidence";
 import { logRedaction, redactDigestSummary, redactMemoryText, redactReflectionOps } from "./redact";
 import { factDatesOf, hasFactDates, isExpired, normalizeFactDates, sameFactDates } from "./dates";
 import { lastConfirmedOf } from "./taxonomy";
@@ -325,6 +327,7 @@ export const loadExpiredMemoriesPage = internalQuery
 
 const vReflectionOp = v.union(
     v.object({
+        absorbedText: v.optional(v.string()),
         byMemoryId: v.string(),
         checkDates: v.optional(
             v.object({
@@ -335,6 +338,7 @@ const vReflectionOp = v.union(
         expiredOn: v.optional(v.string()),
         kind: v.literal("supersede"),
         memoryId: v.string(),
+        merge: v.optional(v.literal(true)),
     }),
     v.object({
         checkDates: v.optional(
@@ -345,6 +349,7 @@ const vReflectionOp = v.union(
         lastConfirmedAt: v.optional(v.number()),
         memory: v.optional(v.string()),
         memoryId: v.string(),
+        readText: v.optional(v.string()),
     }),
     v.object({
         confidence: v.number(),
@@ -352,6 +357,7 @@ const vReflectionOp = v.union(
         kind: v.literal("promote"),
         memory: v.string(),
         sourceIds: v.array(v.string()),
+        sourceTexts: v.optional(v.array(v.object({ id: v.string(), memory: v.string() }))),
         threadId: v.optional(v.string()),
         type: vReflectionMemoryType,
     }),
@@ -390,12 +396,42 @@ export const applyReflectionOps = internalMutation
             return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy ? row : null;
         };
 
+        // A merge applies whole or not at all: when its survivor was edited, or a row it absorbs was revised, deleted,
+        // retired, pinned or given other dates after the plan read it, neither the survivor's new wording nor any retirement
+        // of that merge is written, so no merged text overwrites the user's edit, outlives the fact it read or carries one the
+        // user removed.
+        const staleMerges = new Set<string>();
+        const datesMoved = (row: Doc<"memories">, planned: { eventEnd?: string; eventStart?: string; validUntil?: string } | undefined): boolean =>
+            planned !== undefined && !sameFactDates(factDatesOf(row), normalizeFactDates(planned));
+
+        for (const op of ops) {
+            if (op.kind === "patch" && op.readText !== undefined) {
+                const row = await active(op.memoryId);
+
+                if (row?.memory !== op.readText || datesMoved(row, op.checkDates?.memory)) {
+                    staleMerges.add(op.memoryId);
+                }
+
+                continue;
+            }
+
+            if (op.kind !== "supersede" || op.merge !== true || op.absorbedText === undefined) {
+                continue;
+            }
+
+            const row = await active(op.memoryId);
+
+            if (!row || row.pinned === true || row.memory !== op.absorbedText || datesMoved(row, op.checkDates?.memory)) {
+                staleMerges.add(op.byMemoryId);
+            }
+        }
+
         for (const op of ops) {
             switch (op.kind) {
                 case "patch": {
                     const row = await active(op.memoryId);
 
-                    if (!row) {
+                    if (!row || staleMerges.has(op.memoryId)) {
                         break;
                     }
 
@@ -430,20 +466,28 @@ export const applyReflectionOps = internalMutation
                 }
                 case "promote": {
                     const rows = await Promise.all(op.sourceIds.map(async (id) => active(id)));
-                    const sources = rows.filter((row): row is Doc<"memories"> => row !== null && row.pinned !== true);
+                    const read = new Map(op.sourceTexts?.map((source) => [source.id, source.memory]));
+                    const sources = rows.filter(
+                        (row): row is Doc<"memories"> => row !== null && row.pinned !== true && (read.get(row._id as string) ?? row.memory) === row.memory,
+                    );
                     // A promotion that is nothing but a secret is not made, and its sources stay.
                     const memory = redactMemoryText(op.memory);
                     // Planned from undated activities: a source dated since is an occurrence, not a habit, so nothing is promoted.
                     const datedSince = sources.some((row) => hasFactDates(factDatesOf(row)));
 
-                    if (sources.length === 0 || memory === null || datedSince) {
+                    // A source revised, deleted or pinned since the synthesis read it leaves the promotion unmade: the
+                    // promoted wording still holds its old fact, and every source stays active for the next run.
+                    if (sources.length === 0 || sources.length !== rows.length || memory === null || datedSince) {
                         promotedIds.push(null);
                         break;
                     }
 
+                    const evidence = newestEvidence(sources);
                     const promotedId = await ctx.db.insert("memories", {
                         botId: botId as Id<"bots"> | undefined,
                         confidence: op.confidence,
+                        // The newest words among the merged rows back the promoted one.
+                        ...(evidence && { evidence }),
                         importance: op.importance,
                         lastConfirmedAt: now,
                         memory,
@@ -469,8 +513,16 @@ export const applyReflectionOps = internalMutation
                     const row = await active(op.memoryId);
                     const by = op.byMemoryId === op.memoryId ? row : await active(op.byMemoryId);
 
-                    // An expiry planned before a restatement moved the end date no longer holds.
-                    if (!row || !by || row.pinned === true || (op.expiredOn !== undefined && !isExpired(row, op.expiredOn))) {
+                    // An expiry planned before a restatement moved the end date no longer holds. A merge whose absorbed row
+                    // was revised since the plan read it is left out: its newer words are a different fact, and it stays
+                    // active for the next run.
+                    if (
+                        !row ||
+                        !by ||
+                        row.pinned === true ||
+                        (op.expiredOn !== undefined && !isExpired(row, op.expiredOn)) ||
+                        (op.merge === true && staleMerges.has(op.byMemoryId))
+                    ) {
                         break;
                     }
 
@@ -484,6 +536,17 @@ export const applyReflectionOps = internalMutation
                     }
 
                     await ctx.db.patch("memories", row._id, { supersededBy: by._id, updatedAt: now });
+
+                    // The survivor takes the absorbed row's words when they were said later. Outside a merge, a survivor
+                    // with no quote takes none: it is the newer belief that contradicts or reworded the absorbed one.
+                    // Only a merge hands the absorbed row's words on: a replacing belief keeps its own quote, never the replaced one's.
+                    // A survivor the user wrote (`manual`) takes none: its words are theirs, not anything they were quoted saying.
+                    const evidence = by._id === row._id || op.merge !== true || by.source === "manual" ? undefined : newestEvidence([by, row]);
+
+                    if (evidence !== undefined && evidence !== by.evidence) {
+                        await ctx.db.patch("memories", by._id, { evidence });
+                    }
+
                     supersededIds.push(row._id);
                     applied += 1;
                     break;
@@ -727,6 +790,7 @@ const reflectScope = async (
     const superseded = new Set([...expirySuperseded, ...result.supersededIds]);
     const committed = new Map(result.written.map(({ memory, memoryId }) => [memoryId, memory]));
     const promoteOps = writeOps.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
+    const committedOps = committedReflectionOps(writeOps, result.supersededIds);
     const learned = [
         ...promoteOps.flatMap((op, index) => {
             const memoryId = result.promotedIds[index];
@@ -748,9 +812,9 @@ const reflectScope = async (
         learned,
         stats: {
             // Counted from what is written: a revision whose wording was only a secret resolves nothing.
-            contradictionsResolved: countResolvedContradictions(revisedPairs, writeOps),
+            contradictionsResolved: countResolvedContradictions(revisedPairs, committedOps),
             decayed: plan.decay.length,
-            merged: countAppliedMerges(plan.merges, writeOps),
+            merged: countAppliedMerges(plan.merges, committedOps),
             newMemories: learnedToday.length,
             promoted: result.promotedIds.filter((id) => id !== null).length,
             // A retirement is a supersession of a row by itself (decay or expiry); count only those the write committed.

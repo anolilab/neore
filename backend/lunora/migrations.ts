@@ -88,6 +88,17 @@ export const addApprovalChainSource = defineMigration({
     up: () => undefined,
 });
 
+/**
+ * A group pause's snapshot gained an optional `group.fileIds` (`chat/group/validators.ts`), the files the turn's message
+ * attached. Nothing to fill: a row without it gives the speakers after the pause no pattern rule files, as before. A
+ * no-op for the same reason as {@link addApprovalChainSource}.
+ */
+export const addGroupPauseFileIds = defineMigration({
+    id: "add-group-pause-file-ids",
+    table: "toolApprovalRuns",
+    up: () => undefined,
+});
+
 /** The options a row stored under `agentOptions` (the read path that is retired), in its own shape. */
 interface LegacyAgentOptions {
     configOptions?: { category?: string; choices: { name: string; value: string }[]; currentValue: string; id: string; name: string }[];
@@ -197,5 +208,116 @@ export const addAgentCommandsToSessions = defineMigration({
 export const addAgentCommandsToChunks = defineMigration({
     id: "add-agent-commands-persistent-chunks",
     table: "persistentChunks",
+    up: () => undefined,
+});
+
+/**
+ * A delivered steer gained `textLength`, so a recovered reply can split a combined row into its steers. A row written
+ * before it has none: recovery falls back to the row's own time for those steers (`chat/lib/recover-finished-reply.ts`).
+ * Nothing is rewritten, so the old rows keep their meaning and the new key is optional.
+ */
+export const addSteerTextLength = defineMigration({
+    id: "add-steer-text-length",
+    table: "persistentStreams",
+    up: () => undefined,
+});
+
+/**
+ * The stored config gained an optional `mcpToolOrigins` (`chat/lib/tool-run-config.ts`): which server's tool each runtime name
+ * stood for. Nothing to fill: a row without it is not held to an origin, as before it, and an origin cannot be told after
+ * the fact. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addApprovalToolOrigins = defineMigration({
+    id: "add-approval-tool-origins",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * The stored config gained an optional `botLookup` (`chat/lib/tool-run-config.ts`): where a paused headless run found its bot.
+ * Nothing to fill: a row without it looks the bot up by its thread, as before it. A no-op, so `lunora prepare` records the
+ * added optional key in the baseline.
+ */
+export const addApprovalBotLookup = defineMigration({
+    id: "add-approval-bot-lookup",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * A queued steer's not-typed mark (`persistentStreams.notTypedSteers`, `lib/not-typed-text.ts`) gained draft kinds:
+ * forwarded messages, a reply sent on as a prompt, a suggestion, the prompt improver's rewrite, a gallery prompt and an
+ * organization's value. Only the union widened, so every stored mark still fits. A no-op, so `lunora prepare` records the
+ * wider shape in the baseline.
+ */
+export const widenNotTypedSteerDrafts = defineMigration({
+    id: "widen-not-typed-steer-drafts",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * The stored config gained an optional `projectId` (`chat/lib/tool-run-config.ts`): the project whose `auto` rule files a
+ * paused run listed. Nothing to fill: a row without it offered no `instruction_read`, or reads no project's files. A no-op,
+ * so `lunora prepare` records the added optional key in the baseline. (The rule files' own new `description` and `auto`
+ * mode need none: `projectRuleFiles` is `.global()`, which a shard's data migration cannot read, and every stored file
+ * still fits the wider shape.)
+ */
+export const addApprovalProjectId = defineMigration({
+    id: "add-approval-project-id",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * A queued steer's not-typed mark gained `collaborator`: another person's message in a shared chat put back into the
+ * composer (Restore to input). Only the union widened, so every stored mark still fits. A no-op, so `lunora prepare`
+ * records the wider shape in the baseline.
+ */
+export const widenNotTypedSteerCollaborator = defineMigration({
+    id: "widen-not-typed-steer-collaborator",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * A run's stored arguments (`persistentStreams.runArgs`, and `pause.run`) gained an optional `impersonated`: whether an
+ * admin acting as the owner sent the turn (`chat/lib/streaming-run-args.ts`). Nothing to fill: a row without it reads as
+ * not known, which gives the turn no saved login. A no-op, so `lunora prepare` records the added optional key.
+ */
+export const addRunArgsImpersonated = defineMigration({
+    id: "add-run-args-impersonated",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * The stored config gained an optional `impersonated` and `systemContext` (`chat/lib/tool-run-config.ts`): what the
+ * saved-login verdict needs of the paused turn. Nothing to fill: a row without them gives its continuation no saved login.
+ * A no-op, so `lunora prepare` records the added optional keys.
+ */
+export const addApprovalRunTurn = defineMigration({
+    id: "add-approval-run-turn",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * A run's stored arguments (`runArgs`, `pause.run`) gained an optional `systemContext` (`chat/lib/streaming-run-args.ts`),
+ * and a held steer's mark (`notTypedSteers`) the `extension` kind. Nothing to fill: a resume of a run stored without
+ * kinds runs as `unrecorded` and gets no saved login, and no stored mark names the new kind. A no-op, so `lunora prepare`
+ * records both in the baseline.
+ */
+export const addRunArgsSystemContext = defineMigration({
+    id: "add-run-args-system-context",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });

@@ -193,32 +193,41 @@ export const oauthHooksFor = (
     };
 };
 
-/** MCP server configs for every usable connector the user has connected, in slug order. */
-export const getConnectorMcpServers = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, userId: string): Promise<MCPServerConfig[]> => {
+/**
+ * MCP server configs for every usable connector the user has connected, in slug order. With `keep`, only the connectors it
+ * keeps (by slug) get a token: the others are skipped before any refresh.
+ */
+export const getConnectorMcpServers = async (
+    ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
+    userId: string,
+    keep?: (slug: string) => boolean,
+): Promise<MCPServerConfig[]> => {
     const grants = (await ctx.runQuery(internal.connectors.store.listConnectorGrants, { userId })) as ConnectorGrant[];
 
     const servers = await Promise.all(
-        grants.map(async (grant): Promise<MCPServerConfig | null> => {
-            const outcome = await obtainAccessToken(ctx, grant);
+        grants
+            .filter((grant) => keep === undefined || keep(grant.slug))
+            .map(async (grant): Promise<MCPServerConfig | null> => {
+                const outcome = await obtainAccessToken(ctx, grant);
 
-            if ("error" in outcome) {
-                toolsLogger.warn(`[connectors] "${grant.slug}" unavailable: ${outcome.error}`);
+                if ("error" in outcome) {
+                    toolsLogger.warn(`[connectors] "${grant.slug}" unavailable: ${outcome.error}`);
 
-                await markGrant(ctx, grant.ref, outcome);
+                    await markGrant(ctx, grant.ref, outcome);
 
-                return null;
-            }
+                    return null;
+                }
 
-            return {
-                connectorSlug: grant.slug,
-                enabled: true,
-                headers: [{ key: "Authorization", value: `Bearer ${outcome.accessToken}` }],
-                name: grant.name,
-                oauth: oauthHooksFor(ctx, grant, `Reconnect ${grant.name} in Settings → Connectors`),
-                protocol: grant.mcpProtocol,
-                url: grant.mcpUrl,
-            };
-        }),
+                return {
+                    connectorSlug: grant.slug,
+                    enabled: true,
+                    headers: [{ key: "Authorization", value: `Bearer ${outcome.accessToken}` }],
+                    name: grant.name,
+                    oauth: oauthHooksFor(ctx, grant, `Reconnect ${grant.name} in Settings → Connectors`),
+                    protocol: grant.mcpProtocol,
+                    url: grant.mcpUrl,
+                };
+            }),
     );
 
     return servers.filter((server) => server !== null);
@@ -266,12 +275,15 @@ interface McpServerGrant {
  * With `pruneOrphans` — pass it ONLY with the user's complete server list — a
  * grant whose server is gone (removed, or its URL changed) is revoked and
  * deleted, so removing a server in settings ends the third-party access too.
+ *
+ * With `keep`, a server it does not keep is returned as saved: no token is obtained or refreshed for it, and a failed refresh
+ * is not recorded against its grant. Orphans are still judged by the whole list.
  */
 export const withMcpServerGrants = async (
     ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
     userId: string,
     servers: MCPServerConfig[],
-    options: { fetchImpl?: OAuthFetch; pruneOrphans?: boolean } = {},
+    options: { fetchImpl?: OAuthFetch; keep?: (server: MCPServerConfig) => boolean; pruneOrphans?: boolean } = {},
 ): Promise<MCPServerConfig[]> => {
     const fetchImpl = options.fetchImpl ?? defaultOAuthFetch;
     const grants = (await ctx.runQuery(internal.connectors.store.listMcpServerGrants, { userId })) as McpServerGrant[];
@@ -299,7 +311,7 @@ export const withMcpServerGrants = async (
         servers.map(async (server) => {
             const grant = byName.get(server.name);
 
-            if (!grant || grant.serverUrl !== server.url || grant.status === "disconnected") {
+            if (!grant || grant.serverUrl !== server.url || grant.status === "disconnected" || options.keep?.(server) === false) {
                 return server;
             }
 

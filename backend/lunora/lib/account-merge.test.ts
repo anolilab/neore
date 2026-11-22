@@ -118,7 +118,7 @@ const fakeShards = (
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
 
-                return { reassigned: 0 } as never;
+                return { done: true, reassigned: 0 } as never;
             }
             case "reassignThreadFollowsPage": {
                 const moved = Math.min(pageSize, followsLeft);
@@ -296,6 +296,30 @@ describe("reassignGlobalRows", () => {
             expect(left.page).toStrictEqual([]);
             expect(leftRepositories.page).toStrictEqual([]);
             expect(movedRepositories.page).toHaveLength(rows);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("moves a guest's rule-file rows a few per call, each read charged whole, until all are the new account's", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 10; index += 1) {
+                    await context.db.insert("projectRuleFiles", { files: [], projectId: `project-${String(index)}`, updatedAt: 0, userId: "guest" });
+                }
+            });
+
+            const first = await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+
+            expect(first).toStrictEqual({ done: false, reassigned: 8 });
+
+            const second = await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+            const moved = await harness.run(async (context: any) => await context.db.projectRuleFiles.findMany({ where: { userId: "user" } }));
+
+            expect(second).toMatchObject({ done: true, reassigned: 2 });
+            expect(moved.page).toHaveLength(10);
         } finally {
             harness.close();
         }

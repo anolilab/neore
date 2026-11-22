@@ -30,14 +30,16 @@ const { readableProjects } = vi.hoisted(() => {
     return { readableProjects: new Map<string, { context?: string }>() };
 });
 
-vi.mock("../projects/functions", () => {
+vi.mock("../projects/functions", async (importOriginal) => {
     const found = async (_ctx: unknown, projectId: string) => {
         const project = readableProjects.get(projectId);
 
         return project ? { _id: projectId, ...project } : null;
     };
 
-    return { readableProject: found, writableProject: found };
+    const { projectRunContext } = await importOriginal<typeof import("../projects/functions")>();
+
+    return { projectRunContext, readableProject: found, writableProject: found };
 });
 
 // A test sets `failing` to make the stuck-task notice write throw, as an inbox write or a schedule can.

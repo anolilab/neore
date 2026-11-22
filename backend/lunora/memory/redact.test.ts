@@ -318,7 +318,7 @@ describe("memory writes", () => {
         expect(row.supersededBy).toBeUndefined();
     });
 
-    it("reports what reflection committed: the rows it superseded, a pinned source left out, and the wording it wrote", async () => {
+    it("reports what reflection committed: the rows it superseded, no promotion of a pinned source, and the wording it wrote", async () => {
         const [survivor, absorbed, pinned, observed] = await harness.run(
             async (ctx: any) =>
                 await ctx.runMutation(saveMemoryBatch, {
@@ -343,17 +343,11 @@ describe("memory writes", () => {
                 }),
         );
 
-        const [promoted] = result.promotedIds;
-
-        expect(result.supersededIds).toEqual([absorbed, observed]);
-        expect(result.written).toEqual([
-            { memory: `User likes black tea, CI token ${REDACTED}`, memoryId: survivor },
-            { memory: "User drinks tea daily", memoryId: promoted },
-        ]);
+        // A source pinned since the synthesis leaves the promotion unmade, so `observed` stays too.
+        expect(result.promotedIds).toEqual([null]);
+        expect(result.supersededIds).toEqual([absorbed]);
+        expect(result.written).toEqual([{ memory: `User likes black tea, CI token ${REDACTED}`, memoryId: survivor }]);
         // Each written row is re-embedded from the write itself.
-        expect(harness.scheduler.list().map((job) => job.args)).toEqual([
-            { memoryId: survivor, userId: "user-1" },
-            { memoryId: promoted, userId: "user-1" },
-        ]);
+        expect(harness.scheduler.list().map((job) => job.args)).toEqual([{ memoryId: survivor, userId: "user-1" }]);
     });
 });

@@ -21,8 +21,10 @@ import { compareStrings } from "../lib/collections";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { checkRateLimit, getRateLimitKey } from "../lib/rate-limiter";
 import { FREE_PROMPT_LIMIT, VARIABLE_REGEX } from "./constants";
+import { contentAuthorAfterEdit, contentAuthorOfSession, copiedContentAuthor, variableDefaults } from "./content-author";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { type StoredRow, storedRow, storedRows } from "../lib/stored-row";
 
 // `prompts`, `promptHistory` and `userVariableDefaults` are `.global()` (D1):
 // they have no legacy `ctx.db.query(...)` reader, so every read goes through the
@@ -170,7 +172,7 @@ export const getPrompts = authAction
         favoriteOnly: v.optional(v.boolean()),
         sortBy: v.optional(v.union(v.literal("recent"), v.literal("mostUsed"), v.literal("recentlyUsed"), v.literal("alphabetical"))),
     })
-    .action(async ({ args: { favoriteOnly, sortBy = "recent" }, ctx }): Promise<Doc<"prompts">[]> => {
+    .action(async ({ args: { favoriteOnly, sortBy = "recent" }, ctx }): Promise<StoredRow<Doc<"prompts">>[]> => {
         const { userId } = ctx.user;
 
         // Handle anonymous users - return empty array if no userId
@@ -182,7 +184,7 @@ export const getPrompts = authAction
 
         const cache = new ActionCache<
             { favoriteOnly: boolean | null; organizationId: string | null; sortBy?: "alphabetical" | "mostUsed" | "recent" | "recentlyUsed"; userId: string },
-            Doc<"prompts">[]
+            StoredRow<Doc<"prompts">>[]
         >(undefined, {
             action: internal.prompts.functions.calculatePrompts,
             name: "prompts",
@@ -208,11 +210,11 @@ export const getPrompt = authQuery
     .input({
         promptId: v.id("prompts"),
     })
-    .query(async ({ args: { promptId }, ctx }): Promise<Doc<"prompts"> | null> => {
+    .query(async ({ args: { promptId }, ctx }): Promise<StoredRow<Doc<"prompts">> | null> => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
-        const prompt = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
+        const prompt = storedRow(await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } }));
 
         if (!prompt) {
             return null;
@@ -267,8 +269,10 @@ export const createPrompt = authMutation
 
         await assertPromptQuota(ctx);
 
+        const author = contentAuthorOfSession(ctx.user);
         const promptId = await ctx.db.insert("prompts", {
             content,
+            ...author,
             currentVersion: 1,
             description,
             enabledFeatures,
@@ -292,6 +296,7 @@ export const createPrompt = authMutation
         await ctx.db.insert("promptHistory", {
             changeType: "created",
             content,
+            ...author,
             createdAt: now,
             description,
             enabledFeatures,
@@ -348,7 +353,7 @@ export const updatePrompt = authMutation
             const organizationId = ctx.user.activeOrganization?.id;
             const { now } = ctx;
 
-            const existing = await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } });
+            const existing = storedRow(await ctx.db.prompts.findFirst({ where: { _id: promptId as Id<"prompts"> } }));
 
             if (!existing) {
                 throw new LunoraError("NOT_FOUND", "Prompt not found");
@@ -369,12 +374,19 @@ export const updatePrompt = authMutation
             const isEnabledFeaturesChanged = enabledFeatures !== undefined && JSON.stringify(enabledFeatures) !== JSON.stringify(existing.enabledFeatures);
             const shouldSaveHistory = isContentChanged || isVariablesChanged || isModelChanged || isReasoningEffortChanged || isEnabledFeaturesChanged;
             const newVersion = (existing.currentVersion || 1) + (shouldSaveHistory ? 1 : 0);
+            // New words add the editor to their writers, whoever owns the prompt (`content-author.ts`). A variable's
+            // default is words too, put into the composer with the content; its name, description or requirement is not.
+            const isDefaultsChanged =
+                variables !== undefined && JSON.stringify(variableDefaults(variables)) !== JSON.stringify(variableDefaults(existing.variables));
+            const isWordsChanged = isContentChanged || isDefaultsChanged;
+            const author = isWordsChanged ? contentAuthorAfterEdit(existing, ctx.user) : copiedContentAuthor(existing);
 
             // Save history entry if content, variables, or settings changed
             if (shouldSaveHistory) {
                 await ctx.db.insert("promptHistory", {
                     changeType: changeType || "manual",
                     content: content === undefined ? existing.content : content,
+                    ...author,
                     createdAt: now,
                     description: description === undefined ? existing.description : description,
                     enabledFeatures: enabledFeatures === undefined ? existing.enabledFeatures : enabledFeatures,
@@ -391,6 +403,7 @@ export const updatePrompt = authMutation
 
             await ctx.db.patch("prompts", promptId, {
                 ...(content !== undefined && { content }),
+                ...(isWordsChanged && author),
                 ...(shouldSaveHistory && { currentVersion: newVersion }),
                 ...(description !== undefined && { description }),
                 ...(enabledFeatures !== undefined && { enabledFeatures }),
@@ -532,7 +545,7 @@ export const searchPrompts = authQuery
         query: v.string().max(MAX_LENGTH.long),
         tags: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
     })
-    .query(async ({ args: { query, tags }, ctx }): Promise<Doc<"prompts">[]> => {
+    .query(async ({ args: { query, tags }, ctx }): Promise<StoredRow<Doc<"prompts">>[]> => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
@@ -553,7 +566,7 @@ export const searchPrompts = authQuery
             // Combine and deduplicate
             const allPrompts = [...userPrompts, ...orgPrompts];
 
-            return allPrompts.filter((prompt, index, self) => index === self.findIndex((p) => p._id === prompt._id));
+            return storedRows(allPrompts.filter((prompt, index, self) => index === self.findIndex((p) => p._id === prompt._id)));
         }
 
         // Limit search results to prevent timeout
@@ -609,7 +622,7 @@ export const searchPrompts = authQuery
             });
         }
 
-        return uniqueResults;
+        return storedRows(uniqueResults);
     });
 
 /**
@@ -852,7 +865,7 @@ export const restorePromptVersion = authMutation
 
         // Find the history entry for the specified version
         // Limit to 10 entries per prompt/version combination (should be unique anyway)
-        const historyEntry = await ctx.db.promptHistory.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { promptId, version } });
+        const historyEntry = storedRow(await ctx.db.promptHistory.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { promptId, version } }));
 
         if (!historyEntry) {
             throw new LunoraError("NOT_FOUND", `Version ${version} not found for this prompt`);
@@ -865,6 +878,7 @@ export const restorePromptVersion = authMutation
         await ctx.db.insert("promptHistory", {
             changeType: "restored",
             content: historyEntry.content,
+            ...copiedContentAuthor(historyEntry),
             createdAt: now,
             description: historyEntry.description,
             note: `Restored from version ${version}`,
@@ -876,9 +890,13 @@ export const restorePromptVersion = authMutation
         });
 
         // Update the prompt with the restored content. A field the restored
-        // version did not have is removed, not kept from the current one.
+        // version did not have is removed, not kept from the current one: so is its writers' record, a version from
+        // before `contentBy` reads as an old row (`content-author.ts`).
         await patchRow(ctx.db, "prompts", prompt, {
             content: historyEntry.content,
+            contentBy: historyEntry.contentBy,
+            contentByImpersonator: historyEntry.contentByImpersonator,
+            contentByOthers: historyEntry.contentByOthers,
             currentVersion: newVersion,
             description: historyEntry.description,
             tags: historyEntry.tags,
@@ -921,8 +939,11 @@ export const duplicatePrompt = authMutation
         // A copy is a new prompt: same quota as `createPrompt`.
         await assertPromptQuota(ctx);
 
+        // The copy is the duplicating user's, the words still their writer's.
+        const author = copiedContentAuthor(storedRow(existing));
         const newPromptId = await ctx.db.insert("prompts", {
             content: existing.content,
+            ...author,
             currentVersion: 1,
             description: existing.description,
             isFavorite: false,
@@ -938,6 +959,7 @@ export const duplicatePrompt = authMutation
         await ctx.db.insert("promptHistory", {
             changeType: "created",
             content: existing.content,
+            ...author,
             createdAt: now,
             description: existing.description,
             note: `Duplicated from "${existing.name}"`,
@@ -963,6 +985,36 @@ export const duplicatePrompt = authMutation
  * `requireOwnedThread`, a stranger could plant variables in someone's thread —
  * substituted into their prompts — and lock the owner out of their own.
  */
+
+/**
+ * The names an admin acting as the user wrote, for a variables row about to hold `next`: the stored marks, plus each value
+ * the admin changed or added over `stored` (one sent unchanged is still the user's). A mark is never cleared, so an owner's
+ * rewrite of a value keeps it. Returns `{}` when nothing changes, so a patch leaves the stored marks alone.
+ */
+const markedNames = (
+    user: { impersonatedBy?: string | null },
+    stored: { variables: { name: string; value: string }[]; variablesByImpersonator?: string[] } | null | undefined,
+    next: { name: string; value: string }[],
+): { variablesByImpersonator?: string[] } => {
+    if (!user.impersonatedBy) {
+        return {};
+    }
+
+    const before = new Map((stored?.variables ?? []).map((variable) => [variable.name, variable.value]));
+    const marks = new Set(stored?.variablesByImpersonator);
+    const { size } = marks;
+
+    for (const { name, value } of next) {
+        if (before.get(name) !== value) {
+            marks.add(name);
+        }
+    }
+
+    return marks.size === size ? {} : { variablesByImpersonator: [...marks] };
+};
+
+/** Whether the value named `name` on a variables row was written by an admin acting as the user (`markedNames`). */
+const isMarked = (row: { variablesByImpersonator?: string[] }, name: string): boolean => row.variablesByImpersonator?.includes(name) === true;
 
 /**
  * Get variables for a specific thread
@@ -1029,6 +1081,7 @@ export const setThreadVariables = authMutation
 
             // Update existing
             await ctx.db.patch("threadVariables", existing._id, {
+                ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
             });
@@ -1042,6 +1095,7 @@ export const setThreadVariables = authMutation
 
         // Create new
         const id = await ctx.db.insert("threadVariables", {
+            ...markedNames(ctx.user, null, variables),
             threadId,
             updatedAt: now,
             userId,
@@ -1096,6 +1150,7 @@ export const updateThreadVariable = authMutation
             }
 
             await ctx.db.patch("threadVariables", existing._id, {
+                ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
             });
@@ -1109,6 +1164,7 @@ export const updateThreadVariable = authMutation
 
         // Create new with single variable
         const id = await ctx.db.insert("threadVariables", {
+            ...markedNames(ctx.user, null, [{ name, value }]),
             threadId,
             updatedAt: now,
             userId,
@@ -1316,10 +1372,11 @@ export const setUserVariableDefaults = authMutation
         const { now } = ctx;
 
         // Check if defaults already exist for this user
-        const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } });
+        const existing = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }));
 
         if (existing) {
             await ctx.db.patch("userVariableDefaults", existing._id, {
+                ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
             });
@@ -1331,6 +1388,7 @@ export const setUserVariableDefaults = authMutation
 
         // Create new
         const id = await ctx.db.insert("userVariableDefaults", {
+            ...markedNames(ctx.user, null, variables),
             updatedAt: now,
             userId,
             variables,
@@ -1371,10 +1429,11 @@ export const setOrganizationVariableDefaults = authMutation
         }
 
         // Check if defaults already exist for this organization
-        const existing = await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } });
+        const existing = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }));
 
         if (existing) {
             await ctx.db.patch("userVariableDefaults", existing._id, {
+                ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
             });
@@ -1386,6 +1445,7 @@ export const setOrganizationVariableDefaults = authMutation
 
         // Create new
         const id = await ctx.db.insert("userVariableDefaults", {
+            ...markedNames(ctx.user, null, variables),
             organizationId,
             updatedAt: now,
             userId,
@@ -1407,7 +1467,7 @@ export const getResolvedVariables = authQuery
     })
     .output(
         v.object({
-            sources: v.record(v.string(), v.union(v.literal("organization"), v.literal("user"), v.literal("thread"))),
+            sources: v.record(v.string(), v.union(v.literal("organization"), v.literal("user"), v.literal("thread"), v.literal("impersonated"))),
             values: v.record(v.string(), v.string()),
         }),
     )
@@ -1416,14 +1476,16 @@ export const getResolvedVariables = authQuery
         const organizationId = ctx.user.activeOrganization?.id;
 
         const values: Record<string, string> = {};
-        const sources: Record<string, "organization" | "user" | "thread"> = {};
+        const sources: Record<string, "organization" | "user" | "thread" | "impersonated"> = {};
 
         // Run all 3 independent queries in parallel
         const [orgDefaults, userDefaults, threadVariables] = await Promise.all([
             // 1. Organization defaults (lowest priority)
-            organizationId ? ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }) : Promise.resolve(null),
+            organizationId
+                ? ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }).then(storedRow)
+                : Promise.resolve(null),
             // 2. User defaults (medium priority)
-            ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }),
+            ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }).then(storedRow),
             // 3. Thread overrides (highest priority)
             threadId
                 ? ctx.db
@@ -1437,14 +1499,19 @@ export const getResolvedVariables = authQuery
         if (orgDefaults?.variables) {
             for (const innerV of orgDefaults.variables) {
                 values[innerV.name] = innerV.value;
-                sources[innerV.name] = "organization";
+                sources[innerV.name] = isMarked(orgDefaults, innerV.name) ? "impersonated" : "organization";
             }
         }
 
         if (userDefaults?.variables) {
+            // An organization's row carries the `userId` of the admin who created it: its values are the organization's,
+            // which the composer marks as not the person's own words (`organizationValueNames`).
+            // A value an admin wrote while acting as a user is `impersonated`, whoever the row belongs to: the composer marks it so.
+            const owned = userDefaults.organizationId === undefined ? "user" : "organization";
+
             for (const innerV of userDefaults.variables) {
                 values[innerV.name] = innerV.value;
-                sources[innerV.name] = "user";
+                sources[innerV.name] = isMarked(userDefaults, innerV.name) ? "impersonated" : owned;
             }
         }
 
@@ -1453,7 +1520,7 @@ export const getResolvedVariables = authQuery
         if (threadVariables?.variables && threadVariables.userId === userId && threadId && !(await isLockedWithoutProof(ctx, threadId, unlockProof))) {
             for (const innerV of threadVariables.variables) {
                 values[innerV.name] = innerV.value;
-                sources[innerV.name] = "thread";
+                sources[innerV.name] = isMarked(threadVariables, innerV.name) ? "impersonated" : "thread";
             }
         }
 

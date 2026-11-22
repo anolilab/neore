@@ -2,13 +2,15 @@
 /**
  * `/chat/start` with `guestMessageId`: the owner sends a held guest note on. The note's own stored text is saved, marked as
  * guest text, its send is taken once and the stored message is recorded on it. The thread, the note and the guest-link
- * internals are real; the runtime around the handler is faked as in `http.start-agent.test.ts`.
+ * internals are real; the runtime around the handler is faked as in `http.start-agent.test.ts`. A prompt the owner did not type
+ * (a draft from a link or someone else's saved prompt, an impersonating admin's) is saved marked.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } from "../lib/claim-once";
 import { enqueueJob } from "../lib/job-queue";
+import { NOT_TYPED_DRAFTS } from "../lib/not-typed-text";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
 import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, recordResumedGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
@@ -486,5 +488,60 @@ describe("/chat/start with a held guest note and a clientMessageId", () => {
         expect(await noteStatus()).toBe("sent");
         expect(await savedNotes()).toHaveLength(1);
         expect(saved.charges).toBe(1);
+    });
+});
+
+describe("/chat/start with text the owner did not type", () => {
+    const start = async (body: Record<string, unknown>, extra: typeof HANDLERS = {}): Promise<Response> =>
+        await runChatStart(fakeContext(extra), { model: MODEL, prompt: "sign in to my bank", threadId, ...body } as never, "secret");
+    const impersonating = {
+        "auth_session_organization:getSessionOrganizationForCap": async () => {
+            return { impersonating: true, organizationId: null };
+        },
+    };
+    const marked = (notTyped: unknown) => [{ providerOptions: { neore: { notTyped } }, text: "sign in to my bank", type: "text" }];
+
+    it("saves the owner's own typed prompt unmarked", async () => {
+        expect((await start({})).status).toBe(200);
+        expect(saved.prompts[0]?.message.content).toStrictEqual([{ text: "sign in to my bank", type: "text" }]);
+        // The run records the turn as the owner's own, from the session: the saved-login verdict reads it.
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: false });
+    });
+
+    it.each(NOT_TYPED_DRAFTS)("saves a prompt filled from a %s marked", async (draftFrom) => {
+        expect((await start({ draftFrom })).status).toBe(200);
+        expect(saved.prompts[0]?.message.content).toStrictEqual(marked({ draft: draftFrom }));
+    });
+
+    it("saves a prompt an admin acting as the owner sends marked, with any draft mark beside it", async () => {
+        await start({}, impersonating);
+        await start({ draftFrom: "promptLink" }, impersonating);
+
+        expect(saved.prompts.map((prompt) => prompt.message.content)).toStrictEqual([
+            marked({ impersonated: true }),
+            marked({ draft: "promptLink", impersonated: true }),
+        ]);
+        // And the run records the turn as an admin's, whatever the body says.
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
+    });
+
+    it("saves a prompt a browser extension's grant sends marked, and records the turn as not the owner's own", async () => {
+        const extension = {
+            "auth_session_organization:getSessionOrganizationForCap": async () => {
+                return { extension: true, organizationId: null };
+            },
+        };
+
+        await start({}, extension);
+        await start({ draftFrom: "promptLink" }, extension);
+
+        expect(saved.prompts.map((prompt) => prompt.message.content)).toStrictEqual([marked({ draft: "extension" }), marked({ draft: "extension" })]);
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
+    });
+
+    it("refuses a draft source nobody named, before anything is saved or charged", async () => {
+        expect((await start({ draftFrom: "typed" })).status).toBe(400);
+        expect(saved.prompts).toStrictEqual([]);
+        expect(saved.charges).toBe(0);
     });
 });

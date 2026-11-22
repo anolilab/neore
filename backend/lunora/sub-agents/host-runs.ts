@@ -10,14 +10,26 @@ import type { DeviceTaintSource } from "../devices/lib/taint";
 import { sessionOfThread } from "../acp/lib/sessions";
 import { isLiveStream } from "../chat/streaming/persistent/host";
 import { buildSubAgentPrompt } from "./logic";
+import { roleSystemText } from "./roles";
 
 type RunDoc = Doc<"subAgentRuns">;
 
 /** Every untrusted source: the lead's run is not traced call by call, so its task is treated as having read all of them. */
 const LEAD_TASK_TAINT: ReadonlyArray<DeviceTaintSource> = ["web", "knowledge", "mcp", "device", "files"];
 
-/** What a worker run is sent to the agent as: the person's own words as written, a lead's task framed as a delegation. */
-const promptOf = (run: Pick<RunDoc, "clientId" | "task">): string => (run.clientId === undefined ? buildSubAgentPrompt(run.task) : run.task);
+/**
+ * What a worker run is sent to the agent as: the person's own words as written, a lead's task framed as a delegation,
+ * after its role's instructions when it has a role (the coding agent has no system text of ours to carry them).
+ */
+const promptOf = (run: Pick<RunDoc, "clientId" | "role" | "task">): string => {
+    if (run.clientId !== undefined) {
+        return run.task;
+    }
+
+    const prompt = buildSubAgentPrompt(run.task);
+
+    return run.role ? `${roleSystemText(run.role)}\n\n${prompt}` : prompt;
+};
 
 const REFUSALS = {
     busy: "That computer is busy. Try again in a moment.",

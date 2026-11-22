@@ -2,7 +2,7 @@
  * The seeded generator is a 32-bit PRNG (bit operations are its algorithm), and the
  * URLs and HTML below are inputs to convert, never requests.
  */
-/* eslint-disable no-bitwise, operator-assignment, unicorn/operator-assignment, unicorn/prefer-math-trunc, no-script-url -- see the comment above */
+/* eslint-disable no-bitwise, unicorn/operator-assignment, unicorn/prefer-math-trunc, no-script-url -- see the comment above */
 import { createDocument } from "@mixmark-io/domino";
 import TurndownUpstream from "turndown";
 import { describe, expect, it } from "vitest";

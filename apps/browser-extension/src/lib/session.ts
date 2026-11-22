@@ -1,14 +1,14 @@
-import { authClient } from "./auth";
-import { signOutGrant, useGrantUser } from "./extension-grant";
-import { IS_FIREFOX } from "./target";
+import { useEffect, useState } from "react";
+
+import { holdAccessTokens, releaseAccessTokens } from "./access-token";
+import type { SuspendedSession } from "./auth-token-sync";
+import type { GrantUser, StoredGrant } from "./extension-grant";
+import { grantKey, readGrant, signOutGrant, STORAGE_KEY } from "./extension-grant";
+import { GrantRemovalError } from "./grant-removal-error";
 
 /**
- * The signed-in user, the same shape for both builds.
- *
- * Chrome reads better-auth's cookie session on the app origin; Firefox reads the
- * bearer grant it holds itself (`extension-grant.ts`). `IS_FIREFOX` is a
- * build-time constant, so each build calls one hook, always — the rules of hooks
- * hold.
+ * The signed-in user: the app grant this extension holds itself
+ * (`extension-grant.ts`). Neither build reads the web app's cookie session.
  */
 export interface ExtensionSession {
     /** Changes when the signed-in session does; for effect dependencies, not display. */
@@ -16,29 +16,128 @@ export interface ExtensionSession {
     user: { email: string; id: string; image?: string | null; name?: string | null };
 }
 
-const useCookieSession = (): { data: ExtensionSession | null; isPending: boolean } => {
-    const { data, isPending } = authClient.useSession();
+interface GrantSession {
+    key: string;
+    user: GrantUser;
+}
 
-    return {
-        data: data?.session ? { sessionId: data.session.id, user: data.user } : null,
-        isPending,
-    };
+const toGrantSession = (grant: StoredGrant | undefined): GrantSession | null => (grant ? { key: grantKey(grant), user: grant.user } : null);
+
+/**
+ * The stored grant's session, or `null` when there is none — and when storage
+ * cannot be read: the panel then offers sign-in, which writes a new grant,
+ * rather than waiting on a read that will not come.
+ */
+export const loadGrantSession = async (): Promise<GrantSession | null> => {
+    try {
+        return toGrantSession(await readGrant());
+    } catch {
+        return null;
+    }
 };
 
-const useGrantSession = (): { data: ExtensionSession | null; isPending: boolean } => {
-    const { isPending, user } = useGrantUser();
+/** The sign-out running for each grant key: a second one for the same grant joins it. */
+const signingOut = new Map<string, Promise<void>>();
 
-    return { data: user ? { sessionId: user.id, user } : null, isPending };
-};
+const runEndSession = async (authTokenSync: { suspend: () => SuspendedSession }, key: string): Promise<void> => {
+    holdAccessTokens();
 
-export const useSession = IS_FIREFOX ? useGrantSession : useCookieSession;
+    const suspended = authTokenSync.suspend();
+    let outcome: "replaced" | "signed-out";
 
-export const signOut = async (): Promise<void> => {
-    if (IS_FIREFOX) {
-        await signOutGrant();
+    try {
+        outcome = await signOutGrant(key);
+    } catch (error) {
+        // Revoked: the grant is dead server side, so nothing comes back for it.
+        if (error instanceof GrantRemovalError && error.revoked) {
+            suspended.finish();
+        } else {
+            releaseAccessTokens();
+            suspended.restore();
+        }
+
+        throw error;
+    }
+
+    if (outcome === "replaced") {
+        releaseAccessTokens();
+        suspended.restore();
 
         return;
     }
 
-    await authClient.signOut();
+    suspended.finish();
+};
+
+/**
+ * End the grant `key` names (the session shown), and this panel's session with
+ * it. While the grant is being revoked and removed, no new token goes out
+ * (`holdAccessTokens`) and the refresh loop stops; the bearer and the writes
+ * queued offline under it stay. Once the grant is gone the bearer is cleared.
+ *
+ * When storage fails to read or remove the grant this rejects, so the caller
+ * shows the sign-out as failed and it can be tried again. If the server still
+ * accepts the grant, the session comes back for it (its tokens flow and the
+ * loop restarts, the queue intact); once the revoke was confirmed it does not:
+ * the bearer is cleared and tokens stay held. When another grant is stored by
+ * now, it is left signed in and this resolves.
+ *
+ * One sign-out per grant: a second call for the same key, from a reopened
+ * Settings, joins the one running.
+ */
+export const endSession = async (authTokenSync: { suspend: () => SuspendedSession }, key: string): Promise<void> => {
+    const running = signingOut.get(key);
+
+    if (running) {
+        return await running;
+    }
+
+    const run = runEndSession(authTokenSync, key).finally(() => {
+        signingOut.delete(key);
+    });
+
+    signingOut.set(key, run);
+
+    return await run;
+};
+
+/** The stored grant's session, kept in step with `storage.local`. `undefined` while loading. */
+const useGrantSession = (): { isPending: boolean; session: GrantSession | null } => {
+    const [session, setSession] = useState<GrantSession | null | undefined>(undefined);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+            if (area === "local" && Object.hasOwn(changes, STORAGE_KEY)) {
+                setSession(toGrantSession(changes[STORAGE_KEY]?.newValue as StoredGrant | undefined));
+            }
+        };
+
+        chrome.storage.onChanged.addListener(listener);
+
+        const load = async () => {
+            const loaded = await loadGrantSession();
+
+            if (!cancelled) {
+                // A change that arrived first is newer than this read.
+                setSession((current) => (current === undefined ? loaded : current));
+            }
+        };
+
+        void load();
+
+        return () => {
+            cancelled = true;
+            chrome.storage.onChanged.removeListener(listener);
+        };
+    }, []);
+
+    return { isPending: session === undefined, session: session ?? null };
+};
+
+export const useSession = (): { data: ExtensionSession | null; isPending: boolean } => {
+    const { isPending, session } = useGrantSession();
+
+    return { data: session ? { sessionId: session.key, user: session.user } : null, isPending };
 };

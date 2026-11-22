@@ -1,16 +1,16 @@
 /**
- * Sign-in for browser extensions that cannot share the web app's cookies.
+ * Sign-in for browser extensions (both builds), which never use the web app's cookies.
  *
- * Firefox gives every install its own random `moz-extension://<uuid>` origin, so
- * the Chrome build's model — trust the extension's exact origin for credentialed
- * CORS (`TRUSTED_EXTENSION_ORIGINS`) — has no single origin to list. It does not
- * need one: an extension page holding `host_permissions` for the backend is not
- * subject to CORS at all (MDN, `host_permissions`: "XMLHttpRequest and fetch
- * access to those origins without cross-origin restrictions"), and every check
- * that looks at the `Origin` header here — better-auth's origin check, Lunora's
- * CSRF and WebSocket checks — only runs for requests that carry a cookie. So the
- * Firefox build sends NO cookies, only bearer tokens, and nothing needs to
- * recognise its origin.
+ * The server must tell an extension's sends from the web app's, so no extension
+ * rides the web cookie: `src/extension-cookie.ts` strips it off any
+ * extension-origin request. (Firefox could not anyway: every install has its own
+ * random `moz-extension://<uuid>` origin.) No origin needs trusting: an extension
+ * page holding `host_permissions` for the backend is not subject to CORS at all
+ * (MDN, `host_permissions`: "XMLHttpRequest and fetch access to those origins
+ * without cross-origin restrictions"), and every check that looks at the
+ * `Origin` header here — better-auth's origin check, Lunora's CSRF and WebSocket
+ * checks — only runs for requests that carry a cookie. So the extension sends
+ * NO cookies, only bearer tokens.
  *
  * What it needs instead is a way to obtain a token. This is an authorization-code
  * flow with PKCE (RFC 7636), run through `identity.launchWebAuthFlow`:
@@ -53,6 +53,7 @@
  * `createExtensionGrantStore` binds it to the real better-auth instance.
  */
 import { sha256Bytes, timingSafeEqual } from "../lib/crypto";
+import { type ClientGrantKind, clientGrantKindOf } from "./lib/sign-in-standing";
 
 /** How long a code lives. It only has to survive one redirect and one POST. */
 export const CODE_TTL_MS = 60_000;
@@ -89,7 +90,10 @@ export interface ExtensionGrantUser {
 export interface ExtensionGrantStore {
     /** Atomically delete and return the code row; `null` when absent or already consumed. */
     consumeCode: (identifier: string) => Promise<null | { expiresAt: Date; value: string }>;
-    createSession: (userId: string, meta: { ipAddress?: string; userAgent?: string }) => Promise<{ expiresAt: Date; token: string }>;
+    createSession: (
+        userId: string,
+        meta: { clientGrant: ClientGrantKind; ipAddress?: string; userAgent?: string },
+    ) => Promise<{ expiresAt: Date; token: string }>;
     deleteSession: (token: string) => Promise<void>;
     extendSession: (token: string, expiresAt: Date) => Promise<void>;
     findSession: (token: string) => Promise<null | { session: { expiresAt: Date; id: string }; user: ExtensionGrantUser }>;
@@ -293,7 +297,13 @@ export const exchangeExtensionCode = async (
 
     // Re-checked: the user could have been banned in the minute since approving.
     const user = assertEligible(await store.findUser(stored.userId));
-    const session = await store.createSession(user.id, { ipAddress: input.ipAddress, userAgent: input.userAgent });
+    // The app the code was issued for, from its stored redirect URI, never the request: what a browser extension sends is
+    // not the owner's typing (`auth/lib/sign-in-standing.ts`).
+    const session = await store.createSession(user.id, {
+        clientGrant: clientGrantKindOf(stored.redirectUri),
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+    });
 
     return { expiresAt: session.expiresAt.getTime(), token: session.token, user: profileOf(user) };
 };
@@ -389,6 +399,7 @@ export const createExtensionGrantStore = (auth: unknown): ExtensionGrantStore =>
         createSession: async (userId, meta) => {
             const internal = await adapter();
             const session = await internal.createSession(userId, false, {
+                clientGrant: meta.clientGrant,
                 ...(meta.ipAddress && { ipAddress: meta.ipAddress }),
                 ...(meta.userAgent && { userAgent: meta.userAgent }),
             });

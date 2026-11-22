@@ -251,7 +251,8 @@ const PAGE_TIMEOUT = 30_000;
 /** Max time to wait for navigation (ms) */
 const NAV_TIMEOUT = 60_000;
 
-const routedContexts = new WeakMap<WeakKey, Promise<void>>();
+// `context.route()` resolves to a Disposable since @cloudflare/playwright 1.4; it is only awaited here.
+const routedContexts = new WeakMap<WeakKey, Promise<unknown>>();
 
 /** Every request any page in the context makes (clicks, redirects, subresources, popups) passes the same SSRF check. */
 const guardPage = async (page: import("@cloudflare/playwright").Page) => {
@@ -466,7 +467,7 @@ app.post("/action", async (c) => {
                     };
                 });
 
-                result = { direction: scrollDirection, scrollPosition, success: true };
+                result = { direction: scrollDirection, scrollPosition, success: true, url: page.url() };
                 break;
             }
 
@@ -477,7 +478,7 @@ app.post("/action", async (c) => {
                 }
 
                 await page.fill(selector, text, { timeout: PAGE_TIMEOUT });
-                result = { success: true, typedSelector: selector, typedText: text };
+                result = { success: true, typedSelector: selector, typedText: text, url: page.url() };
                 break;
             }
 

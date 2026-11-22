@@ -27,6 +27,7 @@ import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
@@ -54,7 +55,9 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/core/utils/capture-screen";
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
-import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
+import { onComposerAttachRequest, onComposerSubmitRequest, SIGNED_OUT } from "@/features/chat/core/utils/composer-submit";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import { composerDraftFrom, draftFromField, markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
@@ -86,6 +89,8 @@ import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import TurnStepAnnouncement from "./turn-step-announcement";
+import type { UploadWait } from "./upload-send-wait";
+import { settleUploadWait, startUploadWait } from "./upload-send-wait";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
@@ -228,7 +233,7 @@ interface ComposerInputProps {
      * Used by comparison parent threads to fan-out the message to all child threads.
      * When set, neither sendMessage nor sendComparisonMessage is called.
      */
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
 }
 
@@ -528,6 +533,8 @@ const ComposerInput = ({
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const { isLoading: isComparisonLoading, sendComparisonMessage } = useComparisonChat({ jwtToken });
     const isComparisonValid = comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;
+    // Where a send goes: the compared models, or empty for an ordinary send. A waiting send keeps the one it was pressed for.
+    const sendTarget = isComparisonValid ? selectedModelsForComparison.join("\n") : "";
 
     // SSE streaming in progress
     const isSSEStreaming = !!sseStreamState;
@@ -576,8 +583,13 @@ const ComposerInput = ({
     const attachedReferences = useChatUIStore(selectAttachedReferences);
     const removeAttachedReference = useChatUIStore(selectRemoveAttachedReference);
 
-    // True while any attachment is still uploading — blocks send and shows spinner on button
+    // True while any attachment is still uploading: the input area shows the send-when-uploads-finish tooltip and holds
+    // back steer, queue and voice. Send stays enabled; a send pressed now waits through `uploadWait` below.
     const hasUploadingAttachments = attachments.some((a) => a.status === "pending" || a.status === "uploading");
+    // A send pressed while uploads run waits for them here; `settleUploadWait` decides when it goes out or stops.
+    const [uploadWait, setUploadWait] = useState<UploadWait | null>(null);
+    // The draft text being converted to a file while that upload runs; it leaves the draft once the upload succeeds.
+    const [converting, setConverting] = useState<string | null>(null);
     // bannedContent is subscribed because it drives render output (word highlights + error message).
     // isSubmitting / setIsSubmitting / setComposerBannedContent are only read inside callbacks
     // so we access them via getState() to avoid unnecessary re-renders (rerender-defer-reads).
@@ -1085,7 +1097,8 @@ const ComposerInput = ({
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
-        const steerText = text;
+        // From the store, as the mark below is: a key pressed right after an edit runs the previous render's handler.
+        const steerText = useChatUIStore.getState().composerText;
 
         if (
             !canSteer ||
@@ -1106,10 +1119,14 @@ const ComposerInput = ({
         }
 
         promptHistory.reset();
+
+        // Read before the draft is cleared: the steer, or the queued message it may become, carries it.
+        const draftFrom = composerDraftFrom();
+
         clear();
 
         if (followUp === "steer-restart") {
-            interruptAndSend(threadId, steerText, cancelStream);
+            interruptAndSend(threadId, steerText, cancelStream, draftFrom);
 
             return;
         }
@@ -1124,45 +1141,90 @@ const ComposerInput = ({
         // The chip exists before the call is made: the text is in the (persisted)
         // queue the moment it leaves the draft, and a prompt queued while the call
         // is out lands behind it. `pending` keeps the queue from acting on it.
-        enqueue(threadId, { attachments: [], steer: { id: steerId, pending: true, streamId }, text: steerText });
+        enqueue(threadId, { attachments: [], ...(draftFrom !== undefined && { draftFrom }), steer: { id: steerId, pending: true, streamId }, text: steerText });
 
         const unanswered = setTimeout(settleSteer, STEER_ANSWER_MS, threadId, steerId, "accepted");
 
-        void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
+        void steerRun({
+            ...draftFromField(draftFrom),
+            steerId,
+            streamId: streamId as Id<"persistentStreams">,
+            text: steerText,
+            threadId: threadId as Id<"threads">,
+        })
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
+    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, threadId]);
+
+    const notifyFailedUpload = useCallback(
+        (fileName: string) => {
+            showError(t`"${fileName}" could not be uploaded, so the message was not sent.`);
+        },
+        [t],
+    );
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
     // Content safety (banned words) is validated server-side in the /chat/stream endpoint.
-    const handleSubmit = useCallback(() => {
+    const { data: sessionData, isPending: sessionPending } = useAuthSession();
+    // The account a send belongs to: the user's id, `signed-out` for a guest whose session has loaded, or undefined while
+    // it still loads. Only that last case is bound to the account that resolves; a guest who signs in cancels the wait.
+    const accountId = sessionData?.user?.id ?? (sessionPending ? undefined : SIGNED_OUT);
+
+    // `true` when the press did something with the draft (sent, queued, held, or said why not); `false` when it refused it
+    // without a word, so a send that waited on uploads can say why it did not go out.
+    const handleSubmit = useCallback((): boolean => {
         // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
         // the previous render, which still sees the old (possibly empty) draft.
-        const { composerAttachments: draftAttachments, composerText: draftText } = useChatUIStore.getState();
+        // The draft's not-typed mark goes with it, down every path out (`draft-origin.ts`).
+        const { composerAttachments: draftAttachments, composerDraftFrom: draftFrom, composerText: draftText } = useChatUIStore.getState();
 
         if (!draftText.trim() && draftAttachments.length === 0) {
-            return;
+            return false;
         }
 
         // The notice under the input says why; the server would answer with its size limit.
         if (draftText.length > MAX_PROMPT_CHARS) {
-            return;
+            return false;
         }
 
         // Read isSubmitting via getState() — it's only needed as a guard here, not in render output.
         // This avoids subscribing to isSubmitting and re-rendering ComposerInput on every submission.
         if (disabled || useChatUIStore.getState().isSubmitting) {
-            return;
+            return false;
         }
 
         const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
 
+        // Text being converted to a file leaves the draft once its upload succeeds, so the wait is for the file alone.
+        const waitedText = converting !== null && draftText === converting ? "" : draftText;
+
         if (pendingAttachments.length > 0) {
-            return;
+            const failed = pendingAttachments.find((a) => a.status === "error");
+
+            if (failed) {
+                notifyFailedUpload(failed.name);
+
+                return true;
+            }
+
+            // Not sent yet: it waits for these uploads and goes out once they finish, if the draft stays as it is (see the
+            // effect after the auto-submit).
+            setUploadWait(
+                startUploadWait(
+                    { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, target: sendTarget, text: waitedText },
+                    threadId,
+                    accountId,
+                ),
+            );
+
+            return true;
         }
+
+        // Every upload is done, so this send goes out now: a wait still pending would read the cleared draft as an edit.
+        setUploadWait(null);
 
         const intent = composerSubmitIntent({
             hasAttachments: draftAttachments.length > 0,
@@ -1178,7 +1240,7 @@ const ComposerInput = ({
         if (isOffline && intent !== "queue") {
             showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
 
-            return;
+            return true;
         }
 
         promptHistory.reset();
@@ -1190,7 +1252,7 @@ const ComposerInput = ({
             clear();
             void compactThread();
 
-            return;
+            return true;
         }
 
         // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
@@ -1212,33 +1274,37 @@ const ComposerInput = ({
 
             void finishClear();
 
-            return;
+            return true;
         }
 
         // Block submission if context is too large
         if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
-            return;
+            return false;
         }
 
         // A turn is still running: queue instead of sending. The queue sends it
         // when the stream finishes (see ComposerPromptQueue). A composer without a queue waits.
         if (intent === "queue" || intent === "wait") {
             if (intent === "queue" && threadId) {
-                usePromptQueueStore
-                    .getState()
-                    .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
+                usePromptQueueStore.getState().enqueue(threadId, {
+                    attachments: draftAttachments,
+                    ...(draftFrom !== undefined && { draftFrom }),
+                    references: useChatUIStore.getState().attachedReferences,
+                    text: draftText,
+                });
                 clear();
             }
 
-            return;
+            // A composer without a queue only waits: nothing happened to the draft.
+            return intent === "queue" && Boolean(threadId);
         }
 
         // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
         // it here: the draft stays and sign-in opens.
         if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
-            holdForSignIn(draftText);
+            holdForSignIn(draftText, draftFrom);
 
-            return;
+            return true;
         }
 
         // Set submitting flag briefly (guards against double-send, cleared inside sendMessage)
@@ -1246,14 +1312,14 @@ const ComposerInput = ({
 
         if (onSubmitOverride) {
             // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(draftText, draftAttachments).then(() => {
+            void onSubmitOverride(draftText, draftAttachments, draftFrom).then(() => {
                 clear();
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
             });
         } else if (isComparisonValid) {
-            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments).then(() => {
+            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments, draftFrom).then(() => {
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
@@ -1261,10 +1327,12 @@ const ComposerInput = ({
         } else {
             // Fire-and-forget: sendMessage updates optimistic state synchronously
             // (clears composer, shows Thinking...) then runs the fetch in the background
-            void sendMessage(draftText, draftAttachments);
+            void sendMessage(draftText, draftAttachments, { draftFrom });
         }
 
         onSubmitProp?.();
+
+        return true;
     }, [
         isOffline,
         t,
@@ -1285,6 +1353,10 @@ const ComposerInput = ({
         compactThread,
         clearThreadContext,
         setText,
+        notifyFailedUpload,
+        accountId,
+        sendTarget,
+        converting,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick
@@ -1307,29 +1379,37 @@ const ComposerInput = ({
             draftOwnership.prefill = requested;
             autoSubmitTextRef.current = requested;
             setText(requested);
+            // The shell hands over text from outside the page (a share, the Quick Composer): none of it counts as typed here.
+            markComposerDraft("shellLink");
             setAutoSubmitRequest((count) => count + 1);
         });
     }, [isAutoSubmitTarget, setText]);
 
     // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
     // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
-    usePendingSend(!onSubmitOverride && !compact, (pending) => {
+    usePendingSend(!onSubmitOverride && !compact, ({ draftFrom, text: pending }) => {
         draftOwnership.prefill = pending;
         autoSubmitTextRef.current = pending;
         setText(pending);
+
+        if (draftFrom !== undefined) {
+            markComposerDraft(draftFrom);
+        }
+
         setAutoSubmitRequest((count) => count + 1);
     });
 
-    // Files dropped on the dock icon (`core/utils/composer-submit.ts`) are attached the same way as a drop: uploaded, never sent.
+    // Files dropped on the dock icon or the sidebar (`core/utils/composer-submit.ts`) are attached the same way as a drop:
+    // uploaded, never sent, and only for the account they were dropped for, so the wait for the session comes first.
     useEffect(() => {
-        if (!isAutoSubmitTarget) {
+        if (!isAutoSubmitTarget || accountId === undefined) {
             return undefined;
         }
 
-        return onComposerAttachRequest(({ files }) => {
+        return onComposerAttachRequest(accountId, ({ files }) => {
             void handleFileSelect(files);
         });
-    }, [isAutoSubmitTarget, handleFileSelect]);
+    }, [accountId, isAutoSubmitTarget, handleFileSelect]);
 
     useEffect(() => {
         if (autoSubmitTextRef.current === null || autoSubmitTextRef.current !== text || disabled || isStreaming) {
@@ -1342,6 +1422,103 @@ const ComposerInput = ({
         handleSubmit();
     }, [autoSubmitRequest, disabled, handleSubmit, isStreaming, text]);
 
+    // A send that waited for uploads settles as they change: it goes out once they all complete, while a failed or removed
+    // upload stops it, so an unfinished attachment is never sent.
+    useEffect(() => {
+        // A conversion of the draft to a file is still running: the wait settles once it has ended, either way.
+        if (uploadWait === null || converting !== null) {
+            return;
+        }
+
+        // The session is still loading: the wait settles only once it knows the account it belongs to.
+        if (uploadWait.accountId === undefined && accountId === undefined) {
+            return;
+        }
+
+        // Send was pressed while the session was loading: the wait belongs to the account that resolves first, and only a
+        // later change of account cancels it.
+        if (uploadWait.accountId === undefined && accountId !== undefined) {
+            setUploadWait({ ...uploadWait, accountId });
+
+            return;
+        }
+
+        // Settle against the store, as `handleSubmit` reads it, so the draft judged here is the one that goes out.
+        const live = useChatUIStore.getState();
+        const outcome = settleUploadWait(
+            uploadWait,
+            { attachments: live.composerAttachments, references: live.attachedReferences, target: sendTarget, text: live.composerText },
+            threadId,
+            accountId,
+        );
+
+        if (outcome.kind === "waiting") {
+            return;
+        }
+
+        setUploadWait(null);
+
+        switch (outcome.kind) {
+            case "edited": {
+                showInfo(t`Your message changed while the uploads ran, so it was not sent. Press send to send it.`);
+
+                break;
+            }
+
+            case "failed": {
+                // The upload's own toast already gave the reason when it recognised the failure: one message is enough.
+                if (!toastedMessages.has(outcome.error ?? "")) {
+                    notifyFailedUpload(outcome.name);
+                }
+
+                break;
+            }
+
+            case "retargeted": {
+                showInfo(t`The model selection changed while the uploads ran, so the message was not sent. Press send to send it.`);
+
+                break;
+            }
+
+            case "send": {
+                // `handleSubmit` refuses some drafts without a word (a locked composer, a send in flight, a reply streaming
+                // with no queue, a draft too large for the model). Nobody pressed send just now, so the reason is given
+                // here, and the draft stays.
+                if (!handleSubmit()) {
+                    if (contextWarning?.level === "error") {
+                        showError(contextWarning.message);
+                    } else {
+                        showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
+                    }
+                }
+
+                break;
+            }
+
+            default: {
+                // A chat change cancels the wait without a message: the draft belongs to the chat it was typed in.
+                break;
+            }
+        }
+    }, [
+        accountId,
+        attachedReferences,
+        attachments,
+        contextWarning,
+        converting,
+        disabled,
+        handleSubmit,
+        isComparisonValid,
+        isStreaming,
+        isThreadComposer,
+        notifyFailedUpload,
+        sendTarget,
+        t,
+        text,
+        threadId,
+        uploadWait,
+    ]);
+
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.
     const handleCancel = useCallback(() => {
@@ -1349,6 +1526,8 @@ const ComposerInput = ({
             usePromptQueueStore.getState().setPaused(threadId, true);
         }
 
+        // A manual stop pauses everything that would send by itself, a send waiting on uploads included; the draft stays.
+        setUploadWait(null);
         cancelStream();
     }, [cancelStream, threadId]);
 
@@ -1458,6 +1637,13 @@ const ComposerInput = ({
                     setText(textAfterRestore(getComposerText(), payload));
                 }
 
+                // A marked restore marks the draft it joins. One that replaced the draft as a whole leaves none of the old text.
+                if (payload.draftFrom !== undefined) {
+                    markComposerDraft(payload.draftFrom);
+                } else if (payload.append !== true) {
+                    useChatUIStore.getState().setComposerDraftFrom(undefined);
+                }
+
                 void Promise.all(payload.files.map((file, index) => restoreFile(file, index)));
                 inputAreaRef.current?.focus();
             }),
@@ -1550,10 +1736,21 @@ const ComposerInput = ({
         const timestamp = new Date().toISOString().split("T", 1)[0];
         const file = new File([blob], `text-input-${timestamp}.txt`, { type: "text/plain" });
 
-        // Clear the text after successful conversion
+        // The text stays in the draft (and in its chat) until the upload succeeds. Meanwhile a send waits for the file alone
+        // and settles once the conversion ends: with the text cleared it sends the file, and a failure leaves the text.
+        setConverting(text);
+
         if (await attachGeneratedFile(file, t`Conversion failed`)) {
-            setText("");
+            if (useChatUIStore.getState().composerText === text) {
+                setText("");
+            } else {
+                // The draft was edited during the upload: what was typed stays, and a waiting send compares it with the text
+                // it was pressed on, so it ends with the edit notice instead of sending the file without it.
+                setUploadWait((wait) => (wait === null ? null : { ...wait, text }));
+            }
         }
+
+        setConverting(null);
     }, [text, attachGeneratedFile, setText, t]);
 
     // "@" a chat: read it through the thread view's own query (so the usual access and lock checks apply), then attach its text.
@@ -1587,9 +1784,13 @@ const ComposerInput = ({
     const handleAttachmentUpdate = useCallback(
         async (attachmentId: string, newFile: File) => {
             try {
+                const revision = useChatUIStore.getState().composerAttachments.find((attachment) => attachment.id === attachmentId)?.revision ?? 0;
+
+                // A user edit: a send waiting on this file ends rather than send the edited content without a new press.
                 updateAttachment(attachmentId, {
                     file: newFile,
                     name: newFile.name,
+                    revision: revision + 1,
                     status: "uploading",
                 });
 
@@ -1736,6 +1937,7 @@ const ComposerInput = ({
                 hasCompletedAttachments={hasCompletedAttachments}
                 hiddenRemoved={hiddenRemoved}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
+                isSendWaiting={uploadWait !== null}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}

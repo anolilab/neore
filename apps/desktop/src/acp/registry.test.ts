@@ -59,7 +59,7 @@ describe("what can be installed", () => {
         expect(resolveInstall(amp, "darwin-aarch64")).toMatchObject({ format: "tar.gz", sha256: SHA });
         expect(resolveInstall(amp, "windows-aarch64")).toMatch("No download for this platform");
         expect(resolveInstall(cortex, "darwin-aarch64")).toMatch("no checksum");
-        expect(resolveInstall(thing, "darwin-aarch64")).toMatch("npx or uvx");
+        expect(resolveInstall(thing, "darwin-aarch64")).toMatchObject({ kind: "npm", name: "thing", version: "1.0.0" });
         expect(resolveInstall(amp, "windows-x86_64")).toMatch("cannot unpack");
         expect(resolveInstall(amp, undefined)).toMatch("not supported");
     });
@@ -99,6 +99,66 @@ describe("what can be installed", () => {
     });
 });
 
+describe("npm agents", () => {
+    const thing = parseRegistry(REGISTRY_FIXTURE)[2];
+    const withNpx = (npx: Partial<NonNullable<typeof thing.npx>>, agent: Partial<typeof thing> = {}) => resolveInstall({ ...thing, ...agent, npx: { args: [], env: {}, package: "thing@1.0.0", ...npx } }, "linux-x86_64");
+
+    it("pins an npx entry at the exact version it names, scoped names included", () => {
+        expect(withNpx({})).toMatchObject({ args: [], kind: "npm", name: "thing", version: "1.0.0" });
+        expect(withNpx({ package: "@acme/agent-cli@2.3.4-beta.1" })).toMatchObject({ name: "@acme/agent-cli", version: "2.3.4-beta.1" });
+        expect(withNpx({ args: ["--acp"], env: { DEMO_MODE: "acp" } })).toMatchObject({ args: ["--acp"], env: { DEMO_MODE: "acp" } });
+    });
+
+    it("refuses a package that names no exact version, so nothing is resolved on the day it runs", () => {
+        for (const spec of ["thing", "thing@latest", "thing@^1.0.0", "thing@1", "thing@>=1.0.0", "@acme/agent", "thing@1..2", "../x@1.0.0", "Thing@1.0.0"]) {
+            expect(withNpx({ package: spec }), spec).toMatch("exact version");
+        }
+    });
+
+    it("refuses what the core would refuse after the person has confirmed", () => {
+        expect(withNpx({ package: "thing-Cli@1.0.0" })).toMatch("exact version");
+        expect(withNpx({ package: "@Acme/thing@1.0.0" })).toMatch("exact version");
+        expect(withNpx({ package: `thing@1.0.0-${"a".repeat(35)}` })).toMatch("exact version");
+        expect(withNpx({ package: `thing@1.0.0-${"a".repeat(34)}` })).toMatchObject({ kind: "npm" });
+        expect(withNpx({ args: "-v ".repeat(49).trim().split(" ") })).toMatchObject({ kind: "npm" });
+        expect(withNpx({ args: "-v ".repeat(50).trim().split(" ") })).toMatch("49 arguments");
+    });
+
+    it("bounds all of an entry's variables together, as the core does", () => {
+        const variables = (count: number, size: number) => Object.fromEntries(Array.from({ length: count }, (_, index) => [`V${String(index)}`, "x".repeat(size)]));
+
+        expect(withNpx({ env: variables(50, 1) })).toMatchObject({ kind: "npm" });
+        expect(withNpx({ env: variables(51, 1) })).toMatch("variables are longer");
+        expect(withNpx({ env: variables(5, 8000) })).toMatch("variables are longer");
+    });
+
+    it("applies the same limits to its arguments and variables as to a download", () => {
+        expect(withNpx({ env: { NODE_OPTIONS: "--require x" } })).toMatch("It sets NODE_OPTIONS");
+        expect(withNpx({ args: ["x".repeat(1001)] })).toMatch("arguments");
+        expect(withNpx({}, { publisher: "x".repeat(201) })).toMatch("publisher");
+    });
+
+    it("prefers a verifiable binary download, and falls back to npm when the binary has no checksum or platform", () => {
+        const [amp, cortex] = parseRegistry(REGISTRY_FIXTURE);
+        const npx = { args: [], env: {}, package: "thing@1.0.0" };
+
+        expect(resolveInstall({ ...amp, npx }, "linux-x86_64")).toMatchObject({ kind: "binary" });
+        expect(resolveInstall({ ...amp, npx }, "linux-riscv64")).toMatchObject({ kind: "npm" });
+        expect(resolveInstall({ ...cortex, npx }, "darwin-aarch64")).toMatchObject({ kind: "npm" });
+    });
+
+    it("is not offered on Windows, and a uvx-only or empty entry keeps its refusal with the reason", () => {
+        expect(resolveInstall({ ...thing, npx: { args: [], env: {}, package: "thing@1.0.0" } }, "windows-x86_64")).toMatch("Windows");
+        expect(resolveInstall({ ...thing, distributions: ["uvx"], npx: undefined }, "linux-x86_64")).toMatch("uvx");
+        expect(resolveInstall({ ...thing, distributions: [], npx: undefined }, "linux-x86_64")).toMatch("no distribution");
+    });
+
+    it("reads the npx distribution from the registry file", () => {
+        expect(thing.npx).toEqual({ args: [], env: {}, package: "thing@1.0.0" });
+        expect(parseRegistry({ agents: [{ distribution: { npx: { package: 7 } }, id: "bad", name: "Bad", version: "1.0.0" }] })[0].npx).toBeUndefined();
+    });
+});
+
 describe("AgentRegistry", () => {
     const registryWith = (respond: () => Response | Promise<Response>, now = () => 0) => {
         const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => respond());
@@ -113,9 +173,18 @@ describe("AgentRegistry", () => {
         expect(fetchSpy).toHaveBeenCalledTimes(1);
         expect(fetchSpy.mock.calls[0][0]).toBe(REGISTRY_URL);
         expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
-        expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", false]]);
+        expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", true]]);
         expect(listings[0]).toMatchObject({ license: "Apache-2.0", publisher: "Ada Lovelace, Grace Hopper", version: "0.10.0" });
         expect(listings[1].reason).toMatch("no checksum");
+    });
+
+    it("lists an npm agent with the reason when node and npm are not here", async () => {
+        const fetchSpy = vi.fn(async () => jsonResponse(REGISTRY_FIXTURE));
+        const registry = new AgentRegistry({ arch: "x64", fetch: fetchSpy as unknown as typeof fetch, hasNpmTools: () => false, platform: "linux" });
+        const listings = await registry.search("");
+
+        expect(listings.map(({ id, installable }) => [id, installable])).toEqual([["amp-acp", true], ["cortex-code", false], ["thing", false]]);
+        expect(listings[2].reason).toMatch("Node.js and npm were not found");
     });
 
     it("lists nothing as installable where coding agents cannot run", async () => {
@@ -173,7 +242,7 @@ describe("AgentRegistry", () => {
 
         await registry.search("");
 
-        expect(registry.resolve("amp-acp", "0.10.0").sha256).toBe(SHA);
+        expect(registry.resolve("amp-acp", "0.10.0")).toMatchObject({ kind: "binary", sha256: SHA });
         expect(() => registry.resolve("amp-acp", "0.9.0")).toThrow("Search again");
         expect(() => registry.resolve("missing", "1.0.0")).toThrow("Search again");
         expect(() => registry.resolve("cortex-code", "1.0.0")).toThrow("no checksum");
@@ -220,6 +289,15 @@ describe("a download that points inward", () => {
         for (const host of ["cdn.agentclientprotocol.com", "github.com", "8.8.8.8", "172.32.0.1", "100.128.0.1", "[2606:4700::1]"]) {
             expect(isPrivateHost(host), host).toBe(false);
         }
+    });
+
+    it("can be held to one host on every hop, checked before the hop is requested", async () => {
+        const fetchImpl = vi.fn(async () => new Response(null, { headers: { location: "https://mirror.example.com/x" }, status: 302 }));
+
+        await expect(fetchHttps(fetchImpl, "https://registry.npmjs.org/x", {}, "registry.npmjs.org")).rejects.toThrow("redirected away");
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        await expect(fetchHttps(fetchImpl, "https://other.example.com/x", {}, "registry.npmjs.org")).rejects.toThrow("redirected away");
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
 
     it("is refused before it is requested, as the first address and as a redirect", async () => {

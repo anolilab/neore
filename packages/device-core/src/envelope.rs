@@ -81,6 +81,10 @@ pub struct CallEnvelope {
     pub nonce: String,
     #[serde(default)]
     pub tainted_by: Vec<String>,
+    /// The chat the call came from. Every chat call names one; the only calls without one are the global instruction
+    /// files, started from a project's settings (`backend/lunora/devices/global-instructions.ts`).
+    #[serde(default)]
+    pub thread_id: Option<String>,
     #[serde(default)]
     pub thread_title: String,
     pub tool: String,
@@ -97,6 +101,9 @@ pub const MAX_ENVELOPE_AHEAD_MS: u64 = 15 * 60 * 1000;
 pub struct NonceSet {
     entries: HashMap<String, u64>,
     path: Option<PathBuf>,
+    /// Also sync the folder after each save. Only the strict set does: a desktop keeps its history as before, without
+    /// a folder sync per call or a refusal on a file system that will not sync a folder.
+    sync_folder: bool,
 }
 
 impl NonceSet {
@@ -109,7 +116,23 @@ impl NonceSet {
         NonceSet {
             entries,
             path: Some(path.to_owned()),
+            sync_folder: false,
         }
+    }
+
+    /// [`persisted`](Self::persisted) for a caller that must not run on a lost history: a stored file that cannot be
+    /// read or parsed is an error.
+    pub fn persisted_strict(path: &Path, now: u64) -> Result<Self, String> {
+        let mut entries = store::load_nonces_strict(path)?;
+
+        entries.retain(|_, expiry| *expiry > now);
+
+        // A power loss that brought back the previous history would make an accepted call replayable.
+        Ok(NonceSet {
+            entries,
+            path: Some(path.to_owned()),
+            sync_folder: true,
+        })
     }
 
     /// `false` when the nonce was already used (a replay), or when it cannot be
@@ -124,7 +147,15 @@ impl NonceSet {
         self.entries.insert(nonce.to_owned(), expires_at);
 
         if let Some(path) = &self.path {
-            if store::save_nonces(path, &self.entries).is_err() {
+            let saved = store::save_nonces(path, &self.entries).and_then(|()| {
+                if self.sync_folder {
+                    store::sync_folder_of(path)
+                } else {
+                    Ok(())
+                }
+            });
+
+            if saved.is_err() {
                 self.entries.remove(nonce);
 
                 return false;

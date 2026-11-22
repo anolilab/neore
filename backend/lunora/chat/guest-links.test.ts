@@ -66,8 +66,9 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
-const { _deletePageForThreadId, createTemporaryThread, markThreadArchived, softDeleteThread } = await import("../agent/threads");
+const { _deletePageForThreadId, createTemporaryThread, deleteAllForThreadIdAsync, markThreadArchived, softDeleteThread } = await import("../agent/threads");
 const { enableThreadLock } = await import("../agent/thread-lock");
+const sharing = await import("../agent/sharing");
 const { GUEST_ROUTE_BATCH, scheduleGuestLinkRouteDrop, withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
@@ -156,6 +157,67 @@ describe("withdrawing a link", () => {
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
         expect(await rows("shardRoutes")).toHaveLength(0);
+    });
+});
+
+describe("a deleted chat's share grants", () => {
+    const deletions: [string, () => Promise<unknown>][] = [
+        ["trashed", async () => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }))],
+        ["deleted for good", async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }))],
+    ];
+
+    it.each(deletions)("are removed when the chat is %s, so no collaborator keeps reading it", async (_label, remove) => {
+        await harness.run(async (ctx: any) => {
+            // More grants than one page reads, so every page must go.
+            for (let index = 0; index < 120; index += 1) {
+                await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: `guest-${index}` });
+            }
+
+            await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: "collaborator" });
+            await ctx.db.insert("threadInvites", {
+                expiresAt: NOW + 60_000,
+                invitedBy: OWNER,
+                invitedEmail: "someone@example.com",
+                inviteToken: "token-1",
+                ownerId: OWNER,
+                permission: "read",
+                status: "pending",
+                threadId,
+            });
+            await ctx.db.insert("threadAccess", {
+                grantedAt: 0,
+                grantedBy: OWNER,
+                ownerId: OWNER,
+                permission: "read",
+                threadId: "another-thread",
+                userId: "collaborator",
+            });
+        });
+        await remove();
+
+        // The delete schedules the revocation; it runs a batch at a time and schedules the next until none is left.
+        const ran = new Set<string>();
+
+        for (let pass = 0; pass < 10; pass += 1) {
+            const due = harness.scheduler.list().filter((job) => !ran.has(job.id) && Object.keys(job.args).join(",") === "threadId");
+
+            for (const job of due) {
+                ran.add(job.id);
+                await harness.run(async (ctx: any) => await ctx.runMutation(sharing.revokeThreadGrantsJob, job.args));
+            }
+        }
+
+        // 121 grants and an invite take four batches.
+        expect(ran.size).toBeGreaterThan(3);
+
+        const grants = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { userId: "collaborator" } }));
+        const invites = await harness.run(async (ctx: any) => await ctx.db.threadInvites.findMany({ where: { threadId } }));
+
+        const left = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { threadId } }));
+
+        expect(left.page).toHaveLength(0);
+        expect(grants.page.map((grant: any) => grant.threadId)).toEqual(["another-thread"]);
+        expect(invites.page.map((invite: any) => invite.status)).toEqual(["revoked"]);
     });
 });
 

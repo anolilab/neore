@@ -6,6 +6,7 @@ import { admitThread, systemDb } from "../lib/rls/scope";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 
 import { isUnlockProofValid } from "./thread-passcode";
+import { storedRow } from "../lib/stored-row";
 
 /**
  * Who may read a thread's raw message rows through a CLIENT-reachable procedure.
@@ -46,7 +47,9 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
     PERMISSION_LEVELS[granted] >= PERMISSION_LEVELS[required];
 
 /**
- * - `full` — owner (`admin`) or live grantee (the grant's permission): the raw row.
+ * - `full` — owner (`admin`) or live grantee (the grant's permission): the raw row. `expiresAt`: when a
+ *   grantee's grant ends, for a live read that must stop showing the thread then (a cached live query is not
+ *   re-run when only the clock moves).
  * - `redacted` — a live PUBLIC thread and anyone else, including no caller at
  *   all: only what `redactThreadForPublicViewer` / `toPublicThreadMessages`
  *   let through. Never an authorization for anything but that projection.
@@ -57,7 +60,7 @@ export const meetsThreadPermission = (granted: ThreadPermission, required: Threa
  *   public view).
  */
 export type ThreadReadAccess =
-    | { kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> }
+    | { expiresAt?: number; kind: "full"; permission: ThreadPermission; thread: Doc<"threads"> }
     | { kind: "locked"; thread: Doc<"threads"> }
     | { kind: "redacted"; thread: Doc<"threads"> }
     | null;
@@ -110,15 +113,17 @@ export const resolveThreadReadAccess = async (
     if (userId) {
         // `.global()` (D1): a grant is read from whichever shard the caller is on.
         // `primary`: a caller about to write on the strength of the grant must not see one a replica still holds.
-        const access = await context.db.threadAccess.findFirst({
-            ...(options.primary === true && { consistency: "primary" as const }),
-            where: { threadId, userId },
-        });
+        const access = storedRow(
+            await context.db.threadAccess.findFirst({
+                ...(options.primary === true && { consistency: "primary" as const }),
+                where: { threadId, userId },
+            }),
+        );
 
         if (access && hasThreadReadAccess({ access, now: Date.now(), thread, userId })) {
             admitThread(context, threadId, access.permission, userId);
 
-            return { kind: "full", permission: access.permission, thread };
+            return { ...(access.expiresAt !== undefined && { expiresAt: access.expiresAt }), kind: "full", permission: access.permission, thread };
         }
     }
 

@@ -135,6 +135,7 @@ export const getChatFileImageUrl = authQuery
             return null;
         }
 
+        // lunora-advisor-exempt storage_key_from_user_args -- the key is the stored `storageId` of a file the caller holds a `chatFileAccess` grant on (read by `ctx.user.userId` above), never request input
         return await ctx.storage.getSignedUrl(file.storageId, { expiresInSeconds: displayUrlExpiresInSeconds() });
     });
 

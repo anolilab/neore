@@ -6,9 +6,11 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { deleteHumanChecksOfThread } from "../browser/gdpr";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
+import { revokeThreadGrants } from "./sharing";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
@@ -472,6 +474,8 @@ export const deleteAllForThreadIdAsync = internalMutation
             }
 
             await deleteThreadSummaries(ctx, args.threadId);
+            // A chat deleted for good without passing the trash keeps no grant either.
+            await revokeThreadGrants(ctx, args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,
@@ -549,6 +553,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
 
         // The follow rows of the thread (`chat/follows/functions.ts`), one batch per call; the thread goes once none are left.
         if (!(await deleteFollowRowsOfThread(context, args.threadId))) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
+
+        // The sites its runs asked the person to clear (`browser/human-check.ts`), one batch per call as the rows above.
+        if (!(await deleteHumanChecksOfThread(context, args.threadId))) {
             return { cursor: messages.continueCursor, isDone: false };
         }
 
@@ -782,6 +791,8 @@ export const softDeleteThread = internalMutation
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
         await withdrawGuestLinksForThread(ctx, args.threadId);
+        // A deleted chat is no one else's to read, its memories' quotes included.
+        await revokeThreadGrants(ctx, args.threadId);
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Remove from aggregates when soft deleted

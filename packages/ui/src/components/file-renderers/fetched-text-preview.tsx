@@ -13,6 +13,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { useFetchedText } from "@ui/hooks/use-fetched-text";
 import cn from "@ui/utils/cn";
+import { saveOnClick } from "@ui/utils/save-from-url";
 import { Download, FileText } from "lucide-react";
 import type { FC, ReactNode } from "react";
 
@@ -43,6 +44,7 @@ export const FilePreviewFrame: FC<FilePreviewFrameProps> = ({ children, classNam
                     className="hover:bg-accent shrink-0 rounded p-1"
                     download={filename}
                     href={url}
+                    onClick={saveOnClick(url, filename, fallbackName)}
                     rel="noopener noreferrer"
                     target="_blank"
                 >

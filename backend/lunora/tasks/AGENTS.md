@@ -83,8 +83,9 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
 - A passing fallback (`thread_locked`, `thread_busy`: `isPassingFallback`) keeps `lastRunThreadId` on the old
   thread (`completeRound`'s `keepLastThread`); a moved or deleted thread hands over to the new one.
 - Filing stays best-effort (`.catch` + log): a project deleted mid-run must not fail a paid run.
-- The run gets the project's `context` as `PROJECT CONTEXT:` in `system`, framed as `chat/lib/agent-run.ts` does.
-  The runner re-reads project and context with `runProjectFor` right before it uses them (access can go in between).
+- The run gets the project's `always` rule files as `PROJECT CONTEXT:` in `system` and its `auto` ones as
+  `projectInstructions`, from `projectRunContext` (the chat runs' helper, same cap), re-read with `runProjectFor`
+  right before the run uses them (access can go in between).
 - A repair round continues the thread its cycle's previous round ran in (`resolveRunPlace`), which after a passing
   fallback is not `lastRunThreadId`.
 - The divider is `agent/context-reset.ts` (`appendContextReset`): a `system` row with no text and

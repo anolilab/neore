@@ -81,13 +81,14 @@ the files from the root down to their working directory, so **read the file for 
 | Branches, agent switch, idle-thread summaries                                       | `backend/lunora/agent/AGENTS.md`                        |
 | Tasks: rounds, the recurrence sweep, skipped slots, where a run goes               | `backend/lunora/tasks/AGENTS.md`                        |
 | Host-run threads, coding agents on a paired computer                                | `backend/lunora/acp/AGENTS.md`                          |
-| Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices | `backend/lunora/<folder>/AGENTS.md`                     |
+| Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices, vault, projects (rule files) | `backend/lunora/<folder>/AGENTS.md`                     |
 | AI model registry, prompt optimizer, multi-reference images                         | `packages/ai/AGENTS.md`                                 |
 | LLM gateway, video render queue, FAL media                                          | `services/llm-gateway/AGENTS.md`                        |
 | Web app, frontend lessons, accessibility                                            | `apps/web/AGENTS.md`, `apps/web/src/AGENTS.md`           |
 | Storybook: stories, MSW fixtures, page stories, a11y in CI                          | `apps/web/src/storybook/AGENTS.md`                      |
 | Web auth (session reads), chat UI, local models                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md` |
 | Desktop shell, dictation, ACP registry installs; mobile app; UI components          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md` |
+| Browser extension: sign-in through the app grant, no cookies                        | `apps/browser-extension/AGENTS.md`                      |
 | Device execution, sandbox, SSH servers, `neore-host`                                | `packages/device-core/AGENTS.md`                        |
 | Dev servers, build, deploy, pnpm, vis; review checklist and test rules for a PR      | `docs/agents/{local-dev,build-and-deploy,tooling,review-checklist,testing}.md` |
 

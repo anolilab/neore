@@ -5,7 +5,6 @@ import { BACKGROUND_PATH, buildManifest, FIREFOX_MIN_VERSION, GECKO_ID, SIDEBAR_
 
 const input = (overrides: Partial<ManifestInput> = {}): ManifestInput => {
     return {
-        appUrl: "https://app.example.test",
         browser: "chrome",
         command: "build",
         description: "Test",
@@ -28,15 +27,15 @@ describe("buildManifest — chrome", () => {
         expect(manifest.browser_specific_settings).toBeUndefined();
     });
 
-    it("grants host access to the app (cookie session), backend and gateway only", () => {
-        expect(manifest.host_permissions).toEqual(["https://app.example.test/*", "https://api.example.test:8443/*", "https://gateway.example.test/*"]);
-        expect(manifest.permissions).not.toContain("identity");
+    it("signs in through identity and grants host access to the backend and gateway only — never the app's cookie origin", () => {
+        expect(manifest.host_permissions).toEqual(["https://api.example.test:8443/*", "https://gateway.example.test/*"]);
+        expect(manifest.permissions).toContain("identity");
     });
 
     it("lists permissions sorted, and lets connect-src reach the same origins over WebSocket", () => {
-        expect(manifest.permissions).toEqual(["activeTab", "contextMenus", "scripting", "sidePanel", "storage"]);
+        expect(manifest.permissions).toEqual(["activeTab", "contextMenus", "identity", "scripting", "sidePanel", "storage"]);
         expect(manifest.content_security_policy?.extension_pages).toContain(
-            "connect-src 'self' https://app.example.test https://api.example.test:8443 https://gateway.example.test wss://app.example.test wss://api.example.test:8443 wss://gateway.example.test",
+            "connect-src 'self' https://api.example.test:8443 https://gateway.example.test wss://api.example.test:8443 wss://gateway.example.test",
         );
     });
 });
@@ -63,10 +62,9 @@ describe("buildManifest — firefox", () => {
         });
     });
 
-    it("signs in through identity and needs no host access to the app origin", () => {
+    it("signs in through identity, with the same host access as Chrome", () => {
         expect(manifest.permissions).toEqual(["activeTab", "contextMenus", "identity", "scripting", "storage"]);
         expect(manifest.host_permissions).toEqual(["https://api.example.test:8443/*", "https://gateway.example.test/*"]);
-        expect(manifest.content_security_policy?.extension_pages).not.toContain("app.example.test");
         expect(manifest.content_security_policy?.extension_pages).toContain("wss://api.example.test:8443");
     });
 
@@ -84,6 +82,7 @@ describe("buildManifest — dev server", () => {
     });
 
     it("drops unset and unparsable origins", () => {
-        expect(buildManifest(input({ gatewayUrl: "not a url", lunoraUrl: undefined })).host_permissions).toEqual(["https://app.example.test/*"]);
+        expect(buildManifest(input({ gatewayUrl: "not a url" })).host_permissions).toEqual(["https://api.example.test:8443/*"]);
+        expect(buildManifest(input({ gatewayUrl: undefined, lunoraUrl: undefined })).host_permissions).toEqual([]);
     });
 });

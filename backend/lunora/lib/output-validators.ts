@@ -28,14 +28,16 @@ import { v } from "lunorash/server";
 import type { Doc } from "../_generated/dataModel";
 import { vPaginationResult } from "../agent/validators";
 import { schema } from "../schema";
+import type { StoredRow } from "./stored-row";
 
 type TableName = keyof typeof schema.tables & string;
 
 /**
  * A stored document: the table's own columns plus the two fields the runtime
- * stamps on every row.
+ * stamps on every row. An optional column is `?: T`, as the validator checks it
+ * (`StoredRow`: codegen types it `T | null` on a `.global()` table).
  */
-export const docOf = <T extends TableName>(table: T): Validator<Doc<T>> =>
+export const docOf = <T extends TableName>(table: T): Validator<StoredRow<Doc<T>>> =>
     // The assertion is about what tsc can prove, not about what this returns.
     // `schema.tables[table].shape` is indexed by a generic `T`, so its type is
     // the union of every table's shape (9000+ members) and tsc cannot narrow
@@ -46,7 +48,7 @@ export const docOf = <T extends TableName>(table: T): Validator<Doc<T>> =>
         _creationTime: v.number(),
         _id: v.id(table),
         ...schema.tables[table].shape,
-    }) as unknown as Validator<Doc<T>>;
+    }) as unknown as Validator<StoredRow<Doc<T>>>;
 
 /**
  * Any paginated result, with the envelope type named rather than inlined.
@@ -65,4 +67,4 @@ export const paginatedOf = <T>(item: Validator<T>): Validator<PaginationResult<T
  * handlers return on their empty-page early return. Declaring a second envelope
  * here without it would have stripped `pageStatus` out of those responses.
  */
-export const paginatedDocsOf = <T extends TableName>(table: T): Validator<PaginationResult<Doc<T>>> => paginatedOf(docOf(table));
+export const paginatedDocsOf = <T extends TableName>(table: T): Validator<PaginationResult<StoredRow<Doc<T>>>> => paginatedOf(docOf(table));

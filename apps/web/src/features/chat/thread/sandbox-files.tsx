@@ -3,6 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neore/chat-ui/types";
 import { formatFileSize, isDocx, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { saveOnClick } from "@neore/ui/utils/save-from-url";
 import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { Component, lazy, Suspense, useEffect, useState } from "react";
@@ -241,6 +242,7 @@ const SandboxFileChip: FC<{ file: SandboxOutputFile }> = ({ file }) => {
                     className="border-border hover:bg-muted flex max-w-full items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
                     download={file.name}
                     href={file.url}
+                    onClick={saveOnClick(file.url, file.name)}
                     rel="noopener noreferrer"
                     target="_blank"
                 >

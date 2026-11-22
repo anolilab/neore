@@ -9,11 +9,22 @@ import { gdprLogger } from "../lib/logger";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 
 /**
- * The user's vault: files (with their R2 objects), then folders once no file is
+ * The user's vault: saved site logins, files (with their R2 objects), then folders once no file is
  * left. At most {@link BATCH} rows per call; `hasMore` while any may remain —
  * the workflow drains it.
  */
 export const eraseVaultForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const logins = await ctx.db
+        .query("savedSiteLogins")
+        .withIndex("by_userId_origin", (q) => q.eq("userId", userId))
+        .take(BATCH);
+
+    if (logins.length > 0) {
+        await Promise.all(logins.map((login) => ctx.db.delete("savedSiteLogins", login._id)));
+
+        return { hasMore: true };
+    }
+
     const files = await ctx.db
         .query("files")
         .withIndex("by_user_and_folder", (q) => q.eq("userId", userId))

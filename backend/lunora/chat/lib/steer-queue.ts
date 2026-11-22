@@ -17,10 +17,12 @@ export interface SteerEntry {
     messageId?: string;
     /** The run's pending row the delivery moved under `messageId`. */
     pendingMessageId?: string;
-    /** When the user sent it, while queued. */
+    /** When the user sent it; a memory quoting it is dated by this. Absent on entries queued before it was kept. */
     sentAt?: number;
     status: "delivered" | "queued" | "withdrawn";
     text?: string;
+    /** Set on delivery: the length of its text, which splits the combined row back into the steers it held. */
+    textLength?: number;
 }
 
 /** Waiting at once: bounds the stream row (each text is up to `MAX_LENGTH.text`). */
@@ -42,8 +44,9 @@ export const queueSteer = (entries: ReadonlyArray<SteerEntry>, entry: { id: stri
 
 /**
  * Every queued entry, as the ONE message the run receives (texts in the order
- * they were sent, a blank line apart), and `deliver(messageId, pendingMessageId)`: the queue with
- * them delivered as that row, and `parts`: each text with when it was sent. `undefined` when nothing is queued.
+ * they were sent, a blank line apart), each with when it was sent (`parts`), and
+ * `deliver(messageId, pendingMessageId)`: the queue with them delivered as that row.
+ * `undefined` when nothing is queued.
  */
 export const takeQueuedSteers = (
     entries: ReadonlyArray<SteerEntry>,
@@ -58,7 +61,19 @@ export const takeQueuedSteers = (
 
     return {
         deliver: (messageId, pendingMessageId) =>
-            entries.map((item) => (item.status === "queued" ? { id: item.id, messageId, pendingMessageId, status: "delivered" } : item)),
+            entries.map((item) =>
+                item.status === "queued"
+                    ? {
+                          id: item.id,
+                          messageId,
+                          pendingMessageId,
+                          status: "delivered",
+                          // Kept without the text: a recovered reply splits its combined row back into the steers (`textLength`).
+                          ...(item.sentAt !== undefined && { sentAt: item.sentAt }),
+                          textLength: (item.text ?? "").length,
+                      }
+                    : item,
+            ),
         ids: queued.map((item) => item.id),
         parts: queued.map((item) => {
             return { ...(item.sentAt !== undefined && { sentAt: item.sentAt }), text: item.text ?? "" };

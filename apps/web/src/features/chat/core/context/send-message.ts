@@ -32,6 +32,8 @@ import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { PendingSettings } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import type { DraftOrigin } from "../utils/draft-origin";
+import { draftFromField } from "../utils/draft-origin";
 import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import type { ReadinessGate } from "../utils/readiness-gate";
 import { clearSendStarting, markSendStarting } from "../utils/send-in-flight";
@@ -100,8 +102,12 @@ export interface SendMessageEnv extends ChatActionBase {
     turnRef: RefObject<number>;
 }
 
-/** What a send carries besides its text: a held guest note's id, set only by the Guests tab's Send. */
+/**
+ * What a send carries besides its text: the draft's not-typed mark (`core/utils/draft-origin.ts`), and a held guest note's id,
+ * set only by the Guests tab's Send.
+ */
 export interface SendMessageOptions {
+    draftFrom?: DraftOrigin;
     guestMessageId?: string;
 }
 
@@ -139,12 +145,12 @@ const endComposerSubmit = (guestMessageId: string | undefined): void => {
  * A send by someone who must sign in first (invite-only): the owner's own text goes back to the composer and is held for
  * after sign-in. A guest's note is not the composer's draft: it is neither put there nor held to go out as the owner's words.
  */
-export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageOptions = {}): void => {
+export const holdSendForSignIn = (text: string, { draftFrom, guestMessageId }: SendMessageOptions = {}): void => {
     endComposerSubmit(guestMessageId);
 
     if (guestMessageId === undefined) {
-        useChatUIStore.getState().setComposerText(text);
-        holdForSignIn(text);
+        restoreTextFor(undefined, text, draftFrom);
+        holdForSignIn(text, draftFrom);
     } else {
         openLoginPrompt();
     }
@@ -230,7 +236,7 @@ const runSendMessageBody = async (
     // A held guest note the owner sends on from the Guests tab: the server saves its own text, marked as the guest's. Only
     // that send carries the id, never one of the composer's or the queue's. It goes alone: never through the composer (the
     // owner's draft stays, on every path out), with no goal, no reference images and none of the composer's files.
-    const { guestMessageId } = options;
+    const { draftFrom, guestMessageId } = options;
     const attachedReferences = guestMessageId === undefined ? useChatUIStore.getState().attachedReferences : [];
     const modelAtStart = useModelStore.getState();
     const currentMode = modelAtStart.getComposerMode(threadId || undefined);
@@ -254,7 +260,7 @@ const runSendMessageBody = async (
             providerLogger.error("[ChatProvider] Session not ready after waiting; send not delivered");
 
             if (guestMessageId === undefined && sameSession()) {
-                restoreTextFor(owner, text);
+                restoreTextFor(owner, text, draftFrom);
             }
 
             endComposerSubmit(guestMessageId);
@@ -304,7 +310,7 @@ const runSendMessageBody = async (
             setOptimisticMessages(withoutMessage(optimisticId));
 
             if (sameSession()) {
-                restoreTextFor(owner, text);
+                restoreTextFor(owner, text, draftFrom);
             }
 
             if (message) {
@@ -370,6 +376,7 @@ const runSendMessageBody = async (
                     navigate({ params: { threadId: savedThreadId }, state: { isNewThread: true } as HistoryState, to: "/chat/$threadId" });
                 }
             },
+            draftFrom,
             prompt: text,
             systemPrompt: isCreatingNewThread ? pendingSettings?.customSystemPrompt : threadDataRef.current?.customSystemPrompt,
             temporary: isCreatingNewThread ? newChatTemporaryFields(pendingSettings, newChatsTemporary) : undefined,
@@ -449,6 +456,7 @@ const runSendMessageBody = async (
             mode: currentMode,
             model,
             prompt: text,
+            ...draftFromField(draftFrom),
             researchDepth: searchMode === "chat" ? undefined : researchDepth,
             searchMode,
             threadId: threadId || undefined, // undefined triggers thread creation
@@ -557,7 +565,7 @@ const runSendMessageBody = async (
                 setOptimisticMessages(withoutMessage(optimisticId));
 
                 if (sameSession()) {
-                    restoreTextFor(owner, text);
+                    restoreTextFor(owner, text, draftFrom);
                 }
 
                 restoreSettings();
@@ -704,7 +712,7 @@ const runSendMessageBody = async (
         // deadline the backend may still have saved the prompt, so the draft returns for the user to resend on
         // purpose (never automatically) and the timeout message says to check the conversation first.
         if (guestMessageId === undefined && sameSession()) {
-            restoreComposerFor(owner, { attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+            restoreComposerFor(owner, { attachedReferences, composerAttachments: attachments ?? [], composerDraftFrom: draftFrom, composerText: text });
         }
 
         restoreSettings();

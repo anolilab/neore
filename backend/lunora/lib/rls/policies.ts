@@ -171,6 +171,7 @@ const OWNER_TABLES = [
     "aiUserPreferences",
     "bots",
     "browserExtensions",
+    "browserHumanChecks",
     "browserSessions",
     "chatImportJobs",
     "codingAgentRuns",
@@ -217,6 +218,7 @@ const OWNER_TABLES = [
     "requestedSecrets",
     "reviewDrafts",
     "sandboxSessions",
+    "savedSiteLogins",
     "session",
     "skillInvocations",
     "subAgentRuns",
@@ -424,6 +426,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     actionCache: "server-side cache of computed values; no user column",
     apikey: "better-auth's own table, reached through its adapter and `verifyApiKey`",
     auditLog: "admin-only audit trail (`admin*` procedures)",
+    botOwners:
+        "bot creator record, global: written by `createBot`, erased with its owner; read by the memory list (`listUserMemories` through `memory/bot-owner.ts`), which returns only whether a bot is someone else's and whether it was deleted, never the owner id",
     browserActions: "no owner column; read only after the parent browser session's owner check",
     changelogCache: "public changelog cache",
     chatFiles: "content-addressed and SHARED (same bytes, one row) — no owner; access is the `chatFileAccess` grant",
@@ -454,6 +458,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     projectKnowledge: "link rows with no owner column; every access follows the project's owner check",
     projectRepositories:
         "access is decided by the row's project, never its own `userId`/`organizationId` copies: `readableProject`/`editableProject` in `projects/functions.ts` (read: the owner or a current member of the project's organization; change: the owner, or any current member when the project has no owner)",
+    projectRuleFiles:
+        "one row per project; its `userId` copies the project's owner (re-stamped on account merge) for erasure only (`eraseProjectRuleFilesForUser`), and every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
     promptHistory: "`userId` is the EDITOR of an org-shared prompt; read under the prompt's rule",
     rateLimit: "better-auth rate limiter",
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",

@@ -114,6 +114,12 @@ export const RATE_LIMIT_CONFIGS = {
 
     "browser/action:premium": Ratelimit.fixedWindow(200, HOUR),
     "browser/action:public": Ratelimit.fixedWindow(5, HOUR),
+    // Keeping, handing back and steering the browser a person took control of (`browser/live-view.ts`).
+    "browser/control:free": Ratelimit.fixedWindow(240, HOUR),
+    "browser/control:premium": Ratelimit.fixedWindow(600, HOUR),
+    // Each call mints a live view URL at the provider (`browser/live-view.ts`).
+    "browser/liveView:free": Ratelimit.fixedWindow(30, HOUR),
+    "browser/liveView:premium": Ratelimit.fixedWindow(120, HOUR),
 
     "byok/decrypt:free": Ratelimit.fixedWindow(100, MINUTE),
 
@@ -635,8 +641,10 @@ export const RATE_LIMIT_CONFIGS = {
     "vault/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "vault/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "vault/download:free": Ratelimit.fixedWindow(30, MINUTE),
-
     "vault/download:premium": Ratelimit.fixedWindow(90, MINUTE),
+    // Saving or deleting a site login: a person at the settings page, never a loop.
+    "vault/site-logins:free": Ratelimit.fixedWindow(20, MINUTE),
+    "vault/site-logins:premium": Ratelimit.fixedWindow(40, MINUTE),
     "vault/upload:free": Ratelimit.fixedWindow(10, MINUTE),
     "vault/upload:premium": Ratelimit.fixedWindow(30, MINUTE),
     vercel: Ratelimit.tokenBucket(3, 10 * SECOND, 3),

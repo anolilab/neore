@@ -94,6 +94,10 @@ const speakerTools = vi.hoisted(() => new Map<string, unknown>());
 const progressProbe = vi.hoisted(() => {
     return { on: false };
 });
+/** A thread filed in a project: the file ids each speaker's project-rule read names (`getProjectContextForRun`). */
+const projectRuns = vi.hoisted(() => {
+    return { fileIds: [] as (string[] | undefined)[], projectId: undefined as string | undefined };
+});
 /** The organization each faked `buildAgentTools` call was capped by. */
 const toolOrganizations = vi.hoisted(() => [] as (string | null | undefined)[]);
 const routerScript = vi.hoisted(() => {
@@ -192,12 +196,22 @@ const fakeProcedures = () => {
     const keys = internalQuery.input({ userId: v.string() }).query(async () => {
         return {};
     });
-    const threadSettings = internalQuery.input({ threadId: v.string() }).query(async () => null);
+    const threadSettings = internalQuery
+        .input({ threadId: v.string() })
+        .query(async () => (projectRuns.projectId ? { projectId: projectRuns.projectId } : null));
+    const projectContext = internalQuery
+        .input({ fileIds: v.optional(v.array(v.string())), projectId: v.string(), userId: v.string() })
+        .query(async ({ args }) => {
+            projectRuns.fileIds.push(args.fileIds);
+
+            return null;
+        });
 
     registry.set("auth_functions:getUserPreferencesQuery", prefs);
     registry.set("auth_functions:getAgentModulePreferencesQuery", agentPrefs);
     registry.set("auth_functions:getDecryptedProviderKeysQuery", keys);
     registry.set("chat_functions:getThreadSettings", threadSettings);
+    registry.set("projects_functions:getProjectContextForRun", projectContext);
     // Scheduled after the turn; the fake scheduler only runs it on `runPending()`.
     registry.set("chat_functions:generateFollowupSuggestionsForThread", threadSettings);
     // `afterRun` notes Daily Brief activity after every reply; likewise only scheduled.
@@ -348,6 +362,8 @@ beforeEach(async () => {
     speakerTools.clear();
     progressProbe.on = false;
     toolOrganizations.length = 0;
+    projectRuns.fileIds.length = 0;
+    projectRuns.projectId = undefined;
     routerScript.calls = 0;
     routerScript.failRulesReadAt = 0;
     routerScript.rulesReads = 0;
@@ -505,6 +521,33 @@ describe("runGroupTurn — MCP tool progress", () => {
             { progress: 1, serverName: "Docs", toolCallId: "call_1", toolName: "index", total: 2 },
             { ended: true, serverName: "Docs", toolCallId: "call_1", toolName: "index" },
         ]);
+    });
+});
+
+describe("runGroupTurn — tool context", () => {
+    it("names each speaker's reply, not the group thread, so a site is asked about once per reply", async () => {
+        const { createTool } = await import("../../agent/client");
+        const replyKeys: (string | undefined)[] = [];
+
+        await setGroup("supervisor", ["writer"]);
+        routerScript.speakers = ["p1"];
+        speakerTools.set("all", {
+            probe: createTool({
+                description: "records the reply key",
+                execute: async (toolCtx) => {
+                    replyKeys.push(toolCtx.replyKey);
+
+                    return "ok";
+                },
+                inputSchema: z.object({}),
+            }),
+        });
+        speakerModels.set("INSTR:writer", scriptedModel([toolCallStep("probe", "call-1"), textStep("writer after the tool.")]));
+
+        await runTurn();
+
+        expect(replyKeys).toStrictEqual([streamId]);
+        expect(replyKeys).not.toContain(threadId);
     });
 });
 
@@ -739,6 +782,29 @@ describe("runGroupTurn — tool approval inside a group turn", () => {
         expect(secret).toMatchObject({ status: "abandoned" });
         expect(secret.encryptedValue).toBeUndefined();
         expect(await approvalRow()).toMatchObject({ status: "pending" });
+    });
+
+    it("gives the speakers after an approval the project rules for the message's files, as the first speaker got them", async () => {
+        await setUpPausingWriter();
+        projectRuns.projectId = "project-1";
+        // Read by the speakers' prompt for the message's attachment; never signed, as the message carries no file part.
+        registry.set(
+            "agent_files:getStorageKeys",
+            internalQuery.input({ fileIds: v.array(v.string()) }).query(async () => {
+                return {};
+            }),
+        );
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", promptId, { fileIds: ["file-sql"] }));
+
+        await runTurn();
+
+        const paused = await approvalRow();
+
+        expect(paused.config.group).toMatchObject({ fileIds: ["file-sql"] });
+
+        await resume(true);
+
+        expect(projectRuns.fileIds).toStrictEqual([["file-sql"], ["file-sql"]]);
     });
 
     it("keeps what started the turn in the snapshot, so a person's answer does not turn an outside agent's turn into the lead's", async () => {
