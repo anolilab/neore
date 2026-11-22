@@ -73,15 +73,31 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
     // icon in a button, a span in a clickable div) is clicked as those ancestors too.
     const actionableSelector =
         "button, a[href], [role='button'], [role='link'], [onclick], [tabindex]:not([tabindex='-1']), label, summary, input[type='button'], input[type='submit'], input[type='reset']";
-    const nodes: Element[] = [control];
-    let ancestor = control.closest(actionableSelector);
-
-    while (ancestor) {
-        if (!nodes.includes(ancestor)) {
-            nodes.push(ancestor);
+    // The parent of an element, crossing a shadow root to its host: a button in a shadow tree is clicked as the host's ancestors too.
+    const parentOf = (node: Element): Element | null => {
+        if (node.parentElement !== null) {
+            return node.parentElement;
         }
 
-        ancestor = ancestor.parentElement?.closest(actionableSelector) ?? null;
+        const root = node.getRootNode();
+
+        return root instanceof ShadowRoot ? root.host : null;
+    };
+    // Text the stylesheet draws, from CSS `content`: a quoted string. `none`, `normal` and counters are not text.
+    const generatedText = (node: Element): string[] =>
+        ["::before", "::after"].flatMap((pseudo) => {
+            const { content } = getComputedStyle(node, pseudo);
+            const quote = content.charAt(0);
+
+            return quote === '"' || quote === "'" ? [content.slice(1, -1)] : [];
+        });
+
+    const nodes: Element[] = [control];
+
+    for (let ancestor = parentOf(control); ancestor !== null; ancestor = parentOf(ancestor)) {
+        if (ancestor.matches(actionableSelector) && !nodes.includes(ancestor)) {
+            nodes.push(ancestor);
+        }
     }
 
     const outermost = nodes.at(-1) ?? control;
@@ -103,9 +119,7 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
         }
 
         // Text the stylesheet draws (CSS `content`) is on screen but in neither innerText nor textContent.
-        for (const pseudo of ["::before", "::after"]) {
-            names.push(getComputedStyle(node, pseudo).content);
-        }
+        names.push(...generatedText(node));
 
         // The rendered text: a child with ordinary text can sit beside a purchase word the person sees.
         if (node instanceof HTMLElement) {
@@ -123,6 +137,21 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
         names.push(node.textContent ?? "");
     }
 
+    // Generated text drawn by the elements inside the outermost one: a purchase word in a descendant's ::before is shown too.
+    // Stops once the name is past its cap, which the read reports as cut short.
+    let generatedLength = 0;
+
+    for (const node of outermost.querySelectorAll("*")) {
+        for (const text of generatedText(node)) {
+            names.push(text);
+            generatedLength += text.length;
+        }
+
+        if (generatedLength > options.max) {
+            break;
+        }
+    }
+
     const joined = names.filter(Boolean).join(" ");
     const label = joined.slice(0, options.max);
     // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
@@ -133,11 +162,10 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
     let current: Element | null = control;
 
     while (current !== null && current !== document.documentElement) {
-        const parent: Element | null = current.parentElement;
-        const index = parent === null ? 0 : [...parent.children].indexOf(current);
+        const index = current.parentElement === null ? 0 : [...current.parentElement.children].indexOf(current);
 
         steps.unshift(`${current.localName}.${index}`);
-        current = parent;
+        current = parentOf(current);
     }
 
     // FNV-1a over the three parts: a click compares the same string the read built.
