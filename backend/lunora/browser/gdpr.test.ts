@@ -580,6 +580,5 @@ describe("browser export pages stay within the export's limits", () => {
         expect(pages.filter((page) => page.phase === "actions").length).toBeGreaterThanOrEqual(2);
         expect(actions).toHaveLength(ACTIONS);
         expect(JSON.stringify(actions)).not.toContain("vvvv");
-        // It writes and reads 40 MB in-process, which outlasts the 5 s default on a loaded runner.
-    }, 60_000);
+    });
 });
