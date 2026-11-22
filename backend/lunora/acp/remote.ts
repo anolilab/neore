@@ -13,7 +13,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { insertThread } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
-import { claimOnce } from "../lib/claim-once";
+import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
@@ -23,7 +23,7 @@ import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { hostOrganizationRefusal } from "./lib/organization-cap";
 import { sessionOfThread } from "./lib/sessions";
-import { projectRunnerOf, rememberProjectRunner, runnerStillOffered } from "./lib/project-runner";
+import { projectRunnerOf, runnerStillOffered } from "./lib/project-runner";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
 import { readableProject, writableProject } from "../projects/functions";
@@ -119,12 +119,14 @@ const answerRetry = async (
     ctx: MutationCtx,
     deviceId: Id<"devices">,
     hostSessionId: string,
+    startKey: string,
     project: Doc<"projects"> | null,
 ): Promise<{ started: boolean; threadId?: string }> => {
     const first = await ctx.db.acpSessions.findFirst({ where: { deviceId, hostSessionId } });
-    const firstThread = first ? await ctx.db.get("threads", first.threadId) : null;
+    // The project the first try was for, as its claim recorded it. A claim from before that was recorded has none, and is not refused on it.
+    const requested = (await claimRow(ctx, "host-start", startKey))?.result;
 
-    if (first && firstThread?.projectId !== project?._id) {
+    if (first && requested !== undefined && requested !== (project?._id ?? "")) {
         throw new LunoraError("BAD_REQUEST", "That start was made for another project. Start it again from the project it was made in.");
     }
 
@@ -154,9 +156,15 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
     const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
 
-    if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
-        return await answerRetry(ctx, device._id, hostSessionId, project);
+    const startKey = `${userId}:${args.clientId}`;
+    const claimedAt = await claimFence(ctx, "host-start", startKey, { ttlMs: START_CLAIM_TTL_MS, userId });
+
+    if (claimedAt === null) {
+        return await answerRetry(ctx, device._id, hostSessionId, startKey, project);
     }
+
+    // The project this start is for is kept on its claim, so a retry is judged by it and not by where the thread is filed now.
+    await recordClaimResult(ctx, "host-start", startKey, claimedAt, project?._id ?? "");
 
     // A project of an organization files its thread under that organization, whatever space the start came from, so the
     // organization's cap holds the thread. Otherwise the thread is filed under the caller's organization.
@@ -191,14 +199,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
     }
 
-    if (project) {
-        await rememberProjectRunner(ctx, project, userId, organizationId ?? null, {
-            agentKey: offer.agentKey,
-            deviceId: args.deviceId as string,
-            folderId: args.folderId,
-        });
-    }
-
+    // The project's default is recorded when the agent opens (`acp/ingest.ts`), not here: a start the computer refuses leaves it.
     return { started: true, threadId: threadId as string };
 };
 

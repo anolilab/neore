@@ -35,6 +35,38 @@ const utf8Bytes = (value: unknown): number => new TextEncoder().encode(JSON.stri
  * say so (`{ detailsOmitted: true }`), and the export still completes. A project that is gone, or not the user's, shows
  * as `null`.
  */
+/** One page of `collectProjectRunnersForExport`. */
+interface RunnersPage {
+    continueCursor?: string;
+    projectRunners: unknown[];
+    readBytes: number;
+}
+
+/**
+ * Every page of the personal runners, within `maxBytes` of what they read. Past it the list is cut and marked `truncated`,
+ * as the feedback section is.
+ */
+export const collectAllProjectRunners = async (
+    readPage: (cursor: string | undefined) => Promise<RunnersPage>,
+    maxBytes: number,
+): Promise<{ readBytes: number; section: { projectRunners: unknown[]; truncated: boolean } }> => {
+    const projectRunners: unknown[] = [];
+    let cursor: string | undefined;
+    let done = false;
+    let readBytes = 0;
+
+    while (!done && readBytes < maxBytes) {
+        const page = await readPage(cursor);
+
+        projectRunners.push(...page.projectRunners);
+        readBytes += page.readBytes;
+        cursor = page.continueCursor;
+        done = cursor === undefined;
+    }
+
+    return { readBytes, section: { projectRunners, truncated: !done } };
+};
+
 export const collectAllRepositories = async (
     readPage: (cursor: string | null) => Promise<unknown>,
     readProjects: (projectIds: string[]) => Promise<ProjectDetails>,

@@ -1080,6 +1080,7 @@ export interface InternalApiTypes {
         gdpr: {
             collectProjectDetailsForExport: FunctionReference<"query", { projectIds: Array<Id<"projects">>; userId: string }, { projects: Array<{ project: { sharingEnabled: boolean; title: string }; projectId: string }>; readBytes: number }>;
             collectProjectRepositoriesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; projectRepositories: Array<unknown> }>;
+            collectProjectRunnersForExport: FunctionReference<"query", { cursor?: string; userId: string }, { continueCursor?: string; projectRunners: Array<{ agentKey: string; deviceId: string; folderId: string; projectId: string; title: string }>; readBytes: number }>;
             eraseOrganizationRepositories: FunctionReference<"mutation", { cursor?: string; organizationId: string }, null>;
             sweepOrphanedOrganizationRepositories: FunctionReference<"mutation", { cursor?: string }, null>;
         };
@@ -2458,6 +2459,7 @@ export const internal: InternalApiTypes = {
         gdpr: {
             collectProjectDetailsForExport: { __lunoraRef: "projects_gdpr:collectProjectDetailsForExport" },
             collectProjectRepositoriesForExport: { __lunoraRef: "projects_gdpr:collectProjectRepositoriesForExport" },
+            collectProjectRunnersForExport: { __lunoraRef: "projects_gdpr:collectProjectRunnersForExport" },
             eraseOrganizationRepositories: { __lunoraRef: "projects_gdpr:eraseOrganizationRepositories" },
             sweepOrphanedOrganizationRepositories: { __lunoraRef: "projects_gdpr:sweepOrphanedOrganizationRepositories" },
         },

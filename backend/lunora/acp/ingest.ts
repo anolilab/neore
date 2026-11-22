@@ -41,6 +41,7 @@ import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
+import { rememberOpenedRunner } from "./lib/project-runner";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
@@ -145,6 +146,11 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
                 ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
             });
+        }
+
+        // The runner a project remembers is the one that opened: a start the computer refused or never opened records nothing.
+        if (opened && thread?.projectId) {
+            await rememberOpenedRunner(ctx, thread.projectId, existing);
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };

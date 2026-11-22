@@ -6,7 +6,7 @@ import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
-import { collectAllRepositories } from "../projects/export-pages";
+import { collectAllProjectRunners, collectAllRepositories } from "../projects/export-pages";
 import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -604,13 +604,18 @@ export const generateExportFile = internalAction
             projectDetailsReadBudget(earlierReadBytes),
         );
         const projectRepositories = { projectRepositories: repositories.projectRepositories };
+        // The personal runners the user's own projects remember (`projects/gdpr.ts`), a page per query within what is left.
+        const runners = await collectAllProjectRunners(
+            async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRunnersForExport, { cursor, userId: args.userId }),
+            projectDetailsReadBudget(earlierReadBytes + repositories.readBytes),
+        );
         // What the user sent through "Send feedback", read here a page per query within what the sections above left.
         const feedback = await collectAllFeedback(
             async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
-            feedbackReadBudget(earlierReadBytes + repositories.readBytes),
+            feedbackReadBudget(earlierReadBytes + repositories.readBytes + runners.readBytes),
         );
         // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes);
+        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + runners.readBytes + feedback.readBytes);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -632,6 +637,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             projectRepositories,
+            projectRunners: runners.section,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },

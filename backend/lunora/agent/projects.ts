@@ -260,6 +260,12 @@ export const updateProject = internalMutation
             }
         }
 
+        // A project that changes organization leaves its personal runner behind: on the row it would show to the organization's
+        // members, and it would come back if the project moved back. An organization's default lives on each starter's settings.
+        if (args.patch.organizationId !== undefined && (args.patch.organizationId || undefined) !== (project.organizationId || undefined)) {
+            Object.assign(changes, { runnerAgentKey: undefined, runnerDeviceId: undefined, runnerFolderId: undefined, runnerKind: undefined });
+        }
+
         await patchRow(ctx.db, "projects", project, changes);
 
         if (args.patch.workflowContent !== undefined) {

@@ -246,6 +246,31 @@ export const collectProjectRepositoriesForExport = internalQuery
  * whole rows cost, `context` and workflow included, so the export can count it against its read budget. A project
  * that is gone or not the user's is left out.
  */
+/**
+ * One page of the personal runners the user's own projects remember (`acp/lib/project-runner.ts`): the computer, agent and
+ * folder ids, never a path. An organization project's runner is kept on each person's settings, which the export carries.
+ */
+export const collectProjectRunnersForExport = internalQuery
+    .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            continueCursor: v.optional(v.string()),
+            projectRunners: v.array(v.object({ agentKey: v.string(), deviceId: v.string(), folderId: v.string(), projectId: v.string(), title: v.string() })),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db.projects.findMany({ cursor, limit: BATCH, orderBy: [{ createdAt: "asc" }], where: { userId } });
+        const readBytes = page.page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        const projectRunners = page.page.flatMap((row) =>
+            row.organizationId === undefined && row.runnerKind === "host" && row.runnerAgentKey && row.runnerDeviceId && row.runnerFolderId
+                ? [{ agentKey: row.runnerAgentKey, deviceId: row.runnerDeviceId, folderId: row.runnerFolderId, projectId: row._id, title: row.title }]
+                : [],
+        );
+
+        return { continueCursor: page.isDone ? undefined : (page.continueCursor ?? undefined), projectRunners, readBytes };
+    });
+
 export const collectProjectDetailsForExport = internalQuery
     .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ), userId: v.string().max(MAX_LENGTH.id) })
     .output(
