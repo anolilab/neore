@@ -468,11 +468,11 @@ for a schema table that is neither policed nor listed:
 | `gdpr_functions.cancelStuckExport` | mutation | authMutation + RL | gdprAuditLog | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getDataAccessSummary` | query | authQuery | gdprRequests | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getDeletionStatus` | query | authQuery | gdprRequests | caller-scoped (ctx.user) | ok |
-| `gdpr_functions.getExportDownloadUrl` | action | authAction + RL | — | caller-scoped (ctx.user); FORBIDDEN while impersonating (the export holds the whole account) | **fixed** — an impersonating admin could download the owner's export |
+| `gdpr_functions.getExportDownloadUrl` | action | authAction + RL | — | caller-scoped (ctx.user); FORBIDDEN while impersonating (the export holds the whole account), checked before the rate limit so a refused call spends none of the owner's quota | **fixed** — an impersonating admin could download the owner's export |
 | `gdpr_functions.getExportStatus` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.getGdprStatus` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.requestAccountDeletion` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | identity (self-resolved) | ok |
-| `gdpr_functions.requestDataExport` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | caller-scoped (ctx.user); FORBIDDEN while impersonating; the status reads stay open (no content or link) | **fixed** — an impersonating admin could start the owner's export |
+| `gdpr_functions.requestDataExport` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | caller-scoped (ctx.user); FORBIDDEN while impersonating, before the rate limit; the status reads stay open (no content or link) | **fixed** — an impersonating admin could start the owner's export |
 | `home_overview.getHomeOverview` | query | authQuery | toolApprovalRuns, tasks, codingAgentRuns, subAgentRuns, threads, notifications, userSettings, user, organizationPolicies | caller-scoped (ctx.user) | ok — new; row reads `where: { userId: caller }`, bounded, chats by id from the caller's own rows; for the Daily Brief offer, only when otherwise eligible, the caller's own `user` row and the policy of `ctx.user.activeOrganization` (from the session, never args; primary read) |
 | `knowledge_agent_assignment.assignToProject` | mutation | authMutation + RL | knowledgeFiles, projectKnowledge, projects | row.userId == caller | ok |
 | `knowledge_agent_assignment.getProjectKnowledge` | query | authQuery | projects | row.userId == caller | ok |

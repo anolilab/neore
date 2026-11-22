@@ -436,13 +436,13 @@ no content worth exporting.
 
 ### Mutations
 
-- `requestDataExport()` - Request a data export (refused while an admin impersonates the user)
+- `requestDataExport()` - Request a data export (refused while an admin impersonates the user; the refusal runs before the `gdpr/request` rate limit, so it spends none of the owner's quota)
 - `requestAccountDeletion()` - Request account deletion
 - `cancelStuckExport()` - Cancel a stuck export request
 
 ### Actions
 
-- `getExportDownloadUrl()` - Get signed download URL for completed export (refused while an admin impersonates the user)
+- `getExportDownloadUrl()` - Get signed download URL for completed export (refused while an admin impersonates the user; the refusal runs before the `gdpr/request` rate limit, so it spends none of the owner's quota)
 
 ### Internal Functions
 
