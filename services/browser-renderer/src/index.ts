@@ -292,7 +292,11 @@ function readTarget(
         destinations += `${link}|${formTarget}|${kind}|`;
     }
 
-    destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
+    // The form's destination is read through the prototype: a field named "action" (or "querySelector") in the form would
+    // otherwise shadow the form's own property, and the destination would be that field.
+    const formAction = enclosingForm === null ? "" : new URL(Element.prototype.getAttribute.call(enclosingForm, "action") ?? "", document.URL).href;
+
+    destinations += formAction;
 
     // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
@@ -301,14 +305,15 @@ function readTarget(
     // another site: its fields are not in the DOM, so the field check alone misses it.
     // Card fields are read in the form when there is one, and on the page when there is not (a card form built from divs).
     // A frame or a cross-origin action only counts inside a form, since those are what a hosted card form is.
+    const cardSelector =
+        "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i]";
     const hasCardFields =
-        (enclosingForm ?? document).querySelector(
-            "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i]",
-        ) !== null;
+        (enclosingForm === null ? document.querySelector(cardSelector) : Element.prototype.querySelector.call(enclosingForm, cardSelector)) !== null;
     const isCardFields =
         hasCardFields ||
         (enclosingForm !== null &&
-            (enclosingForm.querySelector("iframe") !== null || new URL(enclosingForm.action, document.URL).origin !== new URL(document.URL).origin));
+            (Element.prototype.querySelector.call(enclosingForm, "iframe") !== null ||
+                new URL(formAction, document.URL).origin !== new URL(document.URL).origin));
     const address = document.URL.toLowerCase();
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
 
