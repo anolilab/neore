@@ -22,7 +22,7 @@ import { importRuleTexts, isWholeInstructionFile } from "../lib/rule-file-import
 /**
  * What a repository import read: the files as the upload import turns them into drafts (`skipped`: the paths past the
  * room), the paths it could not read (gone or too large), the links it refused to follow (`refused`: one that, followed
- * again, no longer leads to a file the listing offered), how many it had no requests left for (`notRead`), which another
+ * again, no longer leads to a file the listing offered, or whose target could not be read again), how many it had no requests left for (`notRead`), which another
  * import reads, and picks left out as the same file as another picked (`duplicates`: a link such as
  * `CLAUDE.md → AGENTS.md`, whose text would apply twice).
  */
@@ -226,8 +226,9 @@ const RepoRuleFileImport: FC<{
     const shownFailure = failure?.repoId === chosen.id ? failure.reason : undefined;
 
     const failureText: Record<Failure | "unknown", string> = {
-        // Redirects (a renamed repository) spent its requests: a retry meets the same ones, so it does not say to try again.
-        budget_spent: t`The repository's listing took too long to read. Give the project the repository's current address, or add the file directly with Import files.`,
+        // Redirects (a renamed repository) or a 401's repeat after a token refresh spent its requests: only the second
+        // passes on a retry, so it says to try again first and names the address for when it keeps happening.
+        budget_spent: t`The repository's listing took too long to read. Try again; if it keeps happening, give the project the repository's current address, or add the file directly with Import files.`,
         forbidden: t`Your GitHub account cannot read this repository.`,
         host_error: t`GitHub did not answer. Try again in a moment.`,
         needs_reconnect: t`Your GitHub sign-in has expired. Connect GitHub again in Settings → Connectors.`,

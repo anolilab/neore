@@ -581,7 +581,7 @@ const ProjectRuleFiles: FC<{
         const unreadable = t`${plural(unreadableCount, { one: "# file could not be read: it is gone from the repository or too large.", other: "# files could not be read: they are gone from the repository or too large." })} Not read: ${unreadableNames}.`;
         const refusedCount = read.refused.length;
         const refusedNames = named(read.refused);
-        const refusedNote = t`${plural(refusedCount, { one: "# link was not followed: it no longer leads to a file the repository listed.", other: "# links were not followed: they no longer lead to a file the repository listed." })} Not read: ${refusedNames}.`;
+        const refusedNote = t`${plural(refusedCount, { one: "# link could not be followed to a file the repository listed.", other: "# links could not be followed to a file the repository listed." })} Not read: ${refusedNames}.`;
         const { duplicates } = read;
         const duplicatesNote = t`${plural(duplicates, { one: "# file was left out as the same file as another picked", other: "# files were left out as the same file as another picked" })}: the same text would apply twice.`;
         const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;

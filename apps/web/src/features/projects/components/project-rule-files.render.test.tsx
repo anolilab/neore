@@ -1097,7 +1097,7 @@ describe("project rule files imported from the project's repository", () => {
         // Redirects spent the listing's requests: a retry meets the same ones, so it is not called GitHub not answering.
         [
             "budget_spent",
-            "The repository's listing took too long to read. Give the project the repository's current address, or add the file directly with Import files.",
+            "The repository's listing took too long to read. Try again; if it keeps happening, give the project the repository's current address, or add the file directly with Import files.",
         ],
     ])("says why the repository could not be read (%s) and adds nothing", async (status, said) => {
         const user = userEvent.setup();
@@ -1713,11 +1713,11 @@ describe("project rule files imported from the project's repository", () => {
     it.each([
         {
             reads: { "rules/big.md": "too_large", "rules/gone.md": "missing", "rules/link.md": "refused" },
-            said: "1 rule file imported. Review, then save. 2 files could not be read: they are gone from the repository or too large. Not read: rules/big.md and rules/gone.md. 1 link was not followed: it no longer leads to a file the repository listed. Not read: rules/link.md.",
+            said: "1 rule file imported. Review, then save. 2 files could not be read: they are gone from the repository or too large. Not read: rules/big.md and rules/gone.md. 1 link could not be followed to a file the repository listed. Not read: rules/link.md.",
         },
         {
             reads: { "rules/gone.md": "missing", "rules/link.md": "refused", "rules/other.md": "refused" },
-            said: "1 rule file imported. Review, then save. 1 file could not be read: it is gone from the repository or too large. Not read: rules/gone.md. 2 links were not followed: they no longer lead to a file the repository listed. Not read: rules/link.md and rules/other.md.",
+            said: "1 rule file imported. Review, then save. 1 file could not be read: it is gone from the repository or too large. Not read: rules/gone.md. 2 links could not be followed to a file the repository listed. Not read: rules/link.md and rules/other.md.",
         },
     ])("names the files the read could not read apart from the links it refused, one or several", async ({ reads, said }) => {
         const user = userEvent.setup();

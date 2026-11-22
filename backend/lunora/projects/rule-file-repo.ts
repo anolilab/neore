@@ -102,7 +102,8 @@ export const listRepoRuleFiles = authAction
         // One budget for both tries: a 401's repeat spends what the first left.
         const budgeted = fetchBudget();
         // Links past the budget are listed `budget`; a walk the budget cuts short (redirect hops spent it) lists nothing
-        // it can stand by, so it is `budget_spent`, never a thrown error: trying again meets the same redirects.
+        // it can stand by, so it is `budget_spent`, never a thrown error. Trying again meets the same redirects, but a
+        // 401's repeat (a refreshed token) can pass on the next try, so the client's note says to try again first.
         const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => listFiles(budgeted(request), address)).catch((error: unknown) => {
             if (error instanceof FetchBudgetSpent) {
                 return { status: "budget_spent" as const };
