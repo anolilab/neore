@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { approvalMessagesFor } from "../../agent/client/tool-approval";
 import { approvedToolCallIds, browserActionNeedsPurchaseApproval, isPurchaseText } from "./purchase-gate";
 
 describe("isPurchaseText", () => {
@@ -148,5 +149,11 @@ describe("the purchase gate on browser actions", () => {
         const look = vi.fn(() => Promise.resolve({ content: "Next", success: true, truncated: true }));
 
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#next" }, look)).toBe(true);
+    });
+});
+
+describe("the approval an approved tool call runs with", () => {
+    it("is read as approved for that call", () => {
+        expect([...approvedToolCallIds(approvalMessagesFor("approval-7", "call-7"))]).toEqual(["call-7"]);
     });
 });

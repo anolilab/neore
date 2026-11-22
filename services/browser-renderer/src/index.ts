@@ -180,7 +180,8 @@ function readTarget(control: Element, options: { max: number; splitter: RegExp }
     }
 
     // FNV-1a over the three parts: a click compares the same string the read built.
-    const fingerprintOf = [steps.join(">"), label, shown].join("\u{0}");
+    // The whole name, not its capped part: a purchase word appended past the cap still changes the fingerprint.
+    const fingerprintOf = [steps.join(">"), joined, shown].join("\u{0}");
     let hash = 0x81_1c_9d_c5;
 
     for (const character of fingerprintOf) {
