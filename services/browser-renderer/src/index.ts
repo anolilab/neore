@@ -71,7 +71,7 @@ const TARGET_CHANGED = "The target changed since it was checked, so nothing was 
 function readTarget(
     control: Element,
     options: { max: number; splitter: RegExp },
-): { checkout: boolean; label: string; labelTruncated: boolean; target: string } {
+): { canonical: string; checkout: boolean; label: string; labelTruncated: boolean } {
     // This function is serialized into the page by Playwright (`element.evaluate`). A bundler wraps a named inner function in a
     // helper the page does not have, so this function declares none: every step is written out in its body.
     // The elements the click lands in: the control, then each actionable ancestor. A visible child (an icon in a button, a
@@ -223,7 +223,6 @@ function readTarget(
         current = current.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
     }
 
-    // FNV-1a over the three parts, the whole name included: a click compares the same string the read built.
     // Where the click goes: a link's href, a button's formaction, and the form it submits to. Changing one changes what the
     // click does, so it is part of the fingerprint.
     let destinations = "";
@@ -242,12 +241,8 @@ function readTarget(
     destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
 
     // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
-    const fingerprintOf = [document.URL, steps.join(">"), joined, shown, destinations].join("\u{0}");
-    let hash = 0x81_1c_9d_c5;
-
-    for (const character of fingerprintOf) {
-        hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 0x01_00_01_93);
-    }
+    // The whole canonical string: `targetOf` digests it outside the page, so no two different targets share a fingerprint.
+    const canonical = [document.URL, steps.join(">"), joined, shown, destinations].join("\u{0}");
 
     // A checkout: a form the control submits with card or bank fields in it, or a page whose address says so. A bare "Confirm"
     // there pays, so the gate reads a submit-like label on a checkout as a purchase.
@@ -257,12 +252,19 @@ function readTarget(
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
 
     return {
+        canonical,
         checkout: isCardFields || isCheckoutPage,
         label,
         labelTruncated: joined.length > options.max,
-        target: `${(hash >>> 0).toString(16)}-${fingerprintOf.length}`,
     };
 }
+
+/** The fingerprint of a read: SHA-256 of its canonical string, computed here (outside the page), where it is compared. */
+const targetOf = async (canonical: string): Promise<string> => {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
 
@@ -753,7 +755,7 @@ const actHeld = async (
 
                     const read = await element.evaluate(readTarget, { max: LABEL_MAX_LENGTH, splitter: WHITESPACE_RE });
 
-                    if (read.target !== expectTarget) {
+                    if ((await targetOf(read.canonical)) !== expectTarget) {
                         result = { error: TARGET_CHANGED, success: false };
                         break;
                     }
@@ -791,7 +793,7 @@ const actHeld = async (
 
                         label = read.label;
                         isLabelTruncated = read.labelTruncated;
-                        target = read.target;
+                        target = await targetOf(read.canonical);
                         isCheckout = read.checkout;
                     }
                 } else {
