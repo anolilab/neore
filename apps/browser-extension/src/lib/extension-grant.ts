@@ -58,7 +58,7 @@ export const RECONNECT_KEY = "neore.reconnectNeeded";
  * The key (`grantKey`) of a grant whose sign-out began, written before the
  * revoke and removed with the grant. While it names the stored grant, that
  * grant reads as absent: a sign-out whose removal failed never signs back in,
- * in this panel or one opened later (`finishPendingSignOut` retries).
+ * in this panel or another (`finishPendingSignOut` retries).
  */
 export const SIGNED_OUT_KEY = "neore.signedOutGrant";
 
@@ -391,7 +391,7 @@ const markSignOutFailed = async (key: string): Promise<void> => {
  * the revoke fails or runs out of time. Storage that keeps the grant writes the
  * failure mark and rejects with `GrantRemovalError`; only then do other panels
  * warn. A panel that closes before the removal leaves the mark alone, hidden,
- * for the next panel's `finishPendingSignOut`.
+ * for an open or later panel's `finishPendingSignOut`.
  */
 const removeSignedOutGrant = async (token: string, key: string): Promise<void> => {
     // Offline or out of time: the session expires on its own; the local copy goes regardless.
@@ -423,8 +423,8 @@ const markedGrant = (stored: Awaited<ReturnType<typeof readStored>>): { grant: S
 
 /**
  * Finish a sign-out that did not (`SIGNED_OUT_KEY` still names the stored
- * grant): revoke it once more, best effort, and forget it. Run when a panel
- * loads the session; a failure leaves the mark for the next one. A sign-out
+ * grant): revoke it once more, best effort, and forget it. Run when a panel's
+ * session watch reads the mark; a failure leaves it for another panel. A sign-out
  * still running in another panel holds its lock: this waits for it and acts
  * only on what it left. A storage read that fails rejects with
  * `GrantReadError`: nothing was tried.

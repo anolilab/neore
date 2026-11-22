@@ -109,7 +109,7 @@ export const keepAuthToken = (
 
 /** A sign-out in progress (`createAuthTokenSync().suspend`). */
 export interface SuspendedSession {
-    /** The grant is gone: clear the bearer, unless another session has started since. */
+    /** The grant is marked signed out: clear the bearer, unless another session has started since. */
     finish: () => void;
     /** The grant is still stored: refresh its bearer again, unless another session has started since. */
     restore: () => void;
@@ -125,8 +125,8 @@ export interface SuspendedSession {
  * starts.
  *
  * A sign-out first `suspend`s: the loop stops, but the bearer and its offline
- * queue stay until the grant is really gone (`finish`). If storage keeps the
- * grant, `restore` restarts the loop for it. Either is a no-op once another
+ * queue stay until the grant is marked signed out (`finish`). If storage could
+ * not mark it, `restore` restarts the loop for it. Either is a no-op once another
  * session has started, so a sign-in from another panel is never undone.
  *
  * The account on record is the one whose bearer is installed: a loop handed

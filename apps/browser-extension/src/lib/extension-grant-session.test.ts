@@ -560,13 +560,87 @@ describe("endSession", () => {
         await settle();
         expect(warningOf(page)).toBeUndefined();
 
-        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+        // Storage keeps refusing: this panel's retry, once that sign-out ends, fails too.
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValue(storageUnavailable);
         revoke.resolve(new Response(null, { status: 204 }));
         await act(async () => {
             await expect(signingOut).rejects.toThrow("storage unavailable");
         });
         await settle();
 
+        expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
+    it("lets open panels finish a sign-out whose panel closed mid-way, once its lock goes, with one removal among them", async () => {
+        store.set(GRANT_KEY, grant);
+        fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+        // A second open panel: its own copy of the session modules, sharing storage and locks.
+        vi.resetModules();
+        const second = await import("./session");
+        const SecondPanel = () => {
+            second.useSession();
+
+            return null;
+        };
+        const page = await mount(createElement(AuthPage));
+        const other = await mount(createElement(SecondPanel));
+        const closed = deferred();
+
+        await settle();
+        // A third panel's sign-out marks the grant, then the panel closes before its revoke: its lock goes, the mark stays.
+        const signOut = navigator.locks.request(`neore.signOut:${USER.id}`, async () => {
+            await chrome.storage.local.set({ [SIGNED_OUT_KEY]: USER.id });
+            await closed.promise;
+        });
+
+        await settle();
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(0);
+        expect(warningOf(page)).toBeUndefined();
+
+        closed.resolve(new Response(null));
+        await act(async () => {
+            await signOut;
+        });
+        await settle();
+
+        expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"))).toHaveLength(1);
+        expect(store.has(GRANT_KEY)).toBe(false);
+        expect(store.has(SIGNED_OUT_KEY)).toBe(false);
+        expect(warningOf(page)).toBeUndefined();
+        await other.unmount();
+        await page.unmount();
+    });
+
+    it("warns in an open panel when another panel's sign-out ends with storage refusing the removal and the failure mark", async () => {
+        store.set(GRANT_KEY, grant);
+        const page = await mount(createElement(AuthPage));
+        const revoke = deferred();
+        const { set } = chrome.storage.local;
+
+        fetchMock.mockReturnValueOnce(revoke.promise).mockResolvedValue(new Response(null, { status: 204 }));
+        vi.spyOn(chrome.storage.local, "set").mockImplementation(async (items: Record<string, Stored>) => {
+            if (Object.hasOwn(items, "neore.signOutFailed")) {
+                throw storageUnavailable;
+            }
+
+            await set(items);
+        });
+        const signingOut = signOutGrant(USER.id);
+
+        await vi.waitFor(() => expect(store.get(SIGNED_OUT_KEY)).toBe(USER.id));
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValue(storageUnavailable);
+        await settle();
+        expect(warningOf(page)).toBeUndefined();
+
+        revoke.resolve(new Response(null, { status: 204 }));
+        await act(async () => {
+            await expect(signingOut).rejects.toThrow("storage unavailable");
+        });
+        await settle();
+
+        expect(store.has("neore.signOutFailed")).toBe(false);
+        expect(store.get(GRANT_KEY)).toEqual(grant);
         expect(warningOf(page)).toBeDefined();
         await page.unmount();
     });
