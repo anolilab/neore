@@ -3478,6 +3478,8 @@ const vSentPrompt = v.object({
 /** Index hits read before the role filter and the newest-first sort. A hit past this window is not searched. */
 const SENT_PROMPT_WINDOW = 400;
 const SENT_PROMPT_LIMIT = 50;
+/** Thread lookups that run at once inside one search. */
+const SENT_PROMPT_LOOKUP_BATCH = 16;
 
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the message text index
@@ -3502,16 +3504,22 @@ export const searchSentPrompts = authQuery
         });
         const sent = hits.filter((message) => (message.message as { role?: string } | undefined)?.role === "user" && (message.text ?? "").trim() !== "");
         const threadIds = [...new Set(sent.map((message) => message.threadId))];
-        const threads = await Promise.all(
-            threadIds.map((threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }).catch(() => null)),
-        );
         const titles = new Map<string, string>();
 
-        for (const [index, threadId] of threadIds.entries()) {
-            const thread = threads[index];
+        // Each lookup is a nested query and Lunora caps how many run at once, so they go in small batches. A failed lookup
+        // is not caught: a missing thread already reads as null, and swallowing an error would drop its prompts unseen.
+        for (let start = 0; start < threadIds.length; start += SENT_PROMPT_LOOKUP_BATCH) {
+            const batch = threadIds.slice(start, start + SENT_PROMPT_LOOKUP_BATCH);
+            const threads = await Promise.all(
+                batch.map((threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> })),
+            );
 
-            if (thread && thread.userId === userId && !thread.deleted && !isThreadLocked(thread)) {
-                titles.set(threadId, thread.title ?? DEFAULT_THREAD_TITLE);
+            for (const [offset, threadId] of batch.entries()) {
+                const thread = threads[offset];
+
+                if (thread && thread.userId === userId && !thread.deleted && !isThreadLocked(thread)) {
+                    titles.set(threadId, thread.title ?? DEFAULT_THREAD_TITLE);
+                }
             }
         }
 

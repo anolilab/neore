@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@neore/ui/components/input";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import type { KeyboardEvent } from "react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -26,6 +26,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const crpc = useCRPC();
     const inputId = useId();
     const listId = useId();
+    const listRef = useRef<HTMLDivElement>(null);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const searched = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
@@ -36,6 +37,11 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     // Typing or a new answer can leave the highlight past the end of the list; clamp it rather than reset it in an effect.
     const index = Math.min(active, Math.max(prompts.length - 1, 0));
     const optionId = (position: number) => `${listId}-${position}`;
+    // Focus stays in the input; the list scrolls so the highlighted row is the one the arrow keys reach on screen.
+    const moveActive = (position: number) => {
+        setActive(position);
+        listRef.current?.children.item(position)?.scrollIntoView({ block: "nearest" });
+    };
 
     const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.nativeEvent.isComposing) {
@@ -45,12 +51,12 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         switch (event.key) {
             case "ArrowDown": {
                 event.preventDefault();
-                setActive(Math.min(index + 1, Math.max(prompts.length - 1, 0)));
+                moveActive(Math.min(index + 1, Math.max(prompts.length - 1, 0)));
                 break;
             }
             case "ArrowUp": {
                 event.preventDefault();
-                setActive(Math.max(index - 1, 0));
+                moveActive(Math.max(index - 1, 0));
                 break;
             }
             case "Enter": {
@@ -114,7 +120,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                     type="search"
                     value={query}
                 />
-                <div aria-label={t`Matching prompts`} className="mt-3 max-h-80 space-y-1 overflow-y-auto" id={listId} role="listbox">
+                <div aria-label={t`Matching prompts`} className="mt-3 max-h-80 space-y-1 overflow-y-auto" id={listId} ref={listRef} role="listbox">
                     {prompts.map((prompt, position) => (
                         <button
                             aria-selected={position === index}

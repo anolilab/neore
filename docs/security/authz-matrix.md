@@ -333,6 +333,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.pinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.revokeExtension` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.searchMessages` | query | authQuery | — | thread access (owner/grant); row.userId == caller | ok |
+| `chat_functions.searchSentPrompts` | query | authQuery | messages, threads | row.userId == caller (user rows of the caller's own threads; locked, trashed and other people's threads dropped via `getThreadInternal` + `isThreadLocked`) | ok |
 | `chat_functions.searchThreads` | query | liteAuthQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.softDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating (trashing withdraws the guest link and held notes); row.userId == caller | ok |
 | `chat_functions.terminateBrowserSession` | mutation | authMutation + RL | — | row.userId == caller | ok |

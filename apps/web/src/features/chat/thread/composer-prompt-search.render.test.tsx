@@ -58,6 +58,9 @@ vi.mock("@/lib/lunora/crpc", () => {
 
 const { default: ComposerPromptSearch } = await import("./composer-prompt-search");
 
+// jsdom has no layout or scrolling; the search asks the highlighted row to scroll into view.
+Element.prototype.scrollIntoView = () => {};
+
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
 
 describe("ComposerPromptSearch", () => {
@@ -117,6 +120,35 @@ describe("ComposerPromptSearch", () => {
 
         expect(onPick).toHaveBeenCalledTimes(1);
         expect(onPick).toHaveBeenCalledWith("deploy the staging build");
+    });
+
+    it("scrolls each newly highlighted row into view", async () => {
+        const scrollIntoView = vi.fn();
+
+        Element.prototype.scrollIntoView = scrollIntoView;
+
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+        const input = screen.getByRole("combobox");
+
+        fireEvent.change(input, { target: { value: "deploy" } });
+
+        await waitFor(() => {
+            expect(screen.getAllByRole("option")).toHaveLength(2);
+        });
+
+        fireEvent.keyDown(input, { key: "ArrowDown" });
+
+        const options = screen.getAllByRole("option");
+
+        expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+        expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[1]);
+
+        fireEvent.keyDown(input, { key: "ArrowUp" });
+
+        expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
+
+        Element.prototype.scrollIntoView = () => {};
     });
 
     it("picks a row on click", async () => {

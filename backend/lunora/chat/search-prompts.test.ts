@@ -193,6 +193,35 @@ describe("searchSentPrompts", () => {
         }
     });
 
+    it("lists a match from every thread when the matches span more threads than one lookup batch", async () => {
+        const harness = lunoraTest(schema as never);
+        const threadCount = 40;
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < threadCount; index += 1) {
+                    const thread = await insertThread(context, { title: `Chat ${index}`, userId: OWNER });
+
+                    await insertMessage(context, {
+                        createdAt: index,
+                        order: 0,
+                        role: "user",
+                        text: `deploy from chat ${index}`,
+                        threadId: thread,
+                        userId: OWNER,
+                    });
+                }
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts).toHaveLength(threadCount);
+            expect(new Set(prompts.map((prompt) => prompt.threadId)).size).toBe(threadCount);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("answers nothing for a blank query", async () => {
         const harness = lunoraTest(schema as never);
 
