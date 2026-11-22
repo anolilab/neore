@@ -219,7 +219,8 @@ function readTarget(
 
     destinations += enclosingForm instanceof HTMLFormElement ? enclosingForm.action : "";
 
-    const fingerprintOf = [steps.join(">"), joined, shown, destinations].join("\u{0}");
+    // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
+    const fingerprintOf = [document.URL, steps.join(">"), joined, shown, destinations].join("\u{0}");
     let hash = 0x81_1c_9d_c5;
 
     for (const character of fingerprintOf) {
