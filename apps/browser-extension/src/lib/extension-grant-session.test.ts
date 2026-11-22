@@ -497,6 +497,32 @@ describe("endSession", () => {
         await page.unmount();
     });
 
+    it("tells this panel's sign-in page when storage kept the grant and refused the failure mark too", async () => {
+        const { sync } = await signedIn();
+
+        stopSync = sync.signOut;
+        const page = await mount(createElement(AuthPage));
+        const { set } = chrome.storage.local;
+
+        vi.spyOn(chrome.storage.local, "remove").mockRejectedValueOnce(storageUnavailable);
+        vi.spyOn(chrome.storage.local, "set").mockImplementation(async (items: Record<string, Stored>) => {
+            if (Object.hasOwn(items, "neore.signOutFailed")) {
+                throw storageUnavailable;
+            }
+
+            await set(items);
+        });
+
+        await act(async () => {
+            await expect(endSession(sync, USER.id)).rejects.toThrow("storage unavailable");
+        });
+        await settle();
+
+        expect(store.has("neore.signOutFailed")).toBe(false);
+        expect(warningOf(page)).toBeDefined();
+        await page.unmount();
+    });
+
     it("shows no warning in another panel while a sign-out runs there, and shows it once that removal fails", async () => {
         store.set(GRANT_KEY, grant);
         const page = await mount(createElement(AuthPage));

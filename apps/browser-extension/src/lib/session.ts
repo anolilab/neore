@@ -33,6 +33,13 @@ const signingOut = new Map<string, Promise<void>>();
  * while this panel tries again.
  */
 let removing = 0;
+
+/**
+ * The grant a removal in this panel failed to remove: the sign-in page warns
+ * from it while that grant stays stored, even when storage also refused the
+ * failure mark (`SIGN_OUT_FAILED_KEY`) other panels read.
+ */
+let failedHere: string | undefined;
 /** Reads storage again for the session watch, when one runs. */
 let reloadGrantSession: (() => void) | undefined;
 
@@ -41,6 +48,12 @@ const trackRemoval = async <T>(removal: () => Promise<T>): Promise<T> => {
 
     try {
         return await removal();
+    } catch (error) {
+        if (error instanceof GrantRemovalError) {
+            failedHere = error.key;
+        }
+
+        throw error;
     } finally {
         removing -= 1;
         // A fresh read decides: the removal may have succeeded, or failed and left the grant.
@@ -120,9 +133,14 @@ let unfinished = false;
 const sessionWatchers = new Set<() => void>();
 let stopWatching: (() => void) | undefined;
 
-const publish = (next: GrantSession | null, removalFailed: boolean): void => {
+const publish = (next: GrantSession | null, removalFailed: boolean, markedKey: string | undefined): void => {
+    // A removal that succeeded, or a sign-in that replaced the grant, ends this panel's own failure.
+    if (failedHere !== markedKey) {
+        failedHere = undefined;
+    }
+
     shown = next;
-    unfinished = removalFailed && removing === 0;
+    unfinished = (removalFailed || failedHere !== undefined) && removing === 0;
 
     for (const watcher of sessionWatchers) {
         watcher();
@@ -180,12 +198,14 @@ const watchGrantSession = (): (() => void) => {
         const read = reads;
         let loaded: GrantSession | null;
         let failed = false;
+        let markedKey = failedHere;
 
         try {
             const state = await readGrantState();
 
             loaded = toGrantSession(state.grant);
             failed = state.removalFailed;
+            markedKey = state.markedKey;
 
             if (!stopped) {
                 finishLeftover();
@@ -210,7 +230,7 @@ const watchGrantSession = (): (() => void) => {
         }
 
         if (!stopped && read === reads) {
-            publish(loaded, failed);
+            publish(loaded, failed, markedKey);
         }
     };
 
@@ -267,7 +287,8 @@ export const useSession = (): { data: ExtensionSession | null; isPending: boolea
 /**
  * Whether a sign-out failed to remove its grant (marked, never used again), in
  * this panel or any other: read from storage through the shared watch, so every
- * panel shows it, and it clears once a removal succeeds or a sign-in replaces
+ * panel shows it (this panel's own failure shows even when its mark was never
+ * written: `failedHere`), and it clears once a removal succeeds or a sign-in replaces
  * the grant. Not while a sign-out is still running, here or in another panel,
  * nor while this panel tries the removal again.
  */

@@ -182,12 +182,13 @@ const readStored = async (): Promise<{ failed: unknown; grant: StoredGrant | und
  * The stored grant as `readGrant` shows it, and whether a grant marked signed
  * out (`SIGNED_OUT_KEY`) is still stored after its removal failed
  * (`SIGN_OUT_FAILED_KEY`). One still being removed is hidden, not failed.
+ * `markedKey` names a grant marked signed out and still stored.
  */
-export const readGrantState = async (): Promise<{ grant: StoredGrant | undefined; removalFailed: boolean }> => {
+export const readGrantState = async (): Promise<{ grant: StoredGrant | undefined; markedKey: string | undefined; removalFailed: boolean }> => {
     const { failed, grant, signedOut } = await readStored();
     const marked = grant !== undefined && grantKey(grant) === signedOut;
 
-    return { grant: marked ? undefined : grant, removalFailed: marked && failed === signedOut };
+    return { grant: marked ? undefined : grant, markedKey: marked ? signedOut : undefined, removalFailed: marked && failed === signedOut };
 };
 
 /** The stored grant, or none when its sign-out began (`SIGNED_OUT_KEY`): that one is never used again. */
@@ -389,7 +390,7 @@ const removeSignedOutGrant = async (token: string, key: string): Promise<void> =
     } catch (error) {
         await markSignOutFailed(key);
 
-        throw new GrantRemovalError(error);
+        throw new GrantRemovalError(error, key);
     }
 };
 
