@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { applyLimit } from "../lib/rate-limiter-mutations";
 import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
@@ -192,6 +193,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "browser_functions", await import("./functions"));
     registerModule(registry, "browser_live_view", await import("./live-view"));
+    registerModule(registry, "lib_rate_limiter_mutations", await import("../lib/rate-limiter-mutations"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -1044,6 +1046,20 @@ describe("opening a page while in control", () => {
 
         await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
         await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
+    });
+
+    it("gives back the person's charge for a navigation the renderer ran none of because it retired the browser", async () => {
+        await addSession();
+        await take(OWNER);
+        // The hour's 240 spent, this navigation's unit with them (the guard that takes it is stubbed here).
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 240, identifier: OWNER, key: "browser/control:free" }));
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        // That unit was given back.
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/control:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
     });
 
     it("refuses someone who does not hold control, and a page the owner's lists or the address guard block", async () => {

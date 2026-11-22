@@ -317,6 +317,31 @@ describe("a browser action on a running browser", () => {
         expect(renderer).toHaveBeenCalledTimes(2);
     });
 
+    it("keeps the new browser of an action whose hold the renderer lost, and tells the agent it may have run", async () => {
+        await addSession(NOW - 1000);
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { providerSessionId: NO_PROVIDER_SESSION }));
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-2", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(act()).resolves.toStrictEqual({ error: lost, success: false });
+
+        const after = await row();
+
+        expect(after.providerSessionId).toBe("s-2");
+        expect(after.inUseHolds).toBeUndefined();
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/" }));
+        await act("extract");
+
+        expect(renderer.mock.lastCall?.[0]).toMatchObject({ body: { sessionId: "s-2" } });
+    });
+
     it("drops a session the renderer retired, so the next action opens a new browser, and tells the agent to navigate first", async () => {
         await addSession(NOW - 1000);
         renderer.mockResolvedValueOnce({

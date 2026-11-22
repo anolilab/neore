@@ -245,6 +245,35 @@ export const executeBrowserAction = internalAction
                     return returned === undefined ? busy : handedBackResult(busy, returned);
                 }
 
+                // The renderer lost the session's hold during the action: it may have run, so its charge is kept, the browser
+                // it names (a new one, for a first action) stays the thread's, and the agent is told to look before repeating it.
+                if (response?.status === 503 && response.headers?.get?.("x-browser-action") !== "not-run") {
+                    const lapsed = (error ?? {}) as { error?: unknown; sessionId?: unknown };
+                    const message = typeof lapsed.error === "string" ? lapsed.error : "The action may have run: look at the page before you repeat it.";
+                    const logged = await ctx.runMutation(internal.browser.functions.logAction, {
+                        action: sent.action,
+                        durationMs: Date.now() - startTime,
+                        errorMessage: message,
+                        heldReaped: held.reaped,
+                        heldUntil: held.until,
+                        // No id: the lost hold closed the browser it ran on, or none was named; the row keeps what it has.
+                        ...(typeof lapsed.sessionId === "string" && { providerSessionId: lapsed.sessionId }),
+                        sessionId,
+                        startedAt: startTime,
+                        startedWithProviderSessionId: startedWith,
+                        success: false,
+                    });
+                    let lapsedResult: { error: string; success: false; url?: string } = { error: message, success: false };
+
+                    if (logged.closed === true) {
+                        lapsedResult = { error: BROWSER_CLOSED_DURING_ACTION, success: false };
+                    } else if (logged.replaced) {
+                        lapsedResult = browserReplacedResult(logged.currentUrl);
+                    }
+
+                    return returned === undefined ? lapsedResult : handedBackResult(lapsedResult, returned);
+                }
+
                 if (error || !response?.ok || !data) {
                     // The renderer says it ran nothing (its session lock did not answer): the charge is given back.
                     if (response?.headers?.get?.("x-browser-action") === "not-run") {
