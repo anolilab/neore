@@ -60,6 +60,11 @@ export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
  */
 const FOLLOWUP_CLAIM_TTL_MS = 60 * 60 * 1000;
 
+/** A grant's removal in progress for a chat: no suggestion request may start on the chat until it is released (`holdFollowupRevoke`). */
+export const FOLLOWUP_REVOKE_SCOPE = "followup-revoke";
+/** Long enough for one grant delete; a removal that dies lets requests resume after this. */
+export const FOLLOWUP_REVOKE_TTL_MS = 60 * 1000;
+
 /** A model request in flight for a chat: a lock waits for it, and the claim goes as soon as the request settles. */
 export const FOLLOWUP_DISPATCH_SCOPE = "followup-dispatch";
 /** Long enough for one model call; a job that dies lets the chat be locked again after this. The model call itself is cut off at half of it. */
@@ -201,10 +206,41 @@ export const beginFollowupDispatch = internalMutation
             return null;
         }
 
+        // A grant being removed for this chat holds new requests back, so the removal is not raced by one that starts after it checked.
+        if (await hasClaimWithPrefix(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:`)) {
+            return null;
+        }
+
         // Dispatches whose end never landed are cleared here, so the lock's check reads a short range.
         await dropExpiredClaimsWithPrefix(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:`);
 
         return await claimFence(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:${requestId}`, { ttlMs: FOLLOWUP_DISPATCH_TTL_MS });
+    });
+
+/**
+ * Holds the chat's suggestion requests back while a grant is removed. Refused (`null`) while a request is in flight: the removal then
+ * waits for it. Once held, no request can start on the chat until the hold is released, so the grant is gone before any later request
+ * reads it. The hold is taken on the chat's own shard, where the claims are.
+ */
+export const holdFollowupRevoke = internalMutation
+    .input({ threadId: v.string() })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args: { threadId }, ctx: context }) => {
+        if (await followupDispatchInFlight(context, threadId)) {
+            return null;
+        }
+
+        return await claimFence(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:revoke`, { ttlMs: FOLLOWUP_REVOKE_TTL_MS });
+    });
+
+/** The grant's removal has returned: requests may start on the chat again. */
+export const releaseFollowupRevoke = internalMutation
+    .input({ claimedAt: v.number(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { claimedAt, threadId }, ctx: context }) => {
+        await releaseClaim(context, FOLLOWUP_REVOKE_SCOPE, `${threadId}:revoke`, claimedAt);
+
+        return null;
     });
 
 /** The request has settled: its dispatch claim goes, and the chat may be locked again. */

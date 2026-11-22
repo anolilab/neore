@@ -465,32 +465,40 @@ export const removeThreadAccess = authMutation
             throw new LunoraError("BAD_REQUEST", "Cannot remove thread owner");
         }
 
-        // A suggestion for this chat is being sent to a model under the run's own access: the removal waits for it, as a delete does.
-        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+        // The removal holds the chat's suggestion requests back while the grant goes: a request in flight is waited for, as a delete
+        // waits for it, and none can start on the chat until the hold is released (`holdFollowupRevoke`). The grant is global, so the
+        // hold cannot share its transaction; the hold is what closes the window.
+        const revokeClaim = await context.runMutation(internal.agent.followup_suggestions.holdFollowupRevoke, { threadId });
+
+        if (revokeClaim === null) {
             throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }
 
-        const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
-            threadId,
-            userId: targetUserId,
-        });
-
-        // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
-        // RLS), so the trusted internal mutation deletes it. Before the grant: the writes commit separately, and a failed
-        // cleanup must leave the grant in place so the removal can be retried.
-        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
-
-        if (access) {
-            await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
-                accessId: access._id,
+        try {
+            const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
+                threadId,
+                userId: targetUserId,
             });
+
+            // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
+            // RLS), so the trusted internal mutation deletes it. Before the grant: the writes commit separately, and a failed
+            // cleanup must leave the grant in place so the removal can be retried.
+            await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
+            if (access) {
+                await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
+                    accessId: access._id,
+                });
+            }
+
+            // Again once the grant is gone: a change the member made between the two writes wrote a row back, and with no grant
+            // `setThreadFollow`'s primary check now refuses any further one.
+            await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
+            context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
+        } finally {
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupRevoke, { claimedAt: revokeClaim, threadId });
         }
-
-        // Again once the grant is gone: a change the member made between the two writes wrote a row back, and with no grant
-        // `setThreadFollow`'s primary check now refuses any further one.
-        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
-
-        context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
     });
 
 // Toggle thread public visibility

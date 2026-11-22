@@ -31,7 +31,6 @@ import type { FC, RefObject } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
 import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import CompactionChip from "@/features/chat/compaction/compaction-chip";
@@ -355,7 +354,6 @@ const Composer: FC<ComposerProps> = ({
 
     // favoriteModelIds is handled by the tiptap editor internally
     useFavoriteModels();
-    const { data: userSettings } = useUserSettings();
     const { isAnonymous } = useIsAnonymous();
     const currentModel = useCurrentModel();
     const flaggedModels = useFeatureFlaggedModels();
@@ -458,8 +456,6 @@ const Composer: FC<ComposerProps> = ({
         return mode;
     }, [isNewThread, threadId, storeNewThreadMode, storeUserChangedMode, storeThreadMode, thread?.mode]);
 
-    // Off until the settings have loaded, as the next-prompt hook is: an unresolved query is `undefined`, not an opt-in.
-    const isEnableFollowupSuggestions = userSettings !== undefined && userSettings?.enableFollowupSuggestions !== false;
     const prefersReducedMotion = useReducedMotion();
 
     // Get model mode and default models (memoized together since they share the same data source)
@@ -716,9 +712,9 @@ const Composer: FC<ComposerProps> = ({
                             {!minimal && isEmpty && <ThreadWelcomeSuggestions className="-mb-5 pb-5.5" key={threadId} />}
 
                             {/* Followup suggestions - only for text mode, hide while streaming or regenerating */}
-                            {!minimal && isEnableFollowupSuggestions && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && (
-                                <ComposerFollowupSuggestions />
-                            )}
+                            {/* The owner's setting decides whether a thread has suggestions (the cache is written only when it is on), so a viewer's own
+                                setting does not hide a shared thread's panel. */}
+                            {!minimal && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && <ComposerFollowupSuggestions />}
 
                             {/* Project hint for a new thread's first message - not in a comparison fan-out, which files nothing */}
                             {!minimal && !onSubmitOverride && !isStreaming && !isSubmitting && <ComposerProjectHint />}

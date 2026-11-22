@@ -2826,9 +2826,10 @@ export const deleteThread = authMutation
             throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }
 
-        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
-
+        // The delete first: a refused delete (a suggestion in flight) must leave the chat's branch link in place.
         const result = await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+
+        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
 
         // Record audit history for thread deletion
         if (threadBeforeDelete) {
@@ -2894,9 +2895,10 @@ export const deleteThreads = authMutation
 
                 try {
                     // Run all operations in parallel for this thread
+                    // The delete first, then its link and audit: a refused delete leaves the branch link in place.
+                    await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
                     await Promise.all([
                         context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId }),
-                        context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> }),
                         context.runMutation(internal.lib.document_history.recordHistory, {
                             attribution: { action: "delete", source: "manual" },
                             doc: null,
@@ -3959,8 +3961,8 @@ export const hardDeleteThread = internalMutation
         // Get thread data before deletion for audit history
         const threadBeforeDelete = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
-        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
         // Record audit history for hard delete
@@ -4587,16 +4589,18 @@ export const retryFollowupCache = internalAction
         chargedUserId: v.string().max(MAX_LENGTH.id),
         claimedAt: v.number(),
         lastMessageId: v.string().max(MAX_LENGTH.id),
+        leafId: v.optional(v.string().max(MAX_LENGTH.id)),
         order: v.number(),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         pathIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         replyAt: v.number(),
         requestId: v.string().max(MAX_LENGTH.long),
+        resetOrder: v.optional(v.number()),
         suggestions: v.array(v.string().max(MAX_LENGTH.long)),
         threadId: v.string().max(MAX_LENGTH.id),
     })
     .action(async ({ args, ctx }) => {
-        const { chargedUserId, claimedAt, organizationId, requestId, ...write } = args;
+        const { chargedUserId, claimedAt, leafId, organizationId, requestId, resetOrder, ...write } = args;
 
         // The reply's claim is renewed before each attempt, so no second model call can start while this write is still outstanding.
         // If the claim is no longer this run's (it lapsed and another run took the reply), this write is dropped: the newer run owns it.
@@ -4609,6 +4613,34 @@ export const retryFollowupCache = internalAction
 
         if (!stillOurs) {
             return;
+        }
+
+        // A suggestion is written only while its reply is still the one the composer shows: a `/clear` since the job began, a branch
+        // switch, or a deletion drops it (the claim goes, and no unit is taken). A clear always lands, so it is never dropped.
+        if (write.suggestions.length > 0) {
+            const [thread, reset] = await Promise.all([
+                ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: write.threadId as Id<"threads"> }),
+                ctx.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: write.threadId as Id<"threads"> }),
+            ]);
+            const fresh =
+                thread !== null &&
+                thread !== undefined &&
+                !thread.deletedAt &&
+                thread.deletingAt === undefined &&
+                (thread.activeLeafMessageId ?? undefined) === leafId &&
+                reset?.order === resetOrder;
+
+            if (!fresh) {
+                chatLogger.debug(`[retryFollowupCache] The reply is no longer the one shown, dropping its suggestions: ${write.threadId}`);
+                await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                    claimedAt,
+                    lastMessageId: write.lastMessageId,
+                    threadId: write.threadId,
+                    userId: chargedUserId,
+                });
+
+                return;
+            }
         }
 
         const written = await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, write);
@@ -5063,8 +5095,11 @@ export const generateFollowupSuggestionsForThread = internalAction
                             // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
                             chargedUserId,
                             claimedAt: paid.claimedAt,
+                            // The reply as it was when the suggestions were made: a retry that finds it changed drops its write.
+                            leafId: threadData.activeLeafMessageId ?? undefined,
                             organizationId: threadData.organizationId ?? undefined,
                             requestId: replyChargeKey,
+                            resetOrder: contextReset?.order,
                         },
                         FOLLOWUP_CACHE_RETRY,
                     );
@@ -5127,8 +5162,10 @@ export const generateFollowupSuggestionsForThread = internalAction
                                 ...cacheWrite,
                                 chargedUserId,
                                 claimedAt: paid.claimedAt,
+                                leafId: threadData.activeLeafMessageId ?? undefined,
                                 organizationId: threadData.organizationId ?? undefined,
                                 requestId: replyChargeKey,
+                                resetOrder: contextReset?.order,
                                 suggestions: [],
                             },
                             FOLLOWUP_CACHE_RETRY,

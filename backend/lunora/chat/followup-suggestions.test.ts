@@ -17,6 +17,8 @@ import {
     FOLLOWUP_CACHE_ROWS,
     followupDispatchInFlight,
     holdFollowupClaim,
+    holdFollowupRevoke,
+    releaseFollowupRevoke,
     followupInFlight,
     followupModelRows,
     getCachedFollowupSuggestionsHandler,
@@ -25,7 +27,6 @@ import {
     withDeadline,
 } from "../agent/followup-suggestions";
 import { deleteAllForThreadIdAsync } from "../agent/threads";
-import { deleteThreadAccess } from "../agent/sharing";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
 
@@ -362,33 +363,33 @@ describe("a thread is not deleted while a suggestion is being sent", () => {
     });
 });
 
-describe("a grant is not deleted while a suggestion is being sent", () => {
-    const grant = async () =>
-        await harness.run(
-            async (ctx: any) => await ctx.db.insert("threadAccess", { grantedAt: 1, grantedBy: OWNER, permission: "read", threadId, userId: COLLAB }),
-        );
+// A grant's removal holds the chat's requests back: the hold waits for a request in flight, and while it is held no request starts.
+describe("a grant's removal holds the chat's suggestion requests back", () => {
+    const hold = async () => await harness.action(async (context: any) => await context.runMutation(holdFollowupRevoke, { threadId }));
+    const begin = async (requestId: string) =>
+        await harness.action(async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId, threadId }));
 
-    it("is refused while the chat's dispatch claim is held, and the grant stays for a retry", async () => {
-        const accessId = await grant();
+    it("is refused while a request is in flight, so the removal waits for it", async () => {
+        await begin("reply-1");
 
-        await harness.action(async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId: "reply-1", threadId }));
-
-        await expect(harness.action(async (context: any) => await context.runMutation(deleteThreadAccess, { accessId }))).rejects.toMatchObject({
-            code: "CONFLICT",
-        });
-        await expect(harness.run(async (ctx: any) => await ctx.db.get("threadAccess", accessId))).resolves.not.toBeNull();
+        await expect(hold()).resolves.toBeNull();
     });
 
-    it("is deleted once the request has settled", async () => {
-        const accessId = await grant();
-        const claimedAt = (await harness.action(
-            async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId: "reply-2", threadId }),
-        )) as number;
+    it("while held, no request can start on the chat; once released, one can", async () => {
+        const claimedAt = (await hold()) as number;
 
-        await harness.action(async (context: any) => await context.runMutation(endFollowupDispatch, { claimedAt, requestId: "reply-2", threadId }));
-        await harness.action(async (context: any) => await context.runMutation(deleteThreadAccess, { accessId }));
+        expect(claimedAt).toEqual(expect.any(Number));
+        await expect(begin("reply-2")).resolves.toBeNull();
 
-        await expect(harness.run(async (ctx: any) => await ctx.db.get("threadAccess", accessId))).resolves.toBeNull();
+        await harness.action(async (context: any) => await context.runMutation(releaseFollowupRevoke, { claimedAt, threadId }));
+
+        await expect(begin("reply-3")).resolves.toEqual(expect.any(Number));
+    });
+
+    it("a second removal of the same chat is refused while the first holds it", async () => {
+        await hold();
+
+        await expect(hold()).resolves.toBeNull();
     });
 });
 

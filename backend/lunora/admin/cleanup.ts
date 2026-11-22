@@ -180,12 +180,20 @@ export const executeCleanup = adminAction
                     const onUserShard = { shardKey: userId };
                     const threads = await callOnShard(internal.admin.cleanup.getUserThreads, { userId }, onUserShard);
 
-                    await Promise.allSettled(
+                    const threadResults = await Promise.allSettled(
                         threads.map(
                             async (thread: { _id: string }) =>
                                 await callOnShard(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id as Id<"threads"> }, onUserShard),
                         ),
                     );
+
+                    // A thread refused (a suggestion is being sent to a model) keeps the account: deleting the user record now would leave
+                    // that thread and its messages with no owner. The account is counted as failed and a later pass deletes it.
+                    const refused = threadResults.find((result) => result.status === "rejected");
+
+                    if (refused?.status === "rejected") {
+                        throw new Error("A thread of this account could not be deleted, so the account is kept", { cause: refused.reason });
+                    }
 
                     // `auth_hooks.cascadeDeleteUser` already deletes the session and
                     // account rows, by index, along with the other four user-owned tables — so

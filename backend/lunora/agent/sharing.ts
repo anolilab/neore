@@ -9,7 +9,6 @@ import { internalMutation, internalQuery, type MutationCtx, type QueryCtx as Que
  * Thread access and invite operations.
  * Migrated from `@neore/backend-agent` component.
  */
-import { followupDispatchInFlight } from "./followup-suggestions";
 import { assert } from "../lib/error-helpers";
 import { withoutUndefined } from "../lib/patch";
 import { storedRow, storedRows } from "../lib/stored-row";
@@ -225,15 +224,8 @@ export const deleteThreadAccess = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const access = await ctx.db.threadAccess.findFirst({ where: { _id: args.accessId } });
-
-        // A suggestion job takes its dispatch claim before it reads the grant, so a claim held here refuses the removal (kept for a retry).
-        // The grant is a global row and the claim is shard-local, so this check and the delete are not one transaction: a claim that
-        // starts just after the check is not refused. That window is the known limit recorded on the PR.
-        if (access && (await followupDispatchInFlight(ctx, access.threadId))) {
-            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
-        }
-
+        // Run only under the chat's revoke hold (`holdFollowupRevoke`, in `chat/sharing.ts`): no suggestion request starts on the chat
+        // until the hold is released, so this delete is not raced by one.
         await ctx.db.delete("threadAccess", args.accessId);
 
         return null;
