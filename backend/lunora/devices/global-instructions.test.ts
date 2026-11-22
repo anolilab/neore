@@ -217,7 +217,7 @@ describe("getGlobalInstructionsCall", () => {
             { callId, deviceId, payload, signature: await signDevicePayload(secret, "result", payload) } as never,
         );
 
-        await expect(read(ownerId, callId)).resolves.toEqual({ error: "The computer's answer could not be read", status: "failed" });
+        await expect(read(ownerId, callId)).resolves.toEqual({ code: "ANSWER_UNREADABLE", error: "The computer's answer could not be read", status: "failed" });
     });
 });
 
@@ -234,5 +234,18 @@ describe("parseGlobalInstructionFiles", () => {
             ),
         ).toBeUndefined();
         expect(globalInstructions.parseGlobalInstructionFiles("[]")).toEqual([]);
+    });
+
+    it("keeps the earlier file a link leads to, and drops one that names itself or no known file", () => {
+        const files = globalInstructions.parseGlobalInstructionFiles(
+            JSON.stringify([
+                { id: "claude", name: "CLAUDE.md", path: "~/.claude/CLAUDE.md", status: "found" },
+                { id: "codex", name: "AGENTS.md", path: "~/.codex/AGENTS.md", sameAs: "claude", status: "found" },
+                { id: "gemini", name: "GEMINI.md", path: "~/.gemini/GEMINI.md", sameAs: "gemini", status: "found" },
+                { id: "windsurf", name: "global_rules.md", path: "~/x", sameAs: "../etc", status: "found" },
+            ]),
+        );
+
+        expect(files?.map((file) => file.sameAs)).toStrictEqual([undefined, "claude", undefined, undefined]);
     });
 });

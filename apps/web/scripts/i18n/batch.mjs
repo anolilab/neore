@@ -3,6 +3,7 @@
 // of it is unit-tested without a network.
 
 import { parseMessage, validateTranslation } from "./icu.mjs";
+import { looksLikeLocaleMap } from "./locale-map.mjs";
 
 /** Target-language names and register, as the prompt states them. */
 export const LOCALES = {
@@ -15,6 +16,9 @@ export const LOCALES = {
     pt: { name: "Portuguese (Brazil)", register: 'Address the user as "você".' },
     zh: { name: "Simplified Chinese", register: "Use concise, neutral Simplified Chinese as is standard for app UI." },
 };
+
+/** The keys a reply that is a map of every locale's translation uses, the source's own included. */
+const MAP_KEYS = ["en", ...Object.keys(LOCALES)];
 
 /** Never translated. Model and provider names are covered by the prompt's general rule. */
 export const PRODUCT_NAMES = ["Neore", "Neore Chat", "Pro", "MCP", "API", "BYOK"];
@@ -207,6 +211,10 @@ export const checkBatch = (batch, translations) => {
     for (const [index, item] of batch.entries()) {
         const translation = translations[String(index + 1)];
         const problems = typeof translation === "string" ? validateTranslation(item.source, translation) : ["no translation returned"];
+
+        if (typeof translation === "string" && looksLikeLocaleMap(translation, MAP_KEYS) && !looksLikeLocaleMap(item.source, MAP_KEYS)) {
+            problems.push("a map of locales, not this locale's translation");
+        }
 
         if (problems.length === 0) {
             accepted.set(item.key, translation);
