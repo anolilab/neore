@@ -939,6 +939,43 @@ describe("useSession", () => {
         await panel.unmount();
     });
 
+    it("backs off a leftover cleanup whose storage reads keep failing while the session reads succeed", async () => {
+        store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
+        store.set(SIGNED_OUT_KEY, "g1");
+        vi.useFakeTimers();
+
+        try {
+            const { get } = chrome.storage.local;
+            let cleanupReads = 0;
+
+            // The session's reads succeed; the cleanup's (`finishPendingSignOut`, on the call stack) fail,
+            // the first 50 of them, so a retry with no delay ends instead of hanging the test.
+            chrome.storage.local.get = vi.fn().mockImplementation(async (keys: string[]) => {
+                if (cleanupReads < 50 && new Error("stack").stack?.includes("finishPendingSignOut")) {
+                    cleanupReads += 1;
+
+                    throw new Error("storage unavailable");
+                }
+
+                return await get(keys);
+            });
+
+            const panel = await mount(createElement(Probe));
+
+            // 250 ms doubling to 30 s: 8 tries in the first 32 s, then one each 30 s.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(60_000);
+            });
+
+            expect(cleanupReads).toBeGreaterThan(1);
+            expect(cleanupReads).toBeLessThanOrEqual(10);
+            expect(store.has(GRANT_KEY)).toBe(true);
+            await panel.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("finishes a pending sign-out once per panel, however many components read the session", async () => {
         store.set(GRANT_KEY, { id: "g1", token: "grant", user: USER });
         store.set(SIGNED_OUT_KEY, "g1");

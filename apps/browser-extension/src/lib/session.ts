@@ -169,12 +169,18 @@ const watchGrantSession = (): (() => void) => {
     let stopped = false;
     let reads = 0;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    /** The leftover cleanup: `pending` until one ran past its storage read, never two at once. */
-    let cleanup: "done" | "pending" | "running" = "pending";
+
+    /**
+     * The leftover cleanup: `pending` until one ran past its storage read, never two at once;
+     * `waiting` out its backoff after a failed read, whatever reads succeed meanwhile.
+     */
+    let cleanup: "done" | "pending" | "running" | "waiting" = "pending";
+    let cleanupFailures = 0;
+    let cleanupRetry: ReturnType<typeof setTimeout> | undefined;
 
     // A sign-out whose removal failed in an earlier panel: remove its leftover grant, once per watch.
-    // A storage read that fails first leaves it pending for the next good read; any other failure
-    // leaves it stored, and the sign-in page says so (`useSignOutUnfinished`).
+    // A storage read that fails first retries it on the first good read after a backoff like the
+    // watch's; any other failure leaves it stored, and the sign-in page says so (`useSignOutUnfinished`).
     const finishLeftover = () => {
         if (cleanup !== "pending") {
             return;
@@ -186,7 +192,21 @@ const watchGrantSession = (): (() => void) => {
                 await finishPendingSignOut();
                 cleanup = "done";
             } catch (error) {
-                cleanup = error instanceof GrantReadError ? "pending" : "done";
+                if (!(error instanceof GrantReadError)) {
+                    cleanup = "done";
+
+                    return;
+                }
+
+                cleanup = "waiting";
+                cleanupRetry = setTimeout(
+                    () => {
+                        cleanup = "pending";
+                        void load();
+                    },
+                    Math.min(READ_RETRY_FIRST_MS * 2 ** cleanupFailures, READ_RETRY_MAX_MS),
+                );
+                cleanupFailures += 1;
             }
         });
     };
@@ -250,6 +270,7 @@ const watchGrantSession = (): (() => void) => {
     return () => {
         stopped = true;
         clearTimeout(retry);
+        clearTimeout(cleanupRetry);
         shown = undefined;
         unfinished = false;
         reloadGrantSession = undefined;
