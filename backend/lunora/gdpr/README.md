@@ -141,14 +141,14 @@ Users can request a complete export of all their personal data in JSON format. T
    over 4 KiB is cut and named in the row's `truncated` (a list keeps every item, the cut ones named: `capabilities[1]`). The
    section is held to 8 MiB of the file (measured as written, indented) and 256 pages (workflow steps): past either no further
    page is stored, the rest is left out and the section says `truncated: true`, and the rest of the export is written. The
-   actions are read last, as by far the largest, so a cut drops the newest actions before any session, site or extension
+   actions are read last, as by far the largest, so a cut drops the newest actions before any session, site or extension is dropped.
 
 **Workflow Steps:**
 
 1. User requests export via `requestDataExport` mutation
 2. Workflow collects data from all tables (parallel queries)
-3. Data is formatted as JSON
-4. JSON is uploaded to R2
+3. `open-export-run` records the run (`usageExportRuns`), then `collect-browser-<n>` stores the browser section a page at a time
+4. Data is formatted as JSON and uploaded to R2; `delete-browser-pages` then deletes the run's browser pages, either way
 5. Signed download URL is generated (7-day expiry)
 6. Email notification sent to user
 

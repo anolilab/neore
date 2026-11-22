@@ -482,7 +482,7 @@ const ensureRun = async (ctx: MutationCtx, requestId: string, userId: string): P
  * cleanup is found by the sweep. Refused once the account's deletion has begun, as every write of the run is.
  */
 export const openUsageExportRun = internalMutation
-    .input({ requestId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ requestId: v.string().max(MAX_LENGTH.key), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { requestId, userId }, ctx }) => {
         if (await deletionUnderwayOnPrimary(ctx, userId)) {
