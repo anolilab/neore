@@ -1,7 +1,7 @@
 /**
  * The admin provider prompt-cache readings call the gateway with the caller's
- * user id. Lunora's `auth.getIdentity()` carries `userId` (and `sessionId`),
- * never `subject`, so the id must be read from `userId`.
+ * user id, read from `context.auth.userId`: Lunora's identity claims
+ * (`auth.getIdentity()`) carry neither `subject` nor `userId`.
  */
 import { describe, expect, it } from "vitest";
 
@@ -28,17 +28,18 @@ class FakeBinding {
     }
 }
 
-const contextFor = (identity: { sessionId?: string; userId?: string } | null, gateway: FakeBinding) =>
+const contextFor = (userId: string | null, gateway: FakeBinding) =>
     ({
-        auth: { getIdentity: async () => identity },
+        // Claims without a user id, as Lunora's are: the id is only on `auth.userId`.
+        auth: { getIdentity: async () => (userId === null ? null : { sessionId: "session-1" }), userId },
         services: { llmGateway: gateway },
     }) as never;
 
 describe("getProviderCacheReadings", () => {
-    it("sends the signed-in admin's user id, read from the identity's userId", async () => {
+    it("sends the signed-in admin's user id, read from auth.userId", async () => {
         const gateway = new FakeBinding();
 
-        const readings = await getProviderCacheReadings(contextFor({ sessionId: "session-1", userId: "admin-1" }, gateway), 7);
+        const readings = await getProviderCacheReadings(contextFor("admin-1", gateway), 7);
 
         expect(readings.days).toBe(7);
         expect(gateway.calls).toHaveLength(1);
@@ -46,17 +47,10 @@ describe("getProviderCacheReadings", () => {
         expect(new URL(gateway.calls[0] ?? "").searchParams.get("days")).toBe("7");
     });
 
-    it("refuses without an identity, before calling the gateway", async () => {
+    it("refuses a caller with no user id, before calling the gateway", async () => {
         const gateway = new FakeBinding();
 
         await expect(getProviderCacheReadings(contextFor(null, gateway), 1)).rejects.toThrow("authenticated admin user");
-        expect(gateway.calls).toHaveLength(0);
-    });
-
-    it("refuses an identity that carries no userId, before calling the gateway", async () => {
-        const gateway = new FakeBinding();
-
-        await expect(getProviderCacheReadings(contextFor({ sessionId: "session-1" }, gateway), 30)).rejects.toThrow("authenticated admin user");
         expect(gateway.calls).toHaveLength(0);
     });
 });

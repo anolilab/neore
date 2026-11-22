@@ -362,9 +362,9 @@ export interface ProviderCacheReadings {
 
 /** Fetch the provider prompt-cache readings from the gateway admin endpoint, for the last `days`. */
 export const getProviderCacheReadings = async (context: ActionContext, days: 1 | 7 | 30): Promise<ProviderCacheReadings> => {
-    // Identity carries `userId` (and `sessionId`), never `subject`: reading `subject` made every call refuse.
-    const identity = await context.auth.getIdentity();
-    const adminUserId = identity?.userId;
+    // `context.auth.userId`, as every action reads the caller (`auth/lib/helper.ts`): the identity claims carry neither
+    // `subject` nor `userId`, so reading either made every call refuse.
+    const adminUserId = context.auth.userId;
 
     if (typeof adminUserId !== "string") {
         throw new TypeError("Provider cache readings require an authenticated admin user");
