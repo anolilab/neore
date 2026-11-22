@@ -282,7 +282,9 @@ function readTarget(
     // another site: its fields are not in the DOM, so the field check alone misses it.
     const isCardFields =
         enclosingForm !== null &&
-        (enclosingForm.querySelector("input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i], iframe") !== null ||
+        (enclosingForm.querySelector(
+            "input[autocomplete^='cc-'], input[name*='card' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i], iframe",
+        ) !== null ||
             new URL(enclosingForm.action, document.URL).origin !== new URL(document.URL).origin);
     const address = document.URL.toLowerCase();
     const isCheckoutPage = ["checkout", "cart", "basket", "payment", "kasse", "warenkorb", "bestell"].some((word) => address.includes(word));
