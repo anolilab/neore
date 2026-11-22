@@ -7,20 +7,32 @@
  * thing the click would press. A read that errors or finds nothing asks: an unreadable target is never clicked unseen.
  */
 
-/** Phrases that name a purchase on a button or link, English and German. Whole words only, so "payroll" is not "pay". */
+/**
+ * Phrases that name a purchase on a button or link, English and German. Whole words only, so "payroll" is not "pay" and
+ * "Bestellungen" (orders, a noun) is not "bestellen" (to order). Matched on text with its whitespace collapsed, so a line
+ * break or a non-breaking space inside a phrase does not hide it.
+ */
 const PURCHASE_PATTERNS: ReadonlyArray<RegExp> = [
     /\b(?:pay|buy|purchase|checkout|check out)\b/iu,
-    /\b(?:place|complete|confirm) (?:your )?(?:order|purchase)\b/iu,
+    /\b(?:place|complete|confirm|submit) (?:your )?(?:order|purchase)\b/iu,
     /\border now\b/iu,
-    /\b(?:bezahl|kauf|bestell|zahlungspflichtig)\w*\b/iu,
+    /\b(?:bezahlen|bezahle|kaufen|kaufe|bestellen|bestelle)\b/iu,
+    /\bzur kasse\b/iu,
+    /\bzahlungspflichtig\w*\b/iu,
 ];
 
-export const isPurchaseText = (text: string): boolean => PURCHASE_PATTERNS.some((pattern) => pattern.test(text));
+export const isPurchaseText = (text: string): boolean => {
+    const collapsed = text.replaceAll(/\s+/gu, " ");
+
+    return PURCHASE_PATTERNS.some((pattern) => pattern.test(collapsed));
+};
 
 /** What the renderer reports for a read of one element (`extract` with a selector): its text as `content`. */
 export interface ClickTargetLook {
     content?: string;
     success: boolean;
+    /** The renderer cut the text short: a purchase word may sit past the cut, so the gate cannot clear it. */
+    truncated?: boolean;
 }
 
 /**
@@ -38,7 +50,7 @@ export const browserActionNeedsPurchaseApproval = async (
     try {
         const target = await look(input.selector);
 
-        if (target.success !== true) {
+        if (target.success !== true || target.truncated === true) {
             return true;
         }
 

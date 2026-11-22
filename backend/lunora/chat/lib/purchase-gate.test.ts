@@ -14,16 +14,30 @@ describe("isPurchaseText", () => {
         "Jetzt kaufen",
         "Bezahlen",
         "Zahlungspflichtig bestellen",
+        "Submit order",
+        "Zur Kasse",
+        "Place\norder",
+        "Place order",
+        "Bestellen",
     ])("reads %s as a purchase", (text) => {
         expect(isPurchaseText(text)).toBe(true);
     });
 
-    it.each(["Payroll", "Buyers guide", "Next page", "Sort by order", "Order history", "Search", "Continue", "Payment settings"])(
-        "does not read %s as a purchase",
-        (text) => {
-            expect(isPurchaseText(text)).toBe(false);
-        },
-    );
+    it.each([
+        "Payroll",
+        "Buyers guide",
+        "Next page",
+        "Sort by order",
+        "Order history",
+        "Search",
+        "Continue",
+        "Payment settings",
+        "Bestellungen",
+        "Kaufbedingungen",
+        "Kaufhaus",
+    ])("does not read %s as a purchase", (text) => {
+        expect(isPurchaseText(text)).toBe(false);
+    });
 });
 
 describe("the purchase gate on browser actions", () => {
@@ -70,5 +84,11 @@ describe("the purchase gate on browser actions", () => {
 
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#next" }, failed)).toBe(true);
         expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#next" }, thrown)).toBe(true);
+    });
+
+    it("asks for a truncated read, since a purchase word may sit past the cut", async () => {
+        const look = vi.fn(() => Promise.resolve({ content: "Next", success: true, truncated: true }));
+
+        expect(await browserActionNeedsPurchaseApproval({ action: "click", selector: "#next" }, look)).toBe(true);
     });
 });
