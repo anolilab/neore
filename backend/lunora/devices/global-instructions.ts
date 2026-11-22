@@ -34,6 +34,9 @@ export const GLOBAL_INSTRUCTION_FILE_IDS = ["claude", "codex", "gemini", "windsu
 /** The `data.code` of a refusal the editor words itself. */
 export const GLOBAL_INSTRUCTIONS_REFUSALS = { BUSY: "DEVICE_BUSY", OFFLINE: "DEVICE_OFFLINE", OUTDATED: "DEVICE_OUTDATED" } as const;
 
+/** The `code` of a call the device answered but this side could not read, so the editor says it in the person's language. */
+export const GLOBAL_INSTRUCTIONS_ANSWER_UNREADABLE = "ANSWER_UNREADABLE";
+
 /** What the desktop's approval window names as the call's origin, where a chat call names its thread. */
 const ORIGIN_TITLE = "Import into a project's rule files";
 
@@ -44,6 +47,8 @@ const vFileEntry = v.object({
     name: v.string(),
     path: v.string(),
     reason: v.optional(v.string()),
+    // An earlier file this one leads to (a link): the same text, imported once.
+    sameAs: v.optional(vFileId),
     size: v.optional(v.number()),
     status: v.union(v.literal("found"), v.literal("left_out"), v.literal("missing"), v.literal("read"), v.literal("refused"), v.literal("too_large")),
     text: v.optional(v.string()),
@@ -82,6 +87,7 @@ export const parseGlobalInstructionFiles = (output: string | undefined): FileEnt
         const reason = text(entry.reason, 200);
         const body = text(entry.text, 100_000);
         const size = byteCount(entry.size);
+        const sameAs = typeof entry.sameAs === "string" && IDS.has(entry.sameAs) && entry.sameAs !== entry.id ? (entry.sameAs as FileEntry["id"]) : undefined;
 
         return [
             {
@@ -90,6 +96,7 @@ export const parseGlobalInstructionFiles = (output: string | undefined): FileEnt
                 path: text(entry.path, 200) ?? "",
                 status: entry.status as FileEntry["status"],
                 ...(reason !== undefined && { reason }),
+                ...(sameAs !== undefined && { sameAs }),
                 ...(size !== undefined && { size }),
                 ...(body !== undefined && { text: body }),
             },
@@ -200,6 +207,7 @@ export const getGlobalInstructionsCall = authQuery
         v.union(
             v.null(),
             v.object({
+                code: v.optional(v.literal("ANSWER_UNREADABLE")),
                 error: v.optional(v.string()),
                 files: v.optional(v.array(vFileEntry)),
                 phase: v.optional(v.union(v.literal("prompting"), v.literal("running"))),
@@ -222,7 +230,7 @@ export const getGlobalInstructionsCall = authQuery
 
         // A result the device sent but this side cannot read is a failed import, never one that found no files.
         if (files === undefined && call.status === "completed") {
-            return { error: "The computer's answer could not be read", status: "failed" as const };
+            return { code: GLOBAL_INSTRUCTIONS_ANSWER_UNREADABLE, error: "The computer's answer could not be read", status: "failed" as const };
         }
 
         ctx.log.event("devices.get_global_instructions_call", { files: files?.length ?? 0, status: call.status });

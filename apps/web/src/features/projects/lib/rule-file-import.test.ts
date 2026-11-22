@@ -220,6 +220,21 @@ describe("importRuleTexts", () => {
     });
 });
 
+describe("importRuleTexts with whole files", () => {
+    it("takes an entry marked whole as one always file under its name, front matter and all, whatever its name", async () => {
+        const text = "---\ndescription: Mine\n---\nBe brief.";
+
+        await expect(importRuleTexts([{ path: "global_rules.md", text: () => text, whole: true }], 1)).resolves.toStrictEqual({
+            imported: [{ content: text, description: "", mode: "always", path: "global_rules.md", patterns: "", title: "global_rules.md" }],
+            skipped: [],
+        });
+        // Unmarked, the same file is read by its front matter.
+        await expect(importRuleTexts([{ path: "global_rules.md", text: () => text }], 1)).resolves.toMatchObject({
+            imported: [{ description: "Mine", mode: "auto", title: "global_rules" }],
+        });
+    });
+});
+
 describe("importRuleFiles", () => {
     it("reads a picked folder's top-level instruction file whole, and one in its rules folder by front matter", async () => {
         const inFolder = (path: string, text: string) => {
