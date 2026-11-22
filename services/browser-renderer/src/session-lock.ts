@@ -222,7 +222,9 @@ export const holdSession = async (
                 if (answer?.held === false) {
                     lose();
                 } else if (answer?.held) {
-                    confirmedUntil = renewedAt + LEASE_MS;
+                    // The lock keeps the later end of a hold (`SessionHolds.renew`): so does this, so a periodic renewal that
+                    // answers after a linger's longer lease never pulls the release's retries back short of the hold.
+                    confirmedUntil = Math.max(confirmedUntil, renewedAt + LEASE_MS);
                 }
 
                 return answer;

@@ -380,6 +380,56 @@ describe(holdSession, () => {
         expect(control.calls.filter((call) => (call as { op: string }).op === "release").length).toBeGreaterThanOrEqual(3);
     });
 
+    it("keeps sending a lost release until a linger's hold ends, even when an older renewal answers after the linger", async () => {
+        const { control, namespace: inner } = namespaceOf();
+        const renewal = Promise.withResolvers<undefined>();
+        let isRenewalHeld = false;
+        const namespace = {
+            get: (id: unknown) => {
+                const stub = inner.get(id as never);
+
+                return {
+                    fetch: async (url: string, init: RequestInit) => {
+                        const body = JSON.parse(init.body as string) as { leaseMs?: number; op: string };
+
+                        if (!isRenewalHeld && body.op === "renew" && body.leaseMs === LEASE_MS) {
+                            // The first periodic renewal is answered only once the linger has been.
+                            isRenewalHeld = true;
+                            await renewal.promise;
+                        }
+
+                        return stub.fetch(url, init);
+                    },
+                };
+            },
+            idFromName: inner.idFromName.bind(inner),
+        } as unknown as DurableObjectNamespace;
+        const hold = await held(namespace);
+
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(isRenewalHeld).toBe(true);
+
+        await hold.linger(90_000);
+        renewal.resolve(undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        control.reachable = false;
+
+        let isSettled = false;
+        const settling = hold.settle().finally(() => {
+            isSettled = true;
+        });
+
+        // Past the renewal's own lease end, well inside the linger's.
+        await vi.advanceTimersByTimeAsync(LEASE_MS + 20_000);
+        expect(isSettled).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(90_000);
+        await settling;
+
+        expect(isSettled).toBe(true);
+    });
+
     it("stops sending the release once the lock answered one, and gives up when the lease it confirmed has run out", async () => {
         const answered = namespaceOf();
         const hold = await held(answered.namespace);
