@@ -208,7 +208,8 @@ describe("an approved sign-in in the owner's own turn", () => {
             url: LOGIN_PAGE,
             username: USERNAME,
         });
-        expect(result.output).toMatchObject({ site: SITE, submitted: true, success: true, url: `${SITE}/account?p=[password]&q=[password]` });
+        // An address that names the login is withheld whole: scrubbed, it would be a page that does not exist.
+        expect(result.output).toMatchObject({ site: SITE, submitted: true, success: true, url: WITHHELD_FIELD });
         await expectNoSecret(result);
 
         // The history names the site only.
@@ -233,8 +234,29 @@ describe("an approved sign-in in the owner's own turn", () => {
 
         const result = await signIn();
 
-        expect(result.output).toMatchObject({ error: "Signed in as [username]", title: WITHHELD_FIELD, url: `${SITE}/account?user=[username]` });
+        expect(result.output).toMatchObject({ error: "Signed in as [username]", title: WITHHELD_FIELD, url: WITHHELD_FIELD });
         await expectNoSecret(result);
+    });
+
+    it("scrubs a common username only where it stands alone, and withholds an address that names it", async () => {
+        await insertApprovalRow();
+        await harness.run(async (ctx: any) => {
+            const [login] = await ctx.db.query("savedSiteLogins").collect();
+
+            await ctx.db.patch("savedSiteLogins", login._id, { username: "admin" });
+        });
+        renderer.mockResolvedValue(
+            answered({ sessionId: "s-1", submitted: true, success: true, title: "Welcome admin, to the administrator panel", url: `${SITE}/admin/home` }),
+        );
+
+        const result = await signIn();
+
+        expect(result.output).toMatchObject({ title: "Welcome [username], to the administrator panel", url: WITHHELD_FIELD });
+        // The thread's browser row keeps no address that does not exist.
+        const [row] = await all("browserSessions");
+
+        expect(row?.["currentUrl"]).not.toBe(WITHHELD_FIELD);
+        expect(String(row?.["currentUrl"])).not.toContain("[username]");
     });
 
     it("scrubs the password from a renderer failure too", async () => {
@@ -452,6 +474,27 @@ describe("what the renderer answers", () => {
 
         expect(result.output).toMatchObject({ error: PASSWORD_UNREADABLE, success: false });
         expect(renderer).not.toHaveBeenCalled();
+        expect(await session()).not.toHaveProperty("inUseHolds");
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/action:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
+    });
+
+    it("types nothing, keeps the thread's browser and gives the charge back when the browser did not start in time", async () => {
+        await insertApprovalRow();
+        await withBrowser();
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: "The browser did not start in time, so nothing was typed. Try it again.", success: false },
+            response: { ok: false, status: 504 },
+        });
+        // The hour's 20 spent, this sign-in's unit with them: only a refund leaves one.
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 19, identifier: OWNER, key: "browser/action:free" }));
+
+        const result = await signIn();
+
+        expect(result.output).toMatchObject({ error: expect.stringContaining("did not start in time"), success: false });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-1" });
         expect(await session()).not.toHaveProperty("inUseHolds");
         await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/action:free" }))).resolves.toMatchObject({
             ok: true,

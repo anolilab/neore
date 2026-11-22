@@ -83,30 +83,60 @@ const spellingsOf = (secret: string): string[] => {
 /** The shortest username scrubbed: a shorter one would blank ordinary words, and tells nothing of the account. */
 const MIN_SCRUBBED_USERNAME = 3;
 
+// The characters a pattern reads as syntax; `-` is literal outside a class, and escaping it is an error under the `u` flag.
+const REGEXP_SPECIAL_RE = /[$()*+./?[\\\]^{|}]/g;
+
+/**
+ * Where `spelling` stands in a text: anywhere for the password, which is the secret wherever it is, and only as a token
+ * of its own for the username, so a common one (`admin`) does not blank ordinary words (`administrator`).
+ */
+const placesOf = (spelling: string, isToken: boolean): RegExp => {
+    const escaped = spelling.replaceAll(REGEXP_SPECIAL_RE, String.raw`\$&`);
+
+    return new RegExp(isToken ? String.raw`(?<![\p{L}\p{N}_])${escaped}(?![\p{L}\p{N}_])` : escaped, "gu");
+};
+
+interface Saved {
+    password?: string;
+    username: string;
+}
+
+/** The login's secrets a text is scrubbed of, each with its marker. */
+const secretsOf = ({ password, username }: Saved): { isToken: boolean; marker: string; value: string }[] => [
+    ...(password === undefined ? [] : [{ isToken: false, marker: "[password]", value: password }]),
+    ...(username.length >= MIN_SCRUBBED_USERNAME ? [{ isToken: true, marker: "[username]", value: username }] : []),
+];
+
+/** Whether `text`, as it is or with its escapes read, spells the password or the username (as a token) anywhere. */
+export const holdsLogin = (text: string, saved: Saved): boolean => {
+    const read = unescaped(text);
+
+    return secretsOf(saved).some(({ isToken, value }) =>
+        spellingsOf(value).some((spelling) => placesOf(spelling, isToken).test(text) || placesOf(spelling, isToken).test(read)),
+    );
+};
+
 /**
  * `text` with the password and the username, in the forms an address or a form body encodes them in, replaced; withheld
  * whole when an escaped spelling of either is in it, which no replacement could find.
  */
-export const withoutLogin = (text: string | undefined, { password, username }: { password?: string; username: string }): string | undefined => {
+export const withoutLogin = (text: string | undefined, saved: Saved): string | undefined => {
     if (text === undefined) {
         return undefined;
     }
 
-    const secrets = [
-        ...(password === undefined ? [] : [{ marker: "[password]", value: password }]),
-        ...(username.length >= MIN_SCRUBBED_USERNAME ? [{ marker: "[username]", value: username }] : []),
-    ];
+    const secrets = secretsOf(saved);
     const read = unescaped(text);
 
-    if (read !== text && secrets.some(({ value }) => spellingsOf(value).some((spelling) => read.includes(spelling)))) {
+    if (read !== text && secrets.some(({ isToken, value }) => spellingsOf(value).some((spelling) => placesOf(spelling, isToken).test(read)))) {
         return WITHHELD_FIELD;
     }
 
     let scrubbed = text;
 
-    for (const { marker, value } of secrets) {
+    for (const { isToken, marker, value } of secrets) {
         for (const spelling of spellingsOf(value)) {
-            scrubbed = scrubbed.replaceAll(spelling, () => marker);
+            scrubbed = scrubbed.replaceAll(placesOf(spelling, isToken), () => marker);
         }
     }
 
@@ -203,10 +233,19 @@ export const fillSavedLogin = internalAction
                 const ended = held;
 
                 held = undefined;
-                await ctx.runMutation(internal.browser.functions.endSessionUse, ended).catch(() => undefined);
+                // Best effort, said in the log (no value of the login): a hold left runs out on its own.
+                await ctx.runMutation(internal.browser.functions.endSessionUse, ended).catch((error_: unknown) => {
+                    toolsLogger.warn(
+                        `[SITE_LOGIN] The hold of a sign-in that typed nothing could not be ended: ${error_ instanceof Error ? error_.name : "unknown"}`,
+                    );
+                });
             }
 
-            await ctx.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key: rateKey }).catch(() => undefined);
+            await ctx.runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, { identifier: userId, key: rateKey }).catch((error_: unknown) => {
+                toolsLogger.warn(
+                    `[SITE_LOGIN] The charge of a sign-in that typed nothing could not be given back: ${error_ instanceof Error ? error_.name : "unknown"}`,
+                );
+            });
 
             return told(refused(error, login.site));
         };
@@ -343,9 +382,10 @@ export const fillSavedLogin = internalAction
             }
 
             // Refused before anything was typed: another call holds the session (409), its lock did not answer or the sign-in
-            // could not be armed (503), or the session was retired on the new browser too (410). A session it says is gone
+            // could not be armed (503), the browser did not start in time (504), or the session was retired on the new browser too
+            // (410). A session it says is gone
             // (retired, or a reconnect that failed) is dropped from the row first.
-            if (response?.status === 409 || response?.status === 410 || response?.status === 503) {
+            if (response?.status === 409 || response?.status === 410 || response?.status === 503 || response?.status === 504) {
                 if (response.status === 410 || data.sessionClosed === true) {
                     await ctx.runMutation(internal.browser.functions.logAction, {
                         action: "login",
@@ -378,14 +418,15 @@ export const fillSavedLogin = internalAction
                 ...(data.submitted !== undefined && { submitted: data.submitted }),
                 success: data.success === true,
                 ...(data.title !== undefined && { title: scrub(data.title) }),
-                ...(data.url !== undefined && { url: scrub(data.url) }),
+                // An address that names the login is withheld whole: scrubbed, it would be a page that does not exist.
+                ...(data.url !== undefined && { url: holdsLogin(data.url, { password, username: login.username }) ? WITHHELD_FIELD : scrub(data.url) }),
             };
 
             // The site only: never the username or password, nor the page's error in their words. A session the renderer
             // closed, or could not confirm closed, comes back with no id: the row keeps no browser to reuse.
             const logged = await ctx.runMutation(internal.browser.functions.logAction, {
                 action: "login",
-                currentUrl: result.url,
+                ...(result.url !== WITHHELD_FIELD && { currentUrl: result.url }),
                 durationMs: Date.now() - startTime,
                 errorMessage: result.error,
                 heldReaped: held.reaped,
