@@ -56,6 +56,7 @@ import {
     setRunOrganizationId,
     setRunReplyKey,
     setRunStartedBy,
+    setRunToolSources,
     setRunTurn,
     setThreadStatus,
     stampSavedToolCalls,
@@ -678,6 +679,7 @@ export const runStreamingAgent = internalAction
                 );
 
                 setRunTurn(ctx, { impersonated, promptMessageId: messageId, systemContext });
+                setRunToolSources(ctx, toolResult.permissionKeys);
 
                 if (additionalParts.length > 0) {
                     const baseInstructions = agent.options.instructions || "";

@@ -298,7 +298,7 @@ export const deleteSiteLogin = authMutation
  * turn's record. Every field is required, so a caller that does not know one cannot fall back to an allowing default.
  * What each must hold is decided in `site-login-turn.ts`.
  */
-const siteLoginTurnFields = {
+export const siteLoginTurnFields = {
     /** `ToolCtx.headless`: a sub-agent, trigger, task, eval or messenger reply. Nobody is at the app to see the run. */
     headless: v.boolean(),
     /**
@@ -308,6 +308,8 @@ const siteLoginTurnFields = {
     impersonated: v.boolean(),
     /** `ToolCtx.dispatchOrigin`: `"lead"` for the owner's own chat, else what started the run (an outside agent, a trigger, a messenger reply). */
     origin: v.string().max(40),
+    /** The fill's own tool call when it runs approved, with no step messages: the step is read from the saved rows (`site-login-turn.ts`). */
+    ownCallId: v.optional(v.string().max(128)),
     /**
      * The turn's prompt row (the tool context's `promptMessageId`, `agent/client/start.ts`): who wrote it is read from the
      * row, never taken from the run. After a resume or an approval that id is a reply or tool row, which is refused.
@@ -383,8 +385,8 @@ export const listUsableSiteLogins = internalQuery
 
 /**
  * The one login a run of `threadId` may use for `site`, still encrypted, for the server-side fill. `null` when there is
- * none: the site is not saved, or the run may not use it. `site` is the origin of the page the browser is on, read by
- * the server, never a site the model names. The caller decrypts it in the action that types it, and never returns it
+ * none: the site is not saved, or the run may not use it. `site` is the origin the model names, used only to find the
+ * login: the page typed into is never the model's (`signInUrl` below). The caller decrypts it in the action that types it, and never returns it
  * from a workflow step or puts it in a queue payload, where it would be kept. `signInUrl` is the saved sign-in page, the
  * only page the fill opens (the site's front page when none is saved).
  */

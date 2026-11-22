@@ -50,11 +50,22 @@ const NAMED_ENTITIES = new Map([
     ['"', "quot"],
 ]);
 
-/** Every spelling of one character a URL, a form body or HTML may give it: raw, `%xx` in either case, `+`, `&#…;`. */
+/**
+ * Every spelling of one character a URL, a form body, HTML or a script may give it: raw, `%xx` in either case, `+`,
+ * `&#…;`, and the JS escapes `\uXXXX`, `\u{…}` and `\xXX`.
+ */
 const characterPattern = (character: string): string => {
     const code = character.codePointAt(0) ?? 0;
     const percent = [...new TextEncoder().encode(character)].map((byte) => `%${anyCaseHex(byte, 2)}`).join("");
-    const spellings = [character.replaceAll(REGEXP_SPECIAL_RE, String.raw`\$&`), percent, `&#0*${code};`, `&#[xX]0*${anyCaseHex(code)};`];
+    const spellings = [
+        character.replaceAll(REGEXP_SPECIAL_RE, String.raw`\$&`),
+        percent,
+        `&#0*${code};`,
+        `&#[xX]0*${anyCaseHex(code)};`,
+        String.raw`\\u\{0*` + anyCaseHex(code) + String.raw`\}`,
+        ...(code <= 0xff_ff ? [String.raw`\\u` + anyCaseHex(code, 4)] : []),
+        ...(code <= 0xff ? [String.raw`\\x` + anyCaseHex(code, 2)] : []),
+    ];
     const named = NAMED_ENTITIES.get(character);
 
     if (character === " ") {
@@ -143,7 +154,7 @@ const decodeRun = (run: string): string => {
 };
 
 /**
- * Whether `text` carries `secret`: in a form, URL, HTML or base64 spelling, escaped as a JSON string, or under any
+ * Whether `text` carries `secret`: in a form, URL, HTML, JS-escaped or base64 spelling, escaped as a JSON string, or under any
  * number of further layers of percent-encoding, each read in turn until one changes nothing. Each run of escapes is
  * decoded alone, so a stray `%` elsewhere (a "100%") does not stop the rest from being read. A text with more layers
  * than `MAX_DECODE_ROUNDS` or its budget reaches is taken to carry it.
@@ -177,7 +188,7 @@ export const WITHHELD = "[withheld: it holds the password]";
 
 /**
  * `text`, or `WITHHELD` in its place when it carries the password in any spelling a page could echo it in (raw, URL- or
- * form-encoded, HTML-escaped, base64 or base64url, at any depth of percent-encoding). Withheld whole, never marked where
+ * form-encoded, HTML- or JS-escaped, base64 or base64url, at any depth of percent-encoding). Withheld whole, never marked where
  * it matched: a page that put guesses in its address or title would learn from the mark which guess is the password.
  */
 export const withoutSecret = (text: string, secret: string): string => (hasSecret(text, secret) ? WITHHELD : text);

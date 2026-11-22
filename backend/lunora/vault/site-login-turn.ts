@@ -39,6 +39,11 @@ export type SiteLoginTurn = {
     headless: boolean;
     impersonated: boolean;
     origin: string;
+    /**
+     * The fill's own tool call, when it runs approved (`agent/client/tool-approval.ts` runs it with no messages): its step
+     * is then read from the saved rows below the prompt, and that call's approval request is the one part admitted.
+     */
+    ownCallId?: string;
     promptMessageId: Id<"messages">;
     startedBy: string;
     /** The messages the model saw for the step (`ToolExecutionOptions.messages`), as they are: classified here. */
@@ -79,7 +84,7 @@ const SAFE_THREAD_TAGS: ReadonlySet<string> = new Set(["chat"]);
 const PATH_ROWS = 3000;
 const PATH_PAGE = 100;
 
-type Part = { providerMetadata?: unknown; providerOptions?: unknown; text?: unknown; toolName?: unknown; type?: unknown };
+type Part = { providerMetadata?: unknown; providerOptions?: unknown; text?: unknown; toolCallId?: unknown; toolName?: unknown; type?: unknown };
 
 const hasNeoreMark = (meta: unknown): boolean => typeof meta === "object" && meta !== null && "neore" in meta;
 
@@ -135,14 +140,16 @@ const userMessageRefusal = (message: SiteLoginMessage): string | null => {
 
 const ASSISTANT_PART_TYPES: ReadonlySet<unknown> = new Set(["reasoning", "text", "tool-call"]);
 
-const assistantMessageRefusal = (message: SiteLoginMessage): string | null => {
+const assistantMessageRefusal = (message: SiteLoginMessage, ownCallId: string | undefined): string | null => {
     if (typeof message.content === "string") {
         return null;
     }
 
+    // The approval request of the fill's own call, and no other: one for another call stands for a call not run yet.
     const own = (message.content as ReadonlyArray<Part>).every(
         (part) =>
-            ASSISTANT_PART_TYPES.has(part.type) && (part.type !== "text" || (!hasNeoreMark(part.providerOptions) && !hasNeoreMark(part.providerMetadata))),
+            (part.type === "tool-approval-request" && ownCallId !== undefined && part.toolCallId === ownCallId) ||
+            (ASSISTANT_PART_TYPES.has(part.type) && (part.type !== "text" || (!hasNeoreMark(part.providerOptions) && !hasNeoreMark(part.providerMetadata)))),
     );
 
     return own ? null : "assistant-part";
@@ -160,7 +167,7 @@ const toolMessageRefusal = (message: SiteLoginMessage): string | null =>
  * Why one model message is not safe, or `null` when it is: typed user text, the model's own reply, or a safe tool's
  * result. Any other role (a `system` message among the messages), a part nobody classified, or no content refuses.
  */
-export const messageRefusal = (message: SiteLoginMessage | undefined): string | null => {
+export const messageRefusal = (message: SiteLoginMessage | undefined, ownCallId?: string): string | null => {
     if (!message || (typeof message.content !== "string" && !Array.isArray(message.content))) {
         return "no-content";
     }
@@ -173,7 +180,7 @@ export const messageRefusal = (message: SiteLoginMessage | undefined): string | 
 
     switch (message.role) {
         case "assistant": {
-            return assistantMessageRefusal(message);
+            return assistantMessageRefusal(message, ownCallId);
         }
         case "tool": {
             return toolMessageRefusal(message);
@@ -192,7 +199,7 @@ export const messageRefusal = (message: SiteLoginMessage | undefined): string | 
  * or not at all, with no group speaker, coding agent, metadata of the app's own, file, sources or memories, and a
  * message {@link messageRefusal} admits.
  */
-export const pathRowRefusal = (row: Doc<"messages">, userId: string): string | null => {
+export const pathRowRefusal = (row: Doc<"messages">, userId: string, ownCallId?: string): string | null => {
     if (row.userId !== userId) {
         return "not-owner";
     }
@@ -205,7 +212,7 @@ export const pathRowRefusal = (row: Doc<"messages">, userId: string): string | n
         return "row-context";
     }
 
-    return messageRefusal(row.message as SiteLoginMessage | undefined);
+    return messageRefusal(row.message as SiteLoginMessage | undefined, ownCallId);
 };
 
 /**
@@ -260,7 +267,7 @@ const threadVerdict = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">,
  */
 export const siteLoginTurnOf = (
     context: Pick<ToolCtx, "dispatchOrigin" | "headless" | "runTurn" | "startedBy">,
-    call: { stepMessages: ReadonlyArray<SiteLoginMessage>; toolSources: ReadonlyArray<string> },
+    call: { ownCallId?: string; stepMessages: ReadonlyArray<SiteLoginMessage>; toolSources: ReadonlyArray<string> },
 ): SiteLoginTurn | null => {
     const { runTurn } = context;
 
@@ -272,6 +279,7 @@ export const siteLoginTurnOf = (
         headless: context.headless === true,
         impersonated: runTurn.impersonated,
         origin: context.dispatchOrigin,
+        ...(call.ownCallId !== undefined && { ownCallId: call.ownCallId }),
         promptMessageId: runTurn.promptMessageId as Id<"messages">,
         startedBy: context.startedBy,
         stepMessages: call.stepMessages,
@@ -297,11 +305,82 @@ const turnRefusal = (turn: SiteLoginTurn, userId: string): string | null => {
         return "tools";
     }
 
-    // The step's messages hold this run's own steps, which are not on the saved path above the prompt.
+    // The step's messages hold this run's own steps, which are not on the saved path above the prompt. An approved call's
+    // step is read from the saved rows instead (`approvedStepRefusal`).
+    if (turn.stepMessages.length === 0 && turn.ownCallId !== undefined) {
+        return null;
+    }
+
     const step =
-        turn.stepMessages.length === 0 ? "no-step-messages" : turn.stepMessages.map((message) => messageRefusal(message)).find((reason) => reason !== null);
+        turn.stepMessages.length === 0
+            ? "no-step-messages"
+            : turn.stepMessages.map((message) => messageRefusal(message, turn.ownCallId)).find((reason) => reason !== null);
 
     return step ? `step:${step}` : null;
+};
+
+/**
+ * Why the step of an approved call is not safe, or `null`. The call ran outside the step that made it, with no messages:
+ * the step is the saved rows from the prompt down to the row holding the call's approval request, on the prompt's own
+ * path, each classified as a row of the path is. A request not found, or not below the prompt, refuses.
+ */
+const approvedStepRefusal = async (
+    ctx: Pick<QueryCtx, "db">,
+    threadId: Id<"threads">,
+    prompt: Doc<"messages">,
+    callId: string,
+    userId: string,
+): Promise<string | null> => {
+    const holdsRequest = (row: Doc<"messages">): boolean => {
+        const content = (row.message as SiteLoginMessage | undefined)?.content;
+
+        return Array.isArray(content) && (content as ReadonlyArray<Part>).some((part) => part.type === "tool-approval-request" && part.toolCallId === callId);
+    };
+
+    // Paged, newest first, as far as a turn's path is ever read (`PATH_ROWS`): a busy turn's request may sit below a page.
+    let asking: Doc<"messages"> | undefined;
+    let cursor: string | null = null;
+    let searched = 0;
+
+    do {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId).gte("order", prompt.order))
+            .order("desc")
+            .paginate({ cursor, numItems: PATH_PAGE });
+        const rows = page.page as unknown as Doc<"messages">[];
+
+        asking = rows.find((row) => holdsRequest(row));
+        searched += rows.length;
+        cursor = page.isDone ? null : page.continueCursor;
+    } while (!asking && cursor !== null && searched < PATH_ROWS);
+
+    if (!asking) {
+        return "approval-not-found";
+    }
+
+    // Up from the request to the prompt, a page at a time within the same limit; every row read is classified, and a path
+    // that does not reach the prompt in it refuses.
+    let from: Doc<"messages"> | null = asking;
+    let walked = 0;
+
+    while (from && from._id !== prompt._id) {
+        if (walked >= PATH_ROWS) {
+            return "approval-path";
+        }
+
+        const { next, rows } = await walkPath(ctx, threadId, from, { limit: PATH_PAGE, stopAtId: prompt._id });
+        const reason = rows.map((row) => pathRowRefusal(row, userId, callId)).find((refusal) => refusal !== null);
+
+        if (reason) {
+            return reason;
+        }
+
+        walked += rows.length;
+        from = next;
+    }
+
+    return from?._id === prompt._id ? null : "approval-path";
 };
 
 /**
@@ -329,6 +408,14 @@ export const siteLoginTurnVerdict = async (
 
     if (prompt?.threadId !== threadId || (prompt.message as SiteLoginMessage | undefined)?.role !== "user") {
         return { allowed: false, reason: "prompt" };
+    }
+
+    if (turn.stepMessages.length === 0 && turn.ownCallId !== undefined) {
+        const step = await approvedStepRefusal(ctx, threadId, prompt, turn.ownCallId, userId);
+
+        if (step) {
+            return { allowed: false, reason: `step:${step}` };
+        }
     }
 
     let cursor: Doc<"messages"> | null = prompt;

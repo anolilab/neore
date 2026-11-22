@@ -4088,6 +4088,7 @@ export const getBrowserActions = authQuery
                     v.literal("type"),
                     v.literal("extract"),
                     v.literal("scroll"),
+                    v.literal("login"),
                 ),
                 /** A person in control of the browser did this: the owner, or someone they shared the chat with; absent: the agent. */
                 actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),

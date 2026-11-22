@@ -25,6 +25,12 @@ describe(withoutSecret, () => {
         ["HTML-escaped", SECRET.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")],
         ["HTML numeric entities", [...SECRET].map((character) => `&#${character.codePointAt(0)};`).join("")],
         ["HTML hex entities", [...SECRET].map((character) => `&#X${character.codePointAt(0)?.toString(16).toUpperCase()};`).join("")],
+        [String.raw`JS \u-escaped`, [...SECRET].map((character) => String.raw`\u` + (character.codePointAt(0) ?? 0).toString(16).padStart(4, "0")).join("")],
+        [
+            String.raw`JS \u{}-escaped`,
+            [...SECRET].map((character) => `${String.raw`\u`}{${(character.codePointAt(0) ?? 0).toString(16).toUpperCase()}}`).join(""),
+        ],
+        [String.raw`JS \x-escaped`, [...SECRET].map((character) => String.raw`\x` + (character.codePointAt(0) ?? 0).toString(16).padStart(2, "0")).join("")],
     ])("withholds a text with the %s password whole", (_name, spelling) => {
         expect(withoutSecret(`Welcome ${spelling} back`, SECRET)).toBe(WITHHELD);
     });
