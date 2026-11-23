@@ -54,6 +54,9 @@ pub mod shell;
 pub mod ssh;
 #[cfg(feature = "keychain")]
 pub mod store;
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+pub mod test_dir;
 
 #[cfg(feature = "keychain")]
 pub use engine::{DeviceState, Event, Sink};

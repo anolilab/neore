@@ -1498,6 +1498,7 @@ pub fn validate_servers(servers: &[McpServerConfig]) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::actions::SHELL_MAX_TIMEOUT;
+    use crate::test_dir::TestDir;
 
     #[test]
     fn a_pairing_whose_secret_is_unavailable_is_not_usable() {
@@ -1525,7 +1526,7 @@ mod tests {
 
     #[test]
     fn a_disconnected_shared_folder_survives_an_unrelated_save() {
-        let dir = std::env::temp_dir().join(format!("neore-device-roots-{}", std::process::id()));
+        let dir = TestDir::at("device-roots");
         std::fs::create_dir_all(&dir).unwrap();
         let missing = dir.join("drive-not-mounted").to_string_lossy().into_owned();
         store::save(
@@ -1543,14 +1544,11 @@ mod tests {
         state.settings_update(unrelated).unwrap();
 
         assert_eq!(store::load(&dir.join("device.json")).roots, vec![missing]);
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn changing_the_mcp_servers_forgets_the_cached_tool_metadata() {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-mcp-cache-{}", std::process::id()));
+        let dir = TestDir::at("device-mcp-cache");
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -1579,15 +1577,13 @@ mod tests {
         let replaced: SettingsUpdate = serde_json::from_str(r#"{"mcpServers":[]}"#).unwrap();
         state.settings_update(replaced).unwrap();
         assert!(state.mcp_tools.lock().unwrap().is_empty());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn turn_secret() -> String {
         "0123456789abcdef".repeat(4)
     }
 
-    fn paired_state(name: &str) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
+    fn paired_state(name: &str) -> (DeviceState, TestDir, std::sync::Arc<Mutex<Vec<Event>>>) {
         paired_state_as(name, "dev1")
     }
 
@@ -1596,9 +1592,9 @@ mod tests {
     fn paired_state_as(
         name: &str,
         device_id: &str,
-    ) -> (DeviceState, PathBuf, std::sync::Arc<Mutex<Vec<Event>>>) {
+    ) -> (DeviceState, TestDir, std::sync::Arc<Mutex<Vec<Event>>>) {
         crate::store::test_keychain::install();
-        let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
+        let dir = TestDir::at(&format!("device-{name}"));
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -1625,7 +1621,7 @@ mod tests {
 
     #[test]
     fn signs_only_a_turn_post_for_this_device() {
-        let (state, dir, _) = paired_state("sign-turn");
+        let (state, _dir, _) = paired_state("sign-turn");
         let post = r#"{"v":1,"kind":"turn","deviceId":"dev1","events":[]}"#;
 
         assert_eq!(
@@ -1642,13 +1638,11 @@ mod tests {
             .sign_turn(r#"{"kind":"turn","deviceId":"dev1"}"#)
             .is_err());
         assert!(state.sign_turn("not json").is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn only_an_upload_request_for_this_computer_is_signed_as_one() {
-        let (state, dir, _events) = paired_state("sign-upload");
+        let (state, _dir, _events) = paired_state("sign-upload");
         let post = r#"{"v":1,"kind":"upload","deviceId":"dev1","method":"POST"}"#;
 
         assert_eq!(
@@ -1668,8 +1662,6 @@ mod tests {
             .sign_upload(r#"{"v":1,"kind":"upload","deviceId":"dev2","method":"POST"}"#)
             .is_err());
         assert!(state.sign_upload("not json").is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The next prompt a worker thread raises. Bounded: a call that is refused before it asks (a computer without
@@ -1733,9 +1725,7 @@ mod tests {
 
     #[test]
     fn replacing_a_server_through_settings_update_drops_its_saved_rule() {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-mcp-rules-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-mcp-rules");
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -1759,8 +1749,6 @@ mod tests {
             .unwrap()
             .allow_rules
             .is_empty());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1873,15 +1861,13 @@ mod tests {
         assert_eq!(outcome.status, "failed");
         assert!(outcome.output.is_none());
         assert_eq!(outcome.error.as_deref(), Some(SETTINGS_CHANGED_DURING_READ));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// Replanning after a settings change (which resolves paths a hung mount can stall) holds no lock a settings
     /// change waits on, and a change saved while it ran voids its answer, so the call fails closed.
     #[test]
     fn a_stalled_replan_never_blocks_settings_and_loses_its_answer_to_a_change() {
-        let (state, dir, _) = paired_state("stalled-replan");
+        let (state, _dir, _) = paired_state("stalled-replan");
         let state = Arc::new(state);
         let pairing = state.settings().pairing.unwrap();
         let planned = state.generation.load(Ordering::SeqCst);
@@ -1926,15 +1912,13 @@ mod tests {
         release.send(()).unwrap();
 
         assert!(!checker.join().unwrap());
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// The deadline is a point in time fixed before `approval_holds` waits for the save lock (`execute`), and the read
     /// checks it again after its own wait: a deadline that passed while the lock was held never starts the read.
     #[test]
     fn an_instruction_read_never_starts_past_a_deadline_that_ran_out_during_the_lock_wait() {
-        let (state, dir, _) = paired_state("read-past-deadline");
+        let (state, _dir, _) = paired_state("read-past-deadline");
         let state = Arc::new(state);
         let pairing = state.settings().pairing.unwrap();
         let deadline = std::time::Instant::now();
@@ -1955,15 +1939,13 @@ mod tests {
 
         assert_eq!(outcome.status, "failed");
         assert_eq!(outcome.error.as_deref(), Some(EXPIRED_BEFORE_START));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// An unpair (or a re-pair) saved after the approval was checked refuses the read before it starts, and one saved
     /// while it runs voids its result, though a pairing is saved without a generation bump.
     #[test]
     fn an_instruction_read_never_runs_for_a_pairing_that_is_gone() {
-        let (state, dir, _) = paired_state_as("read-after-unpair", "dev-read-after-unpair");
+        let (state, _dir, _) = paired_state_as("read-after-unpair", "dev-read-after-unpair");
         let state = Arc::new(state);
         let pairing = state.settings().pairing.unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(60);
@@ -2003,8 +1985,6 @@ mod tests {
         assert_eq!(outcome.status, "failed");
         assert!(outcome.output.is_none());
         assert_eq!(outcome.error.as_deref(), Some(PAIRING_CHANGED));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -2101,9 +2081,7 @@ mod tests {
     #[test]
     fn shares_no_root_that_resolves_to_home_or_its_parent() {
         let home = canonical_home().expect("a home folder");
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-shareable-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-shareable");
         stdfs::create_dir_all(&dir).unwrap();
 
         let mut roots = vec![
@@ -2125,7 +2103,7 @@ mod tests {
 
     #[test]
     fn plans_only_inside_the_roots_and_only_known_tools() {
-        let dir = std::env::temp_dir().join(format!("neore-device-plan-{}", std::process::id()));
+        let dir = TestDir::at("device-plan");
         let _ = stdfs::create_dir_all(&dir);
         let settings = Settings {
             // Plans the same on a host without an OS sandbox.
@@ -2349,7 +2327,7 @@ mod tests {
 
     #[test]
     fn the_shell_network_tier_is_set_by_name_or_by_the_legacy_switch() {
-        let dir = std::env::temp_dir().join(format!("neore-device-tier-{}", std::process::id()));
+        let dir = TestDir::at("device-tier");
         let state = DeviceState::new(&dir, Box::new(|_| {}));
         let tier = |json: &str| {
             state
@@ -2379,8 +2357,6 @@ mod tests {
             state.settings().shell_network_tier(),
             NetworkTier::Dependencies
         );
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -2442,11 +2418,7 @@ mod tests {
 
         crate::store::test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!(
-            "neore-device-chat-instructions-{}",
-            std::process::id()
-        ));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-chat-instructions");
         stdfs::create_dir_all(&dir).unwrap();
 
         let secret = "0123456789abcdef".repeat(4);
@@ -2510,8 +2482,6 @@ mod tests {
         let parsed: Value = serde_json::from_str(&worker.join().unwrap().unwrap().payload).unwrap();
 
         assert_eq!(parsed["status"], "denied");
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// The approval gate end to end: a call waits for a person, a refusal runs
@@ -2523,8 +2493,7 @@ mod tests {
 
         crate::store::test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-device-gate-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-gate");
         stdfs::create_dir_all(&dir).unwrap();
         stdfs::write(dir.join("a.txt"), "hello").unwrap();
 
@@ -2589,8 +2558,6 @@ mod tests {
                 assert_eq!(parsed["output"], "hello");
             }
         }
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// The action vectors `neore-host` is checked with (`tests/host_stdio.rs`), through the whole engine: signed,
@@ -2606,7 +2573,7 @@ mod tests {
         crate::store::test_keychain::install();
 
         let sandbox = vectors::sandbox();
-        let root = vectors::fixture("engine");
+        let (_fixture, root) = vectors::fixture("engine");
         let dir = root.parent().unwrap().to_path_buf();
         let secret = "0123456789abcdef".repeat(4);
 
@@ -2671,7 +2638,6 @@ mod tests {
         }
 
         vectors::assert_nothing_escaped(&root);
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// Approving must not run a call under folders the owner withdrew while the prompt was open.
@@ -2682,8 +2648,7 @@ mod tests {
 
         crate::store::test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-device-revoke-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-revoke");
         stdfs::create_dir_all(&dir).unwrap();
         stdfs::write(dir.join("a.txt"), "hello").unwrap();
 
@@ -2737,8 +2702,6 @@ mod tests {
         assert_eq!(parsed["status"], "failed");
         assert!(parsed.get("output").is_none());
         assert!(state.settings().allow_rules.is_empty());
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// A replaced server must not pick up the rule an answer to the OLD server was about to save.
@@ -2749,8 +2712,7 @@ mod tests {
 
         crate::store::test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-device-race-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-race");
         stdfs::create_dir_all(&dir).unwrap();
 
         let secret = "0123456789abcdef".repeat(4);
@@ -2814,15 +2776,12 @@ mod tests {
 
         assert_eq!(parsed["status"], "failed");
         assert!(state.settings().allow_rules.is_empty());
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// Any settings change after a call was planned (a removed rule, a shell policy) is seen right before dispatch.
     #[test]
     fn a_settings_update_invalidates_the_generation_a_call_was_planned_under() {
-        let dir = std::env::temp_dir().join(format!("neore-device-gen-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-gen");
         stdfs::create_dir_all(&dir).unwrap();
         let state = DeviceState::new(&dir, Box::new(|_| {}));
         let planned = state.generation.load(Ordering::SeqCst);
@@ -2839,14 +2798,11 @@ mod tests {
             .settings_update(serde_json::from_str(r#"{"allowRules":[]}"#).unwrap())
             .unwrap();
         assert!(!state.settings_unchanged(planned));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_rejected_settings_update_leaves_waiting_calls_valid() {
-        let dir = std::env::temp_dir().join(format!("neore-device-badgen-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-badgen");
         stdfs::create_dir_all(&dir).unwrap();
         let state = DeviceState::new(&dir, Box::new(|_| {}));
         let planned = state.generation.load(Ordering::SeqCst);
@@ -2856,8 +2812,6 @@ mod tests {
 
         assert!(state.settings_update(invalid).is_err());
         assert!(state.settings_unchanged(planned));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -2900,15 +2854,14 @@ mod tests {
         std::sync::Arc<DeviceState>,
         std::thread::JoinHandle<Result<Signed, String>>,
         u64,
-        PathBuf,
+        TestDir,
     ) {
         use std::sync::mpsc::channel;
         use std::sync::Arc;
 
         crate::store::test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at(&format!("device-{name}"));
         stdfs::create_dir_all(dir.join("extra")).unwrap();
         stdfs::write(dir.join("a.txt"), "hello").unwrap();
 
@@ -2983,8 +2936,6 @@ mod tests {
 
         assert_eq!(parsed["status"], "completed");
         assert_eq!(parsed["output"], "hello");
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -2993,7 +2944,7 @@ mod tests {
             return;
         }
 
-        let (state, worker, prompt, dir) = open_prompt(
+        let (state, worker, prompt, _dir) = open_prompt(
             "netoff",
             "shell_run",
             json!({ "command": "echo hi" }),
@@ -3008,15 +2959,12 @@ mod tests {
 
         assert_eq!(parsed["status"], "failed");
         assert!(parsed.get("output").is_none());
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_removed_allow_rule_stops_a_call_that_skipped_its_prompt() {
         crate::store::test_keychain::install();
-        let dir = std::env::temp_dir().join(format!("neore-device-rule-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-rule");
         stdfs::create_dir_all(&dir).unwrap();
         stdfs::write(dir.join("a.txt"), "hello").unwrap();
         let root = dir.canonicalize().unwrap();
@@ -3065,8 +3013,6 @@ mod tests {
             false,
             &pairing
         ));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// A call verified under one pairing must not run, nor save a rule, after the device was paired again.
@@ -3077,8 +3023,7 @@ mod tests {
 
         crate::store::test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-device-repair-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-repair");
         stdfs::create_dir_all(&dir).unwrap();
         stdfs::write(dir.join("a.txt"), "hello").unwrap();
         let root = dir.canonicalize().unwrap();
@@ -3128,15 +3073,12 @@ mod tests {
         assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, false, &old));
         assert!(!state.approval_holds(planned, ("fs_read", &input, false), &action, true, &old));
         assert!(state.settings().allow_rules.is_empty());
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 
     /// Adding a server must not cancel a pending call to another one: only the changed servers lose their tools.
     #[test]
     fn adding_a_server_keeps_a_pending_call_to_another_server_valid() {
-        let dir = std::env::temp_dir().join(format!("neore-device-addsrv-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at("device-addsrv");
         stdfs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -3194,7 +3136,5 @@ mod tests {
             )
             .unwrap();
         assert!(!state.mcp_tools.lock().unwrap().contains_key("mcp__x__t"));
-
-        let _ = stdfs::remove_dir_all(&dir);
     }
 }
