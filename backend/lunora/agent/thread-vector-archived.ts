@@ -16,7 +16,9 @@
  * Every writer reads the thread's CURRENT status and patches only a row that differs, so each is
  * idempotent and a retry or a late run converges. A vector is patched only when it is the thread's own
  * (`threadId`) and has the thread's owner (`userId`); a thread that is gone or being deleted is left to
- * its cleanup (`deleteThreadVectors`), so nothing here brings a deleted thread's vector back.
+ * its cleanup (`deleteThreadVectors`), so nothing here brings a deleted thread's vector back. The backfill
+ * stands down for an account being erased: its claim row is tagged with the user, and one written behind the
+ * deletion workflow's claim step would survive the erasure.
  */
 import { v } from "lunorash/server";
 
@@ -24,6 +26,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
 import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
@@ -142,6 +145,10 @@ export const parseBackfillPlace = (result: string | undefined): BackfillPlace =>
     return FIRST_PLACE;
 };
 
+/** Pure: whether a delivered step is the one the saved place names (same chain, kind and cursor). */
+const isSavedStep = (place: BackfillPlace, step: { chain: number; cursor?: string; kind: SearchKind }): boolean =>
+    place.chain === step.chain && place.kind === step.kind && place.cursor === step.cursor;
+
 /** Pure: where the walk goes after a page of `kind`: further in it, the next kind, or `undefined` when all are done. */
 const nextPlace = (kind: SearchKind, page: { continueCursor: string | null; isDone: boolean }): BackfillPlace | undefined => {
     // A page with no cursor to go on ends its kind: starting the kind again would loop.
@@ -190,6 +197,11 @@ export const sweepThreadVectorArchived = internalMutation
             return null;
         }
 
+        // A claim row written behind the deletion workflow's claim step would survive the erasure.
+        if (await isAccountDeletionUnderway(ctx, userId)) {
+            return null;
+        }
+
         const now = Date.now();
         const existing = await claimRow(ctx, BACKFILL_SCOPE, userId);
 
@@ -217,7 +229,9 @@ export const sweepThreadVectorArchived = internalMutation
 
 /**
  * One backfill step on the current shard: up to {@link BACKFILL_PAGE} thread vectors of one kind, each set to its
- * thread's current flag, then the next step. A step whose chain was taken over (`chain` no longer matches) stops.
+ * thread's current flag, then the next step. Only the step the saved place names runs: one whose chain was taken over,
+ * or a redelivered earlier step of the live chain (its kind and cursor are behind the place), stops without writing or
+ * scheduling, so the chain never forks. A step for an account being erased stops too.
  */
 export const backfillThreadVectorArchived = internalMutation
     .input({
@@ -235,7 +249,11 @@ export const backfillThreadVectorArchived = internalMutation
 
         const claim = await claimRow(ctx, BACKFILL_SCOPE, userId);
 
-        if (claim === null || claim.result === DONE || parseBackfillPlace(claim.result).chain !== args.chain) {
+        if (claim === null || claim.result === DONE || !isSavedStep(parseBackfillPlace(claim.result), args)) {
+            return null;
+        }
+
+        if (await isAccountDeletionUnderway(ctx, userId)) {
             return null;
         }
 

@@ -520,15 +520,8 @@ const startArchivedBackfill = async (ctx: ActionCtx, userId: string): Promise<vo
     }
 };
 
-/**
- * The palette's meaning search for one person: embed the query, read the nearest
- * title and summary vectors among their own, map each to its thread and keep the
- * best ones. Returns `[]` for a query too short to embed, or when the model is
- * refused for the person.
- */
-export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
-    await startArchivedBackfill(ctx, args.userId);
-
+/** The meaning search itself: {@link searchThreadsByMeaningFor} runs it beside the backfill start. */
+const searchByMeaning = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();
 
     if (query.length < MEANING_MIN_CHARS) {
@@ -600,6 +593,24 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
         })
         .toSorted((a, b) => b.score - a.score)
         .slice(0, MEANING_RESULT_LIMIT);
+};
+
+/**
+ * The palette's meaning search for one person: embed the query, read the nearest
+ * title and summary vectors among their own, map each to its thread and keep the
+ * best ones. Returns `[]` for a query too short to embed, or when the model is
+ * refused for the person.
+ */
+export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
+    // Runs beside the search, not ahead of it: the embed and vector reads do not queue behind a shard round-trip. An
+    // action ctx has no `waitUntil`, so it is awaited before returning; it never rejects.
+    const backfill = startArchivedBackfill(ctx, args.userId);
+
+    try {
+        return await searchByMeaning(ctx, args);
+    } finally {
+        await backfill;
+    }
 };
 
 export const searchThreadsByMeaning = authAction

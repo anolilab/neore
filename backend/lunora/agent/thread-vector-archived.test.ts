@@ -248,6 +248,105 @@ describe("the backfill", () => {
 
         expect(await drive()).toBe(2);
     });
+
+    it("ignores a redelivered earlier step of the live chain: no page replayed, place kept, no second successor", async () => {
+        await run(async (ctx) => {
+            const threadId = await insertThread(ctx, "archived");
+
+            for (let index = 0; index < BACKFILL_PAGE * 2 + 1; index += 1) {
+                await insertVector(ctx, threadId);
+            }
+        });
+
+        vi.useFakeTimers({ now: new Date("2026-11-23T10:00:00Z"), toFake: ["Date"] });
+
+        try {
+            await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+            const started = await claim();
+            const firstArgs = stepArgs(started.result);
+
+            await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, firstArgs));
+            const advanced = await claim();
+
+            // A later delivery would save a fresh lease if it ran: the clock moves so a rewrite shows.
+            vi.setSystemTime(Date.now() + 1000);
+            await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, firstArgs));
+
+            const afterRedelivery = await claim();
+
+            expect(afterRedelivery.result).toBe(advanced.result);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        // The walk still finishes from where it was: two more title pages, then summary.
+        expect(await drive()).toBe(3);
+    });
+});
+
+describe("the backfill and account deletion", () => {
+    const claimRows = async () =>
+        await run(
+            async (ctx) =>
+                await ctx.db
+                    .query("idempotencyClaims")
+                    .withIndex("by_scope_key", (q: any) => q.eq("scope", BACKFILL_SCOPE).eq("key", OWNER))
+                    .collect(),
+        );
+
+    const requestDeletion = async (status: "completed" | "processing") =>
+        await run(
+            async (ctx) => await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "deletion", status, userEmail: "a@example.com", userId: OWNER }),
+        );
+
+    const archivedThreadWithVector = async () =>
+        await run(async (ctx) => {
+            const threadId = await insertThread(ctx, "archived");
+
+            return await insertVector(ctx, threadId, { archived: false });
+        });
+
+    it("a sweep queued before the deletion completed creates no claim row and writes no vector", async () => {
+        const vectorId = await archivedThreadWithVector();
+
+        await requestDeletion("completed");
+        await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+
+        expect(await claimRows()).toStrictEqual([]);
+        expect(await run(async (ctx) => await flagOf(ctx, vectorId))).toBe(false);
+    });
+
+    it("a step queued before the claim rows were drained recreates nothing", async () => {
+        const vectorId = await archivedThreadWithVector();
+
+        await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+        const [row] = await claimRows();
+        const queued = parseBackfillPlace(row.result);
+
+        // The deletion workflow drains the user's claim rows, then completes.
+        await run(async (ctx) => await ctx.db.delete("idempotencyClaims", row._id));
+        await requestDeletion("completed");
+        await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, { chain: queued.chain!, kind: queued.kind }));
+
+        expect(await claimRows()).toStrictEqual([]);
+        expect(await run(async (ctx) => await flagOf(ctx, vectorId))).toBe(false);
+    });
+
+    it("a step running while the deletion is underway writes no vector and saves no place", async () => {
+        const vectorId = await archivedThreadWithVector();
+
+        await run(async (ctx) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+        const [before] = await claimRows();
+        const queued = parseBackfillPlace(before.result);
+
+        await requestDeletion("processing");
+        await run(async (ctx) => await ctx.runMutation(backfillThreadVectorArchived, { chain: queued.chain!, kind: queued.kind }));
+
+        const after = await claimRows();
+
+        expect(after.map((row: { result?: string }) => row.result)).toStrictEqual([before.result]);
+        expect(await run(async (ctx) => await flagOf(ctx, vectorId))).toBe(false);
+    });
 });
 
 describe("the backfill a meaning search starts", () => {
