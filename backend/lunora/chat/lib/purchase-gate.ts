@@ -82,6 +82,9 @@ export const browserActionNeedsPurchaseApproval = async (
 
 /** Words a checkout's own submit button carries when it has no purchase word of its own (English and German). */
 // The whole label must be the word (the labels are trimmed before this): "Continue shopping" is navigation, not the payment.
+/** A bare "Subscribe" or "Abonnieren": a paid signup or a newsletter, so it asks on any page (not only a checkout). */
+const SUBSCRIBE_WORD = /^(?:subscribe|abonnieren)[.!]?$/iu;
+
 const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [/^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu];
 
 /** Whether one read of a click's target asks the person first. A read that failed, or was cut short, asks. */
@@ -101,7 +104,10 @@ export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean =>
     const submitsOnCheckout =
         target.checkout === true && (target.submitLike === true || [text, name].some((part) => CHECKOUT_SUBMIT_WORDS.some((pattern) => pattern.test(part))));
 
-    return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name) || submitsOnCheckout;
+    // A bare "Subscribe" (a paid signup, or a newsletter's) asks on any page: a paid one must not run unapproved where no checkout is recognized.
+    const isBareSubscribe = [text, name].some((part) => SUBSCRIBE_WORD.test(part.trim()));
+
+    return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name) || isBareSubscribe || submitsOnCheckout;
 };
 
 /**
