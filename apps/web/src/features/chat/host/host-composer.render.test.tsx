@@ -473,6 +473,41 @@ describe("the coding-agent composer", () => {
         expect(sendCalls()).toEqual([]);
     });
 
+    it.each([
+        { during: undefined, name: "the sent message goes and the prompt stays" },
+        { during: "rewritten while it went out", name: "an edited sent message goes too" },
+    ])("takes a fix prompt clicked while a send is pending: $name", async ({ during }) => {
+        let open: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            open = () => {
+                resolve();
+            };
+        });
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "first message" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        if (during !== undefined) {
+            fireEvent.change(box, { target: { value: during } });
+        }
+
+        act(() => {
+            prefillComposer("thread-1", "Fix checks on octo/hello#7");
+        });
+        await waitFor(() => expect(box.value).toBe(`${during ?? "first message"}\nFix checks on octo/hello#7`));
+        open();
+        harness.gate = undefined;
+
+        // The message went out once; the box keeps only the prompt, so the next Send cannot post it again.
+        await waitFor(() => expect(box.value).toBe("Fix checks on octo/hello#7"));
+        expect(sendCalls().map(([, args]: [string, unknown]) => (args as { text: string }).text)).toEqual(["first message"]);
+    });
+
     it("does not send an empty message", async () => {
         mount(session());
 
