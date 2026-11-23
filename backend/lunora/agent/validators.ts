@@ -738,6 +738,14 @@ export const vThreadDocFields = {
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
+    // The palette sync's claim on a thread's texts (`agent/thread-search.ts`). Internal, like the vector ids: `publicThread` omits it.
+    searchClaim: v.optional(
+        v.object({
+            expiresAt: v.number(),
+            id: v.string(),
+            texts: v.array(v.object({ kind: v.union(v.literal("summary"), v.literal("title")), text: v.string() })),
+        }),
+    ),
     // The newest snooze ordering, a choice or a wake (`agent/table-writes.ts#setThreadSnooze`, `#patchThread`).
     snoozeChosenAt: v.optional(v.number()),
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.

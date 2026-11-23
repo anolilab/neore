@@ -92,6 +92,35 @@ export const EMBED_MAX_CHARS = 8000;
  */
 export const embedInput = (value: string | null | undefined): string | undefined => searchText(value)?.slice(0, EMBED_MAX_CHARS);
 
+/** How long a sync's claim on a thread's texts holds if its job dies without releasing it. */
+export const SEARCH_CLAIM_MS = 5 * 60_000;
+
+/** One job's claim on embedding a thread's texts (the thread's `searchClaim`). */
+export interface SearchClaim {
+    expiresAt: number;
+    id: string;
+    texts: ReadonlyArray<{ kind: SearchKind; text: string }>;
+}
+
+/**
+ * Whether a live claim already covers these texts. Another job is then embedding them and
+ * will commit them, so a second job has nothing to add. A claim on other texts, or one that
+ * has expired, does not hold.
+ */
+export const claimHolds = (claim: SearchClaim | undefined, texts: ReadonlyArray<{ kind: SearchKind; text: string }>, now: number): boolean => {
+    if (claim === undefined || claim.expiresAt <= now) {
+        return false;
+    }
+
+    const key = (entries: ReadonlyArray<{ kind: SearchKind; text: string }>) =>
+        entries
+            .map((entry) => `${entry.kind}\u{0}${entry.text}`)
+            .toSorted((a, b) => a.localeCompare(b))
+            .join("\u{1}");
+
+    return key(claim.texts) === key(texts);
+};
+
 /** Whether the thread may be in the index at all (the turn gate is checked separately). */
 export const isSearchEligible = (row: SearchRow): boolean =>
     row.userId !== undefined && !row.deleted && !row.isTemporary && (row.lockedAt === undefined || row.lockedAt === null);

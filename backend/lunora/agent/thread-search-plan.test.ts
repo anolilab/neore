@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     bestMeaningThreadIds,
+    claimHolds,
     countUserTurns,
     decideCommit,
     EMBED_MAX_CHARS,
@@ -235,6 +236,34 @@ describe(userTurnsEnoughFrom, () => {
 
         expect(await userTurnsEnoughFrom(pagesOf(pages, reads))).toBe(false);
         expect(reads).toHaveLength(TURN_SCAN_MAX_PAGES);
+    });
+});
+
+describe(claimHolds, () => {
+    const texts = [{ kind: "title" as const, text: "PDF totals" }];
+    const claim = { expiresAt: 1000, id: "job-a", texts };
+
+    it("holds the same texts while the claim is live", () => {
+        expect(claimHolds(claim, [{ kind: "title", text: "PDF totals" }], 999)).toBe(true);
+    });
+
+    it("does not hold once the claim has expired, or for no claim", () => {
+        expect(claimHolds(claim, texts, 1000)).toBe(false);
+        expect(claimHolds(undefined, texts, 0)).toBe(false);
+    });
+
+    it("does not hold for other texts, so a newer revision still embeds", () => {
+        expect(claimHolds(claim, [{ kind: "title", text: "Edited" }], 999)).toBe(false);
+        expect(
+            claimHolds(
+                claim,
+                [
+                    { kind: "title", text: "PDF totals" },
+                    { kind: "summary", text: "x" },
+                ],
+                999,
+            ),
+        ).toBe(false);
     });
 });
 

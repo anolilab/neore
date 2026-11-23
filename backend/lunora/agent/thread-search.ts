@@ -21,6 +21,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { deleteVectorRow } from "./table-writes";
 import {
     bestMeaningThreadIds,
+    claimHolds,
     decideCommit,
     type EmbeddedVector,
     embedInput,
@@ -30,6 +31,7 @@ import {
     MEANING_RESULT_LIMIT,
     MEANING_TOP_K,
     planThreadSearch,
+    SEARCH_CLAIM_MS,
     SEARCH_DIMENSION,
     SEARCH_KINDS,
     SEARCH_MODEL,
@@ -143,6 +145,87 @@ const textsStillWanted = async <T extends { kind: SearchKind; text: string }>(
 };
 
 /**
+ * Embeds the planned texts, inserts their vectors and commits them. A failed embed leaves the
+ * stored vectors as they are and throws. A failure after a vector was written removes the
+ * vectors written so far: the thread row does not point at them yet.
+ */
+const embedAndCommit = async (
+    ctx: ActionCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    plan: SearchPlan,
+    texts: { kind: SearchKind; text: string }[],
+): Promise<void> => {
+    let vectors: number[][] = [];
+
+    if (texts.length > 0) {
+        try {
+            vectors = await embedTexts(
+                ctx,
+                userId,
+                texts.map((entry) => entry.text),
+            );
+        } catch (error) {
+            console.warn("[agent/thread-search] Embedding failed; the scheduler retries the sync:", error);
+
+            throw error;
+        }
+    }
+
+    const embedded: EmbeddedVector[] = [];
+
+    try {
+        for (const [index, entry] of texts.entries()) {
+            const vector = vectors[index];
+
+            if (!vector) {
+                continue;
+            }
+
+            if (vector.length !== SEARCH_DIMENSION) {
+                console.warn(`[agent/thread-search] Expected ${String(SEARCH_DIMENSION)} dimensions, got ${String(vector.length)}; skipped`);
+
+                continue;
+            }
+
+            const ids = await ctx.runMutation(internal.agent.vector.insertBatch, {
+                vectorDimension: SEARCH_DIMENSION as VectorDimension,
+                vectors: [
+                    {
+                        messageId: undefined,
+                        model: SEARCH_MODEL,
+                        table: SEARCH_TABLE[entry.kind],
+                        threadId,
+                        userId,
+                        vector,
+                    },
+                ],
+            });
+
+            for (const vectorId of ids) {
+                embedded.push({ kind: entry.kind, text: entry.text, vectorId: vectorId as string });
+            }
+        }
+
+        if (embedded.length === 0 && plan.clear.length === 0) {
+            return;
+        }
+
+        await ctx.runMutation(internal.agent.thread_search.commitThreadSearch, {
+            clear: plan.clear,
+            embedded,
+            threadId,
+        });
+    } catch (error) {
+        if (embedded.length > 0) {
+            await ctx.runMutation(internal.agent.vector.deleteBatch, { ids: embedded.map((vector) => vector.vectorId) });
+        }
+
+        throw error;
+    }
+};
+
+/**
  * One sync of a thread's vectors: plan from the state, embed what is wanted,
  * commit. A failed embed leaves the stored vectors as they are and throws, so the
  * scheduler retries the sync (`SYNC_RETRY` in `thread-search-triggers.ts`).
@@ -180,79 +263,61 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
         texts = await textsStillWanted(ctx, args.threadId, state, texts);
     }
 
-    let vectors: number[][] = [];
+    // One job embeds a thread's texts at a time. A job that finds them already claimed has nothing to add: the holder commits them.
+    const claimId = texts.length > 0 ? crypto.randomUUID() : undefined;
 
-    if (texts.length > 0) {
-        try {
-            vectors = await embedTexts(
-                ctx,
-                state.userId,
-                texts.map((entry) => entry.text),
-            );
-        } catch (error) {
-            console.warn("[agent/thread-search] Embedding failed; the scheduler retries the sync:", error);
-
-            throw error;
-        }
+    if (claimId !== undefined && !(await ctx.runMutation(internal.agent.thread_search.claimThreadSearch, { claimId, texts, threadId: args.threadId }))) {
+        return;
     }
 
-    const embedded: EmbeddedVector[] = [];
-
     try {
-        for (const [index, entry] of texts.entries()) {
-            const vector = vectors[index];
-
-            if (!vector) {
-                continue;
-            }
-
-            if (vector.length !== SEARCH_DIMENSION) {
-                console.warn(`[agent/thread-search] Expected ${String(SEARCH_DIMENSION)} dimensions, got ${String(vector.length)}; skipped`);
-
-                continue;
-            }
-
-            const ids = await ctx.runMutation(internal.agent.vector.insertBatch, {
-                vectorDimension: SEARCH_DIMENSION as VectorDimension,
-                vectors: [
-                    {
-                        messageId: undefined,
-                        model: SEARCH_MODEL,
-                        table: SEARCH_TABLE[entry.kind],
-                        threadId: args.threadId,
-                        userId: state.userId,
-                        vector,
-                    },
-                ],
-            });
-
-            for (const vectorId of ids) {
-                embedded.push({ kind: entry.kind, text: entry.text, vectorId: vectorId as string });
-            }
+        await embedAndCommit(ctx, args.threadId, state.userId, plan, texts);
+    } finally {
+        if (claimId !== undefined) {
+            await ctx.runMutation(internal.agent.thread_search.releaseThreadSearch, { claimId, threadId: args.threadId });
         }
-
-        if (embedded.length === 0 && plan.clear.length === 0) {
-            return;
-        }
-
-        await ctx.runMutation(internal.agent.thread_search.commitThreadSearch, {
-            clear: plan.clear,
-            embedded,
-            threadId: args.threadId,
-        });
-    } catch (error) {
-        // The vectors written so far are not on the thread row, so no later sync or delete would find them: remove them here.
-        if (embedded.length > 0) {
-            await ctx.runMutation(internal.agent.vector.deleteBatch, { ids: embedded.map((vector) => vector.vectorId) });
-        }
-
-        throw error;
     }
 };
 
 export const syncThreadSearch = internalAction.input({ changed: v.array(vSearchKind), threadId: v.id("threads") }).action(async ({ args, ctx }) => {
     await runThreadSearchSync(ctx, { changed: args.changed, threadId: args.threadId });
 });
+
+const vClaimTexts = v.array(v.object({ kind: vSearchKind, text: v.string() }));
+
+/**
+ * Takes the claim on a thread's texts before the gateway call. `false` when a live claim already
+ * covers these texts (another job embeds them now), or when the thread is gone.
+ */
+export const claimThreadSearch = internalMutation
+    .input({ claimId: v.string(), texts: vClaimTexts, threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const thread = (await ctx.db.get("threads", args.threadId)) as Doc<"threads"> | null;
+        const now = Date.now();
+
+        if (!thread || claimHolds(thread.searchClaim, args.texts, now)) {
+            return false;
+        }
+
+        await patchRow(ctx.db, "threads", thread, { searchClaim: { expiresAt: now + SEARCH_CLAIM_MS, id: args.claimId, texts: args.texts } });
+
+        return true;
+    });
+
+/** Releases the claim this job took, if it still holds it. Another job's claim is left as it is. */
+export const releaseThreadSearch = internalMutation
+    .input({ claimId: v.string(), threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const thread = (await ctx.db.get("threads", args.threadId)) as Doc<"threads"> | null;
+
+        if (thread?.searchClaim?.id === args.claimId) {
+            await patchRow(ctx.db, "threads", thread, { searchClaim: { ...thread.searchClaim, expiresAt: 0 } });
+        }
+
+        return null;
+    });
 
 export const commitThreadSearch = internalMutation
     .input({

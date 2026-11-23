@@ -73,6 +73,10 @@ const makeCtx = (fixture: Fixture) => {
             return (args.vectors ?? []).map((_vector, index) => `vec-${String(index)}`);
         }
 
+        if (reference === internal.agent.thread_search.claimThreadSearch) {
+            return true;
+        }
+
         return null;
     });
 
@@ -150,6 +154,28 @@ describe(runThreadSearchSync, () => {
         expect(commit?.[1]).toMatchObject({ embedded: [{ kind: "title", text: "PDF totals off by one" }] });
     });
 
+    it("sends nothing when another job's live claim already covers these texts", async () => {
+        const runQuery = vi.fn(async () => readyThread());
+        const runMutation = vi.fn(async (reference: unknown) => (reference === internal.agent.thread_search.claimThreadSearch ? false : null));
+
+        await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title"], threadId: THREAD });
+
+        expect(mocks.embedMany).not.toHaveBeenCalled();
+        expect(runMutation).toHaveBeenCalledTimes(1);
+    });
+
+    it("releases its claim after the commit, whatever the outcome", async () => {
+        const ctx = makeCtx({ readThreadSearchState: readyThread() });
+
+        await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
+
+        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const claim = runMutation.mock.calls.find(([reference]) => reference === internal.agent.thread_search.claimThreadSearch);
+        const release = runMutation.mock.calls.find(([reference]) => reference === internal.agent.thread_search.releaseThreadSearch);
+
+        expect(release?.[1]).toMatchObject({ claimId: claim?.[1]?.claimId, threadId: THREAD });
+    });
+
     it("deletes the vectors it already wrote when a later insert fails, and throws so the scheduler retries", async () => {
         let inserts = 0;
         const runMutation = vi.fn(async (reference: unknown) => {
@@ -161,6 +187,10 @@ describe(runThreadSearchSync, () => {
                 }
 
                 return ["vec-title"];
+            }
+
+            if (reference === internal.agent.thread_search.claimThreadSearch) {
+                return true;
             }
 
             return null;
@@ -182,7 +212,10 @@ describe(runThreadSearchSync, () => {
 
         await expect(runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD })).rejects.toThrow("gateway down");
 
-        expect((ctx as unknown as { runMutation: ReturnType<typeof vi.fn> }).runMutation).not.toHaveBeenCalled();
+        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        expect(runMutation).not.toHaveBeenCalledWith(internal.agent.vector.insertBatch, expect.anything());
+        expect(runMutation).not.toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, expect.anything());
         warn.mockRestore();
     });
 
