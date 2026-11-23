@@ -235,6 +235,9 @@ export const schema = defineSchema({
         autoApproveLowRisk: v.optional(v.boolean()),
         autoDetectComplexity: v.optional(v.boolean()),
         autoMediaEnrichment: v.optional(v.boolean()),
+        // How the agent's browser clicks: "page" (absent, the default) checks and clicks in the page; "pointer" clicks for real
+        // except a purchase or an approved click; "all" clicks for real after a check. Server-written (`chat_functions.setBrowserClickMode`).
+        browserClickMode: v.optional(v.union(v.literal("page"), v.literal("pointer"), v.literal("all"))),
         browserSettings: v.optional(
             v.object({ domainAllowlist: v.optional(v.array(v.string())), domainBlocklist: v.optional(v.array(v.string())), enabled: v.optional(v.boolean()) }),
         ),

@@ -128,6 +128,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 action: Exclude<typeof input.action, "needs_person">;
                 approvalLook?: true;
                 approvedCallId?: string;
+                clickMode?: "page" | "pointer" | "all";
                 decisionCallId?: string;
                 expectTarget?: string;
                 ladderLook?: true;
@@ -139,6 +140,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 direction: step.direction,
                 ...(step.approvalLook === true && { approvalLook: true }),
                 ...(step.approvedCallId !== undefined && { approvedCallId: step.approvedCallId }),
+                ...(step.clickMode !== undefined && { clickMode: step.clickMode }),
                 ...(step.decisionCallId !== undefined && { decisionCallId: step.decisionCallId }),
                 ...(step.expectTarget !== undefined && { expectTarget: step.expectTarget }),
                 fullPage: step.fullPage,
@@ -168,8 +170,12 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     return { error: "Browser automation rate limit exceeded.", success: false };
                 }
 
+                // The owner's click mode (`browserClickMode`). "pointer" clicks an ordinary target for real, with no fingerprint
+                // (the purchase check above still ran); an approved click stays in the page's checked click unless the mode is "all".
+                const clickMode = await context.runQuery(internal.browser.functions.getBrowserClickMode, { userId });
+
                 if (approvedToolCallIds(options.messages).has(options.toolCallId)) {
-                    step = { ...step, approvedCallId: options.toolCallId };
+                    step = { ...step, approvedCallId: options.toolCallId, clickMode: clickMode === "all" ? "all" : "page" };
                 } else {
                     const look = await run({ action: "extract", approvalLook: true, selector: input.selector });
 
@@ -178,7 +184,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                         return { error: CLICK_NEEDS_APPROVAL, success: false };
                     }
 
-                    step = { ...step, expectTarget: look.target };
+                    step = clickMode === "pointer" ? { ...step, clickMode } : { ...step, clickMode, expectTarget: look.target };
                 }
             }
 

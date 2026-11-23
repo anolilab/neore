@@ -60,6 +60,19 @@ export const getBrowserDomainSettings = internalQuery
         return preferences?.browserSettings ?? {};
     });
 
+/** How the owner's agent clicks (`aiUserPreferences.browserClickMode`); absent is the default, "page". */
+export const getBrowserClickMode = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.literal("page"), v.literal("pointer"), v.literal("all")))
+    .query(async ({ args, ctx }) => {
+        const preferences = await ctx.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .first();
+
+        return preferences?.browserClickMode ?? "page";
+    });
+
 /**
  * How many purchase decision looks a session keeps, the newest first to go: one per decision not yet clicked. An approved
  * click takes its own (`takePurchaseLook`), so only decisions never clicked accumulate.

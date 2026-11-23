@@ -264,6 +264,21 @@ describe("readTarget in a page", () => {
         expect(await wasClicked(page)).toBe(false);
     });
 
+    it("a label changed in a sibling's text during the press is refused, though the selected element did not change", async () => {
+        await pageWith(
+            page,
+            `<button id="pay" onpointerdown="document.getElementById('label').textContent = 'Buy now'" onclick="window.clicked = true"><span id="icon">x</span><span id="label">Continue</span></button>`,
+        );
+        const element = await page.$("#icon");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("changed");
+        expect(read.clicked).toBe(false);
+        expect(await wasClicked(page)).toBe(false);
+    });
+
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
         await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
         const element = await page.$("#label");

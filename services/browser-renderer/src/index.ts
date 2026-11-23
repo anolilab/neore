@@ -43,6 +43,7 @@ const KEEP_ALIVE_MS = 60_000;
 
 const actionSchema = z.object({
     action: z.enum(["navigate", "screenshot", "click", "type", "extract", "scroll"]),
+    clickMode: z.enum(["page", "pointer", "all"]).optional(), // click, with `expectTarget`: "page" checks and clicks in the page; "all" checks, then a real click
     direction: z.enum(["up", "down"]).optional(),
     expectTarget: z.string().optional(), // click: the `target` of the element the person was shown; refused when it differs
     fullPage: z.boolean().optional(),
@@ -473,7 +474,7 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, direction, expectTarget, fullPage, selector, sessionId, text, url, visibleOnly }: z.infer<typeof actionSchema>,
+    { action, clickMode, direction, expectTarget, fullPage, selector, sessionId, text, url, visibleOnly }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
@@ -550,6 +551,29 @@ const actHeld = async (
 
                 if (expectTarget === undefined) {
                     await page.click(selector, { timeout: PAGE_TIMEOUT });
+                } else if (clickMode === "all") {
+                    // A real click after the check. A page handler can run between the two (the trade-off this mode is chosen for), so
+                    // the check is not one step with the click here. A changed or disabled target is still refused before the click.
+                    const element = await page.$(selector);
+
+                    if (!element) {
+                        result = { error: `Element not found: ${selector}`, success: false };
+                        break;
+                    }
+
+                    const read = await element.evaluate(readTarget, { ...TARGET_READ_OPTIONS, expect: expectTarget });
+
+                    if (read.refused === "changed") {
+                        result = { error: TARGET_CHANGED, success: false, targetChanged: true };
+                        break;
+                    }
+
+                    if (await element.isDisabled()) {
+                        result = { error: DISABLED_TARGET, success: false };
+                        break;
+                    }
+
+                    await element.click({ timeout: PAGE_TIMEOUT });
                 } else {
                     // The check and the click run as one step in the page (`readTarget` with `click`): the fingerprint is compared
                     // and the element clicked with nothing in between, so a page change after the check cannot reach the click.

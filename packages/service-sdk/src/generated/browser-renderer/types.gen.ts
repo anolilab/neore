@@ -99,6 +99,10 @@ export type BrowserActionRequest = {
      */
     expectTarget?: string;
     /**
+     * Click, with `expectTarget`: "page" checks and clicks in the page; "all" checks, then makes a real click
+     */
+    clickMode?: "page" | "pointer" | "all";
+    /**
      * Extract with a selector: return the rendered text, leaving out hidden descendants
      */
     visibleOnly?: boolean;

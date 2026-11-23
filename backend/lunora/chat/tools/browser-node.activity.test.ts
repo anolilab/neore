@@ -990,6 +990,26 @@ describe("a browser a person took control of", () => {
         expect(renderer).toHaveBeenCalledTimes(2);
     });
 
+    it("a click's mode reaches the renderer, and an ordinary click in pointer mode carries no fingerprint", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockResolvedValueOnce(answered({ clickedSelector: "#more", success: true, url: "https://example.com/cart" }));
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(executeBrowserAction, {
+                    action: "click",
+                    clickMode: "pointer",
+                    selector: "#more",
+                    threadId,
+                    userId: OWNER,
+                    userTier: "premium",
+                }),
+        );
+
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "click", clickMode: "pointer", selector: "#more" } });
+        expect((renderer.mock.calls[0]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("expectTarget");
+    });
+
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
         await addSession(NOW - 1000);
         await giveControl({ until: NOW + CONTROL_IDLE_MS });

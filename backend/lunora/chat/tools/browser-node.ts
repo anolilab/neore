@@ -40,6 +40,8 @@ export const executeBrowserAction = internalAction
         /** An `ask`-mode decision look (`chat/tools/browser.ts`): every target it reads is recorded, since every call asks. */
         askDecision: v.optional(v.boolean()),
         browserSettings: v.optional(v.any()),
+        /** How this click is dispatched (`browserClickMode`, chosen by the tool): see the renderer's `clickMode`. */
+        clickMode: v.optional(v.union(v.literal("page"), v.literal("pointer"), v.literal("all"))),
         /** The approval look of this tool call: its target is recorded for the decision, so the approved click can be checked against it. */
         decisionCallId: v.optional(v.string()),
         direction: v.optional(v.string()),
@@ -205,6 +207,7 @@ export const executeBrowserAction = internalAction
                     : {
                           action,
                           direction: args.direction as "up" | "down" | undefined,
+                          ...(args.clickMode !== undefined && action === "click" && { clickMode: args.clickMode }),
                           ...(expectTarget !== undefined && { expectTarget }),
                           fullPage: args.fullPage,
                           selector: args.selector,

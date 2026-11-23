@@ -291,6 +291,11 @@
                         "type": "string",
                         "description": "Click: the target fingerprint of the element the person was shown; the click is refused when the element differs"
                     },
+                    "clickMode": {
+                        "type": "string",
+                        "enum": ["page", "pointer", "all"],
+                        "description": "Click, with expectTarget: \"page\" checks and clicks in the page; \"all\" checks, then makes a real click"
+                    },
                     "visibleOnly": {
                         "type": "boolean",
                         "description": "Extract with a selector: return the rendered text, leaving out hidden descendants"

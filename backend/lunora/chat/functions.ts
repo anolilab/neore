@@ -4188,6 +4188,26 @@ export const updateBrowserSettings = authMutation
     });
 
 /**
+ * How the agent's browser clicks: "page" (the default), "pointer" (real clicks for ordinary targets), or "all" (real clicks after
+ * a check). Server-written, like the commit identity: the setter is the only writer of `browserClickMode`.
+ */
+export const setBrowserClickMode = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ mode: v.union(v.literal("page"), v.literal("pointer"), v.literal("all")) })
+    .output(v.null())
+    .mutation(async ({ args: { mode }, ctx: context }) => {
+        const prefs = await context.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", context.user.userId))
+            .unique();
+
+        await saveAiUserPreferences(context.db, prefs, context.user.userId, { browserClickMode: mode }, context.user.activeOrganization?.id ?? null);
+        context.log.event("chat.set_browser_click_mode", { mode });
+
+        return null;
+    });
+
+/**
  * Get browser settings for the current user.
  */
 // Mirrors `aiUserPreferences.browserSettings`; every field stays optional because
