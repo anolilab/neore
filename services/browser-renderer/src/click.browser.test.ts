@@ -676,6 +676,22 @@ describe("readTarget in a page", () => {
         expect(after.target).not.toBe(before.target);
     });
 
+    it("a submit button whose own click handler changes its value (a double-submit guard) is not refused, and submits the approved value", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/second"><button id="go" type="submit" name="intent" value="confirm" onclick="this.value='Processing'">Confirm</button></form>`,
+        );
+        const element = await page.$("#go");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        expect(read.clicked).toBe(true);
+        await page.waitForURL("**/cart/second**", { timeout: 3000 });
+        expect(page.url()).toContain("intent=confirm");
+    });
+
     it("a control whose rendered text is longer than the cap reads as truncated, so the gate asks", async () => {
         await pageWith(page, `<button id="long">${"x".repeat(TARGET_READ_OPTIONS.max + 1)}</button>`);
         const element = await page.$("#long");

@@ -382,21 +382,13 @@ export function readTarget(
                         // What a submit sends with the form: a submit control's name and value (an order intent is often a value), and how it
                         // submits (its method). A text field's value is never read: a person may have typed into it.
                         const submitter = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node : null;
-                        const isSubmitValued =
-                            submitter instanceof HTMLButtonElement ||
-                            (submitter instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(submitter.type));
                         // The effective target and encoding are part of it too: a change to either after approval changes what the submit sends.
+                        // The value is not here: a page's own click handler may set it (a double-submit guard), and that must not refuse the
+                        // click. It is part of the fingerprint on its own (`submitValues`), and restored before the submission.
                         const kind =
                             submitter === null
                                 ? ""
-                                : [
-                                      submitter.type,
-                                      submitter.name,
-                                      isSubmitValued ? submitter.value : "",
-                                      submitter.formMethod,
-                                      submitter.formEnctype,
-                                      submitter.formTarget,
-                                  ]
+                                : [submitter.type, submitter.name, submitter.formMethod, submitter.formEnctype, submitter.formTarget]
                                       .map((part) => JSON.stringify(part))
                                       .join("\u{3}");
 
@@ -411,6 +403,16 @@ export function readTarget(
                 },
             ];
             const destinations = destinationsOf();
+            // The submit values of the controls a click submits through: a submit button's value is what its submission sends.
+            const submitValues = nodes
+                .map((node) => {
+                    const isValued =
+                        node instanceof HTMLButtonElement || (node instanceof HTMLInputElement && ["button", "image", "reset", "submit"].includes(node.type));
+
+                    return isValued ? (node as HTMLButtonElement | HTMLInputElement).value : "";
+                })
+                .map((value) => JSON.stringify(value))
+                .join("\u{3}");
             const formAction = enclosingForm === null || formActionGetter === undefined ? "" : String(formActionGetter.call(enclosingForm));
 
             // The page's own address too: the same markup on another page (after a navigation during the approval) is another target.
@@ -524,6 +526,7 @@ export function readTarget(
                 String(isCheckout),
                 String(isSubmitLike),
                 String(isSubscribeLike),
+                submitValues,
                 activatedKey,
                 String(isScanCapped || isReferenceCapped || isShownCapped || joined.length > options.max),
             ].join("\u{0}");
@@ -716,7 +719,7 @@ export function readTarget(
                     approved.push([ownForm, name, Element.prototype.getAttribute.call(ownForm, name)]);
                 }
 
-                for (const name of ["formaction", "formmethod", "formenctype", "formtarget"]) {
+                for (const name of ["formaction", "formmethod", "formenctype", "formtarget", "value"]) {
                     approved.push([submitter, name, submitter.getAttribute(name)]);
                 }
             }
