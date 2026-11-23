@@ -1,5 +1,7 @@
 import { defineMigration } from "lunorash/server";
 
+import { typedTextColumn } from "./agent/shared";
+import type { Message } from "./agent/validators";
 import { getMaxSteps } from "./chat/lib/auto-continue";
 
 /**
@@ -324,12 +326,28 @@ export const addRunArgsSystemContext = defineMigration({
 
 /**
  * Messages gained an optional `typedText` (`agent/shared.ts#typedTextColumn`) and its `typed_text_search` index, which the
- * composer's prompt search reads. Nothing to fill: there is no stored data before the first deploy, and a row without it is
- * only missing from that search. A no-op, so `lunora prepare` records the added optional column.
+ * composer's prompt search reads. This fills it on rows saved before it, by the same rule every write uses
+ * (`typedTextColumn` over the stored `message` parts, never the flattened `text`), so an older prompt can be found too.
+ * A row with nothing typed (only a quote, an attachment or a placeholder), a non-user row and a row kept out of search
+ * (no `text`) stay unset, as do rows that already have the column. Only `typedText` is added: `text`, the deletion
+ * marks and the thread's lock are copied through, and the search still drops a locked or deleted row when it reads.
+ *
+ * The runner walks each shard on its own, `batchSize` rows per batch, and records its cursor after every batch, so a run
+ * stopped by a batch cap or a failure resumes where it left off. A batch is one read of 32 rows and one rewrite per
+ * changed row. There is no `down`: a rollback cannot tell a filled row from one a write stamped after this ran.
  */
-export const addMessageTypedText = defineMigration({
-    id: "add-message-typed-text",
+export const backfillMessageTypedText = defineMigration({
+    batchSize: 32,
+    id: "backfill-message-typed-text",
     table: "messages",
-    // `undefined` leaves every row untouched (`MigrationTransform`).
-    up: () => undefined,
+    up: (document) => {
+        if (document.typedText !== undefined) {
+            return undefined;
+        }
+
+        const typedText = typedTextColumn(document.message as Message | undefined, document.text as string | undefined);
+
+        // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
+        return typedText === undefined ? undefined : { ...document, typedText };
+    },
 });

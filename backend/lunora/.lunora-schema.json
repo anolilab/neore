@@ -11,11 +11,11 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
-    "add-message-typed-text",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
+    "backfill-message-typed-text",
     "drop-agent-option-fields",
     "session-options-to-session-state",
     "widen-not-typed-steer-collaborator",
@@ -7289,6 +7289,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7361,6 +7367,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7433,6 +7445,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7505,6 +7523,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7577,6 +7601,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7649,6 +7679,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7721,6 +7757,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -29988,6 +30030,74 @@
           "unique": false,
           "literal": "\"host\""
         },
+        "searchClaim": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "id": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "texts": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "kind": {
+                    "kind": "union",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "members": [
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"summary\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"title\""
+                      }
+                    ]
+                  },
+                  "text": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "searchRefusedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "snoozeChosenAt": {
           "kind": "number",
           "nullable": false,
@@ -30036,6 +30146,12 @@
           "optional": true,
           "unique": false
         },
+        "summaryVectorId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "tagIds": {
           "kind": "array",
           "nullable": false,
@@ -30072,6 +30188,12 @@
           "optional": true,
           "unique": false
         },
+        "titleVectorId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "updatedAt": {
           "kind": "number",
           "nullable": false,
@@ -30080,6 +30202,12 @@
         },
         "userId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userTurnCount": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
