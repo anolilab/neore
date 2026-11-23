@@ -35,8 +35,15 @@ export const SEARCH_KINDS: ReadonlyArray<SearchKind> = ["title", "summary"];
 
 /** A thread is embedded only once it has MORE than this many user turns (plan section 7, decision 3). */
 export const MIN_TURNS_TO_EMBED = 3;
-/** Messages read at most when counting a thread's turns. */
-export const TURN_SCAN_LIMIT = 400;
+/** Message rows read per page when counting a thread's user turns. */
+export const TURN_SCAN_PAGE_ROWS = 400;
+/**
+ * Pages read at most when counting a thread's user turns. A thread whose first
+ * 20,000 rows hold no more than {@link MIN_TURNS_TO_EMBED} user turns counts as not
+ * yet qualifying; the cap keeps a huge, tool-heavy thread from costing a full scan on
+ * every reply.
+ */
+export const TURN_SCAN_MAX_PAGES = 50;
 
 /** Nearest vectors read per kind for one query. */
 export const MEANING_TOP_K = 10;
@@ -76,6 +83,15 @@ export const searchText = (value: string | null | undefined): string | undefined
     return trimmed || undefined;
 };
 
+/** Characters of a title or summary that are embedded; a longer text is cut to this. */
+export const EMBED_MAX_CHARS = 8000;
+
+/**
+ * The text a vector is embedded from, and the text the commit compares it with: the
+ * same function on both sides, so padding or length never makes a fresh vector look stale.
+ */
+export const embedInput = (value: string | null | undefined): string | undefined => searchText(value)?.slice(0, EMBED_MAX_CHARS);
+
 /** Whether the thread may be in the index at all (the turn gate is checked separately). */
 export const isSearchEligible = (row: SearchRow): boolean =>
     row.userId !== undefined && !row.deleted && !row.isTemporary && (row.lockedAt === undefined || row.lockedAt === null);
@@ -86,6 +102,42 @@ export const hasEnoughTurns = (userTurns: number): boolean => userTurns > MIN_TU
 /** The user turns among a thread's message rows; a row's `message` is the AI SDK message. */
 export const countUserTurns = (rows: ReadonlyArray<{ message?: unknown }>): number =>
     rows.filter((row) => (row.message as { role?: unknown } | undefined)?.role === "user").length;
+
+/** One page of a thread's message rows, in order. */
+export interface TurnPage {
+    continueCursor: string | null;
+    isDone: boolean;
+    rows: ReadonlyArray<{ message?: unknown }>;
+}
+
+/**
+ * Whether a thread has enough user turns. Reads its pages in order and stops at the
+ * page that reaches the gate, so a fourth user turn is found wherever it sits in the
+ * thread, not only within the first page. `readPage` gets the cursor to continue
+ * from, `null` for the first page.
+ */
+export const userTurnsEnoughFrom = async (readPage: (cursor: string | null) => Promise<TurnPage>): Promise<boolean> => {
+    let cursor: string | null = null;
+    let userTurns = 0;
+
+    for (let pageNumber = 0; pageNumber < TURN_SCAN_MAX_PAGES; pageNumber += 1) {
+        const page: TurnPage = await readPage(cursor);
+
+        userTurns += countUserTurns(page.rows);
+
+        if (hasEnoughTurns(userTurns)) {
+            return true;
+        }
+
+        if (page.isDone) {
+            return false;
+        }
+
+        cursor = page.continueCursor;
+    }
+
+    return false;
+};
 
 const kindTexts = (row: SearchRow): Record<SearchKind, string | undefined> => {
     return {
@@ -211,7 +263,7 @@ export const decideCommit = (stored: Record<SearchKind, SearchSlot>, embedded: R
     for (const vector of embedded) {
         const current = stored[vector.kind];
 
-        if (searchText(current.text) !== vector.text) {
+        if (embedInput(current.text) !== vector.text) {
             continue;
         }
 

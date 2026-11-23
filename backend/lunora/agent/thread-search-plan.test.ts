@@ -4,6 +4,8 @@ import {
     bestMeaningThreadIds,
     countUserTurns,
     decideCommit,
+    EMBED_MAX_CHARS,
+    embedInput,
     hasEnoughTurns,
     isSearchEligible,
     planThreadSearch,
@@ -11,6 +13,10 @@ import {
     searchText,
     type SearchRow,
     type SearchState,
+    TURN_SCAN_MAX_PAGES,
+    TURN_SCAN_PAGE_ROWS,
+    type TurnPage,
+    userTurnsEnoughFrom,
     withoutSearchVectors,
 } from "./thread-search-plan";
 
@@ -146,6 +152,89 @@ describe(decideCommit, () => {
         expect(cleared).toEqual({ accepted: [], replaced: ["same"], set: { title: undefined } });
         expect(superseded.replaced).toEqual([]);
         expect(superseded.set).toEqual({});
+    });
+
+    it("accepts the vector of a padded title, whose embedded text is the trimmed one", () => {
+        const decision = decideCommit(
+            stored({ title: { text: "  PDF totals  " } }),
+            [{ kind: "title", text: embedInput("  PDF totals  ")!, vectorId: "v" }],
+            [],
+        );
+
+        expect(decision.accepted).toEqual(["v"]);
+    });
+
+    it("accepts the vector of a summary longer than the embedding limit, whose embedded text is cut", () => {
+        const long = "a".repeat(EMBED_MAX_CHARS + 500);
+        const decision = decideCommit(stored({ summary: { text: long } }), [{ kind: "summary", text: embedInput(long)!, vectorId: "v" }], []);
+
+        expect(decision.accepted).toEqual(["v"]);
+    });
+});
+
+describe(embedInput, () => {
+    it("trims the text and cuts it to the embedding limit, and is absent when empty", () => {
+        expect(embedInput("  PDF  ")).toBe("PDF");
+        expect(embedInput("x".repeat(EMBED_MAX_CHARS + 5))).toHaveLength(EMBED_MAX_CHARS);
+        expect(embedInput(" ".repeat(3))).toBeUndefined();
+        expect(embedInput(null)).toBeUndefined();
+    });
+});
+
+describe(userTurnsEnoughFrom, () => {
+    /** Pages of rows, each row a user turn (`true`) or not. The cursor is the page index. */
+    const pagesOf =
+        (pages: boolean[][], reads: number[]) =>
+        async (cursor: string | null): Promise<TurnPage> => {
+            const index = cursor === null ? 0 : Number(cursor);
+
+            reads.push(index);
+
+            return {
+                continueCursor: String(index + 1),
+                isDone: index + 1 >= pages.length,
+                rows: (pages[index] ?? []).map((isUser) => {
+                    return { message: { role: isUser ? "user" : "assistant" } };
+                }),
+            };
+        };
+
+    it("finds a fourth user turn that sits past the first page", async () => {
+        const reads: number[] = [];
+        const idleRows: boolean[] = [];
+
+        for (let row = 0; row < TURN_SCAN_PAGE_ROWS; row += 1) {
+            idleRows.push(false);
+        }
+
+        const pages = [idleRows, [true, true, true, true]];
+
+        expect(await userTurnsEnoughFrom(pagesOf(pages, reads))).toBe(true);
+        expect(reads).toEqual([0, 1]);
+    });
+
+    it("stops reading at the page that reaches the gate", async () => {
+        const reads: number[] = [];
+
+        expect(await userTurnsEnoughFrom(pagesOf([[true, true, true, true], [true]], reads))).toBe(true);
+        expect(reads).toEqual([0]);
+    });
+
+    it("answers no when the whole thread has no more than the gate's turns", async () => {
+        const reads: number[] = [];
+
+        expect(await userTurnsEnoughFrom(pagesOf([[true, true], [true]], reads))).toBe(false);
+        expect(reads).toEqual([0, 1]);
+    });
+
+    it("gives up after the page cap, so a huge thread costs a bounded scan", async () => {
+        const reads: number[] = [];
+        const pages = Array.from({ length: TURN_SCAN_MAX_PAGES + 5 }, () => [false]);
+
+        pages[TURN_SCAN_MAX_PAGES + 2] = [true, true, true, true];
+
+        expect(await userTurnsEnoughFrom(pagesOf(pages, reads))).toBe(false);
+        expect(reads).toHaveLength(TURN_SCAN_MAX_PAGES);
     });
 });
 

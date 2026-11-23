@@ -127,13 +127,52 @@ describe(runThreadSearchSync, () => {
         expect(mocks.embedMany).not.toHaveBeenCalled();
     });
 
-    it("does not embed when the owner's model rules refuse the embedding model", async () => {
+    it("does not embed when the owner's model rules refuse the embedding model, and writes nothing", async () => {
         mocks.embeddingModelAllowed.mockReturnValue(false);
         const ctx = makeCtx({ readThreadSearchState: readyThread() });
 
         await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
 
         expect(mocks.embedMany).not.toHaveBeenCalled();
+        expect((ctx as unknown as { runMutation: ReturnType<typeof vi.fn> }).runMutation).not.toHaveBeenCalled();
+    });
+
+    it("embeds the trimmed title and commits the vector under that same text", async () => {
+        const ctx = makeCtx({ readThreadSearchState: readyThread({ title: { text: "  PDF totals off by one  ", vectorId: null } }) });
+
+        await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
+
+        expect(mocks.embedMany.mock.calls[0]?.[1]).toMatchObject({ values: ["PDF totals off by one"] });
+
+        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const commit = runMutation.mock.calls.find(([reference]) => reference === internal.agent.thread_search.commitThreadSearch);
+
+        expect(commit?.[1]).toMatchObject({ embedded: [{ kind: "title", text: "PDF totals off by one" }] });
+    });
+
+    it("deletes the vectors it already wrote when a later insert fails, and throws so the scheduler retries", async () => {
+        let inserts = 0;
+        const runMutation = vi.fn(async (reference: unknown) => {
+            if (reference === internal.agent.vector.insertBatch) {
+                inserts += 1;
+
+                if (inserts === 2) {
+                    throw new Error("insert down");
+                }
+
+                return ["vec-title"];
+            }
+
+            return null;
+        });
+        const runQuery = vi.fn(async () => readyThread({ summary: { text: "A summary", vectorId: null } }));
+
+        await expect(runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title", "summary"], threadId: THREAD })).rejects.toThrow(
+            "insert down",
+        );
+
+        expect(runMutation).toHaveBeenCalledWith(internal.agent.vector.deleteBatch, { ids: ["vec-title"] });
+        expect(runMutation).not.toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, expect.anything());
     });
 
     it("keeps the stored vectors, writes nothing, and throws so the scheduler retries when the embedder fails", async () => {
@@ -147,7 +186,7 @@ describe(runThreadSearchSync, () => {
         warn.mockRestore();
     });
 
-    it("sends no text to the gateway when a lock lands after the plan read the thread", async () => {
+    it("sends no text to the gateway, and commits nothing, when a lock lands after the plan read the thread", async () => {
         const reads = [readyThread(), readyThread({ eligible: false })];
         const runQuery = vi.fn(async () => reads.shift() ?? null);
         const runMutation = vi.fn(async () => []);
@@ -155,7 +194,7 @@ describe(runThreadSearchSync, () => {
         await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title"], threadId: THREAD });
 
         expect(mocks.embedMany).not.toHaveBeenCalled();
-        expect(runMutation).toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, { clear: [], embedded: [], threadId: THREAD });
+        expect(runMutation).not.toHaveBeenCalled();
     });
 
     it("sends no text to the gateway when the title changed after the plan read the thread", async () => {

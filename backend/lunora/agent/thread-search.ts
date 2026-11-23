@@ -21,10 +21,9 @@ import { MAX_LENGTH } from "../lib/validators";
 import { deleteVectorRow } from "./table-writes";
 import {
     bestMeaningThreadIds,
-    countUserTurns,
     decideCommit,
     type EmbeddedVector,
-    hasEnoughTurns,
+    embedInput,
     isSearchEligible,
     MEANING_MIN_CHARS,
     MEANING_MIN_SCORE,
@@ -38,7 +37,8 @@ import {
     SEARCH_VECTOR_FIELD,
     type SearchKind,
     type SearchPlan,
-    TURN_SCAN_LIMIT,
+    TURN_SCAN_PAGE_ROWS,
+    userTurnsEnoughFrom,
 } from "./thread-search-plan";
 import { findVectorRow, type VectorDimension, type VectorTableName } from "./vector/tables";
 import { searchVectors } from "./vector";
@@ -62,15 +62,16 @@ const vSearchState = v.union(
 const nullable = <T>(value: T | undefined): T | null => value ?? null;
 const defined = (value: string | null): string | undefined => value ?? undefined;
 
-/** The turn gate's read: the thread's user turns, up to {@link TURN_SCAN_LIMIT} rows, as a boolean. */
-const readEnoughTurns = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<boolean> => {
-    const rows = await ctx.db
-        .query("messages")
-        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
-        .take(TURN_SCAN_LIMIT);
+/** The turn gate's read: whether the thread has more user turns than the gate needs, reading its messages page by page. */
+const readEnoughTurns = (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<boolean> =>
+    userTurnsEnoughFrom(async (cursor) => {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor, numItems: TURN_SCAN_PAGE_ROWS });
 
-    return hasEnoughTurns(countUserTurns(rows));
-};
+        return { continueCursor: page.continueCursor, isDone: page.isDone, rows: page.page };
+    });
 
 export const readThreadSearchState = internalQuery
     .input({ threadId: v.id("threads") })
@@ -92,6 +93,13 @@ export const readThreadSearchState = internalQuery
             userId: thread.userId,
         };
     });
+
+/** Whether the owner's model rules allow the embedding model. */
+const embeddingAllowedFor = async (ctx: ActionCtx, userId: string): Promise<boolean> => {
+    const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+
+    return embeddingModelAllowed(await loadModelFilterRules(ctx, userId));
+};
 
 /** Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model. */
 const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[]): Promise<number[][]> => {
@@ -147,8 +155,8 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
     }
 
     const slots = {
-        summary: { text: defined(state.summary.text), vectorId: defined(state.summary.vectorId) },
-        title: { text: defined(state.title.text), vectorId: defined(state.title.vectorId) },
+        summary: { text: embedInput(state.summary.text), vectorId: defined(state.summary.vectorId) },
+        title: { text: embedInput(state.title.text), vectorId: defined(state.title.vectorId) },
     };
     const plan: SearchPlan = planThreadSearch({ eligible: state.eligible, slots }, args.changed, state.enoughTurns);
 
@@ -159,8 +167,14 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
     let texts = plan.embed.flatMap((kind) => {
         const { text } = slots[kind];
 
-        return text === undefined ? [] : [{ kind, text: text.slice(0, 8000) }];
+        return text === undefined ? [] : [{ kind, text }];
     });
+
+    // A model the owner's rules refuse embeds nothing. Checked here, before the gateway
+    // and the commit, so a refused thread costs no send and no write on each reply.
+    if (texts.length > 0 && !(await embeddingAllowedFor(ctx, state.userId))) {
+        texts = [];
+    }
 
     if (texts.length > 0) {
         texts = await textsStillWanted(ctx, args.threadId, state, texts);
@@ -184,46 +198,53 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
 
     const embedded: EmbeddedVector[] = [];
 
-    for (const [index, entry] of texts.entries()) {
-        const vector = vectors[index];
-
-        if (!vector) {
-            continue;
-        }
-
-        if (vector.length !== SEARCH_DIMENSION) {
-            console.warn(`[agent/thread-search] Expected ${String(SEARCH_DIMENSION)} dimensions, got ${String(vector.length)}; skipped`);
-
-            continue;
-        }
-
-        const ids = await ctx.runMutation(internal.agent.vector.insertBatch, {
-            vectorDimension: SEARCH_DIMENSION as VectorDimension,
-            vectors: [
-                {
-                    messageId: undefined,
-                    model: SEARCH_MODEL,
-                    table: SEARCH_TABLE[entry.kind],
-                    threadId: args.threadId,
-                    userId: state.userId,
-                    vector,
-                },
-            ],
-        });
-
-        for (const vectorId of ids) {
-            embedded.push({ kind: entry.kind, text: entry.text, vectorId: vectorId as string });
-        }
-    }
-
     try {
+        for (const [index, entry] of texts.entries()) {
+            const vector = vectors[index];
+
+            if (!vector) {
+                continue;
+            }
+
+            if (vector.length !== SEARCH_DIMENSION) {
+                console.warn(`[agent/thread-search] Expected ${String(SEARCH_DIMENSION)} dimensions, got ${String(vector.length)}; skipped`);
+
+                continue;
+            }
+
+            const ids = await ctx.runMutation(internal.agent.vector.insertBatch, {
+                vectorDimension: SEARCH_DIMENSION as VectorDimension,
+                vectors: [
+                    {
+                        messageId: undefined,
+                        model: SEARCH_MODEL,
+                        table: SEARCH_TABLE[entry.kind],
+                        threadId: args.threadId,
+                        userId: state.userId,
+                        vector,
+                    },
+                ],
+            });
+
+            for (const vectorId of ids) {
+                embedded.push({ kind: entry.kind, text: entry.text, vectorId: vectorId as string });
+            }
+        }
+
+        if (embedded.length === 0 && plan.clear.length === 0) {
+            return;
+        }
+
         await ctx.runMutation(internal.agent.thread_search.commitThreadSearch, {
             clear: plan.clear,
             embedded,
             threadId: args.threadId,
         });
     } catch (error) {
-        await ctx.runMutation(internal.agent.vector.deleteBatch, { ids: embedded.map((vector) => vector.vectorId) });
+        // The vectors written so far are not on the thread row, so no later sync or delete would find them: remove them here.
+        if (embedded.length > 0) {
+            await ctx.runMutation(internal.agent.vector.deleteBatch, { ids: embedded.map((vector) => vector.vectorId) });
+        }
 
         throw error;
     }
