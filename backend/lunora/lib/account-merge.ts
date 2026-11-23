@@ -484,6 +484,16 @@ export const runGuestMerge = internalAction
         // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
         await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
 
+        // An erasure of the guest has priority: it removes the guest's pins, so a merge that moved one now would leave it under the new
+        // account. The merge stops, and its own marker goes.
+        const { erasing } = await context.runMutation(internal.lib.account_moves.isErasingFor, { userId: args.from });
+
+        if (erasing) {
+            await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
+
+            return { moved: 0 };
+        }
+
         const { until } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
 
         if (until !== null) {

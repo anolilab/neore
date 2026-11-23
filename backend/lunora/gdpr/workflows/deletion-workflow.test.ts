@@ -451,6 +451,7 @@ const replayingContext = (
                     inStep = false;
                 }
             },
+            sleep: async () => undefined,
         },
     };
 };
@@ -535,7 +536,7 @@ describe("account deletion workflow: usage exports", () => {
         const purges = runs().filter((entry) => isPurge(entry.ref));
 
         expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
-        expect(sleeps).toStrictEqual(["1 minute", "1 minute"]);
+        expect(sleeps).toStrictEqual(["2 minutes", "1 minute", "1 minute"]);
         expect(completionIndex()).toBeGreaterThan(-1);
         // Completion is recorded only after the final purge, so the request is never complete while a purge is still pending.
         const lastPurgeAt = trace.findLastIndex((entry) => entry.kind === "run" && isPurge(entry.ref));
@@ -581,8 +582,8 @@ describe("account deletion workflow: usage exports", () => {
 
         expect(purges).toHaveLength(121);
         expect(purges.at(-1)?.args["force"]).toBe(true);
-        expect(sleeps).toHaveLength(120);
-        expect(sleeps.every((duration) => duration === "1 minute")).toBe(true);
+        expect(sleeps.filter((duration) => duration === "1 minute")).toHaveLength(120);
+        expect(sleeps.filter((duration) => duration === "2 minutes")).toHaveLength(1);
         expect(completionIndex()).toBeGreaterThan(-1);
     });
 });

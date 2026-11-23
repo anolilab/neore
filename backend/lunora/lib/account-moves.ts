@@ -139,3 +139,41 @@ export const beginAccountMoveFor = internalMutation
 
         return null;
     });
+
+/** Whether an erasure of the account is active. A guest merge checks it before it moves a pin: an erasure removes those pins. */
+export const isErasing = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
+
+    return page.some((row) => row.kind === "erasing");
+};
+
+/**
+ * The latest moment an erasure must wait until before it sweeps the account's pins: the pin writes in flight, and a guest merge that is
+ * still moving them (the erasure has priority once it is marked; a merge that finds it stops). Null when the erasure may sweep.
+ */
+export const eraseWaitUntil = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<number | null> => {
+    const leaseUntil = await pinWritesInFlightUntil(context, userId, now);
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
+
+    if (page.some((row) => row.kind === "merging")) {
+        return Math.max(leaseUntil ?? 0, now + PIN_WRITE_LEASE_MS);
+    }
+
+    return leaseUntil;
+};
+
+/** Whether an erasure of the account is active, from a guest merge. */
+export const isErasingFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ erasing: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        return { erasing: await isErasing(ctx, args.userId) };
+    });
+
+/** The latest moment an erasure waits until (null when it may sweep), from the erasure workflow. */
+export const eraseWaitFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ until: v.union(v.number(), v.null()) }))
+    .mutation(async ({ args, ctx }) => {
+        return { until: await eraseWaitUntil(ctx, args.userId, ctx.now) };
+    });

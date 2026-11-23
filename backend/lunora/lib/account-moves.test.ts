@@ -13,6 +13,8 @@ import {
     admitPinWriteUnlessMoving,
     beginAccountMove,
     endAccountMove,
+    eraseWaitUntil,
+    isErasing,
     isAccountMoving,
     pinWritesInFlightUntil,
 } from "./account-moves";
@@ -147,6 +149,29 @@ describe("the pin-write lease", () => {
             const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-guest" } }));
 
             expect(rows.page).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("an erasure against a guest merge", () => {
+    it("is seen by the merge, and waits while the merge still moves the account's pins", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-both", "erasing", 1));
+
+            expect(await harness.run(async (context: any) => await isErasing(context, "user-both"))).toBe(true);
+            expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-both", 5000))).toBeNull();
+
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-both", "merging", 2));
+
+            expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-both", 5000))).toBe(5000 + PIN_WRITE_LEASE_MS);
+
+            await harness.run(async (context: any) => await endAccountMove(context, "user-both", "merging"));
+
+            expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-both", 5000))).toBeNull();
         } finally {
             harness.close();
         }
