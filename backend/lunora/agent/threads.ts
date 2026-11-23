@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { deleteHumanChecksOfThread } from "../browser/gdpr";
+import { eraseThreadPinsAndRoutes } from "../chat/gdpr";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
@@ -466,6 +467,8 @@ export const deleteAllForThreadIdAsync = internalMutation
         const isDone = messagesResult.isDone && streamResult.isDone;
 
         if (isDone) {
+            // Every deletion of a thread, single, bulk or hard, comes through here: its pins and the routes to it go too (`chat/gdpr.ts`).
+            await eraseThreadPinsAndRoutes(ctx, args.threadId);
             // The thread is fully gone, so its expiry marker goes with it. Until now the
             // cron leases the marker (`deleteExpiredTemporaryChats`), so it is still here
             // only while a chain is running or has died.

@@ -168,12 +168,12 @@ for a schema table that is neither policed nor listed:
 | `admin_gateway_analytics.getProviderCacheReadingsForAdmin` | action | adminAction | — | admin role; the gateway checks the caller against `GATEWAY_ADMIN_USER_IDS` again; token counts by hour and model only, no user or thread | ok |
 | `agent_branches.editAssistantReply` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `agent_branches.switchBranch` | mutation | authMutation + RL | threads | row.userId == caller | ok |
-| `agent_document_history.getVersion` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
-| `agent_document_history.listVersions` | query | query | documents | identity (self-resolved); row.userId == caller | ok |
+| `agent_document_history.getVersion` | query | query | documents, threads | identity (self-resolved); thread read grant from the primary (owner or member; lock proof) when a thread id is given, else the author under their read grant; the version is read past RLS once admitted | ok |
+| `agent_document_history.listVersions` | query | query | documents, threads | identity (self-resolved); thread read grant from the primary (owner or member; lock proof) when a thread id is given, else the author under their read grant; the versions are read past RLS once admitted | ok |
 | `agent_documents.getDocument` | query | query | documents | identity (self-resolved); with a thread id, its read grant (owner or member; lock proof) and the document of that thread; without one, the author's own document under the author's read grant | ok |
 | `agent_documents.getDocumentByMessage` | query | query | — | identity (self-resolved); row.userId == caller | ok |
 | `agent_documents.getDocumentsByThread` | query | query | threads | identity (self-resolved); thread read grant (owner or member; lock proof) | ok |
-| `agent_documents.updateDocument` | mutation | authMutation | documentVersions, documents | identity (self-resolved); row.userId == caller | accepted — owner-only; no rate limit, `v.any()` commit/contentJson (low) |
+| `agent_documents.updateDocument` | mutation | authMutation | documentVersions, documents, threads | identity (self-resolved); row.userId == caller, and the thread's write grant from the primary (owner or the author's grant), refused when the thread id does not match the document | accepted — author with the write grant; no rate limit, `v.any()` commit/contentJson (low) |
 | `agent_messages.listMessagesByThreadId` | query | query | — | thread access (owner/grant); identity (self-resolved) | ok |
 | `agent_projects.getProject` | query | query | projects | identity (self-resolved); row.userId == caller | **fixed** (low) — owner-only; public projects are served by the gallery projection |
 | `agent_projects.listPinnedProjects` | query | query | projects | identity; org membership | **fixed** (high) — org branch requires membership |

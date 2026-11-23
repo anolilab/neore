@@ -86,14 +86,15 @@ export const getDocument = query
 
             const documentRow = await ctx.db.get("documents", args.documentId);
 
-            if (!documentRow || documentRow.threadId !== args.threadId) {
-                return null;
+            if (documentRow && documentRow.threadId === args.threadId) {
+                return {
+                    ...publicDocument(documentRow),
+                    canEdit: documentRow.userId === identity.userId && meetsThreadPermission(access.permission, "write"),
+                };
             }
 
-            return {
-                ...publicDocument(documentRow),
-                canEdit: documentRow.userId === identity.userId && meetsThreadPermission(access.permission, "write"),
-            };
+            // A card whose chat was cloned into a branch, or made before its thread was carried, names another chat: the author reads it
+            // through the author path below, as before.
         }
 
         const authoredRow = await ctx.db.get("documents", args.documentId);
