@@ -1497,6 +1497,36 @@ export const schema = defineSchema({
         .index("by_userId_collectionId", ["userId", "collectionId"])
         .index("by_vaultFileId", ["vaultFileId"]),
 
+    /**
+     * The Events log (`public-api/events-log.ts`): one row per run end and approval request, read by `events/poll`. `seq` is
+     * one past the user's highest (`mcpEventWatermarks`); `eventId` is stable per upstream event; `data` is the payload as
+     * JSON text. Kept seven days (`RETENTION_MS`); every expired row goes, the highest included.
+     */
+    mcpEvents: defineTable({
+        createdAt: v.number(),
+        data: v.string(),
+        eventId: v.string(),
+        name: v.string(),
+        seq: v.number(),
+        timestamp: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_seq", ["userId", "seq"])
+        .index("by_userId_eventId", ["userId", "eventId"])
+        .index("by_createdAt", ["createdAt"]),
+
+    /**
+     * The highest `seq` a user's Events log has issued. Kept apart from the rows, so retention can delete every event and the
+     * sequence still never restarts. One row per user; removed with the user (`public-api/gdpr.ts`).
+     */
+    mcpEventWatermarks: defineTable({
+        seq: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
     // An OAuth grant for one of the user's own MCP servers
     // (`aiUserPreferences.mcpServers`), keyed by server name AND url: a grant
     // for a server whose URL was since edited is never sent to the new URL.
@@ -3657,25 +3687,6 @@ export const schema = defineSchema({
         .index("by_status_resolvedAt", ["status", "resolvedAt"])
         // The home dashboard's "needs you" (`home/overview.ts`).
         .index("by_userId_status_createdAt", ["userId", "status", "createdAt"]),
-
-    /**
-     * The Events log (`public-api/events-log.ts`): one row per run end and approval request, read by `events/poll`. `seq` is
-     * one past the user's highest; `eventId` is stable per upstream event; `data` is the payload as JSON text. Kept seven days
-     * (`RETENTION_MS`), but never the highest row, so the sequence does not restart.
-     */
-    mcpEvents: defineTable({
-        createdAt: v.number(),
-        data: v.string(),
-        eventId: v.string(),
-        name: v.string(),
-        seq: v.number(),
-        timestamp: v.number(),
-        userId: v.string(),
-    })
-        .shardBy("userId")
-        .index("by_userId_seq", ["userId", "seq"])
-        .index("by_userId_eventId", ["userId", "eventId"])
-        .index("by_createdAt", ["createdAt"]),
 
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
