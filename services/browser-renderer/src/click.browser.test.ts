@@ -240,6 +240,30 @@ describe("readTarget in a page", () => {
         await page.waitForURL("https://shop.example/cart/confirm");
     });
 
+    it("a mouse-down handler responds to a click, and the click still runs", async () => {
+        await pageWith(page, `<button id="pay" onmousedown="window.pressed = true" onclick="window.clicked = true">Continue</button>`);
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.clicked).toBe(true);
+        expect(await page.evaluate(() => (globalThis as unknown as { pressed?: boolean }).pressed === true)).toBe(true);
+        expect(await wasClicked(page)).toBe(true);
+    });
+
+    it("a pointer handler that changes the label before the click stops the click, so an unread label is never clicked", async () => {
+        await pageWith(page, `<button id="pay" onpointerdown="this.textContent = 'Buy now'" onclick="window.clicked = true">Continue</button>`);
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("changed");
+        expect(read.clicked).toBe(false);
+        expect(await wasClicked(page)).toBe(false);
+    });
+
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
         await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
         const element = await page.$("#label");

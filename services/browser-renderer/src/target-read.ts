@@ -494,12 +494,37 @@ export function readTarget(
                 },
                 { signal: stop.signal },
             );
-            control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
+            // The pointer sequence of a press, so hover, mouse-down and focus handlers respond as they do to a person's click. The
+            // events are synthetic (isTrusted is false), so a popup that needs a user gesture is still blocked.
+            const press = { bubbles: true, cancelable: true, composed: true };
+            // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
+            const shownBefore = `${control instanceof HTMLElement ? control.innerText : (control.textContent ?? "")}|${control.getAttribute("aria-label") ?? ""}|${control.getAttribute("title") ?? ""}`;
+
+            control.dispatchEvent(new PointerEvent("pointerdown", press));
+            control.dispatchEvent(new MouseEvent("mousedown", press));
+
+            if (control instanceof HTMLElement) {
+                control.focus();
+            }
+
+            control.dispatchEvent(new PointerEvent("pointerup", press));
+            control.dispatchEvent(new MouseEvent("mouseup", press));
+
+            // The handlers above ran between the check and the click: if the control's text or label changed in them, nothing is
+            // clicked, so the click never lands on a label the gate did not read. (A change inside a child element is not seen here.)
+            // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
+            const shownAfter = `${control instanceof HTMLElement ? control.innerText : (control.textContent ?? "")}|${control.getAttribute("aria-label") ?? ""}|${control.getAttribute("title") ?? ""}`;
+
+            if (shownAfter === shownBefore) {
+                control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
+                isClicked = true;
+            } else {
+                refused = "changed";
+            }
+
             stop.abort();
 
-            // The click was dispatched either way; a moved destination is what stops it from being submitted.
-            isClicked = true;
-
+            // The click was dispatched; a moved destination is what stops it from being submitted.
             if (isMoved) {
                 refused = "moved";
             }
