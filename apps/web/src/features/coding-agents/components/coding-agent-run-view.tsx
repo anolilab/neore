@@ -261,7 +261,7 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                 )}
                 {run.setupFix && (
                     <SetupFixButton
-                        available={run.setupFixRunId === null || fixRunEnded}
+                        available={run.setupFixAllowed && (run.setupFixRunId === null || fixRunEnded)}
                         finalFocusRef={sectionRef}
                         prompt={run.setupFix.prompt}
                         runId={run._id}

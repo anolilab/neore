@@ -70,6 +70,8 @@ const vRunView = v.object({
     repoUrl: v.string(),
     // The prepared "Fix setup" task, while one may be started from this run.
     setupFix: v.union(v.object({ prompt: v.string(), step: v.string() }), v.null()),
+    // False once the failed run has used its attempts, so the view stops offering a fix (startSetupFix refuses it anyway).
+    setupFixAllowed: v.boolean(),
     setupFixRunId: v.union(v.id("codingAgentRuns"), v.null()),
     // Every "Fix setup" attempt started from this run, oldest first; the view shows each one.
     setupFixRunIds: v.array(v.id("codingAgentRuns")),
@@ -166,6 +168,7 @@ const toView = (run: RunDoc) => {
         prUrl: run.prUrl ?? null,
         repoUrl: run.repoUrl,
         setupFix: setupFixView(run),
+        setupFixAllowed: (run.setupFixRunIds?.length ?? 0) < MAX_SETUP_FIX_ATTEMPTS,
         setupFixRunId: run.setupFixRunId ?? null,
         setupFixRunIds: run.setupFixRunIds ?? [],
         startedAt: run.startedAt ?? null,
