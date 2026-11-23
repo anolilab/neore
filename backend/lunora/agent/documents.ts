@@ -377,5 +377,18 @@ export const deleteDocument = internalMutation
         assert(documentRow, `Document ${args.documentId} not found`);
         await ctx.db.delete("documents", args.documentId);
 
+        // A document pin names the document: drop the thread's pins that name it, so none is left pointing at nothing. The pins of a
+        // thread sit on the same shard as its documents.
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread", (q) => q.eq("threadId", documentRow.threadId))
+            .take(500);
+
+        for (const pin of pins) {
+            if (pin.documentId === args.documentId) {
+                await ctx.db.delete("threadPins", pin._id);
+            }
+        }
+
         return null;
     });

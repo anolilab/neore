@@ -256,6 +256,19 @@ describe("document pins", () => {
 });
 
 describe("the route a collaborator's pin leaves", () => {
+    it("refuses a message pin from a caller with no grant on an unlocked thread", async () => {
+        await expect(as("user-stranger").mutation(createPin as never, { messageId: "m-7", messageRole: "assistant", threadId } as never)).rejects.toThrow(
+            NO_ACCESS_ERROR,
+        );
+        const strangerPins = await harness.run(async (context: any) => {
+            const { page } = await context.db.threadPins.findMany({ where: { userId: "user-stranger" } });
+
+            return page as unknown[];
+        });
+
+        expect(strangerPins).toHaveLength(0);
+    });
+
     it("records the owner, so the collaborator's export finds the pin after the grant is revoked", async () => {
         await harness.run(
             async (context: any) =>

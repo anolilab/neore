@@ -5,7 +5,6 @@ import type { MutationCtx } from "../../_generated/server";
 import { authMutation, authQuery, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
-import { isThreadLocked } from "../../lib/thread-lock";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 import { isPinnableDocumentKind } from "./pinnable";
 
@@ -137,24 +136,25 @@ export const listPinsForExport = internalQuery
  * pins still export.
  */
 export const listSharedPinRoutesForExport = internalQuery
-    .input({ userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.array(v.object({ ownerId: v.string(), threadId: v.string() })))
+    .input({ cursor: v.union(v.string().max(MAX_LENGTH.cursor), v.null()), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            page: v.array(v.object({ ownerId: v.string(), threadId: v.string() })),
+        }),
+    )
     .query(async ({ args, ctx: context }) => {
-        const routes: { ownerId: string; threadId: string }[] = [];
-        let cursor: string | undefined;
+        // One bounded page per call: the export reads the next page until the last, so no result carries every route at once.
+        const result = await context.db.sharedPinRoutes.findMany({ cursor: args.cursor ?? undefined, limit: PIN_EXPORT_PAGE, where: { userId: args.userId } });
 
-        // A `.global()` read is capped per page, so every page is read until the last.
-        do {
-            const { continueCursor, isDone, page } = await context.db.sharedPinRoutes.findMany({ cursor, limit: 500, where: { userId: args.userId } });
-
-            for (const route of page) {
-                routes.push({ ownerId: route.ownerId, threadId: route.threadId });
-            }
-
-            cursor = isDone ? undefined : (continueCursor ?? undefined);
-        } while (cursor !== undefined);
-
-        return routes;
+        return {
+            continueCursor: result.continueCursor ?? null,
+            isDone: result.isDone,
+            page: result.page.map((route) => {
+                return { ownerId: route.ownerId, threadId: route.threadId };
+            }),
+        };
     });
 
 /**
@@ -199,11 +199,8 @@ export const createPin = authMutation
             throw new LunoraError("BAD_REQUEST", "An image pin names the part it pins; a message pin names none");
         }
 
-        const thread = await context.db.get("threads", threadId as Id<"threads">);
-
-        if (thread && isThreadLocked(thread)) {
-            throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }));
-        }
+        // A pin is listed only through the thread's read grant (`getThreadPins`), so it is written only under that grant, locked or not.
+        throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
 
         const pinId = await context.db.insert("threadPins", {
             createdAt: now,
@@ -233,7 +230,7 @@ export const createPin = authMutation
 export const createDocumentPin = authMutation
     .use(rateLimit("pins/create"))
     .input({
-        documentId: v.string().max(MAX_LENGTH.id),
+        documentId: v.id("documents"),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
