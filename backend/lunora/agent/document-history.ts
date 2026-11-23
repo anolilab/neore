@@ -22,7 +22,7 @@ const historyDocument = async (
     userId: string,
 ): Promise<Doc<"documents"> | null> => {
     if (args.threadId !== undefined) {
-        const access = await resolveThreadReadAccess(ctx, args.threadId, userId, undefined);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, userId, undefined, { primary: true });
 
         if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
             return null;
@@ -39,7 +39,7 @@ const historyDocument = async (
         return null;
     }
 
-    const access = await resolveThreadReadAccess(ctx, row.threadId, userId, undefined);
+    const access = await resolveThreadReadAccess(ctx, row.threadId, userId, undefined, { primary: true });
 
     return access?.kind === "full" && meetsThreadPermission(access.permission, "read") ? row : null;
 };

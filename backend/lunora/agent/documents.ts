@@ -72,7 +72,7 @@ export const getDocument = query
         if (args.threadId !== undefined) {
             // The grant is read first: it admits the thread's rows to this request. A locked thread answers THREAD_LOCKED to its
             // owner until the proof is given.
-            const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
+            const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof, { primary: true });
 
             if (access?.kind === "locked") {
                 return throwThreadLocked();
@@ -97,7 +97,7 @@ export const getDocument = query
             return null;
         }
 
-        const access = await resolveThreadReadAccess(ctx, authoredRow.threadId, identity.userId, args.unlockProof);
+        const access = await resolveThreadReadAccess(ctx, authoredRow.threadId, identity.userId, args.unlockProof, { primary: true });
 
         if (access?.kind === "locked") {
             return throwThreadLocked();
@@ -135,7 +135,7 @@ export const getDocumentsByThread = query
         }
 
         // A thread's documents are readable by whoever holds its read grant, as its messages are.
-        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof);
+        const access = await resolveThreadReadAccess(ctx, args.threadId, identity.userId, args.unlockProof, { primary: true });
 
         if (access?.kind === "locked") {
             return throwThreadLocked();
