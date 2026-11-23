@@ -182,12 +182,7 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     };
 
     return (
-        <section
-            aria-labelledby={headingId}
-            className={cn("my-2 w-full max-w-3xl rounded-lg border p-3 focus:outline-none", className)}
-            ref={sectionRef}
-            tabIndex={-1}
-        >
+        <section aria-labelledby={headingId} className={cn("my-2 w-full max-w-3xl rounded-lg border p-3", className)} ref={sectionRef} tabIndex={-1}>
             <header className="flex flex-wrap items-center gap-2">
                 <SquareTerminal aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                 <h3 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>
