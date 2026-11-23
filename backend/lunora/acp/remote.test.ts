@@ -867,12 +867,23 @@ describe("a project remembers its runner", () => {
     const defaultOf = async (projectId: string, userId = ownerId) => await as(userId).query(remote.getProjectRunnerDefault as never, { projectId } as never);
 
     // The record a session's open schedules (`recordOpenedRunner`), run as the scheduler would: the scheduler is not run here.
-    const recordOf = async (session: Row | undefined) => {
+    // `openedAt` is the time the open wrote; a session that never opened has none, and is asked about with the time now.
+    const recordOf = async (session: Row | undefined, openedAt?: number) => {
         const thread = await row(session?.threadId as string);
+        const stored = await row(session?._id as string);
+        const at = openedAt ?? (stored?.lastEventAt as number | undefined) ?? Date.now();
 
         if (thread?.projectId) {
-            await run(async (ctx) => await ctx.runMutation(recordOpenedRunner, { projectId: thread.projectId, sessionId: session?._id }));
+            await run(async (ctx) => await ctx.runMutation(recordOpenedRunner, { openedAt: at, projectId: thread.projectId, sessionId: session?._id }));
         }
+    };
+
+    // The desktop closes the session (an empty post with `close`).
+    const closeOf = async (device: Device, session: Row | undefined) => {
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { close: true, deviceId: device.deviceId, events: [], sessionId: session?.hostSessionId as string }),
+        );
     };
 
     // The computer's agent opens the session, then its scheduled record runs.
@@ -1226,6 +1237,35 @@ describe("a project remembers its runner", () => {
         expect(await defaultOf(projectId)).toBeNull();
 
         await recordOf(session);
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("records the runner of a session the desktop closed before its record ran, and nothing for one closed without opening", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const unopened = (await startIn(projectId, device, "tap-fast-0")) as { threadId: string };
+        const [neverOpened] = await rows("acpSessions", { threadId: unopened.threadId });
+
+        // Closed while still starting: a record asked about it (whatever time it carries) records nothing.
+        await closeOf(device, neverOpened);
+        expect(await sessionStatusOf(unopened.threadId)).toBe("ended");
+        await recordOf(neverOpened, Date.now());
+        expect(await defaultOf(projectId)).toBeNull();
+
+        const started = (await startIn(projectId, device, "tap-fast-1")) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+        const afterOpen = await row(session?._id as string);
+        const openedAt = afterOpen?.lastEventAt as number;
+
+        // The desktop closes it before the scheduled record runs: the runner that opened is still recorded.
+        await closeOf(device, session);
+        expect(await sessionStatusOf(started.threadId)).toBe("ended");
+        await recordOf(session, openedAt);
         expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
     });
 

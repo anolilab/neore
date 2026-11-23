@@ -154,7 +154,11 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // Its own mutation: the record reads `.global()` rows and writes settings, and none of that may roll this open back.
         if (opened && thread?.projectId) {
             try {
-                await ctx.scheduler.runAfter(0, internal.acp.ingest.recordOpenedRunner, { projectId: thread.projectId, sessionId: existing._id });
+                await ctx.scheduler.runAfter(0, internal.acp.ingest.recordOpenedRunner, {
+                    openedAt: now,
+                    projectId: thread.projectId,
+                    sessionId: existing._id,
+                });
             } catch (error) {
                 logger.warn("acp: the project's runner default was not scheduled", {
                     error: error instanceof Error ? error.message : String(error),
@@ -568,16 +572,18 @@ export const applyHostEvents = internalMutation
 
 /**
  * Records the runner of a host session that opened as its project's default (`lib/project-runner.ts`), scheduled by the
- * session's open so a failure here leaves the open as it was. Only while the session is still one that opened (not `starting`,
- * which an open that rolled back leaves, nor `ended`) and its thread is still in the project it was in at the open.
+ * session's open so a failure here leaves the open as it was. Only for a session that opened: not `starting`, and with the
+ * `lastEventAt` the open wrote (`openedAt`) or a later one, so a session the desktop closed before this ran still records the
+ * runner that opened, and one ended without opening (a refused start) records nothing. Its thread must still be in the project
+ * it was in at the open.
  */
 export const recordOpenedRunner = internalMutation
-    .input({ projectId: v.id("projects"), sessionId: v.id("acpSessions") })
+    .input({ openedAt: v.number(), projectId: v.id("projects"), sessionId: v.id("acpSessions") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const session = await ctx.db.get("acpSessions", args.sessionId);
 
-        if (!session || session.status === "starting" || session.status === "ended") {
+        if (!session || session.status === "starting" || (session.lastEventAt ?? -Infinity) < args.openedAt) {
             return null;
         }
 
