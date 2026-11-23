@@ -9,6 +9,7 @@ import type { QueryCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { systemDb } from "../lib/rls/scope";
+import { MAX_LENGTH } from "../lib/validators";
 import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-access";
 
 /**
@@ -18,11 +19,11 @@ import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-ac
  */
 const historyDocument = async (
     ctx: QueryCtx,
-    args: { documentId: Id<"documents">; threadId?: Id<"threads"> },
+    args: { documentId: Id<"documents">; threadId?: Id<"threads">; unlockProof?: string | null },
     userId: string,
 ): Promise<Doc<"documents"> | null> => {
     if (args.threadId !== undefined) {
-        const access = await resolveThreadReadAccess(ctx, args.threadId, userId, undefined, { primary: true });
+        const access = await resolveThreadReadAccess(ctx, args.threadId, userId, args.unlockProof, { primary: true });
 
         if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
             return null;
@@ -39,7 +40,7 @@ const historyDocument = async (
         return null;
     }
 
-    const access = await resolveThreadReadAccess(ctx, row.threadId, userId, undefined, { primary: true });
+    const access = await resolveThreadReadAccess(ctx, row.threadId, userId, args.unlockProof, { primary: true });
 
     return access?.kind === "full" && meetsThreadPermission(access.permission, "read") ? row : null;
 };
@@ -50,6 +51,7 @@ export const listVersions = query
         limit: v.optional(v.number()),
         // The document's thread: the read routes to its owner's shard and goes through the thread's grant (see `historyDocument`).
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.array(
@@ -98,6 +100,7 @@ export const getVersion = query
         documentId: v.id("documents"),
         // The document's thread, as in `listVersions`.
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         version: v.number(),
     })
     .output(

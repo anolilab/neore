@@ -546,13 +546,13 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 commit,
                 content,
                 contentJson,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
             trackEvent("artifact_edited", { kind: document?.kind ?? "text" });
         },
         [activeDocumentId, updateDocument, setCanvasDirty, document?.kind],
@@ -565,11 +565,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
     );
@@ -581,11 +581,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content: csv,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
     );
@@ -597,12 +597,12 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content: previewDataUrl,
                 contentJson: canvasJson,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
             trackEvent("artifact_edited", { kind: "design" });
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
@@ -615,11 +615,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content: pngDataUrl,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
             trackEvent("artifact_edited", { kind: "image" });
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
@@ -655,11 +655,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                 }
 
                 localSaveRef.current = true;
-                setCanvasDirty(false);
                 await updateDocument({
                     content: csv,
                     documentId: activeDocumentId as Id<"documents">,
                 });
+                setCanvasDirty(false);
                 showSuccess(t`Spreadsheet imported successfully.`);
             } catch {
                 showError(t`Failed to import the spreadsheet file.`);

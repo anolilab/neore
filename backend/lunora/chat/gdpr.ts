@@ -4,6 +4,7 @@
  * `ctx`, so the deletes stay in the orchestrator's mutation and the writes are
  * the owner's. Batching follows `gdpr/batch.ts`.
  */
+import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { dropGuestLinkRoutes } from "./lib/guest-link-store";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
@@ -150,4 +151,30 @@ export const erasePresentationsForUser = async (ctx: MutationCtx, userId: string
     );
 
     return { hasMore };
+};
+
+/**
+ * Deletes the pins that name each of the given documents, one batch per document, on the thread's shard where the document is. Returns
+ * the ids of the documents whose pins are all gone; a document with more pins left than one batch is not in it, and the caller keeps it
+ * for the next round.
+ */
+export const erasePinsNamingDocuments = async (ctx: MutationCtx, documents: ReadonlyArray<Doc<"documents">>): Promise<Set<string>> => {
+    const drained = new Set<string>();
+
+    for (const documentRow of documents) {
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread_and_document", (q) => q.eq("threadId", documentRow.threadId).eq("documentId", documentRow._id))
+            .take(BATCH);
+
+        for (const pin of pins) {
+            await ctx.db.delete("threadPins", pin._id);
+        }
+
+        if (pins.length < BATCH) {
+            drained.add(documentRow._id);
+        }
+    }
+
+    return drained;
 };

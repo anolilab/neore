@@ -9,6 +9,7 @@ import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
+import { erasePinsNamingDocuments } from "../chat/gdpr";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
 
@@ -241,20 +242,13 @@ export const eraseDocumentsForUser = async (ctx: MutationCtx, userId: string): P
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
-    // A pin names its document, so the pins that name these documents go with them: they sit on the thread's shard, where the document is.
-    for (const documentRow of documents) {
-        const pins = await ctx.db
-            .query("threadPins")
-            .withIndex("by_thread_and_document", (q) => q.eq("threadId", documentRow.threadId).eq("documentId", documentRow._id))
-            .collect();
-
-        for (const pin of pins) {
-            await ctx.db.delete("threadPins", pin._id);
-        }
-    }
+    // A pin names its document, so each document's pins go first (the chat module owns them). A document whose pins are not all gone yet
+    // stays for the next round, so no single call deletes an unbounded pin set.
+    const drained = await erasePinsNamingDocuments(ctx, documents);
+    const ready = documents.filter((documentRow) => drained.has(documentRow._id));
 
     const hasMore = await deleteParentsWithChildren(
-        documents,
+        ready,
         async (documentRow) =>
             await ctx.db
                 .query("documentVersions")
@@ -266,5 +260,5 @@ export const eraseDocumentsForUser = async (ctx: MutationCtx, userId: string): P
         },
     );
 
-    return { hasMore };
+    return { hasMore: hasMore || ready.length < documents.length };
 };
