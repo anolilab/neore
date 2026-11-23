@@ -150,12 +150,13 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     // Checked before the claim: a project the caller may not file into refuses the start and gives nothing up.
     const project = args.projectId ? await writableProject(ctx, args.projectId, userId) : null;
     // A computer limited to some projects starts threads only in those, the rule a switch and its tools follow (`devices/lib/scope.ts`).
-    const refusal =
-        args.projectId && !project
-            ? new LunoraError("FORBIDDEN", "Project not found or access denied")
-            : project && !isDeviceInScope(device, project._id)
-              ? new LunoraError("BAD_REQUEST", "That computer is not allowed in this project. Change which projects it may be used in, in its settings.")
-              : null;
+    let refusal: LunoraError | null = null;
+
+    if (args.projectId && !project) {
+        refusal = new LunoraError("FORBIDDEN", "Project not found or access denied");
+    } else if (project && !isDeviceInScope(device, project._id)) {
+        refusal = new LunoraError("BAD_REQUEST", "That computer is not allowed in this project. Change which projects it may be used in, in its settings.");
+    }
 
     if (args.projectId && refusal) {
         // A retry of a start that went through, its project deleted or closed to the computer since: the first try's thread is still the answer.

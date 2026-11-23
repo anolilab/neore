@@ -1099,8 +1099,7 @@ describe("a project remembers its runner", () => {
 
         await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationId: "org-a" }));
         await run(
-            async (ctx) =>
-                await projectRunner.rememberProjectRunner(ctx, read, ownerId, null, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }),
+            async (ctx) => await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }),
         );
 
         const stored = await projectRow(projectId);
