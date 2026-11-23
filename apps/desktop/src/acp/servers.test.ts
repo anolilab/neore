@@ -29,6 +29,8 @@ let stopped: number[];
 let posts: { post: Post; signature: string; url: string }[];
 let signed: string[];
 let children: Map<number, AgentProcess>;
+/** Every `ServerAgents` a test set up, so the teardown can wait for what each still writes into the scratch folder. */
+let created: ServerAgents[];
 let records: ServerRecord[] | undefined;
 /** Set once the core has dropped a server: its secret is gone, so nothing can be signed for it any more. */
 let secretGone: boolean;
@@ -126,6 +128,8 @@ const setup = (): { remote: RemoteAgents; servers: ServerAgents } => {
         userData: scratch.dir,
     });
 
+    created.push(servers);
+
     return { remote, servers };
 };
 
@@ -136,14 +140,31 @@ beforeEach(() => {
     posts = [];
     signed = [];
     children = new Map();
+    created = [];
     records = undefined;
     secretGone = false;
 });
 
-afterEach(() => {
+afterEach(async () => {
     for (const child of children.values()) {
         child.killNow();
     }
+
+    await Promise.all(Array.from(children.values(), async (child) => await child.exited));
+
+    // An agent's end is recorded in the server's turn file under the scratch folder; that write must land before the
+    // folder is removed, or it makes the folder again.
+    await Promise.all(
+        created.map(async (servers) => {
+            try {
+                await servers.posterForEnd(SERVER).persisted();
+            } catch {
+                // A server the test removed or unpaired has no runtime left to write.
+            }
+
+            servers.stop();
+        }),
+    );
 
     scratch.dispose();
 });
