@@ -603,6 +603,51 @@ describe("command palette filters and meaning search", () => {
         });
     });
 
+    it("asks the archived-only meaning search again once an active thread is archived, which its hits could not list", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        harness.meaning = [{ archived: true, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
+        renderPalette(queryClient);
+        const input = await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+        expect(harness.meaningArgs).toStrictEqual([{ archivedOnly: true, query: "the invoice bug" }]);
+
+        await act(async () => {
+            await new MutationObserver(queryClient, {
+                mutationFn: async (_variables: { model: string; status: string; threadId: string }) => "",
+                mutationKey: ["lunora", "chat_functions:updateThread"],
+            }).mutate({ model: "gpt-4o", status: "archived", threadId: "thread-active" });
+        });
+
+        await waitFor(() => {
+            expect(harness.meaningArgs).toHaveLength(2);
+        });
+        expect(harness.meaningArgs[1]).toStrictEqual({ archivedOnly: true, query: "the invoice bug" });
+    });
+
+    it("keeps an unfiltered meaning search's hits when a thread it does not list is archived", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        harness.meaning = [{ archived: false, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
+        renderPalette(queryClient);
+        fireEvent.change(await openPalette(), { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+        expect(harness.meaningArgs).toHaveLength(1);
+
+        await act(async () => {
+            await new MutationObserver(queryClient, {
+                mutationFn: async (_variables: { model: string; status: string; threadId: string }) => "",
+                mutationKey: ["lunora", "chat_functions:updateThread"],
+            }).mutate({ model: "gpt-4o", status: "archived", threadId: "thread-other" });
+        });
+        await waitPastDebounce();
+
+        expect(harness.meaningArgs).toHaveLength(1);
+    });
+
     it("lists meaning hits after the exact title matches, and does not repeat a thread the title already matched", async () => {
         harness.threads = [{ _id: "thread-x", status: "active", title: "Invoice export" }];
         harness.meaning = [

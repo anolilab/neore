@@ -20,6 +20,7 @@ import { Kbd, KbdGroup } from "@neore/ui/components/kbd";
 import { Toggle } from "@neore/ui/components/toggle";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
+import type { Query } from "@tanstack/react-query";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
@@ -103,15 +104,19 @@ interface ThreadWriteArgs {
     title?: unknown;
 }
 
+/** Which cached meaning queries a write marks stale: every one, only the archived-only ones, or none. */
+type MeaningHitsChange = "all" | "archived" | undefined;
+
 /**
- * Whether a finished write changes what a meaning hit shows (its title, archived state or existence), told apart by the function
- * it called (its `mutationKey`, `lunoraMutationKey`). Hiding a thread (archive, delete) matters only for a listed one; a rename,
- * a restore from the archive or an undone delete can add a hit, so each marks the hits stale. Anything else, a sent message or a
+ * Which meaning hits a finished write changes (a hit's title, archived state or existence), told apart by the function it called
+ * (its `mutationKey`, `lunoraMutationKey`). Hiding a thread (delete) matters only for a listed one. An archive hides a listed
+ * thread and adds one to every archived-only search, where a thread just archived cannot be listed yet. A rename, a restore from
+ * the archive or an undone delete can add a hit anywhere, so each marks every query stale. Anything else, a sent message or a
  * model change, keeps them, so it never pays for the embedding again.
  */
-const changesMeaningHits = (mutationKey: ReadonlyArray<unknown> | undefined, variables: unknown, listedIds: ReadonlySet<string>): boolean => {
+const changesMeaningHits = (mutationKey: ReadonlyArray<unknown> | undefined, variables: unknown, listedIds: ReadonlySet<string>): MeaningHitsChange => {
     if (mutationKey?.[0] !== "lunora" || typeof variables !== "object" || variables === null) {
-        return false;
+        return undefined;
     }
 
     const args = variables as ThreadWriteArgs;
@@ -119,19 +124,23 @@ const changesMeaningHits = (mutationKey: ReadonlyArray<unknown> | undefined, var
 
     switch (mutationKey[1] as ApiPath) {
         case "chat_functions:deleteThreads": {
-            return Array.isArray(args.threadIds) && args.threadIds.some((id: unknown) => isListed(id));
+            return Array.isArray(args.threadIds) && args.threadIds.some((id: unknown) => isListed(id)) ? "all" : undefined;
         }
         case "chat_functions:softDeleteThread": {
-            return isListed(args.threadId);
+            return isListed(args.threadId) ? "all" : undefined;
         }
         case "chat_functions:undoDeleteThread": {
-            return true;
+            return "all";
         }
         case "chat_functions:updateThread": {
-            return args.title !== undefined || args.status === "active" || (args.status === "archived" && isListed(args.threadId));
+            if (args.title !== undefined || args.status === "active" || (args.status === "archived" && isListed(args.threadId))) {
+                return "all";
+            }
+
+            return args.status === "archived" ? "archived" : undefined;
         }
         default: {
-            return false;
+            return undefined;
         }
     }
 };
@@ -269,8 +278,16 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         .flatMap(([, hits]: [unknown, { threadId: string }[] | undefined]) => (hits ?? []).map((hit: { threadId: string }) => hit.threadId)),
                 );
 
-                if (changesMeaningHits(event.mutation.options.mutationKey, event.mutation.state.variables, listedIds)) {
+                const change = changesMeaningHits(event.mutation.options.mutationKey, event.mutation.state.variables, listedIds);
+
+                if (change === "all") {
                     void queryClient.invalidateQueries({ queryKey: MEANING_QUERY_KEY });
+                } else if (change === "archived") {
+                    // The key's `scope.archived` (after the account): an archived-only search.
+                    void queryClient.invalidateQueries({
+                        predicate: (query: Query) => query.queryKey[MEANING_QUERY_KEY.length + 1] === true,
+                        queryKey: MEANING_QUERY_KEY,
+                    });
                 }
             }),
         [queryClient],

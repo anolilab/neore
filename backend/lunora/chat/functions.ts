@@ -1614,7 +1614,8 @@ export const updateThread = authAction
             }
 
             context.log.event("chat.update_thread", {
-                modelChanged: model !== undefined && !threadData?.activeAgent,
+                // The model actually applied: an archive or restore carries the caller's open model but keeps the thread's own.
+                modelChanged: pickedModel !== undefined && !threadData?.activeAgent && pickedModel !== threadData?.model,
                 statusChanged: status ?? null,
                 summaryChanged: summary !== undefined,
                 titleChanged: title !== undefined,

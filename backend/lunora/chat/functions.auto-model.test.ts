@@ -1,6 +1,7 @@
 /**
  * `updateThread` and Auto: a group chat's turns are taken by its participants, so the owner cannot switch Auto on
- * there. (The paths that go on to write need the preference reads the harness cannot hold.)
+ * there. (The paths that go on to write need the preference reads the harness cannot hold.) An archive or restore keeps the
+ * thread's model, and its log says so.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,6 +65,7 @@ beforeEach(() => {
 
 afterEach(() => {
     harness.close();
+    vi.restoreAllMocks();
 });
 
 const insertThread = async (fields: Record<string, unknown> = {}) =>
@@ -113,6 +115,17 @@ describe("updateThread on a thread with no model", () => {
 
         expect(row).toMatchObject({ status: "archived" });
         expect(row.model).toBeUndefined();
+    });
+
+    it("logs no model change for an archive that carries the caller's open model", async () => {
+        // The harness's logger is one shared no-op object, so its `event` can be watched from any context it hands out.
+        const log = (await harness.run(async (ctx: any) => ctx.log)) as { event: (name: string, fields: Record<string, unknown>) => void };
+        const event = vi.spyOn(log, "event");
+        const threadId = await insertThread({ model: undefined });
+
+        await update(threadId, { model: "gpt-4o", status: "archived" });
+
+        expect(event).toHaveBeenCalledWith("chat.update_thread", expect.objectContaining({ modelChanged: false, statusChanged: "archived" }));
     });
 
     it("still refuses a change that writes the model", async () => {
