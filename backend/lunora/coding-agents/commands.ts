@@ -231,13 +231,13 @@ export const gitAuthEnv = (githubToken: string | undefined, origin = GITHUB_CRED
 };
 
 /**
- * The agent CLI's environment: the user's provider key and nothing of ours. Claude Code also names neore as its
+ * The run script's environment: nothing of ours and no secret. The user's provider key reaches the agent CLI alone,
+ * after the repository's setup script has ended ({@link AGENT_KEY_PATH}). Claude Code also names neore as its
  * entrypoint, which it sends in its `User-Agent`.
  */
-export const agentEnv = (agent: CodingAgentId, providerKey: string): Record<string, string> => {
+export const agentEnv = (agent: CodingAgentId): Record<string, string> => {
     return {
         CI: "1",
-        [CODING_AGENTS[agent].envVar]: providerKey,
         ...(agent === "claude_code" && { CLAUDE_CODE_ENTRYPOINT: "neore" }),
         DISABLE_AUTOUPDATER: "1",
         DISABLE_TELEMETRY: "1",
@@ -333,8 +333,20 @@ export const buildAgentCommand = (agent: CodingAgentId): string => {
 /** The run script's combined output, read incrementally by the poller. */
 export const RUN_LOG_PATH = "/tmp/neore-run.log";
 
+/**
+ * Private to the sandbox user (mode 0700): the repository's setup script runs as another user and can neither forge
+ * a status nor reach the key here.
+ */
+export const RUN_DIR = "/home/user/.neore-run";
+
 /** Written once, last: `agent:<exit code>` or `setup-failed:<step>`. Its presence means the script ended. */
-export const RUN_STATUS_PATH = "/tmp/neore-run.status";
+export const RUN_STATUS_PATH = `${RUN_DIR}/status`;
+
+/** Present while the script waits for the provider key; the poller then writes {@link AGENT_KEY_PATH}. */
+export const KEY_WANTED_PATH = `${RUN_DIR}/key-wanted`;
+
+/** The provider key, written by the poller once setup has ended, read into the agent's environment and deleted. */
+export const AGENT_KEY_PATH = `${RUN_DIR}/agent-key`;
 
 export const RUN_SCRIPT_PATH = "/tmp/neore-run.sh";
 
@@ -344,28 +356,135 @@ export const GIT_AUTH_PATH = "/tmp/neore-git-auth";
 /** Base commit and branch of the clone, one per line. */
 export const BASE_INFO_PATH = "/tmp/neore-base";
 
+/** The repository's own setup script, relative to its root. Executed directly when executable, else with bash. */
+export const REPO_SETUP_FILE = ".neore/setup";
+
+/** Its output, kept apart from the run log; the agent is pointed at it when setup did not finish. */
+export const SETUP_LOG_PATH = "/tmp/neore-setup.log";
+
+/** The unprivileged user the repository's setup script runs as: no sudo, no access to the sandbox user's files. */
+export const SETUP_USER = "neore-setup";
+
+/** Setup's own budget, inside the run's 20 minutes. */
+export const SETUP_TIMEOUT_S = 300;
+
 const CLONE_TIMEOUT_S = 180;
 const INSTALL_TIMEOUT_S = 300;
+/** How long the script waits for the poller (every 4s) to hand over the key. */
+const KEY_WAIT_S = 60;
+
+/** Readable names of the steps a `setup-failed:<step>` status names, for the run's error. */
+export const SETUP_STEP_LABELS: Readonly<Record<string, string>> = {
+    "agent-key": "handing your API key to the agent",
+    clone: "cloning the repository",
+    install: "installing the agent CLI",
+    "repo-setup": "taking the repository back after its setup script (.neore/setup)",
+    "rev-parse": "reading the cloned commit",
+};
+
+/**
+ * Runs {@link REPO_SETUP_FILE}, when the repository has one, as {@link SETUP_USER} with an empty environment apart from
+ * the hints below. At that point no secret exists in the sandbox: the clone has deleted the git credential, and the
+ * provider key has not been delivered yet. The setup user owns the working tree but not `.git`. Before the key is
+ * requested, every process it left is killed, the tree is taken back, and `.git` must still be the inode the clone
+ * made: owning the working tree is enough to swap `.git` for one whose config runs a command in the next `git` call.
+ * A sandbox without passwordless sudo cannot separate the users, so setup is skipped there rather than run as the
+ * agent's user. Files the agent writes later in `/tmp` exist before setup, so setup cannot take them over.
+ *
+ * A failure or timeout does not fail the run: whatever setup did install stays, and the agent is told.
+ */
+const repoSetupLines = (): string[] => {
+    const owner = '"$(id -u):$(id -g)"';
+    const run = `cd ${REPO_DIR} && if [ -x ${REPO_SETUP_FILE} ]; then exec ./${REPO_SETUP_FILE}; else exec bash ./${REPO_SETUP_FILE}; fi`;
+    const env = [
+        "env -i",
+        `HOME=/home/${SETUP_USER}`,
+        'PATH="$BASE_PATH"',
+        "LANG=C.UTF-8",
+        "TERM=dumb",
+        "CI=1",
+        "NEORE=1",
+        "NEORE_SETUP=fresh",
+        `NEORE_REPO_DIR=${REPO_DIR}`,
+        // `.git` belongs to another user; git refuses such a repository without this (command-line scope).
+        "GIT_CONFIG_COUNT=1",
+        "GIT_CONFIG_KEY_0=safe.directory",
+        `GIT_CONFIG_VALUE_0=${REPO_DIR}`,
+    ].join(" ");
+    const limit = `${String(SETUP_TIMEOUT_S / 60)}-minute`;
+    /** Appends a note to the agent's prompt; `%s` in `text` takes the exit code. */
+    const note = (text: string): string => `printf ${shellQuote(String.raw`\n\n${text}\n`)} "$setup_exit" >> ${PROMPT_PATH}`;
+    const takeBack = "finish setup-failed:repo-setup";
+
+    return [
+        `if [ -f ${REPO_SETUP_FILE} ]; then`,
+        `  echo ${shellQuote(`$ ${REPO_SETUP_FILE} (repository setup as ${SETUP_USER}, without secrets, up to ${String(SETUP_TIMEOUT_S / 60)} min)`)}`,
+        "  git_id=$(stat -c %i:%u .git)",
+        `  : > ${CODEX_LAST_MESSAGE_PATH}`,
+        `  if sudo -n true 2>/dev/null && { id -u ${SETUP_USER} >/dev/null 2>&1 || sudo -n useradd -m -s /bin/bash ${SETUP_USER}; } && chmod o+x /home/user; then`,
+        `    if timeout 180 sudo -n chown -R ${SETUP_USER}: ${REPO_DIR} && timeout 180 sudo -n chown -R ${owner} ${REPO_DIR}/.git; then`,
+        `      timeout -k 10 ${String(SETUP_TIMEOUT_S)} sudo -n -u ${SETUP_USER} -- ${env} bash -c ${shellQuote(run)} > ${SETUP_LOG_PATH} 2>&1 < /dev/null`,
+        "      setup_exit=$?",
+        "    else",
+        `      setup_exit=1; echo 'could not hand the working tree to the setup user' > ${SETUP_LOG_PATH}`,
+        "    fi",
+        `    for _ in 1 2 3 4 5; do sudo -n pkill -KILL -u ${SETUP_USER} || break; sleep 1; done`,
+        `    sudo -n pgrep -u ${SETUP_USER} >/dev/null && ${takeBack}`,
+        `    timeout 180 sudo -n chown -R ${owner} ${REPO_DIR} || ${takeBack}`,
+        `    [ "$(stat -c %i:%u .git 2>/dev/null)" = "$git_id" ] || ${takeBack}`,
+        '    case "$setup_exit" in',
+        "      0)",
+        '        echo "repository setup finished after $SECONDS s of the run"',
+        `        ${note(`The repository's setup script (${REPO_SETUP_FILE}) ran before you started (exit code %s); its output is in ${SETUP_LOG_PATH}.`)} ;;`,
+        "      124 | 137)",
+        `        tail -n 20 ${SETUP_LOG_PATH}`,
+        `        echo 'repository setup hit its ${limit} limit; the agent starts anyway'`,
+        `        ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) was stopped at its ${limit} limit (exit code %s). Its output is in ${SETUP_LOG_PATH}. Dependencies may be missing or only partly installed.`)} ;;`,
+        "      *)",
+        `        tail -n 20 ${SETUP_LOG_PATH}`,
+        '        echo "repository setup exited with $setup_exit; the agent starts anyway"',
+        `        ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) failed (exit code %s). Its output is in ${SETUP_LOG_PATH}. Dependencies may be missing or only partly installed.`)} ;;`,
+        "    esac",
+        "  else",
+        `    echo 'repository setup skipped: this sandbox cannot run it as a separate user'`,
+        `    setup_exit=skipped; ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) was not run (%s); dependencies are not installed.`)}`,
+        "  fi",
+        "fi",
+    ];
+};
 
 /**
  * The script that performs a whole run inside the sandbox, detached from any
- * backend action: clone, install the pinned CLI, run the agent, record the
- * outcome. The backend only starts it and polls its files.
+ * backend action: clone, install the pinned CLI, run the repository's setup
+ * script, receive the provider key, run the agent, record the outcome. The
+ * backend only starts it, polls its files, and hands over the key when asked.
  *
- * The GitHub token never enters the script's own environment — a process's
- * initial environment stays readable in `/proc/<pid>/environ` for its whole
- * life, and the agent (untrusted code, same user) outlives the clone. The clone
- * runs in a subshell that reads the credential from {@link GIT_AUTH_PATH},
- * deletes it, and exports it only to `git`, which has exited before the agent
- * starts.
+ * No secret is in the script's own environment — a process's initial
+ * environment stays readable in `/proc/<pid>/environ` for its whole life. The
+ * clone runs in a subshell that reads the GitHub credential from
+ * {@link GIT_AUTH_PATH}, deletes it, and exports it only to `git`. The provider
+ * key is requested only after repository setup ended ({@link KEY_WANTED_PATH}),
+ * read from {@link AGENT_KEY_PATH}, deleted, and exported to the agent alone.
+ * The agent's timeout is what is left of `timeoutSeconds` since the script began.
+ * `skipRepoSetup` leaves the repository's setup script out; the key hand-off stays.
  */
-export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; repo: ParsedRepo; timeoutSeconds: number }): string => {
-    const { label } = CODING_AGENTS[input.agent];
-    const agentSeconds = Math.max(60, Math.floor(input.timeoutSeconds));
+export const buildRunScript = (input: {
+    agent: CodingAgentId;
+    branch?: string;
+    repo: ParsedRepo;
+    /** Leave out {@link REPO_SETUP_FILE}, e.g. for a run that fixes a failed repository setup. */
+    skipRepoSetup?: boolean;
+    timeoutSeconds: number;
+}): string => {
+    const { envVar, label } = CODING_AGENTS[input.agent];
+    const budgetSeconds = Math.max(60, Math.floor(input.timeoutSeconds));
 
     return [
         "#!/bin/bash",
         "set -u",
+        `mkdir -p -m 700 ${RUN_DIR} && chmod 700 ${RUN_DIR} || exit 1`,
+        `chmod 600 ${PROMPT_PATH}`,
+        'BASE_PATH="$PATH"',
         `export PATH=${NPM_PREFIX}/bin:$PATH GIT_TERMINAL_PROMPT=0`,
         `finish() { echo "$1" > ${RUN_STATUS_PATH}; exit 0; }`,
         "cd /home/user",
@@ -376,8 +495,13 @@ export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; r
         `{ git rev-parse HEAD && git rev-parse --abbrev-ref HEAD; } > ${BASE_INFO_PATH} || finish setup-failed:rev-parse`,
         `echo ${shellQuote(`$ install ${label} ${CODING_AGENTS[input.agent].npmVersion}`)}`,
         `timeout ${String(INSTALL_TIMEOUT_S)} bash -c ${shellQuote(buildInstallCommand(input.agent))} > /tmp/neore-install.log 2>&1 || { tail -n 20 /tmp/neore-install.log; finish setup-failed:install; }`,
+        ...(input.skipRepoSetup ? [`echo ${shellQuote(`repository setup (${REPO_SETUP_FILE}) skipped for this run`)}`] : repoSetupLines()),
+        `touch ${KEY_WANTED_PATH}`,
+        `waited=0; while [ ! -s ${AGENT_KEY_PATH} ]; do [ "$waited" -ge ${String(KEY_WAIT_S)} ] && finish setup-failed:agent-key; sleep 1; waited=$((waited + 1)); done`,
+        `rm -f ${KEY_WANTED_PATH}; agent_key=$(cat ${AGENT_KEY_PATH}); rm -f ${AGENT_KEY_PATH}`,
+        `agent_s=$((${String(budgetSeconds)} - SECONDS)); [ "$agent_s" -lt 30 ] && agent_s=30`,
         `echo ${shellQuote(`$ ${label}`)}`,
-        `timeout ${String(agentSeconds)} ${buildAgentCommand(input.agent)} 2>&1`,
+        `${envVar}="$agent_key" timeout "$agent_s" ${buildAgentCommand(input.agent)} 2>&1`,
         'finish "agent:$?"',
         "",
     ].join("\n");
@@ -407,13 +531,19 @@ export const TIMEOUT_EXIT_CODE = 124;
 
 export const READ_CHUNK_BYTES = 256 * 1024;
 
-/** Size of the log, the status (possibly empty) and up to {@link READ_CHUNK_BYTES} of log from byte `offset`. */
+/** Header line on a poll while the script waits for the provider key. */
+export const KEY_WANTED_MARK = "key-wanted";
+
+/**
+ * The status (possibly empty), {@link KEY_WANTED_MARK} or an empty line, and up to {@link READ_CHUNK_BYTES} of log from
+ * byte `offset`.
+ */
 export const buildPollCommand = (offset: number): string => {
     if (!Number.isSafeInteger(offset) || offset < 0) {
         throw new Error("Invalid log offset");
     }
 
-    return `cat ${RUN_STATUS_PATH} 2>/dev/null; echo; tail -c +${String(offset + 1)} ${RUN_LOG_PATH} 2>/dev/null | head -c ${String(READ_CHUNK_BYTES)}`;
+    return `cat ${RUN_STATUS_PATH} 2>/dev/null; echo; [ -e ${KEY_WANTED_PATH} ] && [ ! -e ${AGENT_KEY_PATH} ] && printf ${KEY_WANTED_MARK}; echo; tail -c +${String(offset + 1)} ${RUN_LOG_PATH} 2>/dev/null | head -c ${String(READ_CHUNK_BYTES)}`;
 };
 
 /** Stage everything (the agent may also have committed) and diff against the clone's HEAD. */
