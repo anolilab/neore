@@ -352,6 +352,8 @@ export const updatePinNote = authMutation
     .input({
         note: v.string().max(MAX_LENGTH.long),
         pinId: v.string().max(MAX_LENGTH.id),
+        // The pin's thread: a collaborator's pin is stored on the thread owner's shard, and the call routes there by this id.
+        threadId: v.optional(v.id("threads")),
     })
     .mutation(async ({ args: { note, pinId }, ctx: context }) => {
         const { userId } = context.user;
@@ -377,6 +379,8 @@ export const updatePinSelectedText = authMutation
     .input({
         pinId: v.string().max(MAX_LENGTH.id),
         selectedText: v.string().max(MAX_LENGTH.document),
+        // The pin's thread: a collaborator's pin is stored on the thread owner's shard, and the call routes there by this id.
+        threadId: v.optional(v.id("threads")),
     })
     .mutation(async ({ args: { pinId, selectedText }, ctx: context }) => {
         const { userId } = context.user;
@@ -401,6 +405,8 @@ export const deletePin = authMutation
     .use(rateLimit("pins/delete"))
     .input({
         pinId: v.string().max(MAX_LENGTH.id),
+        // The pin's thread: a collaborator's pin is stored on the thread owner's shard, and the call routes there by this id.
+        threadId: v.optional(v.id("threads")),
     })
     .mutation(async ({ args: { pinId }, ctx: context }) => {
         const { userId } = context.user;
@@ -415,5 +421,17 @@ export const deletePin = authMutation
         }
 
         await context.db.delete("threadPins", pinId as Id<"threadPins">);
+
+        // Once the caller has no pin left on the thread, the route to it goes too: nothing is left to find through it.
+        const left = await context.db
+            .query("threadPins")
+            .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", pin.threadId))
+            .take(1);
+        const route = left.length === 0 ? await context.db.sharedPinRoutes.findFirst({ where: { threadId: pin.threadId, userId } }) : null;
+
+        if (route) {
+            await context.db.delete("sharedPinRoutes", route._id);
+        }
+
         context.log.event("chat.delete_pin", { deleted: true });
     });

@@ -3,6 +3,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { code } from "@neore/ui/utils/code-highlighter";
@@ -67,11 +68,15 @@ interface PinItemProps {
         messageRole: string;
         note?: string;
         selectedText?: string;
+        /** The pin's thread, which its edits route by. */
+        threadId?: string;
     };
 }
 
 const PinItem: FC<PinItemProps> = ({ pin }) => {
     const { i18n, t } = useLingui();
+    // A collaborator's pin is stored on the thread owner's shard: every edit names its thread so the call reaches that shard.
+    const pinThreadId = pin.threadId as Id<"threads"> | undefined;
     const crpc = useCRPC();
     const noteDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -130,13 +135,13 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
         }
 
         noteDebounceRef.current = setTimeout(() => {
-            updateNote({ note: value, pinId: pin._id });
+            updateNote({ note: value, pinId: pin._id, threadId: pinThreadId });
         }, NOTE_DEBOUNCE_MS);
     };
 
     const handleDelete = () =>
         deletePin(
-            { pinId: pin._id },
+            { pinId: pin._id, threadId: pinThreadId },
             {
                 onError: (e) => showError(e as Error),
                 onSuccess: () => trackEvent("message_unpinned", {}),
@@ -156,7 +161,7 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
         const trimmed = editTextValue.trim();
 
         if (trimmed && trimmed !== pin.selectedText) {
-            updateSelectedText({ pinId: pin._id, selectedText: trimmed }, { onError: (e) => showError(e as Error) });
+            updateSelectedText({ pinId: pin._id, selectedText: trimmed, threadId: pinThreadId }, { onError: (e) => showError(e as Error) });
         }
 
         setIsEditDialogOpen(false);

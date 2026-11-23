@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import schema from "../../schema";
-import { createDocumentPin, createPin, eraseUserPinsOnThread, getThreadPins, isPinShapeValid, reassignUserPinsOnThread } from "./functions";
+import { createDocumentPin, createPin, deletePin, eraseUserPinsOnThread, getThreadPins, isPinShapeValid, reassignUserPinsOnThread } from "./functions";
 
 const OWNER = "user-owner";
 const SHAPE_ERROR = /An image pin names the part it pins/;
@@ -256,6 +256,25 @@ describe("document pins", () => {
 });
 
 describe("the route a collaborator's pin leaves", () => {
+    it("drops the route once a collaborator deletes their last pin on the thread", async () => {
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" }),
+        );
+
+        const pinId = await as("user-collaborator").mutation(createPin as never, { messageId: "m-11", messageRole: "assistant", threadId } as never);
+
+        await as("user-collaborator").mutation(deletePin as never, { pinId, threadId } as never);
+
+        const routes = await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+            return page as unknown[];
+        });
+
+        expect(routes).toHaveLength(0);
+    });
+
     it("refuses a message pin from a caller with no grant on an unlocked thread", async () => {
         await expect(as("user-stranger").mutation(createPin as never, { messageId: "m-7", messageRole: "assistant", threadId } as never)).rejects.toThrow(
             NO_ACCESS_ERROR,
