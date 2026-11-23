@@ -66,6 +66,9 @@ import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 import { assertRunHeld, vRunHold } from "./lib/run-epoch";
 import { APPROVAL_REMINDER_SCHEDULE_DELAY_MS } from "./lib/approval-reminder";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { APPROVAL_REQUESTED_EVENT } from "../public-api/events-catalog";
+import type { ApprovalKind } from "../public-api/events-catalog";
+import { recordMcpEvent } from "../public-api/events-log";
 import { chainStarterLabel } from "../sub-agents/logic";
 import { markRunAwaiting } from "../sub-agents/functions";
 
@@ -806,6 +809,27 @@ export const recordPendingToolApprovals = internalMutation
                 }
 
                 return false;
+            }
+
+            // One `approval.requested` per request, in this mutation: a refused pause (above) records none. The kind is what the
+            // person is asked for: a requestSecret card, an askUser question, or a plain tool approval.
+            const questionIds = new Set(askUserApprovalIds);
+            const kindOf = (approvalId: string): ApprovalKind => {
+                if (secretIds.has(approvalId)) {
+                    return "secret";
+                }
+
+                return questionIds.has(approvalId) ? "question" : "approval";
+            };
+
+            for (const approvalId of uniqueIds) {
+                await recordMcpEvent(ctx, {
+                    data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
+                    eventId: `${APPROVAL_REQUESTED_EVENT}:${approvalId}`,
+                    name: APPROVAL_REQUESTED_EVENT,
+                    timestamp: createdAt,
+                    userId: ownerId,
+                });
             }
 
             // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.

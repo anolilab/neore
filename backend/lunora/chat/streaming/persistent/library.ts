@@ -25,6 +25,8 @@ import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
 import { discardPausedThreadSecrets, discardThreadSecrets, replyKeyOfStream } from "../../lib/secret-requests";
+import { RUN_COMPLETED_EVENT, RUN_FAILED_EVENT } from "../../../public-api/events-catalog";
+import { recordMcpEvent } from "../../../public-api/events-log";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
@@ -124,6 +126,11 @@ export const addChunk = internalMutation
         reasoning: v.optional(v.string()),
         /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
         restart: v.optional(v.boolean()),
+        /**
+         * How the run ended, on the chunk that ends it: the owner's Events log gets one event for the reply (`run:<streamId>`,
+         * `public-api/events-log.ts`), in this mutation, so the event and the end commit together.
+         */
+        runEnd: v.optional(v.union(v.literal("succeeded"), v.literal("failed"))),
         /** The writing run's epoch (`run-epoch.ts`): a chunk from a run a newer one replaced is refused. */
         runEpoch: v.optional(v.number()),
         /** Group chat: this chunk starts a new participant's reply. */
@@ -199,6 +206,23 @@ export const addChunk = internalMutation
             const steers = args.final ? withoutQueuedText(stream.steers as SteerEntry[] | undefined) : undefined;
 
             await ctx.db.patch("persistentStreams", args.streamId, { status, ...(steers && { steers }) });
+        }
+
+        // The run's end: one event per reply, keyed by its stream. A redelivered end finds the event and writes nothing more.
+        if (args.final && args.runEnd !== undefined) {
+            const thread = await ctx.db.get("threads", stream.threadId as Id<"threads">);
+            const owner = thread?.userId;
+
+            // A thread with no owner has no log to write to.
+            if (owner !== undefined) {
+                await recordMcpEvent(ctx, {
+                    data: { finishedAt: ctx.now, outcome: args.runEnd, threadId: stream.threadId },
+                    eventId: `run:${args.streamId}`,
+                    name: args.runEnd === "succeeded" ? RUN_COMPLETED_EVENT : RUN_FAILED_EVENT,
+                    timestamp: ctx.now,
+                    userId: owner,
+                });
+            }
         }
     });
 

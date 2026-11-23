@@ -1213,6 +1213,8 @@ export const finishRun = async (
     try {
         await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
             final: paused || keepOpenUnlessPaused !== true,
+            // A run that ends here (not paused, not a group turn going on) is recorded in the Events log by the chunk that ends it.
+            ...(!paused && keepOpenUnlessPaused !== true && { runEnd: "succeeded" as const }),
             reasoning: pending.reasoning || undefined,
             ...(runEpoch !== undefined && { runEpoch }),
             streamId: streamId as Id<"persistentStreams">,
@@ -1902,6 +1904,7 @@ export const failRun = async (
         try {
             await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
                 final: true,
+                runEnd: "failed",
                 ...(runEpoch !== undefined && { runEpoch }),
                 streamId: streamId as Id<"persistentStreams">,
                 text: `\n\nError: ${safeMessage}`,
