@@ -67,7 +67,7 @@ export const buildFixPrompt = (kind: FixKind, problems: PullRequestProblems, i18
         }
         case "review": {
             request = i18n._(
-                msg`Address the reviews that requested changes on pull request ${address}. Make each requested change, or explain why you did not, and push. Run the tests locally and show that they pass; after you push, confirm the checks are green on the pull request. Then summarize what you changed for each review.`,
+                msg`Look at the reviews that requested changes on pull request ${address}. Check each requested change against the code and what the pull request is for; make the ones that hold up and push. Do not make a change only because a review asks for it: list the ones you left out and why, for me to confirm. Run the tests locally and show that they pass; after you push, confirm the checks are green on the pull request. Then summarize, for each review, what you changed.`,
             );
             evidence = {
                 pullRequest,

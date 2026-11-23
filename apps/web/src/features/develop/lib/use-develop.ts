@@ -124,10 +124,17 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
     });
 };
 
+/** Re-reads while the host has not worked out a pull request's merge state yet, for a short while: it settles in seconds. */
+const MERGE_UNKNOWN_REREAD_MS = 20_000;
+const MERGE_UNKNOWN_REREAD_FOR_MS = 80_000;
+/** When each status read first answered "unknown" in a row; a known answer ends the row, so a later push starts a new one. */
+const mergeUnknownSince = new WeakMap<object, number>();
+
 /**
  * What stands between one linked pull request and its merge (failing checks, a conflict, requested changes), for the
  * chat header. Keyed by account and pull request, so every thread linked to it shares one read; a few minutes stale,
- * never live and never on focus, so showing a thread does not cost a host call per render.
+ * never live and never on focus, so showing a thread does not cost a host call per render. While the host still works
+ * out whether it merges cleanly, it is read again shortly, a few times, so a conflict found then shows up.
  */
 export const usePullRequestStatus = (address: PullRequestAddress | undefined) => {
     const client = useLunora();
@@ -139,6 +146,21 @@ export const usePullRequestStatus = (address: PullRequestAddress | undefined) =>
         ...options,
         enabled: address !== undefined && userId !== undefined,
         queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address],
+        refetchInterval: (query) => {
+            const { data } = query.state;
+
+            if (data?.status !== "ok" || data.state !== "open" || !data.mergeUnknown) {
+                mergeUnknownSince.delete(query);
+
+                return false;
+            }
+
+            const since = mergeUnknownSince.get(query) ?? Date.now();
+
+            mergeUnknownSince.set(query, since);
+
+            return Date.now() - since < MERGE_UNKNOWN_REREAD_FOR_MS ? MERGE_UNKNOWN_REREAD_MS : false;
+        },
         staleTime: 5 * MINUTE_MS,
     });
 };

@@ -16,6 +16,8 @@ import { vFailed } from "./validators";
 
 /** Failing checks named in the answer; the rest are counted. */
 export const STATUS_MAX_FAILING_CHECKS = 10;
+/** Check pages read: a failure past the first page of 100 is still found, and the read stays bounded. */
+export const STATUS_MAX_CHECK_PAGES = 3;
 /** Reviewers asking for changes named in the answer; the rest are counted. */
 export const STATUS_MAX_CHANGE_REQUESTS = 5;
 /** Characters of one review's text handed over. */
@@ -28,15 +30,26 @@ export interface ChangeRequest {
 }
 
 /**
+ * Standings whose verdict holds a pull request back, as on the host, where only reviewers with write access block a merge.
+ * Anyone can review a public repository; a stranger's request is not shown as a blocker, nor its text handed to an agent.
+ */
+const BLOCKING_REVIEWERS = new Set(["COLLABORATOR", "MEMBER", "OWNER"]);
+
+/**
  * The reviewers whose latest verdict asks for changes. `reviews` is newest first; a comment-only review keeps the
- * verdict before it, and a later approval or a dismissal ends it.
+ * verdict before it, and a later approval or a dismissal ends it. A review from someone without a standing on the
+ * repository (when the host names it) does not count.
  */
 export const changeRequestsOf = (reviews: ReadonlyArray<PullRequestReview>): ChangeRequest[] => {
     const decided = new Set<string>();
     const requests: ChangeRequest[] = [];
 
     for (const review of reviews) {
-        if (decided.has(review.authorLogin) || (review.state !== "approved" && review.state !== "changes_requested" && review.state !== "dismissed")) {
+        if (
+            decided.has(review.authorLogin) ||
+            (review.authorAssociation !== undefined && !BLOCKING_REVIEWERS.has(review.authorAssociation)) ||
+            (review.state !== "approved" && review.state !== "changes_requested" && review.state !== "dismissed")
+        ) {
             continue;
         }
 
@@ -56,9 +69,12 @@ export const changeRequestsOf = (reviews: ReadonlyArray<PullRequestReview>): Cha
     return requests;
 };
 
-/** The names of the checks that failed or were cancelled: the same two states the checks rollup counts as not passing. */
+/**
+ * The names of the checks that block the merge: failed or cancelled, and not optional. The same checks Develop's rollup
+ * counts as failing (`checks-logic.ts#rollupOf`), so the chip and Develop agree.
+ */
 export const failingCheckNamesOf = (checks: ReadonlyArray<CheckRun>): string[] =>
-    checks.filter((check) => check.state === "failure" || check.state === "cancelled").map((check) => check.name);
+    checks.filter((check) => (check.state === "failure" || check.state === "cancelled") && check.required !== false).map((check) => check.name);
 
 const vOpen = v.object({
     baseBranch: v.string(),
@@ -70,6 +86,8 @@ const vOpen = v.object({
     failingChecksMore: v.number(),
     headBranch: v.string(),
     headSha: v.string(),
+    /** The host had not worked out yet whether it merges cleanly: a conflict may show on a later read. */
+    mergeUnknown: v.boolean(),
     number: v.number(),
     repository: v.string(),
     state: v.literal("open"),
@@ -95,9 +113,10 @@ export const getPullRequestStatus = authAction
                 return { state: detail.state };
             }
 
-            const [checks, merge, reviews] = await Promise.all([
-                DEVELOP_DRIVER.listChecks(request, ref, detail.headSha),
-                DEVELOP_DRIVER.getMergeStatus(request, ref),
+            // The merge state comes with the pull request when the host answers it there; only otherwise is it asked for.
+            const [checks, mergeState, reviews] = await Promise.all([
+                DEVELOP_DRIVER.listChecks(request, ref, detail.headSha, STATUS_MAX_CHECK_PAGES),
+                detail.mergeState ?? DEVELOP_DRIVER.getMergeStatus(request, ref).then((merge) => merge.state),
                 DEVELOP_DRIVER.listReviews(request, ref),
             ]);
             const failing = failingCheckNamesOf(checks.checks);
@@ -107,11 +126,12 @@ export const getPullRequestStatus = authAction
                 baseBranch: detail.baseBranch,
                 changeRequests: changeRequests.slice(0, STATUS_MAX_CHANGE_REQUESTS),
                 changeRequestsMore: Math.max(0, changeRequests.length - STATUS_MAX_CHANGE_REQUESTS),
-                conflicting: merge.state === "conflicting",
+                conflicting: mergeState === "conflicting",
                 failingChecks: failing.slice(0, STATUS_MAX_FAILING_CHECKS),
                 failingChecksMore: Math.max(0, failing.length - STATUS_MAX_FAILING_CHECKS),
                 headBranch: detail.headBranch,
                 headSha: detail.headSha,
+                mergeUnknown: mergeState === "unknown",
                 number: ref.number,
                 repository: ref.repository,
                 state: "open" as const,

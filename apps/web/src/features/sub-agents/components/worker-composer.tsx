@@ -8,6 +8,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { stripHiddenText } from "@neore/ai/utils";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Textarea } from "@neore/ui/components/textarea";
@@ -18,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 
 import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import { peekWorkerDraft, saveWorkerDraft } from "@/features/chat/split/composer-drafts";
+import { useComposerPrefill } from "@/features/chat/thread/composer-prefill";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -37,6 +39,7 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
     const [text, setText] = useState(() => peekWorkerDraft(workerId) ?? "");
     const draft = useRef(text);
     const clientId = useRef<string | undefined>(undefined);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const send = useMutation(crpc.sub_agents.functions.dispatchToWorker.mutationOptions());
 
     useEffect(
@@ -45,6 +48,23 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
         },
         [workerId],
     );
+
+    // A fix prompt from the header's pull request chip (`composer-prefill.ts`): added after the draft, never sent. A
+    // worker's thread id is its worker id.
+    useComposerPrefill(workerId, (prefill) => {
+        // Cleaned of hidden characters: the prompt quotes host text (review bodies) that the worker would otherwise read.
+        const { text: clean } = stripHiddenText(prefill);
+
+        if (!draft.current.includes(clean)) {
+            const next = draft.current.trim() === "" ? clean : `${draft.current.trimEnd()}\n${clean}`;
+
+            clientId.current = undefined;
+            draft.current = next;
+            setText(next);
+        }
+
+        textareaRef.current?.focus();
+    });
 
     let notice: string | undefined;
 
@@ -69,9 +89,13 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
             {
                 onError: (error: unknown) => showError(error instanceof Error ? error : t`Could not send the message.`),
                 onSuccess: () => {
+                    // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                    const typed = draft.current.trimStart();
+                    const rest = typed.startsWith(message) ? typed.slice(message.length).trimStart() : typed;
+
                     clientId.current = undefined;
-                    draft.current = "";
-                    setText("");
+                    draft.current = rest;
+                    setText(rest);
                 },
             },
         );
@@ -116,6 +140,7 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
                         }}
                         onKeyDown={onKeyDown}
                         placeholder={t`Message the worker...`}
+                        ref={textareaRef}
                         value={text}
                     />
                     <Button aria-label={t`Send`} disabled={!canSend} size="icon" type="submit">

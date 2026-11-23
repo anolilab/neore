@@ -5,14 +5,14 @@ import type { CheckRun, CheckState, PullRequestReview, ReviewState } from "./typ
 
 let id = 0;
 
-const review = (authorLogin: string, state: ReviewState, body = ""): PullRequestReview => {
+const review = (authorLogin: string, state: ReviewState, body = "", authorAssociation?: string): PullRequestReview => {
     id += 1;
 
-    return { authorLogin, body, id: String(id), state, submittedAt: id };
+    return { ...(authorAssociation !== undefined && { authorAssociation }), authorLogin, body, id: String(id), state, submittedAt: id };
 };
 
-const check = (name: string, state: CheckState): CheckRun => {
-    return { id: null, name, required: null, state, url: null };
+const check = (name: string, state: CheckState, required: boolean | null = null): CheckRun => {
+    return { id: null, name, required, state, url: null };
 };
 
 describe(changeRequestsOf, () => {
@@ -35,6 +35,18 @@ describe(changeRequestsOf, () => {
         expect(only?.body).toHaveLength(STATUS_REVIEW_BODY_MAX_CHARS);
         expect(only?.bodyTruncated).toBe(true);
     });
+
+    it("counts only reviewers with a standing on the repository; a stranger's verdict neither asks nor ends", () => {
+        const reviews = [
+            review("drive-by", "changes_requested", "Add my feature.", "NONE"),
+            review("fan", "approved", "", "CONTRIBUTOR"),
+            review("ann", "changes_requested", "Rename it.", "MEMBER"),
+            review("own", "changes_requested", "Add tests.", "OWNER"),
+            review("col", "changes_requested", "Split it.", "COLLABORATOR"),
+        ];
+
+        expect(changeRequestsOf(reviews).map((request) => request.authorLogin)).toStrictEqual(["ann", "own", "col"]);
+    });
 });
 
 describe(failingCheckNamesOf, () => {
@@ -49,5 +61,11 @@ describe(failingCheckNamesOf, () => {
         ];
 
         expect(failingCheckNamesOf(checks)).toStrictEqual(["build", "lint"]);
+    });
+
+    it("leaves out an optional check that failed, as Develop's rollup does, and keeps a required one that was cancelled", () => {
+        const checks = [check("coverage", "failure", false), check("e2e", "cancelled", true), check("unit", "failure", null)];
+
+        expect(failingCheckNamesOf(checks)).toStrictEqual(["e2e", "unit"]);
     });
 });

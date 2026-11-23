@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { cleanPromptText } from "@/features/chat/core/utils/prompt-queue";
+import { useComposerPrefill } from "@/features/chat/thread/composer-prefill";
 import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
@@ -781,6 +782,29 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         boxText.current = next.text;
         setText(next.text);
     };
+
+    // A fix prompt from the header's pull request chip (`composer-prefill.ts`): added after the draft, never sent, cleaned of
+    // hidden characters as typed text is. One that would make the draft too long to send is refused, as a command pick is.
+    useComposerPrefill(threadId, (prefill) => {
+        const { current } = boxText;
+        const { text: prompt } = stripHiddenText(prefill);
+
+        if (!current.includes(prompt)) {
+            const { text: clean } = stripHiddenText(current.trim() === "" ? prompt : `${current.trimEnd()}\n${prompt}`, { keepTrailingJoiner: true });
+
+            if (clean.length > MAX_HOST_PROMPT_CHARS) {
+                toast.error(messages.too_large);
+
+                return;
+            }
+
+            pendingCursor.current = clean.length;
+            boxText.current = clean;
+            setText(clean);
+        }
+
+        boxRef.current?.focus();
+    });
 
     // A caret move that lands in another slash query lists other commands: the highlight starts again at the first, as an edit does.
     // A move within the same query keeps it.

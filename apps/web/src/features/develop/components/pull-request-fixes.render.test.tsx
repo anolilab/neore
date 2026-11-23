@@ -8,8 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PullRequestFixes from "./pull-request-fixes";
 
-const { prefill, status } = vi.hoisted(() => {
-    return { prefill: vi.fn(), status: { current: {} as { data?: Record<string, unknown> } } };
+const { prefill, refetch, status } = vi.hoisted(() => {
+    return { prefill: vi.fn(), refetch: vi.fn(), status: { current: {} as { data?: Record<string, unknown>; isError?: boolean } } };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -36,7 +36,11 @@ vi.mock("@/features/chat/thread/composer-prefill", () => {
 });
 
 vi.mock("../lib/use-develop", () => {
-    return { usePullRequestStatus: () => status.current };
+    return {
+        usePullRequestStatus: () => {
+            return { isError: false, isFetching: false, refetch, ...status.current };
+        },
+    };
 });
 
 const open = (overrides: Record<string, unknown>) => {
@@ -67,6 +71,7 @@ const renderFixes = () => render(<PullRequestFixes address={{ number: 7, reposit
 describe(PullRequestFixes, () => {
     beforeEach(() => {
         prefill.mockReset();
+        refetch.mockReset();
         // The popover positions itself with a ResizeObserver, which jsdom lacks.
         vi.stubGlobal(
             "ResizeObserver",
@@ -80,8 +85,8 @@ describe(PullRequestFixes, () => {
         );
     });
 
-    it("shows nothing for a pull request with no problems, a merged one, or one the host could not read", () => {
-        for (const data of [undefined, { state: "merged", status: "ok" }, { status: "rate_limited" }]) {
+    it("shows nothing while loading, for a pull request with no problems, a merged one, or one reading again cannot help", () => {
+        for (const data of [undefined, { state: "merged", status: "ok" }, { status: "not_connected" }, { status: "forbidden" }]) {
             status.current = { data };
 
             const { unmount } = renderFixes();
@@ -105,6 +110,8 @@ describe(PullRequestFixes, () => {
         fireEvent.click(screen.getByRole("button", { name: "Problems on octo/hello#7: 3" }));
 
         expect(await screen.findByText("Failing checks: lint")).toBeDefined();
+        // Opening the list reads the state again: an action's prompt is built from what blocks it now.
+        expect(refetch).toHaveBeenCalledTimes(1);
         expect(screen.getByText("Conflicts with main")).toBeDefined();
         expect(screen.getByText("Changes requested by rev")).toBeDefined();
 
@@ -115,5 +122,38 @@ describe(PullRequestFixes, () => {
 
         expect(prefill).toHaveBeenCalledTimes(1);
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("Resolve the merge conflicts between pull request octo/hello#7"));
+    });
+
+    it("says a read failed, with a retry, instead of looking like a pull request with nothing in its way", () => {
+        for (const current of [{ data: { status: "rate_limited" } }, { data: { status: "host_error" } }, { isError: true }]) {
+            status.current = current;
+
+            const { unmount } = renderFixes();
+
+            fireEvent.click(screen.getByRole("button", { name: "Could not read what blocks octo/hello#7. Try again" }));
+
+            expect(refetch).toHaveBeenCalledTimes(1);
+
+            refetch.mockReset();
+            unmount();
+        }
+    });
+
+    it("does not reopen the list by itself once the chip went away and came back", async () => {
+        open({ conflicting: true });
+
+        const { rerender } = renderFixes();
+
+        fireEvent.click(screen.getByRole("button", { name: "Problems on octo/hello#7: 1" }));
+
+        expect(await screen.findByText("Conflicts with main")).toBeDefined();
+
+        open({});
+        rerender(<PullRequestFixes address={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />);
+        open({ conflicting: true });
+        rerender(<PullRequestFixes address={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />);
+
+        expect(screen.getByRole("button", { name: "Problems on octo/hello#7: 1" })).toBeDefined();
+        expect(screen.queryByText("Conflicts with main")).toBeNull();
     });
 });

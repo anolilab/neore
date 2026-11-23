@@ -521,6 +521,52 @@ describe("ComposerInput fix prompts from the pull request chip", () => {
 
         expect(useChatUIStore.getState().composerText).toBe("");
     });
+
+    it("marks a fix prompt as not typed, since it quotes the host", () => {
+        renderComposer();
+        act(() => {
+            prefillComposer("thread-1", "Fix checks on octo/hello#7");
+        });
+
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
+    it("keeps a fix prompt that arrived while a comparison send ran, and drops only the sent text", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(onSubmitOverride).toHaveBeenCalledWith("compare these", [], undefined);
+
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
+    });
+
+    it("still empties the draft after a comparison send when nothing joined it", async () => {
+        const onSubmitOverride = vi.fn(async () => undefined);
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        await waitFor(() => {
+            expect(useChatUIStore.getState().composerText).toBe("");
+        });
+    });
 });
 
 describe("ComposerInput and the draft's not-typed mark", () => {

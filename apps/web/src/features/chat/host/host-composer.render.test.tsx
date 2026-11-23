@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { prefillComposer } from "@/features/chat/thread/composer-prefill";
 import { focusNextArea } from "@/features/keyboard/lib/focus-areas";
 
 const NAME_0 = /^(Send|Queue)$/;
@@ -455,6 +456,21 @@ describe("the coding-agent composer", () => {
         expect(box.value).toBe("ab");
         await waitFor(() => expect(box.selectionStart).toBe(2));
         expect(toast.info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ id: "host-composer-hidden-text" }));
+    });
+
+    it("takes a fix prompt for its thread after the draft, cleaned and unsent, and leaves another thread's", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "my notes" } });
+        act(() => {
+            prefillComposer("thread-2", "not this one");
+            prefillComposer("thread-1", "Fix checks on octo/hello#7\u{202E}");
+        });
+
+        await waitFor(() => expect(box.value).toBe("my notes\nFix checks on octo/hello#7"));
+        expect(sendCalls()).toEqual([]);
     });
 
     it("does not send an empty message", async () => {

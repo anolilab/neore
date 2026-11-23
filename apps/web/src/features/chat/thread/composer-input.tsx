@@ -61,6 +61,7 @@ import { composerDraftFrom, draftFromField, markComposerDraft } from "@/features
 import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
+import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
@@ -1319,7 +1320,19 @@ const ComposerInput = ({
         if (onSubmitOverride) {
             // Comparison parent: fan-out to all child threads
             void onSubmitOverride(draftText, draftAttachments, draftFrom).then(() => {
-                clear();
+                // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                const now = getComposerText();
+
+                if (now === draftText) {
+                    clear();
+                } else if (now.startsWith(draftText)) {
+                    setText(now.slice(draftText.length).trimStart());
+
+                    for (const attachment of draftAttachments) {
+                        useChatUIStore.getState().removeAttachment(attachment.id);
+                    }
+                }
+
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
@@ -1343,6 +1356,7 @@ const ComposerInput = ({
         isOffline,
         t,
         disabled,
+        getComposerText,
         mustSignIn,
         sendMessage,
         onSubmitProp,
@@ -1658,14 +1672,24 @@ const ComposerInput = ({
 
     // A prompt another part of the thread's UI wrote for this thread (`composer-prefill.ts`): added after what is typed,
     // never sent. The same prompt twice is not added twice. A comparison parent's shared composer takes one too: its send
-    // fans out through `onSubmitOverride`, but the text belongs to this thread.
-    useComposerPrefill(!compact && Boolean(threadId) ? threadId : undefined, (prefill) => {
+    // fans out through `onSubmitOverride`, but the text belongs to this thread. The thread's parked draft comes back first,
+    // so a prompt taken as a pane mounts joins that draft instead of keeping it parked. The person did not type the
+    // prompt, and it quotes host text: the draft is marked as a clicked suggestion, unless it already has a mark.
+    useComposerPrefill(!compact && threadId ? threadId : undefined, (prefill) => {
+        if (threadId) {
+            restoreLiveComposerFor(threadId);
+        }
+
         const current = getComposerText();
 
         promptHistory.reset();
 
         if (!current.includes(prefill)) {
             setText(textAfterRestore(current, { append: true, files: [], text: prefill }));
+
+            if (composerDraftFrom() === undefined) {
+                markComposerDraft("suggestion");
+            }
         }
 
         inputAreaRef.current?.focus();

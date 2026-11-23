@@ -351,6 +351,7 @@ const pullSchema = z.object({
     draft: z.boolean().optional(),
     head: z.object({ ref: z.string(), sha: z.string() }),
     html_url: z.string(),
+    mergeable_state: z.string().optional(),
     merged: z.boolean().optional(),
     number: z.int(),
     state: z.string(),
@@ -358,6 +359,17 @@ const pullSchema = z.object({
     updated_at: z.string(),
     user: z.object({ login: z.string() }).nullable(),
 });
+
+/** The host's `mergeable_state`, as ours; a state it has not worked out yet reads `unknown`. */
+const MERGE_STATES: Record<string, MergeState> = {
+    behind: "behind",
+    blocked: "blocked",
+    clean: "clean",
+    dirty: "conflicting",
+    draft: "draft",
+    has_hooks: "clean",
+    unstable: "unstable",
+};
 
 const pullState = (pull: { merged?: boolean; state: string }): PullRequestDetail["state"] => {
     if (pull.merged === true) {
@@ -384,6 +396,7 @@ const getPullRequest = async (request: HostRequest, ref: PullRequestRef): Promis
         draft: pull.draft === true,
         headBranch: pull.head.ref,
         headSha: pull.head.sha,
+        mergeState: MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown",
         number: pull.number,
         repository: ref.repository,
         state: pullState(pull),
@@ -693,6 +706,7 @@ const REVIEW_PAGE_SIZE = 100;
 const REVIEW_BODY_MAX_CHARS = 20_000;
 
 const submittedReviewSchema = z.object({
+    author_association: z.string().optional(),
     body: z.string().nullable().optional(),
     id: z.number(),
     state: z.string(),
@@ -767,6 +781,7 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
 
         return [
             {
+                ...(review.data.author_association !== undefined && { authorAssociation: review.data.author_association }),
                 authorLogin: review.data.user?.login ?? "",
                 body: (review.data.body ?? "").slice(0, REVIEW_BODY_MAX_CHARS),
                 id: String(review.data.id),
@@ -781,7 +796,10 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
     // anyone sees, so they leave the count. Pages not read may hold more of them: the count is then an upper bound.
     const dropped = values.length - items.length;
 
-    return { items: items.toSorted((left, right) => right.submittedAt - left.submittedAt), total: Math.max(items.length, total - dropped) };
+    // Two reviews submitted in the same second keep the host's order reversed (the later id first), so the newer verdict leads.
+    const newestFirst = items.toSorted((left, right) => right.submittedAt - left.submittedAt || Number(right.id) - Number(left.id));
+
+    return { items: newestFirst, total: Math.max(items.length, total - dropped) };
 };
 
 const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
@@ -1470,16 +1488,6 @@ const mergeabilitySchema = z.object({
     auto_merge: z.unknown().nullable().optional(),
     mergeable_state: z.string().optional(),
 });
-
-const MERGE_STATES: Record<string, MergeState> = {
-    behind: "behind",
-    blocked: "blocked",
-    clean: "clean",
-    dirty: "conflicting",
-    draft: "draft",
-    has_hooks: "clean",
-    unstable: "unstable",
-};
 
 const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promise<MergeStatus> => {
     const repo = repoPath(ref);
