@@ -65,6 +65,11 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ available, finalFocusRef, pro
 
                     setStarted(true);
                     setOpen(false);
+                    // Move focus to the run explicitly once the dialog has closed, rather than relying on the dialog's
+                    // final-focus restore alone: the run view may re-render while the close animation is still running.
+                    requestAnimationFrame(() => {
+                        finalFocusRef.current?.focus();
+                    });
                     showSuccess(t`Fix started — follow it below`);
                 },
             },

@@ -445,7 +445,8 @@ export const startSetupFix = authMutation
             agent: run.agent,
             ...(run.branch !== undefined && { branch: run.branch }),
             fixesSetupStep: step,
-            openPr: false,
+            // The fix continues the failed run's work, so it opens a pull request exactly when that run was asked to.
+            openPr: run.openPr,
             prompt: args.prompt,
             repoUrl: run.repoUrl,
             ...(run.threadId !== undefined && { threadId: run.threadId }),
