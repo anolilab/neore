@@ -207,7 +207,7 @@ msgstr "(sin conexión)"
 msgid "(old side)"
 msgstr "(lado antiguo)"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:250
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:275
 #: src/features/settings/connectors/connector-card.tsx:202
 msgid "(opens in a new tab)"
 msgstr "(se abre en una pestaña nueva)"
@@ -376,7 +376,7 @@ msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, one {# comentario pendiente} other {# comentarios pendientes}}"
 
 #. placeholder {0}: prompts.length
-#: src/features/chat/thread/composer-prompt-search.tsx:197
+#: src/features/chat/thread/composer-prompt-search.tsx:199
 msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, one {# prompt encontrado} other {# prompts encontrados}}"
 
@@ -901,7 +901,7 @@ msgstr "{activeCount} de {0} servidores MCP activos"
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:176
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:192
 msgid "{agentLabel} on {repo}"
 msgstr "{agentLabel} en {repo}"
 
@@ -1096,7 +1096,7 @@ msgstr "{fieldLabel} es igual al valor actual"
 msgid "{fieldLabel} updated successfully"
 msgstr "{fieldLabel} se actualizó correctamente"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:212
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:228
 msgid "{fileCount, plural, one {Changes (# file)} other {Changes (# files)}}"
 msgstr "{fileCount, plural, one {Cambios (# archivo)} other {Cambios (# archivos)}}"
 
@@ -2116,6 +2116,10 @@ msgstr "Llega un momento"
 #: src/features/chat/forward/forward-dialog.tsx:109
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "Se abre un chat nuevo con los mensajes seleccionados citados. Revísalo y envíalo."
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:92
+msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
+msgstr "Una nueva ejecución en el mismo repositorio y rama corregirá la causa en el repositorio y volverá a ejecutar el paso. Lee y edita su tarea antes de iniciarla."
 
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:49
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
@@ -6012,7 +6016,8 @@ msgstr "Canadá"
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:118
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/develop/components/pull-request-reviewers-action.tsx:166
@@ -6097,7 +6102,7 @@ msgstr "Cancelar selección"
 
 #: src/features/chat/thread/host-activity.tsx:130
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:164
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:180
 #: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:134
@@ -7247,7 +7252,7 @@ msgstr "programación"
 msgid "Coding"
 msgstr "Programación"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:88
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:89
 msgid "Coding agent log"
 msgstr "Registro del agente de programación"
 
@@ -8817,7 +8822,7 @@ msgstr "no se pudo guardar"
 msgid "Could not cancel the message. It is still queued."
 msgstr "No se pudo cancelar el mensaje. Sigue en la cola."
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:142
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:143
 msgid "Could not cancel the run."
 msgstr "No se pudo cancelar la ejecución."
 
@@ -9082,7 +9087,7 @@ msgstr "No se pudo abrir un hilo para este {requestNoun}. Inténtalo de nuevo."
 msgid "Could not open as a page"
 msgstr "No se pudo abrir como página"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:151
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 msgid "Could not open the pull request."
 msgstr "No se pudo abrir la pull request."
 
@@ -9267,6 +9272,10 @@ msgstr "No se pudo iniciar un contexto nuevo. Inténtalo de nuevo."
 #: src/features/settings/components/chat/mcp-settings.tsx:94
 msgid "Could not start sign-in"
 msgstr "No se pudo comenzar el inicio de sesión"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:58
+msgid "Could not start the fix."
+msgstr "No se pudo iniciar la corrección."
 
 #: src/features/skills/components/skill-builder-test-drive.tsx:79
 msgid "Could not start the test drive."
@@ -9523,7 +9532,7 @@ msgstr "Crear organización"
 msgid "Create Organization"
 msgstr "Crear organización"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:259
 msgid "Create PR"
 msgstr "Crear PR"
 
@@ -11402,7 +11411,7 @@ msgstr "No usar tus instrucciones predeterminadas en este proyecto"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:118
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:168
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:383
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
@@ -12691,7 +12700,7 @@ msgstr "Introduce el slug de la organización"
 msgid "Enter pull requests as owner/name#123."
 msgstr "Escribe las pull requests como propietario/nombre#123."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:219
+#: src/features/chat/thread/composer-prompt-search.tsx:221
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "Intro pone el prompt en el redactor. No se envía."
 
@@ -13645,7 +13654,7 @@ msgstr "fallido"
 
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/chat/thread/host-activity.tsx:139
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:165
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:77
 #: src/features/devices/components/devices-settings.tsx:386
 #: src/features/evals/components/model-comparison.tsx:112
@@ -15194,6 +15203,18 @@ msgstr "Corregir comprobaciones"
 #: src/features/canvas/components/canvas-toolbar.tsx:33
 msgid "Fix grammar"
 msgstr "Corregir gramática"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:84
+msgid "Fix setup"
+msgstr "Corregir la configuración"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:73
+msgid "Fix started — follow it below"
+msgstr "Corrección iniciada: síguela abajo"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:90
+msgid "Fix the \"{step}\" step"
+msgstr "Corregir el paso «{step}»"
 
 #: src/features/develop/lib/fix-prompts.ts:60
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
@@ -20117,7 +20138,7 @@ msgstr "Limitado a modelos de {0}"
 msgid "Locked to {anchorModeName} models"
 msgstr "Limitado a modelos de {anchorModeName}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:198
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:214
 msgid "Log"
 msgstr "Registro"
 
@@ -20662,7 +20683,7 @@ msgstr "Igualar el diseño y la estructura"
 msgid "Matching messages"
 msgstr "Mensajes coincidentes"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:243
+#: src/features/chat/thread/composer-prompt-search.tsx:246
 msgid "Matching prompts"
 msgstr "Prompts coincidentes"
 
@@ -23261,7 +23282,7 @@ msgstr "No se encontraron resultados."
 msgid "No runs yet. Start one to score every case."
 msgstr "Aún no hay ejecuciones. Inicia una para puntuar todos los casos."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:193
+#: src/features/chat/thread/composer-prompt-search.tsx:195
 msgid "No sent prompts match \"{searched}\"."
 msgstr "Ningún prompt enviado coincide con \"{searched}\"."
 
@@ -24132,7 +24153,7 @@ msgstr "Solo quien puede escribir en este chat puede tomar el control del navega
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "Solo se filtran por estado las {0} conversaciones cargadas aquí; las más antiguas no se incluyen."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:204
+#: src/features/chat/thread/composer-prompt-search.tsx:206
 msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
 msgstr "Solo se buscan las mejores coincidencias, así que puede que no aparezca un prompt más antiguo o más reciente. Añade una palabra para acotar la búsqueda."
 
@@ -24803,7 +24824,7 @@ msgstr "Abierto desde este hilo"
 msgid "Opening a blank chat"
 msgstr "Abriendo un chat en blanco"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:156
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:172
 msgid "Opening a pull request — progress is in the log"
 msgstr "Abriendo una pull request: el progreso está en el registro"
 
@@ -24811,7 +24832,7 @@ msgstr "Abriendo una pull request: el progreso está en el registro"
 msgid "Opening a thread…"
 msgstr "Abriendo un hilo…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:233
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
 msgid "Opening pull request…"
 msgstr "Abriendo pull request…"
 
@@ -30094,9 +30115,9 @@ msgstr "Resultados de búsqueda"
 msgid "Search Results ({0})"
 msgstr "Resultados de búsqueda ({0})"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:218
-#: src/features/chat/thread/composer-prompt-search.tsx:222
-#: src/features/chat/thread/composer-prompt-search.tsx:238
+#: src/features/chat/thread/composer-prompt-search.tsx:220
+#: src/features/chat/thread/composer-prompt-search.tsx:224
+#: src/features/chat/thread/composer-prompt-search.tsx:241
 msgid "Search sent prompts"
 msgstr "Buscar prompts enviados"
 
@@ -30204,7 +30225,7 @@ msgstr "Buscar..."
 msgid "Searched the latest messages only"
 msgstr "Se buscó solo en los últimos mensajes"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:191
+#: src/features/chat/thread/composer-prompt-search.tsx:193
 msgid "Searching"
 msgstr "Buscando"
 
@@ -31071,7 +31092,7 @@ msgstr "Atajos"
 msgid "Show {fieldLabel}"
 msgstr "Mostrar {fieldLabel}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:63
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:64
 msgid "Show {hidden} more lines"
 msgstr "Mostrar {hidden} líneas más"
 
@@ -32381,6 +32402,10 @@ msgstr "Empieza a chatear gratis"
 msgid "Start editing cell"
 msgstr "Empezar a editar la celda"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:122
+msgid "Start fix"
+msgstr "Iniciar corrección"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
@@ -32514,7 +32539,7 @@ msgstr "Iniciando el agente de programación…"
 msgid "Starting voice input…"
 msgstr "Iniciando la entrada de voz…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:166
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:182
 msgid "Starting…"
 msgstr "Iniciando…"
 
@@ -33641,6 +33666,10 @@ msgstr "La tarea falló"
 msgid "Task finished"
 msgstr "Tarea completada"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:98
+msgid "Task for the coding agent"
+msgstr "Tarea para el agente de programación"
+
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
 #: ../../packages/ui/src/components/tiptap-editor.tsx:228
 msgid "Task list"
@@ -34214,7 +34243,7 @@ msgstr "Ese código de acceso no es correcto."
 msgid "That path is a file."
 msgstr "Esa ruta es un archivo."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:184
+#: src/features/chat/thread/composer-prompt-search.tsx:186
 msgid "That prompt is no longer available. Pick another."
 msgstr "Ese prompt ya no está disponible. Elige otro."
 
@@ -34339,7 +34368,7 @@ msgstr "El agente guarda los datos que compartes y los usa en chats posteriores,
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "El bucle del agente está siempre activado para ejecutar las tareas de forma sistemática. Estos ajustes controlan módulos especializados adicionales que amplían las capacidades de la IA para tipos de tareas concretos."
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:220
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:236
 msgid "The agent made no file changes."
 msgstr "El agente no hizo cambios en los archivos."
 
@@ -34473,7 +34502,7 @@ msgstr "No se pudo importar el paquete."
 msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
 msgstr "El cambio tiene commits nuevos desde que empezaste esta revisión. Envía o descarta primero la revisión y luego comenta la nueva versión."
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:215
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:231
 msgid "The change is too large to show in full."
 msgstr "El cambio es demasiado grande para mostrarlo completo."
 
@@ -35010,7 +35039,7 @@ msgstr "No se pudieron cargar los repositorios del proyecto, así que no se pued
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "El prompt pasa a ser la entrada del caso y esta respuesta, la respuesta esperada. Edita cualquiera de los dos antes de guardar."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:186
+#: src/features/chat/thread/composer-prompt-search.tsx:188
 msgid "The prompt could not be checked. Try again."
 msgstr "No se pudo comprobar el prompt. Inténtalo de nuevo."
 
@@ -35128,7 +35157,7 @@ msgstr "La ejecución va donde elijas: un chat nuevo cada vez, el mismo chat de 
 msgid "The screenshot could not be saved."
 msgstr "No se pudo guardar la captura de pantalla."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:189
+#: src/features/chat/thread/composer-prompt-search.tsx:191
 msgid "The search failed. Try again."
 msgstr "La búsqueda falló. Inténtalo de nuevo."
 
@@ -37114,7 +37143,7 @@ msgstr "Escríbelo de nuevo"
 msgid "Type to search"
 msgstr "Escribe para buscar"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:181
+#: src/features/chat/thread/composer-prompt-search.tsx:183
 msgid "Type to search the prompts you have sent."
 msgstr "Escribe para buscar en los prompts que has enviado."
 
@@ -38661,7 +38690,7 @@ msgstr "Ver en Google Maps"
 msgid "View Privacy Policy"
 msgstr "Ver política de privacidad"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:274
 msgid "View pull request"
 msgstr "Ver pull request"
 
@@ -38943,7 +38972,7 @@ msgstr "Esperando aprobación"
 msgid "Waiting for approval on {device}"
 msgstr "Esperando aprobación en {device}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:103
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:104
 msgid "Waiting for output…"
 msgstr "Esperando la salida…"
 
@@ -39613,7 +39642,7 @@ msgstr "Trabajando hacia el objetivo: ronda {nextRound} de {0}"
 #: src/features/auth/components/device-approval.tsx:233
 #: src/features/auth/components/device-approval.tsx:242
 #: src/features/chat/thread/streaming-placeholder.tsx:634
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:183
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
 msgstr "Trabajando…"
@@ -39669,6 +39698,10 @@ msgstr "Escribe algo"
 #: src/features/develop/components/guide-tab.tsx:187
 msgid "Write the guide"
 msgstr "Escribir la guía"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:111
+msgid "Write the task for the agent before you start the fix."
+msgstr "Escribe la tarea para el agente antes de iniciar la corrección."
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
 msgid "Write, or type '/' for commands…"

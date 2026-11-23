@@ -690,6 +690,8 @@ export const schema = defineSchema({
         // Set once, by whichever step ended the run first, when the follow-ups
         // (thread message, PR, task round) were claimed — makes them run once.
         finishedAt: v.optional(v.number()),
+        // A "Fix setup" run: the setup step it repairs, which it skips so its agent can run (`setup-fix.ts`).
+        fixesSetupStep: v.optional(v.string()),
         log: v.string(),
         // Byte offset into the sandbox's run log the poller has consumed.
         logOffset: v.optional(v.number()),
@@ -709,6 +711,13 @@ export const schema = defineSchema({
         prUrl: v.optional(v.string()),
         repoUrl: v.string(),
         sandboxId: v.optional(v.string()),
+        // The step a `setup-failed` run stopped at and the capped, redacted end of its log, kept for "Fix setup".
+        setupFailure: v.optional(v.object({ logTail: v.string(), step: v.string() })),
+        // On a fix run: the failed run it repairs, so its finish notification can link where that run was started.
+        setupFixOf: v.optional(v.id("codingAgentRuns")),
+        // The newest "Fix setup" run started from this one; every attempt is in `setupFixRunIds`, oldest first.
+        setupFixRunId: v.optional(v.id("codingAgentRuns")),
+        setupFixRunIds: v.optional(v.array(v.id("codingAgentRuns"))),
         startedAt: v.optional(v.number()),
         status: vCodingAgentRunStatus,
         summary: v.optional(v.string()),
