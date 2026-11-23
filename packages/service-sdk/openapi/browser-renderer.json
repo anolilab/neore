@@ -296,6 +296,10 @@
                         "enum": ["page", "pointer", "all"],
                         "description": "Click, with expectTarget: \"page\" checks and clicks in the page; \"all\" checks, then makes a real click"
                     },
+                    "strictVisibility": {
+                        "type": "boolean",
+                        "description": "Click: refuse an element that opacity hides too (an approved click, the one a person saw); an ordinary click ignores opacity"
+                    },
                     "visibleOnly": {
                         "type": "boolean",
                         "description": "Extract with a selector: return the rendered text, leaving out hidden descendants"

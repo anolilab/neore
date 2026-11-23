@@ -103,6 +103,10 @@ export type BrowserActionRequest = {
      */
     clickMode?: "page" | "pointer" | "all";
     /**
+     * Click: refuse an element that opacity hides too (an approved click, the one a person saw); an ordinary click ignores opacity
+     */
+    strictVisibility?: boolean;
+    /**
      * Extract with a selector: return the rendered text, leaving out hidden descendants
      */
     visibleOnly?: boolean;

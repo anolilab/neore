@@ -44,6 +44,8 @@ export function readTarget(
         pathSplitter: RegExp;
         payment: RegExp;
         splitter: RegExp;
+        /** An approved click: an element opacity hides is refused too. An ordinary click ignores opacity (a styled checkbox's input is 0). */
+        strict?: boolean;
         submit: RegExp;
     },
 ): TargetRead {
@@ -568,7 +570,7 @@ export function readTarget(
         } else if (
             control.getClientRects().length === 0 ||
             getComputedStyle(control).visibility === "hidden" ||
-            control.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false
+            control.checkVisibility?.({ opacityProperty: options.strict === true, visibilityProperty: true }) === false
         ) {
             refused = "hidden";
         } else if (isCoveredIn(control)) {
@@ -645,7 +647,7 @@ export function readTarget(
             } else if (
                 control.getClientRects().length === 0 ||
                 getComputedStyle(control).visibility === "hidden" ||
-                control.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false
+                control.checkVisibility?.({ opacityProperty: options.strict === true, visibilityProperty: true }) === false
             ) {
                 refused = "hidden";
             } else if (isCoveredIn(control)) {

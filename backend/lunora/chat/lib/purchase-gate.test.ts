@@ -187,6 +187,16 @@ describe("the approval an approved tool call runs with", () => {
     });
 });
 
+describe("a look that failed for another reason", () => {
+    it("asks nothing either: the click is refused when it runs (a person is driving the browser)", async () => {
+        const drivenByPerson = vi.fn(async () => {
+            return { error: "The person is driving the browser", success: false, target: undefined };
+        });
+
+        await expect(browserActionNeedsPurchaseApproval({ action: "click", selector: "#pay" }, drivenByPerson)).resolves.toBe(false);
+    });
+});
+
 describe("a selector that matches nothing", () => {
     it("asks nothing: the click fails at once", async () => {
         const missing = vi.fn(async () => {

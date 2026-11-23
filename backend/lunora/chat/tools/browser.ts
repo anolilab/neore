@@ -324,8 +324,8 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                 } else {
                     const look = await run({ action: "extract", approvalLook: true, selector: input.selector });
 
-                    // A selector that matches nothing fails at once, with the renderer's own error (nothing to approve).
-                    if (look.error?.startsWith("Element not found") === true) {
+                    // A look that failed returns its own error (a missing element, a person in control): nothing to approve.
+                    if (look.error !== undefined) {
                         return { error: look.error, success: false };
                     }
 

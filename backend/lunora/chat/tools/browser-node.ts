@@ -221,6 +221,8 @@ export const executeBrowserAction = internalAction
                           action,
                           direction: args.direction as "up" | "down" | undefined,
                           ...(args.clickMode !== undefined && action === "click" && { clickMode: args.clickMode }),
+                          // An approved click is the one a person saw: an element hidden by opacity is refused for it (the renderer checks it).
+                          ...(action === "click" && args.approvedCallId !== undefined && { strictVisibility: true }),
                           ...(expectTarget !== undefined && { expectTarget }),
                           fullPage: args.fullPage,
                           selector: args.selector,

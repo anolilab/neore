@@ -348,7 +348,7 @@ describe("readTarget in a page", () => {
         const element = await page.$("#pay");
         const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
 
-        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target, strict: true });
 
         expect(read.refused).toBe("hidden");
         expect(await wasClicked(page)).toBe(false);
@@ -362,7 +362,7 @@ describe("readTarget in a page", () => {
         const element = await page.$("#pay");
         const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
 
-        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target, strict: true });
 
         expect(read.refused).toBe("hidden");
         expect(read.clicked).toBe(false);
@@ -374,7 +374,7 @@ describe("readTarget in a page", () => {
         const element = await page.$("#pay");
         const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
 
-        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target, strict: true });
 
         expect(read.refused).toBe("hidden");
         expect(await wasClicked(page)).toBe(false);
@@ -426,5 +426,15 @@ describe("readTarget in a page", () => {
         expect(read.refused).toBeUndefined();
         expect(read.clicked).toBe(true);
         expect(await page.evaluate(() => document.body.dataset.submitted === "true")).toBe(true);
+    });
+    it("an ordinary click on a styled checkbox (input at opacity 0) still clicks: opacity alone does not refuse it", async () => {
+        await pageWith(page, `<input id="box" type="checkbox" style="opacity: 0" onclick="window.clicked = true">`);
+        const element = await page.$("#box");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        expect(await wasClicked(page)).toBe(true);
     });
 });

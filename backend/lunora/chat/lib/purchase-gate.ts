@@ -68,8 +68,9 @@ export const browserActionNeedsPurchaseApproval = async (
     try {
         const target = await look(input.selector);
 
-        // A selector that matches nothing is not a purchase: the click fails at once, so nothing is asked for it.
-        if (target.error?.startsWith("Element not found") === true) {
+        // A look that failed (a selector that matches nothing, a person in control, a closed session) asks nothing: the click is
+        // refused when it runs, and `execute` checks a purchase itself. A card would approve a click that cannot run.
+        if (target.error !== undefined) {
             return false;
         }
 

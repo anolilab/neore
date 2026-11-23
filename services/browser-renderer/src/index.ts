@@ -49,6 +49,7 @@ const actionSchema = z.object({
     fullPage: z.boolean().optional(),
     selector: z.string().optional(),
     sessionId: z.string().optional(), // Reconnect to an existing browser session
+    strictVisibility: z.boolean().optional(), // click: refuse an element opacity hides too (an approved click); an ordinary click ignores opacity
     text: z.string().optional(),
     url: z.string().optional(),
     visibleOnly: z.boolean().optional(), // extract with a selector: the rendered text a person sees, not the raw textContent
@@ -480,7 +481,7 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, clickMode, direction, expectTarget, fullPage, selector, sessionId, text, url, visibleOnly }: z.infer<typeof actionSchema>,
+    { action, clickMode, direction, expectTarget, fullPage, selector, sessionId, strictVisibility, text, url, visibleOnly }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
@@ -593,6 +594,7 @@ const actHeld = async (
                     const read = await element.evaluate(readTarget, {
                         click: true,
                         expect: expectTarget,
+                        strict: strictVisibility === true,
                         ...TARGET_READ_OPTIONS,
                     });
 
