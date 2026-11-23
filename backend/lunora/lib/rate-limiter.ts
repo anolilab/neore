@@ -355,15 +355,15 @@ export const RATE_LIMIT_CONFIGS = {
     "messenger/connection:free": Ratelimit.fixedWindow(60, HOUR),
     "messenger/connection:premium": Ratelimit.fixedWindow(300, HOUR),
     "messenger/disconnect:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "messenger/disconnect:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     // Per-platform-sender inbound message cap. Bot owner pays the LLM bill,
     // so the cap is keyed on (connectionId, platformUserId) to prevent a
     // single sender (e.g. anyone with DM access to a public Telegram bot)
     // from running up arbitrary LLM cost on the owner's BYOK key.
     "messenger/inbound:free": Ratelimit.fixedWindow(20, HOUR),
+
     "messenger/inbound:premium": Ratelimit.fixedWindow(120, HOUR),
+
     "messenger/inbound:public": Ratelimit.fixedWindow(20, HOUR),
     // Pairing: `/pair <code>` guesses per sender on a connection, and per
     // connection across senders (the code is ~40 bits and lives 15 minutes) —
@@ -374,11 +374,11 @@ export const RATE_LIMIT_CONFIGS = {
     "messenger/pairAttempt": Ratelimit.fixedWindow(5, 15 * MINUTE),
     "messenger/pairAttemptConnection": Ratelimit.fixedWindow(30, 15 * MINUTE),
     "messenger/privateNotice": Ratelimit.fixedWindow(1, HOUR),
-
     // Notifications (`notifications/`): read state and the Daily Brief toggle,
     // and push subscribe/unsubscribe (each a browser permission prompt at most).
     "notifications/push:free": Ratelimit.fixedWindow(10, MINUTE),
     "notifications/push:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     // A phone fetching one notification's text before it shows the push: per account, a few per notification at most.
     "notifications/pushContent": Ratelimit.fixedWindow(120, MINUTE),
     // Registering a phone (sign-in, token rotation, each return to the front): its own bucket, so a phone opened often
@@ -411,9 +411,9 @@ export const RATE_LIMIT_CONFIGS = {
     "organization/removeMember:premium": Ratelimit.fixedWindow(15, MINUTE),
     "organization/setActive:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/setActive:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     "organization/update:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/update:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     "organization/updateRole:free": Ratelimit.fixedWindow(5, MINUTE),
     "organization/updateRole:premium": Ratelimit.fixedWindow(15, MINUTE),
     // Pages workspace (`pages/`). `save` is the editor's autosave (1.5 s
@@ -422,43 +422,43 @@ export const RATE_LIMIT_CONFIGS = {
     "pages/agent:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
     "pages/comment:free": Ratelimit.fixedWindow(30, MINUTE),
     "pages/comment:premium": Ratelimit.fixedWindow(100, MINUTE),
-
     "pages/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "pages/create:premium": Ratelimit.fixedWindow(60, MINUTE),
 
     "pages/delete:free": Ratelimit.fixedWindow(20, MINUTE),
     "pages/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     "pages/presence:free": Ratelimit.fixedWindow(30, MINUTE),
     "pages/presence:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pages/save:free": Ratelimit.fixedWindow(90, MINUTE),
     "pages/save:premium": Ratelimit.fixedWindow(240, MINUTE),
-
     "pages/share:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "pages/share:premium": Ratelimit.fixedWindow(30, MINUTE),
 
     "pages/update:free": Ratelimit.fixedWindow(60, MINUTE),
+
     "pages/update:premium": Ratelimit.fixedWindow(180, MINUTE),
+
     "pins/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "pins/create:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pins/delete:free": Ratelimit.fixedWindow(20, MINUTE),
     "pins/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pins/update:free": Ratelimit.fixedWindow(30, MINUTE),
-
     "pins/update:premium": Ratelimit.fixedWindow(100, MINUTE),
-
     premium: Ratelimit.tokenBucket(100, 10 * SECOND, 100),
+
     // Project limits
     "project/create:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "project/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "project/member:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "project/member:premium": Ratelimit.fixedWindow(30, MINUTE),
     "project/update:free": Ratelimit.fixedWindow(20, MINUTE),
 
     "project/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Projects (plural) aliases used by projects/functions.ts
     "projects/create:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "projects/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "projects/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "projects/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
@@ -466,9 +466,9 @@ export const RATE_LIMIT_CONFIGS = {
     "projects/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Prompts limits
     "prompts/create:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "prompts/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "prompts/delete:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "prompts/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "prompts/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "prompts/update:premium": Ratelimit.fixedWindow(60, MINUTE),
@@ -487,10 +487,10 @@ export const RATE_LIMIT_CONFIGS = {
     "sandbox/execute:public": Ratelimit.fixedWindow(5, HOUR),
     // Scraper limits (admin only)
     scraper: Ratelimit.fixedWindow(10, MINUTE),
-
     // Settings are written on every toggle and autosave; a loop of them is abuse, not use.
     "settings/update:free": Ratelimit.fixedWindow(60, MINUTE),
     "settings/update:premium": Ratelimit.fixedWindow(180, MINUTE),
+
     "share/view:free": Ratelimit.fixedWindow(600, MINUTE),
     "share/view:premium": Ratelimit.fixedWindow(600, MINUTE),
     // Public share views (`getPublicThread`, `getPublicPage`, `getPublicWorkflow`),
@@ -504,7 +504,6 @@ export const RATE_LIMIT_CONFIGS = {
     "sharing/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "sharing/create:premium": Ratelimit.fixedWindow(15, MINUTE),
     "sharing/update:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "sharing/update:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Skills limits — mirror the prompts CRUD shape; `invoke` is closer to a chat
     // action, so it gets a token bucket rather than a fixed window.
@@ -519,6 +518,7 @@ export const RATE_LIMIT_CONFIGS = {
     // conversation takes several — its own budget, so building one agent does
     // not starve the prompt optimizer's `chat/promptImprovement`.
     "skills/builder:free": Ratelimit.tokenBucket(10, MINUTE, 20),
+
     "skills/builder:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
     // Exporting, previewing and importing a team bundle (`skills/bundle.ts`). The creates an import makes are
     // charged to their own families (`skills/create`, `triggers/create`, `chat/create`); this one only bounds the
@@ -526,19 +526,19 @@ export const RATE_LIMIT_CONFIGS = {
     "skills/bundle:free": Ratelimit.fixedWindow(10, MINUTE),
     "skills/bundle:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/create:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "skills/create:premium": Ratelimit.fixedWindow(30, MINUTE),
-
     "skills/delete:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "skills/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     // Reading a SKILL.md from a pasted link (`skills/io.ts#fetchSkillFromUrl`): one outbound request per
     // call, and a miss costs one too, so it must not eat the budget of the import that follows.
     "skills/fetch:free": Ratelimit.fixedWindow(10, MINUTE),
     "skills/fetch:premium": Ratelimit.fixedWindow(30, MINUTE),
     "skills/invoke:free": Ratelimit.tokenBucket(30, MINUTE, 50),
-
     "skills/invoke:premium": Ratelimit.tokenBucket(100, MINUTE, 200),
     "skills/update:free": Ratelimit.fixedWindow(20, MINUTE),
+
     "skills/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Develop mode (`source-control/`): every read is an outbound call to the Git host with
     // the user's own token, and opening one pull request fans out to a few (files page by page).
@@ -564,48 +564,48 @@ export const RATE_LIMIT_CONFIGS = {
     "sourceControl/webhookIp": Ratelimit.fixedWindow(120, MINUTE),
     "sourceControl/write:free": Ratelimit.fixedWindow(60, MINUTE),
     "sourceControl/write:premium": Ratelimit.fixedWindow(120, MINUTE),
-
     // Sub-agent starts (`sub-agents/functions.ts`), on top of the task quotas
     // each start is charged (`tasks/account.ts:chargeRound`) and the fan-out cap.
     "subAgents/run:free": Ratelimit.fixedWindow(10, HOUR),
-
     "subAgents/run:premium": Ratelimit.fixedWindow(60, HOUR),
+
     // Tag limits
     "tag/create:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "tag/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tag/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "tag/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tag/update:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "tag/update:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     // Tasks and goals (`tasks/functions.ts`). `run` also covers review decisions:
     // each one can start a full headless agent run plus a verifier call.
     "tasks/create:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "tasks/create:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     // Rounds per day, on top of `chat/dailyText` (`tasks/account.ts:chargeRound`):
     // a recurring task must not spend a user's whole message allowance.
     "tasks/dailyRuns:free": Ratelimit.fixedWindow(10, DAY),
-
     "tasks/dailyRuns:premium": Ratelimit.fixedWindow(200, DAY),
     "tasks/delete:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "tasks/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "tasks/run:free": Ratelimit.fixedWindow(5, MINUTE),
     "tasks/run:premium": Ratelimit.fixedWindow(20, MINUTE),
-
     "tasks/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "tasks/update:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     // Team limits
     "team/addMember:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "team/addMember:premium": Ratelimit.fixedWindow(30, MINUTE),
     "team/create:free": Ratelimit.fixedWindow(5, MINUTE),
+
     "team/create:premium": Ratelimit.fixedWindow(15, MINUTE),
     "team/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
-
     "team/leave:free": Ratelimit.fixedWindow(5, MINUTE),
     "team/leave:premium": Ratelimit.fixedWindow(15, MINUTE),
+
     "team/removeMember:free": Ratelimit.fixedWindow(10, MINUTE),
     "team/removeMember:premium": Ratelimit.fixedWindow(30, MINUTE),
     "team/setActive:free": Ratelimit.fixedWindow(10, MINUTE),
@@ -621,6 +621,9 @@ export const RATE_LIMIT_CONFIGS = {
     // threads; the per-thread backoff lives on the passcode row itself.
     "threadLock/unlock:free": Ratelimit.fixedWindow(20, 15 * MINUTE),
     "threadLock/unlock:premium": Ratelimit.fixedWindow(40, 15 * MINUTE),
+    // The command palette's search by meaning: each call embeds the query, and the palette sends one per pause in typing.
+    "threads/meaning:free": Ratelimit.fixedWindow(30, MINUTE),
+    "threads/meaning:premium": Ratelimit.fixedWindow(120, MINUTE),
     // Trigger limits
     "triggers/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "triggers/create:premium": Ratelimit.fixedWindow(20, MINUTE),

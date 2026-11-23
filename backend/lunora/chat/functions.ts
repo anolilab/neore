@@ -5,6 +5,7 @@ import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { FOLLOWUP_DISPATCH_TTL_MS, FOLLOWUP_PATH_LIMIT, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
+import { withoutSearchVectors } from "../agent/thread-search-plan";
 import { callOnShard } from "../lib/cross-shard";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { signDocsForDisplay } from "../agent/display-media";
@@ -44,6 +45,7 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, QueryCtx as QueryContext } from "../_generated/server";
+import { eraseThreadPinsAndRoutes } from "./gdpr";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 // Types from their declaring modules rather than the `agent/client` barrel —
 // see the note in `chat/composite.ts` (since fixed; kept because it decouples
@@ -3729,7 +3731,8 @@ export const getFullThreadForExport = authQuery
             allMessages = messages.page;
         }
 
-        return { messages: allMessages, thread };
+        // Derived data is not exported: the palette-search vector ids (`agent/thread-search.ts`) are rebuilt from the text.
+        return { messages: allMessages, thread: withoutSearchVectors(thread) };
     });
 
 export const branchThread = authAction
@@ -3963,6 +3966,8 @@ export const hardDeleteThread = internalMutation
         const threadBeforeDelete = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+        // The thread's pins and the collaborator routes that name it go with it (`chat/gdpr.ts`).
+        await eraseThreadPinsAndRoutes(context, threadId as Id<"threads">);
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
@@ -4185,6 +4190,32 @@ export const updateBrowserSettings = authMutation
             blocklistCount: browserSettings.domainBlocklist?.length ?? 0,
             enabledSet: browserSettings.enabled !== undefined,
         });
+    });
+
+/**
+ * How the agent's browser clicks: "page" (the default), "pointer" (real clicks for ordinary targets), or "all" (real clicks after
+ * a check). Server-written, like the commit identity: the setter is the only writer of `browserClickMode`.
+ */
+export const setBrowserClickMode = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ mode: v.union(v.literal("page"), v.literal("pointer"), v.literal("all")) })
+    .output(v.null())
+    .mutation(async ({ args: { mode }, ctx: context }) => {
+        // A real-click mode lets a page change an ordinary button into a purchase unseen: an admin acting as the user may not turn it on.
+        // Going back to "page" only adds protection, so it stays allowed.
+        if (mode !== "page") {
+            refuseImpersonation(context.user.impersonatedBy, "The browser click mode cannot be made real while impersonating");
+        }
+
+        const prefs = await context.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", context.user.userId))
+            .first();
+
+        await saveAiUserPreferences(context.db, prefs, context.user.userId, { browserClickMode: mode }, context.user.activeOrganization?.id ?? null);
+        context.log.event("chat.set_browser_click_mode", { mode });
+
+        return null;
     });
 
 /**

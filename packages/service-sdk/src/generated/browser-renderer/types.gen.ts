@@ -95,6 +95,22 @@ export type BrowserActionRequest = {
      */
     fullPage?: boolean;
     /**
+     * Click: the target fingerprint of the element the person was shown; the click is refused when the element differs
+     */
+    expectTarget?: string;
+    /**
+     * Click, with `expectTarget`: "page" checks and clicks in the page; "all" checks, then makes a real click
+     */
+    clickMode?: "page" | "pointer" | "all";
+    /**
+     * Click: refuse an element that opacity hides too (an approved click, the one a person saw); an ordinary click ignores opacity
+     */
+    strictVisibility?: boolean;
+    /**
+     * Extract with a selector: return the rendered text, leaving out hidden descendants
+     */
+    visibleOnly?: boolean;
+    /**
      * JavaScript to evaluate (max 5000 chars)
      */
     script?: string;
@@ -118,6 +134,34 @@ export type BrowserActionResponse = {
      * Extracted text content
      */
     content?: string;
+    /**
+     * Accessible name of the extracted control, when it is not its text (visibleOnly reads only)
+     */
+    label?: string;
+    /**
+     * The accessible name was cut short
+     */
+    labelTruncated?: boolean;
+    /**
+     * A click was refused because its target changed since it was checked; nothing was clicked
+     */
+    targetChanged?: boolean;
+    /**
+     * Fingerprint of the extracted element (visibleOnly reads only)
+     */
+    target?: string;
+    /**
+     * The element is on a checkout (visibleOnly reads only)
+     */
+    checkout?: boolean;
+    /**
+     * One of the element's name sources is exactly a bare subscription word (visibleOnly reads only)
+     */
+    subscribeLike?: boolean;
+    /**
+     * One of the element's name sources is exactly a submit word (visibleOnly reads only)
+     */
+    submitLike?: boolean;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;

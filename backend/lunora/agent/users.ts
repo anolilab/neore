@@ -12,6 +12,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { nullable, paginationOptionsValidator } from "../lib/validators";
 import { stream } from "../lib/streams";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
+import { eraseThreadPinsAndRoutes } from "../chat/gdpr";
 import { deleteMessage } from "./messages";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { vPaginationResult } from "./validators";
@@ -227,6 +228,8 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
 
     // The thread's follow rows go first, one batch per call; the thread goes once none are left.
     if (streamResult.isDone && (await deleteFollowRowsOfThread(context, threadInProgress!))) {
+        // The pins on this thread and the routes to it go with it: a collaborator's pins are stored on this shard (`chat/gdpr.ts`).
+        await eraseThreadPinsAndRoutes(context, threadInProgress!);
         await context.db.delete("threads", threadInProgress);
         threadInProgress = null;
         messagesCursor = null;

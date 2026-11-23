@@ -251,6 +251,21 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             text?: string;
             tool?: boolean;
         }[];
+        /** The owner's own pins on the thread: what each pins, the note on it and the text it quotes (`chat/pins/functions.ts`). */
+        pins: {
+            _id: string;
+            createdAt: number;
+            documentId?: string;
+            documentKind?: string;
+            imageIndex?: number;
+            imageKey?: string;
+            kind?: "document" | "image" | "message";
+            messageId?: string;
+            messageRole: string;
+            note?: string;
+            selectedText?: string;
+            updatedAt: number;
+        }[];
         thread: {
             _id: string;
             activeLeafMessageId?: string;
@@ -285,7 +300,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
-            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes" | "pins"> | undefined;
 
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
@@ -349,7 +364,12 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                         ? []
                         : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
 
-                conversations.push({ ...collected, guestLinks, guestNotes });
+                // The owner's pins, read by the owner's id: a pin someone else made on a shared thread is theirs to export.
+                const pins = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.pins.functions.listPinsForExport, { cursor, threadId, userId }),
+                );
+
+                conversations.push({ ...collected, guestLinks, guestNotes, pins });
             }
         }
 
@@ -367,6 +387,71 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
     return conversations;
 });
+
+/**
+ * The pins the caller made on threads other people shared with them. Such a thread and its pins live on its owner's shard, so the
+ * pins are read there, page by page, by the caller's own id. A thread's pins that the caller made nothing on are left out.
+ */
+export const collectSharedPins = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
+    const routes = await readAllPages(async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }));
+    const shared: { pins: unknown[]; threadId: string }[] = [];
+
+    const seen = new Set<string>();
+
+    for (const route of routes) {
+        // A thread is read once, even if two routes name it (a replica can miss the first insert).
+        if (seen.has(route.threadId)) {
+            continue;
+        }
+
+        seen.add(route.threadId);
+
+        const pins = await readAllPages(
+            async (cursor) =>
+                await callOnShard(
+                    internal.chat.pins.functions.listPinsForExport,
+                    { cursor, threadId: route.threadId as Id<"threads">, userId },
+                    { shardKey: route.ownerId },
+                ),
+        );
+
+        if (pins.length > 0) {
+            shared.push({ pins, threadId: route.threadId });
+        }
+    }
+
+    return shared;
+});
+
+/**
+ * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
+ * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
+ */
+export const erasePinsOnOwnerShards = internalAction
+    .input({ userId: v.string() })
+    .output(v.null())
+    .action(async ({ args: { userId }, ctx: context }) => {
+        const routes = await readAllPages(
+            async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }),
+        );
+
+        for (const route of routes) {
+            // One batch per call on the owner's shard: repeat until none is left.
+            let more = true;
+
+            while (more) {
+                const result = await callOnShard(
+                    internal.chat.pins.functions.eraseUserPinsOnThread,
+                    { threadId: route.threadId as Id<"threads">, userId },
+                    { shardKey: route.ownerId },
+                );
+
+                more = result.hasMore;
+            }
+        }
+
+        return null;
+    });
 
 export const collectFiles = internalQuery
     .input({ userId: v.string() })
@@ -614,6 +699,9 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         reviewDrafts: v.optional(v.any()),
         settings: v.any(),
+        // The pins the caller made on threads shared with them, read from each owner's shard (`collectSharedPins`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        sharedThreadPins: v.optional(v.any()),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         tasks: v.optional(v.any()),
@@ -752,6 +840,7 @@ export const generateExportFile = internalAction
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             settings: args.settings,
+            sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,
