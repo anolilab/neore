@@ -13,12 +13,24 @@ export interface PromptSearchKeyOptions {
     onOpen: () => boolean;
 }
 
+const LATIN_LETTER = /^[a-z]$/i;
+
 /**
- * Ctrl+R, alone. The physical key counts as well as the typed letter: on a non-Latin layout (Cyrillic, Greek) the key
- * in the R position types another letter, and the browser's reload still answers it there.
+ * Ctrl+R, alone. The typed letter decides; the physical key in the R position counts only when the layout types no Latin
+ * letter there (Cyrillic, Greek), where the browser's reload still answers it. On Dvorak or Colemak that key types `p`,
+ * and Ctrl+P stays with whoever owns it.
  */
-export const isPromptSearchKey = (event: Pick<KeyboardEvent, "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey">): boolean =>
-    event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && (event.key.toLowerCase() === "r" || event.code === "KeyR");
+export const isPromptSearchKey = (event: Pick<KeyboardEvent, "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey">): boolean => {
+    if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+        return false;
+    }
+
+    if (LATIN_LETTER.test(event.key)) {
+        return event.key.toLowerCase() === "r";
+    }
+
+    return event.code === "KeyR";
+};
 
 const PromptSearchKey = Extension.create<PromptSearchKeyOptions>({
     addOptions() {

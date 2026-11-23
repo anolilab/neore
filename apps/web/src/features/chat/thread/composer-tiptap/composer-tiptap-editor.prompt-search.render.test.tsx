@@ -132,6 +132,17 @@ describe("ComposerTiptapEditor Ctrl+R", () => {
         expect(event.defaultPrevented).toBe(true);
     });
 
+    it("leaves Ctrl+P alone on a layout that types p on the R key", async () => {
+        const onPromptSearch = vi.fn(() => true);
+        const { element } = await renderEditor(onPromptSearch);
+
+        // Dvorak and Colemak type p in the R position.
+        const event = pressCtrlR(element, "p");
+
+        expect(onPromptSearch).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
+    });
+
     it("keeps a taken Ctrl+R from a shortcut recorded on the same key", async () => {
         const reached = vi.fn();
 
