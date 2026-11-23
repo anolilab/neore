@@ -11,8 +11,9 @@ import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { currentSentPrompt, SENT_PROMPT_LINEAGE_READS, searchSentPrompts } from "./functions";
 import { typedTextColumn } from "../agent/shared";
+import { getMessagesByIdsUnfiltered, publicMessage } from "../agent/messages";
 import { patchMessage } from "../agent/table-writes";
-import { documentTextPart, guestTextPart, typedTextOf } from "./lib/attached-text";
+import { documentTextPart, guestTextPart, outsideAgentTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
@@ -98,6 +99,12 @@ const search = async (harness: ReturnType<typeof lunoraTest>, searchQuery: strin
 
     return result.prompts as { createdAt?: number; draftFrom?: string; messageId: string; text: string; threadId: string; threadTitle: string }[];
 };
+
+const current = (harness: ReturnType<typeof lunoraTest>, messageId: string, userId = OWNER) =>
+    harness.withIdentity({ userId } as never).query(currentSentPrompt as never, { messageId } as never) as Promise<{
+        draftFrom?: string;
+        text: string;
+    } | null>;
 
 describe("searchSentPrompts", () => {
     it("lists the caller's sent prompts from two threads, newest first, and nothing else", async () => {
@@ -591,7 +598,10 @@ describe("searchSentPrompts", () => {
                 const thread = await insertThread(context, { title: "Trip", userId: OWNER });
                 const { messages } = await addMessagesHandler(context, { messages: [{ message }], threadId: thread, userId: OWNER } as never);
 
-                return messages[0];
+                // The row as stored: the returned message, like every message read, leaves `typedText` out (`publicMessage`).
+                expect(messages[0]).not.toHaveProperty("typedText");
+
+                return context.db.get("messages", messages[0]!._id);
             });
 
             // `text` keeps every part in the order it was sent; `typedText` is `typedTextOf`'s, each typed part its own paragraph.
@@ -844,12 +854,6 @@ describe("searchSentPrompts", () => {
 });
 
 describe("currentSentPrompt", () => {
-    const current = (harness: ReturnType<typeof lunoraTest>, messageId: string, userId = OWNER) =>
-        harness.withIdentity({ userId } as never).query(currentSentPrompt as never, { messageId } as never) as Promise<{
-            draftFrom?: string;
-            text: string;
-        } | null>;
-
     it("answers with the prompt for a prompt newer matches pushed out of the search's list, and no where the search would not list it", async () => {
         const harness = lunoraTest(schema as never);
 
@@ -980,6 +984,84 @@ describe("currentSentPrompt", () => {
             });
 
             await expect(current(harness, messageId)).resolves.toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("a prompt holding someone else's words beside the person's", () => {
+    it("lists, matches and answers a pick with the person's typed words alone, never the guest's note or the outside agent's text", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const threadId = await insertThread(context, { title: "Mixed", userId: OWNER });
+                const withGuest = await insertMessage(context, {
+                    content: [guestTextPart("rollback from the guest", "note-1"), { text: "release checklist please", type: "text" }],
+                    createdAt: 1,
+                    order: 0,
+                    role: "user",
+                    text: "rollback from the guest\n\nrelease checklist please",
+                    threadId,
+                    userId: OWNER,
+                });
+                const withOutsideAgent = await insertMessage(context, {
+                    content: [outsideAgentTextPart("rollback from the agent"), { text: "release notes too", type: "text" }],
+                    createdAt: 2,
+                    order: 1,
+                    role: "user",
+                    text: "rollback from the agent\n\nrelease notes too",
+                    threadId,
+                    userId: OWNER,
+                });
+
+                return { withGuest, withOutsideAgent };
+            });
+
+            const listed = await search(harness, "release");
+
+            expect(
+                listed.map(({ messageId, text }) => {
+                    return { messageId, text };
+                }),
+            ).toStrictEqual([
+                { messageId: ids.withOutsideAgent, text: "release notes too" },
+                { messageId: ids.withGuest, text: "release checklist please" },
+            ]);
+            // The other words are in `text`, never in the index: a search for them finds nothing.
+            await expect(search(harness, "rollback")).resolves.toStrictEqual([]);
+            await expect(current(harness, ids.withGuest)).resolves.toStrictEqual({ text: "release checklist please" });
+            await expect(current(harness, ids.withOutsideAgent)).resolves.toStrictEqual({ text: "release notes too" });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("typed words stay on the server", () => {
+    it("leaves typedText out of a message as message reads return it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const messageId = await harness.run(async (context: any) => {
+                const threadId = await insertThread(context, { title: "Plain", userId: OWNER });
+
+                return insertMessage(context, { createdAt: 1, order: 0, role: "user", text: "deploy the site", threadId, userId: OWNER });
+            });
+            const stored = await harness.run(async (context: any) => context.db.get("messages", messageId));
+
+            expect(stored.typedText).toBe("deploy the site");
+            expect(publicMessage(stored)).not.toHaveProperty("typedText");
+            expect(publicMessage(stored)).toMatchObject({ _id: messageId, text: "deploy the site" });
+
+            const [read] = (await harness.run(async (context: any) => context.runQuery(getMessagesByIdsUnfiltered, { messageIds: [messageId] }))) as {
+                _id: string;
+                text?: string;
+            }[];
+
+            expect(read).toMatchObject({ _id: messageId, text: "deploy the site" });
+            expect(read).not.toHaveProperty("typedText");
         } finally {
             harness.close();
         }

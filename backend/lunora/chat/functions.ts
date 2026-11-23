@@ -69,11 +69,10 @@ import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
-import { messageCarriesGuestText, messageCarriesOutsideAgentText } from "./lib/attached-text";
 import { readChildThreads } from "./lib/child-threads";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
-import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { type TypedPromptRow, vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
 import { type DraftFrom, draftFromOfMarks, notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
 import { vDraftFrom, vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
@@ -3505,22 +3504,16 @@ export const SENT_PROMPT_LINEAGE_READS = 64;
 
 /**
  * One saved row as a sent prompt: a user row someone typed, with its `typedText` (the indexed words, so what lists is
- * what matched) and its not-typed mark. `undefined` for a reply, a goal continuation round (typed by nobody), a guest's
- * note or an outside agent's text sent on, and a row with no typed words (an attached document alone, a quote, the app's
- * placeholder), which has no `typedText`.
+ * what matched) and its not-typed mark. `undefined` for a reply, a goal continuation round (typed by nobody), and a row
+ * with no typed words: an attached document alone, a quote, the app's placeholder, a guest's note or an outside agent's
+ * text sent on. `typedText` (`typedTextOf`) leaves those parts out of a row that has typed parts beside them, so only the
+ * person's own words list, and a row of nothing but such parts has no `typedText`.
  */
-const sentPromptOf = (message: MessageDoc): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
+const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
     const stored = message.message as { content?: unknown; role?: string } | undefined;
     const typed = message.typedText;
 
-    if (
-        typed === undefined ||
-        message.tool ||
-        stored?.role !== "user" ||
-        message.agentName === GOAL_CONTINUATION_AGENT ||
-        messageCarriesGuestText(stored) ||
-        messageCarriesOutsideAgentText(stored)
-    ) {
+    if (typed === undefined || message.tool || stored?.role !== "user" || message.agentName === GOAL_CONTINUATION_AGENT) {
         return undefined;
     }
 
@@ -3540,7 +3533,8 @@ const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is T
  * placeholder) through `typedTextSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt
  * never lists. Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index
  * matches. Trashed threads, chats deleted for good, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are
- * dropped too, and so are a guest's note or an outside agent's text sent on. A branch copies its rows, so the same prompt
+ * dropped too. A guest's note or an outside agent's text sent on never lists: `typedText` leaves those parts out, so a
+ * message holding them beside typed words lists and matches by the typed words alone. A branch copies its rows, so the same prompt
  * in chats of one branch family (`threadRelationships`) lists once; the same words sent in unrelated chats list once per
  * chat. A query longer than the search reads is cut to its first characters and words, not refused. `truncated` says a
  * matching prompt may be missing: the index window was full, or more prompts matched than the list holds.
@@ -3560,7 +3554,7 @@ export const searchSentPrompts = authQuery
         }
 
         // The index already holds only typed words; this keeps a hit only when they match as the query reads them.
-        const typedHits = (hits: ReadonlyArray<MessageDoc>) =>
+        const typedHits = (hits: ReadonlyArray<TypedPromptRow>) =>
             hits.flatMap((message) => {
                 const prompt = sentPromptOf(message);
 
@@ -3632,8 +3626,8 @@ export const searchSentPrompts = authQuery
                 }
             }
 
-            const sentAt = (message: MessageDoc): number => message.createdAt ?? message._creationTime;
-            const copyKey = (message: MessageDoc, typed: string) => `${String(sentAt(message))}\u{0}${typed}`;
+            const sentAt = (message: TypedPromptRow): number => message.createdAt ?? message._creationTime;
+            const copyKey = (message: TypedPromptRow, typed: string) => `${String(sentAt(message))}\u{0}${typed}`;
             const listed = sent
                 .filter(({ message }) => listsSentPrompts(threads.get(message.threadId) ?? null, userId))
                 .toSorted(
@@ -3716,7 +3710,7 @@ export const currentSentPrompt = authQuery
     .output(v.union(v.object({ draftFrom: v.optional(vDraftFrom), text: v.string() }), v.null()))
     .query(async ({ args: { messageId }, ctx: context }) => {
         const { userId } = context.user;
-        const [message] = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId] });
+        const message = await context.runQuery(internal.agent.messages.typedPromptRow, { messageId });
         // No `typedText` is a row the typed-words index does not hold (`sentPromptOf`), so the search never lists it.
         const prompt = message && message.userId === userId ? sentPromptOf(message) : undefined;
         const thread =

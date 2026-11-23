@@ -619,8 +619,6 @@ export const vMessageDocFields = {
     threadId: v.string(),
     // Convenience fields extracted from the message
     tool: v.boolean(), // either tool call (assistant) or tool result (tool)
-    // What the person typed into a user message, for the composer's prompt search (`schema.ts`, `typedText`).
-    typedText: v.optional(v.string()),
     // Result metadata
     usage: v.optional(vUsage),
     userId: v.optional(v.string()), // useful for searching across threads
@@ -628,6 +626,32 @@ export const vMessageDocFields = {
 };
 
 export const vMessageDoc = v.object(vMessageDocFields);
+
+/**
+ * Message columns no client reads: `publicMessage` (`agent/messages.ts`) leaves them out of every message read and stream, so
+ * `vMessageDocFields` does not declare them. `typedText` is the prompt search's index column (`schema.ts`); the search
+ * reads it through {@link vTypedPromptRow} only.
+ */
+export const SERVER_ONLY_MESSAGE_COLUMNS = ["typedText"] as const;
+
+/**
+ * A row of the typed-words index as the composer's prompt search reads it (`agent/messages.ts#typedTextSearch`,
+ * `#typedPromptRow`): what `chat/functions.ts#sentPromptOf` decides with, and the typed words. Server-only.
+ */
+export const vTypedPromptRow = v.object({
+    _creationTime: v.number(),
+    _id: v.string(),
+    agentName: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    message: v.optional(vMessage),
+    order: v.number(),
+    stepOrder: v.number(),
+    threadId: v.string(),
+    tool: v.boolean(),
+    typedText: v.optional(v.string()),
+    userId: v.optional(v.string()),
+});
+export type TypedPromptRow = Infer<typeof vTypedPromptRow>;
 
 /** The columns `updateMessage` may patch; literal for the reason on `vThreadPatchFields`. */
 export const vMessagePatchFields = {

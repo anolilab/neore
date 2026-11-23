@@ -33,6 +33,8 @@ import {
     vMessageEmbeddingsWithDimension,
     vMessageStatus,
     vMessageWithMetadataInternal,
+    type TypedPromptRow,
+    vTypedPromptRow,
     vPaginationResult,
 } from "./validators";
 import { agentSwitchOf, withoutSwitchIds } from "./agent-switch-logic";
@@ -49,11 +51,35 @@ import { patchRow, withoutUndefined } from "../lib/patch";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { ownedChatFileIdsIn } from "../lib/storage-ownership";
 
-const publicMessage = (message: Doc<"messages">): MessageDoc =>
+/**
+ * A row as message reads and streams return it: without the server-only columns (`SERVER_ONLY_MESSAGE_COLUMNS`), so the
+ * prompt search's `typedText` never reaches a client beside `text`.
+ */
+export const publicMessage = (message: Doc<"messages">): MessageDoc => {
+    // eslint-disable-next-line sonarjs/no-unused-vars -- the rest pattern is the point of this line
+    const { typedText: _typedText, ...visible } = message;
+
     // Optional fields are never null at runtime (only undefined),
     // but the column builders generate null|T types in TypeScript.
     // Safe cast: runtime values are always T | undefined, never null.
-    message as unknown as MessageDoc;
+    return visible as unknown as MessageDoc;
+};
+
+/** A row as the prompt search reads it (`vTypedPromptRow`): only what `sentPromptOf` decides with. */
+const typedPromptRowOf = (message: Doc<"messages">): TypedPromptRow =>
+    withoutUndefined({
+        _creationTime: message._creationTime,
+        _id: message._id,
+        agentName: message.agentName ?? undefined,
+        createdAt: message.createdAt ?? undefined,
+        message: (message.message ?? undefined) as TypedPromptRow["message"],
+        order: message.order,
+        stepOrder: message.stepOrder,
+        threadId: message.threadId,
+        tool: message.tool,
+        typedText: message.typedText ?? undefined,
+        userId: message.userId ?? undefined,
+    }) as TypedPromptRow;
 
 export const deleteMessage = async (context: MutationContext, messageDocument: Doc<"messages">) => {
     await context.db.delete("messages", messageDocument._id);
@@ -1311,7 +1337,7 @@ export const textSearch = internalQuery
  */
 export const typedTextSearch = internalQuery
     .input({ limit: v.number(), text: v.string().max(MAX_LENGTH.long), userId: v.string().max(MAX_LENGTH.short) })
-    .output(v.object({ filled: v.boolean(), messages: v.from(v.array(vMessageDocument)) }))
+    .output(v.object({ filled: v.boolean(), messages: v.from(v.array(vTypedPromptRow)) }))
     .query(async ({ args, ctx }) => {
         const messages = await ctx.db
             .query("messages")
@@ -1319,7 +1345,21 @@ export const typedTextSearch = internalQuery
             .take(args.limit);
         const visible = await withoutLockedThreads(ctx, messages, {});
 
-        return { filled: messages.length >= args.limit, messages: visible.map((item) => publicMessage(item)) };
+        return { filled: messages.length >= args.limit, messages: visible.map((item) => typedPromptRowOf(item)) };
+    });
+
+/**
+ * One message as the prompt search reads it (`vTypedPromptRow`), or `null` when there is none. Raw like
+ * `getMessagesByIdsUnfiltered`: the caller (`chat/functions.ts#currentSentPrompt`) checks the owner and the thread's lock
+ * itself. Internal only.
+ */
+export const typedPromptRow = internalQuery
+    .input({ messageId: v.id("messages") })
+    .output(v.from(v.union(v.null(), vTypedPromptRow)))
+    .query(async ({ args, ctx }) => {
+        const message = await ctx.db.get("messages", args.messageId);
+
+        return message ? typedPromptRowOf(message) : null;
     });
 
 export const getMessageSearchFields = internalQuery
