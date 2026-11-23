@@ -558,7 +558,8 @@ const actHeld = async (
 
                 if (expectTarget === undefined) {
                     await page.click(selector, { timeout: PAGE_TIMEOUT });
-                } else if (clickMode === "all") {
+                } else if (clickMode === "all" && strictVisibility !== true) {
+                    // (An approved click takes the in-page path below: its form is submitted by the renderer to the approved destination.)
                     // A real click after the check. A page handler can run between the two (the trade-off this mode is chosen for), so
                     // the check is not one step with the click here. A changed or disabled target is still refused before the click.
                     const element = await page.$(selector);
@@ -577,16 +578,6 @@ const actHeld = async (
 
                     if (await element.isDisabled()) {
                         result = { error: DISABLED_TARGET, success: false };
-                        break;
-                    }
-
-                    // An approved click is the one a person saw: Playwright counts opacity 0 as visible, so an element opacity hides is
-                    // refused here for an approved click (the same check the in-page path makes with `strict`).
-                    if (
-                        strictVisibility === true &&
-                        (await element.evaluate((node) => node.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false))
-                    ) {
-                        result = { error: NOT_VISIBLE_TARGET, success: false };
                         break;
                     }
 

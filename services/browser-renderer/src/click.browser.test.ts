@@ -172,7 +172,7 @@ describe("readTarget in a page", () => {
         expect(page.url()).toBe("https://shop.example/cart");
     });
 
-    it("a destination moved by a handler that stops the click's propagation is refused too, and nothing is submitted", async () => {
+    it("a destination moved by a handler that stops the click's propagation does not move the approved submission", async () => {
         await pageWith(page, `<form id="order" action="/cart/confirm"><button id="pay" type="submit">Pay now</button></form>`);
         const element = await page.$("#pay");
         const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
@@ -186,11 +186,9 @@ describe("readTarget in a page", () => {
         });
         const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
 
-        expect(read.refused).toBe("moved");
-        // No event marks a navigation that never starts: a short wait is how the absence shows.
-        // eslint-disable-next-line sonarjs/no-fixed-wait-in-tests
-        await page.waitForTimeout(300);
-        expect(page.url()).toBe("https://shop.example/cart");
+        expect(read.refused).toBeUndefined();
+        await page.waitForURL("**/cart/confirm**", { timeout: 3000 });
+        expect(page.url()).toContain("/cart/confirm");
     });
 
     it("a purchase phrase appended to a label already at the cap changes the target", async () => {
@@ -436,5 +434,19 @@ describe("readTarget in a page", () => {
 
         expect(read.refused).toBeUndefined();
         expect(await wasClicked(page)).toBe(true);
+    });
+    it("a page submit handler that moves the destination does not redirect an approved submission", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm"><button id="pay" type="submit">Pay now</button></form><script>document.addEventListener("submit", () => { document.getElementById("order").setAttribute("action", "/elsewhere"); });</script>`,
+        );
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        await page.waitForURL("**/cart/confirm**", { timeout: 3000 });
+        expect(page.url()).not.toContain("/elsewhere");
     });
 });

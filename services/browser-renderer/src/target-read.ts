@@ -595,17 +595,47 @@ export function readTarget(
                 },
                 { signal: stop.signal },
             );
+            // A form the click submits: after the page's own submit handlers (the last listener of the bubble phase), the renderer submits
+            // it to the destination the check approved, rather than leaving the browser to read the form's action as it is now. A
+            // handler that cancelled the submission (a single-page form) keeps it cancelled. Known limit: a page that stops the submit
+            // event's propagation before it reaches the window is submitted by the browser, to whatever destination it set.
+            const submitter = control instanceof HTMLButtonElement || control instanceof HTMLInputElement ? control : null;
+            const isSubmitter =
+                submitter !== null && (submitter instanceof HTMLButtonElement ? submitter.type === "submit" : ["image", "submit"].includes(submitter.type));
+            const ownForm = isSubmitter && submitter !== null ? submitter.form : null;
+            let approvedAction = "";
+
+            if (isSubmitter && submitter !== null && ownForm !== null) {
+                // A submitter without its own formaction reads the document address; the form's own resolved action is the destination then.
+                approvedAction = submitter.hasAttribute("formaction")
+                    ? submitter.formAction
+                    : String(Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, "action")?.get?.call(ownForm) ?? "");
+            }
+
             clickScope.addEventListener(
                 "submit",
                 (event) => {
-                    if (first.destinationsOf() === first.destinations) {
+                    if (ownForm === null || submitter === null || event.target !== ownForm || event.defaultPrevented) {
                         return;
                     }
 
-                    isMoved = true;
                     event.preventDefault();
+                    ownForm.setAttribute("action", approvedAction);
+
+                    // The submitter's name and value go with the form, as the browser would send them. `submit()` runs no submit event.
+                    const sent = submitter.name === "" ? null : document.createElement("input");
+
+                    if (sent !== null) {
+                        sent.type = "hidden";
+                        sent.name = submitter.name;
+                        sent.value = submitter.value;
+                        ownForm.append(sent);
+                    }
+
+                    HTMLFormElement.prototype.submit.call(ownForm);
+                    sent?.remove();
                 },
-                { capture: true, signal: stop.signal },
+                { signal: stop.signal },
             );
             const { navigation } = clickScope as typeof clickScope & { navigation?: EventTarget };
 
@@ -660,6 +690,7 @@ export function readTarget(
             stop.abort();
 
             // The click was dispatched; a moved destination is what stops it from being submitted.
+            // A moved destination, or a form whose submission was cancelled and never made (a handler stopped the event): refused.
             if (isMoved) {
                 refused = "moved";
             }
