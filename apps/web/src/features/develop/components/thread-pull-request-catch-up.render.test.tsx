@@ -21,7 +21,15 @@ const { composer, hostMerge, prefill, pull, reads } = vi.hoisted(() => {
         pull: {
             current: {} as {
                 data?: {
-                    detail?: { baseBranch: string; headBranch: string; headInBaseRepository?: boolean; headSha: string; state: string; url: string };
+                    detail?: {
+                        baseBranch: string;
+                        draft?: boolean;
+                        headBranch: string;
+                        headInBaseRepository?: boolean;
+                        headSha: string;
+                        state: string;
+                        url: string;
+                    };
                     status: string;
                 };
                 isError?: boolean;
@@ -93,7 +101,7 @@ vi.mock("../lib/use-develop", () => {
 const BUTTON = { name: "Catch up octo/hello#7 with main" };
 
 /** `head` is what the host said of the head's repository: the same as the base unless a case says otherwise. */
-const given = (state: string, mergeState: string, headBranch = "feat/x", head?: { headInBaseRepository?: boolean }, baseBranch = "main") => {
+const given = (state: string, mergeState: string, headBranch = "feat/x", head?: { draft?: boolean; headInBaseRepository?: boolean }, baseBranch = "main") => {
     pull.current = {
         data: {
             detail: {
@@ -175,6 +183,15 @@ describe("ThreadPullRequestCatchUp", () => {
         given(state, mergeState);
         await renderCatchUp();
 
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(screen.queryByText("Behind main")).toBeNull();
+    });
+
+    it("makes no mergeability read and shows nothing for an open draft", async () => {
+        given("open", "behind", "feat/x", { draft: true, headInBaseRepository: true });
+        await renderCatchUp();
+
+        expect(hostMerge).not.toHaveBeenCalled();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
     });
