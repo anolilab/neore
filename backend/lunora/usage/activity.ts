@@ -105,7 +105,8 @@ const threadProject = async (ctx: ReadCtx, threadId: string): Promise<Attributio
         }
 
         currentId = lead;
-        current = await ctx.db.threads.findFirst({ where: { _id: lead as Id<"threads"> } });
+        // From the primary, as the first read: a lead moved to another project files the child's reply under the new one.
+        current = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: lead as Id<"threads"> } });
     }
 
     return attributionOf(current);

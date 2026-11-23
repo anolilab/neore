@@ -15,7 +15,8 @@
  *
  * A dormant shard gets no housekeeping visit, so its rows past their window are pruned when the shard's
  * census due time comes round: each prune notes the expiry of the oldest row left (`noteShardDue`), and the
- * shard tick (`runShardTick`) runs the prune then. Each row then waits for its own expiry, not a daily visit.
+ * shard tick (`runShardTick`) runs the prune then. A ledger row waits for the first UTC midnight past its
+ * window, so a day of replies is one wake, not one per reply.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -37,16 +38,17 @@ const RETENTION_WAKE_FLOOR_MS = 60 * 1000;
 export const usageDailyCutoffDate = (now: number): string => new Date(now - USAGE_DAILY_RETENTION_DAYS * DAY_MS).toISOString().slice(0, 10);
 
 /**
- * Pure: when the oldest retained rows of a shard expire, the earliest of the two. A ledger row is pruned once `at < now - window`; a day
- * row once its date is before {@link usageDailyCutoffDate}, which first holds from the day after it, plus the window. `undefined` when
- * the shard holds neither.
+ * Pure: when the oldest retained rows of a shard expire, the earliest of the two. A ledger row is pruned once `at < now - window`, and its
+ * expiry is the first UTC midnight past that, so every reply of one day shares one wake rather than waking the shard once per reply; a row
+ * is kept at most a day past its window. A day row expires once its date is before {@link usageDailyCutoffDate}, which first holds from
+ * the day after it, plus the window. `undefined` when the shard holds neither.
  */
 export const retentionExpiryOf = (oldest: { ledgerAt?: number; usageDate?: string }): number | undefined => {
     const window = USAGE_DAILY_RETENTION_DAYS * DAY_MS;
     const expiries: number[] = [];
 
     if (oldest.ledgerAt !== undefined) {
-        expiries.push(oldest.ledgerAt + window + 1);
+        expiries.push((Math.floor((oldest.ledgerAt + window) / DAY_MS) + 1) * DAY_MS);
     }
 
     if (oldest.usageDate !== undefined) {
@@ -55,6 +57,13 @@ export const retentionExpiryOf = (oldest: { ledgerAt?: number; usageDate?: strin
 
     return expiries.length === 0 ? undefined : Math.min(...expiries);
 };
+
+/**
+ * Pure: when a shard is next due after a prune, given its oldest rows left. A ledger row the batch left past its window (the batch was
+ * full) is due now, not at the midnight {@link retentionExpiryOf} rounds it up to, so the rest is taken a minute later.
+ */
+export const retentionDueAfterPrune = (now: number, oldest: { ledgerAt?: number; usageDate?: string }): number | undefined =>
+    oldest.ledgerAt !== undefined && oldest.ledgerAt < now - USAGE_DAILY_RETENTION_DAYS * DAY_MS ? now : retentionExpiryOf(oldest);
 
 export const pruneRetainedActivity = internalMutation
     .input({})
@@ -75,7 +84,7 @@ export const pruneRetainedActivity = internalMutation
         const oldestLedgerRows = await ctx.db.usageOrganizationReplies.findMany({ consistency: "primary", limit: 1, orderBy: [{ at: "asc" }] });
         const [oldestDay] = oldestDays.page;
         const [oldestLedgerRow] = oldestLedgerRows.page;
-        const expiresAt = retentionExpiryOf({ ledgerAt: oldestLedgerRow?.at, usageDate: oldestDay?.date });
+        const expiresAt = retentionDueAfterPrune(now, { ledgerAt: oldestLedgerRow?.at, usageDate: oldestDay?.date });
 
         // The census: when the tick should prune (`retentionDueAt`, cleared when nothing is left), and the wake for it. If either write fails the
         // prune fails, which rolls back its deletes, so the tick retries it soon and the rows are not left without a wake.

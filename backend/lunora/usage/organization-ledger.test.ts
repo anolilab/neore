@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import schema from "../schema";
 import { recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
-import { eraseUsageForUser, pruneOrganizationRepliesBefore } from "./gdpr";
+import { eraseUsageForUser, MAX_PRUNED_ORGANIZATIONS, pruneOrganizationRepliesBefore } from "./gdpr";
 import {
     collectOrganizationRepliesForExport,
     collectOrganizationReplyPages,
@@ -292,6 +292,40 @@ describe("the organization ledger", () => {
         expect(pruned).toBe(1);
         expect(await orgUsage("org-1", [project], 0)).toEqual({ projects: [], truncated: false });
         expect(scope?.members.map((entry: { userId: string }) => entry.userId)).not.toContain(MEMBER);
+    });
+
+    it("prunes the rows of a bounded number of organizations per batch, and books a reconcile only for one left with no rows", async () => {
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < MAX_PRUNED_ORGANIZATIONS + 10; index += 1) {
+                await ctx.db.insert("usageOrganizationReplies", {
+                    at: 1000 + index,
+                    costMicrodollars: 1,
+                    organizationId: `org-${String(index)}`,
+                    projectKey: "project",
+                    replyKey: `reply-${String(index)}`,
+                    tokens: 1,
+                    userId: MEMBER,
+                });
+            }
+
+            // A newer row keeps org-0's ledger, so it needs no reconcile.
+            await ctx.db.insert("usageOrganizationReplies", {
+                at: 5000,
+                costMicrodollars: 1,
+                organizationId: "org-0",
+                projectKey: "project",
+                replyKey: "reply-kept",
+                tokens: 1,
+                userId: MEMBER,
+            });
+        });
+
+        const pruned = await harness.run(async (ctx: any) => await pruneOrganizationRepliesBefore(ctx, 2000, 200));
+        const left = await harness.run(async (ctx: any) => await ctx.db.usageOrganizationReplies.findMany({ where: { at: { lt: 2000 } } }));
+
+        expect(pruned).toBe(MAX_PRUNED_ORGANIZATIONS);
+        expect(left.page).toHaveLength(10);
+        expect(harness.scheduler.list()).toHaveLength(MAX_PRUNED_ORGANIZATIONS - 1);
     });
 
     it("removes every contributor entry of a member left with no rows, not only the first", async () => {

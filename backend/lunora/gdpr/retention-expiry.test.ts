@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { NO_RETENTION_DUE, setRetentionDue } from "../lib/shard-housekeeping";
-import { retentionExpiryOf, USAGE_DAILY_RETENTION_DAYS, usageDailyCutoffDate } from "./retention";
+import { retentionDueAfterPrune, retentionExpiryOf, USAGE_DAILY_RETENTION_DAYS, usageDailyCutoffDate } from "./retention";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_MS = USAGE_DAILY_RETENTION_DAYS * DAY_MS;
@@ -17,14 +17,20 @@ describe("retentionExpiryOf", () => {
         expect(retentionExpiryOf({})).toBeUndefined();
     });
 
-    it("expires a ledger row one millisecond past its window, the first instant the prune takes it", () => {
-        const at = Date.UTC(2026, 0, 1);
-        const expiry = retentionExpiryOf({ ledgerAt: at });
+    it("expires a ledger row at the first UTC midnight past its window, when the prune takes it", () => {
+        const at = Date.UTC(2026, 0, 1, 15, 30);
+        const expiry = retentionExpiryOf({ ledgerAt: at })!;
 
-        expect(expiry).toBe(at + WINDOW_MS + 1);
+        expect(expiry).toBe(Date.UTC(2026, 0, 2) + WINDOW_MS);
         // `pruneOrganizationRepliesBefore` takes `at < now - window`.
-        expect(at < expiry! - WINDOW_MS).toBe(true);
-        expect(at < expiry! - WINDOW_MS - 1).toBe(false);
+        expect(at < expiry - WINDOW_MS).toBe(true);
+    });
+
+    it("gives every reply of one day the same expiry, so a busy day wakes its shard once", () => {
+        const morning = retentionExpiryOf({ ledgerAt: Date.UTC(2026, 0, 1, 0, 0, 1) });
+        const night = retentionExpiryOf({ ledgerAt: Date.UTC(2026, 0, 1, 23, 59, 59) });
+
+        expect(morning).toBe(night);
     });
 
     it("keeps a day row until its date is before the cutoff, which is from the day after it plus the window", () => {
@@ -43,6 +49,23 @@ describe("retentionExpiryOf", () => {
             Math.min(later!, retentionExpiryOf({ usageDate: "2026-01-01" })!),
         );
         expect(earlier! < later!).toBe(true);
+    });
+});
+
+describe("retentionDueAfterPrune", () => {
+    it("is due now when a full batch left a ledger row past its window, not at the midnight its expiry rounds to", () => {
+        const now = Date.UTC(2027, 3, 10, 11);
+        const ledgerAt = now - WINDOW_MS - 60 * 60 * 1000;
+
+        expect(retentionDueAfterPrune(now, { ledgerAt })).toBe(now);
+    });
+
+    it("is the oldest row's expiry when nothing left has expired", () => {
+        const now = Date.UTC(2027, 3, 10, 11);
+        const ledgerAt = now - WINDOW_MS + 60 * 60 * 1000;
+
+        expect(retentionDueAfterPrune(now, { ledgerAt })).toBe(retentionExpiryOf({ ledgerAt }));
+        expect(retentionDueAfterPrune(now, {})).toBeUndefined();
     });
 });
 

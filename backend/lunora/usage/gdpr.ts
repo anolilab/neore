@@ -481,6 +481,12 @@ export const pruneUsageDaysBefore = async (ctx: MutationCtx, cutoffDate: string,
 };
 
 /**
+ * The organizations one prune batch takes rows from. Each organization a batch empties books a reconcile on the scheduler, a subrequest, so a
+ * batch over a member's many organizations stays under the Free Worker's 50; the rest are taken by the next batch.
+ */
+export const MAX_PRUNED_ORGANIZATIONS = 20;
+
+/**
  * Retention (`gdpr/retention.ts`): one batch of `usageOrganizationReplies` rows recorded before `cutoff` (epoch ms). Returns how many rows
  * were deleted. The contributor entries of the members they belonged to are settled after this write commits
  * (`reconcileOrganizationContributor`), not here: a member left with no rows loses their entry, and one with rows keeps it.
@@ -492,11 +498,37 @@ export const pruneOrganizationRepliesBefore = async (ctx: MutationCtx, cutoff: n
         where: { at: { lt: cutoff } },
     });
 
-    await Promise.all(page.map(async (row) => await ctx.db.delete("usageOrganizationReplies", row._id)));
+    // Oldest first, up to the batch's organization bound; a row of an organization past it waits for the next batch.
+    const members = new Map<string, (typeof page)[number]>();
+    const taken: typeof page = [];
 
-    const members = new Map(page.map((row) => [`${row.organizationId}\u{0}${row.userId}`, row]));
+    for (const row of page) {
+        const key = `${row.organizationId}\u{0}${row.userId}`;
+
+        if (!members.has(key)) {
+            if (members.size >= MAX_PRUNED_ORGANIZATIONS) {
+                continue;
+            }
+
+            members.set(key, row);
+        }
+
+        taken.push(row);
+    }
+
+    await Promise.all(taken.map(async (row) => await ctx.db.delete("usageOrganizationReplies", row._id)));
 
     for (const row of members.values()) {
+        // A member with rows left keeps their entry, so only an organization this batch emptied needs the reconcile.
+        const left = await ctx.db.usageOrganizationReplies.findFirst({
+            consistency: "primary",
+            where: { organizationId: row.organizationId, userId: row.userId },
+        });
+
+        if (left) {
+            continue;
+        }
+
         await runAfterOnShard(
             ctx.scheduler,
             0,
@@ -507,7 +539,7 @@ export const pruneOrganizationRepliesBefore = async (ctx: MutationCtx, cutoff: n
         );
     }
 
-    return page.length;
+    return taken.length;
 };
 
 /**
