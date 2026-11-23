@@ -27,6 +27,8 @@ type Harness = ReturnType<typeof lunoraTest>;
 let harness: Harness;
 let userId: string;
 let delegated: unknown;
+/** The reply key the approved call's tool context carried. */
+let toolReplyKey: string | undefined;
 
 const insertThread = async () => (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "T", userId }))) as string;
 
@@ -70,7 +72,8 @@ beforeEach(async () => {
 
     // The approved delegation: admitted with the chain its tool context carries.
     vi.mocked(getAgent).mockResolvedValue({
-        approveToolCall: vi.fn(async (toolCtx: { chainSource?: string }) => {
+        approveToolCall: vi.fn(async (toolCtx: { chainSource?: string; replyKey?: string }) => {
+            toolReplyKey = toolCtx.replyKey;
             delegated = await harness.run(
                 async (ctx: any) =>
                     await admitSubAgentRun(ctx, {
@@ -154,5 +157,66 @@ describe("a resumed sub-agent child's own delegation", () => {
         await resume(undefined);
 
         expect(delegated).toHaveProperty("row");
+    });
+});
+
+describe("a resumed run's turn", () => {
+    const resumeWith = async (snapshot: Record<string, unknown>): Promise<unknown> => {
+        let seen: unknown = "unset";
+
+        vi.mocked(getAgent).mockResolvedValue({
+            approveToolCall: vi.fn(async (toolCtx: { runTurn?: unknown }) => {
+                seen = toolCtx.runTurn;
+
+                throw new Error("stop");
+            }),
+            options: {},
+        } as never);
+
+        await resumeApprovedRun(
+            {
+                runQuery: vi.fn(async () => {
+                    return { toolName: TOOL };
+                }),
+            } as never,
+            {
+                approvalId: "approval-1",
+                approved: true,
+                config: {
+                    autoMediaEnrichment: false,
+                    mcpServerNames: [],
+                    model: "gpt-4o",
+                    researchDepth: "balanced",
+                    searchMode: "chat",
+                    shouldAutoContinue: false,
+                    toolNames: [TOOL],
+                    ...snapshot,
+                } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId,
+            },
+        ).catch(() => undefined);
+
+        return seen;
+    };
+
+    it("is the paused turn's, read from the snapshot: who sent it, its prompt and its system prompt's kinds", async () => {
+        const turn = { impersonated: true, promptMessageId: "prompt-1", systemContext: ["instructions", "skills"] };
+
+        expect(await resumeWith(turn)).toStrictEqual(turn);
+    });
+
+    it("is none for a snapshot that does not say whether an admin sent it", async () => {
+        expect(await resumeWith({ promptMessageId: "prompt-1", systemContext: ["instructions"] })).toBeUndefined();
+    });
+});
+
+describe("a resumed run's tool context", () => {
+    it("names the reply the run belongs to: its first stream, else this one", async () => {
+        await resume(undefined);
+
+        // The snapshot in `resume` has no `replyKey`: the continuation's own stream names the reply.
+        expect(toolReplyKey).toBe("stream-1");
     });
 });

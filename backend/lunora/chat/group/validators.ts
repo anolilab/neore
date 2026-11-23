@@ -70,6 +70,11 @@ export type GroupStep = Infer<typeof vGroupStep>;
 export const vGroupRunSnapshot = v.object({
     /** The model the user picked for the turn — a participant without a preferred model runs on it. */
     baseModel: v.string(),
+    /**
+     * The files the turn's user message attaches: the speakers after the paused one match the project's pattern rule
+     * files against their names, as the turn's first speakers did. At most a message's `MAX_ATTACHED_FILES` (20).
+     */
+    fileIds: v.optional(v.array(v.string()).max(20)),
     /** Anonymous callers stay pinned to the free model; no participant lifts that. */
     isAnonymous: v.boolean(),
     /** The caller's active organization when the turn started — scopes organization-shared skills. */

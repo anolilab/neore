@@ -620,11 +620,16 @@ export const NsfwChecker = Cloudflare.Worker("nsfw-checker", {
 // Uses CF Browser Rendering binding for serverless headless Chrome.
 // PRIVATE, like the document parser: reached only through `SERVICE_BROWSER_RENDERER`.
 export const BrowserRenderer = Cloudflare.Worker("browser-renderer", {
-    build: WORKER_BUILD,
+    // No kept names: a function handed to `page.evaluate` runs in the page as its source text, where the `__name(…)`
+    // helper a kept name is wrapped in does not exist.
+    build: { ...WORKER_BUILD, output: { ...WORKER_BUILD.output, keepNames: false } },
     compatibility: { date: "2025-09-15", flags: ["nodejs_compat"] },
     env: {
         BROWSER: Cloudflare.Browser(),
         NODE_ENV: stage === "production" ? "production" : "development",
+        // The hold on each browser session every isolate sees (`src/session-lock.ts`); created SQLite-backed, as
+        // `wrangler.jsonc`'s migration declares it.
+        SESSION_LOCK: Cloudflare.DurableObject("SessionLock"),
     },
     main: "./services/browser-renderer/src/index.ts",
     name: named("browser-renderer"),
@@ -826,7 +831,8 @@ export default Alchemy.Stack(
             // Production only, for the same reason as the backend's crons.
             // `global_fetch_strictly_public`: the gateway calls the backend by its public URL,
             // which on workers.dev is another Worker of this account (see `Website`).
-            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public"] },
+            // `enable_request_signal`: the request's signal aborts when the caller disconnects, so a cancelled model call stops at the provider.
+            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public", "enable_request_signal"] },
             crons: stage === "production" ? [...GATEWAY_CRONS] : [],
             domain: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
             env: llmGatewayEnv(website.url),

@@ -65,7 +65,9 @@ const { SUB_AGENT_NAME } = await import("../sub-agents/logic");
 const { CODING_AGENTS } = await import("../coding-agents/commands");
 const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
 const { MODEL_LOOKUP } = await import("@neore/ai/models");
-const { isLeadAgentName } = await import("./site-login-turn");
+const { isLeadAgentName, messageRefusal, siteLoginTurnOf } = await import("./site-login-turn");
+const { setRunTurn } = await import("../chat/lib/agent-run");
+const { NOT_TYPED_DRAFTS } = await import("../lib/not-typed-text");
 const { SITE_LOGIN_CHANGED } = await import("./lib/site-login-shape");
 
 // The model a lead run is named for.
@@ -89,6 +91,7 @@ const SAVE_WHILE_IMPERSONATING = /cannot be saved while impersonating/;
 const DELETE_WHILE_IMPERSONATING = /cannot be deleted while impersonating/;
 const CHANGED_ELSEWHERE = /changed elsewhere/;
 const NAMES_NO_VERSION = /which version/;
+const { SITE_LOGIN_SIGN_IN_PAGE_REFUSED } = await import("./lib/site-login-shape");
 
 // Built at run time, so no secret-shaped literal sits in the source.
 const PASSWORD = ["pw", crypto.randomUUID(), "x"].join("-");
@@ -303,6 +306,78 @@ describe("saving a site login", () => {
         const renamed = await firstRow();
 
         expect(renamed?.["label"]).toBe("Renamed");
+    });
+
+    it("keeps a sign-in page only on the login's own https origin, without its fragment", async () => {
+        const id = await save({ password: PASSWORD, signInUrl: " https://example.com/account/login?next=/orders#form " });
+
+        const PAGE = "https://example.com/account/login?next=/orders";
+        const signInUrlNow = async () => {
+            const row = await firstRow();
+
+            return row?.["signInUrl"];
+        };
+        const listed = await listLogins(OWNER);
+
+        expect(await signInUrlNow()).toBe(PAGE);
+        expect(listed.logins[0]?.["signInUrl"]).toBe(PAGE);
+
+        // The save answers with the page as stored, which the form then holds as the one it opened; an edit that sends
+        // none answers with the page it kept.
+        const answered = (await as(OWNER).mutation(
+            saveSiteLogin as never,
+            {
+                expectedUpdatedAt: await updatedAtOf(id),
+                loginId: id,
+                signInUrl: `${PAGE}#again`,
+                site: SITE,
+                teammateIds: [],
+                username: "ada@example.com",
+            } as never,
+        )) as { signInUrl?: string };
+
+        expect(answered.signInUrl).toBe(PAGE);
+
+        const kept = (await as(OWNER).mutation(
+            saveSiteLogin as never,
+            {
+                expectedUpdatedAt: await updatedAtOf(id),
+                loginId: id,
+                site: SITE,
+                teammateIds: [],
+                username: "ada@example.com",
+            } as never,
+        )) as { signInUrl?: string };
+
+        expect(kept.signInUrl).toBe(PAGE);
+
+        const refused = [
+            [INSECURE_SITE, "login"].join("/"),
+            "https://other.example/login",
+            "https://login.example.com/",
+            "https://example.com:8443/login",
+            // No scheme: the parser reads `example.com` as one, which is not https.
+            "example.com:443/login",
+            // Credentials in the URL, joined so no such literal sits in the source.
+            ["https://ada", "pw@example.com/login"].join(":"),
+            ["https://ada", "example.com/login"].join("@"),
+            "example.com/login",
+            "not a url",
+        ];
+
+        for (const signInUrl of refused) {
+            await expect(save({ loginId: id, signInUrl })).rejects.toMatchObject({ code: "BAD_REQUEST", data: { code: SITE_LOGIN_SIGN_IN_PAGE_REFUSED } });
+        }
+
+        expect(await signInUrlNow()).toBe(PAGE);
+
+        // An edit that does not send it keeps it; an empty one clears it.
+        await save({ label: "Renamed", loginId: id });
+        expect(await signInUrlNow()).toBe(PAGE);
+        await save({ loginId: id, signInUrl: "  " });
+        expect(await firstRow()).not.toHaveProperty("signInUrl");
+        await expect(save({ password: PASSWORD, signInUrl: "https://other.example/login", site: "https://new.example" })).rejects.toThrow("sign-in page");
+        expect(await rows()).toHaveLength(1);
     });
 
     it("refuses an edit that names no version", async () => {
@@ -540,6 +615,40 @@ describe("which chats may use a login", () => {
         expect(await forFill(plainThread, SITE, OWNER, { impersonated: true })).toBeNull();
     });
 
+    it("a tool builds the turn from its run's record, and a run that recorded none, or not all of it, gives no turn at all", async () => {
+        await save({ password: PASSWORD });
+
+        const promptMessageId = await promptFor(plainThread);
+        const call = { stepMessages: [{ content: "Sign in and check my order", role: "user" }], toolSources: ["builtin"] };
+        const toolCtx = (turn: Parameters<typeof setRunTurn>[1]) => {
+            const ctx = { dispatchOrigin: "lead" as const, startedBy: OWNER };
+
+            setRunTurn(ctx, turn);
+
+            return ctx;
+        };
+        const full = { impersonated: false, promptMessageId, systemContext: ["instructions"] };
+
+        // An older snapshot or a run path that records nothing: never an allowing default.
+        for (const partial of [
+            undefined,
+            { ...full, impersonated: undefined },
+            { ...full, promptMessageId: undefined },
+            { ...full, systemContext: undefined },
+        ]) {
+            expect(siteLoginTurnOf(toolCtx(partial), call)).toBeNull();
+        }
+
+        const runAs = async (impersonated: boolean) => {
+            const turn = siteLoginTurnOf(toolCtx({ ...full, impersonated }), call);
+
+            return await harness.run(async (ctx: any) => await ctx.runQuery(listUsableSiteLogins, { threadId: plainThread, turn, userId: OWNER }));
+        };
+
+        expect(await runAs(false)).toStrictEqual([{ site: SITE }]);
+        expect(await runAs(true)).toStrictEqual([]);
+    });
+
     it("a prompt the owner did not type gets none: an outside agent's (a regenerate runs with no origin), a guest's, a goal round's, someone else's", async () => {
         await save({ password: PASSWORD });
 
@@ -562,6 +671,54 @@ describe("which chats may use a login", () => {
         }
 
         expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
+    });
+
+    it("a prompt, a row above it or a step the owner did not type gets none: every draft source, an admin's", async () => {
+        await save({ password: PASSWORD });
+
+        // Every draft source: a link, the shell, someone else's prompt, forwarded messages, a reply sent on, a suggestion,
+        // the improver's rewrite, a gallery prompt, an organization's value.
+        const marks = [
+            ...NOT_TYPED_DRAFTS.map((draft) => {
+                return { draft };
+            }),
+            { impersonated: true },
+        ];
+        const markedMessage = (notTyped: unknown) => {
+            return { content: [{ providerOptions: { neore: { notTyped } }, text: "Sign in", type: "text" }], role: "user" };
+        };
+
+        for (const notTyped of marks) {
+            const promptMessageId = await insertPrompt(plainThread, { message: markedMessage(notTyped) });
+
+            expect(await usable(plainThread, OWNER, { promptMessageId })).toStrictEqual([]);
+            expect(await forFill(plainThread, SITE, OWNER, { promptMessageId })).toBeNull();
+            // A steer delivered into the run reaches the step's messages marked (`agent/client/stream-text.ts`).
+            expect(await forFill(plainThread, SITE, OWNER, { stepMessages: [markedMessage(notTyped)] })).toBeNull();
+        }
+
+        // An admin's row above the owner's own typed prompt.
+        const thread = await insertThread({});
+        const above = await insertPrompt(thread, { message: markedMessage({ impersonated: true }) });
+        const typed = await insertPrompt(thread, { order: 1, parentMessageId: above });
+
+        expect(await forFill(thread, SITE, OWNER, { promptMessageId: typed })).toBeNull();
+        expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
+    });
+
+    it("names why a message the owner did not type is refused", () => {
+        const withMark = (notTyped: unknown) => {
+            return { content: [{ providerOptions: { neore: { notTyped } }, text: "Sign in", type: "text" }], role: "user" };
+        };
+
+        for (const draft of NOT_TYPED_DRAFTS) {
+            expect(messageRefusal(withMark({ draft }))).toBe(`draft-${draft}`);
+        }
+
+        expect(messageRefusal(withMark({ draft: "sharedPrompt", impersonated: true }))).toBe("impersonated");
+        // A mark nobody classified refuses too.
+        expect(messageRefusal(withMark({ by: "someone" }))).toBe("impersonated");
+        expect(messageRefusal({ content: "Sign in", role: "user" })).toBeNull();
     });
 
     it("a prompt that carries content the owner attached rather than typed gets none: a document, a captured page, a file", async () => {
@@ -714,6 +871,8 @@ describe("which chats may use a login", () => {
             ["instructions", "project"],
             ["instructions", "threadInstructions"],
             ["instructions", "skills"],
+            ["instructions", "skill-instructions"],
+            ["instructions", "attached-documents"],
             ["instructions", "threadNotes"],
             ["instructions", "attachedDocuments"],
             ["instructions", "somethingNew"],
@@ -739,7 +898,11 @@ describe("which chats may use a login", () => {
         ];
 
         expect(
-            await usable(plainThread, OWNER, { stepMessages: safeStep, systemContext: ["instructions", "personalization", "teammate"], toolSources: [] }),
+            await usable(plainThread, OWNER, {
+                stepMessages: safeStep,
+                systemContext: ["instructions", "personalization", "teammate", "agent-mode", "search-mode", "task-plan"],
+                toolSources: [],
+            }),
         ).toStrictEqual([{ site: SITE }]);
 
         // An earlier turn read a page: the tool result is still on the prompt's path, whatever the caller reports.
@@ -856,6 +1019,13 @@ describe("which chats may use a login", () => {
         const login = await forFill(plainThread, "https://example.com/sign-in");
 
         expect(login?.site).toBe(SITE);
+        expect(login).not.toHaveProperty("signInUrl");
+    });
+
+    it("the fill lookup names the saved sign-in page, the only page the fill opens", async () => {
+        await save({ password: PASSWORD, signInUrl: "https://example.com/login" });
+
+        expect(await forFill(plainThread)).toMatchObject({ signInUrl: "https://example.com/login", site: SITE });
     });
 });
 

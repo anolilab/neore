@@ -9,6 +9,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { GatewayModel } from "@neore/ai/models";
 import { api } from "@neore/backend/api";
 import type { Doc } from "@neore/backend/dataModel";
+import type { StoredRow } from "@neore/backend/stored-row";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandItem, CommandList } from "@neore/ui/components/command";
 import { useMutation } from "@tanstack/react-query";
@@ -23,11 +24,17 @@ import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { ComposerSlashState, SlashCommandMatch } from "./extensions/slash-command";
 import { clearedCommandRange, isBareCommand, isPrefixOfCommand } from "./extensions/slash-command";
 import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
+
+/** A prompt row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedPrompt = StoredRow<Doc<"prompts">>;
+/** A skill row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedSkill = StoredRow<Doc<"skills">>;
 
 ("use client");
 
@@ -99,7 +106,7 @@ const filterModels = (models: GatewayModel[], query: string, favoriteModelIds: s
     return filtered.slice(0, 10);
 };
 
-const filterPrompts = (prompts: Doc<"prompts">[], query: string): Doc<"prompts">[] => {
+const filterPrompts = (prompts: SavedPrompt[], query: string): SavedPrompt[] => {
     if (!query) {
         return prompts.slice(0, 10);
     }
@@ -117,7 +124,7 @@ const filterPrompts = (prompts: Doc<"prompts">[], query: string): Doc<"prompts">
         .slice(0, 10);
 };
 
-const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] => {
+const filterSkills = (skills: SavedSkill[], query: string): SavedSkill[] => {
     if (!query) {
         return skills.slice(0, 10);
     }
@@ -166,8 +173,8 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
     // network (TanStack's default for a mutation): a failed load is tried again when the menu next opens.
     const { mutateAsync: getPrompts } = useMutation({ ...useLunoraActionOptions(api.prompts.functions.getPrompts), networkMode: "always" });
     const { mutateAsync: getSkills } = useMutation({ ...useLunoraActionOptions(api.skills.functions.getSkills), networkMode: "always" });
-    const [prompts, setPrompts] = useState<Doc<"prompts">[]>([]);
-    const [skills, setSkills] = useState<Doc<"skills">[]>([]);
+    const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
+    const [skills, setSkills] = useState<SavedSkill[]>([]);
     // Both follow the session's active organization, so a switch drops what was loaded for the previous one.
     const organizationId = sessionData?.session.activeOrganizationId ?? null;
     const loadedRef = useRef({ organizationId, prompts: false, skills: false });
@@ -213,7 +220,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
             : getPrompts({}).then((result) => {
                   if (!isCancelled) {
                       loaded.prompts = true;
-                      setPrompts(result as Doc<"prompts">[]);
+                      setPrompts(result as SavedPrompt[]);
                   }
 
                   return undefined;
@@ -223,7 +230,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
             : getSkills({ sortBy: "recent" }).then((result) => {
                   if (!isCancelled) {
                       loaded.skills = true;
-                      setSkills(result as Doc<"skills">[]);
+                      setSkills(result as SavedSkill[]);
                   }
 
                   return undefined;
@@ -389,19 +396,21 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
     );
 
     const handleSelectPrompt = useCallback(
-        (prompt: Doc<"prompts">) => {
+        (prompt: SavedPrompt) => {
             if (!match) {
                 return;
             }
 
             onReplace(match.from, match.to, prompt.content);
+            // Into the draft's other text, which keeps its own mark.
+            noteSavedPrompt(prompt, user?.id, { replaced: false });
             onDismiss();
         },
-        [match, onReplace, onDismiss],
+        [match, onReplace, onDismiss, user?.id],
     );
 
     const handleSelectSkill = useCallback(
-        (skill: Doc<"skills">) => {
+        (skill: SavedSkill) => {
             if (!match) {
                 return;
             }
@@ -432,11 +441,11 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
                 break;
             }
             case "prompts": {
-                handleSelectPrompt(selected as Doc<"prompts">);
+                handleSelectPrompt(selected as SavedPrompt);
                 break;
             }
             case "skills": {
-                handleSelectSkill(selected as Doc<"skills">);
+                handleSelectSkill(selected as SavedSkill);
                 break;
             }
             default: {
@@ -504,11 +513,11 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
         }
 
         if (type === "prompts") {
-            return (selected as Doc<"prompts">)._id;
+            return (selected as SavedPrompt)._id;
         }
 
         if (type === "skills") {
-            return (selected as Doc<"skills">)._id;
+            return (selected as SavedSkill)._id;
         }
 
         return undefined;
@@ -607,7 +616,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
                                     <CommandGroupLabel>
                                         <Trans>Insert Prompt</Trans>
                                     </CommandGroupLabel>
-                                    {(items as Doc<"prompts">[]).map((prompt, index) => (
+                                    {(items as SavedPrompt[]).map((prompt, index) => (
                                         <CommandItem
                                             className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={prompt._id}
@@ -640,7 +649,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
                                     <CommandGroupLabel>
                                         <Trans>Invoke Skill</Trans>
                                     </CommandGroupLabel>
-                                    {(items as Doc<"skills">[]).map((skill, index) => (
+                                    {(items as SavedSkill[]).map((skill, index) => (
                                         <CommandItem
                                             className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={skill._id}

@@ -39,6 +39,7 @@ import { cronsLogger } from "./logger";
 import { patchRow } from "./patch";
 import { currentUserShard } from "./shard-context";
 import { runAfterOnShard } from "./shard-scheduler";
+import { storedPage, storedRow } from "./stored-row";
 
 /** How long a shard stays in the daily sweep after its last activity. */
 export const HOUSEKEEPING_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
@@ -135,7 +136,7 @@ const bestEffort = async (what: string, write: () => Promise<void>): Promise<boo
 
 /** `primary` for a read whose answer decides a flag write: a lagging replica could still show a flag the sweep cleared. */
 const censusRow = async (ctx: CensusCtx, shardKey: string, consistency?: "primary") =>
-    await ctx.db.shardActivity.findFirst({ ...(consistency && { consistency }), where: { shardKey } });
+    storedRow(await ctx.db.shardActivity.findFirst({ ...(consistency && { consistency }), where: { shardKey } }));
 
 const touchedAt = new Map<string, number>();
 
@@ -309,11 +310,13 @@ export const dispatchShardHousekeeping = internalMutation
     .output(v.object({ dispatched: v.number() }))
     .mutation(async ({ ctx }) => {
         const { now } = ctx;
-        const { page: recent } = await ctx.db.shardActivity.findMany({
-            limit: DISPATCH_BATCH * 5,
-            orderBy: [{ lastActiveAt: "desc" }],
-            where: { lastActiveAt: { gte: now - HOUSEKEEPING_HORIZON_MS } },
-        });
+        const { page: recent } = storedPage(
+            await ctx.db.shardActivity.findMany({
+                limit: DISPATCH_BATCH * 5,
+                orderBy: [{ lastActiveAt: "desc" }],
+                where: { lastActiveAt: { gte: now - HOUSEKEEPING_HORIZON_MS } },
+            }),
+        );
         const due = recent.filter((row) => needsHousekeeping(row, now)).slice(0, DISPATCH_BATCH);
 
         for (const row of due) {

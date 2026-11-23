@@ -200,7 +200,7 @@ export const prepareSkillInvocation = async (
     }
 
     return {
-        config: skill.config,
+        config: skill.config ?? undefined,
         instructions: substituteVariables(skill.instructions, (name) => resolved[name]),
         resolvedVariables: resolved,
         skillId: skill._id,

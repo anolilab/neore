@@ -7,18 +7,21 @@ import { CardContent } from "@neore/ui/components/card";
 import { Field, FieldDescription, FieldLabel } from "@neore/ui/components/field";
 import { Input } from "@neore/ui/components/input";
 import { Textarea } from "@neore/ui/components/textarea";
+import { useMutation } from "@tanstack/react-query";
 import { RotateCcw, Sparkles } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import SystemPromptOptimizerDialog from "@/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { trackEvent } from "@/lib/analytics";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import MemorySettings from "./memory-settings";
 
@@ -45,6 +48,8 @@ const PersonalizationSettings: FC = () => {
     const ownerId = sessionData?.user?.id ?? null;
     const { data: userSettings, isLoading } = useUserSettings();
     const updateSettingsMutation = useUpdateUserSettings();
+    const crpc = useCRPC();
+    const keepMutation = useMutation(crpc.auth.functions.keepPersonalization.mutationOptions());
     const { onboardingCompleted, setOnboardingCompleted } = useUserPreferences();
 
     // Local state for form fields
@@ -152,6 +157,13 @@ const PersonalizationSettings: FC = () => {
         setDraftState(null);
     }
 
+    // A field's draft that differs from its stored value (a failed save leaves one on screen): "Keep as mine" waits for it.
+    const hasUnsavedPersonalization =
+        nickname.trim() !== (userSettings?.nickname ?? "").trim() ||
+        profession.trim() !== (userSettings?.profession ?? "").trim() ||
+        aboutMe.trim() !== (userSettings?.aboutMe ?? "").trim() ||
+        customInstructions.trim() !== (userSettings?.customInstructions ?? "").trim();
+
     const titleInstructionsDraft = draftState && draftState.ownerId === ownerId ? draftState.text : null;
     const threadTitleInstructions = titleInstructionsDraft ?? userSettings?.threadTitleInstructions ?? "";
 
@@ -213,6 +225,30 @@ const PersonalizationSettings: FC = () => {
                 title={t`About You`}
             >
                 <CardContent className="space-y-6">
+                    {userSettings?.personalizationByImpersonator && (
+                        // One mark for every field the system prompt carries (`auth/lib/personalization.ts`): language and location
+                        // are set elsewhere, so they are shown here. The keep sends the stored text, refused if it changed since.
+                        <ChangedByAdminMark
+                            disabled={updateSettingsMutation.isPending}
+                            fieldLabel={t`Your personalization`}
+                            onKeep={async () =>
+                                await keepMutation.mutateAsync({
+                                    seen: {
+                                        aboutMe: userSettings.aboutMe,
+                                        customInstructions: userSettings.customInstructions,
+                                        language: userSettings.language,
+                                        location: userSettings.location,
+                                        nickname: userSettings.nickname,
+                                        profession: userSettings.profession,
+                                    },
+                                })
+                            }
+                            unsavedEdit={hasUnsavedPersonalization}
+                        >
+                            {userSettings.language && <p className="text-muted-foreground w-full text-xs">{t`Language: ${userSettings.language}`}</p>}
+                            {userSettings.location && <p className="text-muted-foreground w-full text-xs">{t`Location: ${userSettings.location}`}</p>}
+                        </ChangedByAdminMark>
+                    )}
                     <Field>
                         <FieldLabel htmlFor="nickname">{t`Nickname`}</FieldLabel>
                         <FieldDescription>{t`What should the AI call you?`}</FieldDescription>

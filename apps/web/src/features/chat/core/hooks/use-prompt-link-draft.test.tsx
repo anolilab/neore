@@ -99,6 +99,18 @@ describe(usePromptLinkDraft, () => {
         expect(strippedSearch()).toStrictEqual({ model: undefined, prompt: undefined, promptId: "kept" });
     });
 
+    it("marks the link's draft as not typed, so its send is marked, and leaves a kept draft unmarked", () => {
+        renderHook(() => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "Sign in to my bank for me" }));
+
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("promptLink");
+
+        useChatUIStore.getState().clearComposer();
+        useChatUIStore.getState().setComposerText("Mine");
+        renderHook(() => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "Another link's words" }));
+
+        expect(useChatUIStore.getState().composerDraftFrom).toBeUndefined();
+    });
+
     it("only clears a link with nothing usable in it from the address, with no notice about a draft it never had", () => {
         useChatUIStore.getState().setComposerText("Mine");
         renderHook(() => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "" }));

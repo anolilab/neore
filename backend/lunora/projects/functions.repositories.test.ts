@@ -14,6 +14,7 @@ import {
     findRepoProject,
     listProjectRepos,
     removeProjectRepo,
+    repoForRuleFileImport,
     restampProjectRepositories,
     applyDefaultStamp,
     setDefaultProjectRepo,
@@ -24,6 +25,7 @@ import {
 } from "./functions";
 import { eraseOrganizationRepositories, sweepOrphanedOrganizationRepositories } from "./gdpr";
 import { DEFAULT_COUNTER_URL, DELETION_MARKER_URL, MAX_PROJECT_REPOSITORIES } from "./repositories";
+import { listRepoRuleFiles, readRepoRuleFiles } from "./rule-file-repo";
 
 const OWNER = "user-owner";
 const STRANGER = "user-stranger";
@@ -102,6 +104,26 @@ vi.mock("../auth", async (importOriginal) => {
         ...(await importOriginal<typeof import("../auth")>()),
         getAuthUserIdentity: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId ? { subject: context.auth.userId, userId: context.auth.userId } : null,
+    };
+});
+
+// A connected GitHub account, and a listing whose own walk the redirects of a renamed repository spend.
+vi.mock("../connectors/lib/github-token", () => {
+    return {
+        resolveGithubToken: async () => {
+            return { accessToken: "token" };
+        },
+    };
+});
+
+vi.mock("../source-control/repo-rule-files", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../source-control/repo-rule-files")>();
+
+    return {
+        ...original,
+        listRepoRuleFiles: async () => {
+            throw new original.FetchBudgetSpent();
+        },
     };
 });
 
@@ -749,5 +771,61 @@ describe("project repositories", () => {
         const left = await harness.run(async (ctx: any) => await ctx.db.projectRepositories.findMany({ where: { projectId } }));
 
         expect(left.page).toStrictEqual([]);
+    });
+});
+
+describe("a repository for a rule-file import", () => {
+    const forImport = (userId: string, projectId: string, repoId: string) =>
+        harness.run(async (ctx: any) => await ctx.runQuery(repoForRuleFileImport as never, { projectId, repoId, userId }));
+
+    it("answers only whoever may save the project's rule files, and only for that project's own repository", async () => {
+        const organizationId = "org-1";
+        const [owned, other] = (await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 1, organizationId, role: "member", userId: MEMBER });
+
+            return [
+                await ctx.db.insert("projects", { createdAt: 0, organizationId, title: "owned", userId: OWNER }),
+                await ctx.db.insert("projects", { createdAt: 0, title: "other", userId: OWNER }),
+            ];
+        })) as [string, string];
+        const repoId = (await harness
+            .withIdentity({ userId: OWNER })
+            .mutation(addProjectRepo as never, { defaultBranch: "develop", projectId: owned, url: "acme/web" } as never)) as string;
+
+        await expect(forImport(OWNER, owned, repoId)).resolves.toStrictEqual({ defaultBranch: "develop", url: "https://github.com/acme/web.git" });
+        // A member reads the project but may not save its rule files; a stranger cannot read it.
+        await expect(forImport(MEMBER, owned, repoId)).resolves.toBeNull();
+        await expect(forImport(STRANGER, owned, repoId)).resolves.toBeNull();
+        // Another project of the same owner does not reach this one's repository.
+        await expect(forImport(OWNER, other, repoId)).resolves.toBeNull();
+    });
+
+    it("imports through the actions only for the owner, only instruction files, and only from GitHub", async () => {
+        const organizationId = "org-1";
+        const projectId = (await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 1, organizationId, role: "member", userId: MEMBER });
+
+            return await ctx.db.insert("projects", { createdAt: 0, organizationId, title: "owned", userId: OWNER });
+        })) as string;
+        const add = (url: string) => harness.withIdentity({ userId: OWNER }).mutation(addProjectRepo as never, { projectId, url } as never) as Promise<string>;
+        const elsewhere = await add("https://gitlab.com/acme/web");
+        const onGithub = await add("acme/web");
+        const list = (userId: string, repoId: string) => harness.withIdentity({ userId }).action(listRepoRuleFiles as never, { projectId, repoId } as never);
+
+        await expect(list(MEMBER, onGithub)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(list(OWNER, elsewhere)).resolves.toStrictEqual({ status: "unsupported_host" });
+        // A walk its host requests ran out for is told apart from the host's error: a retry meets the same redirects.
+        await expect(list(OWNER, onGithub)).resolves.toStrictEqual({ status: "budget_spent" });
+        await expect(
+            harness
+                .withIdentity({ userId: OWNER })
+                .action(readRepoRuleFiles as never, { commit: "a".repeat(40), files: [{ path: "src/index.ts" }], projectId, repoId: onGithub } as never),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        // A branch name in place of the listing's commit: the read would take whatever the branch holds now.
+        await expect(
+            harness
+                .withIdentity({ userId: OWNER })
+                .action(readRepoRuleFiles as never, { commit: "main", files: [{ path: "AGENTS.md" }], projectId, repoId: onGithub } as never),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 });

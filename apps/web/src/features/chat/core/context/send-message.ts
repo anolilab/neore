@@ -1,14 +1,15 @@
 import { stripHiddenText } from "@neore/ai/utils";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { withUnlockProofBody } from "@neore/client-runtime";
+import { currentUnlockProof, withUnlockProofBody } from "@neore/client-runtime";
 import type { QueryClient } from "@tanstack/react-query";
 import type { HistoryState, useNavigate } from "@tanstack/react-router";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
-import { goalForMessage, useGoalComposer } from "@/features/chat/goal/goal-store";
+import type { PinnedGoal } from "@/features/chat/goal/goal-store";
+import { goalForMessage, pinOverrideFor, useGoalComposer } from "@/features/chat/goal/goal-store";
 import { draftGeneration } from "@/features/chat/split/composer-drafts";
 import {
     clearSentDraft,
@@ -32,6 +33,8 @@ import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { PendingSettings } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import type { DraftOrigin } from "../utils/draft-origin";
+import { draftFromField } from "../utils/draft-origin";
 import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import type { ReadinessGate } from "../utils/readiness-gate";
 import { clearSendStarting, markSendStarting } from "../utils/send-in-flight";
@@ -58,6 +61,24 @@ const guestRefusalText = (texts: SendMessageTexts, code: GatewayErrorBody["error
     };
 
     return typeof code === "string" && Object.hasOwn(byCode, code) ? byCode[code]?.() : undefined;
+};
+
+/** How long a send waits for its chat's pin. Past it the send fails visibly (draft kept) instead of hanging before the gateway deadline starts. */
+const PIN_LOOKUP_DEADLINE_MS = 5000;
+
+const withPinDeadline = async <T>(lookup: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+            reject(new Error("The chat's pinned goal did not load in time"));
+        }, PIN_LOOKUP_DEADLINE_MS);
+    });
+
+    try {
+        return await Promise.race([lookup, deadline]);
+    } finally {
+        clearTimeout(timer);
+    }
 };
 
 /** User-facing strings the send body needs, as thunks so the `t` templates stay in the provider where Lingui compiles them. */
@@ -88,6 +109,8 @@ export interface SendMessageEnv extends ChatActionBase {
     model: string;
     navigate: ReturnType<typeof useNavigate>;
     newChatsTemporary: boolean;
+    /** False while an admin acts as the owner: the owner's pinned goal does not apply then (`chat/http.ts` refuses a goal too). */
+    pinnedGoalAllowed: boolean;
     queryClient: QueryClient;
     refetchSession: () => unknown;
     sendLocalTurn: ReturnType<typeof useLocalModelTurn>["send"];
@@ -100,8 +123,12 @@ export interface SendMessageEnv extends ChatActionBase {
     turnRef: RefObject<number>;
 }
 
-/** What a send carries besides its text: a held guest note's id, set only by the Guests tab's Send. */
+/**
+ * What a send carries besides its text: the draft's not-typed mark (`core/utils/draft-origin.ts`), and a held guest note's id,
+ * set only by the Guests tab's Send.
+ */
 export interface SendMessageOptions {
+    draftFrom?: DraftOrigin;
     guestMessageId?: string;
 }
 
@@ -139,12 +166,12 @@ const endComposerSubmit = (guestMessageId: string | undefined): void => {
  * A send by someone who must sign in first (invite-only): the owner's own text goes back to the composer and is held for
  * after sign-in. A guest's note is not the composer's draft: it is neither put there nor held to go out as the owner's words.
  */
-export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageOptions = {}): void => {
+export const holdSendForSignIn = (text: string, { draftFrom, guestMessageId }: SendMessageOptions = {}): void => {
     endComposerSubmit(guestMessageId);
 
     if (guestMessageId === undefined) {
-        useChatUIStore.getState().setComposerText(text);
-        holdForSignIn(text);
+        restoreTextFor(undefined, text, draftFrom);
+        holdForSignIn(text, draftFrom);
     } else {
         openLoginPrompt();
     }
@@ -230,7 +257,7 @@ const runSendMessageBody = async (
     // A held guest note the owner sends on from the Guests tab: the server saves its own text, marked as the guest's. Only
     // that send carries the id, never one of the composer's or the queue's. It goes alone: never through the composer (the
     // owner's draft stays, on every path out), with no goal, no reference images and none of the composer's files.
-    const { guestMessageId } = options;
+    const { draftFrom, guestMessageId } = options;
     const attachedReferences = guestMessageId === undefined ? useChatUIStore.getState().attachedReferences : [];
     const modelAtStart = useModelStore.getState();
     const currentMode = modelAtStart.getComposerMode(threadId || undefined);
@@ -254,7 +281,7 @@ const runSendMessageBody = async (
             providerLogger.error("[ChatProvider] Session not ready after waiting; send not delivered");
 
             if (guestMessageId === undefined && sameSession()) {
-                restoreTextFor(owner, text);
+                restoreTextFor(owner, text, draftFrom);
             }
 
             endComposerSubmit(guestMessageId);
@@ -304,7 +331,7 @@ const runSendMessageBody = async (
             setOptimisticMessages(withoutMessage(optimisticId));
 
             if (sameSession()) {
-                restoreTextFor(owner, text);
+                restoreTextFor(owner, text, draftFrom);
             }
 
             if (message) {
@@ -370,6 +397,7 @@ const runSendMessageBody = async (
                     navigate({ params: { threadId: savedThreadId }, state: { isNewThread: true } as HistoryState, to: "/chat/$threadId" });
                 }
             },
+            draftFrom,
             prompt: text,
             systemPrompt: isCreatingNewThread ? pendingSettings?.customSystemPrompt : threadDataRef.current?.customSystemPrompt,
             temporary: isCreatingNewThread ? newChatTemporaryFields(pendingSettings, newChatsTemporary) : undefined,
@@ -449,13 +477,27 @@ const runSendMessageBody = async (
             mode: currentMode,
             model,
             prompt: text,
+            ...draftFromField(draftFrom),
             researchDepth: searchMode === "chat" ? undefined : researchDepth,
             searchMode,
             threadId: threadId || undefined, // undefined triggers thread creation
         };
 
-        // "Run until done": this message is a goal (text turns only).
-        const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text) : undefined;
+        // "Run until done": this message is a goal (text turns only). A goal armed for it wins; otherwise the chat's pinned goal
+        // applies, unless an admin is acting as the owner. The pin is what this tab last saved, else the cache the composer keeps live.
+        let pinnedGoal: PinnedGoal | null = null;
+
+        if (currentMode === "text" && guestMessageId === undefined && threadId && text.trim() && !useGoalComposer.getState().enabled && env.pinnedGoalAllowed) {
+            const pinOverride = pinOverrideFor(threadId);
+            const pinOptions = crpc.chat.goals.functions.getPinnedGoal.queryOptions({
+                threadId: threadId as Id<"threads">,
+                unlockProof: currentUnlockProof(threadId),
+            });
+
+            pinnedGoal = pinOverride === undefined ? await withPinDeadline(queryClient.ensureQueryData(pinOptions)) : pinOverride;
+        }
+
+        const goal = currentMode === "text" && guestMessageId === undefined ? goalForMessage(text, pinnedGoal) : undefined;
 
         if (goal) {
             requestBody.goal = goal;
@@ -484,6 +526,8 @@ const runSendMessageBody = async (
             // support multi-ref (FAL Nano-Banana et al.).
             if (attachedReferences.length > 0) {
                 requestBody.referenceImages = attachedReferences.map((ref) => ref.url);
+                // The picker's id for each one, which the backend checks against the caller's own rows (`chat/reference-gate.ts`).
+                requestBody.referenceIds = attachedReferences.map((ref) => ref.id);
             }
         }
 
@@ -557,7 +601,7 @@ const runSendMessageBody = async (
                 setOptimisticMessages(withoutMessage(optimisticId));
 
                 if (sameSession()) {
-                    restoreTextFor(owner, text);
+                    restoreTextFor(owner, text, draftFrom);
                 }
 
                 restoreSettings();
@@ -704,7 +748,7 @@ const runSendMessageBody = async (
         // deadline the backend may still have saved the prompt, so the draft returns for the user to resend on
         // purpose (never automatically) and the timeout message says to check the conversation first.
         if (guestMessageId === undefined && sameSession()) {
-            restoreComposerFor(owner, { attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+            restoreComposerFor(owner, { attachedReferences, composerAttachments: attachments ?? [], composerDraftFrom: draftFrom, composerText: text });
         }
 
         restoreSettings();

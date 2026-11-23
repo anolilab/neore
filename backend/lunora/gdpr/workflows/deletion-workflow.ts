@@ -466,13 +466,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { dedupId: stepDedupId(scope, "anonymise-gateway-usage-deductions", round) },
                 ),
         );
-        await context.step.do(
+        await drain(
             "delete-user-browser-data",
-            async () =>
+            async (round) =>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserBrowserData,
                     { userId: args.userId },
-                    { dedupId: stepDedupId(scope, "delete-user-browser-data") },
+                    { dedupId: stepDedupId(scope, "delete-user-browser-data", round) },
                 ),
         );
 
@@ -557,15 +557,13 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 await context.run(steps.deleteUserWorkflowData, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-workflow-data", round) }),
         );
 
-        await context.step.do(
+        await drain(
             "delete-user-projects",
-            async () =>
+            async (round) =>
                 await context.run(
                     internal.gdpr.steps.deletion_steps.deleteUserProjects,
-                    {
-                        userId: args.userId,
-                    },
-                    { dedupId: stepDedupId(scope, "delete-user-projects") },
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-projects", round) },
                 ),
         );
 
@@ -652,6 +650,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // Writes made while the export was live are removed as well.
         await eraseUsage("delete-user-usage-daily-after-purge");
+
+        // Browser pages an export run stored and never cleaned up, killed before its ending (`browser/export-pages.ts`).
+        await context.step.do(
+            "delete-user-browser-export-pages",
+            async () =>
+                await context.run(
+                    internal.browser.gdpr.deleteUserBrowserExportPages,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-browser-export-pages") },
+                ),
+        );
 
         await context.step.do(
             "delete-user-settings",

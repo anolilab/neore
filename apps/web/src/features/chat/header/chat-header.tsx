@@ -14,6 +14,7 @@ import { useValidatedThread } from "@/features/chat/core/hooks/use-validated-thr
 import { beginTitleSave, queueTitleWrite, settleTitleSave, titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
 import { useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
 import GroupParticipantBar from "@/features/chat/group/group-participant-bar";
+import ThreadImagesButton from "@/features/chat/image-gallery/thread-images-button";
 import ThreadShareButton from "@/features/chat/sharing/thread-share-button";
 import ThreadPullRequests from "@/features/develop/components/thread-pull-requests";
 import SiteHeader from "@/features/layout/components/site-header";
@@ -135,6 +136,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
             anonymousUserBanner={<AnonymousUserBanner />}
             menu={
                 <>
+                    <ThreadImagesButton threadId={actualThreadId} />
                     <KBAttachmentButton threadId={actualThreadId} />
                     <ThreadDownloadButton model={model} threadId={actualThreadId} />
                     <ThreadShareButton threadId={actualThreadId} />

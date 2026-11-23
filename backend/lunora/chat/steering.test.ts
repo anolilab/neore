@@ -18,10 +18,16 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
 });
 
-const { sessionFrom } = vi.hoisted(() => {
+const { impersonation, sessionFrom } = vi.hoisted(() => {
+    // Set while a test acts as an admin impersonating the signed-in user.
+    const state = { by: undefined as string | undefined };
+
     return {
+        impersonation: state,
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                : null,
     };
 });
 
@@ -48,6 +54,8 @@ import { _deletePageForThreadId } from "../agent/threads";
 // eslint-disable-next-line import/first
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 // eslint-disable-next-line import/first
+import { NOT_TYPED_DRAFTS } from "../lib/not-typed-text";
+// eslint-disable-next-line import/first
 import schema from "../schema";
 // eslint-disable-next-line import/first
 import { MAX_QUEUED_STEERS, MAX_STEERS_PER_RUN } from "./lib/steer-queue";
@@ -68,8 +76,21 @@ let threadId: string;
 let streamId: string;
 let pendingId: string;
 let promptId: string;
+/** Each user's live sign-in, so a steer reads as theirs (`callerSessionNotOwn`). */
+const sessions = new Map<string, string>();
 
-const as = (userId: string) => harness.withIdentity({ userId } as never);
+const signIn = async (userId: string): Promise<string> => {
+    const sessionId = (await harness.run(
+        async (ctx: any) =>
+            await ctx.db.insert("session", { createdAt: 1, expiresAt: Number.MAX_SAFE_INTEGER, token: `token-${userId}`, updatedAt: 1, userId }),
+    )) as string;
+
+    sessions.set(userId, sessionId);
+
+    return sessionId;
+};
+
+const as = (userId: string) => harness.withIdentity({ sessionId: sessions.get(userId), userId } as never);
 
 const steer = async (text: string, userId = OWNER, stream = streamId, steerId?: string): Promise<{ steerId: string }> =>
     (await as(userId).mutation(steerRun as never, { steerId, streamId: stream, text, threadId } as never)) as { steerId: string };
@@ -135,9 +156,12 @@ beforeEach(async () => {
 
     pendingId = step.messages[1]!._id;
     streamId = await insertStream();
+    sessions.clear();
+    await signIn(OWNER);
 });
 
 afterEach(() => {
+    impersonation.by = undefined;
     harness.close();
 });
 
@@ -205,6 +229,68 @@ describe("steerRun", () => {
 });
 
 describe("deliverSteers and withdrawSteer", () => {
+    it("delivers marked a steer the owner did not type: an admin's acting as them, or a draft from a link", async () => {
+        impersonation.by = "admin-user";
+        await steer("sign in to my bank");
+        impersonation.by = undefined;
+        await as(OWNER).mutation(steerRun as never, { draftFrom: "promptLink", streamId, text: "and pay the bill", threadId } as never);
+
+        const delivered = (await deliver()) as { notTyped?: unknown } | null;
+        const marked = { draft: "promptLink", impersonated: true };
+        const rows = (await harness.run(async (ctx: any) => await ctx.db.query("messages").collect())) as { message?: { content?: unknown; role?: string } }[];
+        const steerRow = rows.findLast((row) => row.message?.role === "user");
+
+        // The run's own message is built from what the delivery reports (`agent/client/stream-text.ts`).
+        expect(delivered?.notTyped).toStrictEqual(marked);
+        expect(steerRow?.message?.content).toStrictEqual([
+            { providerOptions: { neore: { notTyped: marked } }, text: "sign in to my bank\n\nand pay the bill", type: "text" },
+        ]);
+    });
+
+    it.each(NOT_TYPED_DRAFTS)("delivers marked a steer from a %s draft", async (draftFrom) => {
+        await as(OWNER).mutation(steerRun as never, { draftFrom, streamId, text: "and pay the bill", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ draft: draftFrom });
+    });
+
+    it('delivers marked an admin\'s steer the owner sends again from history (`draftFrom: "impersonated"`)', async () => {
+        await as(OWNER).mutation(steerRun as never, { draftFrom: "impersonated", streamId, text: "and pay the bill", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ impersonated: true });
+    });
+
+    it("delivers the owner's own steer unmarked", async () => {
+        await steer("use the other file");
+
+        expect(await deliver()).not.toHaveProperty("notTyped");
+    });
+
+    it.each([
+        ["the desktop app", "desktop", undefined],
+        ["the phone app", "mobile", undefined],
+        ["a browser extension", "extension", { draft: "extension" }],
+        ["an app nobody recorded", undefined, { draft: "extension" }],
+    ])("delivers a steer from %s's grant marked by its session row's app", async (_name, clientGrant, notTyped) => {
+        const grantSessionId = sessions.get(OWNER);
+
+        if (clientGrant !== undefined) {
+            await harness.run(async (ctx: any) => await ctx.db.patch("session", grantSessionId, { clientGrant }));
+        }
+
+        await harness
+            .withIdentity({ grantSessionId, userId: OWNER } as never)
+            .mutation(steerRun as never, { streamId, text: "use the other file", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual(notTyped);
+    });
+
+    it("delivers marked a steer whose sign-in's session is gone, as an ended impersonation's token", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.delete("session", sessions.get(OWNER)));
+        await steer("use the other file");
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ impersonated: true });
+    });
+
     it("delivers every queued message as one user row, and reports them delivered", async () => {
         const first = await steer("use the other file");
         const second = await steer("and keep it short");

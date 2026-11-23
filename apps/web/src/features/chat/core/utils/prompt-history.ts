@@ -7,6 +7,11 @@
  * this module owns WHAT the navigation does to the text.
  */
 
+import type { DraftFrom } from "@neore/backend/not-typed-text";
+import { draftFromOfMarks, mergeNotTypedMarks, notTypedMarksOfPart } from "@neore/backend/not-typed-text";
+
+import { isViewersOwnMessage } from "./message-author";
+
 /** `null` while the user is editing their own draft rather than a recalled entry. */
 export type PromptHistoryState = {
     /** The unsent text the user had before the first ArrowUp; restored on the way back down or on Escape. */
@@ -23,9 +28,13 @@ export interface PromptHistoryStep {
 }
 
 interface MessageLike {
-    parts?: ReadonlyArray<{ text?: string; type: string }>;
+    parts?: ReadonlyArray<{ providerMetadata?: unknown; text?: string; type: string }>;
     role: string;
+    /** `pending` for the composer's own unsaved send, which names no sender yet (`isViewersOwnMessage`). */
+    status?: string;
     text?: string;
+    /** Who sent it: in a shared chat, a collaborator's message is not the viewer's own words. */
+    userId?: string;
 }
 
 const messageText = (message: MessageLike): string => {
@@ -62,6 +71,40 @@ export const buildPromptHistoryEntries = (messages: ReadonlyArray<MessageLike>):
     }
 
     return entries;
+};
+
+/**
+ * The not-typed mark of each entry whose message the server saved marked (`@neore/backend/not-typed-text`), so a recalled
+ * entry goes out marked again: a draft's source, or `impersonated` for one an admin wrote as the owner. Another person's
+ * message in a shared chat (any the viewer cannot be shown to have sent, `isViewersOwnMessage`) is `collaborator`. A
+ * text sent both marked and unmarked keeps the mark; a saved mark replaces `collaborator`, never the other way round.
+ */
+export const buildPromptHistoryMarks = (messages: ReadonlyArray<MessageLike>, viewerId: string | undefined): Map<string, DraftFrom> => {
+    const marks = new Map<string, DraftFrom>();
+
+    for (const message of messages) {
+        const draftFrom =
+            message.role === "user"
+                ? draftFromOfMarks(
+                      mergeNotTypedMarks(
+                          ...(message.parts ?? []).map((part) => (part.type === "text" ? notTypedMarksOfPart({ providerOptions: part.providerMetadata }) : {})),
+                      ),
+                  )
+                : undefined;
+        const text = messageText(message).trim();
+
+        if (!text) {
+            continue;
+        }
+
+        if (draftFrom !== undefined) {
+            marks.set(text, draftFrom);
+        } else if (message.role === "user" && !isViewersOwnMessage(message, viewerId) && !marks.has(text)) {
+            marks.set(text, "collaborator");
+        }
+    }
+
+    return marks;
 };
 
 /**

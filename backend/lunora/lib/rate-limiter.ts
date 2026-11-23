@@ -114,9 +114,15 @@ export const RATE_LIMIT_CONFIGS = {
 
     "browser/action:premium": Ratelimit.fixedWindow(200, HOUR),
     "browser/action:public": Ratelimit.fixedWindow(5, HOUR),
+    // Keeping, handing back and steering the browser a person took control of (`browser/live-view.ts`).
+    "browser/control:free": Ratelimit.fixedWindow(240, HOUR),
+    "browser/control:premium": Ratelimit.fixedWindow(600, HOUR),
     // Each call mints a live view URL at the provider (`browser/live-view.ts`).
     "browser/liveView:free": Ratelimit.fixedWindow(30, HOUR),
     "browser/liveView:premium": Ratelimit.fixedWindow(120, HOUR),
+    // A closing page's hand back (`POST /browser/release`) per client address, on the root shard, once its token is
+    // proven: a page closes a few times a minute at most, and a replayed token must not keep the owner's shard busy.
+    "browser/releaseIp": Ratelimit.fixedWindow(30, MINUTE),
 
     "byok/decrypt:free": Ratelimit.fixedWindow(100, MINUTE),
 
@@ -177,10 +183,14 @@ export const RATE_LIMIT_CONFIGS = {
     "chat/dailyRetrieve:anonymous": Ratelimit.fixedWindow(5, DAY),
     "chat/dailyRetrieve:free": Ratelimit.fixedWindow(50, DAY),
     "chat/dailyRetrieve:premium": Ratelimit.fixedWindow(500, DAY),
+    // Daily cap on follow-up suggestions (`chat/functions.ts`): its own bucket, so a suggestion never takes a unit a real send needs.
+    "chat/dailySuggestion:free": Ratelimit.fixedWindow(50, DAY),
+    "chat/dailySuggestion:premium": Ratelimit.fixedWindow(300, DAY),
+
     // Daily content limits per user tier - TEXT
     "chat/dailyText:anonymous": Ratelimit.fixedWindow(10, DAY),
-    "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
 
+    "chat/dailyText:free": Ratelimit.fixedWindow(20, DAY),
     "chat/dailyText:premium": Ratelimit.fixedWindow(1000, DAY),
 
     // Daily content limits per user tier - VIDEO
@@ -191,12 +201,6 @@ export const RATE_LIMIT_CONFIGS = {
 
     "chat/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "chat/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
-    // Follow-up suggestions: an LLM call per invocation. Its own family, so the
-    // suggestions a client fetches after every reply cannot eat the budget of
-    // real thread edits (`chat/update`), and vice versa.
-    "chat/followups:free": Ratelimit.fixedWindow(30, MINUTE),
-    "chat/followups:premium": Ratelimit.fixedWindow(100, MINUTE),
-
     "chat/globalPromptImprovement": Ratelimit.tokenBucket(1000, MINUTE, 1500),
     // Link preview cards (`chat/link-preview.ts`): charged only on a cache miss,
     // each one outbound fetch of at most 5s. A thread scrolled into view can ask
@@ -811,6 +815,34 @@ export const createRatelimit = (
 
                 throw error;
             }
+        },
+
+        /**
+         * Gives back `count` units a charge took for work that was then refused before it ran, up to the window's
+         * capacity. The limiter takes no negative count, so the stored value is changed directly, under the storage key
+         * the limiter writes (`name` and key, each URI-encoded); a window that has rolled over since is left alone.
+         */
+        refund: async (identifier: string, count = 1) => {
+            const storageKey = `${encodeURIComponent(name)}:${encodeURIComponent(`neore:${name}:${identifier}`)}`;
+            const stored = await store.get(storageKey);
+
+            if (!stored) {
+                return;
+            }
+
+            if (config.kind === "sliding window") {
+                await store.set(storageKey, { ...stored, value: Math.max(0, stored.value - count) });
+
+                return;
+            }
+
+            const windowStart = config.kind === "fixed window" ? Math.floor(Date.now() / config.period) * config.period : stored.ts;
+
+            if (stored.ts !== windowStart) {
+                return;
+            }
+
+            await store.set(storageKey, { ...stored, value: Math.min(config.capacity ?? config.rate, stored.value + count) });
         },
 
         resetUsedTokens: async (identifier: string) => {

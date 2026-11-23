@@ -4,9 +4,10 @@ import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-
 import { readStoredText } from "../lib/storage-read";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
-import { collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
+import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
 import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
 import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
@@ -16,6 +17,7 @@ import { gdprLogger } from "../lib/logger";
 import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
+import { storedPage, storedRows } from "../lib/stored-row";
 
 const TRAILING_SLASH = /\/$/;
 
@@ -384,6 +386,7 @@ export const collectFiles = internalQuery
                 v.object({
                     createdAt: v.number(),
                     label: v.optional(v.string()),
+                    signInUrl: v.optional(v.string()),
                     site: v.string(),
                     teammateIds: v.array(v.id("bots")),
                     updatedAt: v.number(),
@@ -432,6 +435,7 @@ export const collectFiles = internalQuery
                 return {
                     createdAt: login.createdAt,
                     label: login.label,
+                    signInUrl: login.signInUrl,
                     site: login.origin,
                     teammateIds: login.teammateIds ?? [],
                     updatedAt: login.updatedAt,
@@ -449,6 +453,9 @@ const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 
 /** The share of the export trigger run history may take; past it, the oldest runs are left out and marked as cut. */
 const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
+
+/** The share of the export the projects' legacy `context` texts may take; past it, a project's is left out and marked. */
+const PROJECT_CONTEXT_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
  * Sub-agent delegations (their task text and results) and knowledge
@@ -487,6 +494,7 @@ export const collectActivityForExport = internalQuery
                     id: run._id,
                     parentThreadId: run.parentThreadId,
                     result: run.result,
+                    role: run.role,
                     skillSlug: run.skillSlug,
                     status: run.status,
                     task: run.task,
@@ -499,10 +507,12 @@ export const collectPrompts = internalQuery.input({ userId: v.string() }).query(
     // `prompts` / `promptHistory` are `.global()` (D1): ORM facade, no legacy
     // reader. Unlimited `findMany` returns every matching row. Order mirrors the
     // old `by_user_and_favorite` walk and the old full-table scan.
-    const { page: prompts } = await context.db.prompts.findMany({
-        orderBy: [{ isFavorite: "asc" }, { _creationTime: "asc" }],
-        where: { userId },
-    });
+    const { page: prompts } = storedPage(
+        await context.db.prompts.findMany({
+            orderBy: [{ isFavorite: "asc" }, { _creationTime: "asc" }],
+            where: { userId },
+        }),
+    );
 
     // History of the user's prompts only — filtered in the query rather than by
     // scanning every user's history rows.
@@ -511,7 +521,7 @@ export const collectPrompts = internalQuery.input({ userId: v.string() }).query(
             ? []
             : await context.db.promptHistory
                   .findMany({ orderBy: [{ _creationTime: "asc" }], where: { promptId: { in: prompts.map((p) => p._id) } } })
-                  .then((result) => result.page);
+                  .then((result) => storedRows(result.page));
 
     return {
         promptHistory: relevantHistory.map((h) => {
@@ -552,6 +562,12 @@ export const generateExportFile = internalAction
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         bots: v.optional(v.any()),
+        // The workflow stopped at `BROWSER_EXPORT_PAGES` with history left: the section is marked as cut.
+        browserCut: v.optional(v.boolean()),
+        // How many browser pages the workflow stored under `browserPrefix` (`browser/export-pages.ts`), read here. Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        browserPages: v.optional(v.number()),
+        browserPrefix: v.optional(v.string()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -652,9 +668,50 @@ export const generateExportFile = internalAction
         const triggerReadBytes = triggerReadBudget(
             earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes,
         );
+        // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
+        const triggers = await collectAllTriggers(
+            async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+            async (triggerId, cursor) =>
+                await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
+                    cursor,
+                    triggerId: triggerId as Id<"triggers">,
+                    userId: args.userId,
+                }),
+            TRIGGER_EXPORT_BYTES,
+            triggerReadBytes,
+        );
+        // The projects' rule files, read last within what everything above leaves, counting what the triggers actually read.
+        const ownedWithRules = await attachProjectRuleFiles(
+            // Each is an object `collectOwnedProjectsForExport` returned.
+            ownedProjects.projects as object[],
+            ownedProjects.contexts,
+            async (projectIds) =>
+                await context.runQuery(internal.projects.gdpr.collectProjectRuleFilesForExport, {
+                    // The ids of the owned projects' pages; the query re-checks each is still this user's before reading its rules.
+                    projectIds: projectIds as Id<"projects">[],
+                    userId: args.userId,
+                }),
+            projectDetailsReadBudget(
+                earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes + triggers.readBytes,
+            ),
+            PROJECT_CONTEXT_EXPORT_BYTES,
+        );
+        // The browser pages, read from their objects, so neither this action's arguments nor its read budget carry them.
+        // Held to its share of the file: past it the section is cut and says so, and the rest of the export is written.
+        const { browserCut, browserPages, browserPrefix } = args;
+        const browser =
+            browserPrefix === undefined || browserPages === undefined
+                ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
+                : await readAllBrowserPages(
+                      async (page) => await readStoredText(context.storage, browserExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      browserPages,
+                      BROWSER_EXPORT_BYTES,
+                      browserCut === true,
+                  );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
+            browser,
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {
@@ -673,7 +730,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             projectRepositories,
-            projects: ownedProjects.projects,
+            projects: ownedWithRules.projects,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
@@ -683,18 +740,7 @@ export const generateExportFile = internalAction
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
-            // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
-            triggers: await collectAllTriggers(
-                async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
-                async (triggerId, cursor) =>
-                    await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
-                        cursor,
-                        triggerId: triggerId as Id<"triggers">,
-                        userId: args.userId,
-                    }),
-                TRIGGER_EXPORT_BYTES,
-                triggerReadBytes,
-            ),
+            triggers: { triggers: triggers.triggers },
             // An export from before the usage pieces existed carries its rows in `activity`; otherwise the usage JSON is spliced in below.
             ...(usageJson === undefined && { usageDaily: activity?.usageDaily ?? [] }),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },

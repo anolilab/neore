@@ -63,7 +63,8 @@ import {
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
-import { writableProject } from "../projects/functions";
+import { projectRunContext, writableProject } from "../projects/functions";
+import { readProjectRuleFiles } from "../projects/rule-file-rows";
 
 export type TaskRunOrigin = "dependency" | "manual" | "repair" | "retry" | "schedule";
 
@@ -597,12 +598,42 @@ const resolveRunPlace = async (ctx: QueryCtx, task: Doc<"tasks">, round: number)
  */
 export const runProjectFor = internalQuery
     .input({ taskId: v.id("tasks") })
-    .output(v.union(v.null(), v.object({ context: v.optional(v.string()), projectId: v.id("projects") })))
+    .output(
+        v.union(
+            v.null(),
+            v.object({
+                context: v.optional(v.string()),
+                // The text a run that lists no `auto` file takes instead, when the list's cost cut it (`projectRunContext`).
+                contextWithoutInstructions: v.optional(v.string()),
+                // The project's `auto` rule files, from the same read: listed, and read with `instruction_read`.
+                instructions: v.optional(v.array(v.object({ content: v.string(), description: v.string(), id: v.string(), title: v.string() }))),
+                projectId: v.id("projects"),
+            }),
+        ),
+    )
     .query(async ({ args, ctx }) => {
         const task = await ctx.db.get("tasks", args.taskId);
-        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId) : null;
+        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId, { primary: true }) : null;
 
-        return project ? { projectId: project._id, ...(project.context && { context: project.context }) } : null;
+        if (!project) {
+            return null;
+        }
+
+        // A task's run attaches no files: its project's `always` rule files, a legacy `context` first, as a chat gets them;
+        // read on the primary, as a chat's are (`getProjectContextForRun`).
+        const { instructions, text, textWithoutInstructions } = projectRunContext(
+            ctx,
+            project._id,
+            await readProjectRuleFiles(ctx, project, { primary: true }),
+            [],
+        );
+
+        return {
+            projectId: project._id,
+            ...(text && { context: text }),
+            ...(instructions.length > 0 && { instructions }),
+            ...(textWithoutInstructions !== undefined && { contextWithoutInstructions: textWithoutInstructions }),
+        };
     });
 
 /**

@@ -3,10 +3,9 @@ import { ModelPickerButton } from "@neore/chat-ui/model-picker/model-picker-butt
 import { ArrowLeftIcon, KeyboardIcon, LogOutIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-import { clearAccessToken } from "@/lib/access-token";
+import { signOut as endSession } from "@/lib/auth-session";
 import { APP_URL, LLM_GATEWAY_URL, LUNORA_URL } from "@/lib/env";
-import { lunora } from "@/lib/lunora-client";
-import { signOut as endSession, useSession } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { browserLanguage, updateSettings, useSettings } from "@/lib/settings";
 import { firefoxBrowser, IS_FIREFOX } from "@/lib/target";
 import { languageName } from "@/page-context/quick-prompts";
@@ -27,6 +26,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     const models = useModels();
     const [commands, setCommands] = useState<chrome.commands.Command[]>([]);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [signOutFailed, setSignOutFailed] = useState(false);
     const modelLabelId = useId();
     const languageId = useId();
 
@@ -34,14 +34,15 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         void chrome.commands.getAll().then(setCommands);
     }, []);
 
-    const signOut = async () => {
+    const signOut = async (key: string) => {
         setIsSigningOut(true);
+        setSignOutFailed(false);
 
         try {
-            await endSession();
+            await endSession(key);
+        } catch {
+            setSignOutFailed(true);
         } finally {
-            clearAccessToken();
-            lunora.setAuthToken(null);
             setIsSigningOut(false);
         }
     };
@@ -71,15 +72,22 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                     <p className="truncate">{session?.user.email}</p>
                     <button
                         className="flex w-fit items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                        disabled={isSigningOut}
+                        disabled={isSigningOut || !session}
                         onClick={() => {
-                            void signOut();
+                            if (session) {
+                                void signOut(session.sessionId);
+                            }
                         }}
                         type="button"
                     >
                         <LogOutIcon aria-hidden="true" className="size-4" />
                         {isSigningOut ? "Signing out…" : "Sign out"}
                     </button>
+                    {signOutFailed && (
+                        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                            Sign-out did not finish: this browser could not forget the account. Try again.
+                        </p>
+                    )}
                 </section>
 
                 <section aria-labelledby="settings-chat" className="flex flex-col gap-3">

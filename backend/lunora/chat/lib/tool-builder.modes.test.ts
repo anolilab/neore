@@ -57,6 +57,7 @@ vi.mock("../tools", () => {
         "saveSecretAsProviderKey",
         "searchMemory",
         "setMcpServerSecret",
+        "signInWithSavedLogin",
         "shellExecution",
         "spotifySearch",
         "stockChart",

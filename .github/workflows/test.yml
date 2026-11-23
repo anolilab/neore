@@ -590,8 +590,19 @@ jobs:
             # shutdown signal" (exit 143) during the guest-conversion test, and a
             # killed runner skips every later step, so nothing uploads; only this
             # step's own output survives up to the kill.
+            #
+            # NODE_OPTIONS: the backend's `lunora dev` runs codegen in-process
+            # on start, and that holds ~4.0 GB of live heap before the server is
+            # ready (measured 2026-11-21 on Node 24.22.1: main 4001 MB, a PR
+            # with +900 backend lines 4014 MB). Node's default limit on this
+            # 16 GB runner is ~4096 MB, so a run that lands a little high dies
+            # with "JavaScript heap out of memory" and Playwright reports
+            # "config.webServer was not able to start". 6144 leaves ~2 GB of
+            # headroom; the runner peaks at ~5.6 GB used of 16 GB.
             - name: "Run e2e tests"
               shell: "bash"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=6144"
               run: |
                   (
                       # The step runs under `-eo pipefail`; a SIGPIPE from `head` must not end the loop.

@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 import type { D1PreparedStatementLike } from "@lunora/d1";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import {
     handleWsTicketRequest,
@@ -9,8 +9,10 @@ import {
     purgeExpiredWsTickets,
     redeemWsTicket,
     resetWsTicketTableForTests,
+    resolveWsTicketIdentity,
     WS_TICKET_PATH,
     WS_TICKET_TTL_MS,
+    WsTicketUnavailableError,
 } from "./ws-ticket";
 
 /**
@@ -99,7 +101,15 @@ describe("ws tickets", () => {
 
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
         // Consumed all the same: a session restored later cannot revive it.
-        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('s1', 'u1', 0)`).run();
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('s1', 'u1', ?)`).run(Date.now() + 60_000);
+        await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
+    });
+
+    it("refuses a ticket whose session expired after the mint", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        database.sqlite.prepare(`UPDATE "session" SET "expiresAt" = ? WHERE "id" = ?`).run(Date.now() - 1, "sa");
+
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
     });
 
@@ -111,18 +121,81 @@ describe("ws tickets", () => {
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
     });
 
+    it("refuses an app grant's ticket once the grant is revoked, though the user has another live session", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('web', 'user-a', ?)`).run(Date.now() + 60_000);
+        // The revoke lands between the mint and the redeem.
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("sa");
+
+        await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
+    });
+
+    it("redeems an app grant's ticket as the grant, never as a web session", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ grantSessionId: "sa", userId: "user-a" });
+    });
+
+    it("adds the grant column to a table created before it existed", async () => {
+        database.sqlite.exec(
+            `CREATE TABLE "wsTicket" ("hash" TEXT PRIMARY KEY NOT NULL, "userId" TEXT NOT NULL, "sessionId" TEXT, "expiresAt" INTEGER NOT NULL)`,
+        );
+
+        const ticket = await issueWsTicket(database, { grantSessionId: "sa", userId: "user-a" });
+
+        await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ grantSessionId: "sa", userId: "user-a" });
+    });
+
     it("refuses a ticket naming another user's session", async () => {
         const ticket = await issueWsTicket(database, { sessionId: "sb", userId: "user-a" });
 
         await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
     });
 
-    it("refuses, rather than throws, when the session table cannot be read", async () => {
-        const ticket = await issueWsTicket(database, { sessionId: "s1", userId: "u1" });
+    it("throws a retryable error, rather than refusing, when the session table cannot be read", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        const named = await issueWsTicket(database, { sessionId: "s1", userId: "u1" });
+        const unnamed = await issueWsTicket(database, { userId: "u1" });
 
         database.sqlite.exec(`DROP TABLE "session"`);
 
-        await expect(redeemWsTicket(database, ticket)).resolves.toBeNull();
+        await expect(redeemWsTicket(database, named)).rejects.toBeInstanceOf(WsTicketUnavailableError);
+        await expect(redeemWsTicket(database, unnamed)).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", status: 503 });
+        expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses a ticket whose web session is gone even when its grant's read fails", async () => {
+        const ticket = await issueWsTicket(database, { grantSessionId: "grant", sessionId: "gone", userId: "u1" });
+        const failingGrant = {
+            prepare: (sql: string) => {
+                const prepared = database.prepare(sql);
+
+                return {
+                    ...prepared,
+                    bind: (...values: unknown[]) => {
+                        if (values[0] === "grant") {
+                            throw new Error("D1 unavailable");
+                        }
+
+                        return prepared.bind(...values);
+                    },
+                };
+            },
+        };
+
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        await expect(redeemWsTicket(failingGrant, ticket)).resolves.toBeNull();
     });
 
     it("refuses a ticket it never minted", async () => {
@@ -196,6 +269,81 @@ describe(handleWsTicketRequest, () => {
         await expect(redeemWsTicket(database, ticket)).resolves.toStrictEqual({ sessionId: "s1", userId: "u1" });
     });
 
+    it("refuses an app grant's bearer once its grant session has expired, though the bearer is still valid", async () => {
+        const database = createDatabase();
+
+        database.sqlite.prepare(`UPDATE "session" SET "expiresAt" = ? WHERE "id" = ?`).run(Date.now() - 1, "sa");
+
+        const response = await handleWsTicketRequest(post(), database, async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        });
+
+        expect(response?.status).toBe(401);
+    });
+
+    it("refuses an app grant's bearer once the grant is revoked, so its sockets are cut at the next re-check", async () => {
+        const database = createDatabase();
+        const grantBearer = async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        };
+
+        const live = await handleWsTicketRequest(post(), database, grantBearer);
+
+        expect(live?.status).toBe(200);
+
+        // Sign-out revokes the grant's session; the JWT itself stays valid until it expires.
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("sa");
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('web', 'user-a', ?)`).run(Date.now() + 60_000);
+
+        const revoked = await handleWsTicketRequest(post(), database, grantBearer);
+
+        expect(revoked?.status).toBe(401);
+    });
+
+    it("answers 503, not 401, when the grant's session cannot be read, so the client retries instead of connecting anonymously", async () => {
+        const database = createDatabase();
+        const failing = {
+            ...database,
+            prepare: (sql: string) => {
+                if (sql.includes(`FROM "session"`)) {
+                    throw new Error("D1 unavailable");
+                }
+
+                return database.prepare(sql);
+            },
+        };
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        const response = await handleWsTicketRequest(post(), failing, async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        });
+
+        expect(response?.status).toBe(503);
+        expect(warn).toHaveBeenCalledOnce();
+        await expect(response!.json()).resolves.not.toHaveProperty("ticket");
+    });
+
+    it("refuses at redeem a grant's ticket minted just before the revoke", async () => {
+        const database = createDatabase();
+        const response = await handleWsTicketRequest(post(), database, async () => {
+            return { grantSessionId: "sa", userId: "user-a" };
+        });
+        const { ticket } = (await response!.json()) as { ticket: string };
+
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("sa");
+        database.sqlite.prepare(`INSERT INTO "session" ("id", "userId", "expiresAt") VALUES ('web', 'user-a', ?)`).run(Date.now() + 60_000);
+
+        await expect(
+            resolveWsTicketIdentity(new Request(`http://x/_lunora/ws/reauth?shard=user-a&token=${ticket}`, { method: "POST" }), database, async () => {
+                return { sessionId: "web", userId: "user-a" };
+            }),
+        ).resolves.toBeNull();
+    });
+
     it("refuses an anonymous caller", async () => {
         const response = await handleWsTicketRequest(post(), createDatabase(), async () => null);
 
@@ -216,5 +364,76 @@ describe(handleWsTicketRequest, () => {
                 return { userId: "u1" };
             }),
         ).resolves.toBeUndefined();
+    });
+});
+
+describe(resolveWsTicketIdentity, () => {
+    const upgrade = (ticket: string) => new Request(`http://x/_lunora/ws?token=${ticket}`, { headers: { Upgrade: "websocket" } });
+    const reauth = (ticket: string) => new Request(`http://x/_lunora/ws/reauth?shard=u1&token=${ticket}`, { method: "POST" });
+    // The bearer or cookie that rode the same request: another account's, to show it never takes the socket over.
+    const cookie = async () => {
+        return { userId: "user-b" };
+    };
+
+    beforeEach(() => {
+        resetWsTicketTableForTests();
+    });
+
+    it("resolves a live ticket to the user it was minted for, on the upgrade and on a re-authentication", async () => {
+        const database = createDatabase();
+
+        await expect(resolveWsTicketIdentity(upgrade(await issueWsTicket(database, { userId: "u1" })), database, cookie)).resolves.toStrictEqual({
+            userId: "u1",
+        });
+        await expect(resolveWsTicketIdentity(reauth(await issueWsTicket(database, { userId: "u1" })), database, cookie)).resolves.toStrictEqual({
+            userId: "u1",
+        });
+    });
+
+    it("lets a refused ticket on the upgrade fall through to the session", async () => {
+        await expect(resolveWsTicketIdentity(upgrade("forged"), createDatabase(), cookie)).resolves.toStrictEqual({ userId: "user-b" });
+    });
+
+    it("ends the authentication of a re-authentication whose ticket is forged, spent, expired or revoked", async () => {
+        const database = createDatabase();
+        const spent = await issueWsTicket(database, { userId: "u1" });
+
+        await redeemWsTicket(database, spent);
+
+        const expired = await issueWsTicket(database, { userId: "u1" }, Date.now() - WS_TICKET_TTL_MS - 1);
+        const revoked = await issueWsTicket(database, { sessionId: "s1", userId: "u1" });
+
+        database.sqlite.prepare(`DELETE FROM "session" WHERE "id" = ?`).run("s1");
+
+        for (const ticket of ["forged", spent, expired, revoked]) {
+            await expect(resolveWsTicketIdentity(reauth(ticket), database, cookie)).resolves.toBeNull();
+        }
+    });
+
+    it("neither falls through nor ends the authentication when the ticket's session cannot be read", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        onTestFinished(() => {
+            warn.mockRestore();
+        });
+
+        const database = createDatabase();
+        const onUpgrade = await issueWsTicket(database, { grantSessionId: "s1", userId: "u1" });
+        const onReauth = await issueWsTicket(database, { grantSessionId: "s1", userId: "u1" });
+        const fallback = vi.fn(cookie);
+
+        database.sqlite.exec(`DROP TABLE "session"`);
+
+        await expect(resolveWsTicketIdentity(upgrade(onUpgrade), database, fallback)).rejects.toBeInstanceOf(WsTicketUnavailableError);
+        await expect(resolveWsTicketIdentity(reauth(onReauth), database, fallback)).rejects.toBeInstanceOf(WsTicketUnavailableError);
+        expect(fallback).not.toHaveBeenCalled();
+    });
+
+    it("leaves a request with no ticket to the session", async () => {
+        await expect(
+            resolveWsTicketIdentity(new Request("http://x/_lunora/ws/reauth?shard=u1", { method: "POST" }), createDatabase(), cookie),
+        ).resolves.toStrictEqual({
+            userId: "user-b",
+        });
     });
 });

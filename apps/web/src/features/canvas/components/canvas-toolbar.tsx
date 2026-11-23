@@ -10,6 +10,7 @@ import cn from "@neore/ui/utils/cn";
 import type { FC } from "react";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 
 interface CanvasToolbarProps {
     className?: string;
@@ -80,6 +81,8 @@ const CanvasToolbar: FC<CanvasToolbarProps> = ({ className, documentKind }) => {
 
     const handleAction = (action: QuickAction) => {
         setComposerText(action.prompt);
+        // Picked, not typed (`draft-origin.ts`).
+        markComposerDraft("suggestion");
     };
 
     return (

@@ -14,6 +14,7 @@
 import { useLingui } from "@lingui/react/macro";
 import cn from "@ui/utils/cn";
 import { assertOfficeZipWithinLimits } from "@ui/utils/office-zip-limits";
+import { saveOnClick } from "@ui/utils/save-from-url";
 import DOMPurify from "dompurify";
 import { Download, FileText } from "lucide-react";
 import type { FC } from "react";
@@ -118,6 +119,7 @@ const DocxPreview: FC<DocxPreviewProps> = memo(({ className, filename, url }) =>
                     className="hover:bg-accent rounded p-1"
                     download={filename}
                     href={url}
+                    onClick={saveOnClick(url, filename, "document.docx")}
                     rel="noopener noreferrer"
                     target="_blank"
                 >

@@ -4,15 +4,16 @@
  * Pure (no `chrome.*`, no Vite) so both variants are unit-tested, and so
  * `manifest.config.ts` stays a thin adapter from the build's env to this.
  *
+ * Both builds sign in through `identity.launchWebAuthFlow` (see
+ * `src/lib/extension-grant.ts`), so both carry `identity`, and neither has host
+ * access to the app origin: the extension never fetches it, it only opens it in
+ * the sign-in window.
+ *
  * What differs for Firefox, and why:
  *
  * - `background.scripts`, not `service_worker` — Firefox MV3 runs background
  *   scripts as an event page and does not support `service_worker`.
  * - `sidebar_action` instead of `side_panel`/`sidePanel` — Firefox's sidebar API.
- * - `identity` — sign-in runs through `identity.launchWebAuthFlow`, because the
- *   Firefox build cannot use the web app's session cookie (see
- *   `src/lib/extension-grant.ts`). For the same reason it needs no host
- *   permission for the app origin: it never fetches it.
  * - `browser_specific_settings.gecko` — a fixed add-on id (required to sign an
  *   MV3 add-on, and what the sign-in redirect URI is derived from) plus the
  *   data-collection declaration AMO requires of new submissions.
@@ -39,7 +40,6 @@ export const SIDEBAR_PATH = "src/sidepanel/index.html";
 export const BACKGROUND_PATH = "src/background/index.ts";
 
 export interface ManifestInput {
-    appUrl: string;
     browser: TargetBrowser;
     /** Vite's command: the CSP is added to builds only. */
     command: "build" | "serve";
@@ -92,15 +92,13 @@ export type ExtensionManifest = Manifest & {
 export const buildManifest = (input: ManifestInput): ExtensionManifest => {
     const isFirefox = input.browser === "firefox";
 
-    // Host access is limited to our own origins: the Lunora backend (RPC) and the
-    // LLM gateway (chat start + stream), plus — Chrome only — the app, where
-    // better-auth's session cookie lives. Nothing else is ever fetched, and page
+    // Host access is limited to our own origins: the Lunora backend (RPC and the
+    // grant routes) and the LLM gateway (chat start + stream). Nothing else is ever fetched, and page
     // content is read through `activeTab` + `scripting`, which needs no host
     // permission at all — so there is no `<all_urls>` and no persistent content
-    // script. In Firefox these grants are also what exempt the extension's
-    // requests from CORS, which is why that build needs no origin allow-listing
-    // on the backend.
-    const configured = [isFirefox ? undefined : input.appUrl, input.lunoraUrl, input.gatewayUrl];
+    // script. These grants are also what exempt the extension's requests from
+    // CORS, which is why the backend needs no origin allow-listing for it.
+    const configured = [input.lunoraUrl, input.gatewayUrl];
     const hostPermissions = [...new Set(configured.map((value) => toMatchPattern(value)).filter(present))];
 
     // `connect-src` repeats that list so a compromised dependency cannot exfiltrate
@@ -112,8 +110,11 @@ export const buildManifest = (input: ManifestInput): ExtensionManifest => {
     // activeTab + scripting: read the CURRENT tab only, only after the user
     // invokes the extension on it (toolbar, context menu, shortcut).
     // contextMenus: the page/selection actions. storage: settings and the
-    // background -> panel hand-off. sidePanel / identity: see the file header.
-    const permissions = ["activeTab", "contextMenus", "scripting", isFirefox ? "identity" : "sidePanel", "storage"].toSorted((a, b) => a.localeCompare(b));
+    // background -> panel hand-off. identity: sign-in, see the file header.
+    // sidePanel: Chrome's panel (Firefox declares `sidebar_action` instead).
+    const permissions = ["activeTab", "contextMenus", "identity", "scripting", ...(isFirefox ? [] : ["sidePanel"]), "storage"].toSorted((a, b) =>
+        a.localeCompare(b),
+    );
 
     const manifest: ExtensionManifest = {
         manifest_version: 3,

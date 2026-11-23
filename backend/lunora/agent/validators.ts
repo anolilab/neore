@@ -1,8 +1,9 @@
 import type { Infer, Validator } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { vPinnedGoal } from "../chat/goals/validators";
 import { vGroupChat } from "../chat/group/validators";
-import { vWorkerPolicy } from "../sub-agents/validators";
+import { vSubAgentRoles, vWorkerPolicy } from "../sub-agents/validators";
 import { vAgentRef } from "./agent-switch-validators";
 import { vVectorDimension } from "./vector/tables";
 
@@ -589,6 +590,8 @@ export const vMessageDocFields = {
     error: v.optional(v.string()),
     fileIds: v.optional(v.array(v.string())),
     finishReason: v.optional(vFinishReason),
+    // Whether the run that wrote this row ran on the device (`agent/followup-suggestions.ts#stampRunLocality`).
+    localRun: v.optional(v.boolean()),
     // The result
     message: v.optional(vMessage),
     model: v.optional(v.string()),
@@ -706,6 +709,9 @@ export const vThreadDocFields = {
     createdAt: v.optional(v.number()),
     // Written only by a hard delete's first page (`agent/threads.ts`): the thread is going, so not a create or patch field.
     deletingAt: v.optional(v.number()),
+    // Written only by the suggestion dispatch and the grant removal (`agent/followup-suggestions.ts`), as short leases.
+    followupDispatch: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number(), requestId: v.optional(v.string()) })),
+    followupRevoke: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number() })),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
@@ -727,6 +733,8 @@ export const vThreadDocFields = {
     // owner check), and by the ACP handoff's insert
     // (`acp/switch.ts`, carrying a cloud thread's mode to the thread that takes over).
     permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
+    // Written only by `chat/goals/functions.ts` (set and clear), which checks the caller owns the thread.
+    pinnedGoal: v.optional(vPinnedGoal),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
@@ -885,6 +893,8 @@ export const vProjectCreateFields = {
     // Workflow fields
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
     publicAccessToken: v.optional(v.string()),
+    // Written only through `projects/functions.ts:setProjectSubAgentRole`; here so every project output carries it.
+    subAgentRoles: v.optional(vSubAgentRoles),
     title: v.string(),
     userId: v.optional(v.string()),
     workflowContent: v.optional(vWorkflowContent),

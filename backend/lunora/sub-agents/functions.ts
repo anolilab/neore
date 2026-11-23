@@ -121,7 +121,10 @@ import {
     WORKER_POLICY_MAX_PER_HOUR,
 } from "./logic";
 import type { vWorkerPolicy } from "./validators";
-import { vDispatchSource, vHostRunnerRequest, vSubAgentRunMode, vSubAgentRunStatus } from "./validators";
+import { vDispatchSource, vHostRunnerRequest, vSubAgentRoleName, vSubAgentRunMode, vSubAgentRunRole, vSubAgentRunStatus } from "./validators";
+import type { SubAgentRoleName, SubAgentRunRole } from "./roles";
+import { isRoleModelAllowed, resolveHostRoleLaunch, resolveRoleLaunch } from "./roles";
+import { delegationProjectId, effectiveRoleSettings, roleModelRefusal } from "./role-settings";
 
 type RunDoc = Doc<"subAgentRuns">;
 
@@ -134,6 +137,8 @@ export interface CreateSubAgentRunArgs {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    /** The role the call named, already resolved against the settings (`createRun`); a worker's later runs copy its first's. */
+    role?: SubAgentRunRole;
     skillSlug?: string;
     task: string;
     toolAllowlist?: string[];
@@ -314,6 +319,7 @@ export const admitSubAgentRun = async (
             organizationId,
             parentModel: args.parentModel,
             parentThreadId: parent._id,
+            ...(args.role && { role: args.role }),
             skillSlug,
             status: "queued",
             task,
@@ -864,13 +870,15 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             defaultModel: DEFAULT_CHAT_MODEL,
             isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
             parentModel: args.parentModel,
-            preferredModel: args.model,
+            // A role's model passed the same rule at `createRun`, so it is the one picked.
+            preferredModel: args.role?.model ?? args.model,
         });
 
         childThreadId = await insertThread(ctx.db, {
             createdAt: now,
             // A host worker runs on its agent, not on a cloud model.
             model: host ? host.offer.agentKey : model,
+            ...(!host && args.role?.reasoningEffort !== undefined && { reasoningEffort: args.role.reasoningEffort }),
             organizationId: newWorkerOrganizationId,
             ...(host && { runner: "host" as const }),
             status: "active",
@@ -921,6 +929,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),
+        // A worker keeps the role its first run launched with, as it keeps its skill.
+        ...((origin ? origin.role : args.role) && { role: origin ? origin.role : args.role }),
         skillSlug: origin?.skillSlug ?? skillSlug,
         status: "queued",
         task,
@@ -958,6 +968,41 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
     return { runId: admitted.run._id, state, workerId: admitted.run.childThreadId! };
 };
 
+/**
+ * The role a dispatch from `parentThreadId` names, as the settings in effect there have it: the user's roles,
+ * overridden by the parent thread's project. Refuses a role without a model or whose model the sub-agent rule refuses,
+ * except for a worker on a computer (`onHost`), which runs on its coding agent and takes only the instructions.
+ */
+export const resolveRunRole = async (
+    ctx: MutationCtx,
+    args: { parentThreadId: string; userId: string },
+    roleName: SubAgentRoleName,
+    onHost = false,
+): Promise<{ error: string } | { role: SubAgentRunRole }> => {
+    const { ownersInstructions, roles } = await effectiveRoleSettings(ctx, args.userId, await delegationProjectId(ctx, args.parentThreadId));
+    const attributed = (role: SubAgentRunRole): SubAgentRunRole =>
+        role.instructions && ownersInstructions.has(roleName) ? { ...role, instructionsBy: "projectOwner" } : role;
+
+    if (onHost) {
+        return { role: attributed(resolveHostRoleLaunch(roles, roleName).role) };
+    }
+
+    const launch = resolveRoleLaunch(roles, roleName, isRoleModelAllowed);
+
+    if ("error" in launch) {
+        return launch;
+    }
+
+    // A project's owner set its overrides: the model must also pass this user's own run checks.
+    const refusal = await roleModelRefusal(ctx, args.userId, launch.role.model);
+
+    return refusal
+        ? {
+              error: `The ${roleName} role's model cannot run for you: ${refusal} Delegate without a role, or ask the user to pick another model for it in Settings → Sub-agent roles.`,
+          }
+        : { role: attributed(launch.role) };
+};
+
 export const createRun = internalMutation
     .input({
         chainSource: v.optional(v.string().max(200)),
@@ -975,6 +1020,8 @@ export const createRun = internalMutation
         parentThreadId: v.string(),
         // A worker: the thread outlives this run and is messaged again with `messageWorker`.
         persistent: v.optional(v.boolean()),
+        // A role the user gave a model of its own (`sub-agents/roles.ts`).
+        role: v.optional(vSubAgentRoleName),
         skillSlug: v.optional(v.string()),
         task: v.string(),
         toolAllowlist: v.optional(v.array(v.string())),
@@ -982,7 +1029,20 @@ export const createRun = internalMutation
         userId: v.string(),
     })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), workerId: v.optional(v.string()) }), v.object({ error: v.string() })))
-    .mutation(async ({ args: { chainSource, host, persistent, ...args }, ctx }) => {
+    .mutation(async ({ args: { chainSource, host, persistent, role: roleName, ...rest }, ctx }) => {
+        // Resolved before anything is charged: a role without a usable model is the lead's to read, and costs nothing.
+        let args: typeof rest & { role?: SubAgentRunRole } = rest;
+
+        if (roleName !== undefined) {
+            const launch = await resolveRunRole(ctx, rest, roleName, host !== undefined);
+
+            if ("error" in launch) {
+                return launch;
+            }
+
+            args = { ...rest, role: launch.role };
+        }
+
         // A worker never waits for approval, but it carries the chain source on, so the one-shot children it delegates
         // count toward their task's or trigger's limit, and an eval's still never pause.
         if (persistent) {
@@ -1144,6 +1204,7 @@ export const claimRun = internalMutation
                 organizationId: v.optional(v.string()),
                 parentModel: v.optional(v.string()),
                 parentThreadId: v.string(),
+                role: v.optional(vSubAgentRunRole),
                 skillSlug: v.optional(v.string()),
                 task: v.string(),
                 toolAllowlist: v.optional(v.array(v.string())),
@@ -1181,6 +1242,7 @@ export const claimRun = internalMutation
             ...(run.organizationId !== undefined && { organizationId: run.organizationId }),
             ...(run.parentModel !== undefined && { parentModel: run.parentModel }),
             parentThreadId: run.parentThreadId,
+            ...(run.role !== undefined && { role: run.role }),
             ...(run.skillSlug !== undefined && { skillSlug: run.skillSlug }),
             task: run.task,
             ...(run.toolAllowlist !== undefined && { toolAllowlist: run.toolAllowlist }),

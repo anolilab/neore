@@ -16,6 +16,7 @@ import { useRef, useState } from "react";
 import { useOutsideClick } from "rooks";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 
 const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => {
     const { t } = useLingui();
@@ -26,6 +27,8 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
 
     const handleSuggestionClick = (prompt: string) => {
         setComposerText(prompt);
+        // Picked, not typed (`draft-origin.ts`).
+        markComposerDraft("suggestion");
         setIsOpen(false);
         setActiveTab("");
     };

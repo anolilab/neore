@@ -1342,6 +1342,45 @@ describe("run prompts", () => {
         expect(exported[0]?.runsTruncated).toBeUndefined();
     });
 
+    it("counts each trigger's whole row as read, on its page and again on each of its run pages", async () => {
+        const { triggerId } = (await as().mutation(createTrigger as never, { model: "m", name: "Hook", type: "webhook" } as never)) as { triggerId: string };
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("triggers", triggerId, { systemPrompt: "p".repeat(50_000) });
+        });
+
+        const read = (await harness.run(async (ctx: any) => {
+            const triggersPage = await ctx.runQuery(collectTriggersForExport, { userId: "user-a" });
+            const runsPage = await ctx.runQuery(collectTriggerRunsForExport, { triggerId, userId: "user-a" });
+
+            return { runs: runsPage.readBytes, triggers: triggersPage.readBytes };
+        })) as { runs: number; triggers: number };
+
+        // A run page with no runs still read the trigger's row, its long prompt included.
+        expect(read.triggers).toBeGreaterThan(50_000);
+        expect(read.runs).toBeGreaterThan(50_000);
+    });
+
+    it("reports what it actually read, so an account with no triggers leaves its whole read budget to later sections", async () => {
+        const collect = async (triggers: { id: string }[]) =>
+            await collectAllTriggers(
+                async () => {
+                    return { cursor: null, triggers };
+                },
+                async () => {
+                    return { cursor: null, readBytes: 500, runs: [] };
+                },
+                Number.MAX_SAFE_INTEGER,
+                12 * 1024 * 1024,
+            );
+
+        const none = await collect([]);
+        const one = await collect([{ id: "a" }]);
+
+        expect(none.readBytes).toBe(0);
+        expect(one.readBytes).toBe(JSON.stringify({ id: "a" }).length + 500);
+    });
+
     it("exports every trigger across the export pages, with the settings a bot routine keeps", async () => {
         for (let n = 0; n < 7; n += 1) {
             await as().mutation(createTrigger as never, { model: "m", name: `Hook ${String(n)}`, type: "webhook" } as never);

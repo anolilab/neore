@@ -11,6 +11,7 @@ import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
 import { grantWorkflowFiles } from "./images";
 import { findOwnedVaultRows, insertVaultCopies, rewriteStorageKeys, scheduleVaultObjectCopies, vVaultRowToCopy, type VaultRowToCopy } from "../vault/fork-copy";
+import { storedRow } from "../lib/stored-row";
 
 /**
  * Fork a public workflow into the user's own workspace.
@@ -102,7 +103,7 @@ export const completeFork = internalMutation
     .input({ sourceProjectId: v.string(), userId: v.string(), vaultRows: v.array(vVaultRowToCopy) })
     .output(v.object({ projectId: v.string() }))
     .mutation(async ({ args: { sourceProjectId, userId, vaultRows }, ctx: context }) => {
-        const source = await context.db.projects.findFirst({ where: { _id: sourceProjectId as Id<"projects"> } });
+        const source = storedRow(await context.db.projects.findFirst({ where: { _id: sourceProjectId as Id<"projects"> } }));
 
         assertForkable(source, userId);
 

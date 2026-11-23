@@ -103,6 +103,7 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: modelState.memory,
                 prefs: {
@@ -111,8 +112,10 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
                     personalization: undefined,
                     timezone: "Europe/Berlin",
                 },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: modelState.threadStateless ? { statelessMode: true } : null,
                 userProviderKeys: undefined,
             };
@@ -1579,5 +1582,26 @@ describe("a run whose model call is aborted", () => {
 
         expect(rows.some((row) => row.status === "pending")).toBe(false);
         expect(rows.some((row) => row.role === "assistant" && row.status === "failed")).toBe(true);
+    });
+});
+
+describe("a run in a chat without memory", () => {
+    it("saves its prompt again with the marks of the saved one, so text the owner did not type stays marked", async () => {
+        const marked = [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "Say hello", type: "text" }];
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content: marked, role: "user" } }));
+        modelState.threadStateless = true;
+        await run();
+
+        const copies = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q: any) => q.eq("threadId", ids.threadId))
+                .collect();
+
+            return rows.filter((row: any) => row.message?.role === "user" && String(row._id) !== ids.messageId).map((row: any) => row.message.content);
+        });
+
+        expect(copies).toStrictEqual([marked]);
     });
 });

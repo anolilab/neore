@@ -23,7 +23,8 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
-import type { ResearchDepth } from "../../agent/client/create-tool";
+import type { ResearchDepth, RunTurn } from "../../agent/client/create-tool";
+import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
 import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
 import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 import type { MessageDoc } from "../../agent/validators";
@@ -40,6 +41,7 @@ import type { GatewayCustomProviderConfig } from "./gateway-language-model";
 import { gatewayFetch } from "../../lib/services";
 import getAgent from "./get-agent";
 import type { AutoApprovals } from "./low-risk-approval";
+import { systemContextKinds } from "./system-context-kinds";
 import { injectsUntrustedContext } from "./low-risk-approval";
 import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
@@ -76,6 +78,7 @@ import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
 import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
+import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -303,9 +306,39 @@ export const setHeadlessRun = (ctx: object): void => {
     (ctx as { headless?: boolean }).headless = true;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `replyKey`; the action ctx has no such field. */
+export const setRunReplyKey = (ctx: object, replyKey: string): void => {
+    (ctx as { replyKey?: string }).replyKey = replyKey;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runTurn`. Set only when every field is
+ * known: a run started before `/chat/start` recorded impersonation, or a snapshot written before these fields, sets none.
+ */
+export const setRunTurn = (ctx: object, turn: Partial<RunTurn> | undefined): void => {
+    const { impersonated, promptMessageId, systemContext } = turn ?? {};
+
+    (ctx as { runTurn?: RunTurn }).runTurn =
+        impersonated === undefined || promptMessageId === undefined || systemContext === undefined
+            ? undefined
+            : { impersonated, promptMessageId, systemContext };
+};
+
+/**
+ * The agent forwards the action ctx to tools as their `ToolCtx`, which declares `runToolSources`: the source of each tool
+ * the run offers, read off its permission key (`builtin:…`, `mcp:…`, `connector:…`, `device:…`), never off its name; a
+ * key with no source reads as `unknown`. A continuation passes the keys its snapshot recorded too, so a tool the step
+ * that made the call was offered still counts after it is gone; a snapshot that recorded none sets none.
+ */
+export const setRunToolSources = (ctx: object, ...permissionKeys: ReadonlyArray<Record<string, string> | undefined>): void => {
+    (ctx as { runToolSources?: ReadonlyArray<string> }).runToolSources = permissionKeys.includes(undefined)
+        ? undefined
+        : permissionKeys.flatMap((keys) => Object.values(keys ?? {}).map((key) => (key.includes(":") ? key.slice(0, key.indexOf(":")) : "unknown")));
 };
 
 /**
@@ -471,6 +504,13 @@ const retrieveKnowledgeContext = async (
 };
 
 /**
+ * Characters of the longest context a run of `context` may append: which of its two kinds it sends is known only once its
+ * tools are built (`instruction_read` may be removed), so an Auto route, chosen before, is sized for the longer.
+ */
+export const longestContextCharacters = (context: { contextParts: string[]; contextPartsWithoutInstructions: string[] }): number =>
+    Math.max(context.contextParts.join("\n\n").length, context.contextPartsWithoutInstructions.join("\n\n").length);
+
+/**
  * The per-user context an interactive run reads before it starts: preferences
  * and personalization, the thread's settings, the user's provider keys, and the
  * extra system-prompt context — relevant memories, knowledge-base excerpts,
@@ -485,8 +525,12 @@ export const loadRunContext = async (
         /** Set only by a caller whose run was admitted by the stream gate: a locked chat's knowledge scope is empty without it. */
         admittedRun?: boolean;
         customSystemPrompt?: string;
+        /** The files the run's message attaches: the project's rule files applied by pattern match their names. */
+        fileIds?: string[];
         promptText?: string;
         researchDepth?: string;
+        /** Read the sub-agent role catalog: only a run that may hand work to one asks (a group turn does not). */
+        roleCatalog?: boolean;
         threadId: string;
         threadLanguage?: string;
         userId: string;
@@ -511,7 +555,7 @@ export const loadRunContext = async (
 
         return bot ? { ...bot, botId: settings.botId } : null;
     });
-    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot] = await Promise.all([
+    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot, roleCatalog] = await Promise.all([
         prefsPromise,
         threadSettingsPromise,
         loadUserProviderKeys(ctx, userId),
@@ -527,40 +571,43 @@ export const loadRunContext = async (
         retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
             settings?.projectId
-                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: settings.projectId as Id<"projects">, userId })
+                ? await ctx.runQuery(internal.projects.functions.getProjectContextForRun, {
+                      ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds.slice(0, MAX_ATTACHED_FILES) as Id<"chatFiles">[] }),
+                      projectId: settings.projectId as Id<"projects">,
+                      userId,
+                  })
                 : null,
         ),
         botPromise,
+        // Alongside the project read, so it adds no wait of its own.
+        args.roleCatalog ? ctx.runQuery(internal.sub_agents.role_settings.getRoleCatalogForRun, { threadId, userId }) : null,
     ]);
 
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;
-    const contextParts: string[] = [];
+    const partsWith = (projectText: string | null | undefined): string[] =>
+        [
+            memoryContext?.context,
+            knowledgeContext?.context,
+            projectText ? `PROJECT CONTEXT:\n${projectText}` : undefined,
+            bot ? `BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}` : undefined,
+            customSystemPrompt ? `ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}` : undefined,
+        ].filter((part): part is string => !!part);
+    const contextParts = partsWith(project?.text);
 
-    if (memoryContext?.context) {
-        contextParts.push(memoryContext.context);
-    }
-
-    if (knowledgeContext?.context) {
-        contextParts.push(knowledgeContext.context);
-    }
-
-    if (project) {
-        contextParts.push(`PROJECT CONTEXT:\n${project}`);
-    }
-
-    if (bot) {
-        contextParts.push(`BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}`);
-    }
-
-    if (customSystemPrompt) {
-        contextParts.push(`ADDITIONAL INSTRUCTIONS:\n${customSystemPrompt}`);
-    }
+    const personalization = toPersonalization(prefs);
+    // The thread's stored instructions win over the request's (`customSystemPrompt` above).
+    const systemPromptSource = threadSettings?.customSystemPrompt === undefined ? "request" : "thread";
 
     return {
         /** The bot this chat runs as, when it resolves; its memory is written in that scope. */
         botId: bot?.botId,
-        /** Appended to the agent's instructions, in this order. */
+        /** Appended to the agent's instructions, in this order, by a run that lists the project's `auto` files. */
         contextParts,
+        /**
+         * The same parts for a run that lists none of them (`projectInstructions` unused): its project text is chosen without the
+         * list's cost (`projectRunContext`), so the list never takes room from files that run is given.
+         */
+        contextPartsWithoutInstructions: project?.textWithoutInstructions === undefined ? contextParts : partsWith(project.textWithoutInstructions),
         /** The passages behind the `[n]` citations; `afterRun` records them on the reply. */
         knowledgeSources: knowledgeContext?.sources ?? [],
         memoryEnabled: prefs.memoryEnabled,
@@ -569,19 +616,37 @@ export const loadRunContext = async (
             backupModel: prefs.backupModel,
             language: args.threadLanguage || prefs.language,
             location: prefs.location,
-            personalization: toPersonalization(prefs),
+            personalization,
             threadSummariesEnabled: prefs.threadSummariesEnabled,
             timezone: prefs.timezone,
         },
+        /**
+         * The project's `auto` rule files, from the same read: a run whose tools keep `instruction_read` over them
+         * (`buildAgentTools`) lists them after `contextParts` (`renderInstructionList`); one that does not leaves them out.
+         */
+        projectInstructions: project?.instructions ?? [],
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
         retrievedMemories: memoryContext?.refs ?? [],
+        /** The sub-agent roles that have a model (`sub-agents/roles.ts`); the run adds it only while it can delegate. */
+        roleCatalog: roleCatalog ?? undefined,
+        /** One kind per piece of the system prompt above, for the saved-login verdict (`system-context-kinds.ts`). */
+        systemContext: systemContextKinds({
+            bot,
+            knowledge: Boolean(knowledgeContext?.context),
+            memories: Boolean(memoryContext?.context),
+            personalization: personalization !== undefined || Boolean(prefs.location) || Boolean(prefs.language),
+            personalizationByImpersonator: prefs.personalizationByImpersonator,
+            project: Boolean(project),
+            systemPrompt: customSystemPrompt ? systemPromptSource : undefined,
+            threadLanguage: Boolean(args.threadLanguage),
+        }),
         threadSettings,
         /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
         untrustedContext: injectsUntrustedContext({
             knowledge: knowledgeContext?.context,
             memory: memoryContext?.context,
-            project: project ?? undefined,
+            project: [project?.text, renderInstructionList(project?.instructions ?? [])].filter(Boolean).join("\n\n") || undefined,
             threadPrompt: threadSettings?.customSystemPrompt,
         }),
         userProviderKeys,
@@ -589,6 +654,20 @@ export const loadRunContext = async (
 };
 
 export type RunContext = Awaited<ReturnType<typeof loadRunContext>>;
+
+/**
+ * The `auto` rule files of `projectId`, the project a paused run listed them from, for `userId` (`getProjectContextForRun`,
+ * with its access check): none when the run recorded no project, or the user can no longer reach it.
+ */
+const readProjectInstructions = async (ctx: ActionCtx, projectId: string | undefined, userId: string): Promise<RunInstruction[]> => {
+    if (!projectId) {
+        return [];
+    }
+
+    const project = await ctx.runQuery(internal.projects.functions.getProjectContextForRun, { projectId: projectId as Id<"projects">, userId });
+
+    return project?.instructions ?? [];
+};
 
 /** A saved tool result, cut down for memory extraction. */
 const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summary: string; toolName: string }[] => {
@@ -1116,6 +1195,20 @@ export const finishRun = async (
 
     await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
 
+    // Each row the run saved is stamped with whether the run ran on the device, now: the suggestion job reads that stamp (`stampRunLocality`).
+    // Best effort, as the tool-call stamp is: a row left unstamped falls back to its endpoint's current type, and the reply is kept.
+    if (savedMessages?.length) {
+        try {
+            await ctx.runMutation(internal.agent.followup_suggestions.stampRunLocality, {
+                messageIds: savedMessages.map((m) => m._id),
+                model: snapshot.model,
+                userId,
+            });
+        } catch (error) {
+            streamLogger.warn("[AgentRun] Could not stamp the run's locality:", error);
+        }
+    }
+
     // With no step left to answer it, a request is not a pause: nothing could resume the run past it.
     const approvalIds = noStepLeft ? [] : collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = noStepLeft ? [] : collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
@@ -1304,6 +1397,8 @@ export const resumeApprovedRun = async (
     looped?: LoopFinding;
     messageIds?: string[];
     paused: boolean;
+    /** Whether the continuation saved an assistant row, not only tool results: what a finished reply after an approval is judged by. */
+    savedReply?: boolean;
     stopped: boolean;
     /** A sub-agent child that paused again: whether its run now waits (false: it was refused or ended, its requests closed). */
     subAgentWaits?: boolean;
@@ -1339,6 +1434,15 @@ export const resumeApprovedRun = async (
           })
         : null;
 
+    // A paused run that offered `instruction_read` offers it again, over the `auto` files of the project it listed them from
+    // (`config.projectId`), read anew: never the project the thread was moved to meanwhile. A file removed since, or a
+    // project no longer reachable, is answered as not found, never an unknown tool. Built with the other tools, so the
+    // permissions that apply now still remove it.
+    const resumeInstructions = config.toolNames.includes(INSTRUCTION_READ_TOOL) ? readProjectInstructions(ctx, config.projectId, userId) : undefined;
+
+    // A run whose tools are all removed never awaits it; a failed read still fails a run that does.
+    resumeInstructions?.catch(() => undefined);
+
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
@@ -1346,6 +1450,7 @@ export const resumeApprovedRun = async (
             botLookup,
             // A person just answered in the chat; a sub-agent child is still rebuilt headless below.
             deviceThreadId: threadId,
+            ...(resumeInstructions && { instructions: resumeInstructions }),
             ...(subAgentChild && {
                 headless: true,
                 headlessCanAsk: true,
@@ -1505,7 +1610,11 @@ export const resumeApprovedRun = async (
 
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
+        // And what the saved-login verdict needs of that turn: a snapshot without any of it sets none.
+        setRunTurn(ctx, { impersonated: config.impersonated, promptMessageId: config.promptMessageId, systemContext: config.systemContext });
+        setRunToolSources(ctx, config.toolPermissionKeys, toolResult.permissionKeys);
         setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
+        setRunReplyKey(ctx, config.replyKey ?? streamId);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
@@ -1718,6 +1827,7 @@ export const resumeApprovedRun = async (
             looped,
             messageIds,
             paused,
+            savedReply: (result.savedMessages ?? []).some((message) => !message.tool),
             stopped: false,
             ...(subAgentWaits !== undefined && { subAgentWaits }),
         };
