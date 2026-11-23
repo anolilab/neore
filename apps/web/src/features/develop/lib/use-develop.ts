@@ -8,6 +8,7 @@ import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { createLunoraActionQueryOptions, useAction, useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import { retryFailedPage } from "./failed-pages";
+import { nextMergeReread } from "./merge-reread";
 
 const MINUTE_MS = 60_000;
 
@@ -124,9 +125,6 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
     });
 };
 
-/** Re-reads while the host has not worked out a pull request's merge state yet, for a short while: it settles in seconds. */
-const MERGE_UNKNOWN_REREAD_MS = 20_000;
-const MERGE_UNKNOWN_REREAD_FOR_MS = 80_000;
 /** When each status read first answered "unknown" in a row; a known answer ends the row, so a later push starts a new one. */
 const mergeUnknownSince = new WeakMap<object, number>();
 
@@ -147,19 +145,15 @@ export const usePullRequestStatus = (address: PullRequestAddress | undefined) =>
         enabled: address !== undefined && userId !== undefined,
         queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address],
         refetchInterval: (query) => {
-            const { data } = query.state;
+            const { delay, since } = nextMergeReread(query.state.data, mergeUnknownSince.get(query), Date.now());
 
-            if (data?.status !== "ok" || data.state !== "open" || !data.mergeUnknown) {
+            if (since === undefined) {
                 mergeUnknownSince.delete(query);
-
-                return false;
+            } else {
+                mergeUnknownSince.set(query, since);
             }
 
-            const since = mergeUnknownSince.get(query) ?? Date.now();
-
-            mergeUnknownSince.set(query, since);
-
-            return Date.now() - since < MERGE_UNKNOWN_REREAD_FOR_MS ? MERGE_UNKNOWN_REREAD_MS : false;
+            return delay;
         },
         staleTime: 5 * MINUTE_MS,
     });

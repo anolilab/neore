@@ -556,6 +556,69 @@ describe("ComposerInput fix prompts from the pull request chip", () => {
         expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
     });
 
+    it("drops the sent text and files when the sent text ended in a space and a fix prompt arrived", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these ");
+        useChatUIStore.setState({
+            composerAttachments: [{ file: new File(["x"], "notes.txt"), id: "file-1", name: "notes.txt", status: "complete", type: "document" }],
+        });
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(onSubmitOverride).toHaveBeenCalledWith("compare these ", expect.any(Array), undefined);
+
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
+        expect(useChatUIStore.getState().composerAttachments).toStrictEqual([]);
+    });
+
+    it("adds a prompt quoting hidden characters once, also on a second click", () => {
+        renderComposer();
+        act(() => {
+            prefillComposer("thread-1", "Fix checks\u{200B} on octo/hello#7");
+        });
+        act(() => {
+            prefillComposer("thread-1", "Fix checks\u{200B} on octo/hello#7");
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Fix checks on octo/hello#7");
+    });
+
+    it("empties a draft edited while its comparison send ran, so the sent message does not stay to go out twice", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+        act(() => {
+            useChatUIStore.getState().setComposerText("compare those");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+    });
+
     it("still empties the draft after a comparison send when nothing joined it", async () => {
         const onSubmitOverride = vi.fn(async () => undefined);
 

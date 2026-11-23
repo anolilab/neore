@@ -90,8 +90,9 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
                 onError: (error: unknown) => showError(error instanceof Error ? error : t`Could not send the message.`),
                 onSuccess: () => {
                     // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                    // A draft edited during the send is the sent message, so it empties rather than wait to go out twice.
                     const typed = draft.current.trimStart();
-                    const rest = typed.startsWith(message) ? typed.slice(message.length).trimStart() : typed;
+                    const rest = typed.startsWith(message) ? typed.slice(message.length).trimStart() : "";
 
                     clientId.current = undefined;
                     draft.current = rest;

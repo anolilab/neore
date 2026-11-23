@@ -23,11 +23,13 @@ interface FixesListProps {
     name: string;
     onOpen: () => void;
     problems: PullRequestProblems;
+    /** A read is running: an action waits for it, so its prompt is built from what blocks the pull request now. */
+    refreshing: boolean;
     threadId: string;
 }
 
 /** The chip and its list. Its own component, so the open state goes when the chip goes and never reopens it later. */
-const FixesList = ({ fixes, name, onOpen, problems, threadId }: FixesListProps) => {
+const FixesList = ({ fixes, name, onOpen, problems, refreshing, threadId }: FixesListProps) => {
     const { i18n, t } = useLingui();
     const [open, setOpen] = useState(false);
     const reviewers = namesOf(
@@ -70,6 +72,8 @@ const FixesList = ({ fixes, name, onOpen, problems, threadId }: FixesListProps) 
                         <li className="flex items-center justify-between gap-2" key={kind}>
                             <span className="min-w-0 text-xs break-words">{rows[kind].problem}</span>
                             <Button
+                                aria-busy={refreshing}
+                                disabled={refreshing}
                                 onClick={() => {
                                     prefillComposer(threadId, buildFixPrompt(kind, problems, i18n));
                                     setOpen(false);
@@ -137,6 +141,7 @@ const PullRequestFixes = ({ address, threadId }: { address: PullRequestAddress; 
                 void status.refetch();
             }}
             problems={data}
+            refreshing={status.isFetching}
             threadId={threadId}
         />
     );

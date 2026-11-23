@@ -1321,16 +1321,21 @@ const ComposerInput = ({
             // Comparison parent: fan-out to all child threads
             void onSubmitOverride(draftText, draftAttachments, draftFrom).then(() => {
                 // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                // A prefill trims the draft's trailing whitespace before it appends (`textAfterRestore`), so match without it.
                 const now = getComposerText();
+                const sentText = draftText.trimEnd();
 
                 if (now === draftText) {
                     clear();
-                } else if (now.startsWith(draftText)) {
-                    setText(now.slice(draftText.length).trimStart());
+                } else if (now.startsWith(sentText)) {
+                    setText(now.slice(sentText.length).trimStart());
 
                     for (const attachment of draftAttachments) {
                         useChatUIStore.getState().removeAttachment(attachment.id);
                     }
+                } else {
+                    // Edited while it went out: what is left is the sent message, so it must not stay to be sent again.
+                    clear();
                 }
 
                 useChatUIStore.getState().setIsSubmitting(false);
@@ -1681,11 +1686,13 @@ const ComposerInput = ({
         }
 
         const current = getComposerText();
+        // The draft is stored without hidden characters (`setComposerText`), so the same prompt is compared the same way.
+        const { text: clean } = stripHiddenText(prefill);
 
         promptHistory.reset();
 
-        if (!current.includes(prefill)) {
-            setText(textAfterRestore(current, { append: true, files: [], text: prefill }));
+        if (!current.includes(clean)) {
+            setText(textAfterRestore(current, { append: true, files: [], text: clean }));
 
             if (composerDraftFrom() === undefined) {
                 markComposerDraft("suggestion");

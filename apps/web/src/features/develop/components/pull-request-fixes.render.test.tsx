@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PullRequestFixes from "./pull-request-fixes";
 
 const { prefill, refetch, status } = vi.hoisted(() => {
-    return { prefill: vi.fn(), refetch: vi.fn(), status: { current: {} as { data?: Record<string, unknown>; isError?: boolean } } };
+    return { prefill: vi.fn(), refetch: vi.fn(), status: { current: {} as { data?: Record<string, unknown>; isError?: boolean; isFetching?: boolean } } };
 });
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -122,6 +122,22 @@ describe(PullRequestFixes, () => {
 
         expect(prefill).toHaveBeenCalledTimes(1);
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("Resolve the merge conflicts between pull request octo/hello#7"));
+    });
+
+    it("keeps the actions unavailable while the read started by opening the list runs", async () => {
+        open({ conflicting: true });
+        status.current = { ...status.current, isFetching: true };
+        renderFixes();
+
+        fireEvent.click(screen.getByRole("button", { name: "Problems on octo/hello#7: 1" }));
+
+        const action = await screen.findByRole("button", { name: "Resolve conflicts" });
+
+        expect((action as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(action);
+
+        expect(prefill).not.toHaveBeenCalled();
     });
 
     it("says a read failed, with a retry, instead of looking like a pull request with nothing in its way", () => {

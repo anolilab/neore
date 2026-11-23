@@ -128,4 +128,19 @@ describe("the worker composer", () => {
 
         expect(box.value).toBe("Fix checks on octo/hello#7");
     });
+
+    it("empties a draft edited while its send ran, so the sent message does not stay to go out twice", () => {
+        render(<WorkerComposer archived={false} busy={false} followUp="queue" workerId="w4" />);
+
+        const box = screen.getByLabelText("Message the worker") as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "run the tests" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        fireEvent.change(box, { target: { value: "run the test" } });
+        act(() => {
+            sent.onSuccess?.();
+        });
+
+        expect(box.value).toBe("");
+    });
 });
