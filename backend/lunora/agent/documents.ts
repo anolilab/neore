@@ -240,9 +240,8 @@ export const updateDocument = authMutation
 
         assert(documentRow, `Document ${args.documentId} not found`);
 
-        if (args.threadId !== undefined && documentRow.threadId !== args.threadId) {
-            throw new LunoraError("NOT_FOUND", "Document not found in this chat");
-        }
+        // The thread id only routes the call. A card cloned into a branch or made before its thread was carried names another chat, and the
+        // checks below use the document's own thread (its lock and the author's write grant), so such a card saves as before.
 
         if (documentRow.userId !== identity.userId) {
             throw new LunoraError("FORBIDDEN", "Forbidden");
