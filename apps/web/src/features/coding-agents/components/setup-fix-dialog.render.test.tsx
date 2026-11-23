@@ -76,7 +76,7 @@ describe("SetupFixButton", () => {
     });
 
     it("opens the prepared task for editing without starting anything", () => {
-        render(<SetupFixButton finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
+        render(<SetupFixButton available finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
 
         expect(screen.queryByRole("dialog")).toBeNull();
 
@@ -87,7 +87,7 @@ describe("SetupFixButton", () => {
     });
 
     it("starts the fix with the edited task on Start fix", () => {
-        render(<SetupFixButton finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
+        render(<SetupFixButton available finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
 
         fireEvent.click(screen.getByRole("button", { name: "Fix setup" }));
         fireEvent.change(screen.getByRole("textbox", { name: "Task for the coding agent" }), { target: { value: "Fix the setup script" } });
@@ -97,7 +97,7 @@ describe("SetupFixButton", () => {
     });
 
     it("cannot start an empty task", () => {
-        render(<SetupFixButton finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
+        render(<SetupFixButton available finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
 
         fireEvent.click(screen.getByRole("button", { name: "Fix setup" }));
         fireEvent.change(screen.getByRole("textbox", { name: "Task for the coding agent" }), { target: { value: " ".repeat(3) } });
@@ -106,7 +106,7 @@ describe("SetupFixButton", () => {
     });
 
     it("says why an empty task cannot start, and links the reason to the field", () => {
-        render(<SetupFixButton finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
+        render(<SetupFixButton available finalFocusRef={{ current: null }} prompt={PROMPT} runId={"run-1" as never} step="repo-setup" />);
 
         fireEvent.click(screen.getByRole("button", { name: "Fix setup" }));
         const field = screen.getByRole("textbox", { name: "Task for the coding agent" });

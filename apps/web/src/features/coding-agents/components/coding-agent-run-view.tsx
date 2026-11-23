@@ -259,8 +259,14 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                         {t`Create PR`}
                     </Button>
                 )}
-                {run.setupFix && (run.setupFixRunId === null || fixRunEnded) && (
-                    <SetupFixButton finalFocusRef={sectionRef} prompt={run.setupFix.prompt} runId={run._id} step={run.setupFix.step} />
+                {run.setupFix && (
+                    <SetupFixButton
+                        available={run.setupFixRunId === null || fixRunEnded}
+                        finalFocusRef={sectionRef}
+                        prompt={run.setupFix.prompt}
+                        runId={run._id}
+                        step={run.setupFix.step}
+                    />
                 )}
                 {run.prUrl?.startsWith("https://github.com/") && (
                     <a className={buttonVariants({ size: "sm", variant: "outline" })} href={run.prUrl} rel="noopener noreferrer" target="_blank">

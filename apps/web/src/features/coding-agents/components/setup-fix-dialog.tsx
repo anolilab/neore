@@ -24,14 +24,16 @@ import { showError, showSuccess } from "@/lib/toast";
 const PROMPT_MAX = 20_000;
 
 interface SetupFixButtonProps {
-    /** Where focus goes when the dialog closes. The button itself leaves the page once the fix starts. */
+    /** Whether the button may be offered. Hidden, the button leaves the page but the dialog stays mounted until it closes. */
+    available: boolean;
+    /** Where focus goes once a fix has started and the dialog closes: the run, which stays on the page. */
     finalFocusRef: RefObject<HTMLElement | null>;
     prompt: string;
     runId: Id<"codingAgentRuns">;
     step: string;
 }
 
-const SetupFixButton: FC<SetupFixButtonProps> = ({ finalFocusRef, prompt: preparedPrompt, runId, step }) => {
+const SetupFixButton: FC<SetupFixButtonProps> = ({ available, finalFocusRef, prompt: preparedPrompt, runId, step }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const fieldId = useId();
@@ -71,10 +73,12 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ finalFocusRef, prompt: prepar
 
     return (
         <>
-            <Button onClick={openDialog} size="sm" variant="outline">
-                <Wrench aria-hidden="true" />
-                {t`Fix setup`}
-            </Button>
+            {(available || open) && (
+                <Button onClick={openDialog} size="sm" variant="outline">
+                    <Wrench aria-hidden="true" />
+                    {t`Fix setup`}
+                </Button>
+            )}
             <Dialog onOpenChange={setOpen} open={open}>
                 <DialogContent className="sm:max-w-2xl" finalFocus={started ? finalFocusRef : undefined}>
                     <DialogHeader>
