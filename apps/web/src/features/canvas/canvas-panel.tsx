@@ -787,7 +787,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                         </TooltipIconButton>
                     )}
                     {/* XLSX import (sheets only) */}
-                    {document?.kind === "sheet" && !isStreaming && (
+                    {document?.kind === "sheet" && isAuthor && !isStreaming && (
                         <>
                             <input accept=".xlsx,.xls" className="hidden" onChange={handleXlsxImport} ref={xlsxInputRef} type="file" />
                             <TooltipIconButton onClick={() => xlsxInputRef.current?.click()} tooltip={t`Import XLSX`}>
