@@ -23,6 +23,17 @@ export interface ProjectRunner {
 /** A runner as it is stored, with the start time of the thread it came from, so an older thread cannot replace it. */
 type StoredRunner = ProjectRunner & { threadAt?: number };
 
+/**
+ * Whether a stored entry would still be returned for `project`: it is an organization project, and the entry's thread started
+ * after its last move. Strictly after: both are millisecond clocks, so a start in the move's own millisecond could be on either
+ * side of it, and it is taken as from the space the project left. An entry with no start time is older than any move.
+ */
+const entryApplies = (project: Pick<Doc<"projects">, "organizationChangedAt" | "organizationId">, threadAt: number | undefined): boolean => {
+    const movedAt = project.organizationChangedAt ?? undefined;
+
+    return Boolean(project.organizationId) && (movedAt === undefined || (threadAt !== undefined && threadAt > movedAt));
+};
+
 /** The runner a new thread in `project` starts on by default for the caller, given the caller's settings row (or `null`). */
 export const projectRunnerOf = (project: Doc<"projects">, settings: Pick<Doc<"userSettings">, "projectRunnerDefaults"> | null): ProjectRunner | null => {
     if (project.organizationId) {
@@ -30,7 +41,7 @@ export const projectRunnerOf = (project: Doc<"projects">, settings: Pick<Doc<"us
 
         // An entry from a thread started before the project last changed organization is from its earlier space: it stays on the
         // person's settings (writing every member's on their own shards at a move is not done), but no longer applies.
-        if (!found || (found.threadAt ?? -Infinity) < (project.organizationChangedAt ?? -Infinity)) {
+        if (!found || !entryApplies(project, found.threadAt)) {
             return null;
         }
 
@@ -53,13 +64,10 @@ export const runnerStillOffered = (device: Doc<"devices"> | null, runner: Projec
 
 /**
  * The oldest entries whose projects are looked up at the cap. Each project row is read, and charged, whole, so the read is
- * kept to a few rows rather than every entry: the session-open mutation it runs in stays well inside the read limit.
+ * kept to a few rows rather than every entry: with the project read twice, at most ten rows of D1's 2 MB each, so the record's own
+ * mutation (`acp/ingest.ts#recordOpenedRunner`) stays well inside the 32 MiB read limit.
  */
 const ENTRIES_CHECKED_AT_CAP = 8;
-
-/** Whether a stored entry would still be returned for `project`: it is an organization project, and the entry is from after its last move. */
-const entryApplies = (project: Pick<Doc<"projects">, "organizationChangedAt" | "organizationId">, threadAt: number | undefined): boolean =>
-    Boolean(project.organizationId) && (threadAt ?? -Infinity) >= (project.organizationChangedAt ?? -Infinity);
 
 /**
  * The entries with the ones that go to make room for one more: of the oldest few, those that can never be used again (the
@@ -104,8 +112,9 @@ const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [strin
 
 /**
  * Records the runner of a session the computer's agent has opened, for the project its thread is in (none when the project is gone).
- * Called where the session turns idle, so a start the computer refused or never opened leaves the default it had. A session that
- * opens in an older thread (a switch or `/clear` there) leaves the default a newer thread recorded.
+ * Run by `acp/ingest.ts#recordOpenedRunner`, a mutation of its own scheduled where the session turns idle, so a start the computer
+ * refused or never opened leaves the default it had, and a failure here never holds the session open back. A session that opens
+ * in an older thread (a switch or `/clear` there) leaves the default a newer thread recorded.
  */
 export const rememberOpenedRunner = async (
     ctx: MutationCtx,
@@ -173,6 +182,20 @@ export const rememberProjectRunner = async (
     const others = Object.entries(settings?.projectRunnerDefaults ?? {}).filter(([key]) => key !== project._id);
     const roomy = others.length < MAX_PROJECT_RUNNER_DEFAULTS ? others : await entriesWithRoom(ctx, userId, others);
     const kept = roomy.slice(-(MAX_PROJECT_RUNNER_DEFAULTS - 1));
+    // Read again just before the write, from the primary: a move that landed since the first read (the project row is a
+    // `.global()` row, outside this shard's transaction) makes the entry one that is never returned, which must not take a
+    // slot, or push out a live one at the cap. A move after this read is retired by `organizationChangedAt` on read, and
+    // the entry goes before a live one once it is among the oldest at the cap (`entriesWithRoom`).
+    const latest = await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: project._id } });
+
+    if (
+        !latest ||
+        (latest.organizationId || undefined) !== (project.organizationId || undefined) ||
+        (latest.organizationChangedAt ?? undefined) !== (project.organizationChangedAt ?? undefined) ||
+        !entryApplies(latest, threadAt)
+    ) {
+        return;
+    }
 
     await saveUserSettings(ctx.db, settings, userId, { projectRunnerDefaults: { ...Object.fromEntries(kept), [project._id]: { ...runner, threadAt } } }, null);
 };

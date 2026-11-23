@@ -19,6 +19,7 @@ import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread } from "../agent/table-writes";
@@ -32,6 +33,7 @@ import {
     nextHostSeq,
     updateHostStream,
 } from "../chat/streaming/persistent/host";
+import { logger } from "../lib/logger";
 import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
@@ -149,8 +151,17 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         }
 
         // The runner a project remembers is the one that opened: a start the computer refused or never opened records nothing.
+        // Its own mutation: the record reads `.global()` rows and writes settings, and none of that may roll this open back.
         if (opened && thread?.projectId) {
-            await rememberOpenedRunner(ctx, { ...thread, projectId: thread.projectId }, existing);
+            try {
+                await ctx.scheduler.runAfter(0, internal.acp.ingest.recordOpenedRunner, { projectId: thread.projectId, sessionId: existing._id });
+            } catch (error) {
+                logger.warn("acp: the project's runner default was not scheduled", {
+                    error: error instanceof Error ? error.message : String(error),
+                    sessionId: existing._id,
+                    threadId: existing.threadId,
+                });
+            }
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };
@@ -553,6 +564,32 @@ export const applyHostEvents = internalMutation
             { events: args.events, firstSeq: args.firstSeq, hostSessionId: args.sessionId, threadId: args.threadId, turnId: args.turnId },
             now,
         );
+    });
+
+/**
+ * Records the runner of a host session that opened as its project's default (`lib/project-runner.ts`), scheduled by the
+ * session's open so a failure here leaves the open as it was. Only while the session is still one that opened (not `starting`,
+ * which an open that rolled back leaves, nor `ended`) and its thread is still in the project it was in at the open.
+ */
+export const recordOpenedRunner = internalMutation
+    .input({ projectId: v.id("projects"), sessionId: v.id("acpSessions") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const session = await ctx.db.get("acpSessions", args.sessionId);
+
+        if (!session || session.status === "starting" || session.status === "ended") {
+            return null;
+        }
+
+        const thread = await ctx.db.get("threads", session.threadId as Id<"threads">);
+
+        if (!thread || thread.deleted || thread.projectId !== args.projectId) {
+            return null;
+        }
+
+        await rememberOpenedRunner(ctx, { ...thread, projectId: args.projectId }, session);
+
+        return null;
     });
 
 /**

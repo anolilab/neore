@@ -73,7 +73,7 @@ const projectRunner = await import("./lib/project-runner");
 const { signDevicePayload } = await import("../devices/lib/signing");
 const { ACP_CLAIM_LEASE_MS, ACP_CLAIM_WINDOW_MS, DEVICE_CALL_DEADLINE_MS } = await import("../devices/lib/constants");
 const { parseAcpOffers } = await import("../devices/lib/manifest");
-const { applyHostEvents } = await import("./ingest");
+const { applyHostEvents, recordOpenedRunner } = await import("./ingest");
 const { createAcpCall, createAcpCancelCall } = await import("../devices/lib/acp-call");
 const calls = await import("./calls");
 const remote = await import("./remote");
@@ -866,15 +866,30 @@ describe("a project remembers its runner", () => {
 
     const defaultOf = async (projectId: string, userId = ownerId) => await as(userId).query(remote.getProjectRunnerDefault as never, { projectId } as never);
 
+    // The record a session's open schedules (`recordOpenedRunner`), run as the scheduler would: the scheduler is not run here.
+    const recordOf = async (session: Row | undefined) => {
+        const thread = await row(session?.threadId as string);
+
+        if (thread?.projectId) {
+            await run(async (ctx) => await ctx.runMutation(recordOpenedRunner, { projectId: thread.projectId, sessionId: session?._id }));
+        }
+    };
+
+    // The computer's agent opens the session, then its scheduled record runs.
+    const openAndRecord = async (device: Device, session: Row | undefined) => {
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+        await recordOf(session);
+    };
+
     // The computer's agent opens the session: the project's default is recorded then, not when the start is queued.
     const startOpened = async (projectId: string, device: Device, clientId: string, overrides: Record<string, unknown> = {}) => {
         const started = (await startIn(projectId, device, clientId, overrides)) as { threadId: string };
         const [session] = await rows("acpSessions", { threadId: started.threadId });
 
-        await run(
-            async (ctx) =>
-                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
-        );
+        await openAndRecord(device, session);
 
         return started;
     };
@@ -1182,13 +1197,67 @@ describe("a project remembers its runner", () => {
 
         const [olderSession] = await rows("acpSessions", { threadId: older.threadId });
 
-        await run(
-            async (ctx) =>
-                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: olderSession?.hostSessionId as string }),
-        );
+        await openAndRecord(device, olderSession);
 
         expect(await sessionStatusOf(older.threadId)).toBe("idle");
         expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("opens the session before the default is recorded, and records nothing for an open that never took", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const started = (await startIn(projectId, device, "tap-sched")) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+
+        // An open that rolled back leaves the session starting: its record finds nothing to record.
+        await recordOf(session);
+
+        const unopened = await projectRow(projectId);
+
+        expect(unopened?.runnerDeviceId).toBeUndefined();
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+
+        // The open stands on its own; the default comes with the record it scheduled.
+        expect(await sessionStatusOf(started.threadId)).toBe("idle");
+        expect(await defaultOf(projectId)).toBeNull();
+
+        await recordOf(session);
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+    });
+
+    it("records nothing for a thread started in the same millisecond as the project's last move, and reads no such entry", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationChangedAt: 2000, organizationId: "org-a", userId: ownerId });
+        const project = (await projectRow(projectId)) as never;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+
+        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, project, ownerId, runner, 2000));
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+        expect(projectRunner.projectRunnerOf(project, { projectRunnerDefaults: { [projectId]: { ...runner, threadAt: 2000 } } })).toBeNull();
+        expect(projectRunner.projectRunnerOf(project, { projectRunnerDefaults: { [projectId]: { ...runner, threadAt: 2001 } } })).toEqual(runner);
+    });
+
+    it("saves no organization default when the project moves between its read and the settings write", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationChangedAt: 1000, organizationId: "org-a", userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 5000, organizationId: "org-b" }));
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, 3000),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
     });
 
     it("offers no default once the computer stops offering that agent and folder", async () => {
@@ -1331,10 +1400,7 @@ describe("a project remembers its runner", () => {
         const [membership] = await rows("member", { userId: ownerId });
 
         await run(async (ctx) => await ctx.db.delete("member", membership?._id as never));
-        await run(
-            async (ctx) =>
-                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
-        );
+        await openAndRecord(device, session);
 
         const [settings] = await rows("userSettings", { userId: ownerId });
 
@@ -1383,14 +1449,7 @@ describe("a project remembers its runner", () => {
         await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationId: "", ...ownerRunner }));
         const [session] = await rows("acpSessions", { threadId: started.threadId });
 
-        await run(
-            async (ctx) =>
-                await ctx.runMutation(applyHostEvents, {
-                    deviceId: memberDevice.deviceId,
-                    events: [SESSION_OPEN],
-                    sessionId: session?.hostSessionId as string,
-                }),
-        );
+        await openAndRecord(memberDevice, session);
 
         expect(await projectRow(projectId)).toMatchObject(ownerRunner);
     });
