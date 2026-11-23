@@ -262,6 +262,11 @@ export const readSetupLogTail = async (sandbox: Pick<SandboxHandle, "run">, secr
         timeoutMs: COMMAND_TIMEOUT_MS,
     });
 
+    // A failed read is an error, not an empty log: the caller then keeps the log its poll already has.
+    if (result.exitCode !== 0) {
+        throw new Error(`Reading the setup log tail exited with ${String(result.exitCode)}.`);
+    }
+
     return redactSecrets(completeTailLines(result.stdout, utf8Length(result.stdout) >= SETUP_TAIL_READ_BYTES), secrets);
 };
 

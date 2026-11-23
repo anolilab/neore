@@ -99,15 +99,26 @@ export const isPullRequestStale = (run: Pick<RunDoc, "prStartedAt" | "prStatus" 
 /** A fix run that ended without finishing: the failed step may be tried again from the original run. */
 const RETRYABLE_FIX_STATUSES = new Set<RunDoc["status"]>(["cancelled", "failed"]);
 
+/** The fixable setup step a failed run stopped at, whether or not a fix run has been started for it. */
+const failedSetupStep = (run: Pick<RunDoc, "setupFailure" | "status">) => {
+    const step = run.setupFailure?.step;
+
+    if (step === undefined || run.status !== "failed" || !isFixableSetupStep(step)) {
+        return undefined;
+    }
+
+    return step;
+};
+
 /**
  * The step "Fix setup" applies to: a failed run that stopped at a fixable setup step, whose fix run (if any) ended
  * without finishing. `fixRunStatus` is the linked fix run's status, `undefined` when there is none.
  */
 export const setupFixStep = (run: Pick<RunDoc, "setupFailure" | "setupFixRunId" | "status">, fixRunStatus?: RunDoc["status"]) => {
-    const step = run.setupFailure?.step;
+    const step = failedSetupStep(run);
     const fixDone = run.setupFixRunId === undefined || (fixRunStatus !== undefined && RETRYABLE_FIX_STATUSES.has(fixRunStatus));
 
-    return run.status === "failed" && fixDone && step !== undefined && isFixableSetupStep(step) ? step : undefined;
+    return step !== undefined && fixDone ? step : undefined;
 };
 
 /** The status of the fix run linked to `run`, for {@link setupFixStep}. */
@@ -121,13 +132,17 @@ const linkedFixStatus = async (ctx: Pick<QueryCtx, "db">, run: Pick<RunDoc, "set
     return fixRun?.status;
 };
 
-const setupFixView = (run: RunDoc, fixRunStatus?: RunDoc["status"]): { prompt: string; step: string } | null => {
-    const step = setupFixStep(run, fixRunStatus);
+/**
+ * The fix offer for a failed run. It does not read the fix run, so the view is not re-sent on every fix-run write;
+ * the client hides the button while the linked fix run is still going (see the run view).
+ */
+const setupFixView = (run: RunDoc): { prompt: string; step: string } | null => {
+    const step = failedSetupStep(run);
 
     return step && run.setupFailure ? { prompt: buildSetupFixPrompt({ logTail: run.setupFailure.logTail, step }), step } : null;
 };
 
-const toView = (run: RunDoc, fixRunStatus?: RunDoc["status"]) => {
+const toView = (run: RunDoc) => {
     return {
         _id: run._id,
         agent: run.agent,
@@ -145,7 +160,7 @@ const toView = (run: RunDoc, fixRunStatus?: RunDoc["status"]) => {
         prPending: run.prStatus === "pending",
         prUrl: run.prUrl ?? null,
         repoUrl: run.repoUrl,
-        setupFix: setupFixView(run, fixRunStatus),
+        setupFix: setupFixView(run),
         setupFixRunId: run.setupFixRunId ?? null,
         startedAt: run.startedAt ?? null,
         status: run.status,
@@ -174,7 +189,7 @@ export const getRun = authQuery
     .query(async ({ args, ctx }) => {
         const run = await ctx.db.get("codingAgentRuns", args.runId);
 
-        return run && run.userId === ctx.user.userId ? toView(run, await linkedFixStatus(ctx, run)) : null;
+        return run && run.userId === ctx.user.userId ? toView(run) : null;
     });
 
 /** The run a chat tool call started — the tool part knows only its call id. */
@@ -187,7 +202,7 @@ export const getRunByToolCall = authQuery
             .withIndex("by_user_and_toolCallId", (q) => q.eq("userId", ctx.user.userId).eq("toolCallId", args.toolCallId))
             .first();
 
-        return run ? toView(run, await linkedFixStatus(ctx, run)) : null;
+        return run ? toView(run) : null;
     });
 
 /** The newest run of a task assigned to a coding agent. */
@@ -207,7 +222,7 @@ export const getLatestRunForTask = authQuery
             .order("desc")
             .first();
 
-        return run && run.userId === ctx.user.userId ? toView(run, await linkedFixStatus(ctx, run)) : null;
+        return run && run.userId === ctx.user.userId ? toView(run) : null;
     });
 
 export const cancelRun = authMutation

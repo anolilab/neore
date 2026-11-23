@@ -286,6 +286,14 @@ describe("readSetupLogTail", () => {
         expect(tail).not.toContain(PROVIDER_KEY);
     });
 
+    it("rejects a tail that exits nonzero, so the caller keeps the poll's log instead of an empty one", async () => {
+        const failed = (): CommandOutcome => {
+            return { exitCode: 1, stderr: "", stdout: "" };
+        };
+
+        await expect(readSetupLogTail(fakeSandbox(failed), secrets)).rejects.toThrow("exited with 1");
+    });
+
     it("asks the sandbox for a bounded tail, not the whole log", async () => {
         const sandbox = fakeSandbox(tailOf);
 

@@ -146,6 +146,8 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     const createPr = useMutation(useLunoraActionOptions(api.coding_agents.execute.createPullRequest));
     // The "Fix setup" run started from this one, shown under it so the fix is followed where the failure was.
     const { data: fixRun } = useQuery(crpc.coding_agents.functions.getRun.queryOptions(run.setupFixRunId ? { runId: run.setupFixRunId } : skipToken));
+    // A retry is offered once the linked fix run has ended without finishing; the server checks again when it starts.
+    const fixRunEnded = fixRun?.status === "failed" || fixRun?.status === "cancelled";
 
     const openPullRequest = () => {
         createPr.mutate(
@@ -246,7 +248,9 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                         {t`Create PR`}
                     </Button>
                 )}
-                {run.setupFix && <SetupFixButton prompt={run.setupFix.prompt} runId={run._id} step={run.setupFix.step} />}
+                {run.setupFix && (run.setupFixRunId === null || fixRunEnded) && (
+                    <SetupFixButton prompt={run.setupFix.prompt} runId={run._id} step={run.setupFix.step} />
+                )}
                 {run.prUrl?.startsWith("https://github.com/") && (
                     <a className={buttonVariants({ size: "sm", variant: "outline" })} href={run.prUrl} rel="noopener noreferrer" target="_blank">
                         <ExternalLink aria-hidden="true" />
