@@ -2,44 +2,20 @@
 //! archive installer, the one caller of `commit_install` so far.
 
 use super::*;
+use crate::test_dir::TestDir;
 use serde_json::json;
 use std::time::Duration;
 
 const KEY: &str = "fixture";
 
-/// A scratch folder that is removed when it goes out of scope, whether the test passed or not.
-pub(crate) struct Scratch(pub(crate) PathBuf);
-
-impl std::ops::Deref for Scratch {
-    type Target = Path;
-
-    fn deref(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl AsRef<Path> for Scratch {
-    fn as_ref(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
 /// The state over a fresh folder under the system temp folder.
-fn state(name: &str) -> (DeviceState, Scratch) {
+fn state(name: &str) -> (DeviceState, TestDir) {
     crate::store::test_keychain::install();
 
-    let dir = std::env::temp_dir().join(format!("neore-acp-commit-{name}-{}", std::process::id()));
-
-    let _ = fs::remove_dir_all(&dir);
+    let dir = TestDir::at(&format!("acp-commit-{name}"));
     fs::create_dir_all(&dir).unwrap();
 
-    (DeviceState::new(&dir, Box::new(|_| {})), Scratch(dir))
+    (DeviceState::new(&dir, Box::new(|_| {})), dir)
 }
 
 /// A raw download of `bytes` named `agent`, staged and ready to install under `key` at `version`.
@@ -418,12 +394,9 @@ fn removing_an_agent_moves_its_files_into_the_trash_before_they_are_deleted() {
 fn a_new_state_clears_the_trash_an_earlier_run_left() {
     crate::store::test_keychain::install();
 
-    let dir = Scratch(
-        std::env::temp_dir().join(format!("neore-acp-commit-startup-{}", std::process::id())),
-    );
+    let dir = TestDir::at("acp-commit-startup");
     let left = dir.join("acp-agents/.trash/99999999.1-0");
 
-    let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(left.join("unpacked")).unwrap();
     fs::write(left.join("unpacked/agent"), "x").unwrap();
 
