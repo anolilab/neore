@@ -13,10 +13,11 @@ import { useMergeStatus } from "../lib/use-merge";
 /**
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
  * rebase prompt in this thread's composer and sends nothing. Reads the same cached queries as Develop: the pull request
- * (open, and its base), then the host's mergeability once it is open. Shows nothing while loading, on a failure, or once the
- * pull request is merged or closed, while either is being read again or its latest read failed (a cached "behind" is not known
- * to hold until a read confirms it), for
- * a branch name that is not plain enough to put in a command. Whether the prompt pushes is the host's word on the head's
+ * (open, and its base), then the host's mergeability for that base and head commit once it is open, so a retargeted or
+ * pushed pull request is never paired with the answer for its earlier revision. Shows nothing while there is no answer for
+ * the current revision, on a failure (a failed refresh too: a cached "behind" is not known to hold), or once the pull
+ * request is merged or closed; a background refresh that has not failed keeps it, so it does not flicker. Nor for a branch
+ * name that is not plain enough to put in a command. Whether the prompt pushes is the host's word on the head's
  * repository, never a guess from names or commits: a fork's branch is not pushed.
  */
 const CatchUpControl = ({ link, threadId }: { link: { number: number; repository: string }; threadId: string }) => {
@@ -25,9 +26,9 @@ const CatchUpControl = ({ link, threadId }: { link: { number: number; repository
     const pull = usePullRequest(address);
     const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
     const open = detail?.state === "open";
-    const merge = useMergeStatus(address, open);
+    const merge = useMergeStatus(address, open, detail === undefined ? undefined : { baseBranch: detail.baseBranch, headSha: detail.headSha });
 
-    if (!open || pull.isFetching || pull.isError || merge.isFetching || merge.isError || merge.data?.status !== "ok" || merge.data.state !== "behind") {
+    if (pull.isError || merge.isError || !open || merge.data?.status !== "ok" || merge.data.state !== "behind") {
         return null;
     }
 
