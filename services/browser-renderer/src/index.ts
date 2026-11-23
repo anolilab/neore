@@ -580,6 +580,16 @@ const actHeld = async (
                         break;
                     }
 
+                    // An approved click is the one a person saw: Playwright counts opacity 0 as visible, so an element opacity hides is
+                    // refused here for an approved click (the same check the in-page path makes with `strict`).
+                    if (
+                        strictVisibility === true &&
+                        (await element.evaluate((node) => node.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false))
+                    ) {
+                        result = { error: NOT_VISIBLE_TARGET, success: false };
+                        break;
+                    }
+
                     await element.click({ timeout: PAGE_TIMEOUT });
                 } else {
                     // The check and the click run as one step in the page (`readTarget` with `click`): the fingerprint is compared
