@@ -31,9 +31,7 @@ fn without_scratch(
     plan: Result<crate::acp::SpawnPlan, String>,
 ) -> Result<crate::acp::SpawnPlan, String> {
     if let Ok(plan) = &plan {
-        if plan.scratch {
-            let _ = fs::remove_dir_all(&plan.cwd);
-        }
+        drop(crate::acp::probe_scratch(plan));
     }
 
     plan
