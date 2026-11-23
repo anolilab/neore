@@ -6,6 +6,7 @@ import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { GUEST_NOTES, guestLinksFixtures } from "@/storybook/fixtures/guest-links";
 import { userFixtures } from "@/storybook/fixtures/user";
 import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle, lunoraPending } from "@/storybook/lunora";
+import { pressable } from "@/storybook/play";
 
 import GuestLinkPanel from "./guest-link-panel";
 import useGuestLinkRevoke from "./use-guest-link-revoke";
@@ -20,20 +21,6 @@ const WithRevoke = ({ threadId, ...props }: Omit<ComponentProps<typeof GuestLink
             {confirmDialog}
         </>
     );
-};
-
-/**
- * Finds a button and waits until it can be pressed. A disabled button has `pointer-events: none`, and a click on it
- * throws: "Create guest link" stays off until the read is in the query cache, which can trail the mock's answer.
- */
-const pressable = async (root: Pick<typeof screen, "findByRole">, name: string): Promise<HTMLElement> => {
-    const button = await root.findByRole("button", { name });
-
-    await waitFor(async () => {
-        await expect(button).toBeEnabled();
-    });
-
-    return button;
 };
 
 const HELD = GUEST_NOTES[0]?.text ?? "";
