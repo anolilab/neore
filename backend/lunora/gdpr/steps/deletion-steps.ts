@@ -77,13 +77,13 @@ export const deleteUserSettings = internalMutation
 
 // --- Thread-dependent deletions (MUST run before thread deletion) ---
 
-/** One batch of the user's follow rows on any thread (`chat/follows/functions.ts`); drained by the workflow. */
 /** One batch of the pin routes that name the user (`chat/gdpr.ts`), drained by the deletion workflow. */
 export const deleteUserSharedPinRoutes = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }) => await eraseSharedPinRoutesBatch(context, userId));
 
+/** One batch of the user's follow rows on any thread (`chat/follows/functions.ts`); drained by the workflow. */
 export const deleteUserFollowRows = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)

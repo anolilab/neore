@@ -366,3 +366,25 @@ describe("listing a thread's pins after a grant is revoked", () => {
         expect(await listed()).toHaveLength(0);
     });
 });
+
+describe("a deleted thread takes its pins and routes", () => {
+    it("removes the thread's pins and the collaborator routes that name it", async () => {
+        const { eraseThreadPinsAndRoutes } = await import("../gdpr");
+
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-collaborator" });
+            await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
+        });
+
+        await harness.run(async (context: any) => await eraseThreadPinsAndRoutes(context, threadId));
+
+        const left = await harness.run(async (context: any) => {
+            const pins = await context.db.query("threadPins").collect();
+            const routes = await context.db.sharedPinRoutes.findMany({ where: { threadId } });
+
+            return { pins: pins.length, routes: routes.page.length };
+        });
+
+        expect(left).toStrictEqual({ pins: 0, routes: 0 });
+    });
+});

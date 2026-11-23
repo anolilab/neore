@@ -25076,6 +25076,12 @@
           ],
           "unique": false
         },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
         "by_user_and_thread": {
           "fields": [
             "userId",

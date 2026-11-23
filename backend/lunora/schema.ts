@@ -2753,6 +2753,7 @@ export const schema = defineSchema({
     })
         .global()
         .index("by_owner", ["ownerId"])
+        .index("by_thread", ["threadId"])
         .index("by_user_and_thread", ["userId", "threadId"]),
 
     /**

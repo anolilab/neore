@@ -44,6 +44,7 @@ import { api } from "../_generated/api";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, QueryCtx as QueryContext } from "../_generated/server";
+import { eraseThreadPinsAndRoutes } from "./gdpr";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 // Types from their declaring modules rather than the `agent/client` barrel —
 // see the note in `chat/composite.ts` (since fixed; kept because it decouples
@@ -3963,6 +3964,8 @@ export const hardDeleteThread = internalMutation
         const threadBeforeDelete = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+        // The thread's pins and the collaborator routes that name it go with it (`chat/gdpr.ts`).
+        await eraseThreadPinsAndRoutes(context, threadId as Id<"threads">);
         await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
