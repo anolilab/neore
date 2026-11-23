@@ -69,11 +69,11 @@ const formatKey = (part: string, isMac: boolean): string => {
         case "meta": {
             return isMac ? "⌘" : "Meta";
         }
-        // The store keeps the platform modifier as "ctrl"; it is Command on a Mac.
         // The literal Control key, which is not the platform modifier.
         case "control": {
             return isMac ? "⌃" : "Ctrl";
         }
+        // The store keeps the platform modifier as "ctrl"; it is Command on a Mac.
         case "ctrl": {
             return isMac ? "⌘" : "Ctrl";
         }

@@ -162,8 +162,9 @@ export const blankQuotedLines = (text: string): string => {
 
 /**
  * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's
- * note or a quoted block. A memory quotes only this (`memory/evidence.ts`), so a sentence from an upload or a
- * quote is never shown as their words.
+ * note, an outside agent's text, the app's placeholders or a quoted block, each typed part kept as its own paragraph.
+ * A memory quotes only this (`memory/evidence.ts`) and the composer's prompt search lists and matches only this
+ * (`chat/functions.ts#searchSentPrompts`), so a sentence from an upload or a quote is never shown as their words.
  */
 export const typedTextOf = (message: MessageLike | undefined): string => {
     if (message?.role !== "user") {
@@ -182,19 +183,21 @@ export const typedTextOf = (message: MessageLike | undefined): string => {
         return "";
     }
 
-    return (message.content as ReadonlyArray<ContentPart>)
-        .flatMap((part) =>
-            part.type === "text" &&
-            typeof part.text === "string" &&
-            !isAttachedPart(part) &&
-            !isGuestTextPart(part) &&
-            !isOutsideAgentPart(part) &&
-            !isPlaceholderPart(part)
-                ? [withoutQuotedLines(part.text)]
-                : [],
-        )
-        .join("\n\n");
+    return (message.content as ReadonlyArray<ContentPart>).flatMap((part) => (isTypedPart(part) ? [withoutQuotedLines(part.text)] : [])).join("\n\n");
 };
+
+/**
+ * Whether one stored part of a user message is the person's typing: a text part that is no attached document or page, no
+ * guest's note, no outside agent's text and no placeholder the app wrote. {@link typedTextOf} reads only these parts, and the
+ * search copy of a message (`agent/shared.ts#searchText`) puts them first, so the two never disagree on what was typed.
+ */
+export const isTypedPart = (part: ContentPart): part is ContentPart & { text: string } =>
+    part.type === "text" &&
+    typeof part.text === "string" &&
+    !isAttachedPart(part) &&
+    !isGuestTextPart(part) &&
+    !isOutsideAgentPart(part) &&
+    !isPlaceholderPart(part);
 
 /**
  * A text part an outside agent (the public API) sent: the person did not write it, so no quote may name it as their words.

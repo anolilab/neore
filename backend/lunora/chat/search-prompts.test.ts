@@ -10,7 +10,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { searchSentPrompts } from "./functions";
-import { documentTextPart } from "./lib/attached-text";
+import { searchText } from "../agent/shared";
+import { documentTextPart, guestTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
@@ -544,6 +545,47 @@ describe("searchSentPrompts", () => {
             const images = await search(harness, "generate image");
 
             expect(images.map((prompt) => prompt.messageId)).toEqual([ids.imageTyped]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("lists a prompt as the memory's typed-text reader reads it, and the search copy puts those same words first", async () => {
+        const harness = lunoraTest(schema as never);
+        const content = [
+            documentTextPart("notes.pdf", "lighthouse keeper rota"),
+            { providerOptions: { neore: { pageContext: true } }, text: "A captured lighthouse page", type: "text" },
+            { text: "plan the lighthouse visit", type: "text" },
+            imagePromptPart(),
+            { text: "> the guide said dawn\n\nand book the ferry", type: "text" },
+        ];
+        const message = { content, role: "user" } as const;
+
+        try {
+            const messageId = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Trip", userId: OWNER });
+
+                return insertMessage(context, {
+                    content,
+                    createdAt: 1,
+                    order: 0,
+                    role: "user",
+                    text: searchText(message as never) ?? "",
+                    threadId: thread,
+                    userId: OWNER,
+                });
+            });
+
+            const prompts = await search(harness, "lighthouse");
+
+            // One reader: the listed text is `typedTextOf`'s, each typed part its own paragraph, no attachment, page, placeholder or quote.
+            expect(prompts.map((prompt) => [prompt.messageId, prompt.text])).toEqual([[messageId, typedTextOf(message)]]);
+            expect(prompts[0]?.text).toBe("plan the lighthouse visit\n\nand book the ferry");
+            // The index copy leads with the typed parts, so the index's first terms are the person's own.
+            expect(searchText(message as never)?.startsWith("plan the lighthouse visit > the guide said dawn\n\nand book the ferry")).toBe(true);
+            expect(searchText({ content: [guestTextPart("a guest wrote this", "note-1"), { text: "my words", type: "text" }], role: "user" } as never)).toBe(
+                "my words a guest wrote this",
+            );
         } finally {
             harness.close();
         }

@@ -67,9 +67,8 @@ import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
-import { messageCarriesGuestText, messageCarriesOutsideAgentText } from "./lib/attached-text";
+import { messageCarriesGuestText, messageCarriesOutsideAgentText, typedTextOf } from "./lib/attached-text";
 import { readChildThreads } from "./lib/child-threads";
-import { typedPromptText } from "./lib/first-user-prompt";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
@@ -3530,7 +3529,7 @@ export const searchSentPrompts = authQuery
                     return [];
                 }
 
-                const typed = typedPromptText(stored.content).trim();
+                const typed = typedTextOf(stored).trim();
 
                 return typed !== "" && matchesQueryTerms(typed, terms) ? [{ draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), message, typed }] : [];
             });
