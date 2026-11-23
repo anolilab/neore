@@ -170,6 +170,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             requestId: args.requestId,
         });
 
+        // The account is marked as erasing before its pins are touched: a pin write it starts after this is refused (`lib/account-moves.ts`).
+        await context.step.do(
+            "begin-account-erasure",
+            async () =>
+                await context.run(
+                    internal.lib.account_moves.beginAccountMoveFor,
+                    { kind: "erasing", userId: args.userId },
+                    { dedupId: stepDedupId(scope, "begin-account-erasure") },
+                ),
+        );
+
         // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
         await context.step.do(
             "erase-pins-on-owner-shards",
@@ -190,6 +201,16 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         userId: args.userId,
                     },
                     { dedupId: stepDedupId(scope, "delete-user-thread-metadata") },
+                ),
+        );
+        // The user's pins and tags, one batch per round, before the threads they sit on go.
+        await drain(
+            "delete-user-pins-and-tags",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserPinsAndTags,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-pins-and-tags", round) },
                 ),
         );
 

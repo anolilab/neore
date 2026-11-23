@@ -384,7 +384,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
  */
 export const collectSharedPins = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
     const routes = await readAllPages(async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }));
-    const shared: { pins: unknown[]; threadId: string }[] = [];
+    const shared: { pins: unknown[]; threadId: string; unreadable?: true }[] = [];
 
     const seen = new Set<string>();
 
@@ -396,14 +396,24 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
 
         seen.add(route.threadId);
 
-        const pins = await readAllPages(
-            async (cursor) =>
-                await callOnShard(
-                    internal.chat.pins.functions.listPinsForExport,
-                    { cursor, threadId: route.threadId as Id<"threads">, userId },
-                    { shardKey: route.ownerId },
-                ),
-        );
+        let pins: unknown[];
+
+        try {
+            pins = await readAllPages(
+                async (cursor) =>
+                    await callOnShard(
+                        internal.chat.pins.functions.listPinsForExport,
+                        { cursor, threadId: route.threadId as Id<"threads">, userId },
+                        { shardKey: route.ownerId },
+                    ),
+            );
+        } catch (error) {
+            // One owner's shard that cannot be read (an unreachable shard, a thread removed mid-read) must not fail the whole export:
+            // the thread is listed as unreadable, so the file says its pins were not included rather than dropping them silently.
+            gdprLogger.error(`Failed to read shared pins for thread ${route.threadId}:`, error);
+            shared.push({ pins: [], threadId: route.threadId, unreadable: true });
+            continue;
+        }
 
         if (pins.length > 0) {
             shared.push({ pins, threadId: route.threadId });

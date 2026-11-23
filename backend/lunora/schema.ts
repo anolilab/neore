@@ -171,6 +171,18 @@ export const schema = defineSchema({
         .index("userId", ["userId"])
         .triggers((t) => auditTriggersFor(t, "account", AUDIT_TABLES["account"]!)),
 
+    /**
+     * An account whose pins are being moved or erased: a merge of a guest into a new account, or an account erasure. While a row exists
+     * for a user, that user cannot add pins (`lib/account-moves.ts`). Global, so every shard reads it; written before the move starts.
+     */
+    accountMoves: defineTable({
+        createdAt: v.number(),
+        kind: v.union(v.literal("erasing"), v.literal("merging")),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_user", ["userId"]),
+
     // One coding-agent session on a paired device (`acp/`): the thread it runs
     // in, which agent and folder (labels only; paths never leave the desktop) and
     // what it reported at the handshake. `hostSessionId` is the desktop's own id
@@ -767,7 +779,6 @@ export const schema = defineSchema({
                 userConnectors: r.many("userConnectors", { field: "connectorDefinitionId" }),
             };
         }),
-
     /**
      * The slot each periodic cron job last ran for (`lib/cron-schedule.ts`,
      * `crons.ts:cronTick`). One row per job name; claiming a slot is what makes
@@ -908,6 +919,7 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),
+
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
     // history, so it is a real table rather than a write-only log.
@@ -1784,7 +1796,6 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
         usage: v.optional(v.object({ completionTokens: v.number(), promptTokens: v.number(), totalTokens: v.number() })),
     }).index("by_execution_and_node", ["executionId", "nodeId"]),
-
     // The notification inbox (`notifications/`): one row per event for its
     // user, written only through `notify()`. `title` is the SUBJECT (a task's
     // title); the UI words what happened from `type` + `outcome`. Pruned after
@@ -1817,6 +1828,7 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -2580,7 +2592,6 @@ export const schema = defineSchema({
         .index("by_key", ["key"])
         // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
         .index("by_ts", ["ts"]),
-
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
      * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
@@ -2612,6 +2623,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,

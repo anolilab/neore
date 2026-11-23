@@ -423,6 +423,8 @@ const RULES: Record<string, TableRules> = {
  * fails when a schema table is in neither this list nor {@link POLICIES}.
  */
 export const UNPOLICED_TABLES: Record<string, string> = {
+    accountMoves:
+        "the erasure and guest-merge markers: written by those workflows before an account's pins move, read by pin writers through the primary; no client reads them",
     actionCache: "server-side cache of computed values; no user column",
     apikey: "better-auth's own table, reached through its adapter and `verifyApiKey`",
     auditLog: "admin-only audit trail (`admin*` procedures)",

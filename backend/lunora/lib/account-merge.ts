@@ -86,6 +86,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
 /** `.global()` tables with a `userId` the generic re-pointing loop deliberately leaves alone, and why. */
 export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>> = {
     account: "better-auth links the anonymous user itself",
+    accountMoves:
+        "the move marker of the account being merged or erased: it refuses pin writes from that account and names no content, and that account ends with the move, so nothing re-points it",
     deviceCode: "a guest cannot approve a code, and a pending one lapses in 30 minutes",
     documentHistory: "an audit trail records who acted; it is not re-attributed",
     member: "a guest joins no organization",
@@ -425,6 +427,8 @@ export const runGuestMerge = internalAction
     .input({ from: v.string(), to: v.string() })
     .output(v.object({ moved: v.number() }))
     .action(async ({ args, ctx: context }) => {
+        // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
+        await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
         // The guest's pins on other owners' threads move to the new account on each owner's shard first, while their routes still name the
         // guest; the routes move with the guest's global rows below. Each move is idempotent, so a redelivery repeats it safely.
         let cursor: string | null = null;
