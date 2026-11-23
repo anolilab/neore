@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it } from "vitest";
 
+import { beginAccountMove, pinWritesInFlightUntil } from "../lib/account-moves";
 import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import { getRunWebhook, rotateRunWebhookSecret, saveRunWebhook } from "./functions";
@@ -14,6 +15,7 @@ import { collectRunWebhookForExport, deleteUserRunWebhooks } from "./gdpr";
 const SECRET_PREFIX = /^whsec_/u;
 const OWN_ACCOUNT_ONLY = /own account only/u;
 const IMPERSONATING = /while impersonating/u;
+const BEING_MOVED = /being moved or erased/u;
 const URL = "https://hooks.example.com/neore";
 
 const signedIn = async (harness: ReturnType<typeof lunoraTest>) =>
@@ -65,6 +67,45 @@ describe("saving the run webhook", () => {
                 enabled: false,
                 url: "https://hooks.example.com/other",
             });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("the run webhook while a guest merge moves the account", () => {
+    it("a save holds the account's lease, so the merge waits for it before it copies the webhook", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await as.mutation(saveRunWebhook as never, { enabled: true, url: URL } as never);
+
+            const until = (await harness.run(async (context: any) => await pinWritesInFlightUntil(context, identity.userId, Date.now()))) as number | null;
+
+            expect(until).not.toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a save and a rotation once the account is marked as merging, and leaves the saved webhook as it was", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await as.mutation(saveRunWebhook as never, { enabled: true, url: URL } as never);
+            await harness.run(async (context: any) => await beginAccountMove(context, identity.userId, "merging", Date.now()));
+
+            await expect(as.mutation(saveRunWebhook as never, { enabled: false, url: "https://hooks.example.com/other" } as never)).rejects.toThrow(
+                BEING_MOVED,
+            );
+            await expect(as.mutation(rotateRunWebhookSecret as never, {} as never)).rejects.toThrow(BEING_MOVED);
+            expect(await as.query(getRunWebhook as never, {} as never)).toMatchObject({ configured: true, enabled: true, url: URL });
         } finally {
             harness.close();
         }

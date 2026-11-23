@@ -172,6 +172,18 @@ export const schema = defineSchema({
         .index("userId", ["userId"])
         .triggers((t) => auditTriggersFor(t, "account", AUDIT_TABLES["account"]!)),
 
+    /**
+     * An account whose pins are being moved or erased: a merge of a guest into a new account, or an account erasure. While a row exists
+     * for a user, that user cannot add pins (`lib/account-moves.ts`). Global, so every shard reads it; written before the move starts.
+     */
+    accountMoves: defineTable({
+        createdAt: v.number(),
+        kind: v.union(v.literal("erasing"), v.literal("importing"), v.literal("merging")),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_user", ["userId"]),
+
     // One coding-agent session on a paired device (`acp/`): the thread it runs
     // in, which agent and folder (labels only; paths never leave the desktop) and
     // what it reported at the handshake. `hostSessionId` is the desktop's own id
@@ -2245,6 +2257,15 @@ export const schema = defineSchema({
             };
         }),
 
+    // One row per account that writes pins: the latest time a pin write of the account may still be in flight. A move waits for it
+    // to pass before it sweeps the account's pins (`lib/account-moves.ts`).
+    pinWriteLeases: defineTable({
+        expiresAt: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_user", ["userId"]),
+
     playgroundApiKeys: defineTable({
         name: v.optional(v.string()),
     }).index("name", ["name"]),
@@ -2785,6 +2806,15 @@ export const schema = defineSchema({
         .index("by_lastActiveAt", ["lastActiveAt"])
         .index("by_nextDueAt", ["nextDueAt"])
         .index("by_rateLimitsPending_lastActiveAt", ["rateLimitsPending", "lastActiveAt"]),
+
+    // An erasure's fence on one owner shard: while a row is here, pin writes of the account on this shard are refused in the same
+    // transaction as their insert, so a write that commits after the shard's sweep cannot be kept (`lib/account-moves.ts`).
+    shardPinFences: defineTable({
+        createdAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user", ["userId"]),
 
     /**
      * Lookup from a key known BEFORE the owner is to the owner's shard:
