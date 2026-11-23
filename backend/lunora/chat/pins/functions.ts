@@ -186,9 +186,9 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
 
 /**
  * Writes a pin with its route. The route is a global row, outside this shard's transaction, so it is written BEFORE the pin: a
- * committed pin always has its route (erasure after a revoked grant finds the pin through it). When the pin write then throws, the
- * route this call inserted goes too, unless the caller has another pin on the thread. A route left by a failure that could not be
- * undone is harmless: it names a thread with nothing in it, which every reader skips.
+ * committed pin always has its route (erasure after a revoked grant finds the pin through it). A failed pin write leaves its route
+ * behind on purpose. Removing it could race a concurrent writer that found the same route and is about to commit its own pin; a
+ * route with no pin is harmless (every reader skips it), and account and thread deletion remove it.
  */
 export const withSharedPinRoute = async <T>(
     context: MutationCtx,
@@ -197,24 +197,9 @@ export const withSharedPinRoute = async <T>(
     now: number,
     write: () => Promise<T>,
 ): Promise<T> => {
-    const routeId = await recordSharedPinRoute(context, threadId, userId, now);
+    await recordSharedPinRoute(context, threadId, userId, now);
 
-    try {
-        return await write();
-    } catch (error) {
-        if (routeId !== undefined) {
-            const others = await context.db
-                .query("threadPins")
-                .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", threadId))
-                .take(1);
-
-            if (others.length === 0) {
-                await context.db.delete("sharedPinRoutes", routeId);
-            }
-        }
-
-        throw error;
-    }
+    return await write();
 };
 
 /**

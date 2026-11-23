@@ -932,6 +932,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // so a re-run of a request the retry already confirmed mails nothing while the claim lasts (a
         // re-run no longer starts over a completed request at all). A send that is exhausted keeps the
         // claim: nothing keeps the address afterwards, so there is nothing a later sender could send.
+        // The erasure is done: the account's move marker names the account, so it goes now (`lib/account-moves.ts`).
+        await context.step.do(
+            "end-account-erasure",
+            async () =>
+                await context.run(
+                    internal.lib.account_moves.endAccountMoveFor,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "end-account-erasure") },
+                ),
+        );
+
         try {
             const isEmailClaimed = await context.step.do(
                 "claim-deletion-confirmed-email",

@@ -27,6 +27,28 @@ export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId:
     }
 };
 
+/**
+ * Removes the marker once the move is finished: the account's pins are moved or erased and its routes are gone. The marker names the
+ * account, so it must not outlive the move.
+ */
+export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
+
+    for (const row of page) {
+        await context.db.delete("accountMoves", row._id);
+    }
+};
+
+/** Removes the marker, from a workflow or a job once the account's pins are moved or erased. Idempotent. */
+export const endAccountMoveFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await endAccountMove(ctx, args.userId);
+
+        return null;
+    });
+
 /** The marker, written from a workflow or a job before the account's pins are touched. */
 export const beginAccountMoveFor = internalMutation
     .input({ kind: v.union(v.literal("erasing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })

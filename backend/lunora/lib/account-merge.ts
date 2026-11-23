@@ -429,35 +429,40 @@ export const runGuestMerge = internalAction
     .action(async ({ args, ctx: context }) => {
         // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
         await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
-        // The guest's pins on other owners' threads move to the new account on each owner's shard first, while their routes still name the
-        // guest; the routes move with the guest's global rows below. Each move is idempotent, so a redelivery repeats it safely.
-        let cursor: string | null = null;
-        let isDone = false;
+        // Moves the pins of every route held by `routeUserId` to the new account, on each route's owner shard, one batch per call. Each
+        // move is idempotent, so a redelivery repeats it safely.
+        const reassignPinsOnRoutesOf = async (routeUserId: string): Promise<void> => {
+            let cursor: string | null = null;
+            let isDone = false;
 
-        while (!isDone) {
-            const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await context.runQuery(
-                internal.chat.pins.functions.listSharedPinRoutesForExport,
-                { cursor, userId: args.from },
-            );
+            while (!isDone) {
+                const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await context.runQuery(
+                    internal.chat.pins.functions.listSharedPinRoutesForExport,
+                    { cursor, userId: routeUserId },
+                );
 
-            for (const route of routes.page) {
-                // One batch per call on the owner's shard: repeat until none is left.
-                let more = true;
+                for (const route of routes.page) {
+                    let more = true;
 
-                while (more) {
-                    const result = await callOnShard(
-                        internal.chat.pins.functions.reassignUserPinsOnThread,
-                        { from: args.from, threadId: route.threadId as never, to: args.to },
-                        { shardKey: route.ownerId },
-                    );
+                    while (more) {
+                        const result = await callOnShard(
+                            internal.chat.pins.functions.reassignUserPinsOnThread,
+                            { from: args.from, threadId: route.threadId as never, to: args.to },
+                            { shardKey: route.ownerId },
+                        );
 
-                    more = result.hasMore;
+                        more = result.hasMore;
+                    }
                 }
-            }
 
-            isDone = routes.isDone;
-            cursor = routes.continueCursor;
-        }
+                isDone = routes.isDone;
+                cursor = routes.continueCursor;
+            }
+        };
+
+        // The guest's pins on other owners' threads move while their routes still name the guest; the routes move with the guest's
+        // global rows in the merge below.
+        await reassignPinsOnRoutesOf(args.from);
 
         const result = await mergeGuestInto(
             async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
@@ -473,6 +478,11 @@ export const runGuestMerge = internalAction
             args.from,
             args.to,
         );
+
+        // A parallel merge of the owner can move a thread's shard, and so the guest's pins, between the pass above reading a route and
+        // the merge re-pointing it. The routes now held by `to` name the shard that holds the pins: a second pass reaches them.
+        await reassignPinsOnRoutesOf(args.to);
+        await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { userId: args.from });
 
         authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
 

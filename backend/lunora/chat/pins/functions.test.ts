@@ -466,12 +466,12 @@ describe("an account being moved or erased cannot add pins", () => {
     });
 });
 
-describe("a failed pin write takes the shared route it wrote", () => {
-    // The failure is caught inside the run: an uncaught error would roll the whole run back, route included, and prove nothing.
-    const failingWrite = async (userId: string, now: number): Promise<string | null> =>
-        await harness.run(async (context: any) => {
+describe("a failed pin write leaves its shared route", () => {
+    it("keeps the route, since a concurrent writer may be relying on it, and writes no pin", async () => {
+        // The failure is caught inside the run: an uncaught error would roll the whole run back, route included, and prove nothing.
+        const message = await harness.run(async (context: any) => {
             try {
-                await withSharedPinRoute(context, threadId, userId, now, async () => {
+                await withSharedPinRoute(context, threadId, "user-collaborator", 1, async () => {
                     throw new Error("pin write failed");
                 });
 
@@ -481,20 +481,7 @@ describe("a failed pin write takes the shared route it wrote", () => {
             }
         });
 
-    it("removes the route when the pin write throws and the user has no other pin on the thread", async () => {
-        expect(await failingWrite("user-collaborator", 1)).toBe("pin write failed");
-
-        const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
-
-        expect(routes.page).toHaveLength(0);
-    });
-
-    it("keeps the route when the user already has another pin on the thread", async () => {
-        await harness.run(async (context: any) => {
-            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-collaborator" });
-        });
-
-        expect(await failingWrite("user-collaborator", 2)).toBe("pin write failed");
+        expect(message).toBe("pin write failed");
 
         const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
 
