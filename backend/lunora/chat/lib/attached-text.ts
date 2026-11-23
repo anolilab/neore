@@ -162,34 +162,64 @@ export const blankQuotedLines = (text: string): string => {
 
 /**
  * The lines messenger writes about a received attachment into the caption's part (`messenger/media.ts`): a voice
- * transcript's label, a voice message or file it could not read, a file it cannot show the model.
+ * transcript's label, a voice message or file it could not read, a file it cannot show the model. Read as such only in
+ * a part messenger wrote ({@link messengerTextPart}): typed into the composer, the same line is the person's own words.
  */
 const MESSENGER_ATTACHMENT_LINE_RE = /^\s*\[(?:Voice message[ :\]]|Attached file: |Attachment(?: "[^"\n]*")? not read: )/u;
 
-/** The typed lines of one text: up to the first attachment label or messenger's attachment line, without quoted lines. */
-const typedLinesOf = (text: string): string => {
+/**
+ * The text part messenger saves a received message in: the caption with the lines it writes about the attachments
+ * (`messenger/media.ts#ingestAttachments`). The mark tells {@link typedTextOf} those lines are not typed.
+ */
+export const messengerTextPart = (text: string): { providerOptions: { neore: { messenger: true } }; text: string; type: "text" } => {
+    return { providerOptions: { neore: { messenger: true } }, text, type: "text" };
+};
+
+/** Whether one stored part is messenger's text (`messengerTextPart`). */
+const isMessengerPart = (part: ContentPart): boolean => {
+    const options = part.providerOptions as { neore?: { messenger?: unknown } } | undefined;
+
+    return options?.neore?.messenger === true;
+};
+
+/**
+ * The typed lines of one text: up to the first attachment label (or, in messenger's text, its first attachment line),
+ * without quoted lines.
+ */
+const typedLinesOf = (text: string, messengerLines: boolean): string => {
     const lines = text.split("\n");
-    const end = lines.findIndex((line) => isAttachedLine(line) || MESSENGER_ATTACHMENT_LINE_RE.test(line));
+    const end = lines.findIndex((line) => isAttachedLine(line) || (messengerLines && MESSENGER_ATTACHMENT_LINE_RE.test(line)));
 
     return withoutQuotedLines(end === -1 ? text : lines.slice(0, end).join("\n")).trimEnd();
 };
+
+export interface TypedTextOptions {
+    /**
+     * The message came in through messenger, so its unmarked text parts are read as messenger's text too: a row saved
+     * before {@link messengerTextPart} marked it (the typed-text backfill learns this from the thread).
+     */
+    messengerOrigin?: boolean;
+}
 
 /**
  * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's
  * note, an outside agent's text, the app's placeholders or a quoted block, each typed part kept as its own paragraph.
  * Typed words can come before an attachment in one text (messenger puts the caption and its attachment lines in one
- * part): they are kept, and the rest is dropped from the first label on.
+ * part): they are kept, and the rest is dropped from the first label on. Messenger's own attachment lines end the typed
+ * words only in its marked part (`messengerTextPart`) or with `options.messengerOrigin`.
  * A memory quotes only this (`memory/evidence.ts`), and the composer's prompt search indexes, lists and matches only this
  * (stored as `messages.typedText` by `agent/shared.ts#typedTextColumn`), so a sentence from an upload or a quote is never
  * shown as their words.
  */
-export const typedTextOf = (message: MessageLike | undefined): string => {
+export const typedTextOf = (message: MessageLike | undefined, options: TypedTextOptions = {}): string => {
     if (message?.role !== "user") {
         return "";
     }
 
+    const messengerOrigin = options.messengerOrigin === true;
+
     if (typeof message.content === "string") {
-        return typedLinesOf(message.content);
+        return typedLinesOf(message.content, messengerOrigin);
     }
 
     if (!Array.isArray(message.content)) {
@@ -198,7 +228,7 @@ export const typedTextOf = (message: MessageLike | undefined): string => {
 
     return (message.content as ReadonlyArray<ContentPart>)
         .flatMap((part) => {
-            const typed = isTypedPart(part) ? typedLinesOf(part.text) : "";
+            const typed = isTypedPart(part) ? typedLinesOf(part.text, messengerOrigin || isMessengerPart(part)) : "";
 
             return typed.trim() === "" ? [] : [typed];
         })

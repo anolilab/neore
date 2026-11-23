@@ -340,6 +340,8 @@ export const addPurchaseLookBrowser = defineMigration({
  * Messages gained an optional `typedText` (`agent/shared.ts#typedTextColumn`) and its `typed_text_search` index, which the
  * composer's prompt search reads. This fills it on rows saved before it, by the same rule every write uses
  * (`typedTextColumn` over the stored `message` parts, never the flattened `text`), so an older prompt can be found too.
+ * An unmarked row in a messenger thread is read as messenger's text (its attachment lines are not typed), which takes one
+ * read of the thread, made only for a row whose typed text that changes.
  * A row with nothing typed (only a quote, an attachment or a placeholder), a non-user row and a row kept out of search
  * (no `text`) stay unset, as do rows that already have the column. Only `typedText` is added: `text`, the deletion
  * marks and the thread's lock are copied through, and the search still drops a locked or deleted row when it reads.
@@ -352,12 +354,26 @@ export const backfillMessageTypedText = defineMigration({
     batchSize: 32,
     id: "backfill-message-typed-text",
     table: "messages",
-    up: (document) => {
+    up: async (document, context) => {
         if (document.typedText !== undefined) {
             return undefined;
         }
 
-        const typedText = typedTextColumn(document.message as Message | undefined, document.text as string | undefined);
+        const message = document.message as Message | undefined;
+        const text = document.text as string | undefined;
+        let typedText = typedTextColumn(message, text);
+
+        // A messenger row saved before its part was marked (`messengerTextPart`) reads as typed up to its attachment lines
+        // only in a messenger thread; anywhere else such a line was typed. The thread is read only when that would change.
+        const asMessenger = typedTextColumn(message, text, { messengerOrigin: true });
+
+        if (asMessenger !== typedText && typeof document.threadId === "string") {
+            const thread = await context.db.get("threads", document.threadId);
+
+            if (thread?.messengerConnectionId !== undefined && thread?.messengerConnectionId !== null) {
+                typedText = asMessenger;
+            }
+        }
 
         // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
         return typedText === undefined ? undefined : { ...document, typedText };

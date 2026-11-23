@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { documentTextPart, guestTextPart, typedTextOf } from "./attached-text";
+import { documentTextPart, guestTextPart, messengerTextPart, typedTextOf } from "./attached-text";
 
 describe(typedTextOf, () => {
     it("keeps only what the person typed: no attached document, page capture or guest note", () => {
@@ -28,13 +28,31 @@ describe(typedTextOf, () => {
     it("keeps a messenger caption and drops the attachment lines messenger writes after it in the same part", () => {
         expect.assertions(4);
 
-        // As `messenger/functions.ts` saves a received message: the caption and the attachment lines joined in one part.
-        const received = (text: string) => typedTextOf({ content: [{ text, type: "text" }], role: "user" });
+        // As `messenger/functions.ts` saves a received message: the caption and the attachment lines joined in one marked part.
+        const received = (text: string) => typedTextOf({ content: [messengerTextPart(text)], role: "user" });
 
         expect(received("fix the roof\n\n[Attached file: photo.jpg (image/jpeg) — its contents cannot be read here]")).toBe("fix the roof");
         expect(received("read this\n\n[Document: plan.pdf]\nquarterly numbers")).toBe("read this");
         expect(received('[Voice message transcript]\ncall the plumber\n\n[Attachment "a.zip" not read: this type of file is not supported]')).toBe("");
         expect(received("[Voice message: it could not be transcribed]")).toBe("");
+    });
+
+    it("keeps a typed line that looks like messenger's attachment line in a prompt messenger did not write", () => {
+        expect.assertions(2);
+
+        const typed = 'what does this mean\n[Attached file: x]\n[Voice message: hi]\n[Attachment "a" not read: why]\nand the rest I typed';
+
+        expect(typedTextOf({ content: [{ text: typed, type: "text" }], role: "user" })).toBe(typed);
+        expect(typedTextOf({ content: typed, role: "user" })).toBe(typed);
+    });
+
+    it("drops messenger's attachment lines from an unmarked row it is told came through messenger", () => {
+        expect.assertions(2);
+
+        const saved = "fix the roof\n\n[Attached file: photo.jpg (image/jpeg) — its contents cannot be read here]";
+
+        expect(typedTextOf({ content: [{ text: saved, type: "text" }], role: "user" }, { messengerOrigin: true })).toBe("fix the roof");
+        expect(typedTextOf({ content: saved, role: "user" }, { messengerOrigin: true })).toBe("fix the roof");
     });
 
     it("reads a plain string prompt, and nothing from other roles", () => {

@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internal } from "../_generated/internal";
-import { typedTextOf } from "../chat/lib/attached-text";
+import { messengerTextPart, typedTextOf } from "../chat/lib/attached-text";
 import schema from "../schema";
 import { compressThreadMemories } from "./compress";
 import { extractMemories } from "./extract";
@@ -172,7 +172,7 @@ describe("extraction evidence", () => {
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "Noted.",
                     promptMessageId: "message-1",
-                    quotablePrompt: typedTextOf({ content: [{ text, type: "text" }], role: "user" }),
+                    quotablePrompt: typedTextOf({ content: [messengerTextPart(text)], role: "user" }),
                     threadId,
                     userId: USER,
                     userMessage: text,
