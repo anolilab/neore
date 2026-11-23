@@ -9,8 +9,17 @@ import { describe, expect, it, vi } from "vitest";
 import { deleteMergedGuest } from "../auth/hooks";
 import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
-import type { MergeReferences, ShardCall } from "./account-merge";
-import { deleteShardRows, importShardRows, listShardRowsPage, listShardRowsToClear, MERGE_PAGE_SIZE } from "./account-merge";
+import type { MergeProgress, MergeReferences, ShardCall } from "./account-merge";
+import {
+    canonicalValue,
+    deleteShardRows,
+    dropImportMarkersPage,
+    importShardRows,
+    listShardRowsPage,
+    listShardRowsToClear,
+    MERGE_CALLS_PER_RUN,
+    MERGE_PAGE_SIZE,
+} from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
@@ -18,9 +27,39 @@ import {
     reassignGlobalRows,
     reassignThreadFollowsPage,
     rewriteOwner,
+    runGuestMerge,
     shardLocalTables,
 } from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
+import { listSharedPinRoutesForExport } from "../chat/pins/functions";
+
+// The action's own query runs in the harness, which takes the registered procedure; every other reference stays plain.
+const registry = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../_generated/internal", async (importOriginal) => {
+    const { registeredApi } = await import("../../test/registered-api");
+
+    return registeredApi(await importOriginal(), registry);
+});
+
+/** The shard the action reaches across to, and the jobs it queues: set per test. */
+const transport: { call?: ShardCall; queued: { args: Record<string, unknown>; options: unknown; ref: { __lunoraRef: string } }[] } = { queued: [] };
+
+vi.mock("./cross-shard", () => {
+    return {
+        callOnShard: async (reference: { __lunoraRef: string }, args: Record<string, unknown>, options: { shardKey: string }) =>
+            await transport.call!(reference, args, options.shardKey),
+    };
+});
+
+vi.mock("./job-queue", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./job-queue")>()),
+        enqueueJob: async (ref: { __lunoraRef: string }, args: Record<string, unknown>, options: unknown) => {
+            transport.queued.push({ args, options, ref });
+        },
+    };
+});
 
 const ref = (name: string) => {
     return { __lunoraRef: `lib_account_merge:${name}` };
@@ -29,6 +68,7 @@ const ref = (name: string) => {
 const REFERENCES: MergeReferences = {
     deleteGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
     deleteRows: ref("deleteShardRows"),
+    dropMarkers: ref("dropImportMarkersPage"),
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
     listClear: ref("listShardRowsToClear"),
@@ -37,6 +77,28 @@ const REFERENCES: MergeReferences = {
 };
 
 type Row = Record<string, unknown> & { _id: string };
+
+/** Every run of a merge, as the queue would chain them: each from where the last stopped, until one says it is done. */
+const mergeToEnd = async (
+    call: ShardCall,
+    from: string,
+    to: string,
+    options: { budget?: number; maxRuns?: number } = {},
+): Promise<{ moved: number; runs: MergeProgress[] }> => {
+    const runs: MergeProgress[] = [];
+    let resume: MergeProgress | undefined;
+
+    for (;;) {
+        const { moved, next } = await mergeGuestInto(call, REFERENCES, from, to, { ...options, ...(resume !== undefined && { resume }) });
+
+        if (next === null) {
+            return { moved, runs };
+        }
+
+        runs.push(next);
+        resume = next;
+    }
+};
 
 /**
  * Two shards as `shardKey → table → rows`, and a caller that plays the procedures against them. `follows` is how many
@@ -93,6 +155,9 @@ const fakeShards = (
 
                 return null as never;
             }
+            case "dropImportMarkersPage": {
+                return { hasMore: false } as never;
+            }
             case "importShardRows": {
                 const target = tableOf(shardKey, table);
 
@@ -144,6 +209,14 @@ const fakeShards = (
     return { call, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
 };
 
+describe("canonicalValue", () => {
+    it("tells apart what JSON cannot: the bytes of binary, and a bigint from its digits", () => {
+        expect(canonicalValue({ a: new Uint8Array([1]).buffer })).not.toBe(canonicalValue({ a: new Uint8Array([2]).buffer }));
+        expect(canonicalValue({ a: 5n })).not.toBe(canonicalValue({ a: "5" }));
+        expect(canonicalValue({ a: 1, b: [2] })).toBe(canonicalValue({ a: 1, b: [2] }));
+    });
+});
+
 describe("rewriteOwner", () => {
     it("re-points every top-level field naming the guest, and nothing else", () => {
         expect(rewriteOwner({ _id: "t1", grantedBy: "guest", title: "guest notes", userId: "guest" }, "guest", "user")).toStrictEqual({
@@ -181,7 +254,7 @@ describe("mergeGuestInto", () => {
         const messages: Row[] = [{ _id: "m1", threadId: "t1", userId: "guest" }];
         const { call, reassigned, shards } = fakeShards({ guest: { messages, threads }, user: { threads: [{ _id: "own", title: "mine", userId: "user" }] } });
 
-        const { moved } = await mergeGuestInto(call, REFERENCES, "guest", "user");
+        const { moved } = await mergeToEnd(call, "guest", "user");
 
         expect(moved).toBe(4);
         expect(
@@ -213,7 +286,7 @@ describe("mergeGuestInto", () => {
             },
         });
 
-        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await mergeToEnd(call, "guest", "user");
 
         expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
     });
@@ -221,60 +294,186 @@ describe("mergeGuestInto", () => {
     it("moves the guest's thread follows a page per call until none are left", async () => {
         const { call, deletedGuests, followPageCalls } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { follows: 5 });
 
-        const { moved } = await mergeGuestInto(call, REFERENCES, "guest", "user");
+        const { moved } = await mergeToEnd(call, "guest", "user");
 
         expect(followPageCalls()).toBe(3);
         expect(moved).toBe(1 + 5);
         expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
     });
 
-    it("keeps the guest and fails for the queue to redeliver when the round cap leaves thread follows behind", async () => {
+    it("keeps the guest and fails once the run cap leaves thread follows behind", async () => {
         const { call, deletedGuests, followPageCalls } = fakeShards({ guest: {} }, 2, { follows: Infinity });
 
-        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("round cap");
+        await expect(mergeToEnd(call, "guest", "user", { maxRuns: 20 })).rejects.toThrow("did not finish in 20 runs");
 
         expect(followPageCalls()).toBeGreaterThan(1);
         expect(deletedGuests).toStrictEqual([]);
     });
 
-    it("fails, for the queue to redeliver, when a follow still names the guest at its deletion", async () => {
-        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
+    it("moves the follows again when one still names the guest at its deletion, and keeps the guest while one does", async () => {
+        const { call, deletedGuests, followPageCalls } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
 
-        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("thread follows");
+        await expect(mergeToEnd(call, "guest", "user", { maxRuns: 20 })).rejects.toThrow("did not finish in 20 runs");
+
+        expect(followPageCalls()).toBeGreaterThan(1);
+        expect(deletedGuests).toStrictEqual([]);
     });
 
-    it("fails before clearing anything when the copy stops at its round cap with rows left", async () => {
-        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
-        const deletes: unknown[] = [];
+    it("never clears, and keeps the guest, when the copy of a table does not end within the run cap", async () => {
+        const { call, deletedGuests } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        const clears: unknown[] = [];
 
         await expect(
-            mergeGuestInto(
+            mergeToEnd(
                 async (reference, args, shardKey) => {
-                    if (reference.__lunoraRef.endsWith(":deleteShardRows")) {
-                        deletes.push(args);
+                    if (reference.__lunoraRef.endsWith(":listShardRowsToClear") || reference.__lunoraRef.endsWith(":deleteShardRows")) {
+                        clears.push(args);
                     }
 
-                    // A page that never ends: the copy runs into its cap.
+                    // A page that never ends.
                     if (reference.__lunoraRef.endsWith(":listShardRowsPage") && args.table === "threads") {
                         return { continueCursor: "next", isDone: false, page: [{ _id: "t1", userId: "guest" }] } as never;
                     }
 
                     return await call(reference, args, shardKey);
                 },
+                "guest",
+                "user",
+                { maxRuns: 5 },
+            ),
+        ).rejects.toThrow("did not finish in 5 runs");
+
+        expect(clears).toStrictEqual([]);
+        expect(deletedGuests).toStrictEqual([]);
+    });
+
+    it("resumes a copy across runs from the cursor it stopped at, and clears only after every table is copied", async () => {
+        const threads = Array.from({ length: 9 }, (_, index) => {
+            return { _id: `t${String(index)}`, userId: "guest" };
+        });
+        const { call, shards } = fakeShards({ guest: { threads } });
+        const log: string[] = [];
+
+        const { runs } = await mergeToEnd(
+            async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                if (name === "listShardRowsPage" && args.table === "threads") {
+                    log.push(`copy ${String(args.cursor)}`);
+                }
+
+                if (name === "deleteShardRows") {
+                    log.push("delete");
+                }
+
+                return await call(reference, args, shardKey);
+            },
+            "guest",
+            "user",
+            { budget: 3 },
+        );
+
+        // Five pages of two, each read once: no run starts the table over.
+        expect(log.filter((entry) => entry.startsWith("copy"))).toStrictEqual(["copy null", "copy 2", "copy 4", "copy 6", "copy 8"]);
+        expect(log.indexOf("delete")).toBeGreaterThan(log.lastIndexOf("copy 8"));
+        expect(runs.some((run) => run.phase === "copy" && run.table === "threads" && run.cursor !== null)).toBe(true);
+        expect(shards.get("user")?.get("threads")).toHaveLength(9);
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([]);
+    });
+
+    it("queues the clear's next run when a table needs more clear pages than one run's calls, and deletes the guest only once it is empty", async () => {
+        const threads = Array.from({ length: 30 }, (_, index) => {
+            return { _id: `t${String(index)}`, userId: "guest" };
+        });
+        const { call, deletedGuests, shards } = fakeShards({ guest: { threads } });
+        const calls: number[] = [];
+        let resume: MergeProgress | undefined;
+        let clearStops = 0;
+
+        for (;;) {
+            let made = 0;
+            const { next } = await mergeGuestInto(
+                async (reference, args, shardKey) => {
+                    made += 1;
+
+                    return await call(reference, args, shardKey);
+                },
                 REFERENCES,
                 "guest",
                 "user",
-            ),
-        ).rejects.toThrow("threads rows past the merge's round cap");
+                { budget: 10, ...(resume !== undefined && { resume }) },
+            );
 
-        expect(deletes).toStrictEqual([]);
+            calls.push(made);
+
+            if (next === null) {
+                break;
+            }
+
+            if (next.phase === "clear" && next.table === "threads") {
+                clearStops += 1;
+                // Stopped mid-clear: the guest stays.
+                expect(deletedGuests).toStrictEqual([]);
+            }
+
+            resume = next;
+        }
+
+        expect(clearStops).toBeGreaterThan(1);
+        expect(Math.max(...calls)).toBeLessThanOrEqual(10);
+        expect(shards.get("user")?.get("threads")).toHaveLength(30);
+        expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
+    });
+
+    it("makes no more cross-shard calls in a run than the Free plan's subrequests allow", async () => {
+        const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        let made = 0;
+
+        const { next } = await mergeGuestInto(
+            async (reference, args, shardKey) => {
+                made += 1;
+
+                return await call(reference, args, shardKey);
+            },
+            REFERENCES,
+            "guest",
+            "user",
+        );
+
+        expect(next).not.toBeNull();
+        expect(made).toBeLessThanOrEqual(MERGE_CALLS_PER_RUN);
+        expect(MERGE_CALLS_PER_RUN).toBeLessThan(50);
+    });
+
+    it("queues its next run, from where it stopped, before a run that did not finish returns", async () => {
+        const { call, deletedGuests } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        const harness = lunoraTest(schemaWithShardedTables(["sharedPinRoutes"]) as never);
+
+        registry.set("chat_pins_functions:listSharedPinRoutesForExport", listSharedPinRoutesForExport);
+        transport.call = call;
+        transport.queued = [];
+
+        try {
+            const result = await harness.action(async (context: any) => await context.runAction(runGuestMerge, { from: "guest", to: "user" }));
+
+            expect(result).toMatchObject({ done: false });
+            expect(transport.queued).toHaveLength(1);
+            expect(transport.queued[0]).toMatchObject({
+                args: { from: "guest", resume: { run: 1 }, to: "user" },
+                options: { shardKey: "user" },
+                ref: { __lunoraRef: expect.stringContaining("runGuestMerge") },
+            });
+            expect(deletedGuests).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
     });
 
     it("is safe to run twice", async () => {
         const { call, shards } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
 
-        await mergeGuestInto(call, REFERENCES, "guest", "user");
-        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await mergeToEnd(call, "guest", "user");
+        await mergeToEnd(call, "guest", "user");
 
         expect(shards.get("user")?.get("threads")).toStrictEqual([{ _id: "t1", userId: "user" }]);
     });
@@ -666,7 +865,7 @@ describe("clearing the guest's settings", () => {
         const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } });
         const listClearCalls: Record<string, unknown>[] = [];
 
-        await mergeGuestInto(
+        await mergeToEnd(
             async (reference, args, shardKey) => {
                 if (reference.__lunoraRef.endsWith(":listShardRowsToClear")) {
                     listClearCalls.push(args);
@@ -674,7 +873,6 @@ describe("clearing the guest's settings", () => {
 
                 return await call(reference, args, shardKey);
             },
-            REFERENCES,
             "guest",
             "user",
         );
@@ -692,6 +890,7 @@ describe("clearing the guest's settings", () => {
 describe("mergeGuestInto across two real shards", () => {
     const PROCEDURES: Record<string, { fn: unknown; kind: "mutation" | "query" }> = {
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
+        dropImportMarkersPage: { fn: dropImportMarkersPage, kind: "mutation" },
         importShardRows: { fn: importShardRows, kind: "mutation" },
         listShardRowsPage: { fn: listShardRowsPage, kind: "query" },
         listShardRowsToClear: { fn: listShardRowsToClear, kind: "query" },
@@ -785,7 +984,7 @@ describe("mergeGuestInto across two real shards", () => {
                 late = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("written during the merge")))) as string;
             });
 
-            await mergeGuestInto(merge.call, REFERENCES, "guest", "user");
+            await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual(
                 [
@@ -809,7 +1008,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
             });
 
-            await mergeGuestInto(merge.call, REFERENCES, "guest", "user");
+            await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "edited during the merge", userId: "user" }]);
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
@@ -830,7 +1029,7 @@ describe("mergeGuestInto across two real shards", () => {
                 );
             });
 
-            await mergeGuestInto(merge.call, REFERENCES, "guest", "user");
+            await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "edited at the last moment", userId: "user" }]);
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
@@ -850,14 +1049,14 @@ describe("mergeGuestInto across two real shards", () => {
             // The re-import of the clear landed; the job dies before the guest's rows are deleted.
             merge.onceFail((name, args) => name === "deleteShardRows" && args.table === "threads");
 
-            await expect(mergeGuestInto(merge.call, REFERENCES, "guest", "user")).rejects.toThrow("cut off");
+            await expect(mergeToEnd(merge.call, "guest", "user")).rejects.toThrow("cut off");
 
             // Written before the redelivery, and an edit to a row already copied.
             const late = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("three")))) as string;
 
             await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", ids[0], { title: "one, edited", updatedAt: 2 }));
 
-            await mergeGuestInto(merge.call, REFERENCES, "guest", "user");
+            await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual(
                 [
@@ -867,6 +1066,99 @@ describe("mergeGuestInto across two real shards", () => {
                 ].toSorted(byId),
             );
             expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    /** A document (a table without `updatedAt`) in a thread, on the guest's shard; its id. */
+    const guestDocument = async (merge: ReturnType<typeof twoShards>, contentJson?: unknown) =>
+        (await merge.shards.guest.run(async (context: any) => {
+            const threadId = await context.db.insert("threads", thread("with a document"));
+
+            return await context.db.insert("documents", {
+                kind: "text",
+                threadId,
+                title: "guest draft",
+                userId: "guest",
+                version: 1,
+                ...(contentJson !== undefined && { contentJson }),
+            });
+        })) as string;
+
+    const documentOn = async (merge: ReturnType<typeof twoShards>, shardKey: "guest" | "user", id: string) =>
+        (await merge.shards[shardKey].run(async (context: any) => await context.db.get("documents", id))) as Record<string, unknown> | null;
+
+    it("keeps the new account's edit to a row without updatedAt through a redelivered merge and its clear, and drops its markers", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = await guestDocument(merge);
+
+            // The clear's re-import landed; the job dies before the guest's rows are deleted.
+            merge.onceFail((name, args) => name === "deleteShardRows" && args.table === "documents");
+            await expect(mergeToEnd(merge.call, "guest", "user")).rejects.toThrow("cut off");
+
+            await merge.shards.user.run(async (context: any) => await context.db.patch("documents", id, { title: "renamed by the account" }));
+
+            // The redelivery copies everything again, then clears.
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await documentOn(merge, "user", id)).toMatchObject({ title: "renamed by the account", userId: "user" });
+            expect(await documentOn(merge, "guest", id)).toBeNull();
+
+            const markers = await merge.shards.user.run(
+                async (context: any) =>
+                    await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", "guest-merge-row"))
+                        .take(10),
+            );
+
+            expect(markers).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("does not bring back a moved row the new account deleted before the clear", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = await guestDocument(merge);
+
+            merge.onceBefore("listShardRowsToClear", async () => {
+                await merge.shards.user.run(async (context: any) => await context.db.delete("documents", id));
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await documentOn(merge, "user", id)).toBeNull();
+            expect(await documentOn(merge, "guest", id)).toBeNull();
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("keeps a row whose binary changed between the clear's import and its delete, and moves it with its bigint and new bytes", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = await guestDocument(merge, { blob: new Uint8Array([1, 2, 3]).buffer, count: 5n });
+
+            merge.onceBefore("deleteShardRows", async () => {
+                await merge.shards.guest.run(
+                    async (context: any) => await context.db.patch("documents", id, { contentJson: { blob: new Uint8Array([9, 9, 9]).buffer, count: 5n } }),
+                );
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            const moved = (await documentOn(merge, "user", id))!.contentJson as { blob: ArrayBuffer; count: bigint };
+
+            expect([...new Uint8Array(moved.blob)]).toStrictEqual([9, 9, 9]);
+            expect(moved.count).toBe(5n);
+            expect(await documentOn(merge, "guest", id)).toBeNull();
         } finally {
             merge.close();
         }
@@ -882,7 +1174,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await merge.shards.user.run(async (context: any) => await context.db.patch("threads", id, { title: "renamed by the account", updatedAt: 5 }));
             });
 
-            await mergeGuestInto(merge.call, REFERENCES, "guest", "user");
+            await mergeToEnd(merge.call, "guest", "user");
 
             expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "renamed by the account", userId: "user" }]);
         } finally {

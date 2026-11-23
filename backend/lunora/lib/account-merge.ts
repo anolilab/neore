@@ -13,12 +13,11 @@
  *    rows stays valid) with the guest's id rewritten to the new one;
  * 2. only once EVERYTHING is copied is the guest's shard cleared, a page at a
  *    time: each page is read whole ({@link listShardRowsToClear}), imported
- *    again (an id already there takes the guest's current row), and only the
- *    ids the new shard confirms are deleted ({@link deleteShardRows}). A row
+ *    again, and only the ids the new shard confirms are deleted
+ *    ({@link deleteShardRows}), each while its digest still holds. A row
  *    written or edited on the guest's shard after its table was copied (a
  *    collaborator's comment, a guest tab still open, a scheduled job) so
- *    arrives as it is at the clear, never deleted uncopied. A copy stopped by
- *    the round cap fails the job before anything is cleared;
+ *    arrives as it is at the clear, never deleted uncopied;
  * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}),
  *    and its thread follows a page per mutation ({@link reassignThreadFollowsPage});
  * 4. once the guest's shard is empty, the guest itself is deleted
@@ -26,9 +25,17 @@
  *    conversion completes in the guest's own browser. A cross-browser
  *    conversion (`auth/guest-conversion.ts`) would otherwise leave it alive.
  *
+ * An import never overwrites the new account's own edit: every row it writes
+ * leaves an import marker (the digest of what it wrote), and a row on the new
+ * shard is replaced only while it still matches its marker. A run spends at most
+ * {@link MERGE_CALLS_PER_RUN} cross-shard calls and then queues the next run with
+ * where it stopped ({@link MergeProgress}), so no guest is too large to finish
+ * and no job is acknowledged with rows left behind.
+ *
  * The new account's own seeded `userSettings`/`aiUserPreferences` win over the
  * guest's. Re-running after a partial failure is safe: an id already on the new
- * shard is brought up to the guest's row, and rows already moved are gone from the old one.
+ * shard is brought up to the guest's row unless the account changed it, and
+ * rows already moved are gone from the old one.
  */
 import { v } from "lunorash/server";
 
@@ -36,8 +43,10 @@ import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { AUDIT_TABLES } from "./audit-triggers";
+import { releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
+import { enqueueJob } from "./job-queue";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
@@ -156,21 +165,86 @@ export const listShardRowsPage = internalQuery
 /** A row's own fields, without the system ones (`_id`, `_creationTime`). */
 const ownFields = (row: Record<string, unknown>): Record<string, unknown> => Object.fromEntries(Object.entries(row).filter(([key]) => !key.startsWith("_")));
 
-/** A row's content as it is stored, so the clear can tell whether it changed between its read and its delete. */
-const rowDigest = async (row: Record<string, unknown>): Promise<string> => {
-    const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(ownFields(row))));
+const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+/**
+ * A stored value as deterministic text: object keys sorted, absent (`undefined`) keys dropped, and every value JSON
+ * cannot carry tagged with its type — a bigint by its digits, binary by the hex of its bytes, a date by its time. JSON
+ * throws on a bigint and writes every `ArrayBuffer` as `{}`; this tells them apart, so two rows with the same text hold
+ * the same values. The tags (`<bigint:…>`) are no JSON token, so they cannot meet a string or an array of the row's own.
+ * A value no Lunora column holds throws: a row that cannot be compared is never deleted.
+ */
+export const canonicalValue = (value: unknown): string => {
+    if (value === null) {
+        return "null";
+    }
+
+    switch (typeof value) {
+        case "bigint": {
+            return `<bigint:${value.toString()}>`;
+        }
+        case "boolean": {
+            return String(value);
+        }
+        case "number": {
+            return Number.isFinite(value) ? JSON.stringify(value) : `<number:${String(value)}>`;
+        }
+        case "string": {
+            return JSON.stringify(value);
+        }
+        case "undefined": {
+            return "<undefined>";
+        }
+        default: {
+            break;
+        }
+    }
+
+    if (value instanceof ArrayBuffer) {
+        return `<bytes:${hex(new Uint8Array(value))}>`;
+    }
+
+    if (ArrayBuffer.isView(value)) {
+        return `<bytes:${hex(new Uint8Array(value.buffer, value.byteOffset, value.byteLength))}>`;
+    }
+
+    if (value instanceof Date) {
+        return `<date:${String(value.getTime())}>`;
+    }
+
+    if (Array.isArray(value)) {
+        return `[${value.map((item) => canonicalValue(item)).join(",")}]`;
+    }
+
+    const prototype = typeof value === "object" ? (Object.getPrototypeOf(value) as unknown) : undefined;
+
+    if (prototype === Object.prototype || prototype === null) {
+        const entries = Object.entries(value as Record<string, unknown>)
+            .filter(([, field]) => field !== undefined)
+            // By code unit, not locale: the order must not change with the runtime. An object's keys are never equal.
+            .toSorted(([a], [b]) => (a < b ? -1 : 1));
+
+        return `{${entries.map(([key, field]) => `${JSON.stringify(key)}:${canonicalValue(field)}`).join(",")}}`;
+    }
+
+    throw new TypeError(`a guest merge cannot compare a stored ${Object.prototype.toString.call(value)}`);
 };
 
-/** `rows` from the first, cut where their JSON passes {@link CLEAR_PAGE_BYTES}; never fewer than one. */
+/** A row's content as it is stored ({@link canonicalValue} of its own fields), so a change between two reads shows. */
+const rowDigest = async (row: Record<string, unknown>): Promise<string> =>
+    hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalValue(ownFields(row))))));
+
+/**
+ * `rows` from the first, cut where their {@link canonicalValue} passes {@link CLEAR_PAGE_BYTES}; never fewer than one.
+ * Binary counts as hex, twice its bytes, more than the base64 the cross-shard transport carries it as.
+ */
 const withinClearBytes = (rows: Record<string, unknown>[]): Record<string, unknown>[] => {
     const encoder = new TextEncoder();
     let bytes = 0;
     let count = 0;
 
     for (const row of rows) {
-        bytes += encoder.encode(JSON.stringify(row)).byteLength;
+        bytes += encoder.encode(canonicalValue(row)).byteLength;
 
         if (count > 0 && bytes > CLEAR_PAGE_BYTES) {
             break;
@@ -237,20 +311,25 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
     }
 };
 
-const sameFields = (a: Record<string, unknown>, b: Record<string, unknown>): boolean => {
-    const keys = Object.keys(a);
+/**
+ * The claim scope of import markers: one per row a merge wrote on the new shard, keyed `<guest>:<table>:<id>`, its
+ * `result` the digest of what was written. Tagged with the new account, so its erasure takes them; dropped at the end
+ * of the merge ({@link dropImportMarkersPage}), and past {@link IMPORT_MARKER_TTL_MS} by the claim purge.
+ */
+export const IMPORT_MARKER_SCOPE = "guest-merge-row";
 
-    return keys.length === Object.keys(b).length && keys.every((key) => key in b && JSON.stringify(a[key]) === JSON.stringify(b[key]));
-};
+/** Far past any merge's runs; a marker gone early only keeps the new account's row as it is. */
+export const IMPORT_MARKER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** The copy on the new shard was changed there after the guest's row was (by `updatedAt`): the new account's edit wins. */
-const editedOnNewShard = (existing: Record<string, unknown>, guestRow: Record<string, unknown>): boolean =>
-    typeof existing.updatedAt === "number" && typeof guestRow.updatedAt === "number" && existing.updatedAt > guestRow.updatedAt;
+const markerKey = (from: string, table: string, id: string): string => `${from}:${table}:${id}`;
 
 /**
- * On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. An id already here takes the guest's
- * row as it is now (a row edited after the copy), unless the new account changed it since. `present` names every id the
- * guest's shard may now delete: each is on this shard, or (for the tables the new account keeps its own row of) handled.
+ * On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. An id already here is brought up to
+ * the guest's row as it is now (a row edited after the copy) only while it still holds what the merge last wrote there
+ * (its import marker): a row the new account changed, or one written here by anything but the merge, stays as it is,
+ * and an id whose marker remains but whose row is gone (the account deleted it) is not written again. `present` names
+ * every id the guest's shard may now delete: each is on this shard as the merge or the account left it, or (for the
+ * tables the new account keeps its own row of) handled.
  */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
@@ -270,22 +349,68 @@ export const importShardRows = internalMutation
             return { imported: 0, present: ids };
         }
 
+        const { now } = ctx;
         let imported = 0;
 
         for (const row of rows) {
             const id = row._id as string;
+            const key = markerKey(args.from, args.table, id);
             const reowned = rewriteOwner(row, args.from, args.to);
+            const wanted = await rowDigest(reowned);
+            const marker = await ctx.db
+                .query("idempotencyClaims")
+                .withIndex("by_scope_key", (q) => q.eq("scope", IMPORT_MARKER_SCOPE).eq("key", key))
+                .first();
+            const written = marker !== null && marker.expiresAt > now ? (marker.result ?? null) : null;
             const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
+            let write = false;
 
             if (existing === null) {
-                await db.insert(args.table, reowned, { allowExplicitId: true });
-                imported += 1;
-            } else if (!sameFields(ownFields(existing), ownFields(reowned)) && !editedOnNewShard(existing, reowned)) {
-                await db.replace(args.table, id, ownFields(reowned));
+                // No marker: never here. A marker: the merge wrote it and the new account deleted it since.
+                write = written === null;
+
+                if (write) {
+                    await db.insert(args.table, reowned, { allowExplicitId: true });
+                    imported += 1;
+                }
+            } else {
+                const current = await rowDigest(existing);
+
+                if (current === wanted) {
+                    // Already the guest's row: remember it, so a later guest edit may still follow.
+                    write = written !== wanted;
+                } else if (written === current) {
+                    await db.replace(args.table, id, ownFields(reowned));
+                    write = true;
+                }
+                // Otherwise the new account changed the row since the merge wrote it: its edit stays.
+            }
+
+            if (write) {
+                if (marker === null) {
+                    await ctx.db.insert("idempotencyClaims", {
+                        claimedAt: now,
+                        expiresAt: now + IMPORT_MARKER_TTL_MS,
+                        key,
+                        result: wanted,
+                        scope: IMPORT_MARKER_SCOPE,
+                        userId: args.to,
+                    });
+                } else {
+                    await ctx.db.patch("idempotencyClaims", marker._id, { expiresAt: now + IMPORT_MARKER_TTL_MS, result: wanted });
+                }
             }
         }
 
         return { imported, present: ids };
+    });
+
+/** On the NEW user's shard: drop a page of the guest's import markers, once its merge is done; `hasMore` while some may remain. */
+export const dropImportMarkersPage = internalMutation
+    .input({ from: v.string() })
+    .output(v.object({ hasMore: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        return { hasMore: await releaseClaimsWithPrefix(ctx, IMPORT_MARKER_SCOPE, `${args.from}:`) };
     });
 
 /**
@@ -380,142 +505,247 @@ export const reassignThreadFollowsPage = internalMutation
 /** A caller into a named shard, as `createShardClient(...).call` is. */
 export type ShardCall = <R>(reference: { __lunoraRef: string }, args: Record<string, unknown>, shardKey: string) => Promise<R>;
 
-/** The guest's thread follows, a page per call; `drained` is false when the round cap stopped it with rows left. */
-const moveThreadFollows = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<{ drained: boolean; moved: number }> => {
-    let moved = 0;
-
-    for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-        const page: { hasMore: boolean; moved: number } = await call(references.reassignFollows, { from, to }, to);
-
-        moved += page.moved;
-
-        if (!page.hasMore) {
-            return { drained: true, moved };
-        }
-    }
-
-    return { drained: false, moved };
-};
-
-/** Copy every row of `table` to the new shard; `copied` rows. Throws when the round cap stops it with rows left. */
-const copyTable = async (call: ShardCall, references: MergeReferences, table: string, from: string, to: string): Promise<number> => {
-    let copied = 0;
-    let cursor: string | null = null;
-
-    for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-        const page: { continueCursor: string | null; isDone: boolean; page: Record<string, unknown>[] } = await call(references.list, { cursor, table }, from);
-
-        if (page.page.length > 0) {
-            await call(references.importRows, { from, rows: page.page, table, to }, to);
-            copied += page.page.length;
-        }
-
-        if (page.isDone || page.continueCursor === null) {
-            return copied;
-        }
-
-        cursor = page.continueCursor;
-    }
-
-    // Before anything is cleared: the redelivery copies the rest.
-    throw new Error(`guest ${from} still has ${table} rows past the merge's round cap; the merge into ${to} runs again`);
-};
+/**
+ * Cross-shard calls one merge run makes before it queues the next: each is a Worker subrequest, and the Free plan allows
+ * 50 per invocation, some of which the run's own queue and shard calls take.
+ */
+export const MERGE_CALLS_PER_RUN = 40;
 
 /**
- * Clear `table` on the guest's shard a page at a time. Each page is imported again before it is deleted, so a row
- * written or edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted.
- * `true` once the table is empty of the guest's rows, `false` when the round cap stopped it.
+ * Runs one merge may take before it gives up and fails, keeping the guest and every row not yet moved. At
+ * {@link MERGE_CALLS_PER_RUN} calls a run, that copies and clears at least 4,000 rows of an audited table (16 a page,
+ * five calls a page) and 25,000 of any other; a guest has far fewer.
  */
-const clearTable = async (call: ShardCall, references: MergeReferences, table: string, from: string, to: string): Promise<boolean> => {
-    for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-        const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
-            references.listClear,
-            KEEP_NEW_USERS.has(table) ? { ownedBy: from, table } : { table },
+export const MAX_MERGE_RUNS = 1000;
+
+/** The merge's steps, in order. */
+export type MergePhase = "clear" | "copy" | "follows" | "global" | "guest" | "markers";
+
+/** Where a merge run stopped, for the next run to start from: the step, its table and that table's copy cursor. */
+export interface MergeProgress {
+    cursor: string | null;
+    moved: number;
+    phase: MergePhase;
+    /** Runs taken so far. */
+    run: number;
+    /** The table the copy or the clear stopped in; another phase ignores it. */
+    table: string;
+}
+
+/** A run's position and what it may still spend: {@link MergeProgress} while it runs. */
+interface MergeState {
+    calls: number;
+    cursor: string | null;
+    index: number;
+    moved: number;
+    phase: MergePhase;
+}
+
+interface MergeContext {
+    call: ShardCall;
+    from: string;
+    references: MergeReferences;
+    tables: string[];
+    to: string;
+}
+
+/** The most cross-shard calls one step of each phase makes: a run stops before a step it could not finish. */
+const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 1, guest: 1, markers: 1 };
+
+/** Moves `state` to the first table of `phase`. */
+const enter = (state: MergeState, phase: MergePhase): void => {
+    state.phase = phase;
+    state.index = 0;
+    state.cursor = null;
+};
+
+/** Moves `state` past its table, and on to `phase` after the last one, so a run never stops between them. */
+const nextTable = (state: MergeState, tables: string[], phase: MergePhase): void => {
+    state.index += 1;
+    state.cursor = null;
+
+    if (state.index >= tables.length) {
+        enter(state, phase);
+    }
+};
+
+/** One step of each phase; `true` once the merge is done. */
+const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeState) => Promise<boolean>>> = {
+    // A page of the table: cleared, and read again until the guest's shard holds none of its rows.
+    clear: async ({ call, from, references, tables, to }, state) => {
+        const table = tables[state.index];
+
+        if (table === undefined) {
+            enter(state, "global");
+
+            return false;
+        }
+
+        state.calls -= 1;
+
+        if (await clearPage(call, references, table, from, to)) {
+            state.calls -= 2;
+        } else {
+            nextTable(state, tables, "global");
+        }
+
+        return false;
+    },
+    // A page of the table from the cursor, imported on the new shard.
+    copy: async ({ call, from, references, tables, to }, state) => {
+        const table = tables[state.index];
+
+        if (table === undefined) {
+            enter(state, "clear");
+
+            return false;
+        }
+
+        state.calls -= 1;
+        const page: { continueCursor: string | null; isDone: boolean; page: Record<string, unknown>[] } = await call(
+            references.list,
+            { cursor: state.cursor, table },
             from,
         );
 
-        if (rows.length === 0) {
-            return true;
+        if (page.page.length > 0) {
+            state.calls -= 1;
+            await call(references.importRows, { from, rows: page.page, table, to }, to);
+            state.moved += page.page.length;
         }
 
-        const { present }: { present: string[] } = await call(references.importRows, { from, rows, table, to }, to);
-        const confirmed = new Set(present);
-        const deletable = rows
-            .map((row, index) => {
-                return { digest: digests[index]!, id: row._id as string };
-            })
-            .filter(({ id }) => confirmed.has(id));
-
-        if (deletable.length > 0) {
-            await call(references.deleteRows, { rows: deletable, table }, from);
+        if (page.isDone || page.continueCursor === null) {
+            nextTable(state, tables, "clear");
+        } else {
+            state.cursor = page.continueCursor;
         }
 
-        if (deletable.length < rows.length) {
-            throw new Error(`the new shard of ${to} did not confirm ${String(rows.length - deletable.length)} ${table} rows of guest ${from}; they stay`);
-        }
-    }
+        return false;
+    },
+    follows: async ({ call, from, references, to }, state) => {
+        state.calls -= 1;
+        const page: { hasMore: boolean; moved: number } = await call(references.reassignFollows, { from, to }, to);
 
-    return false;
+        state.moved += page.moved;
+
+        if (!page.hasMore) {
+            enter(state, "guest");
+        }
+
+        return false;
+    },
+    // Each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
+    global: async ({ call, from, references, to }, state) => {
+        state.calls -= 1;
+        const { done }: { done: boolean } = await call(references.reassignGlobal, { from, to }, to);
+
+        if (done) {
+            enter(state, "follows");
+        }
+
+        return false;
+    },
+    // Only now: every table was copied, then cleared to empty, so nothing of the guest's is left to move.
+    guest: async ({ call, from, references }, state) => {
+        state.calls -= 1;
+        const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
+
+        // A follow written under the guest's id after the last page: move it, then try again.
+        enter(state, result.followsRemain === true ? "follows" : "markers");
+
+        return false;
+    },
+    markers: async ({ call, from, references, to }, state) => {
+        state.calls -= 1;
+        const { hasMore }: { hasMore: boolean } = await call(references.dropMarkers, { from }, to);
+
+        return !hasMore;
+    },
 };
 
 /**
- * Move everything of guest `from` to user `to`. Runs where a shard client is
- * available (the better-auth link hook in `auth.ts`).
+ * Run the merge of guest `from` into user `to` from `resume` (from the start without it), for at most `budget`
+ * cross-shard calls. `next` is where it stopped, for the next run, or `null` once the merge is done: every table
+ * copied, then cleared, the global rows and follows moved, the guest deleted and the import markers dropped. Throws past
+ * `maxRuns`, so a merge that cannot finish fails with the guest and its remaining rows kept.
  */
-export const mergeGuestInto = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<{ moved: number }> => {
-    let moved = 0;
+export const mergeGuestInto = async (
+    call: ShardCall,
+    references: MergeReferences,
+    from: string,
+    to: string,
+    { budget = MERGE_CALLS_PER_RUN, maxRuns = MAX_MERGE_RUNS, resume }: { budget?: number; maxRuns?: number; resume?: MergeProgress } = {},
+): Promise<{ moved: number; next: MergeProgress | null }> => {
+    const run = resume?.run ?? 0;
+
+    if (run >= maxRuns) {
+        throw new Error(`the merge of guest ${from} into ${to} did not finish in ${String(maxRuns)} runs; the guest and its rows stay`);
+    }
+
     const tables = shardLocalTables();
+    // A table no longer in the schema (a deploy between runs): its phase starts over, which is safe for both.
+    const index = resume === undefined ? 0 : Math.max(0, tables.indexOf(resume.table));
+    const state: MergeState = {
+        calls: budget,
+        cursor: resume !== undefined && tables[index] === resume.table ? resume.cursor : null,
+        index,
+        moved: resume?.moved ?? 0,
+        phase: resume?.phase ?? "copy",
+    };
+    const context: MergeContext = { call, from, references, tables, to };
 
-    // Copy everything first.
-    for (const table of tables) {
-        moved += await copyTable(call, references, table, from, to);
-    }
-
-    // Then clear the guest's shard, copying each page again as it goes.
-    let drained = true;
-
-    for (const table of tables) {
-        drained = (await clearTable(call, references, table, from, to)) && drained;
-    }
-
-    // In batches: each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
-    for (;;) {
-        const { done } = await call<{ done: boolean }>(references.reassignGlobal, { from, to }, to);
-
-        if (done) {
-            break;
+    while (state.calls >= STEP_CALLS[state.phase]) {
+        if (await STEPS[state.phase](context, state)) {
+            return { moved: state.moved, next: null };
         }
     }
 
-    const follows = await moveThreadFollows(call, references, from, to);
-
-    moved += follows.moved;
-
-    // Stopped by the round cap with follow rows left: fail the job, so its redelivery moves the rest and deletes the guest.
-    if (!follows.drained) {
-        throw new Error(`guest ${from} still has thread follows past the merge's round cap; the merge into ${to} runs again`);
-    }
-
-    // Only once nothing of the guest's is left to move: a later run still needs to find it otherwise.
-    if (drained) {
-        const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
-
-        // A follow written under the guest's id after the last page: fail the job, so its redelivery moves it.
-        if (result.followsRemain === true) {
-            throw new Error(`guest ${from} still has thread follows; the merge into ${to} runs again`);
-        }
-    }
-
-    return { moved };
+    return {
+        moved: state.moved,
+        next: { cursor: state.cursor, moved: state.moved, phase: state.phase, run: run + 1, table: tables[state.index] ?? "" },
+    };
 };
 
-/** A guard against a page that never drains. A guest has far fewer rows than this. */
-const MAX_ROUNDS_PER_TABLE = 1000;
+/**
+ * Clear one page of `table` on the guest's shard: the page is imported again before it is deleted, so a row written or
+ * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. `false`
+ * when the table holds none of the guest's rows any more (one call), `true` after a page (three calls).
+ */
+const clearPage = async (call: ShardCall, references: MergeReferences, table: string, from: string, to: string): Promise<boolean> => {
+    const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
+        references.listClear,
+        KEEP_NEW_USERS.has(table) ? { ownedBy: from, table } : { table },
+        from,
+    );
+
+    if (rows.length === 0) {
+        return false;
+    }
+
+    const { present }: { present: string[] } = await call(references.importRows, { from, rows, table, to }, to);
+    const confirmed = new Set(present);
+    const deletable = rows
+        .map((row, index) => {
+            return { digest: digests[index]!, id: row._id as string };
+        })
+        .filter(({ id }) => confirmed.has(id));
+
+    if (deletable.length > 0) {
+        await call(references.deleteRows, { rows: deletable, table }, from);
+    }
+
+    if (deletable.length < rows.length) {
+        throw new Error(`the new shard of ${to} did not confirm ${String(rows.length - deletable.length)} ${table} rows of guest ${from}; they stay`);
+    }
+
+    return true;
+};
 
 /** The generated references `mergeGuestInto` calls (passed in, so this module does not import `_generated/api`). */
 export interface MergeReferences {
     deleteGuest: { __lunoraRef: string };
     deleteRows: { __lunoraRef: string };
+    dropMarkers: { __lunoraRef: string };
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listClear: { __lunoraRef: string };
@@ -524,19 +754,34 @@ export interface MergeReferences {
 }
 
 /**
- * The move, as a queue job on the NEW user's shard (`auth.ts` enqueues it).
+ * The move, as queue jobs on the NEW user's shard (`auth.ts` enqueues the first).
  * Off the sign-up request: a guest's rows are one round trip per table and
- * page, far too long to hold the request that creates the account. Redelivery
- * is safe — see the module comment.
+ * page, far too long to hold the request that creates the account. Each run
+ * makes at most {@link MERGE_CALLS_PER_RUN} cross-shard calls and queues the
+ * next with where it stopped, before it returns: a run is acknowledged only
+ * once its successor is queued or the merge is done. Redelivery is safe — see
+ * the module comment.
  */
 export const runGuestMerge = internalAction
-    .input({ from: v.string(), to: v.string() })
-    .output(v.object({ moved: v.number() }))
+    .input({
+        from: v.string(),
+        resume: v.optional(
+            v.object({
+                cursor: v.union(v.string(), v.null()),
+                moved: v.number(),
+                phase: v.union(v.literal("clear"), v.literal("copy"), v.literal("follows"), v.literal("global"), v.literal("guest"), v.literal("markers")),
+                run: v.number(),
+                table: v.string(),
+            }),
+        ),
+        to: v.string(),
+    })
+    .output(v.object({ done: v.boolean(), moved: v.number() }))
     .action(async ({ args, ctx: context }) => {
         // The guest's pins on other owners' threads move to the new account on each owner's shard first, while their routes still name the
         // guest; the routes move with the guest's global rows below. Each move is idempotent, so a redelivery repeats it safely.
         let cursor: string | null = null;
-        let isDone = false;
+        let isDone = args.resume !== undefined;
 
         while (!isDone) {
             const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await context.runQuery(
@@ -563,11 +808,12 @@ export const runGuestMerge = internalAction
             cursor = routes.continueCursor;
         }
 
-        const result = await mergeGuestInto(
+        const { moved, next } = await mergeGuestInto(
             async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
             {
                 deleteGuest: internal.auth.hooks.deleteMergedGuest,
                 deleteRows: internal.lib.account_merge.deleteShardRows,
+                dropMarkers: internal.lib.account_merge.dropImportMarkersPage,
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,
                 listClear: internal.lib.account_merge.listShardRowsToClear,
@@ -576,9 +822,17 @@ export const runGuestMerge = internalAction
             },
             args.from,
             args.to,
+            args.resume === undefined ? {} : { resume: args.resume },
         );
 
-        authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
+        if (next !== null) {
+            // Queued before this run returns: should the send fail, the run fails and its redelivery repeats it.
+            await enqueueJob(internal.lib.account_merge.runGuestMerge, { from: args.from, resume: next, to: args.to }, { shardKey: args.to });
 
-        return result;
+            return { done: false, moved };
+        }
+
+        authLogger.info(`[auth] moved ${String(moved)} rows from guest ${args.from} to ${args.to}`);
+
+        return { done: true, moved };
     });
