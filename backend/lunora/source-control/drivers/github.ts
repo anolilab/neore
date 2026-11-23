@@ -711,7 +711,7 @@ const submittedReviewSchema = z.object({
     id: z.number(),
     state: z.string(),
     submitted_at: z.string().nullable().optional(),
-    user: z.object({ login: z.string() }).nullable().optional(),
+    user: z.object({ id: z.number().optional(), login: z.string() }).nullable().optional(),
 });
 
 const REVIEW_STATES: Record<string, ReviewState> = {
@@ -782,6 +782,7 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
         return [
             {
                 ...(review.data.author_association !== undefined && { authorAssociation: review.data.author_association }),
+                ...(review.data.user?.id !== undefined && { authorId: String(review.data.user.id) }),
                 authorLogin: review.data.user?.login ?? "",
                 body: (review.data.body ?? "").slice(0, REVIEW_BODY_MAX_CHARS),
                 id: String(review.data.id),

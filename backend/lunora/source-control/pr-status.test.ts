@@ -47,6 +47,25 @@ describe(changeRequestsOf, () => {
 
         expect(changeRequestsOf(reviews).map((request) => request.authorLogin)).toStrictEqual(["ann", "own", "col"]);
     });
+
+    it.each([
+        ["approve, then request changes", ["changes_requested", "approved"] as const],
+        ["request changes, then approve", ["approved", "changes_requested"] as const],
+    ])("keeps a change request from a deleted account beside another deleted account's review (%s)", (_, states) => {
+        // Newest first; neither review names its reviewer.
+        const reviews = states.map((state) => review("", state, state === "changes_requested" ? "Rename it." : "", "MEMBER"));
+
+        expect(changeRequestsOf(reviews)).toStrictEqual([{ authorLogin: "ghost", body: "Rename it.", bodyTruncated: false }]);
+    });
+
+    it("follows a reviewer by the host's id across a renamed login", () => {
+        const reviews: PullRequestReview[] = [
+            { ...review("ann-renamed", "approved", "", "MEMBER"), authorId: "42" },
+            { ...review("ann", "changes_requested", "Rename it.", "MEMBER"), authorId: "42" },
+        ];
+
+        expect(changeRequestsOf(reviews)).toStrictEqual([]);
+    });
 });
 
 describe(failingCheckNamesOf, () => {

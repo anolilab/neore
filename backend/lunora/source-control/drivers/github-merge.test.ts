@@ -674,6 +674,22 @@ describe("the review count", () => {
             ["fine", "MEMBER"],
         ]);
     });
+
+    it("hands over the reviewer's id, and no name for a deleted account", async () => {
+        const at = "2026-01-01T00:00:00Z";
+        const request: HostRequest = async () =>
+            Response.json([
+                { body: "a", id: 10, state: "APPROVED", submitted_at: at, user: { id: 42, login: "ann" } },
+                { body: "b", id: 11, state: "CHANGES_REQUESTED", submitted_at: at, user: null },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.items.map((review) => [review.authorId, review.authorLogin])).toStrictEqual([
+            [undefined, ""],
+            ["42", "ann"],
+        ]);
+    });
 });
 
 describe("a check log read inside a time budget", () => {

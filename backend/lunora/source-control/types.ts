@@ -231,6 +231,9 @@ export type ReviewState = "approved" | "changes_requested" | "commented" | "dism
 export interface PullRequestReview {
     /** The reviewer's standing on the repository as the host names it (`OWNER`, `MEMBER`, `COLLABORATOR`, ...), when it says. */
     authorAssociation?: string;
+    /** The host's stable id for the reviewer, when it names one: a login can change hands, an id does not. */
+    authorId?: string;
+    /** Empty when the host names no reviewer (a deleted account). */
     authorLogin: string;
     body: string;
     id: string;

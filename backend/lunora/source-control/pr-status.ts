@@ -35,6 +35,21 @@ export interface ChangeRequest {
  */
 const BLOCKING_REVIEWERS = new Set(["COLLABORATOR", "MEMBER", "OWNER"]);
 
+/** How a deleted account is shown, as the host itself shows it. */
+const UNNAMED_REVIEWER = "ghost";
+
+/**
+ * Who a review speaks for: the host's id when it names one, else the login. A review with neither (a deleted account)
+ * speaks only for itself, so another unnamed review can never supersede its verdict.
+ */
+const reviewerKeyOf = (review: PullRequestReview): string => {
+    if (review.authorId !== undefined) {
+        return `id:${review.authorId}`;
+    }
+
+    return review.authorLogin === "" ? `review:${review.id}` : `login:${review.authorLogin}`;
+};
+
 /**
  * The reviewers whose latest verdict asks for changes. `reviews` is newest first; a comment-only review keeps the
  * verdict before it, and a later approval or a dismissal ends it. A review from someone without a standing on the
@@ -45,21 +60,23 @@ export const changeRequestsOf = (reviews: ReadonlyArray<PullRequestReview>): Cha
     const requests: ChangeRequest[] = [];
 
     for (const review of reviews) {
+        const reviewer = reviewerKeyOf(review);
+
         if (
-            decided.has(review.authorLogin) ||
+            decided.has(reviewer) ||
             (review.authorAssociation !== undefined && !BLOCKING_REVIEWERS.has(review.authorAssociation)) ||
             (review.state !== "approved" && review.state !== "changes_requested" && review.state !== "dismissed")
         ) {
             continue;
         }
 
-        decided.add(review.authorLogin);
+        decided.add(reviewer);
 
         if (review.state === "changes_requested") {
             const truncated = review.body.length > STATUS_REVIEW_BODY_MAX_CHARS;
 
             requests.push({
-                authorLogin: review.authorLogin,
+                authorLogin: review.authorLogin === "" ? UNNAMED_REVIEWER : review.authorLogin,
                 body: truncated ? review.body.slice(0, STATUS_REVIEW_BODY_MAX_CHARS) : review.body,
                 bodyTruncated: truncated,
             });
