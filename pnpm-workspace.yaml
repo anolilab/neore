@@ -510,6 +510,7 @@ catalogs:
     facehash: 0.1.0
     input-otp: 1.5.0
     next-themes: 0.4.6
+    open-bot-avatar: 0.3.1
     react-resizable-panels: 4.24.1
     shadcn: 4.23.0
     sonner: 2.0.8
@@ -537,6 +538,7 @@ catalogs:
     mediabunny: 1.66.2
     my-ua-parser: ^2.0.4
     nanoid: 6.0.2
+    parse5: 8.1.0
     pptxgenjs: 4.0.1
     react-hotkeys-hook: 5.4.0
     react-qr-code: 2.2.0
@@ -563,6 +565,9 @@ minimumReleaseAgeExclude:
   - "@visulima/*"
   - "@lunora/*"
   - "lunorash"
+  # Approved by the repo owner: open-bot-avatar 0.3.1 was published 2026-11-22 and its trust check fails.
+  # Its provenance matches 0.3.0 (same repo, workflow and ref). Only 0.3.1 is excepted; remove the entry once it passes on its own.
+  - "open-bot-avatar@0.3.1"
 
 # pnpm 11 replaced onlyBuiltDependencies with this map (true = may run its
 # build scripts). `strictDepBuilds` is on by default since 11, so a NEW
@@ -910,6 +915,8 @@ trustPolicy: no-downgrade
 # every install.
 trustPolicyExclude:
   - xlsx
+  # See the note on open-bot-avatar in minimumReleaseAgeExclude.
+  - open-bot-avatar@0.3.1
 
 trustPolicyIgnoreAfter: 1440
 patchedDependencies:

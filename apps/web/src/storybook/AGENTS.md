@@ -26,6 +26,8 @@ from the root (the vis target `test:storybook`); CI runs it, and the preview dep
   `parameters.persona`. A loader waits until better-auth's session holds it (`settleSession`).
 - A `play` that edits must wait for the data the edit builds on: `await lunoraAnswered(api.x.y.fn)`. axe runs after
   the mock backend has gone quiet (`lunoraIdle`), so it sees the page with its data.
+- Click a button that starts disabled through `await pressable(canvas, name)` (`play.ts`): `lunoraAnswered` marks the
+  answer before the page has rendered it, and a disabled button has `pointer-events: none`, so the click throws.
 - The clock is pinned to `STORY_NOW` (5 Nov 2026, 12:00 UTC); `parameters.now` moves it.
 - Server-only modules are swapped by `.storybook/vite.config.ts` (`@tanstack/react-start`, `lib/auth/server-functions`,
   `lib/posthog/client-state`, `next-themes` → `.storybook/mocks/`). Add one there when a story pulls in Start's server

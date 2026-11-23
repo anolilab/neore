@@ -38,7 +38,7 @@ import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
 import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
-import { changesPersonalization } from "./lib/personalization";
+import { changesPersonalization, PERSONALIZATION_FIELDS } from "./lib/personalization";
 import { isValidShortcut } from "./lib/shortcut";
 import { roleConfigRefusal } from "../sub-agents/role-settings";
 import { withRole } from "../sub-agents/roles";
@@ -1022,6 +1022,49 @@ export const setSubAgentRole = authMutation
         }
 
         ctx.log.event("auth.set_sub_agent_role", { cleared: config === null, role });
+
+        return null;
+    });
+
+/**
+ * The user's review of personalization an admin wrote while acting as them: "Keep as mine" drops
+ * `personalizationByImpersonator`, so it counts as their own words again (`auth/lib/personalization.ts`). An own edit
+ * never clears the mark; only this does, and never from an impersonated session.
+ */
+export const keepPersonalization = authMutation
+    .use(rateLimit("settings/update"))
+    // Every personalization field as the user reviewed it (absent = empty): one changed since is refused, never kept unseen.
+    .input({
+        seen: v.object({
+            aboutMe: v.optional(v.string().max(MAX_LENGTH.document)),
+            customInstructions: v.optional(v.string().max(MAX_LENGTH.document)),
+            language: v.optional(v.string().max(MAX_LENGTH.document)),
+            location: v.optional(v.string().max(MAX_LENGTH.document)),
+            nickname: v.optional(v.string().max(MAX_LENGTH.document)),
+            profession: v.optional(v.string().max(MAX_LENGTH.document)),
+        }),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { seen }, ctx }) => {
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "Personalization cannot be kept as the user's while impersonating");
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        if (
+            changesPersonalization(settings as Record<string, unknown> | null, Object.fromEntries(PERSONALIZATION_FIELDS.map((field) => [field, seen[field]])))
+        ) {
+            throw new LunoraError("CONFLICT", "Your personalization changed since you looked at it. Review it again.");
+        }
+
+        if (settings?.personalizationByImpersonator) {
+            await patchRow(ctx.db, "userSettings", settings, { personalizationByImpersonator: undefined });
+            ctx.log.event("auth.keep_personalization", {});
+        }
 
         return null;
     });

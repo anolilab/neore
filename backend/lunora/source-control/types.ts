@@ -62,6 +62,8 @@ export interface PullRequestDetail extends PullRequestRef {
     draft: boolean;
     headBranch: string;
     headSha: string;
+    /** Whether it merges cleanly, when the host says so on this same read (`unknown` while the host still works it out). */
+    mergeState?: MergeState;
     state: "closed" | "merged" | "open";
     title: string;
     updatedAt: number;
@@ -227,6 +229,11 @@ export type ReviewState = "approved" | "changes_requested" | "commented" | "dism
 
 /** One submitted review: its verdict and its top-level text. Line comments are in the review threads. */
 export interface PullRequestReview {
+    /** The reviewer's standing on the repository as the host names it (`OWNER`, `MEMBER`, `COLLABORATOR`, ...), when it says. */
+    authorAssociation?: string;
+    /** The host's stable id for the reviewer, when it names one: a login can change hands, an id does not. */
+    authorId?: string;
+    /** Empty when the host names no reviewer (a deleted account). */
     authorLogin: string;
     body: string;
     id: string;

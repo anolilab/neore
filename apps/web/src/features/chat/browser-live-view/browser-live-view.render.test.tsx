@@ -17,6 +17,10 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+vi.mock("@/lib/env", () => {
+    return { default: { VITE_LUNORA_URL: "https://backend.example.test" } };
+});
+
 const { backend } = vi.hoisted(() => {
     return {
         backend: {
@@ -25,7 +29,7 @@ const { backend } = vi.hoisted(() => {
                 browserId: string;
                 canControl?: boolean;
                 /** `claim`: the lease's claim, `claim-1` when left out; a read that names a claim is told whether it matches. */
-                control?: { byYou: boolean; claim?: string; until: number };
+                control?: { byYou: boolean; claim?: string; claimIds?: string[]; until: number };
                 currentUrl?: string;
                 idleUntil: number;
                 /** The server's clock at the answer; this device's when left out. */
@@ -177,6 +181,7 @@ afterEach(async () => {
     backend.statusReads = 0;
     backend.oneOffReads = 0;
     backend.impersonating = false;
+    Reflect.deleteProperty(navigator, "sendBeacon");
 });
 
 beforeEach(() => {
@@ -914,6 +919,146 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
             expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
             expect(screen.queryByText("Opening the live view…")).toBeNull();
+        });
+
+        it("sends the claim's release token as a beacon when the page closes, which outlives the page", async () => {
+            controllable();
+            const beacon = vi.fn((_url: string | globalThis.URL, _body?: BodyInit | null) => true);
+
+            Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: beacon });
+            const queryClient = mountCard();
+            const until = Date.now() + 120_000;
+
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                claimId: "id-1",
+                connectBy: Date.now() + 60_000,
+                release: "release-1",
+                status: "ok",
+                until,
+                url: CONTROL_URL,
+            });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, until } });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+
+            await act(async () => {
+                globalThis.dispatchEvent(new Event("pagehide"));
+            });
+
+            expect(beacon).toHaveBeenCalledOnce();
+            expect(String(beacon.mock.calls[0]?.[0])).toBe("https://backend.example.test/browser/release");
+            expect(beacon.mock.calls[0]?.[1]).toBe("release-1");
+            // The mutation still goes too: whichever lands first ends the lease, the other changes nothing.
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it("closes the interactive view as soon as the status names another tab's claim, without handing it back", async () => {
+            controllable();
+            const queryClient = mountCard();
+            const until = Date.now() + 120_000;
+
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", claimId: "id-1", connectBy: Date.now() + 60_000, status: "ok", until, url: CONTROL_URL });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-1"], until } });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            // The person took control in another tab: the lease is theirs still, under that tab's claim.
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-2"], until } });
+
+            expect(await screen.findByText("You no longer have control of the browser.")).toBeTruthy();
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(backend.keep).not.toHaveBeenCalled();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("keeps control when a status older than its claim names another, or its own renewal's claim is named first", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const until = Date.now() + 90_000;
+            const renewal: ((value: unknown) => void)[] = [];
+
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", claimId: "id-1", connectBy: Date.now() + 60_000, status: "ok", until, url: CONTROL_URL });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-1"], until } });
+            await screen.findByTitle(CONTROL_VIEW);
+            // A status read before this tab's claim was written says nothing about it.
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-0"], until }, now: Date.now() - 10_000 });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        renewal.push(resolve);
+                    }),
+            );
+            // The URL never connected: its renewal is minted, and the server names the new claim before it answers.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+            expect(backend.take).toHaveBeenCalledTimes(2);
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-2"], until: Date.now() + 120_000 }, now: Date.now() });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(10);
+            });
+            // The renewal is still being minted: this tab's view stays, waiting for its answer.
+            expect(screen.queryByText("You no longer have control of the browser.")).toBeNull();
+
+            await act(async () => {
+                renewal[0]?.({ claim: "claim-2", claimId: "id-2", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: OTHER_URL });
+            });
+            expect(frameSource()).toBe(OTHER_URL);
+            expect(screen.queryByText("You no longer have control of the browser.")).toBeNull();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("sends a hand back beacon when the page closes while the person's own hand back is out", async () => {
+            controllable();
+            const beacon = vi.fn((_url: string | globalThis.URL, _body?: BodyInit | null) => true);
+
+            Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: beacon });
+            const handedBack: ((value: boolean) => void)[] = [];
+
+            backend.handBack.mockImplementation(
+                async () =>
+                    await new Promise((resolve) => {
+                        handedBack.push(resolve);
+                    }),
+            );
+            const queryClient = mountCard();
+            const until = Date.now() + 120_000;
+
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                claimId: "id-1",
+                connectBy: Date.now() + 60_000,
+                release: "release-1",
+                status: "ok",
+                until,
+                url: CONTROL_URL,
+            });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, until } });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+
+            await act(async () => {
+                globalThis.dispatchEvent(new Event("pagehide"));
+            });
+
+            // The close may cut the hand back's mutation off: the beacon outlives the page, and says it was handed back.
+            expect(beacon).toHaveBeenCalledOnce();
+            expect(beacon.mock.calls[0]?.[1]).toBe("release-1\nhanded_back");
+            // The page's own leave says so too, so neither request that lands first tells the agent the person left.
+            expect(backend.handBack.mock.calls.map(([args]) => args.reason)).toEqual(["handed_back", "handed_back"]);
+
+            await act(async () => {
+                for (const resolve of handedBack) {
+                    resolve(true);
+                }
+            });
         });
 
         it("ignores a page answer that comes back after control moved on to a new lease", async () => {

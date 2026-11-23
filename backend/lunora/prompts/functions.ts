@@ -1317,17 +1317,26 @@ export const applyThreadVariablesToPrompt = authQuery
  */
 export const getUserVariableDefaults = authQuery
     .input({})
-    .output(v.object({ organizationId: v.optional(v.string()), userId: v.string(), variables: v.array(v.object({ name: v.string(), value: v.string() })) }))
+    .output(
+        v.object({
+            // The shown values an admin wrote while acting as a user (`markedNames`) that the caller may keep as theirs, and the
+            // `keepVariableValue` scope that does it.
+            impersonated: v.array(v.object({ name: v.string(), scope: v.union(v.literal("user"), v.literal("organization")) })),
+            organizationId: v.optional(v.string()),
+            userId: v.string(),
+            variables: v.array(v.object({ name: v.string(), value: v.string() })),
+        }),
+    )
     .query(async ({ ctx }) => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
         // Get user defaults
-        const userDefaults = await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } });
+        const userDefaults = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }));
 
         // Get organization defaults if applicable
         const orgDefaults = organizationId
-            ? await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } })
+            ? storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId } }))
             : null;
 
         // Merge: user defaults override org defaults
@@ -1351,7 +1360,27 @@ export const getUserVariableDefaults = authQuery
             }
         }
 
+        const role = ctx.user.activeOrganization?.role;
+        const keepsOrganization = role === "owner" || role === "admin";
+
         return {
+            // Each shown value's mark, from the row it was shown from: a user's own value hides the organization's.
+            // A row found by `userId` can be an organization's row the caller created: never theirs to keep, so its marks are
+            // reported only when it is the active organization's row, and then, as `keepVariableValue` allows, to its
+            // owners and admins only, with `scope: "organization"`.
+            impersonated: mergedVariables.flatMap(({ name }): { name: string; scope: "organization" | "user" }[] => {
+                const source = seen.has(name) ? userDefaults : orgDefaults;
+
+                if (!source || !isMarked(source, name)) {
+                    return [];
+                }
+
+                if (source.organizationId === undefined) {
+                    return [{ name, scope: "user" }];
+                }
+
+                return keepsOrganization && source._id === orgDefaults?._id ? [{ name, scope: "organization" }] : [];
+            }),
             organizationId,
             userId,
             variables: mergedVariables,
@@ -1379,6 +1408,7 @@ export const setUserVariableDefaults = authMutation
                 ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
+                writeId: crypto.randomUUID(),
             });
 
             ctx.log.event("prompts.set_user_variable_defaults", { created: false, variableCount: variables.length });
@@ -1392,6 +1422,7 @@ export const setUserVariableDefaults = authMutation
             updatedAt: now,
             userId,
             variables,
+            writeId: crypto.randomUUID(),
         });
 
         ctx.log.event("prompts.set_user_variable_defaults", { created: true, variableCount: variables.length });
@@ -1436,6 +1467,7 @@ export const setOrganizationVariableDefaults = authMutation
                 ...markedNames(ctx.user, existing, variables),
                 updatedAt: now,
                 variables,
+                writeId: crypto.randomUUID(),
             });
 
             ctx.log.event("prompts.set_organization_variable_defaults", { created: false, organizationId, variableCount: variables.length });
@@ -1450,11 +1482,153 @@ export const setOrganizationVariableDefaults = authMutation
             updatedAt: now,
             userId,
             variables,
+            writeId: crypto.randomUUID(),
         });
 
         ctx.log.event("prompts.set_organization_variable_defaults", { created: true, organizationId, variableCount: variables.length });
 
         return id;
+    });
+
+/** A variables row without the mark on `name`, as a patch for `patchRow` (no marks left removes the field). */
+const withoutMark = (marks: string[], name: string): { variablesByImpersonator: string[] | undefined } => {
+    const kept = marks.filter((marked) => marked !== name);
+
+    return { variablesByImpersonator: kept.length > 0 ? kept : undefined };
+};
+
+/**
+ * Refuses a review of a value that is no longer the one the owner saw (an admin still acting as them changed it). With a
+ * name listed twice, the last entry is the one filled in (`getResolvedVariables`, `markedNames`), so that is the one compared.
+ */
+const assertSeenValue = (row: { variables: { name: string; value: string }[] }, name: string, value: string): void => {
+    if (row.variables.findLast((variable) => variable.name === name)?.value !== value) {
+        throw new LunoraError("CONFLICT", "This value changed since you looked at it. Review it again.");
+    }
+};
+
+/**
+ * Drops the mark on `name` from a defaults row checked a moment ago. The row is `.global()`, so another write (an admin
+ * setting the organization's defaults) can land between that read and this write: it is written only while it is still
+ * the row checked (`patchIf` on `writeId`, which every write replaces; `updatedAt` can repeat within a millisecond),
+ * else CONFLICT. Only the marks column is written (an empty list for none), never the whole row, so a value written
+ * meanwhile is never undone.
+ */
+export const clearDefaultsMark = async (
+    db: Pick<MutationContext["db"], "patchIf">,
+    row: { _id: Id<"userVariableDefaults">; variablesByImpersonator?: string[]; writeId?: string },
+    name: string,
+    now: number,
+): Promise<void> => {
+    const { applied } = await db.patchIf("userVariableDefaults", row._id, {
+        patch: {
+            updatedAt: now,
+            variablesByImpersonator: (row.variablesByImpersonator ?? []).filter((marked) => marked !== name),
+            writeId: crypto.randomUUID(),
+        },
+        where: { writeId: row.writeId ?? null },
+    });
+
+    if (!applied) {
+        throw new LunoraError("CONFLICT", "This value changed since you looked at it. Review it again.");
+    }
+};
+
+/** `keepVariableValue` on a chat's row: the row's owner only, past the chat's lock. Whether a mark was cleared. */
+const keepThreadValue = async (
+    ctx: MutationContext,
+    { name, threadId, unlockProof, userId, value }: { name: string; threadId: Id<"threads">; unlockProof: string | undefined; userId: string; value: string },
+): Promise<boolean> => {
+    const row = await ctx.db
+        .query("threadVariables")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .first();
+
+    if (!row || row.userId !== userId) {
+        throw new LunoraError("NOT_FOUND", "Variables not found");
+    }
+
+    if (await isLockedWithoutProof(ctx, threadId, unlockProof)) {
+        throwThreadLocked();
+    }
+
+    if (!isMarked(row, name)) {
+        return false;
+    }
+
+    assertSeenValue(row, name, value);
+    await patchRow(ctx.db, "threadVariables", row, withoutMark(row.variablesByImpersonator ?? [], name));
+
+    return true;
+};
+
+/**
+ * The owner's review of one variable value an admin wrote while acting as them: "Keep as mine" drops that one name from
+ * the row's `variablesByImpersonator` (`markedNames`), so `getResolvedVariables` reports it as the row's own again. A
+ * user's own defaults, an organization's (whoever may set them: its owners and admins) or a chat's (the row's owner,
+ * past the chat's lock). An own edit never clears a mark; only this does, and never from an impersonated session.
+ */
+export const keepVariableValue = authMutation
+    .use(rateLimit("prompts/update"))
+    .input({
+        name: v.string().max(MAX_LENGTH.short),
+        scope: v.union(v.literal("user"), v.literal("organization"), v.literal("thread")),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        // The value the owner reviewed: one changed since is refused, never kept unseen.
+        value: v.string().max(MAX_LENGTH.document),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { name, scope, threadId, unlockProof, value }, ctx }) => {
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "A variable value cannot be kept as the user's while impersonating");
+        }
+
+        const { userId } = ctx.user;
+
+        if (scope === "thread") {
+            if (!threadId) {
+                throw new LunoraError("BAD_REQUEST", "A chat's variable needs its thread");
+            }
+
+            if (await keepThreadValue(ctx, { name, threadId, unlockProof, userId, value })) {
+                ctx.log.event("prompts.keep_variable_value", { scope, threadId });
+            }
+
+            return null;
+        }
+
+        const organization = ctx.user.activeOrganization;
+        let row: StoredRow<Doc<"userVariableDefaults">> | null;
+
+        if (scope === "organization") {
+            // As `setOrganizationVariableDefaults`: only those who may set the organization's defaults review them.
+            if (!organization || (organization.role !== "owner" && organization.role !== "admin")) {
+                throw new LunoraError("FORBIDDEN", "Only organization admins can review organization variable defaults");
+            }
+
+            row = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { organizationId: organization.id } }));
+        } else {
+            const own = storedRow(await ctx.db.userVariableDefaults.findFirst({ orderBy: USER_DEFAULTS_INDEX_ORDER, where: { userId } }));
+
+            // An organization's row names the member who created it: never theirs to review as their own.
+            row = own?.organizationId === undefined ? own : null;
+        }
+
+        if (!row) {
+            throw new LunoraError("NOT_FOUND", "Variables not found");
+        }
+
+        // Already kept (a second click, another tab): nothing left to clear.
+        if (!isMarked(row, name)) {
+            return null;
+        }
+
+        assertSeenValue(row, name, value);
+        await clearDefaultsMark(ctx.db, row, name, ctx.now);
+        ctx.log.event("prompts.keep_variable_value", { scope });
+
+        return null;
     });
 
 /**

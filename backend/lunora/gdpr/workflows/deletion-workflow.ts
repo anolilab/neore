@@ -170,6 +170,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             requestId: args.requestId,
         });
 
+        // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
+        await context.step.do(
+            "erase-pins-on-owner-shards",
+            async () =>
+                await context.run(
+                    internal.gdpr.steps.erasePinsOnOwnerShards,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
+                ),
+        );
+
         await context.step.do(
             "delete-user-thread-metadata",
             async () =>
@@ -179,6 +190,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                         userId: args.userId,
                     },
                     { dedupId: stepDedupId(scope, "delete-user-thread-metadata") },
+                ),
+        );
+
+        // The routes go only after the owner-shard sweep above, one batch per step, until none is left.
+        await drain(
+            "delete-user-shared-pin-routes",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserSharedPinRoutes,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-shared-pin-routes", round) },
                 ),
         );
 
@@ -659,6 +681,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
 
         // Writes made while the export was live are removed as well.
         await eraseUsage("delete-user-usage-daily-after-purge");
+
+        // Browser pages an export run stored and never cleaned up, killed before its ending (`browser/export-pages.ts`).
+        await context.step.do(
+            "delete-user-browser-export-pages",
+            async () =>
+                await context.run(
+                    internal.browser.gdpr.deleteUserBrowserExportPages,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-browser-export-pages") },
+                ),
+        );
 
         await context.step.do(
             "delete-user-settings",

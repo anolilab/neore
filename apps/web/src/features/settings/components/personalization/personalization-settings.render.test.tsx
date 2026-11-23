@@ -5,7 +5,7 @@
  * queued writes belongs to `updateLatest` and is covered in `use-user-settings.test.tsx`.
  */
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PersonalizationSettings from "./personalization-settings";
@@ -14,7 +14,10 @@ const harness = vi.hoisted(() => {
     const store = {
         listeners: new Set<() => void>(),
         pendingSaves: [] as { land: () => void; resolve: () => void; value: string }[],
-        settings: { threadTitleInstructions: undefined as string | undefined } as { threadTitleInstructions?: string } | undefined,
+        keep: vi.fn(async () => null),
+        settings: { threadTitleInstructions: undefined as string | undefined } as
+            | { language?: string; nickname?: string; personalizationByImpersonator?: true; threadTitleInstructions?: string }
+            | undefined,
         userId: "user-1" as string | null,
     };
 
@@ -65,6 +68,36 @@ vi.mock("@/features/chat/prompt-improvement/components/system-prompt-optimizer-d
     return { default: () => null };
 });
 
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonationState: () => "self" };
+});
+
+vi.mock("@/lib/lunora/crpc", () => {
+    return {
+        useCRPC: () => {
+            return {
+                auth: {
+                    functions: {
+                        keepPersonalization: {
+                            mutationOptions: () => {
+                                return { mutationFn: harness.store.keep };
+                            },
+                        },
+                    },
+                },
+            };
+        },
+    };
+});
+
+vi.mock("@tanstack/react-query", () => {
+    return {
+        useMutation: (options: { mutationFn: (args: unknown) => Promise<unknown> }) => {
+            return { mutateAsync: options.mutationFn };
+        },
+    };
+});
+
 vi.mock("./memory-settings", () => {
     return { default: () => null };
 });
@@ -76,6 +109,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", async () => {
     return {
         useUpdateUserSettings: () => {
             return {
+                isPending: false,
                 updateLatest: (build: () => { threadTitleInstructions?: string }) => {
                     const patch = build();
                     // The cache update (`land`) is held back here, so a blur can run before the cache shows the last save.
@@ -115,6 +149,7 @@ describe("PersonalizationSettings thread title instructions", () => {
         harness.store.settings = { threadTitleInstructions: undefined };
         harness.store.pendingSaves = [];
         harness.store.userId = "user-1";
+        harness.store.keep.mockClear();
     });
 
     it("shows the stored value", () => {
@@ -241,5 +276,43 @@ describe("PersonalizationSettings thread title instructions", () => {
         fireEvent.blur(field());
 
         expect(harness.store.pendingSaves.map((save) => save.value)).toEqual(["Short titles"]);
+    });
+
+    it("marks personalization an admin wrote, and keeps it as the person's on request", async () => {
+        harness.store.settings = { language: "German", nickname: "Boss", personalizationByImpersonator: true };
+        render(<PersonalizationSettings />);
+
+        expect(screen.getByText("Changed by an admin")).toBeTruthy();
+        // Set elsewhere, so shown beside the mark: the person sees all they keep.
+        expect(screen.getByText("Language: German")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Keep as mine: Your personalization" }));
+
+        // The stored text goes with the keep, so the server refuses it if an admin changed any field since.
+        await waitFor(() => {
+            expect(harness.store.keep).toHaveBeenCalledWith({ seen: { language: "German", nickname: "Boss" } });
+        });
+    });
+
+    it("holds the keep while a field shows text other than the stored one", () => {
+        harness.store.settings = { nickname: "Boss", personalizationByImpersonator: true };
+        render(<PersonalizationSettings />);
+
+        const keep = () => screen.getByRole("button", { name: "Keep as mine: Your personalization" }) as HTMLButtonElement;
+        const nickname = screen.getByLabelText("Nickname");
+
+        // A draft not saved (a failed save leaves one on screen): the keep would carry the stored "Boss" unseen.
+        fireEvent.change(nickname, { target: { value: "Bossy" } });
+        expect(keep().disabled).toBe(true);
+        expect(screen.getByText("Save or undo your change first.")).toBeTruthy();
+
+        fireEvent.change(nickname, { target: { value: "Boss" } });
+        expect(keep().disabled).toBe(false);
+    });
+
+    it("shows no mark on personalization the person wrote", () => {
+        render(<PersonalizationSettings />);
+
+        expect(screen.queryByText("Changed by an admin")).toBeNull();
     });
 });

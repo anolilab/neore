@@ -44,3 +44,34 @@ export const normalizeSiteOrigin = (input: string): string | null => {
 
     return origin.length <= SITE_ORIGIN_MAX ? origin : null;
 };
+
+/**
+ * The sign-in page `input` names for a login of `origin`, as it is stored: `undefined` for none (empty), `null` when
+ * refused. A full `https://` URL with no username or password whose origin is exactly `origin` (plain string compare, as
+ * everywhere: never a subdomain or another port), kept without its `#fragment`. The coming fill opens only this page.
+ */
+export const normalizeSignInUrl = (input: string, origin: string, maxLength: number): string | null | undefined => {
+    const trimmed = input.trim();
+
+    if (trimmed === "") {
+        return undefined;
+    }
+
+    let url: URL;
+
+    try {
+        url = new URL(trimmed);
+    } catch {
+        return null;
+    }
+
+    // Its own scheme, read here: `example.com:443/login` parses with the scheme `example.com`, which the origin check would
+    // read as a bare host and so as HTTPS. With the scheme https, that check refuses credentials, as for a login's site.
+    if (url.protocol !== "https:" || normalizeSiteOrigin(url.href) !== origin) {
+        return null;
+    }
+
+    url.hash = "";
+
+    return url.href.length <= maxLength ? url.href : null;
+};

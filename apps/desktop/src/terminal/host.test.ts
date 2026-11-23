@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildSync } from "esbuild";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from "vitest";
 
 import type { HostEvent, HostRequest } from "./protocol";
 import type { HostHandle, TerminalSession } from "./session";
@@ -163,6 +163,9 @@ afterAll(() => {
 describe.skipIf(!supported)("terminal host (real pty)", { timeout: windows ? 120_000 : 60_000 }, () => {
     it("starts a shell in the folder and returns what it prints", async () => {
         const folder = mkdtempSync(path.join(tmpdir(), "neore-term-"));
+
+        onTestFinished(() => rmSync(folder, { force: true, recursive: true }));
+
         const run = await open(folder);
 
         run.session.write(`${dialect.describe}${dialect.enter}`);
@@ -172,7 +175,6 @@ describe.skipIf(!supported)("terminal host (real pty)", { timeout: windows ? 120
 
         run.session.kill();
         await waitFor(() => run.exits.length > 0, "the shell to exit");
-        rmSync(folder, { force: true, recursive: true });
     });
 
     it("reports a shell that cannot start, and ends the host", async () => {

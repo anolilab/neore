@@ -151,6 +151,13 @@ export class WsTicketUnavailableError extends LunoraError {
 export const wsTicketUnavailableResponse = (): Response =>
     Response.json({ error: { code: "SERVICE_UNAVAILABLE", message: "Try again shortly" } }, { headers: { "cache-control": "no-store" }, status: 503 });
 
+/**
+ * The 503 for an RPC or socket call whose caller could not be checked (a session or key read that failed). Its code is
+ * one the client's replay retries (`SHARD_UNAVAILABLE`), so a queued write is sent again rather than settled as refused.
+ */
+export const callerUnavailableResponse = (): Response =>
+    Response.json({ error: { code: "SHARD_UNAVAILABLE", message: "Try again shortly" } }, { headers: { "cache-control": "no-store" }, status: 503 });
+
 const readSession = async (database: TicketDatabase, sql: string, values: (number | string)[]): Promise<SessionLiveness> => {
     try {
         const row = await database

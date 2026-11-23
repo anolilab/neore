@@ -3,6 +3,7 @@
  * the user answers, whatever their mode (the tools themselves always need approval).
  * A headless run has nobody to answer, so they are removed there even when the
  * user set them to `auto`. `mergePullRequest` is here for the same reason: a merge is approved by a person every time, so
- * a run nobody is at never has it, and no time-boxed allow covers it.
+ * a run nobody is at never has it, and no time-boxed allow covers it. So is `signInWithSavedLogin`: the person approves
+ * every sign-in with a saved login.
  */
-export const BUILTIN_TOOLS_NEEDING_A_PERSON: ReadonlySet<string> = new Set(["askUser", "mergePullRequest", "requestSecret"]);
+export const BUILTIN_TOOLS_NEEDING_A_PERSON: ReadonlySet<string> = new Set(["askUser", "mergePullRequest", "requestSecret", "signInWithSavedLogin"]);

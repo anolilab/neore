@@ -19,6 +19,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import {
     DEVICE_CALL_DEADLINE_MS,
     DEVICE_CALL_RETENTION_MS,
+    isGlobalInstructionsTool,
     MAX_DEVICE_INPUT_BYTES,
     MAX_DEVICES_PER_USER,
     MAX_OPEN_CALLS_PER_DEVICE,
@@ -139,6 +140,11 @@ export const createDeviceCall = internalMutation
     .output(vCreateResult)
     .mutation(async ({ args, ctx }) => {
         const { deviceId, threadId, toolName, userId } = args;
+
+        // Started only from project settings (`global-instructions.ts`), whose prompt says the agent did not ask: a chat never signs one.
+        if (isGlobalInstructionsTool(toolName)) {
+            return { error: "ineligible" as const };
+        }
 
         if (utf8Length(args.input) > MAX_DEVICE_INPUT_BYTES) {
             return { error: "input_too_large" as const };

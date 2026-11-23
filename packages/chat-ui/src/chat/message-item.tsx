@@ -13,7 +13,7 @@ import SpeakerChip from "./speaker-chip";
 
 interface MessageItemProps {
     components?: {
-        DocumentArtifact?: FC<{ documentId: string; kind: string; title: string; version: number }>;
+        DocumentArtifact?: FC<{ documentId: string; kind: string; threadId?: string; title: string; version: number }>;
         McpApp?: FC<{ part: ToolPart; resourceUri: string; serverName: string; toolName: string }>;
         PresentationArtifact?: FC<{ presentationId: string; slideCount: number; styleName?: string; title: string }>;
         toolMeta?: Map<string, { resourceUri: string; serverName: string }>;

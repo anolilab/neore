@@ -43,13 +43,14 @@ interface CanvasVersionHistoryProps {
 const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    const { activeDocumentId, setCanvasViewMode } = useCanvasState();
+    const { activeDocumentId, canvasThreadId, setCanvasViewMode } = useCanvasState();
     const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
     // Fetch version list (metadata only)
     const { data: versions } = useQuery({
         ...crpc.agent.document_history.listVersions.queryOptions({
             documentId: document._id as Id<"documents">,
+            threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined,
         }),
         enabled: !!document._id,
     });
@@ -58,6 +59,7 @@ const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
     const { data: selectedVersionData } = useQuery({
         ...crpc.agent.document_history.getVersion.queryOptions({
             documentId: document._id as Id<"documents">,
+            threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined,
             version: selectedVersion ?? 0,
         }),
         enabled: selectedVersion !== null,
@@ -68,6 +70,7 @@ const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
     const { data: nextVersionData } = useQuery({
         ...crpc.agent.document_history.getVersion.queryOptions({
             documentId: document._id as Id<"documents">,
+            threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined,
             version: nextVersionNumber ?? 0,
         }),
         enabled: nextVersionNumber !== null && selectedVersionData !== undefined && selectedVersionData !== null && !selectedVersionData.commit,

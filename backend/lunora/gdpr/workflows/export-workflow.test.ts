@@ -10,6 +10,7 @@
 import { LunoraError } from "lunorash/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { BROWSER_EXPORT_PAGES } from "../../browser/export-pages";
 import { UsageExportError, usageObjectKey } from "../usage-export-steps";
 import { dataExportWorkflowConfig, exportFailureMessage } from "./export-workflow";
 
@@ -337,5 +338,124 @@ describe("data export workflow: the usage object", () => {
         expect(recorded).toBeGreaterThan(-1);
         expect(cleared).toBeGreaterThan(recorded);
         expect(calls[recorded]?.args["storageId"]).toBe("storage-1");
+    });
+});
+
+describe("data export workflow: browser data", () => {
+    /** Lunora's dispatch body limit (`@lunora/runtime`: a `/_lunora/` POST over 1 MiB is refused with 413). */
+    const DISPATCH_BODY_BYTES = 1024 * 1024;
+    // Three pages of about 600 KiB each: every page fits, their sum does not fit one dispatch body.
+    const bigPage = (index: number): { actions: { target: string }[]; extensions: never[]; humanChecks: never[]; sessions: { id: string }[] } => {
+        return { actions: [{ target: "x".repeat(600 * 1024) }], extensions: [], humanChecks: [], sessions: [{ id: `s${String(index)}` }] };
+    };
+    const pageCount = 3;
+    const pagesWithCursors = (): (() => unknown) => {
+        let page = 0;
+
+        return () => {
+            page += 1;
+
+            return { ...bigPage(page), ...(page < pageCount && { next: { page: String(page), phase: "actions" } }) };
+        };
+    };
+
+    it("stores a history past 1 MiB a page per step and hands the export file only where the pages are", async () => {
+        // The page query is stubbed too, so a workflow that passes the pages themselves to the export file is caught as well.
+        stubs["browser_gdpr:collectBrowserForExport"] = pagesWithCursors();
+        stubs["browser_gdpr:storeBrowserExportPage"] = pagesWithCursors();
+
+        await execute();
+
+        const stores = ran("browser_gdpr:storeBrowserExportPage");
+        const generated = ran("gdpr_steps:generateExportFile")[0]?.args;
+        const prefix = generated?.["browserPrefix"] as string;
+
+        expect(calls.every((call) => JSON.stringify(call.args).length < DISPATCH_BODY_BYTES)).toBe(true);
+        expect(stores.map((call) => call.args["cursor"])).toEqual([undefined, { page: "1", phase: "actions" }, { page: "2", phase: "actions" }]);
+        expect(stores.map((call) => call.args["key"])).toEqual([`${prefix}0.json`, `${prefix}1.json`, `${prefix}2.json`]);
+        expect(stepNames).toEqual(expect.arrayContaining(["collect-browser-0", "collect-browser-1", "collect-browser-2"]));
+        expect(generated).toMatchObject({ browserPages: pageCount });
+        expect(generated).not.toHaveProperty("browser");
+        // The stored pages are deleted once the export is done.
+        expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([prefix]);
+    });
+
+    it("stops a history past its page limit within the workflow's steps, and the export file says it was cut", async () => {
+        // A history that never ends: every page names a next one.
+        stubs["browser_gdpr:storeBrowserExportPage"] = () => {
+            return { next: { phase: "actions" } };
+        };
+
+        await execute();
+
+        expect(ran("browser_gdpr:storeBrowserExportPage")).toHaveLength(BROWSER_EXPORT_PAGES);
+        // The whole run within 1,024 steps, the lowest workflow step limit (a Free plan's), with room to spare.
+        expect(stepNames.length).toBeLessThan(512);
+        expect(ran("gdpr_steps:generateExportFile")[0]?.args).toMatchObject({ browserCut: true, browserPages: BROWSER_EXPORT_PAGES });
+        expect(progressWith("completed")).toHaveLength(1);
+    });
+
+    it("deletes the stored pages when the export fails", async () => {
+        stubs["browser_gdpr:storeBrowserExportPage"] = pagesWithCursors();
+        generate = () => {
+            throw new Error("boom");
+        };
+
+        await execute();
+
+        expect(progressWith("failed")).toHaveLength(1);
+        const firstKey = String(ran("browser_gdpr:storeBrowserExportPage")[0]?.args["key"]);
+
+        expect(ran("browser_gdpr:deleteBrowserExportPages").map((call) => call.args["prefix"])).toEqual([firstKey.slice(0, -"0.json".length)]);
+    });
+
+    it("ends the export ready with its file when the page cleanup fails for good, and leaves the pages to the sweep", async () => {
+        stubs["browser_gdpr:deleteBrowserExportPages"] = () => {
+            throw new Error("storage unavailable");
+        };
+
+        await execute();
+
+        expect(progressWith("completed").map((call) => call.args["storageId"])).toEqual(["storage-1"]);
+        expect(progressWith("failed")).toHaveLength(0);
+        expect(ran("notifications_functions:createNotification").map((call) => call.args["outcome"])).toEqual(["success"]);
+        expect(ran("gdpr_steps:sendExportReadyEmail")).toHaveLength(1);
+        // The run's record stays, with its pieces, so the sweep finds the pages through it; the usage object goes all the same.
+        expect(ran("usage_gdpr:clearUsageExportPieces")).toHaveLength(0);
+        expect(ran("gdpr_steps:deleteUsageJson")).toHaveLength(1);
+    });
+
+    it("still marks a failed export failed and tells the user when the page cleanup fails for good", async () => {
+        stubs["browser_gdpr:deleteBrowserExportPages"] = () => {
+            throw new Error("storage unavailable");
+        };
+        generate = () => {
+            throw new Error("boom");
+        };
+
+        await execute();
+
+        expect(progressWith("failed")).toHaveLength(1);
+        expect(ran("notifications_functions:createNotification").map((call) => call.args["outcome"])).toEqual(["failure"]);
+        expect(ran("usage_gdpr:clearUsageExportPieces")).toHaveLength(0);
+    });
+
+    it.each([
+        { exported: true, name: "the ready notice after the file is stored" },
+        { exported: false, name: "the failure notice after the file failed" },
+    ])("deletes the stored pages when $name fails for good", async ({ exported }) => {
+        stubs["notifications_functions:createNotification"] = () => {
+            throw new Error("notification step failed permanently");
+        };
+
+        if (!exported) {
+            generate = () => {
+                throw new Error("boom");
+            };
+        }
+
+        await expect(execute()).rejects.toThrow("notification step failed permanently");
+
+        expect(ran("browser_gdpr:deleteBrowserExportPages")).toHaveLength(1);
     });
 });
