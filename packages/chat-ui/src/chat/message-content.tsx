@@ -104,7 +104,7 @@ interface MessageContentProps {
          * progress (approval prompt on the device, running) lives outside the message.
          */
         DeviceToolCall?: FC<{ part: ToolPart }>;
-        DocumentArtifact?: FC<{ documentId: string; kind: string; title: string; version: number }>;
+        DocumentArtifact?: FC<{ documentId: string; kind: string; threadId?: string; title: string; version: number }>;
         File?: FC<{ part: FilePart }>;
         Image?: FC<ImageRendererProps>;
         McpApp?: FC<{ part: ToolPart; resourceUri: string; serverName: string; toolName: string }>;
@@ -1120,7 +1120,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         typeof toolPart.output === "object" &&
                         toolPart.state === "output-available"
                     ) {
-                        const output = toolPart.output as { documentId?: string; kind?: string; title?: string; version?: number };
+                        const output = toolPart.output as { documentId?: string; kind?: string; threadId?: string; title?: string; version?: number };
 
                         if (output.documentId && output.title && output.kind && DocumentArtifact) {
                             renderedParts.push(
@@ -1128,6 +1128,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                                     documentId={output.documentId}
                                     key={key}
                                     kind={output.kind}
+                                    threadId={output.threadId}
                                     title={output.title}
                                     version={output.version ?? 1}
                                 />,

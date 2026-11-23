@@ -61,19 +61,19 @@ msgstr "\"{0}\" startet, sobald seine Abhängigkeiten erledigt sind"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "„{badLogin}“ ist kein gültiger Login. Ein Login beginnt mit einem Buchstaben oder einer Ziffer, hat höchstens {0} Zeichen und enthält nur Buchstaben, Ziffern und einzelne Bindestriche oder Unterstriche."
 
-#: src/features/chat/thread/composer-input.tsx:712
+#: src/features/chat/thread/composer-input.tsx:715
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "„{fileName}“ kann nicht angehängt werden: Dieser Dateityp wird nicht unterstützt."
 
-#: src/features/chat/thread/composer-input.tsx:705
+#: src/features/chat/thread/composer-input.tsx:708
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "„{fileName}“ konnte nicht angehängt werden: Der Inhalt passt nicht zum Dateityp."
 
-#: src/features/chat/thread/composer-input.tsx:1233
+#: src/features/chat/thread/composer-input.tsx:1236
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "\"{fileName}\" konnte nicht hochgeladen werden, daher wurde die Nachricht nicht gesendet."
 
-#: src/features/chat/thread/composer-input.tsx:707
+#: src/features/chat/thread/composer-input.tsx:710
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut."
 
@@ -81,11 +81,11 @@ msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindun
 #~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
 #~ msgstr "\"{fileName}\" konnte nicht hochgeladen werden. Entferne sie, um zu senden."
 
-#: src/features/chat/thread/composer-input.tsx:710
+#: src/features/chat/thread/composer-input.tsx:713
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/chat/thread/composer-input.tsx:711
+#: src/features/chat/thread/composer-input.tsx:714
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
@@ -376,7 +376,7 @@ msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, one {# ausstehender Kommentar} other {# ausstehende Kommentare}}"
 
 #. placeholder {0}: prompts.length
-#: src/features/chat/thread/composer-prompt-search.tsx:199
+#: src/features/chat/thread/composer-prompt-search.tsx:225
 msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, one {# Prompt gefunden} other {# Prompts gefunden}}"
 
@@ -1019,7 +1019,7 @@ msgstr "{date}: keine Antworten"
 msgid "{days} days"
 msgstr "{days} Tage"
 
-#: src/features/chat/pins/pin-item.tsx:53
+#: src/features/chat/pins/pin-item.tsx:54
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "vor {days} T."
@@ -1202,7 +1202,7 @@ msgstr "{hours} Std. {minutes} Min."
 msgid "{hours}h {minutes}m remaining"
 msgstr "{hours}h {minutes}m verbleibend"
 
-#: src/features/chat/pins/pin-item.tsx:49
+#: src/features/chat/pins/pin-item.tsx:50
 #: src/features/settings/components/chat/api-keys-settings.tsx:286
 msgid "{hours}h ago"
 msgstr "vor {hours} Std."
@@ -1307,7 +1307,7 @@ msgstr "{mins}m {secs}s"
 msgid "{minutes}m"
 msgstr "{minutes} Min."
 
-#: src/features/chat/pins/pin-item.tsx:45
+#: src/features/chat/pins/pin-item.tsx:46
 #: src/features/settings/components/chat/api-keys-settings.tsx:282
 msgid "{minutes}m ago"
 msgstr "vor {minutes} Min."
@@ -1336,7 +1336,7 @@ msgstr "{more, plural, one {# weitere} other {# weitere}}"
 msgid "{moreCount, plural, one {# more item} other {# more items}}"
 msgstr "{moreCount, plural, one {# weiteres Element} other {# weitere Elemente}}"
 
-#: src/features/canvas/canvas-panel.tsx:245
+#: src/features/canvas/canvas-panel.tsx:246
 msgid "{n, plural, one {# unsaved edit} other {# unsaved edits}}"
 msgstr "{n, plural, one {# ungespeicherte Änderung} other {# ungespeicherte Änderungen}}"
 
@@ -2551,7 +2551,7 @@ msgstr "Notiz hinzufügen (optional) …"
 msgid "Add a note..."
 msgstr "Notiz hinzufügen..."
 
-#: src/features/chat/pins/pin-item.tsx:226
+#: src/features/chat/pins/pin-item.tsx:233
 msgid "Add a note…"
 msgstr "Notiz hinzufügen…"
 
@@ -2650,7 +2650,7 @@ msgstr "Endpunkt hinzufügen"
 msgid "Add error handling"
 msgstr "Fehlerbehandlung hinzufügen"
 
-#: src/features/chat/pins/pin-item.tsx:280
+#: src/features/chat/pins/pin-item.tsx:289
 msgid "Add excerpt"
 msgstr "Auszug hinzufügen"
 
@@ -2947,7 +2947,7 @@ msgstr "Fügt keine Tools hinzu."
 msgid "Adds these tools:"
 msgstr "Fügt diese Tools hinzu:"
 
-#: src/features/canvas/canvas-panel.tsx:121
+#: src/features/canvas/canvas-panel.tsx:122
 msgid "Adjust"
 msgstr "Anpassen"
 
@@ -3245,7 +3245,7 @@ msgstr "Agenten erledigen deine Aufgaben selbstständig. Ein Prüfer checkt jede
 msgid "Aggregate scores of both runs"
 msgstr "Gesamtbewertungen beider Durchläufe"
 
-#: src/features/chat/pins/pin-item.tsx:240
+#: src/features/chat/pins/pin-item.tsx:247
 #: src/features/workflow/types/index.ts:384
 msgid "AI"
 msgstr "KI"
@@ -3769,7 +3769,7 @@ msgstr "Amazons neuestes und kleinstes LLM"
 msgid "Amber"
 msgstr "Bernstein"
 
-#: src/features/canvas/canvas-panel.tsx:220
+#: src/features/canvas/canvas-panel.tsx:221
 msgid "Amount"
 msgstr "Stärke"
 
@@ -3825,7 +3825,7 @@ msgstr "Ein Fehler ist aufgetreten"
 msgid "An error occurred during One Tap sign in"
 msgstr "Bei der One-Tap-Anmeldung ist ein Fehler aufgetreten"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1254
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1255
 msgid "An error occurred while generating the response."
 msgstr "Beim Generieren der Antwort ist ein Fehler aufgetreten."
 
@@ -4163,7 +4163,7 @@ msgstr "Gilt"
 msgid "Applies to"
 msgstr "Gilt für"
 
-#: src/features/canvas/canvas-panel.tsx:119
+#: src/features/canvas/canvas-panel.tsx:120
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
@@ -4975,7 +4975,7 @@ msgstr "Zurück"
 msgid "Back online"
 msgstr "Wieder online"
 
-#: src/features/canvas/components/canvas-version-history.tsx:175
+#: src/features/canvas/components/canvas-version-history.tsx:178
 msgid "Back to editor"
 msgstr "Zurück zum Editor"
 
@@ -5402,13 +5402,13 @@ msgid "Blog Header"
 msgstr "Blog-Header"
 
 #: src/features/appearance/components/appearance-controls.tsx:158
-#: src/features/canvas/canvas-panel.tsx:221
+#: src/features/canvas/canvas-panel.tsx:222
 #: src/features/chat/tags/thread-tag-color-picker.tsx:16
 #: src/features/workflow/components/nodes/comment-node.tsx:15
 msgid "Blue"
 msgstr "Blau"
 
-#: src/features/canvas/canvas-panel.tsx:136
+#: src/features/canvas/canvas-panel.tsx:137
 msgid "Blue Channel"
 msgstr "Blaukanal"
 
@@ -5495,7 +5495,7 @@ msgstr "Bots, die ihn nutzen dürfen"
 msgid "Bottom"
 msgstr "Unten"
 
-#: src/features/canvas/canvas-panel.tsx:140
+#: src/features/canvas/canvas-panel.tsx:141
 msgid "Box Blur"
 msgstr "Box-Weichzeichner"
 
@@ -5571,7 +5571,7 @@ msgstr "Kurzbeschreibung dieses Projekts"
 msgid "Brief description of this prompt"
 msgstr "Kurzbeschreibung dieses Prompts"
 
-#: src/features/canvas/canvas-panel.tsx:142
+#: src/features/canvas/canvas-panel.tsx:143
 msgid "Brightness"
 msgstr "Helligkeit"
 
@@ -5998,7 +5998,7 @@ msgstr "Kanada"
 #: src/features/auth/components/team/delete-team-dialog.tsx:76
 #: src/features/auth/components/team/leave-team-dialog.tsx:76
 #: src/features/auth/components/team/team-settings-dialog.tsx:209
-#: src/features/canvas/canvas-panel.tsx:120
+#: src/features/canvas/canvas-panel.tsx:121
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:256
 #: src/features/chat/forward/forward-dialog.tsx:169
 #: src/features/chat/forward/forward-selection-bar.tsx:78
@@ -6007,7 +6007,7 @@ msgstr "Kanada"
 #: src/features/chat/host/host-composer.tsx:1017
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
-#: src/features/chat/pins/pin-item.tsx:294
+#: src/features/chat/pins/pin-item.tsx:303
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:405
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:414
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:178
@@ -6366,7 +6366,7 @@ msgstr "Wenn du die URL änderst, musst du den API-Schlüssel erneut eingeben."
 msgid "Channel secret from the Basic settings tab, used to verify X-Line-Signature"
 msgstr "Channel Secret aus dem Tab \"Basic settings\", wird zur Prüfung von X-Line-Signature verwendet"
 
-#: src/features/canvas/canvas-panel.tsx:122
+#: src/features/canvas/canvas-panel.tsx:123
 msgid "Channels"
 msgstr "Kanäle"
 
@@ -7050,7 +7050,7 @@ msgstr "Klonen oder neu erstellen…"
 #: ../../packages/ui/src/components/sheet.tsx:75
 #: src/components/command-palette.tsx:726
 #: src/features/admin/components/user-sessions-dialog.tsx:159
-#: src/features/canvas/canvas-panel.tsx:818
+#: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:275
@@ -7085,7 +7085,7 @@ msgstr "Suche schließen"
 msgid "Close full screen"
 msgstr "Vollbild schließen"
 
-#: src/features/canvas/canvas-panel.tsx:772
+#: src/features/canvas/canvas-panel.tsx:788
 msgid "Close history"
 msgstr "Verlauf schließen"
 
@@ -7114,7 +7114,7 @@ msgstr "Prompt-Verbesserung schließen"
 msgid "Close search"
 msgstr "Suche schließen"
 
-#: src/features/canvas/document-artifact.tsx:43
+#: src/features/canvas/document-artifact.tsx:46
 msgid "Close the document open in another chat to view this one."
 msgstr "Schließe das Dokument, das in einem anderen Chat geöffnet ist, um dieses anzusehen."
 
@@ -7155,7 +7155,7 @@ msgstr "Cloudflare-Workers-AI-Modelle laufen dort, wo Cloudflare gerade Kapazit�
 #: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
-#: src/features/canvas/canvas-panel.tsx:754
+#: src/features/canvas/canvas-panel.tsx:770
 #: src/features/chat/thread/composer-search-mode.tsx:56
 #: src/features/code/components/code-workspace.tsx:219
 #: src/features/layout/components/workspace-switch.tsx:48
@@ -7221,7 +7221,7 @@ msgstr "Code-Review-Panel"
 msgid "Code Sandbox"
 msgstr "Code-Sandbox"
 
-#: src/features/canvas/canvas-panel.tsx:747
+#: src/features/canvas/canvas-panel.tsx:763
 msgid "Code view"
 msgstr "Code-Ansicht"
 
@@ -7389,7 +7389,7 @@ msgstr "Sammlungen"
 msgid "Colombia"
 msgstr "Kolumbien"
 
-#: src/features/canvas/canvas-panel.tsx:123
+#: src/features/canvas/canvas-panel.tsx:124
 #: src/features/projects/components/project-form-dialog.tsx:299
 msgid "Color"
 msgstr "Farbe"
@@ -7403,7 +7403,7 @@ msgstr "Farbe für den neuen Tag"
 msgid "Color of tag {0}"
 msgstr "Farbe des Tags {0}"
 
-#: src/features/canvas/canvas-panel.tsx:143
+#: src/features/canvas/canvas-panel.tsx:144
 msgid "Colorize"
 msgstr "Einfärben"
 
@@ -8386,7 +8386,7 @@ msgid "Continued quality improvements over 2.5"
 msgstr "Weitere Qualitätsverbesserungen gegenüber 2.5"
 
 #: src/features/appearance/components/appearance-controls.tsx:247
-#: src/features/canvas/canvas-panel.tsx:144
+#: src/features/canvas/canvas-panel.tsx:145
 msgid "Contrast"
 msgstr "Kontrast"
 
@@ -8479,8 +8479,8 @@ msgstr "Unterhaltungen und ausstehende Kommentare zu Dateien, die diese Liste ni
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Unterhaltungen zu Zeilen, die dieser Diff nicht mehr zeigt"
 
-#: src/features/chat/thread/composer-input.tsx:896
-#: src/features/chat/thread/composer-input.tsx:1880
+#: src/features/chat/thread/composer-input.tsx:899
+#: src/features/chat/thread/composer-input.tsx:1883
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -8588,7 +8588,7 @@ msgstr "Als reinen Text kopieren"
 msgid "Copy command: {label}"
 msgstr "Befehl kopieren: {label}"
 
-#: src/features/canvas/canvas-panel.tsx:786
+#: src/features/canvas/canvas-panel.tsx:803
 msgid "Copy content"
 msgstr "Inhalt kopieren"
 
@@ -8810,7 +8810,7 @@ msgstr "{0} konnte nicht angehängt werden. Die übrigen Dateien wurden angehän
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} konnte nicht angehängt werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1910
+#: src/features/chat/thread/composer-input.tsx:1913
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -8984,7 +8984,7 @@ msgstr "Verknüpfen nicht möglich. Versuche es erneut."
 msgid "Could not load API keys. Try again later."
 msgstr "API-Schlüssel konnten nicht geladen werden. Versuche es später erneut."
 
-#: src/features/canvas/canvas-panel.tsx:131
+#: src/features/canvas/canvas-panel.tsx:132
 msgid "Could not load image"
 msgstr "Bild konnte nicht geladen werden"
 
@@ -9122,11 +9122,11 @@ msgstr "Der Server ist nicht erreichbar, um die Generierung zu starten. Prüfe d
 msgid "Could not reach the server. Try again."
 msgstr "Der Server ist nicht erreichbar. Versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1913
+#: src/features/chat/thread/composer-input.tsx:1916
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1914
+#: src/features/chat/thread/composer-input.tsx:1917
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -10031,7 +10031,7 @@ msgstr "Dänisch (Dänemark)"
 msgid "Dark"
 msgstr "Dunkel"
 
-#: src/features/canvas/canvas-panel.tsx:145
+#: src/features/canvas/canvas-panel.tsx:146
 msgid "Darken"
 msgstr "Abdunkeln"
 
@@ -10376,7 +10376,7 @@ msgstr "Lege fest, wie die KI antworten soll. Diese Anweisungen gelten für alle
 msgid "Degraded"
 msgstr "Beeinträchtigt"
 
-#: src/features/canvas/canvas-panel.tsx:222
+#: src/features/canvas/canvas-panel.tsx:223
 msgid "Degrees"
 msgstr "Grad"
 
@@ -10578,7 +10578,7 @@ msgstr "Geöffneten Thread löschen (fragt vorher nach)"
 msgid "Delete Organization"
 msgstr "Organisation löschen"
 
-#: src/features/chat/pins/pin-item.tsx:267
+#: src/features/chat/pins/pin-item.tsx:276
 msgid "Delete pin"
 msgstr "Pin löschen"
 
@@ -10838,7 +10838,7 @@ msgstr "Bereitstellungsnamen"
 msgid "Deployments, edge functions, and frontend infra"
 msgstr "Deployments, Edge Functions und Frontend-Infrastruktur"
 
-#: src/features/canvas/canvas-panel.tsx:223
+#: src/features/canvas/canvas-panel.tsx:224
 msgid "Depth"
 msgstr "Tiefe"
 
@@ -10850,7 +10850,7 @@ msgstr "Tiefenkarte"
 msgid "Depth-aware generation"
 msgstr "Tiefenbewusste Generierung"
 
-#: src/features/canvas/canvas-panel.tsx:146
+#: src/features/canvas/canvas-panel.tsx:147
 msgid "Desaturate"
 msgstr "Entsättigen"
 
@@ -10984,7 +10984,7 @@ msgstr "Bild abwählen"
 msgid "Design"
 msgstr "Design"
 
-#: src/features/canvas/canvas-panel.tsx:305
+#: src/features/canvas/canvas-panel.tsx:306
 msgid "Design preview unavailable"
 msgstr "Designvorschau nicht verfügbar"
 
@@ -11336,7 +11336,7 @@ msgstr "Gleichmäßig verteilen"
 msgid "Distribute evenly (D)"
 msgstr "Gleichmäßig verteilen (D)"
 
-#: src/features/canvas/canvas-panel.tsx:147
+#: src/features/canvas/canvas-panel.tsx:148
 msgid "Dither"
 msgstr "Dithering"
 
@@ -11456,8 +11456,8 @@ msgstr "Download"
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:109
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
-#: src/features/canvas/canvas-panel.tsx:794
 #: src/features/canvas/canvas-panel.tsx:811
+#: src/features/canvas/canvas-panel.tsx:828
 #: src/features/download/components/download-page.tsx:120
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
@@ -11499,7 +11499,7 @@ msgstr "Lade eine Kopie aller deiner persönlichen Daten im JSON-Format herunter
 msgid "Download a model"
 msgstr "Ein Modell herunterladen"
 
-#: src/features/canvas/canvas-panel.tsx:802
+#: src/features/canvas/canvas-panel.tsx:819
 msgid "Download as CSV"
 msgstr "Als CSV herunterladen"
 
@@ -11507,7 +11507,7 @@ msgstr "Als CSV herunterladen"
 msgid "Download as Markdown"
 msgstr "Als Markdown herunterladen"
 
-#: src/features/canvas/canvas-panel.tsx:806
+#: src/features/canvas/canvas-panel.tsx:823
 msgid "Download as XLSX"
 msgstr "Als XLSX herunterladen"
 
@@ -11555,7 +11555,7 @@ msgstr "Neore für den Desktop herunterladen"
 msgid "Download PDF"
 msgstr "PDF herunterladen"
 
-#: src/features/canvas/canvas-panel.tsx:128
+#: src/features/canvas/canvas-panel.tsx:129
 msgid "Download PNG"
 msgstr "PNG herunterladen"
 
@@ -11655,7 +11655,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2109
+#: src/features/chat/thread/composer-input.tsx:2112
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -11921,7 +11921,7 @@ msgstr "Am Edge bereitgestellt"
 msgid "Edge detection"
 msgstr "Kantenerkennung"
 
-#: src/features/canvas/canvas-panel.tsx:148
+#: src/features/canvas/canvas-panel.tsx:149
 msgid "Edge Detection"
 msgstr "Kantenerkennung"
 
@@ -11930,7 +11930,7 @@ msgid "Edge-guided generation"
 msgstr "Kantengeführte Generierung"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
-#: src/features/canvas/canvas-panel.tsx:767
+#: src/features/canvas/canvas-panel.tsx:783
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:138
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
@@ -11995,8 +11995,8 @@ msgstr "Datensatz bearbeiten"
 msgid "Edit Endpoint"
 msgstr "Endpunkt bearbeiten"
 
-#: src/features/chat/pins/pin-item.tsx:259
-#: src/features/chat/pins/pin-item.tsx:280
+#: src/features/chat/pins/pin-item.tsx:268
+#: src/features/chat/pins/pin-item.tsx:289
 msgid "Edit excerpt"
 msgstr "Auszug bearbeiten"
 
@@ -12151,7 +12151,7 @@ msgstr "Bearbeiten und Remixen vorhandener Bilder mit Anweisungen in natürliche
 msgid "Editing: {editingNodeId}"
 msgstr "Bearbeitet: {editingNodeId}"
 
-#: src/features/canvas/canvas-panel.tsx:124
+#: src/features/canvas/canvas-panel.tsx:125
 msgid "Effects"
 msgstr "Effekte"
 
@@ -12368,7 +12368,7 @@ msgstr "E-Mail, wenn eine Aufgabe abgeschlossen ist"
 msgid "Email:"
 msgstr "E-Mail:"
 
-#: src/features/canvas/canvas-panel.tsx:149
+#: src/features/canvas/canvas-panel.tsx:150
 msgid "Emboss"
 msgstr "Prägen"
 
@@ -12700,7 +12700,7 @@ msgstr "Organisations-Slug eingeben"
 msgid "Enter pull requests as owner/name#123."
 msgstr "Gib Pull Requests als owner/name#123 ein."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:221
+#: src/features/chat/thread/composer-prompt-search.tsx:247
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "Enter übernimmt den Prompt in das Eingabefeld. Er wird nicht gesendet."
 
@@ -13271,7 +13271,7 @@ msgstr "ist vorhanden"
 msgid "Exit {0}"
 msgstr "Beendet mit {0}"
 
-#: src/features/canvas/canvas-panel.tsx:815
+#: src/features/canvas/canvas-panel.tsx:832
 msgid "Exit fullscreen"
 msgstr "Vollbild beenden"
 
@@ -13703,7 +13703,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1693
+#: src/features/chat/thread/composer-input.tsx:1696
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -13933,7 +13933,7 @@ msgstr "Temporärer Modus konnte nicht aktiviert werden"
 msgid "Failed to export"
 msgstr "Export fehlgeschlagen"
 
-#: src/features/canvas/canvas-panel.tsx:672
+#: src/features/canvas/canvas-panel.tsx:682
 msgid "Failed to export as XLSX."
 msgstr "Export als XLSX fehlgeschlagen."
 
@@ -13976,11 +13976,11 @@ msgstr "Audiogeräte konnten nicht abgerufen werden"
 msgid "Failed to import cases"
 msgstr "Testfälle konnten nicht importiert werden"
 
-#: src/features/canvas/canvas-panel.tsx:655
+#: src/features/canvas/canvas-panel.tsx:665
 msgid "Failed to import the spreadsheet file."
 msgstr "Tabellendatei konnte nicht importiert werden."
 
-#: src/features/canvas/canvas-panel.tsx:130
+#: src/features/canvas/canvas-panel.tsx:131
 msgid "Failed to initialize image editor"
 msgstr "Bildeditor konnte nicht initialisiert werden"
 
@@ -14113,11 +14113,11 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:1725
+#: src/features/chat/thread/composer-input.tsx:1728
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
-#: src/features/canvas/components/canvas-version-history.tsx:141
+#: src/features/canvas/components/canvas-version-history.tsx:144
 msgid "Failed to restore this version."
 msgstr "Diese Version konnte nicht wiederhergestellt werden."
 
@@ -15092,7 +15092,7 @@ msgstr "Filter:"
 msgid "Filtering"
 msgstr "Filtern"
 
-#: src/features/canvas/canvas-panel.tsx:125
+#: src/features/canvas/canvas-panel.tsx:126
 #: src/features/settings/components/chat/models-settings.tsx:407
 msgid "Filters"
 msgstr "Filter"
@@ -15240,11 +15240,11 @@ msgstr "Flexibel zuschaltbares Reasoning für aufgabenspezifische Optimierung"
 msgid "Flexible Standard and Pro output modes"
 msgstr "Flexible Ausgabemodi Standard und Pro"
 
-#: src/features/canvas/canvas-panel.tsx:183
+#: src/features/canvas/canvas-panel.tsx:184
 msgid "Flip Horizontal"
 msgstr "Horizontal spiegeln"
 
-#: src/features/canvas/canvas-panel.tsx:184
+#: src/features/canvas/canvas-panel.tsx:185
 msgid "Flip Vertical"
 msgstr "Vertikal spiegeln"
 
@@ -15752,7 +15752,7 @@ msgstr "Videoerstellung in Spitzenqualität, die Endframe-Steuerung, Referenzein
 msgid "Frontier-tier quality from BFL"
 msgstr "Qualität der Spitzenklasse von BFL"
 
-#: src/features/canvas/canvas-panel.tsx:185
+#: src/features/canvas/canvas-panel.tsx:186
 msgid "Frosted Glass"
 msgstr "Milchglas"
 
@@ -15774,7 +15774,7 @@ msgstr "Vollzugriff"
 msgid "Full chain-of-thought reasoning visibility"
 msgstr "Volle Sichtbarkeit des Chain-of-Thought-Reasonings"
 
-#: src/features/chat/pins/pin-item.tsx:179
+#: src/features/chat/pins/pin-item.tsx:186
 msgid "Full message pinned"
 msgstr "Vollständige Nachricht angeheftet"
 
@@ -15798,7 +15798,7 @@ msgstr "Hero in voller Breite"
 msgid "Full-width promotional"
 msgstr "Werbung in voller Breite"
 
-#: src/features/canvas/canvas-panel.tsx:815
+#: src/features/canvas/canvas-panel.tsx:832
 msgid "Fullscreen"
 msgstr "Vollbild"
 
@@ -15818,7 +15818,7 @@ msgstr "Galicisch (Spanien)"
 msgid "Gallery item"
 msgstr "Galerie-Element"
 
-#: src/features/canvas/canvas-panel.tsx:186
+#: src/features/canvas/canvas-panel.tsx:187
 msgid "Gamma"
 msgstr "Gamma"
 
@@ -15831,7 +15831,7 @@ msgstr "Gateway"
 msgid "Gateway sections"
 msgstr "Gateway-Bereiche"
 
-#: src/features/canvas/canvas-panel.tsx:188
+#: src/features/canvas/canvas-panel.tsx:189
 msgid "Gaussian Blur"
 msgstr "Gaußscher Weichzeichner"
 
@@ -16259,8 +16259,8 @@ msgid "Go to last item"
 msgstr "Zum letzten Eintrag"
 
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:225
-#: src/features/chat/pins/pin-item.tsx:248
-#: src/features/chat/pins/pin-item.tsx:251
+#: src/features/chat/pins/pin-item.tsx:256
+#: src/features/chat/pins/pin-item.tsx:259
 msgid "Go to message"
 msgstr "Zur Nachricht"
 
@@ -16629,11 +16629,11 @@ msgstr "Grafikdesigner, die außergewöhnlich scharfe, detailreiche Bilder mit p
 msgid "Gray"
 msgstr "Grau"
 
-#: src/features/canvas/canvas-panel.tsx:190
+#: src/features/canvas/canvas-panel.tsx:191
 msgid "Grayscale"
 msgstr "Graustufen"
 
-#: src/features/canvas/canvas-panel.tsx:191
+#: src/features/canvas/canvas-panel.tsx:192
 msgid "Grayscale (Human)"
 msgstr "Graustufen (Mensch)"
 
@@ -16654,13 +16654,13 @@ msgid "Greek (Greece)"
 msgstr "Griechisch (Griechenland)"
 
 #: src/features/appearance/components/appearance-controls.tsx:161
-#: src/features/canvas/canvas-panel.tsx:224
+#: src/features/canvas/canvas-panel.tsx:225
 #: src/features/chat/tags/thread-tag-color-picker.tsx:18
 #: src/features/workflow/components/nodes/comment-node.tsx:16
 msgid "Green"
 msgstr "Grün"
 
-#: src/features/canvas/canvas-panel.tsx:137
+#: src/features/canvas/canvas-panel.tsx:138
 msgid "Green Channel"
 msgstr "Grünkanal"
 
@@ -17226,7 +17226,7 @@ msgstr "Hongkong"
 msgid "Horizontal rule"
 msgstr "Horizontale Linie"
 
-#: src/features/canvas/canvas-panel.tsx:192
+#: src/features/canvas/canvas-panel.tsx:193
 msgid "Horizontal Strips"
 msgstr "Horizontale Streifen"
 
@@ -17344,7 +17344,7 @@ msgstr "https://... (weiß = bearbeiten, schwarz = beibehalten)"
 msgid "https://... or from input"
 msgstr "https://... oder aus der Eingabe"
 
-#: src/features/canvas/canvas-panel.tsx:193
+#: src/features/canvas/canvas-panel.tsx:194
 msgid "Hue Rotate"
 msgstr "Farbton drehen"
 
@@ -17802,7 +17802,7 @@ msgstr "Workflow importieren"
 msgid "Import workflow (ZIP or JSON)"
 msgstr "Workflow importieren (ZIP oder JSON)"
 
-#: src/features/canvas/canvas-panel.tsx:780
+#: src/features/canvas/canvas-panel.tsx:796
 msgid "Import XLSX"
 msgstr "XLSX importieren"
 
@@ -18279,7 +18279,7 @@ msgstr "Intelligente Szenenkomposition"
 msgid "Intelligent video model that thinks before generating"
 msgstr "Intelligentes Videomodell, das vor dem Generieren nachdenkt"
 
-#: src/features/canvas/canvas-panel.tsx:225
+#: src/features/canvas/canvas-panel.tsx:226
 msgid "Intensity"
 msgstr "Intensität"
 
@@ -18373,7 +18373,7 @@ msgstr "Ungültiges URL-Format"
 msgid "Invalid verification code"
 msgstr "Ungültiger Verifizierungscode"
 
-#: src/features/canvas/canvas-panel.tsx:194
+#: src/features/canvas/canvas-panel.tsx:195
 msgid "Invert"
 msgstr "Invertieren"
 
@@ -18683,7 +18683,7 @@ msgid "Jump to prompt {promptNumber}: {preview}"
 msgstr "Zu Prompt {promptNumber} springen: {preview}"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:154
-#: src/features/chat/pins/pin-item.tsx:42
+#: src/features/chat/pins/pin-item.tsx:43
 #: src/features/settings/components/chat/api-keys-settings.tsx:279
 msgid "just now"
 msgstr "gerade eben"
@@ -19439,7 +19439,7 @@ msgstr "Lass den Agenten auf einem Server arbeiten, den du per SSH erreichst. Da
 msgid "Let the bot use its computer"
 msgstr "Den Bot seinen Computer nutzen lassen"
 
-#: src/features/canvas/canvas-panel.tsx:226
+#: src/features/canvas/canvas-panel.tsx:227
 msgid "Level"
 msgstr "Stufe"
 
@@ -19447,7 +19447,7 @@ msgstr "Stufe"
 msgid "Light"
 msgstr "Hell"
 
-#: src/features/canvas/canvas-panel.tsx:195
+#: src/features/canvas/canvas-panel.tsx:196
 msgid "Lighten"
 msgstr "Aufhellen"
 
@@ -19778,7 +19778,7 @@ msgstr "Wird geladen"
 msgid "Loading API keys…"
 msgstr "API-Schlüssel werden geladen…"
 
-#: src/features/canvas/canvas-panel.tsx:318
+#: src/features/canvas/canvas-panel.tsx:319
 msgid "Loading canvas editor..."
 msgstr "Canvas-Editor wird geladen..."
 
@@ -19809,7 +19809,7 @@ msgstr "Datensätze werden geladen…"
 msgid "Loading devices..."
 msgstr "Geräte werden geladen..."
 
-#: src/features/canvas/canvas-panel.tsx:834
+#: src/features/canvas/canvas-panel.tsx:851
 msgid "Loading document..."
 msgstr "Dokument wird geladen..."
 
@@ -19817,16 +19817,16 @@ msgstr "Dokument wird geladen..."
 msgid "Loading document…"
 msgstr "Dokument wird geladen…"
 
-#: src/features/canvas/canvas-panel.tsx:101
-#: src/features/canvas/canvas-panel.tsx:292
-#: src/features/canvas/canvas-panel.tsx:369
-#: src/features/canvas/canvas-panel.tsx:838
+#: src/features/canvas/canvas-panel.tsx:102
+#: src/features/canvas/canvas-panel.tsx:293
+#: src/features/canvas/canvas-panel.tsx:370
+#: src/features/canvas/canvas-panel.tsx:855
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:916
 msgid "Loading editor..."
 msgstr "Editor wird geladen..."
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:280
-#: src/features/canvas/canvas-panel.tsx:132
+#: src/features/canvas/canvas-panel.tsx:133
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
 msgstr "Editor wird geladen…"
@@ -19852,11 +19852,11 @@ msgstr "Dateien werden geladen…"
 msgid "Loading folders…"
 msgstr "Ordner werden geladen…"
 
-#: src/features/canvas/canvas-panel.tsx:358
+#: src/features/canvas/canvas-panel.tsx:359
 msgid "Loading image editor..."
 msgstr "Bildeditor wird geladen..."
 
-#: src/features/canvas/canvas-panel.tsx:133
+#: src/features/canvas/canvas-panel.tsx:134
 msgid "Loading image editor…"
 msgstr "Bildeditor wird geladen…"
 
@@ -20034,7 +20034,7 @@ msgstr "Deine Server, Connectoren und Computer werden geladen…"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
-#: src/features/canvas/canvas-panel.tsx:731
+#: src/features/canvas/canvas-panel.tsx:747
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/split/chat-split-view.tsx:245
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
@@ -20241,7 +20241,7 @@ msgstr "Langer Text erkannt"
 msgid "Long text generation in images"
 msgstr "Generierung langer Texte in Bildern"
 
-#: src/features/chat/thread/composer-input.tsx:972
+#: src/features/chat/thread/composer-input.tsx:975
 msgid "Long text was attached as a file."
 msgstr "Der lange Text wurde als Datei angehängt."
 
@@ -20683,7 +20683,7 @@ msgstr "Layout und Struktur übernehmen"
 msgid "Matching messages"
 msgstr "Passende Nachrichten"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:246
+#: src/features/chat/thread/composer-prompt-search.tsx:273
 msgid "Matching prompts"
 msgstr "Passende Prompts"
 
@@ -22917,7 +22917,7 @@ msgstr "Keine Beschreibung angegeben."
 msgid "No devices paired."
 msgstr "Keine Geräte gekoppelt."
 
-#: src/features/canvas/components/canvas-version-history.tsx:155
+#: src/features/canvas/components/canvas-version-history.tsx:158
 msgid "No diff data available for this version"
 msgstr "Keine Differenzdaten für diese Version verfügbar"
 
@@ -22992,7 +22992,7 @@ msgstr "Kein Leitfaden"
 msgid "No history available"
 msgstr "Kein Verlauf verfügbar"
 
-#: src/features/canvas/components/canvas-version-history.tsx:215
+#: src/features/canvas/components/canvas-version-history.tsx:218
 #: src/features/workflow/components/version-history.tsx:126
 msgid "No history yet"
 msgstr "Noch kein Verlauf"
@@ -23282,7 +23282,7 @@ msgstr "Keine Ergebnisse gefunden."
 msgid "No runs yet. Start one to score every case."
 msgstr "Noch keine Durchläufe. Starte einen, um jeden Testfall zu bewerten."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:195
+#: src/features/chat/thread/composer-prompt-search.tsx:221
 msgid "No sent prompts match \"{searched}\"."
 msgstr "Keine gesendeten Prompts passen zu \"{searched}\"."
 
@@ -23496,7 +23496,7 @@ msgstr "Knotensuche"
 msgid "Node type"
 msgstr "Knotentyp"
 
-#: src/features/canvas/canvas-panel.tsx:196
+#: src/features/canvas/canvas-panel.tsx:197
 msgid "Noise Reduction"
 msgstr "Rauschunterdrückung"
 
@@ -23528,7 +23528,7 @@ msgstr "Normal"
 msgid "Normal Map"
 msgstr "Normal Map"
 
-#: src/features/canvas/canvas-panel.tsx:197
+#: src/features/canvas/canvas-panel.tsx:198
 msgid "Normalize"
 msgstr "Normalisieren"
 
@@ -23856,21 +23856,21 @@ msgid "Offline – reconnecting…"
 msgstr "Offline – Verbindung wird wiederhergestellt…"
 
 #: ../../packages/ui/src/components/file-renderers/hex-viewer.tsx:258
-#: src/features/canvas/canvas-panel.tsx:227
 #: src/features/canvas/canvas-panel.tsx:228
-#: src/features/canvas/canvas-panel.tsx:230
+#: src/features/canvas/canvas-panel.tsx:229
+#: src/features/canvas/canvas-panel.tsx:231
 msgid "Offset"
 msgstr "Versatz"
 
-#: src/features/canvas/canvas-panel.tsx:198
+#: src/features/canvas/canvas-panel.tsx:199
 msgid "Offset Blue"
 msgstr "Versatz Blau"
 
-#: src/features/canvas/canvas-panel.tsx:199
+#: src/features/canvas/canvas-panel.tsx:200
 msgid "Offset Green"
 msgstr "Versatz Grün"
 
-#: src/features/canvas/canvas-panel.tsx:200
+#: src/features/canvas/canvas-panel.tsx:201
 msgid "Offset Red"
 msgstr "Versatz Rot"
 
@@ -23878,7 +23878,7 @@ msgstr "Versatz Rot"
 msgid "Offset: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} ({hoveredValue})"
 msgstr "Offset: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} ({hoveredValue})"
 
-#: src/features/canvas/canvas-panel.tsx:201
+#: src/features/canvas/canvas-panel.tsx:202
 msgid "Oil Painting"
 msgstr "Ölgemälde"
 
@@ -24153,7 +24153,7 @@ msgstr "Nur wer in diesem Chat schreiben darf, kann die Steuerung des Browsers �
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "Nur die {0} hier geladenen Threads werden nach Status gefiltert; ältere sind nicht enthalten."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:206
+#: src/features/chat/thread/composer-prompt-search.tsx:232
 msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
 msgstr "Es werden nur die besten Treffer durchsucht, daher fehlt womöglich ein älterer oder neuerer Prompt. Füge ein Wort hinzu, um die Suche einzugrenzen."
 
@@ -24856,7 +24856,7 @@ msgstr "Geteilte Seite wird geöffnet…"
 msgid "Operating system"
 msgstr "Betriebssystem"
 
-#: src/features/canvas/canvas-panel.tsx:134
+#: src/features/canvas/canvas-panel.tsx:135
 msgid "Operation \"{label}\" failed"
 msgstr "Vorgang \"{label}\" fehlgeschlagen"
 
@@ -26025,11 +26025,11 @@ msgstr "Pins"
 msgid "Pinterest Pin"
 msgstr "Pinterest-Pin"
 
-#: src/features/canvas/canvas-panel.tsx:233
+#: src/features/canvas/canvas-panel.tsx:234
 msgid "Pixel Size"
 msgstr "Pixelgröße"
 
-#: src/features/canvas/canvas-panel.tsx:202
+#: src/features/canvas/canvas-panel.tsx:203
 msgid "Pixelize"
 msgstr "Verpixeln"
 
@@ -26510,8 +26510,8 @@ msgstr "Vorschau"
 #: ../../packages/ui/src/components/ai-elements/web-preview.tsx:163
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:62
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:139
-#: src/features/canvas/canvas-panel.tsx:762
-#: src/features/canvas/canvas-panel.tsx:767
+#: src/features/canvas/canvas-panel.tsx:778
+#: src/features/canvas/canvas-panel.tsx:783
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:317
@@ -26564,7 +26564,7 @@ msgstr "Vorschau auf Reasoning-Fähigkeiten der nächsten Generation"
 msgid "Preview of next-generation capabilities"
 msgstr "Vorschau auf Fähigkeiten der nächsten Generation"
 
-#: src/features/canvas/canvas-panel.tsx:236
+#: src/features/canvas/canvas-panel.tsx:237
 msgid "Preview: {label}"
 msgstr "Vorschau: {label}"
 
@@ -26649,7 +26649,7 @@ msgstr "Preis: aufsteigend"
 msgid "Pricing"
 msgstr "Preise"
 
-#: src/features/canvas/canvas-panel.tsx:203
+#: src/features/canvas/canvas-panel.tsx:204
 msgid "Primary"
 msgstr "Primär"
 
@@ -27449,7 +27449,7 @@ msgstr "R1-Reasoning, destilliert in ein kompaktes 32B-Modell"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:247
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:249
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:333
-#: src/features/canvas/canvas-panel.tsx:232
+#: src/features/canvas/canvas-panel.tsx:233
 msgid "Radius"
 msgstr "Radius"
 
@@ -27624,7 +27624,7 @@ msgstr "Lesereihenfolge"
 msgid "Reading…"
 msgstr "Wird gelesen…"
 
-#: src/features/canvas/canvas-panel.tsx:237
+#: src/features/canvas/canvas-panel.tsx:238
 msgid "Ready"
 msgstr "Bereit"
 
@@ -27910,12 +27910,12 @@ msgstr "Recrafts Text-zu-Bild-Modell mit langer Textgenerierung, Vektorgrafiken 
 msgid "Rectangle"
 msgstr "Rechteck"
 
-#: src/features/canvas/canvas-panel.tsx:231
+#: src/features/canvas/canvas-panel.tsx:232
 #: src/features/chat/tags/thread-tag-color-picker.tsx:21
 msgid "Red"
 msgstr "Rot"
 
-#: src/features/canvas/canvas-panel.tsx:139
+#: src/features/canvas/canvas-panel.tsx:140
 msgid "Red Channel"
 msgstr "Rotkanal"
 
@@ -27930,7 +27930,7 @@ msgstr "Weiterleitung zum Thread..."
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:607
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:293
 #: ../../packages/ui/src/components/tiptap-editor.tsx:186
-#: src/features/canvas/canvas-panel.tsx:238
+#: src/features/canvas/canvas-panel.tsx:239
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:37
 msgid "Redo"
 msgstr "Wiederholen"
@@ -28785,7 +28785,7 @@ msgid "Resend Verification Email"
 msgstr "Verifizierungs-E-Mail erneut senden"
 
 #: ../../packages/ui/src/components/image-editor.tsx:311
-#: src/features/canvas/canvas-panel.tsx:239
+#: src/features/canvas/canvas-panel.tsx:240
 #: src/features/chat/components/cinema-studio/cinema-panel.tsx:88
 #: src/features/settings/components/chat/models-settings.tsx:617
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:268
@@ -28918,7 +28918,7 @@ msgstr "In die Eingabe übernehmen"
 msgid "Restore Version {0}"
 msgstr "Version {0} wiederherstellen"
 
-#: src/features/canvas/components/canvas-version-history.tsx:233
+#: src/features/canvas/components/canvas-version-history.tsx:236
 msgid "Restore version {selectedVersion}"
 msgstr "Version {selectedVersion} wiederherstellen"
 
@@ -29285,15 +29285,15 @@ msgstr "Rom"
 msgid "Rose"
 msgstr "Rosé"
 
-#: src/features/canvas/canvas-panel.tsx:204
+#: src/features/canvas/canvas-panel.tsx:205
 msgid "Rotate 180°"
 msgstr "180° drehen"
 
-#: src/features/canvas/canvas-panel.tsx:205
+#: src/features/canvas/canvas-panel.tsx:206
 msgid "Rotate 90° CCW"
 msgstr "90° gegen den Uhrzeigersinn drehen"
 
-#: src/features/canvas/canvas-panel.tsx:207
+#: src/features/canvas/canvas-panel.tsx:208
 msgid "Rotate 90° CW"
 msgstr "90° im Uhrzeigersinn drehen"
 
@@ -29625,7 +29625,7 @@ msgstr "Sans"
 msgid "Sans (default)"
 msgstr "Sans (Standard)"
 
-#: src/features/canvas/canvas-panel.tsx:208
+#: src/features/canvas/canvas-panel.tsx:209
 msgid "Saturate"
 msgstr "Sättigen"
 
@@ -29647,7 +29647,7 @@ msgstr "Saudi-Arabien"
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/goal/pinned-goal.tsx:134
 #: src/features/chat/host/host-composer.tsx:1006
-#: src/features/chat/pins/pin-item.tsx:295
+#: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
 #: src/features/chat/thread/edit-composer.tsx:166
@@ -29712,7 +29712,7 @@ msgstr "Änderungen speichern"
 msgid "Save Changes"
 msgstr "Änderungen speichern"
 
-#: src/features/canvas/canvas-panel.tsx:241
+#: src/features/canvas/canvas-panel.tsx:242
 msgid "Save failed"
 msgstr "Speichern fehlgeschlagen"
 
@@ -29764,11 +29764,11 @@ msgstr "Tools speichern"
 msgid "Save Variables"
 msgstr "Variablen speichern"
 
-#: src/features/canvas/canvas-panel.tsx:242
+#: src/features/canvas/canvas-panel.tsx:243
 msgid "Save version"
 msgstr "Version speichern"
 
-#: src/features/canvas/canvas-panel.tsx:240
+#: src/features/canvas/canvas-panel.tsx:241
 msgid "Save version as new"
 msgstr "Version als neu speichern"
 
@@ -29835,7 +29835,7 @@ msgstr "Tools werden gespeichert…"
 msgid "Saving..."
 msgstr "Wird gespeichert..."
 
-#: src/features/canvas/canvas-panel.tsx:243
+#: src/features/canvas/canvas-panel.tsx:244
 #: src/features/develop/components/pull-request-edit-action.tsx:174
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 #: src/features/skills/components/skill-form-dialog.tsx:515
@@ -29913,7 +29913,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:1652
+#: src/features/chat/thread/composer-input.tsx:1655
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
@@ -30115,9 +30115,9 @@ msgstr "Suchergebnisse"
 msgid "Search Results ({0})"
 msgstr "Suchergebnisse ({0})"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:220
-#: src/features/chat/thread/composer-prompt-search.tsx:224
-#: src/features/chat/thread/composer-prompt-search.tsx:241
+#: src/features/chat/thread/composer-prompt-search.tsx:246
+#: src/features/chat/thread/composer-prompt-search.tsx:250
+#: src/features/chat/thread/composer-prompt-search.tsx:267
 msgid "Search sent prompts"
 msgstr "Gesendete Prompts durchsuchen"
 
@@ -30225,7 +30225,7 @@ msgstr "Suchen..."
 msgid "Searched the latest messages only"
 msgstr "Nur die neuesten Nachrichten durchsucht"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:193
+#: src/features/chat/thread/composer-prompt-search.tsx:219
 msgid "Searching"
 msgstr "Suche läuft"
 
@@ -30327,7 +30327,7 @@ msgstr "Wähle eine Teilmenge der erlaubten Modelle der Organisation für dieses
 msgid "Select a version to preview"
 msgstr "Version zur Vorschau auswählen"
 
-#: src/features/canvas/components/canvas-version-history.tsx:239
+#: src/features/canvas/components/canvas-version-history.tsx:242
 msgid "Select a version to see changes"
 msgstr "Version auswählen, um Änderungen zu sehen"
 
@@ -30756,7 +30756,7 @@ msgstr "{device}: gesendet…"
 msgid "Separate tags with commas."
 msgstr "Trenne Tags mit Kommas."
 
-#: src/features/canvas/canvas-panel.tsx:209
+#: src/features/canvas/canvas-panel.tsx:210
 msgid "Sepia"
 msgstr "Sepia"
 
@@ -31035,7 +31035,7 @@ msgstr "Mit deiner Organisation geteilt"
 msgid "sharp detail"
 msgstr "scharfe Details"
 
-#: src/features/canvas/canvas-panel.tsx:210
+#: src/features/canvas/canvas-panel.tsx:211
 msgid "Sharpen"
 msgstr "Schärfen"
 
@@ -31153,12 +31153,12 @@ msgid "Show Labels"
 msgstr "Beschriftungen anzeigen"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
-#: src/features/chat/pins/pin-item.tsx:207
+#: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
 msgid "Show less"
 msgstr "Weniger anzeigen"
 
-#: src/features/chat/pins/pin-item.tsx:207
+#: src/features/chat/pins/pin-item.tsx:214
 msgid "Show more"
 msgstr "Mehr anzeigen"
 
@@ -31707,7 +31707,7 @@ msgstr "Folie {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Folientitel"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1187
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1188
 msgid "Slide updated"
 msgstr "Folie aktualisiert"
 
@@ -31849,7 +31849,7 @@ msgstr "Softwareentwicklungsaufgaben, die xAIs spezialisiertes Coding-Modell erf
 msgid "software engineering"
 msgstr "Software-Engineering"
 
-#: src/features/canvas/canvas-panel.tsx:211
+#: src/features/canvas/canvas-panel.tsx:212
 msgid "Solarize"
 msgstr "Solarisieren"
 
@@ -31964,7 +31964,7 @@ msgstr "Soundeffekte aktiviert"
 msgid "Source"
 msgstr "Quelle"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1324
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1325
 #: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "Quelle {index}"
@@ -32196,7 +32196,7 @@ msgstr "Spotify"
 msgid "Spreadsheet"
 msgstr "Tabelle"
 
-#: src/features/canvas/canvas-panel.tsx:653
+#: src/features/canvas/canvas-panel.tsx:663
 msgid "Spreadsheet imported successfully."
 msgstr "Tabellenkalkulation erfolgreich importiert."
 
@@ -32801,7 +32801,7 @@ msgstr "Stärke"
 msgid "Strikethrough"
 msgstr "Durchgestrichen"
 
-#: src/features/canvas/canvas-panel.tsx:234
+#: src/features/canvas/canvas-panel.tsx:235
 msgid "Strips"
 msgstr "Streifen"
 
@@ -33355,15 +33355,15 @@ msgstr "Suaheli"
 msgid "Swahili (Kenya)"
 msgstr "Suaheli (Kenia)"
 
-#: src/features/canvas/canvas-panel.tsx:212
+#: src/features/canvas/canvas-panel.tsx:213
 msgid "Swap G↔B"
 msgstr "G↔B tauschen"
 
-#: src/features/canvas/canvas-panel.tsx:213
+#: src/features/canvas/canvas-panel.tsx:214
 msgid "Swap R↔B"
 msgstr "R↔B tauschen"
 
-#: src/features/canvas/canvas-panel.tsx:214
+#: src/features/canvas/canvas-panel.tsx:215
 msgid "Swap R↔G"
 msgstr "R↔G tauschen"
 
@@ -34243,7 +34243,7 @@ msgstr "Dieser Passcode ist nicht richtig."
 msgid "That path is a file."
 msgstr "Dieser Pfad ist eine Datei."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:186
+#: src/features/chat/thread/composer-prompt-search.tsx:212
 msgid "That prompt is no longer available. Pick another."
 msgstr "Dieser Prompt ist nicht mehr verfügbar. Wähle einen anderen."
 
@@ -34514,7 +34514,7 @@ msgstr "die Änderung wurde abgelehnt"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Der Chat-Agent erledigt die Aufgabe mit seinen Tools und folgt optional einem Skill."
 
-#: src/features/chat/thread/composer-input.tsx:1072
+#: src/features/chat/thread/composer-input.tsx:1075
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "Der Chat hat gewechselt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -34550,8 +34550,8 @@ msgstr "Die Kommandozeile wurde nicht angemeldet. Du kannst diesen Tab schließe
 msgid "The comparison could not be loaded."
 msgstr "Der Vergleich konnte nicht geladen werden."
 
-#: src/features/chat/thread/composer-input.tsx:1080
-#: src/features/chat/thread/composer-input.tsx:1102
+#: src/features/chat/thread/composer-input.tsx:1083
+#: src/features/chat/thread/composer-input.tsx:1105
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "Der Eingabebereich war gesperrt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -34631,7 +34631,7 @@ msgstr "Die Dokumente, aus denen die Antwort abgerufen werden soll. Wird für Tr
 msgid "The draft is full. Send or remove some comments before adding more."
 msgstr "Der Entwurf ist voll. Sende oder entferne einige Kommentare, bevor du weitere hinzufügst."
 
-#: src/features/canvas/canvas-panel.tsx:129
+#: src/features/canvas/canvas-panel.tsx:130
 msgid "The edited image is too large to save (>1 MB). Try cropping, downscaling, or applying fewer effects."
 msgstr "Das bearbeitete Bild ist zu groß zum Speichern (>1 MB). Versuche, es zuzuschneiden, zu verkleinern oder weniger Effekte anzuwenden."
 
@@ -34823,7 +34823,7 @@ msgstr "die Host-Software ist veraltet"
 msgid "The icons could not be loaded."
 msgstr "Die Symbole konnten nicht geladen werden."
 
-#: src/features/canvas/canvas-panel.tsx:638
+#: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
 msgstr "Die importierte Datei scheint leer zu sein."
 
@@ -34933,7 +34933,7 @@ msgstr "Das Modell im Link ist nicht verfügbar. Der Chat behält sein Modell."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "Die Modellauswahl listet jetzt {0} Modelle von {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1587
+#: src/features/chat/thread/composer-input.tsx:1590
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "Die Modellauswahl hat sich während der Uploads geändert, daher wurde die Nachricht nicht gesendet. Drücke auf Senden, um sie zu senden."
 
@@ -35010,7 +35010,7 @@ msgstr "Die Seite, die du geöffnet hast, lädt noch."
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Die Seite, alle Unterseiten, ihre Kommentare und ihr Versionsverlauf werden gelöscht. Das kann nicht rückgängig gemacht werden."
 
-#: src/features/chat/thread/composer-input.tsx:1128
+#: src/features/chat/thread/composer-input.tsx:1131
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Der eingefügte Text konnte nicht angehängt werden und wurde nicht eingefügt."
 
@@ -35039,7 +35039,7 @@ msgstr "Die Repositorys des Projekts konnten nicht geladen werden, daher ist der
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "Der Prompt wird zur Eingabe des Testfalls und diese Antwort zur erwarteten Antwort. Du kannst beides vor dem Speichern bearbeiten."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:188
+#: src/features/chat/thread/composer-prompt-search.tsx:214
 msgid "The prompt could not be checked. Try again."
 msgstr "Der Prompt konnte nicht geprüft werden. Versuche es erneut."
 
@@ -35157,7 +35157,7 @@ msgstr "Der Lauf landet dort, wo du gewählt hast: jedes Mal in einem neuen Chat
 msgid "The screenshot could not be saved."
 msgstr "Der Screenshot konnte nicht gespeichert werden."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:191
+#: src/features/chat/thread/composer-prompt-search.tsx:217
 msgid "The search failed. Try again."
 msgstr "Die Suche ist fehlgeschlagen. Versuche es erneut."
 
@@ -35234,11 +35234,11 @@ msgstr "Die beiden Passcodes stimmen nicht überein."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 
-#: src/features/chat/thread/composer-input.tsx:706
+#: src/features/chat/thread/composer-input.tsx:709
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
 
-#: src/features/chat/thread/composer-input.tsx:1600
+#: src/features/chat/thread/composer-input.tsx:1603
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "Die Uploads sind abgeschlossen, aber die Nachricht wurde nicht gesendet. Drücke auf Senden, um sie zu senden."
 
@@ -35397,7 +35397,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Vision-Language-Modell mit Denkmodus"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1250
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1251
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -35729,7 +35729,7 @@ msgstr "Dieser Host verwendet {key} in ~/.ssh/config, was Neore nicht unterstüt
 msgid "This image has been flagged for review"
 msgstr "Dieses Bild wurde zur Prüfung markiert"
 
-#: src/features/canvas/canvas-panel.tsx:127
+#: src/features/canvas/canvas-panel.tsx:128
 msgid "This image's host does not allow editing. Re-upload or generate a new image to enable editing."
 msgstr "Der Host dieses Bildes erlaubt keine Bearbeitung. Lade es erneut hoch oder generiere ein neues Bild, um es bearbeiten zu können."
 
@@ -36123,7 +36123,7 @@ msgstr "Dies wird den Prompt \"{0}\" dauerhaft löschen. Diese Aktion kann nicht
 msgid "This will permanently remove these {0} files from your knowledge base, including their indexed content. The original files in your vault will not be affected."
 msgstr "Dadurch werden diese {0} Dateien einschließlich ihres indexierten Inhalts dauerhaft aus deiner Wissensdatenbank entfernt. Die Originaldateien in deinem Tresor sind nicht betroffen."
 
-#: src/features/canvas/canvas-panel.tsx:644
+#: src/features/canvas/canvas-panel.tsx:654
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "Diese Arbeitsmappe hat {sheetCount} Tabellenblätter — nur das erste Tabellenblatt wurde importiert."
 
@@ -36275,7 +36275,7 @@ msgstr "Threads, die an diesem {requestNoun} arbeiten"
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr "Drei Schritte, um Coding-Agenten auf deinen eigenen Computern zu nutzen. Überspringe einen davon und komm später zurück."
 
-#: src/features/canvas/canvas-panel.tsx:215
+#: src/features/canvas/canvas-panel.tsx:216
 #: src/features/settings/components/chat/usage-settings.tsx:500
 msgid "Threshold"
 msgstr "Schwellenwert"
@@ -36743,7 +36743,7 @@ msgid "transform"
 msgstr "transformieren"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:290
-#: src/features/canvas/canvas-panel.tsx:126
+#: src/features/canvas/canvas-panel.tsx:127
 #: src/features/workflow/templates/index.ts:331
 msgid "Transform"
 msgstr "Transformieren"
@@ -37143,7 +37143,7 @@ msgstr "Gib es erneut ein"
 msgid "Type to search"
 msgstr "Tippen zum Suchen"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:183
+#: src/features/chat/thread/composer-prompt-search.tsx:209
 msgid "Type to search the prompts you have sent."
 msgstr "Gib etwas ein, um die gesendeten Prompts zu durchsuchen."
 
@@ -37153,7 +37153,7 @@ msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2099
+#: src/features/chat/thread/composer-input.tsx:2102
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:231
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
@@ -37315,7 +37315,7 @@ msgstr "Unterstrichen"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
 #: src/components/model-picker/model-picker.tsx:862
-#: src/features/canvas/canvas-panel.tsx:244
+#: src/features/canvas/canvas-panel.tsx:245
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
@@ -37323,7 +37323,7 @@ msgstr "Unterstrichen"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:974
+#: src/features/chat/thread/composer-input.tsx:977
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Rückgängig"
@@ -37485,7 +37485,7 @@ msgstr "Veröffentlichung zurückziehen"
 msgid "Unread"
 msgstr "Ungelesen"
 
-#: src/features/canvas/canvas-panel.tsx:733
+#: src/features/canvas/canvas-panel.tsx:749
 msgid "Unsaved changes"
 msgstr "Nicht gespeicherte Änderungen"
 
@@ -37575,7 +37575,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1949
+#: src/features/chat/thread/composer-input.tsx:1952
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -37672,11 +37672,11 @@ msgstr "Aktualisierte OpenAI-Spitzenleistung"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Aktualisierte Reasoning-Fähigkeiten gegenüber dem ursprünglichen R1"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Updated slide"
 msgstr "Folie aktualisiert"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1185
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Updated slide {slideNumber}"
 msgstr "Folie {slideNumber} aktualisiert"
 
@@ -37774,13 +37774,13 @@ msgid "Upload documents to your knowledge base and group them into collections. 
 msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Sammlungen. Die KI durchsucht sie nach relevantem Kontext und zitiert die verwendeten Abschnitte."
 
 #: src/features/chat/thread/composer-input.tsx:436
-#: src/features/chat/thread/composer-input.tsx:751
-#: src/features/chat/thread/composer-input.tsx:1855
+#: src/features/chat/thread/composer-input.tsx:754
+#: src/features/chat/thread/composer-input.tsx:1858
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1848
+#: src/features/chat/thread/composer-input.tsx:1851
 msgid "Upload failed: {0}"
 msgstr "Upload fehlgeschlagen: {0}"
 
@@ -38426,7 +38426,7 @@ msgstr "Inhalt von Version {0}"
 msgid "Version {position} of {total}"
 msgstr "Version {position} von {total}"
 
-#: src/features/canvas/canvas-panel.tsx:772
+#: src/features/canvas/canvas-panel.tsx:788
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
 #: src/features/pages/components/page-view.tsx:448
@@ -38442,7 +38442,7 @@ msgstr "Versionsverlauf"
 msgid "Version restored"
 msgstr "Version wiederhergestellt"
 
-#: src/features/canvas/components/canvas-version-history.tsx:184
+#: src/features/canvas/components/canvas-version-history.tsx:187
 #: src/features/prompts/components/prompt-history-dialog.tsx:104
 msgid "Versions"
 msgstr "Versionen"
@@ -38459,7 +38459,7 @@ msgstr "Vertikales Promo-Layout"
 msgid "Vertical story"
 msgstr "Vertikale Story"
 
-#: src/features/canvas/canvas-panel.tsx:216
+#: src/features/canvas/canvas-panel.tsx:217
 msgid "Vertical Strips"
 msgstr "Vertikale Streifen"
 
@@ -39842,7 +39842,7 @@ msgid "Yesterday"
 msgstr "Gestern"
 
 #: src/features/chat/forward/forward-selection-bar.tsx:54
-#: src/features/chat/pins/pin-item.tsx:240
+#: src/features/chat/pins/pin-item.tsx:247
 msgid "You"
 msgstr "Du"
 
@@ -39896,8 +39896,8 @@ msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfü
 msgid "You are offline. Reconnect and try again."
 msgstr "Du bist offline. Stelle die Verbindung wieder her und versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1187
-#: src/features/chat/thread/composer-input.tsx:1312
+#: src/features/chat/thread/composer-input.tsx:1190
+#: src/features/chat/thread/composer-input.tsx:1315
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Du bist offline. Deine Nachricht bleibt hier; sende sie, sobald du wieder online bist."
@@ -40286,12 +40286,12 @@ msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Con
 msgstr "Deine GitHub-Anmeldung ist abgelaufen. Verbinde GitHub unter Einstellungen → Connectors erneut."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:816
+#: src/features/chat/thread/composer-input.tsx:819
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Deine Eingabe ist groß (~{0} Token) und wird einen erheblichen Teil des Kontextfensters des Modells beanspruchen."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:809
+#: src/features/chat/thread/composer-input.tsx:812
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Deine Eingabe ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Bitte kürze die Nachricht oder entferne Anhänge, um sie zu senden."
 
@@ -40324,7 +40324,7 @@ msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 msgid "Your message"
 msgstr "Deine Nachricht"
 
-#: src/features/chat/thread/composer-input.tsx:1572
+#: src/features/chat/thread/composer-input.tsx:1575
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Deine Nachricht hat sich während der Uploads geändert, daher wurde sie nicht gesendet. Drücke auf Senden, um sie zu senden."
 

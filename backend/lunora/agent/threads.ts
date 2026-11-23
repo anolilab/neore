@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { deleteHumanChecksOfThread } from "../browser/gdpr";
+import { eraseThreadPinsAndRoutes } from "../chat/gdpr";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
@@ -37,9 +38,11 @@ import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
-    const result = omit(thread, ["parentThreadIds"]);
+    // The palette-search vector ids are internal (`agent/thread-search.ts`): no client reads them.
+    const result = omit(thread, ["parentThreadIds", ...SEARCH_INTERNAL_FIELDS]);
 
     // `vThreadDoc` types `projectId` as a plain string, and `Id<"projects">` is a
     // branded `string`, so the widening needs no cast — the branch stays only to
@@ -466,6 +469,8 @@ export const deleteAllForThreadIdAsync = internalMutation
         const isDone = messagesResult.isDone && streamResult.isDone;
 
         if (isDone) {
+            // Every deletion of a thread, single, bulk or hard, comes through here: its pins and the routes to it go too (`chat/gdpr.ts`).
+            await eraseThreadPinsAndRoutes(ctx, args.threadId);
             // The thread is fully gone, so its expiry marker goes with it. Until now the
             // cron leases the marker (`deleteExpiredTemporaryChats`), so it is still here
             // only while a chain is running or has died.
