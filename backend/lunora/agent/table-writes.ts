@@ -71,11 +71,13 @@ const RUNNER_WRITE_ATTEMPTS = 3;
 
 /**
  * Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`), with that thread's start
- * time. The row is its owner's, so no other member reads it. Each write is conditional on the organization, the owner and the
- * stamp the row was read with: a `.global()` read and a later write are not one transaction, so a project moved into an
- * organization in between must not take the owner's runner along, and a newer thread's runner recorded in between is not
- * replaced. When another write got in first, the row as it now stands is checked again: the write is retried only while the
- * project is still the same owner's personal project and no thread newer than this one recorded its runner.
+ * time. The row is its owner's, so no other member reads it. A thread started before the project's last move between spaces, or
+ * in its millisecond, records nothing: a project moved into an organization and back must not get a runner from before the moves.
+ * Each write is conditional on the organization, the move stamp, the owner and the runner stamp the row was read with: a
+ * `.global()` read and a later write are not one transaction, so a project moved in between must not take the owner's runner
+ * along, and a newer thread's runner recorded in between is not replaced. When another write got in first, the row as it now
+ * stands is checked again: the write is retried only while the project is still the same owner's personal project, has not
+ * moved since the thread started, and no thread newer than this one recorded its runner.
  */
 export const setProjectRunnerDefault = async (
     db: Database,
@@ -86,7 +88,12 @@ export const setProjectRunnerDefault = async (
     let current: Doc<"projects"> | null = project;
 
     for (let attempt = 0; attempt < RUNNER_WRITE_ATTEMPTS && current !== null; attempt += 1) {
-        if (current.userId !== project.userId || current.organizationId || (current.runnerThreadAt ?? -Infinity) > threadAt) {
+        if (
+            current.userId !== project.userId ||
+            current.organizationId ||
+            (current.organizationChangedAt ?? -Infinity) >= threadAt ||
+            (current.runnerThreadAt ?? -Infinity) > threadAt
+        ) {
             return;
         }
 
@@ -98,7 +105,12 @@ export const setProjectRunnerDefault = async (
                 runnerKind: "host",
                 runnerThreadAt: threadAt,
             },
-            where: { organizationId: current.organizationId ?? null, runnerThreadAt: current.runnerThreadAt ?? null, userId: current.userId },
+            where: {
+                organizationChangedAt: current.organizationChangedAt ?? null,
+                organizationId: current.organizationId ?? null,
+                runnerThreadAt: current.runnerThreadAt ?? null,
+                userId: current.userId,
+            },
         });
 
         if (applied) {

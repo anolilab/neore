@@ -1520,6 +1520,50 @@ describe("a project remembers its runner", () => {
         expect(await defaultOf(projectId)).toBeNull();
     });
 
+    it("records no personal runner for a thread started before the project moved into an organization and back", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const startedAt = Date.now() - 60_000;
+
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "org-a" }, projectId: projectId as never }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "" }, projectId: projectId as never }));
+
+        const movedBack = (await projectRow(projectId)) as never;
+        const { organizationChangedAt: movedAt } = (await projectRow(projectId)) as { organizationChangedAt: number };
+        const runnerKeyAfter = async (threadAt: number): Promise<unknown> => {
+            await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, movedBack, ownerId, runner, threadAt));
+            const stored = await projectRow(projectId);
+
+            return stored?.runnerAgentKey;
+        };
+
+        // Started before the moves, and in the move-back's own millisecond: nothing is saved.
+        expect(await runnerKeyAfter(startedAt)).toBe("");
+        expect(await runnerKeyAfter(movedAt)).toBe("");
+        // Started after the move-back: saved.
+        expect(await runnerKeyAfter(movedAt + 1)).toBe("claude");
+    });
+
+    it("records no personal runner when the project moves into an organization and back between its read and its write", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 5000, organizationId: "org-a" }));
+        await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 6000, organizationId: "" }));
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, 3000),
+        );
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerDeviceId).toBeUndefined();
+    });
+
     it("forgets a person's organization default when the project leaves the organization, so a move back restores nothing", async () => {
         activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
         await run(async (ctx) => {

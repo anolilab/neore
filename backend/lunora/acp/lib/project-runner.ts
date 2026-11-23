@@ -159,7 +159,8 @@ export const rememberProjectRunner = async (
     threadAt: number,
 ): Promise<void> => {
     if (!project.organizationId) {
-        // It leaves a runner a newer thread recorded, and retries a write another one got in before.
+        // It records nothing for a thread started before the project's last move (strictly after, as `entryApplies`), leaves a
+        // runner a newer thread recorded, and retries a write another one got in before.
         await setProjectRunnerDefault(ctx.db, project, runner, threadAt);
 
         return;
