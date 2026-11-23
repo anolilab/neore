@@ -351,6 +351,13 @@ export function readTarget(
             // The form a click submits: a button's own form (its `form` attribute can name one outside it), else the enclosing form.
             let enclosingForm: HTMLFormElement | null = control.closest("form");
 
+            // A label's click submits the form of the control it labels, which may sit outside any form the label is in.
+            const labelledSubmitter = control instanceof HTMLLabelElement ? control.control : null;
+
+            if ((labelledSubmitter instanceof HTMLButtonElement || labelledSubmitter instanceof HTMLInputElement) && labelledSubmitter.form !== null) {
+                enclosingForm = labelledSubmitter.form;
+            }
+
             for (const node of nodes) {
                 if ((node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.form !== null) {
                     enclosingForm = node.form;

@@ -717,6 +717,19 @@ describe("readTarget in a page", () => {
         expect(read.labelTruncated).toBe(true);
     });
 
+    it("a label outside a card form, labelling a submit button inside it, reads as a checkout", async () => {
+        await pageWith(
+            page,
+            `<label id="confirm-label" for="pay">Confirm</label><form action="/pay"><input autocomplete="cc-number"><button id="pay" type="submit">Pay</button></form>`,
+            "/offers",
+        );
+        const element = await page.$("#confirm-label");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.checkout).toBe(true);
+    });
+
     it("an unrelated gift-card field elsewhere on a formless page does not make its Continue button a checkout", async () => {
         await pageWith(page, `<input name="gift_card" placeholder="Gift card code"><button id="go">Continue</button>`, "/offers");
         const element = await page.$("#go");
