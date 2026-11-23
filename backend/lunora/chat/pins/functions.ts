@@ -430,11 +430,14 @@ export const deletePin = authMutation
             .query("threadPins")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", pin.threadId))
             .take(1);
-        const route =
-            left.length === 0 ? await context.db.sharedPinRoutes.findFirst({ consistency: "primary", where: { threadId: pin.threadId, userId } }) : null;
 
-        if (route) {
-            await context.db.delete("sharedPinRoutes", route._id);
+        if (left.length === 0) {
+            // Every route to the thread goes: a guest merge can leave more than one for the same user and thread, and a survivor is a link.
+            const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: 100, where: { threadId: pin.threadId, userId } });
+
+            for (const route of page) {
+                await context.db.delete("sharedPinRoutes", route._id);
+            }
         }
 
         context.log.event("chat.delete_pin", { deleted: true });

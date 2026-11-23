@@ -256,6 +256,29 @@ describe("document pins", () => {
 });
 
 describe("the route a collaborator's pin leaves", () => {
+    it("drops every route to the thread once the last pin goes, even a duplicate a merge left", async () => {
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" }),
+        );
+
+        const pinId = await as("user-collaborator").mutation(createPin as never, { messageId: "m-12", messageRole: "assistant", threadId } as never);
+
+        await harness.run(
+            async (context: any) => await context.db.insert("sharedPinRoutes", { createdAt: 2, ownerId: OWNER, threadId, userId: "user-collaborator" }),
+        );
+
+        await as("user-collaborator").mutation(deletePin as never, { pinId, threadId } as never);
+
+        const routes = await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+            return page as unknown[];
+        });
+
+        expect(routes).toHaveLength(0);
+    });
+
     it("drops the route once a collaborator deletes their last pin on the thread", async () => {
         await harness.run(
             async (context: any) =>
