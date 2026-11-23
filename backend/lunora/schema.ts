@@ -15,7 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
-import { threadSearchTriggers } from "./agent/thread-search-triggers";
+import { threadSearchMessageTriggers, threadSearchTriggers } from "./agent/thread-search-triggers";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
@@ -1737,6 +1737,8 @@ export const schema = defineSchema({
         .index("by_threadId_parentMessageId", ["threadId", "parentMessageId"])
         .index("embeddingId_threadId", ["embeddingId", "threadId"])
         .searchIndex("text_search", { field: "text", filterFields: ["userId", "threadId"] })
+        // A deleted user turn can drop its thread below the palette search's turn gate (`agent/thread-search-triggers.ts`).
+        .triggers((t) => threadSearchMessageTriggers(t))
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),

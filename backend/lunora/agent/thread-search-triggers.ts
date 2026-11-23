@@ -9,6 +9,8 @@
  */
 import type { TriggerBuilder, TriggerCtx } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
+
 import { SEARCH_KINDS, SEARCH_VECTOR_FIELD, type SearchRow, searchKindsChanged } from "./thread-search-plan";
 
 type Internal = (typeof import("../_generated/internal"))["internal"];
@@ -81,6 +83,31 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
                     { retry: SYNC_RETRY },
                 );
             }
+        }),
+    };
+};
+
+/**
+ * The messages table's trigger for the turn gate. Deleting a user turn can take a thread from
+ * four user turns to three, so its vectors must be re-checked: a sync with no changed kinds
+ * clears a thread that no longer qualifies. Only user rows schedule one, so a delete of tool or
+ * assistant rows costs nothing.
+ */
+export const threadSearchMessageTriggers = (t: TriggerBuilder) => {
+    return {
+        threadSearchTurnDelete: t.afterDelete(async (context, event) => {
+            const previous = event.previous as unknown as { message?: { role?: unknown }; threadId?: Id<"threads"> };
+
+            if (previous.message?.role !== "user" || previous.threadId === undefined) {
+                return;
+            }
+
+            await scheduleOrLog(
+                context,
+                (internal) => internal.agent.thread_search.syncThreadSearch,
+                { changed: [], threadId: previous.threadId },
+                { retry: SYNC_RETRY },
+            );
         }),
     };
 };

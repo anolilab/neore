@@ -306,6 +306,7 @@ describe("eligibility", () => {
         expect(isSearchEligible(thread({ lockedAt: 1 }))).toBe(false);
         expect(isSearchEligible(thread({ deleted: true }))).toBe(false);
         expect(isSearchEligible(thread({ isTemporary: true }))).toBe(false);
+        expect(isSearchEligible(thread({ deletingAt: 1 }))).toBe(false);
         expect(isSearchEligible({ title: "x" })).toBe(false);
     });
 });

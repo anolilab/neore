@@ -167,6 +167,19 @@ describe(runThreadSearchSync, () => {
         expect(runMutation).toHaveBeenCalledTimes(1);
     });
 
+    it("still clears a stale vector when another job's live claim covers the texts", async () => {
+        const runQuery = vi.fn(async () => readyThread({ summary: { text: null, vectorId: "old-summary" } }));
+        const runMutation = vi.fn(async (reference: unknown) => (reference === internal.agent.thread_search.claimThreadSearch ? false : null));
+
+        await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title", "summary"], threadId: THREAD });
+
+        expect(runMutation).toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, {
+            clear: [{ kind: "summary", vectorId: "old-summary" }],
+            embedded: [],
+            threadId: THREAD,
+        });
+    });
+
     it("releases its claim after the commit, whatever the outcome", async () => {
         const ctx = makeCtx({ readThreadSearchState: readyThread() });
 
@@ -270,6 +283,29 @@ describe(searchThreadsByMeaningFor, () => {
         });
 
         expect(await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-1" })).toEqual([]);
+    });
+
+    it("finds the visible match past stale hits that would fill the first result slots", async () => {
+        const stale = Array.from({ length: 12 }, (_, index) => {
+            return { _id: `vec-stale-${String(index)}`, _score: 0.95 - index * 0.001 };
+        });
+
+        mocks.searchVectors.mockImplementation(async (_ctx, _vector, args) =>
+            args.table === "threadTitle" ? [...stale, { _id: "vec-pdf", _score: 0.6 }] : [],
+        );
+        const ctx = makeCtx({
+            threadIdsForVectors: [
+                ...stale.map((hit, index) => {
+                    return { threadId: `thread-locked-${String(index)}`, vectorId: hit._id };
+                }),
+                { threadId: "thread-pdf", vectorId: "vec-pdf" },
+            ],
+            visibleThreads: [{ archived: false, threadId: "thread-pdf", title: "PDF totals off by one" }],
+        });
+
+        expect(await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-1" })).toEqual([
+            { archived: false, score: 0.6, threadId: "thread-pdf", title: "PDF totals off by one" },
+        ]);
     });
 
     it("answers nothing for a query too short to embed", async () => {

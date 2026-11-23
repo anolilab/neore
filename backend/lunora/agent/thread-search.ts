@@ -269,6 +269,11 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
     const claimId = texts.length > 0 ? crypto.randomUUID() : undefined;
 
     if (claimId !== undefined && !(await ctx.runMutation(internal.agent.thread_search.claimThreadSearch, { claimId, texts, threadId: args.threadId }))) {
+        // The holder embeds these texts and commits them. Its plan may not clear what this one does, so clear that here too.
+        if (plan.clear.length > 0) {
+            await ctx.runMutation(internal.agent.thread_search.commitThreadSearch, { clear: plan.clear, embedded: [], threadId: args.threadId });
+        }
+
         return;
     }
 
@@ -329,7 +334,8 @@ export const releaseThreadSearch = internalMutation
         const thread = (await ctx.db.get("threads", args.threadId)) as Doc<"threads"> | null;
 
         if (thread?.searchClaim?.id === args.claimId) {
-            await patchRow(ctx.db, "threads", thread, { searchClaim: { ...thread.searchClaim, expiresAt: 0 } });
+            // Removed, not kept as expired: a kept claim would hold a copy of the thread's text on the row.
+            await patchRow(ctx.db, "threads", thread, { searchClaim: undefined });
         }
 
         return null;
@@ -487,6 +493,7 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
 
     const owners = await ctx.runQuery(internal.agent.thread_search.threadIdsForVectors, { vectorIds: hits.map((hit) => hit._id) });
     const threadByVector = new Map(owners.flatMap((owner) => (owner.threadId === null ? [] : [[owner.vectorId, owner.threadId] as const])));
+    // Every candidate is kept until visibility is checked: a stale hit (a locked or deleted thread) must not take a result slot.
     const ranked = bestMeaningThreadIds(
         hits.flatMap((hit) => {
             const threadId = threadByVector.get(hit._id);
@@ -494,7 +501,7 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
             return threadId === undefined ? [] : [{ score: hit._score, threadId }];
         }),
         MEANING_MIN_SCORE,
-        MEANING_RESULT_LIMIT,
+        MEANING_TOP_K * SEARCH_KINDS.length,
     );
 
     if (ranked.length === 0) {
@@ -511,7 +518,8 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: s
         .map((row) => {
             return { archived: row.archived, score: scoreOf.get(row.threadId) ?? 0, threadId: row.threadId, title: row.title };
         })
-        .toSorted((a, b) => b.score - a.score);
+        .toSorted((a, b) => b.score - a.score)
+        .slice(0, MEANING_RESULT_LIMIT);
 };
 
 export const searchThreadsByMeaning = authAction

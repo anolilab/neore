@@ -46,7 +46,7 @@ export const TURN_SCAN_PAGE_ROWS = 400;
 export const TURN_SCAN_MAX_PAGES = 50;
 
 /** Nearest vectors read per kind for one query. */
-export const MEANING_TOP_K = 10;
+export const MEANING_TOP_K = 50;
 /** Threads the palette takes from a meaning query. */
 export const MEANING_RESULT_LIMIT = 10;
 /**
@@ -60,6 +60,8 @@ export const MEANING_MIN_CHARS = 3;
 /** The thread fields this module reads. A `threads` row satisfies it. */
 export interface SearchRow {
     deleted?: boolean;
+    /** Set when a hard delete begins; its paged cleanup then runs, so the thread is no longer searchable. */
+    deletingAt?: number;
     isTemporary?: boolean;
     lastReplyAt?: number;
     lockedAt?: number | null;
@@ -125,7 +127,7 @@ export const claimHolds = (claim: SearchClaim | undefined, texts: ReadonlyArray<
 
 /** Whether the thread may be in the index at all (the turn gate is checked separately). */
 export const isSearchEligible = (row: SearchRow): boolean =>
-    row.userId !== undefined && !row.deleted && !row.isTemporary && (row.lockedAt === undefined || row.lockedAt === null);
+    row.userId !== undefined && !row.deleted && row.deletingAt === undefined && !row.isTemporary && (row.lockedAt === undefined || row.lockedAt === null);
 
 /** Whether a thread has MORE than {@link MIN_TURNS_TO_EMBED} user turns. */
 export const hasEnoughTurns = (userTurns: number): boolean => userTurns > MIN_TURNS_TO_EMBED;
