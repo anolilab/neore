@@ -150,7 +150,7 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
 
         // The runner a project remembers is the one that opened: a start the computer refused or never opened records nothing.
         if (opened && thread?.projectId) {
-            await rememberOpenedRunner(ctx, thread.projectId, existing);
+            await rememberOpenedRunner(ctx, { ...thread, projectId: thread.projectId }, existing);
         }
 
         return { ended: existing.status === "ended", next: 0, outcome: "applied", threadId: existing.threadId as string };

@@ -279,15 +279,25 @@ export const updateProject = internalMutation
             }
         }
 
+        const changesOrganization =
+            args.patch.organizationId !== undefined && (args.patch.organizationId || undefined) !== (project.organizationId || undefined);
+
         // A project that changes organization leaves its personal runner behind: on the row it would show to the organization's
         // members, and it would come back if the project moved back. An organization's default lives on each starter's settings.
         // Only when it has one: clearing a column replaces the whole row, which could carry back a value another write set since.
-        if (
-            project.runnerKind !== undefined &&
-            args.patch.organizationId !== undefined &&
-            (args.patch.organizationId || undefined) !== (project.organizationId || undefined)
-        ) {
-            Object.assign(changes, { runnerAgentKey: undefined, runnerDeviceId: undefined, runnerFolderId: undefined, runnerKind: undefined });
+        if (changesOrganization && project.runnerKind !== undefined) {
+            Object.assign(changes, {
+                runnerAgentKey: undefined,
+                runnerDeviceId: undefined,
+                runnerFolderId: undefined,
+                runnerKind: undefined,
+                runnerThreadAt: undefined,
+            });
+        }
+
+        // The settings entries of the space it leaves stay on each person's own shard; this stamp retires them (`acp/lib/project-runner.ts`).
+        if (changesOrganization) {
+            changes.organizationChangedAt = ctx.now;
         }
 
         await patchRow(ctx.db, "projects", project, changes);

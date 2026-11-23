@@ -19,12 +19,21 @@ export interface ProjectRunner {
     folderId: string;
 }
 
+/** A runner as it is stored, with the start time of the thread it came from, so an older thread cannot replace it. */
+type StoredRunner = ProjectRunner & { threadAt?: number };
+
 /** The runner a new thread in `project` starts on by default for the caller, given the caller's settings row (or `null`). */
 export const projectRunnerOf = (project: Doc<"projects">, settings: Pick<Doc<"userSettings">, "projectRunnerDefaults"> | null): ProjectRunner | null => {
     if (project.organizationId) {
-        const found: ProjectRunner | undefined = settings?.projectRunnerDefaults?.[project._id];
+        const found: StoredRunner | undefined = settings?.projectRunnerDefaults?.[project._id];
 
-        return found ?? null;
+        // An entry from a thread started before the project last changed organization is from its earlier space: it stays on the
+        // person's settings (writing every member's on their own shards at a move is not done), but no longer applies.
+        if (!found || (found.threadAt ?? -Infinity) < (project.organizationChangedAt ?? -Infinity)) {
+            return null;
+        }
+
+        return { agentKey: found.agentKey, deviceId: found.deviceId, folderId: found.folderId };
     }
 
     if (project.runnerKind !== "host" || !project.runnerDeviceId || !project.runnerAgentKey || !project.runnerFolderId) {
@@ -63,42 +72,67 @@ const entriesWithRoom = async <T>(ctx: MutationCtx, entries: [string, T][]): Pro
 };
 
 /**
- * Records the runner of a start the computer's agent has opened, for the project its thread is in (none when the project is gone).
- * Called where the session turns idle, so a start the computer refused or never opened leaves the default it had.
+ * Records the runner of a session the computer's agent has opened, for the project its thread is in (none when the project is gone).
+ * Called where the session turns idle, so a start the computer refused or never opened leaves the default it had. A session that
+ * opens in an older thread (a switch or `/clear` there) leaves the default a newer thread recorded.
  */
-export const rememberOpenedRunner = async (ctx: MutationCtx, projectId: Id<"projects">, session: Doc<"acpSessions">): Promise<void> => {
+export const rememberOpenedRunner = async (
+    ctx: MutationCtx,
+    thread: Pick<Doc<"threads">, "_creationTime" | "createdAt"> & { projectId: Id<"projects"> },
+    session: Doc<"acpSessions">,
+): Promise<void> => {
     // The internal ingest mutation has no RLS scope, so `ctx.db` finds the project whichever space the thread was started from.
-    const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
+    // From the primary: whose row is written is decided on its owner and organization, which a lagging replica can still hold old.
+    const project = await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: thread.projectId } });
 
     // A personal project's row is its owner's: a member's thread left in it after it moved out of an organization records nothing there.
     if (!project || (!project.organizationId && project.userId !== session.userId)) {
         return;
     }
 
-    await rememberProjectRunner(ctx, project, session.userId, {
-        agentKey: session.agentKey,
-        deviceId: session.deviceId as string,
-        folderId: session.folderId,
-    });
+    await rememberProjectRunner(
+        ctx,
+        project,
+        session.userId,
+        { agentKey: session.agentKey, deviceId: session.deviceId as string, folderId: session.folderId },
+        thread.createdAt ?? thread._creationTime,
+    );
 };
 
 /**
- * Records the runner a host thread in `project` started on, for the next new thread there. Runs in the internal ingest
- * mutation, a device post with no signed-in user, so the settings write has no active organization to pass; the key is
- * not a managed setting either (`settings-lock.guard.test.ts` lists this writer).
+ * Records the runner a host thread in `project` started on, for the next new thread there, unless a thread started after
+ * `threadAt` (the thread's own start time) recorded one already. Runs in the internal ingest mutation, a device post with no
+ * signed-in user, so the settings write has no active organization to pass; the key is not a managed setting either
+ * (`settings-lock.guard.test.ts` lists this writer).
  */
-export const rememberProjectRunner = async (ctx: MutationCtx, project: Doc<"projects">, userId: string, runner: ProjectRunner): Promise<void> => {
+export const rememberProjectRunner = async (
+    ctx: MutationCtx,
+    project: Doc<"projects">,
+    userId: string,
+    runner: ProjectRunner,
+    threadAt: number,
+): Promise<void> => {
     if (!project.organizationId) {
-        await setProjectRunnerDefault(ctx.db, project, runner);
+        if ((project.runnerThreadAt ?? -Infinity) > threadAt) {
+            return;
+        }
+
+        await setProjectRunnerDefault(ctx.db, project, runner, threadAt);
 
         return;
     }
 
     const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
+    const current: StoredRunner | undefined = settings?.projectRunnerDefaults?.[project._id];
+
+    if ((current?.threadAt ?? -Infinity) > threadAt) {
+        return;
+    }
+
     // Re-recording a project moves it to the end, so the entries at the front are the ones used longest ago.
     const others = Object.entries(settings?.projectRunnerDefaults ?? {}).filter(([key]) => key !== project._id);
     const roomy = others.length < MAX_PROJECT_RUNNER_DEFAULTS ? others : await entriesWithRoom(ctx, others);
     const kept = roomy.slice(-(MAX_PROJECT_RUNNER_DEFAULTS - 1));
 
-    await saveUserSettings(ctx.db, settings, userId, { projectRunnerDefaults: { ...Object.fromEntries(kept), [project._id]: runner } }, null);
+    await saveUserSettings(ctx.db, settings, userId, { projectRunnerDefaults: { ...Object.fromEntries(kept), [project._id]: { ...runner, threadAt } } }, null);
 };

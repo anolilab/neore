@@ -137,7 +137,8 @@ const answerRetry = async (
 
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
 export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args: StartHostSessionInput): Promise<{ started: boolean; threadId?: string }> => {
-    const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+    // From the primary: the device's pairing and project scope decide the start, and a replica can still show them as they were.
+    const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: args.deviceId, userId } });
     const offer = offerOf(device, args.agentKey, args.folderId);
 
     if (!device?.encryptedSecret || !offer) {
@@ -147,8 +148,9 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
     const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
     const startKey = `${userId}:${args.clientId}`;
-    // Checked before the claim: a project the caller may not file into refuses the start and gives nothing up.
-    const project = args.projectId ? await writableProject(ctx, args.projectId, userId) : null;
+    // Checked before the claim: a project the caller may not file into refuses the start and gives nothing up. From the primary:
+    // the project's organization decides whose cap holds the start, and a replica can still show the one it just moved out of.
+    const project = args.projectId ? await writableProject(ctx, args.projectId, userId, { primary: true }) : null;
     // A computer limited to some projects starts threads only in those, the rule a switch and its tools follow (`devices/lib/scope.ts`).
     let refusal: LunoraError | null = null;
 

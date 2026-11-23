@@ -32,6 +32,22 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// A read replica that still holds a project row the primary has changed: a project read that does not ask for the primary
+// gets `replica.project` while it is set, the way a lagging replica answers just after the project moved organization.
+const { replica } = vi.hoisted(() => {
+    return { replica: {} as { project?: Record<string, unknown> } };
+});
+
+vi.mock("../projects/functions", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../projects/functions")>();
+
+    return {
+        ...original,
+        writableProject: async (...args: Parameters<typeof original.writableProject>) =>
+            args[3]?.primary !== true && replica.project?._id === args[1] ? (replica.project as never) : await original.writableProject(...args),
+    };
+});
+
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/internal", async (importOriginal) => {
@@ -149,6 +165,12 @@ const sessionStatus = async (): Promise<unknown> => {
     return session?.status;
 };
 
+const sessionStatusOf = async (threadId: string): Promise<unknown> => {
+    const [session] = await rows("acpSessions", { threadId });
+
+    return session?.status;
+};
+
 const row = async (id: string): Promise<Row | null> =>
     await run(
         async (ctx) =>
@@ -255,6 +277,7 @@ beforeEach(async () => {
     harness = lunoraTest(schema as never);
     ownerId = await insertUser();
     activeOrganization.current = null;
+    delete replica.project;
 });
 
 afterEach(() => {
@@ -1009,7 +1032,46 @@ describe("a project remembers its runner", () => {
 
         expect(Object.keys(stored)).toHaveLength(200);
         expect(stored[oldest]).toBeUndefined();
-        expect(stored[next]).toEqual(runner);
+        expect(stored[next]).toMatchObject(runner);
+    });
+
+    it.each([
+        ["a personal project", undefined],
+        ["an organization project", "org-a"],
+    ])("keeps a newer thread's runner in %s when an older thread's session opens later (a switch or /clear there)", async (_, organizationId) => {
+        if (organizationId) {
+            activeOrganization.current = { id: organizationId, name: "Org", role: "member", slug: null };
+            await run(async (ctx) => {
+                await ctx.db.insert("member", { createdAt: 0, organizationId, role: "member", userId: ownerId });
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                    organizationId,
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                });
+            });
+        }
+
+        const device = await pairedDevice(ownerId, [OFFER, { ...OFFER, folderId: "f2", folderLabel: "Other" }]);
+        const projectId = await insertProject({ userId: ownerId, ...(organizationId && { organizationId }) });
+
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        const older = (await startIn(projectId, device, "tap-old", { folderId: "f2" })) as { threadId: string };
+
+        vi.setSystemTime(Date.now() + 1000);
+        await startOpened(projectId, device, "tap-new");
+
+        const [olderSession] = await rows("acpSessions", { threadId: older.threadId });
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: olderSession?.hostSessionId as string }),
+        );
+
+        expect(await sessionStatusOf(older.threadId)).toBe("idle");
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
     });
 
     it("offers no default once the computer stops offering that agent and folder", async () => {
@@ -1099,7 +1161,8 @@ describe("a project remembers its runner", () => {
 
         await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationId: "org-a" }));
         await run(
-            async (ctx) => await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }),
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, Date.now()),
         );
 
         const stored = await projectRow(projectId);
@@ -1186,6 +1249,40 @@ describe("a project remembers its runner", () => {
 
         expect(movedBack?.runnerAgentKey).toBeUndefined();
         expect(await defaultOf(projectId)).toBeNull();
+    });
+
+    it("forgets a person's organization default when the project leaves the organization, so a move back restores nothing", async () => {
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        vi.useFakeTimers({ toFake: ["Date"] });
+        await startOpened(projectId, device, "tap-o9");
+
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        vi.setSystemTime(Date.now() + 1000);
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "" }, projectId: projectId as never }));
+        await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "org-a" }, projectId: projectId as never }));
+
+        expect(await defaultOf(projectId)).toBeNull();
+
+        // A thread started after the move records the default again.
+        vi.setSystemTime(Date.now() + 1000);
+        await startOpened(projectId, device, "tap-o10");
+
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
     });
 
     it("hands a retry the thread of the project its first try was filed under, and refuses one named for another project", async () => {
@@ -1325,6 +1422,22 @@ describe("an organization's cap on coding agents", () => {
             await joinOrganization();
             await capOrganization("ask");
             activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+
+            await expect(startIn(device.deviceId, projectId)).rejects.toThrow(NOT_ALLOWED);
+            expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+        });
+
+        it("holds a start to the cap of the organization the project moved into, though a replica still shows the one it left", async () => {
+            const device = await pairedDevice(ownerId);
+            const projectId = (await run(
+                async (ctx) => await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-b", title: "Billing", userId: ownerId }),
+            )) as string;
+
+            await joinOrganization("org-a");
+            await joinOrganization("org-b");
+            await capOrganization("auto", "org-a");
+            await capOrganization("ask", "org-b");
+            replica.project = { ...(await run(async (ctx) => await ctx.db.get("projects", projectId as never))), organizationId: "org-a" };
 
             await expect(startIn(device.deviceId, projectId)).rejects.toThrow(NOT_ALLOWED);
             expect(await rows("threads", { runner: "host" })).toHaveLength(0);

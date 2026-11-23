@@ -90,7 +90,8 @@
   **Project runner default** (`acp/lib/project-runner.ts`): a start given a `projectId` files the thread under that project (only one the caller may write to)
   and records the computer, agent and folder id there: on the project row for a personal project, on the starter's own `userSettings.projectRunnerDefaults`
   for an organization project, so no member reads another's; a personal project's row only for its owner's sessions. It is recorded when the agent opens, for the project
-  the thread is in then. `getProjectRunnerDefault` returns it only while the device still offers the pair and its project scope admits the project; a
+  the thread is in then, stamped with the thread's start time: an older thread's session (a switch, `/clear`) never replaces a newer thread's runner.
+  A start reads the project and the device from the primary, as their organization and scope decide the cap and the start. `getProjectRunnerDefault` returns it only while the device still offers the pair and its project scope admits the project; a
   start refuses a computer kept out of the project. A project moved out of an organization keeps `organizationId: ""`: read it with `||`, never `??`.
   At the cap of `projectRunnerDefaults`, only the oldest `ENTRIES_CHECKED_AT_CAP` projects are read (each row is charged whole); a moved project's
-  settings entries are left, as they are the person's own. The export carries a personal runner on its owned-project entry (`projects/gdpr.ts`).
+  settings entries are left on each person's shard, and `organizationChangedAt` retires those from threads started before the move. The export carries a personal runner on its owned-project entry (`projects/gdpr.ts`).

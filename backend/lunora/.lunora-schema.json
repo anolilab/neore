@@ -22377,6 +22377,12 @@
           "optional": true,
           "unique": false
         },
+        "organizationChangedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "organizationId": {
           "kind": "string",
           "nullable": false,
@@ -22447,6 +22453,12 @@
           "optional": true,
           "unique": false,
           "literal": "\"host\""
+        },
+        "runnerThreadAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "subAgentRoles": {
           "kind": "object",
@@ -32830,6 +32842,12 @@
                 "kind": "string",
                 "nullable": false,
                 "optional": false,
+                "unique": false
+              },
+              "threadAt": {
+                "kind": "number",
+                "nullable": false,
+                "optional": true,
                 "unique": false
               }
             }

@@ -67,18 +67,26 @@ export const insertThread = async (db: Database, row: NewRow<"threads">): Promis
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
 /**
- * Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`). The row is its owner's, so no
- * other member reads it. One conditional write on the organization `project` was read with: a `.global()` read and a later write
- * are not one transaction, and a project moved into an organization in between must not take the owner's runner along.
+ * Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`), with that thread's start
+ * time. The row is its owner's, so no other member reads it. One conditional write on the organization and the stamp `project`
+ * was read with: a `.global()` read and a later write are not one transaction, so a project moved into an organization in
+ * between must not take the owner's runner along, and a newer thread's runner recorded in between is not replaced.
  */
 export const setProjectRunnerDefault = async (
     db: Database,
     project: Doc<"projects">,
     runner: { agentKey: string; deviceId: string; folderId: string },
+    threadAt: number,
 ): Promise<void> => {
     await db.patchIf("projects", project._id, {
-        patch: { runnerAgentKey: runner.agentKey, runnerDeviceId: runner.deviceId, runnerFolderId: runner.folderId, runnerKind: "host" },
-        where: { organizationId: project.organizationId ?? null },
+        patch: {
+            runnerAgentKey: runner.agentKey,
+            runnerDeviceId: runner.deviceId,
+            runnerFolderId: runner.folderId,
+            runnerKind: "host",
+            runnerThreadAt: threadAt,
+        },
+        where: { organizationId: project.organizationId ?? null, runnerThreadAt: project.runnerThreadAt ?? null },
     });
 };
 
