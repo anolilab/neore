@@ -5,10 +5,11 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { internal } from "../_generated/internal";
 import { purgeExpiredClaims } from "../lib/claim-once";
-import { runInShard } from "../lib/shard-context";
+import { currentShard, runInShard } from "../lib/shard-context";
 import schema from "../schema";
-import { commitThreadSearch } from "./thread-search";
+import { BACKFILL_ASK_INTERVAL_MS, BACKFILL_ASKED_MAX, backfillAsksRemembered, commitThreadSearch, searchThreadsByMeaningFor } from "./thread-search";
 import {
     BACKFILL_LEASE_MS,
     BACKFILL_PAGE,
@@ -19,6 +20,21 @@ import {
     syncThreadVectorArchived,
 } from "./thread-vector-archived";
 
+// `callOnShard` is a Durable Object request: here it runs the call on the test database as code serving the named shard.
+const routed = vi.hoisted(() => {
+    return { calls: [] as string[], run: async (_shardKey: string, _ref: unknown): Promise<unknown> => null };
+});
+
+vi.mock("../lib/cross-shard", () => {
+    return {
+        callOnShard: async (ref: unknown, _args: unknown, options?: { shardKey?: string }) => {
+            routed.calls.push(options?.shardKey ?? "");
+
+            return await routed.run(options?.shardKey ?? "", ref);
+        },
+    };
+});
+
 const OWNER = "owner-archived";
 const OTHER = "someone-else";
 const VECTOR = Array.from({ length: 1024 }, (_, index) => (index === 0 ? 1 : 0));
@@ -27,6 +43,7 @@ let harness: ReturnType<typeof lunoraTest>;
 
 beforeEach(() => {
     harness = lunoraTest(schema as never);
+    routed.calls = [];
 });
 
 afterEach(() => {
@@ -230,5 +247,93 @@ describe("the backfill", () => {
         }
 
         expect(await drive()).toBe(2);
+    });
+});
+
+describe("the backfill a meaning search starts", () => {
+    /** The sweep a reference names, run on the test database on whatever shard the caller serves. */
+    const runSweep = async (ref: unknown): Promise<unknown> => {
+        expect(ref).toBe(internal.agent.thread_vector_archived.sweepThreadVectorArchived);
+
+        return await harness.run(async (ctx: any) => await ctx.runMutation(sweepThreadVectorArchived, {}));
+    };
+
+    beforeEach(() => {
+        routed.run = async (shardKey, ref) => await runInShard(shardKey, async () => await runSweep(ref));
+    });
+
+    /** An action ctx whose own `runMutation` runs on the shard the action serves, as an RPC action's does. */
+    const actionCtx = () => {
+        return { runMutation: vi.fn(async (ref: unknown) => await runSweep(ref)) };
+    };
+
+    const claimKeys = async (): Promise<string[]> =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db
+                .query("idempotencyClaims")
+                .withIndex("by_scope_key", (q: any) => q.eq("scope", BACKFILL_SCOPE))
+                .collect();
+
+            return rows.map((row: { key: string }) => row.key);
+        });
+
+    // A short query returns before the embed: the backfill start is all the search does.
+    const search = async (ctx: ReturnType<typeof actionCtx>, userId: string) => await searchThreadsByMeaningFor(ctx as never, { query: "a", userId });
+
+    it("starts the walk on the searching user's shard when the action runs outside any shard", async () => {
+        const ctx = actionCtx();
+
+        expect(currentShard()).toBeUndefined();
+        expect(await search(ctx, "returning-outside")).toStrictEqual([]);
+
+        expect(routed.calls).toStrictEqual(["returning-outside"]);
+        expect(ctx.runMutation).not.toHaveBeenCalled();
+        expect(await claimKeys()).toStrictEqual(["returning-outside"]);
+    });
+
+    it("starts the walk on the searching user's shard, not the shard the call landed on", async () => {
+        const ctx = actionCtx();
+
+        await runInShard(OTHER, async () => await search(ctx, "returning-elsewhere"));
+
+        expect(routed.calls).toStrictEqual(["returning-elsewhere"]);
+        expect(ctx.runMutation).not.toHaveBeenCalled();
+        expect(await claimKeys()).toStrictEqual(["returning-elsewhere"]);
+    });
+
+    it("starts the walk in place when the action already runs on the user's shard", async () => {
+        const ctx = actionCtx();
+
+        await runInShard("returning-home", async () => await search(ctx, "returning-home"));
+
+        expect(routed.calls).toStrictEqual([]);
+        expect(ctx.runMutation).toHaveBeenCalledOnce();
+        expect(await claimKeys()).toStrictEqual(["returning-home"]);
+    });
+
+    it("keeps its per-isolate throttle bounded: stale asks and, past the cap, the oldest are forgotten", async () => {
+        routed.run = async () => null;
+        vi.useFakeTimers({ now: new Date("2026-11-23T10:00:00Z"), toFake: ["Date"] });
+
+        try {
+            for (let index = 0; index < BACKFILL_ASKED_MAX + 50; index += 1) {
+                await search(actionCtx(), `throttle-${String(index)}`);
+            }
+
+            expect(backfillAsksRemembered()).toBe(BACKFILL_ASKED_MAX);
+
+            // The oldest was dropped for the cap, so it may ask again; the newest is still throttled.
+            routed.calls = [];
+            await search(actionCtx(), "throttle-0");
+            await search(actionCtx(), `throttle-${String(BACKFILL_ASKED_MAX + 49)}`);
+            expect(routed.calls).toStrictEqual(["throttle-0"]);
+
+            // Past the interval, the next ask clears every stale one.
+            vi.setSystemTime(Date.now() + BACKFILL_ASK_INTERVAL_MS);
+            await search(actionCtx(), "throttle-late");
+            expect(backfillAsksRemembered()).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

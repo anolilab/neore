@@ -15,8 +15,10 @@ import { internal } from "../_generated/internal";
 import { type ActionCtx, internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, rateLimit } from "../lib/crpc";
+import { callOnShard } from "../lib/cross-shard";
 import { patchRow } from "../lib/patch";
 import { gatewayFetch } from "../lib/services";
+import { currentUserShard } from "../lib/shard-context";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteVectorRow } from "./table-writes";
@@ -467,15 +469,31 @@ export interface MeaningThread {
     title: string | null;
 }
 
-/**
- * The palette's meaning search for one person: embed the query, read the nearest
- * title and summary vectors among their own, map each to its thread and keep the
- * best ones. Returns `[]` for a query too short to embed, or when the model is
- * refused for the person.
- */
-/** When each shard last asked for its vector backfill from this isolate (`startArchivedBackfill`). */
+/** When each shard last asked for its vector backfill from this isolate (`startArchivedBackfill`), oldest first. */
 const backfillAskedAt = new Map<string, number>();
-const BACKFILL_ASK_INTERVAL_MS = 10 * 60 * 1000;
+
+export const BACKFILL_ASK_INTERVAL_MS = 10 * 60 * 1000;
+/** Shards {@link backfillAskedAt} remembers at most; past it, the oldest ask is forgotten (it may ask again sooner). */
+export const BACKFILL_ASKED_MAX = 1000;
+
+/** Records `userId`'s ask at `now`: drops asks past the interval and, over the cap, the oldest, so the map stays bounded. */
+const rememberBackfillAsk = (userId: string, now: number): void => {
+    // Delete first, so the re-inserted key moves to the end and the map stays in ask order.
+    backfillAskedAt.delete(userId);
+
+    for (const [key, askedAt] of backfillAskedAt) {
+        if (now - askedAt < BACKFILL_ASK_INTERVAL_MS && backfillAskedAt.size < BACKFILL_ASKED_MAX) {
+            break;
+        }
+
+        backfillAskedAt.delete(key);
+    }
+
+    backfillAskedAt.set(userId, now);
+};
+
+/** How many shards the throttle remembers (for tests). */
+export const backfillAsksRemembered = (): number => backfillAskedAt.size;
 
 /**
  * Starts the shard's archived-flag backfill (`thread-vector-archived.ts`) if it never ran or its chain died. Housekeeping
@@ -489,15 +507,25 @@ const startArchivedBackfill = async (ctx: ActionCtx, userId: string): Promise<vo
         return;
     }
 
-    backfillAskedAt.set(userId, now);
+    rememberBackfillAsk(userId, now);
 
     try {
-        await ctx.runMutation(internal.agent.thread_vector_archived.sweepThreadVectorArchived, {});
+        // The sweep keys its walk on the shard it runs on, so it must run on `userId`'s: a call naming another shard
+        // (a shared thread's owner) or none at all would start nothing for this user.
+        await (currentUserShard() === userId
+            ? ctx.runMutation(internal.agent.thread_vector_archived.sweepThreadVectorArchived, {})
+            : callOnShard(internal.agent.thread_vector_archived.sweepThreadVectorArchived, {}, { shardKey: userId }));
     } catch (error) {
         console.warn("[agent/thread-search] Could not start the archived-flag backfill:", error);
     }
 };
 
+/**
+ * The palette's meaning search for one person: embed the query, read the nearest
+ * title and summary vectors among their own, map each to its thread and keep the
+ * best ones. Returns `[]` for a query too short to embed, or when the model is
+ * refused for the person.
+ */
 export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { query: string; userId: string }): Promise<MeaningThread[]> => {
     await startArchivedBackfill(ctx, args.userId);
 

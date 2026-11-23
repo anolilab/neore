@@ -15,6 +15,7 @@ import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch
 
 const mocks = vi.hoisted(() => {
     return {
+        callOnShard: vi.fn(async (_ref: unknown, _args: unknown, _options?: { shardKey?: string }) => null),
         embeddingModelAllowed: vi.fn(() => true),
         embedMany: vi.fn(async (_ctx: unknown, { values }: { values: string[] }) => {
             return { embeddings: values.map(() => Array.from({ length: 1024 }, (_unused, index) => (index === 0 ? 1 : 0))) };
@@ -37,6 +38,9 @@ vi.mock("../chat/lib/model-filter-rules", () => {
             return {};
         },
     };
+});
+vi.mock("../lib/cross-shard", () => {
+    return { callOnShard: mocks.callOnShard };
 });
 vi.mock("../lib/services", () => {
     return { gatewayFetch: () => async () => new Response(null) };
@@ -295,14 +299,15 @@ describe(runThreadSearchSync, () => {
 describe(searchThreadsByMeaningFor, () => {
     it("starts the shard's archived-flag backfill, at most once per interval", async () => {
         mocks.searchVectors.mockResolvedValue([]);
-        const ctx = makeCtx({}) as unknown as { runMutation: ReturnType<typeof vi.fn> };
+        const ctx = makeCtx({});
 
-        await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-returning" });
-        await searchThreadsByMeaningFor(ctx as never, { query: "the invoice bug", userId: "user-returning" });
+        await searchThreadsByMeaningFor(ctx, { query: "the invoice bug", userId: "user-returning" });
+        await searchThreadsByMeaningFor(ctx, { query: "the invoice bug", userId: "user-returning" });
 
-        expect(ctx.runMutation.mock.calls.filter(([reference]) => reference === internal.agent.thread_vector_archived.sweepThreadVectorArchived)).toHaveLength(
-            1,
-        );
+        // Outside any shard the sweep is sent to the user's (`thread-vector-archived.test.ts` runs it there).
+        expect(
+            mocks.callOnShard.mock.calls.filter(([reference]) => reference === internal.agent.thread_vector_archived.sweepThreadVectorArchived),
+        ).toStrictEqual([[internal.agent.thread_vector_archived.sweepThreadVectorArchived, {}, { shardKey: "user-returning" }]]);
     });
 
     it("finds 'PDF totals off by one' for 'the invoice bug' through its title vector", async () => {
