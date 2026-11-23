@@ -152,12 +152,6 @@ describe("readTarget in a page", () => {
 
     it("a click whose page moves the form destination in its own click handler is refused, and nothing is submitted", async () => {
         await pageWith(page, `<form id="order" action="/cart/confirm"><button id="pay" type="submit">Pay now</button></form>`);
-        await page.evaluate(() => {
-            document.querySelector("form")!.addEventListener("submit", (event) => {
-                document.body.dataset.submitted = "true";
-                event.preventDefault();
-            });
-        });
         const element = await page.$("#pay");
         const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
 
@@ -172,7 +166,47 @@ describe("readTarget in a page", () => {
         // The click ran (its handlers did), and the browser stopped the submission: a `moved` refusal, not a changed target.
         expect(read.refused).toBe("moved");
         expect(read.clicked).toBe(true);
-        expect(await page.evaluate(() => document.body.dataset.submitted === "true")).toBe(false);
+        // No event marks a navigation that never starts: a short wait is how the absence shows.
+        // eslint-disable-next-line sonarjs/no-fixed-wait-in-tests
+        await page.waitForTimeout(300);
+        expect(page.url()).toBe("https://shop.example/cart");
+    });
+
+    it("a destination moved by a handler that stops the click's propagation is refused too, and nothing is submitted", async () => {
+        await pageWith(page, `<form id="order" action="/cart/confirm"><button id="pay" type="submit">Pay now</button></form>`);
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        // The handler stops the click's propagation, so no bubbling listener sees the click: the submit boundary still does.
+        await page.evaluate(() => {
+            document.querySelector("#pay")!.addEventListener("click", (event) => {
+                event.stopPropagation();
+                document.querySelector("form")!.setAttribute("action", "/elsewhere");
+            });
+        });
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("moved");
+        // No event marks a navigation that never starts: a short wait is how the absence shows.
+        // eslint-disable-next-line sonarjs/no-fixed-wait-in-tests
+        await page.waitForTimeout(300);
+        expect(page.url()).toBe("https://shop.example/cart");
+    });
+
+    it("a purchase phrase appended to a label already at the cap changes the target", async () => {
+        // The label is exactly the cap, with no text of its own, so nothing is cut yet.
+        await pageWith(page, `<button id="icon" aria-label="${"a".repeat(15_000)}"></button>`);
+        const element = await page.$("#icon");
+        const before = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        await element!.evaluate((control) => {
+            control.setAttribute("aria-label", `${control.getAttribute("aria-label") ?? ""} Buy now`);
+        });
+        const after = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(before.labelTruncated).toBe(false);
+        expect(after.labelTruncated).toBe(true);
+        expect(after.target).not.toBe(before.target);
     });
 
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {

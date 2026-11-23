@@ -251,7 +251,9 @@ export function readTarget(
 
     // Each name source on its own: a submit word is a name only when a source is exactly that word (joined names never are).
     const isSubmitLike = names.some((part) => options.submit.test(part.trim()));
-    const joined = names.filter(Boolean).join(" ");
+    // A name found by two sources (the control's own aria-label is read in both the nodes and the scan) counts once: it would
+    // otherwise use up the cap twice.
+    const joined = [...new Set(names.filter(Boolean))].join(" ");
     const label = joined.slice(0, options.max);
     // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
     const shown = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
@@ -461,6 +463,20 @@ export function readTarget(
                     event.preventDefault();
                 },
                 { signal: stop.signal },
+            );
+            // A form's submission is a boundary the click's handlers cannot skip: this capture listener runs before any page listener,
+            // so a destination moved by a handler that stopped the click's propagation is still refused, and the submission canceled.
+            clickScope.addEventListener(
+                "submit",
+                (event) => {
+                    if (destinationsOf() === destinations) {
+                        return;
+                    }
+
+                    isMoved = true;
+                    event.preventDefault();
+                },
+                { capture: true, signal: stop.signal },
             );
             control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
             stop.abort();
