@@ -32230,6 +32230,12 @@
           "optional": false,
           "unique": false
         },
+        "heldFrom": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "organizationId": {
           "kind": "string",
           "nullable": false,

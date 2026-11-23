@@ -52,12 +52,16 @@
   UTC week, Monday to Monday), each shown only when every member of the cohort
   was active that week, and a project named only with five members
   (`releaseCells`). A sealed cohort (`sealedCohortsOf`) that lost a member shows
-  with the members it has (owner's decision, 2026-11-23); one with a member
-  being erased is withheld. A closed week must never change: an organization
+  with the members it has (owner's decision, 2026-11-23), never with fewer than
+  three (`MIN_MEMBERS_SHORT_COHORT`: a member reading two would subtract their
+  own spend); one with a member being erased is withheld. A closed week must never change: an organization
   row is written only within `ORGANIZATION_RECORD_LATE_MS` of its reply, and
   the view ends that long (and a margin) before now. A new write to
   `usageOrganizationReplies` keeps both. A guest merge moves older rows only
   with the guest's own cohort (`handOverOrganizationContributors` runs before
-  the copy); where the account already has an entry, the guest's goes. A
-  marked entry (`mergedFrom`) withholds its cohort and blocks re-booking the
-  guest until the merge settles it.
+  the copy); where the account already has an entry, the guest's goes. Every
+  guest row still moves: an older one that cannot join the guest's cohort is
+  held (`heldFrom`), kept for export and erasure until retention prunes it, and
+  never read by the view or the reconcile. A marked entry (`mergedFrom`)
+  withholds its cohort and blocks re-booking the guest until the merge settles
+  it; a merge stopped by a round cap throws, so its redelivery settles it.

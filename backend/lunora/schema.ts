@@ -3977,6 +3977,10 @@ export const schema = defineSchema({
         // The reply's instant (epoch ms), as recorded.
         at: v.number(),
         costMicrodollars: v.number(),
+        // Set by a guest merge (`lib/account-merge.ts#importShardRows`) on a guest's row of a week the view may already show that could not
+        // move into the cohort that counted it: the guest whose row it was. The row stays the account's record (export, erasure, retention
+        // prune by `at`), and the organization view and the contributor reconcile never read it, so no released week changes by it.
+        heldFrom: v.optional(v.string()),
         organizationId: v.string(),
         projectKey: v.string(),
         replyKey: v.string(),

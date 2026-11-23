@@ -311,6 +311,17 @@ describe("the organization ledger", () => {
                 tokens: 1,
                 userId: MEMBER,
             });
+            // A newer held row (`heldFrom`) keeps no entry: org-1 still needs its reconcile.
+            await ctx.db.insert("usageOrganizationReplies", {
+                at: 5000,
+                costMicrodollars: 1,
+                heldFrom: "guest-1",
+                organizationId: "org-1",
+                projectKey: "project",
+                replyKey: "reply-held",
+                tokens: 1,
+                userId: MEMBER,
+            });
         });
 
         const pruned = await harness.run(async (ctx: any) => await pruneOrganizationRepliesBefore(ctx, 2000, 200));
@@ -319,6 +330,31 @@ describe("the organization ledger", () => {
         expect(pruned).toBe(MAX_PRUNED_ORGANIZATIONS);
         expect(left.page).toHaveLength(10);
         expect(harness.scheduler.list()).toHaveLength(MAX_PRUNED_ORGANIZATIONS - 1);
+    });
+
+    it("keeps a row a guest merge held out of the walk's cells and the contributor reconcile", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageOrganizationReplies", {
+                at: 1000,
+                costMicrodollars: 100,
+                heldFrom: "guest-1",
+                organizationId: "org-1",
+                projectKey: "p",
+                replyKey: "held",
+                tokens: 1,
+                userId: MEMBER,
+            });
+        });
+        await harness.run(async (ctx: any) => await ctx.runMutation(reconcileOrganizationContributor, { organizationId: "org-1", userId: MEMBER }));
+
+        expect(await orgUsage("org-1", 0)).toStrictEqual({ projects: [], truncated: false });
+        expect(
+            (
+                (await harness.run(async (ctx: any) => await ctx.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1" } }))) as {
+                    page: unknown[];
+                }
+            ).page,
+        ).toEqual([]);
     });
 
     it("books a member's contributor entry once they have rows, drops a ghost one with none, and running it again changes nothing", async () => {

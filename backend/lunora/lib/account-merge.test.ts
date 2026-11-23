@@ -49,7 +49,12 @@ type Row = Record<string, unknown> & { _id: string };
 const fakeShards = (
     seed: Record<string, Record<string, Row[]>>,
     pageSize = 2,
-    { follows = 0, followsRemain = false }: { follows?: number; followsRemain?: boolean } = {},
+    {
+        follows = 0,
+        followsRemain = false,
+        handOverDone = true,
+        stuck = false,
+    }: { follows?: number; followsRemain?: boolean; handOverDone?: boolean; stuck?: boolean } = {},
 ) => {
     let followsLeft = follows;
     let followPageCalls = 0;
@@ -90,6 +95,10 @@ const fakeShards = (
                 return { deleted: true } as never;
             }
             case "deleteShardRows": {
+                if (stuck) {
+                    return null as never;
+                }
+
                 const shard = shards.get(shardKey) ?? new Map<string, Row[]>();
 
                 shard.set(
@@ -100,7 +109,7 @@ const fakeShards = (
                 return null as never;
             }
             case "handOverOrganizationContributors": {
-                return { done: true } as never;
+                return { done: handOverDone } as never;
             }
             case "importShardRows": {
                 const target = tableOf(shardKey, table);
@@ -254,6 +263,31 @@ describe("mergeGuestInto", () => {
         const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
 
         await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("thread follows");
+    });
+
+    it("fails before it copies a row when the hand-over's round cap leaves contributor entries, so the redelivery hands them over first", async () => {
+        const { call, calls, deletedGuests } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { handOverDone: false });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("contributor entries");
+
+        expect(calls).not.toContain("importShardRows");
+        expect(deletedGuests).toStrictEqual([]);
+    });
+
+    it("keeps the guest and fails for the queue to redeliver when the clear's round cap leaves rows on the guest's shard", async () => {
+        const { call, deletedGuests, followPageCalls, reassigned } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, {
+            follows: 1,
+            stuck: true,
+        });
+
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("rows on its shard");
+
+        // The thread follows still move first, so a run the queue gives up on has moved them.
+        expect(followPageCalls()).toBe(1);
+
+        // The marked contributor entries stay as they are for the redelivery to settle, never left marked by a run that returned.
+        expect(reassigned).toStrictEqual([{ from: "guest", to: "user" }]);
+        expect(deletedGuests).toStrictEqual([]);
     });
 
     it("is safe to run twice", async () => {
@@ -671,7 +705,7 @@ describe("clearing the guest's settings", () => {
 });
 
 describe("importShardRows for the organization ledger", () => {
-    it("moves only the guest's recent organization rows where the guest's entry did not become the new account's", async () => {
+    it("moves every guest organization row, holding the older ones out of the view where the guest's entry did not become the new account's", async () => {
         const now = 10 * ORGANIZATION_RECORD_LATE_MS;
         const harness = lunoraTest(schemaWithShardedTables(["shardActivity"]) as never, { now } as never);
         const row = (id: string, at: number) => {
@@ -679,18 +713,23 @@ describe("importShardRows for the organization ledger", () => {
         };
 
         try {
-            const moved = await harness.run(async (context: any) => {
-                await context.runMutation(importShardRows, {
+            // No contributor entry for the guest yet (its reconcile has not run): before, the old row was skipped and deleted with the guest.
+            const { moved, result } = await harness.run(async (context: any) => {
+                const imported = await context.runMutation(importShardRows, {
                     from: "guest",
                     rows: [row("old", now - ORGANIZATION_RECORD_LATE_MS - 1), row("recent", now - ORGANIZATION_RECORD_LATE_MS)],
                     table: "usageOrganizationReplies",
                     to: "user",
                 });
 
-                return await context.db.query("usageOrganizationReplies").take(10);
+                return { moved: await context.db.query("usageOrganizationReplies").take(10), result: imported };
             });
 
-            expect(moved.map((entry: { replyKey: string }) => entry.replyKey)).toEqual(["recent"]);
+            expect(moved.map((entry: { heldFrom?: string; replyKey: string; userId: string }) => [entry.replyKey, entry.userId, entry.heldFrom])).toEqual([
+                ["old", "user", "guest"],
+                ["recent", "user", undefined],
+            ]);
+            expect(result).toStrictEqual({ held: 1, imported: 2 });
         } finally {
             harness.close();
         }
@@ -720,7 +759,10 @@ describe("merging a guest's organization usage", () => {
 
             return {
                 entries: entries.page.map((entry: any) => [entry.userId, entry.cohort, entry.mergedFrom]),
-                ledger: ledger.page.map((row: any) => row.replyKey as string).toSorted((a: string, b: string) => a.localeCompare(b)),
+                // A held row (`heldFrom`) is the account's record, outside the view.
+                ledger: ledger.page
+                    .map((row: any) => (typeof row.heldFrom === "string" ? `${String(row.replyKey)} (held)` : (row.replyKey as string)))
+                    .toSorted((a: string, b: string) => a.localeCompare(b)),
             };
         });
     };
@@ -743,7 +785,7 @@ describe("merging a guest's organization usage", () => {
         }
     });
 
-    it("keeps the new account's own entry where both are contributors, and moves only the guest's rows of weeks not yet shown", async () => {
+    it("keeps the new account's own entry where both are contributors, and holds the guest's rows of weeks the view may show", async () => {
         const run = harness();
 
         try {
@@ -756,7 +798,7 @@ describe("merging a guest's organization usage", () => {
 
             // The new account's closed weeks stay in its cohort, and the guest's closed rows join none: no released cell changes by them.
             expect(after.entries).toStrictEqual([["user", 3, undefined]]);
-            expect(after.ledger).toStrictEqual(["open"]);
+            expect(after.ledger).toStrictEqual(["closed (held)", "open"]);
         } finally {
             run.close();
         }
@@ -782,7 +824,7 @@ describe("merging a guest's organization usage", () => {
             const after = await merge(run, [ledgerRow("closed", old)]);
 
             expect(after.entries).toStrictEqual([]);
-            expect(after.ledger).toStrictEqual(["own"]);
+            expect(after.ledger).toStrictEqual(["closed (held)", "own"]);
         } finally {
             run.close();
         }

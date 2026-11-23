@@ -16,7 +16,7 @@
  *    otherwise remove a row before it was copied;
  *    Before that, the guest's organization contributor entries are handed to the new account
  *    ({@link handOverOrganizationContributors}), so its organization ledger rows land in the cohort they
- *    were counted in;
+ *    were counted in; an older row that cannot still moves, held out of the organization view (`heldFrom`);
  * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}),
  *    and its thread follows a page per mutation ({@link reassignThreadFollowsPage});
  * 4. once the guest's shard is empty, the guest itself is deleted
@@ -191,29 +191,33 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
 /** On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
-    .output(v.object({ imported: v.number() }))
+    .output(v.object({ held: v.number(), imported: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
 
         if (args.table === "userSettings") {
             await carrySetupSteps(ctx, args.rows as Record<string, unknown>[], args.from, args.to);
 
-            return { imported: 0 };
+            return { held: 0, imported: 0 };
         }
 
         if (KEEP_NEW_USERS.has(args.table)) {
-            return { imported: 0 };
+            return { held: 0, imported: 0 };
         }
 
         let imported = 0;
+        let held = 0;
         // Per organization: whether the new account's entry there is the guest's, handed over with its cohort.
         const handedOver = new Map<string, boolean>();
 
         for (const row of args.rows as Record<string, unknown>[]) {
+            let moved = rewriteOwner(row, args.from, args.to);
+
             // An organization ledger row older than `ORGANIZATION_RECORD_LATE_MS` is in a week the organization view may already show. It
-            // moves only into the cohort it was counted in: where the guest's entry became the new account's
-            // (`handOverOrganizationContributors`), every cell stays as it was. Elsewhere it would change a released week by the guest's
-            // spend, so it stays out of the view; the guest's own totals move with `usageDaily`.
+            // counts only in the cohort it was counted in: where the guest's entry became the new account's
+            // (`handOverOrganizationContributors`), every cell stays as it was. Elsewhere (the account has its own entry, or the guest had
+            // none yet) it would change a released week by the guest's spend: it still moves, held (`heldFrom`), so the account keeps it
+            // in its export until retention prunes it, and the view never counts it. Nothing of the guest's is left behind to be deleted.
             if (args.table === "usageOrganizationReplies" && typeof row["at"] === "number" && ctx.now - row["at"] > ORGANIZATION_RECORD_LATE_MS) {
                 const organizationId = String(row["organizationId"]);
                 let same = handedOver.get(organizationId);
@@ -226,7 +230,7 @@ export const importShardRows = internalMutation
                 }
 
                 if (!same) {
-                    continue;
+                    moved = { ...moved, heldFrom: typeof row["heldFrom"] === "string" ? row["heldFrom"] : args.from };
                 }
             }
 
@@ -234,8 +238,16 @@ export const importShardRows = internalMutation
                 continue;
             }
 
-            await db.insert(args.table, rewriteOwner(row, args.from, args.to), { allowExplicitId: true });
+            await db.insert(args.table, moved, { allowExplicitId: true });
             imported += 1;
+
+            if (typeof moved["heldFrom"] === "string") {
+                held += 1;
+            }
+        }
+
+        if (held > 0) {
+            authLogger.info(`[auth] held ${String(held)} organization ledger rows of guest ${args.from} out of the organization view`, { to: args.to });
         }
 
         // Moved usage rows have no retention time on this shard (its census row was the guest's): wake it now, so the tick prunes them and
@@ -245,7 +257,7 @@ export const importShardRows = internalMutation
             await noteShardDue(ctx, ctx.now);
         }
 
-        return { imported };
+        return { held, imported };
     });
 
 /** On the GUEST's shard: delete the moved rows. */
@@ -294,7 +306,10 @@ export const handOverOrganizationContributors = internalMutation
             // Rows with no entry yet (a reconcile still to run): they would join the guest's cohort and change its closed weeks.
             const ownRows = kept
                 ? undefined
-                : await ctx.db.usageOrganizationReplies.findFirst({ consistency: "primary", where: { organizationId, userId: args.to } });
+                : await ctx.db.usageOrganizationReplies.findFirst({
+                      consistency: "primary",
+                      where: { heldFrom: { isNull: true }, organizationId, userId: args.to },
+                  });
 
             if (kept || ownRows) {
                 await ctx.db.patch("usageOrganizationContributors", entry._id, { mergedFrom: args.from });
@@ -397,7 +412,7 @@ export const reassignGlobalRows = internalMutation
             for (const entry of marked.slice(0, markRoom)) {
                 const row = await ctx.db.usageOrganizationReplies.findFirst({
                     consistency: "primary",
-                    where: { organizationId: entry.organizationId, userId: args.to },
+                    where: { heldFrom: { isNull: true }, organizationId: entry.organizationId, userId: args.to },
                 });
 
                 if (row) {
@@ -460,17 +475,21 @@ const moveThreadFollows = async (call: ShardCall, references: MergeReferences, f
  * available (the better-auth link hook in `auth.ts`).
  */
 export const mergeGuestInto = async (call: ShardCall, references: MergeReferences, from: string, to: string): Promise<{ moved: number }> => {
+    // The guest's organization contributor entries first, so the copy knows which ledger rows keep their cohort.
+    let handedOver = false;
+
+    for (let round = 0; round < MAX_ROUNDS_PER_TABLE && !handedOver; round += 1) {
+        ({ done: handedOver } = await call<{ done: boolean }>(references.handOverContributors, { from, to }, to));
+    }
+
+    // Stopped by the round cap with entries left: copying now would hold rows of a cohort still to be handed over. Fail the job, so its
+    // redelivery hands over the rest first; nothing has been copied or deleted yet.
+    if (!handedOver) {
+        throw new Error(`guest ${from} still has organization contributor entries past the merge's round cap; the merge into ${to} runs again`);
+    }
+
     let moved = 0;
     const tables = shardLocalTables();
-
-    // The guest's organization contributor entries first, so the copy knows which ledger rows keep their cohort.
-    for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-        const { done } = await call<{ done: boolean }>(references.handOverContributors, { from, to }, to);
-
-        if (done) {
-            break;
-        }
-    }
 
     // Copy everything first.
     for (const table of tables) {
@@ -530,19 +549,23 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
 
     moved += follows.moved;
 
+    // Rows left on the guest's shard past the round cap: the marked contributor entries stay unsettled (their cohorts withheld). Fail the
+    // job, so its redelivery copies and clears the rest, settles them and deletes the guest, instead of ending with them marked for good.
+    if (!drained) {
+        throw new Error(`guest ${from} still has rows on its shard past the merge's round cap; the merge into ${to} runs again`);
+    }
+
     // Stopped by the round cap with follow rows left: fail the job, so its redelivery moves the rest and deletes the guest.
     if (!follows.drained) {
         throw new Error(`guest ${from} still has thread follows past the merge's round cap; the merge into ${to} runs again`);
     }
 
-    // Only once nothing of the guest's is left to move: a later run still needs to find it otherwise.
-    if (drained) {
-        const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
+    // Only now that nothing of the guest's is left to move: a later run still needs to find it otherwise.
+    const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
 
-        // A follow written under the guest's id after the last page: fail the job, so its redelivery moves it.
-        if (result.followsRemain === true) {
-            throw new Error(`guest ${from} still has thread follows; the merge into ${to} runs again`);
-        }
+    // A follow written under the guest's id after the last page: fail the job, so its redelivery moves it.
+    if (result.followsRemain === true) {
+        throw new Error(`guest ${from} still has thread follows; the merge into ${to} runs again`);
     }
 
     return { moved };

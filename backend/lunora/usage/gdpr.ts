@@ -524,10 +524,11 @@ export const pruneOrganizationRepliesBefore = async (ctx: MutationCtx, cutoff: n
     await Promise.all(taken.map(async (row) => await ctx.db.delete("usageOrganizationReplies", row._id)));
 
     for (const row of members.values()) {
-        // A member with rows left keeps their entry, so only an organization this batch emptied needs the reconcile.
+        // A member with rows left keeps their entry, so only an organization this batch emptied needs the reconcile. Held rows
+        // (`heldFrom`) keep no entry, so they do not count as rows left.
         const left = await ctx.db.usageOrganizationReplies.findFirst({
             consistency: "primary",
-            where: { organizationId: row.organizationId, userId: row.userId },
+            where: { heldFrom: { isNull: true }, organizationId: row.organizationId, userId: row.userId },
         });
 
         if (left) {

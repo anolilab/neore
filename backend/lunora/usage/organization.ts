@@ -56,10 +56,11 @@ const SCOPE_BATCH = 10;
 export const MIN_MEMBERS_PER_GROUP = COHORT_SIZE;
 
 /**
- * The fewest members a sealed cohort that lost some still shows with. Below it the cohort is withheld: a cohort of one would release that
- * member's spend alone.
+ * The fewest members a sealed cohort that lost some still shows with. Below it the cohort is withheld: the admin reading the view may be
+ * one of the members, and with two, their own known spend subtracted from the total would leave the other member's spend alone. With
+ * three, any one member's subtraction still leaves at least two people's spend summed.
  */
-export const MIN_MEMBERS_SHORT_COHORT = 2;
+export const MIN_MEMBERS_SHORT_COHORT = 3;
 
 /**
  * Splits a walk's members into one group per cohort. The walk is in cohort order, so each cohort's members are contiguous and each group is
@@ -318,7 +319,8 @@ export const memberProjectUsage = internalQuery
                 consistency: "primary",
                 cursor,
                 limit: REPLY_PAGE,
-                where: { at: { gte: from, lt: until }, organizationId, userId },
+                // A row a guest merge held (`heldFrom`) is the account's record, never part of a cohort's cells.
+                where: { at: { gte: from, lt: until }, heldFrom: { isNull: true }, organizationId, userId },
             });
 
             for (const row of result.page) {
@@ -820,7 +822,8 @@ export const reconcileOrganizationContributor = internalMutation
     .input({ organizationId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args: { organizationId, userId }, ctx }) => {
-        const row = await ctx.db.usageOrganizationReplies.findFirst({ consistency: "primary", where: { organizationId, userId } });
+        // Held rows (`heldFrom`) are not counted by the view, so they book no entry and keep none.
+        const row = await ctx.db.usageOrganizationReplies.findFirst({ consistency: "primary", where: { heldFrom: { isNull: true }, organizationId, userId } });
         // One at most: the `(organizationId, userId)` index is unique.
         const entry = await ctx.db.usageOrganizationContributors.findFirst({ consistency: "primary", where: { organizationId, userId } });
 

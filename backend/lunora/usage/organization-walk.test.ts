@@ -163,8 +163,13 @@ describe("releaseCells", () => {
         expect(released.named.size).toBe(0);
         expect(released.small.costMicrodollars).toBe(406);
         expect(released.withheld).toBe(false);
-        // Down to one member, the cohort would release that member's spend alone: it is withheld.
-        expect(releaseCells([cohortIn(1, () => "p", 1)], new Set(["p"]), true)).toMatchObject({ small: { replies: 0 }, withheld: true });
+
+        // Down to two members, either one subtracting their own spend reads the other's alone (one, that member's spend): it is withheld.
+        for (const size of [1, 2]) {
+            expect(releaseCells([cohortIn(1, () => "p", size)], new Set(["p"]), true)).toMatchObject({ small: { replies: 0 }, withheld: true });
+        }
+
+        expect(releaseCells([cohortIn(1, () => "p", 3)], new Set(["p"]), true).withheld).toBe(false);
         // A cohort still filling, or one the call read only in part, could gain a member who was active that week: it needs five.
         expect(releaseCells([{ ...cohortIn(1, () => "p", 4), whole: false }], new Set(["p"]), true)).toMatchObject({ small: { replies: 0 }, withheld: true });
     });
