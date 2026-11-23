@@ -21,6 +21,7 @@ import type { SecretScan } from "./login";
 import { originOf, ownMessage, secretScan, signIn, TYPE_RESERVE_MS } from "./login";
 import type { HoldKind, SessionHold } from "./session-lock";
 import { holdSession, LEASE_MS } from "./session-lock";
+import { readTarget, TARGET_READ_OPTIONS } from "./target-read";
 
 // The Durable Object the `SESSION_LOCK` binding names: exported by the Worker's main module.
 export { SessionLock } from "./session-lock";
@@ -42,16 +43,39 @@ const KEEP_ALIVE_MS = 60_000;
 
 const actionSchema = z.object({
     action: z.enum(["navigate", "screenshot", "click", "type", "extract", "scroll"]),
+    clickMode: z.enum(["page", "pointer", "all"]).optional(), // click, with `expectTarget`: "page" checks and clicks in the page; "all" checks, then a real click
     direction: z.enum(["up", "down"]).optional(),
+    expectTarget: z.string().optional(), // click: the `target` of the element the person was shown; refused when it differs
     fullPage: z.boolean().optional(),
     selector: z.string().optional(),
     sessionId: z.string().optional(), // Reconnect to an existing browser session
+    strictVisibility: z.boolean().optional(), // click: refuse an element opacity hides too (an approved click); an ordinary click ignores opacity
     text: z.string().optional(),
     url: z.string().optional(),
+    visibleOnly: z.boolean().optional(), // extract with a selector: the rendered text a person sees, not the raw textContent
 });
 
 /** Hoisted so they are compiled once, not on every request. */
 const DIGITS_RE = /^\d+$/;
+
+/** A disabled control is not clicked on an approved target: it is not clicked until it is enabled, on a fresh look. */
+const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at the page again before you click.";
+
+/** The target changed while the press ran its handlers: nothing was clicked, and the press is not retried (its handlers ran). */
+const PRESS_CHANGED = "The target changed while the press ran its handlers, so nothing was clicked. Its handlers did run; look at the page before you act.";
+
+/** Another element (a dialog, an overlay) covers the target, so the press would land on it: nothing is clicked. */
+const COVERED_TARGET = "Another element covers the target (a dialog or an overlay), so nothing was clicked. Look at the page again before you click.";
+
+/** The target is not drawn (hidden), so an approved click is not dispatched to it. */
+const NOT_VISIBLE_TARGET = "The target is not visible, so nothing was clicked. Look at the page again before you click.";
+
+/** A click ran, and a page handler moved its destination during it: the browser stopped the submission. Its handlers did run. */
+const DESTINATION_MOVED =
+    "The page moved this click's destination while the click ran, so the browser stopped the submission. Its handlers did run; look at the page before you act.";
+
+/** The click found another element, or this one with other text: the person's yes was for what they were shown. */
+const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;
 
@@ -239,14 +263,27 @@ const validateUrl = (url: string): string | null => {
 /** Default timeout for page operations (ms) */
 /** The per-action payload merged into the response next to `sessionId`. */
 interface ActionResult {
+    /** The element is on a checkout: a form with card or bank fields, or a page whose address says so (`visibleOnly` reads only). */
+    checkout?: boolean;
     clickedSelector?: string;
     content?: string;
     direction?: string;
     error?: string;
+    /** The control's accessible name when it is not its text (`visibleOnly` reads only): aria-label, labelled-by text, title, a submit button's value. */
+    label?: string;
+    labelTruncated?: boolean;
     screenshot?: string;
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
+    /** One of the control's name sources is exactly a submit word (`visibleOnly` reads only). */
+    submitLike?: boolean;
+    /** One of the control's name sources is exactly a bare subscription word (`visibleOnly` reads only). */
+    subscribeLike?: boolean;
     success: boolean;
+    /** The fingerprint of the extracted element (`visibleOnly` reads only), which a click can be checked against. */
+    target?: string;
+    /** A click was refused because its target changed since it was checked (`expectTarget`); nothing was clicked. */
+    targetChanged?: boolean;
     title?: string;
     truncated?: boolean;
     typedSelector?: string;
@@ -446,7 +483,7 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, direction, fullPage, selector, sessionId, text, url }: z.infer<typeof actionSchema>,
+    { action, clickMode, direction, expectTarget, fullPage, selector, sessionId, strictVisibility, text, url, visibleOnly }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
     // Validate URL for navigate action (SSRF protection)
@@ -521,7 +558,82 @@ const actHeld = async (
                     break;
                 }
 
-                await page.click(selector, { timeout: PAGE_TIMEOUT });
+                if (expectTarget === undefined) {
+                    await page.click(selector, { timeout: PAGE_TIMEOUT });
+                } else if (clickMode === "all" && strictVisibility !== true) {
+                    // (An approved click takes the in-page path below: its form is submitted by the renderer to the approved destination.)
+                    // A real click after the check. A page handler can run between the two (the trade-off this mode is chosen for), so
+                    // the check is not one step with the click here. A changed or disabled target is still refused before the click.
+                    const element = await page.$(selector);
+
+                    if (!element) {
+                        result = { error: `Element not found: ${selector}`, success: false };
+                        break;
+                    }
+
+                    const read = await element.evaluate(readTarget, { ...TARGET_READ_OPTIONS, expect: expectTarget });
+
+                    if (read.refused === "changed") {
+                        result = { error: TARGET_CHANGED, success: false, targetChanged: true };
+                        break;
+                    }
+
+                    if (await element.isDisabled()) {
+                        result = { error: DISABLED_TARGET, success: false };
+                        break;
+                    }
+
+                    await element.click({ timeout: PAGE_TIMEOUT });
+                } else {
+                    // The check and the click run as one step in the page (`readTarget` with `click`): the fingerprint is compared
+                    // and the element clicked with nothing in between, so a page change after the check cannot reach the click.
+                    const element = await page.$(selector);
+
+                    if (!element) {
+                        result = { error: `Element not found: ${selector}`, success: false };
+                        break;
+                    }
+
+                    const read = await element.evaluate(readTarget, {
+                        click: true,
+                        expect: expectTarget,
+                        strict: strictVisibility === true,
+                        ...TARGET_READ_OPTIONS,
+                    });
+
+                    if (read.refused === "changed") {
+                        result = { error: TARGET_CHANGED, success: false, targetChanged: true };
+                        break;
+                    }
+
+                    if (read.refused === "disabled") {
+                        result = { error: DISABLED_TARGET, success: false };
+                        break;
+                    }
+
+                    // The click ran, and a page handler moved its destination: the browser stopped the submission. Not a changed target
+                    // (no `targetChanged`): the click must not be retried, since its handlers already ran.
+                    if (read.refused === "moved") {
+                        result = { error: DESTINATION_MOVED, success: false };
+                        break;
+                    }
+
+                    if (read.refused === "pressed") {
+                        result = { error: PRESS_CHANGED, success: false };
+                        break;
+                    }
+
+                    if (read.refused === "covered") {
+                        result = { error: COVERED_TARGET, success: false };
+                        break;
+                    }
+
+                    if (read.refused === "hidden") {
+                        result = { error: NOT_VISIBLE_TARGET, success: false };
+                        break;
+                    }
+                }
+
                 await page.waitForTimeout(500);
                 result = { clickedSelector: selector, success: true, url: page.url() };
                 break;
@@ -529,6 +641,12 @@ const actHeld = async (
 
             case "extract": {
                 let extractedText: string;
+                let label: string | undefined;
+                let isLabelTruncated = false;
+                let target: string | undefined;
+                let isCheckout = false;
+                let isSubmitLike = false;
+                let isSubscribeLike = false;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -538,7 +656,26 @@ const actHeld = async (
                         break;
                     }
 
-                    extractedText = (await element.textContent()) ?? "";
+                    if (visibleOnly === true) {
+                        // The rendered text and the fingerprint come from one read of the element, so they describe the same state of
+                        // the page: two reads could pair a purchase's text with an ordinary fingerprint when the page changes between them.
+                        // The text is `innerText` (hidden descendants left out, so a purchase word the person cannot see does not count),
+                        // or the element's own text for an SVG, which has no innerText. The rendered text is read on purpose.
+                        const read = await element.evaluate(readTarget, {
+                            ...TARGET_READ_OPTIONS,
+                        });
+
+                        extractedText = read.shown;
+                        label = read.label;
+                        isLabelTruncated = read.labelTruncated;
+                        target = read.target;
+                        isCheckout = read.checkout;
+                        isSubmitLike = read.submitLike;
+                        isSubscribeLike = read.subscribeLike;
+                    } else {
+                        // An ordinary extract keeps the raw text it always returned.
+                        extractedText = (await element.textContent()) ?? "";
+                    }
                 } else {
                     extractedText = await page.evaluate(() => {
                         const clone = document.body.cloneNode(true) as HTMLElement;
@@ -557,7 +694,19 @@ const actHeld = async (
                 const isTruncated = extractedText.length > maxLength;
                 const content = isTruncated ? `${extractedText.slice(0, maxLength)}\n\n[Content truncated]` : extractedText;
 
-                result = { content, success: true, title: await page.title(), truncated: isTruncated, url: page.url() };
+                result = {
+                    content,
+                    success: true,
+                    title: await page.title(),
+                    truncated: isTruncated,
+                    url: page.url(),
+                    ...(label !== undefined && { label }),
+                    ...(isLabelTruncated && { labelTruncated: true }),
+                    ...(target !== undefined && { target }),
+                    ...(isCheckout && { checkout: true }),
+                    ...(isSubscribeLike && { subscribeLike: true }),
+                    ...(isSubmitLike && { submitLike: true }),
+                };
                 break;
             }
 

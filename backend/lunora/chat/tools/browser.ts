@@ -26,11 +26,21 @@ import {
     waitUnlessStopped,
 } from "../../browser/human-check";
 import { toolsLogger } from "../../lib/logger";
+import { approvedToolCallIds, browserActionNeedsPurchaseApproval, type ClickTargetLook, purchaseTargetNeedsApproval } from "../lib/purchase-gate";
 import toonEncodeOutput from "./toon-encode";
+
+/** A click that reads as a purchase, or whose target cannot be read, runs only once the person has said yes to it. */
+const CLICK_NEEDS_APPROVAL =
+    "This click reads as a purchase, or its target cannot be read, so it needs the person's approval. Look at the page again before you click.";
+
+/** The renderer sent no target for the look (an older renderer, or a read that did not find one): nothing to approve, so nothing ran. */
+const CLICK_UNCHECKED = "The browser could not check this click's target, so nothing was clicked. Look at the page again before you click.";
 
 export interface BrowserResult {
     /** The browser the page is on (`browser-node.ts`); for the ladder's ask only, never the model. */
     browserId?: string;
+    /** The element is on a checkout (`visibleOnly` reads only): a submit-like label there asks. */
+    checkout?: boolean;
     clickedSelector?: string;
     content?: string;
     direction?: string;
@@ -43,13 +53,24 @@ export interface BrowserResult {
      * action that ran on it) and on `site`.
      */
     humanCheck?: { browserId?: string; checkId?: string; site: string; status: "already_asked" | "asked" | "declined" };
+    /** The accessible name of the element a look read (`visibleOnly`). */
+    label?: string;
+    labelTruncated?: boolean;
     /** A navigate, or an interactive action that left the page on another URL (`browser-node.ts`); for the ladder only, never the model. */
     navigated?: boolean;
     result?: string;
     screenshot?: string;
     screenshotFormat?: string;
     scrollPosition?: { maxY: number; x: number; y: number };
+    /** One of the element's name sources is exactly a submit word (`visibleOnly` reads): on a checkout it is the payment. */
+    submitLike?: boolean;
+    /** One of the element's name sources is exactly a bare subscription word (`visibleOnly` reads): it asks on any page. */
+    subscribeLike?: boolean;
     success: boolean;
+    /** The fingerprint of the element a look read: a click is checked against it (`expectTarget`). */
+    target?: string;
+    /** A click was refused because its target changed since it was checked; nothing was clicked (the renderer's answer). */
+    targetChanged?: boolean;
     title?: string;
     truncated?: boolean;
     typedSelector?: string;
@@ -172,6 +193,26 @@ export const waitForAnswer = async (context: AnswerContext, threadId: Id<"thread
 };
 
 /**
+ * Whether the user has a browser action left this hour, charged and given back at once. A click with none left reads
+ * nothing: its target looks are not charged, so without this check each attempt would still open a renderer call.
+ */
+const hasBrowserActionLeft = async (context: ToolContext, userId: string): Promise<boolean> => {
+    const key = `browser/action:${context.userTier ?? "free"}`;
+    const probe = await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { identifier: userId, key });
+
+    // Given back to the window it was charged in, not the current one: an hour may roll over between the two steps.
+    if (probe.ok && probe.windowStart !== undefined) {
+        await context.runMutation(internal.lib.rate_limiter_mutations.refundRateLimitWindow, {
+            identifier: userId,
+            key,
+            windowStart: probe.windowStart,
+        });
+    }
+
+    return probe.ok;
+};
+
+/**
  * Browser Automation Tool
  */
 const browserTool = createTool<
@@ -217,12 +258,25 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
         const { userId } = context;
         // `ladderLook`: one of the human-check ladder's own reads, set here only, never from the model's input.
         const run = async (
-            step: Omit<typeof input, "action"> & { action: Exclude<typeof input.action, "needs_person" | "wait_for_person">; ladderLook?: true },
+            step: Omit<typeof input, "action"> & {
+                action: Exclude<typeof input.action, "needs_person" | "wait_for_person">;
+                approvalLook?: true;
+                approvedCallId?: string;
+                clickMode?: "page" | "pointer" | "all";
+                decisionCallId?: string;
+                expectTarget?: string;
+                ladderLook?: true;
+            },
         ): Promise<BrowserResult> =>
             (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
                 action: step.action,
                 browserSettings: (context as { browserSettings?: unknown }).browserSettings,
                 direction: step.direction,
+                ...(step.approvalLook === true && { approvalLook: true }),
+                ...(step.approvedCallId !== undefined && { approvedCallId: step.approvedCallId }),
+                ...(step.clickMode !== undefined && { clickMode: step.clickMode }),
+                ...(step.decisionCallId !== undefined && { decisionCallId: step.decisionCallId }),
+                ...(step.expectTarget !== undefined && { expectTarget: step.expectTarget }),
                 fullPage: step.fullPage,
                 ...(step.ladderLook === true && { ladderLook: true }),
                 selector: step.selector,
@@ -254,7 +308,67 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             }
 
             const reported = action === "needs_person";
-            const first = await run(action === "needs_person" ? { action: "screenshot" } : { ...input, action });
+            // A click is checked against the target the person was shown. One they approved is checked against the target its
+            // decision recorded (`approvedCallId`). Any other click is looked at now, and refused when that look reads as a
+            // purchase: a purchase needs the person's yes, which this call was not given (its decision read was not one).
+            let step: Parameters<typeof run>[0] = action === "needs_person" ? { action: "screenshot" } : { ...input, action };
+
+            // An empty selector is no selector: the renderer refuses that click, so no look runs for it.
+            if (action === "click" && input.selector) {
+                // Out of browser actions this hour: refused before any look, as the renderer would refuse the click.
+                if (!(await hasBrowserActionLeft(context, userId))) {
+                    return { error: "Browser automation rate limit exceeded.", success: false };
+                }
+
+                // The owner's click mode (`browserClickMode`). "pointer" clicks an ordinary target for real, after the same check "all" makes
+                // (the purchase check above still ran); an approved click stays in the page's checked click unless the mode is "all".
+                const clickMode = await context.runQuery(internal.browser.functions.getBrowserClickMode, { userId });
+
+                if (approvedToolCallIds(options.messages).has(options.toolCallId)) {
+                    step = { ...step, approvedCallId: options.toolCallId, clickMode: clickMode === "all" ? "all" : "page" };
+                } else {
+                    const look = await run({ action: "extract", approvalLook: true, selector: input.selector });
+
+                    // A look that failed returns its own error (a missing element, a person in control): nothing to approve.
+                    if (look.error !== undefined) {
+                        return { error: look.error, success: false };
+                    }
+
+                    // A look that reads no target clears nothing: a click without a fingerprint would run unchecked.
+                    if (look.target === undefined) {
+                        return { error: CLICK_UNCHECKED, success: false };
+                    }
+
+                    if (purchaseTargetNeedsApproval(look as ClickTargetLook)) {
+                        return { error: CLICK_NEEDS_APPROVAL, success: false };
+                    }
+
+                    // An ordinary click is checked against the look, then made for real ("all"); "pointer" and "all" both do that for an
+                    // ordinary target. Only "page" keeps the check and the press in the page.
+                    step = { ...step, clickMode: clickMode === "page" ? "page" : "all", expectTarget: look.target };
+                }
+            }
+
+            let first = await run(step);
+
+            // A click that was not approved is checked against the target looked at just before it. When the page changed in
+            // between, that target is looked at once more: an ordinary target is clicked, a purchase (or one that cannot be read)
+            // needs the person's yes as before. An approved click is never retried: its approval is for the target it was shown.
+            if (first.targetChanged === true && step.approvedCallId === undefined && step.expectTarget !== undefined && input.selector !== undefined) {
+                const again = await run({ action: "extract", approvalLook: true, selector: input.selector });
+
+                // A look that failed (a person took control since the mismatch) returns its own error, as the first look does.
+                if (again.error !== undefined) {
+                    return { error: again.error, success: false };
+                }
+
+                if (again.target === undefined || purchaseTargetNeedsApproval(again as ClickTargetLook)) {
+                    return { error: CLICK_NEEDS_APPROVAL, success: false };
+                }
+
+                first = await run({ ...step, expectTarget: again.target });
+            }
+
             // A refused or failed action (a person in control, the browser closed) is not a page to judge.
             const result =
                 first.success === true || first.handedBack === true
@@ -332,6 +446,40 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
             url: z.string().optional().meta({ description: "Target URL (required for navigate)" }),
         })
         .strict(),
+    // A click on something that reads as a purchase asks first (`lib/purchase-gate.ts`). This is the tool's own answer,
+    // so the `auto` default and a time-boxed allow do not lift it. Nothing runs without a person and a thread: `execute`
+    // refuses the call then, so no look is made.
+    needsApproval: async (context, input, options) => {
+        if (!context.userId || !context.threadId) {
+            return false;
+        }
+
+        const { threadId, userId } = context;
+
+        // A click the hour's budget cannot run asks nothing: `execute` refuses it before any look, so no card is shown for it.
+        if (input.action === "click" && input.selector && !(await hasBrowserActionLeft(context, userId))) {
+            return false;
+        }
+
+        // In `ask` mode (`looksBeforeAsk`) the call asks whatever the read says, but the read still keeps its target for the click.
+        const asking = (options as { asking?: boolean }).asking === true;
+
+        return await browserActionNeedsPurchaseApproval(
+            input,
+            async (selector) =>
+                (await context.runAction(internal.chat.tools.browser_node.executeBrowserAction, {
+                    action: "extract",
+                    approvalLook: true,
+                    ...(asking && { askDecision: true }),
+                    browserSettings: (context as { browserSettings?: unknown }).browserSettings,
+                    decisionCallId: options.toolCallId,
+                    selector,
+                    threadId: threadId as Id<"threads">,
+                    userId,
+                    userTier: context.userTier,
+                })) as BrowserResult,
+        );
+    },
     title: "Browser",
     toModelOutput: (_context, { output }) => {
         // For screenshots, return as image content part
@@ -360,4 +508,6 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
     },
 });
 
-export default browserTool;
+// `ask` mode reads a click's target before it asks, and keeps it for the approved click (`lib/tool-permissions.ts`).
+// `readsApproval`: a checked click reads the person's approval from its `messages` (`approvedToolCallIds`), so the continuation passes it.
+export default Object.assign(browserTool, { looksBeforeAsk: true as const, readsApproval: true as const });

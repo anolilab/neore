@@ -1,6 +1,6 @@
 import type { JSONValue } from "@ai-sdk/provider";
 import type { Context as AiContext, ToolContent } from "@ai-sdk/provider-utils";
-import type { StaticToolError, StaticToolResult, StreamTextResult, Tool, ToolSet } from "ai";
+import type { ModelMessage, StaticToolError, StaticToolResult, StreamTextResult, Tool, ToolSet } from "ai";
 
 import { createToolModelOutput } from "../shared";
 import type { MessageDoc } from "../validators";
@@ -8,6 +8,16 @@ import type { ContextAcceptingTool } from "./agent-types";
 import type { Agent } from "./index";
 import type { StreamingOptions } from "./streaming";
 import type { ActionCtx as ActionContext, AgentPrompt, GenerationOutputMetadata, Options, StreamingTextArgs } from "./types";
+
+/**
+ * The approval of one tool call as the SDK records it, for the `messages` a tool's `execute` gets when the approval is run
+ * here rather than by the SDK: the request names the call, and the response approves it (`chat/lib/purchase-gate.ts#approvedToolCallIds`
+ * reads exactly this).
+ */
+export const approvalMessagesFor = (approvalId: string, toolCallId: string): ModelMessage[] => [
+    { content: [{ approvalId, toolCallId, type: "tool-approval-request" }], role: "assistant" },
+    { content: [{ approvalId, approved: true, type: "tool-approval-response" }], role: "tool" },
+];
 
 /**
  * Approve a pending tool call and continue generation. The body of
@@ -105,9 +115,12 @@ export async function approveToolCallFor<CustomContext extends object, AgentTool
         // `__acceptsCtx` / `getCtx(this)`, which is what `toolCtx` above is
         // doing. Nothing here uses the SDK's, so it is empty rather than
         // duplicated.
+        // Only a tool that reads its approval from `messages` (`readsApproval`: the browser's checked clicks) gets the synthetic
+        // pair. Any other tool runs with no messages, as before: a saved-login turn validates its messages and refuses the pair.
+        const readsApproval = (tool as { readsApproval?: boolean }).readsApproval === true;
         const output = await wrappedTool.execute?.call(wrappedTool, toolInput, {
             context: {},
-            messages: [],
+            messages: readsApproval ? approvalMessagesFor(approvalId, toolCallId) : [],
             toolCallId,
         });
 
