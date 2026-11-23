@@ -170,6 +170,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             requestId: args.requestId,
         });
 
+        // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
+        await context.step.do(
+            "erase-pins-on-owner-shards",
+            async () =>
+                await context.run(
+                    internal.gdpr.steps.erasePinsOnOwnerShards,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards") },
+                ),
+        );
+
         await context.step.do(
             "delete-user-thread-metadata",
             async () =>

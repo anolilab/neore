@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import schema from "../../schema";
-import { createDocumentPin, createPin, getThreadPins, isPinShapeValid } from "./functions";
+import { createDocumentPin, createPin, eraseUserPinsOnThread, getThreadPins, isPinShapeValid, reassignUserPinsOnThread } from "./functions";
 
 const OWNER = "user-owner";
 const SHAPE_ERROR = /An image pin names the part it pins/;
@@ -284,6 +284,41 @@ describe("the route a collaborator's pin leaves", () => {
         });
 
         expect(routes).toMatchObject([{ ownerId: OWNER, threadId, userId: "user-collaborator" }]);
+    });
+});
+
+describe("a collaborator's pins on the owner's shard", () => {
+    it("erases one user's pins on one thread and leaves the owner's and every other thread's", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-collaborator" });
+            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: OWNER });
+        });
+
+        await harness.run(async (context: any) => await context.runMutation(eraseUserPinsOnThread, { threadId, userId: "user-collaborator" }));
+
+        const left = await harness.run(async (context: any) => {
+            const rows = await context.db.query("threadPins").collect();
+
+            return rows.map((row: { userId: string }) => row.userId) as unknown[];
+        });
+
+        expect(left).toStrictEqual([OWNER]);
+    });
+
+    it("moves one user's pins on one thread to the new account", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-guest" });
+        });
+
+        await harness.run(async (context: any) => await context.runMutation(reassignUserPinsOnThread, { from: "user-guest", threadId, to: "user-new" }));
+
+        const owners = await harness.run(async (context: any) => {
+            const rows = await context.db.query("threadPins").collect();
+
+            return rows.map((row: { userId: string }) => row.userId) as unknown[];
+        });
+
+        expect(owners).toStrictEqual(["user-new"]);
     });
 });
 

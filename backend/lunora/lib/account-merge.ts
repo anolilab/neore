@@ -424,7 +424,30 @@ export interface MergeReferences {
 export const runGuestMerge = internalAction
     .input({ from: v.string(), to: v.string() })
     .output(v.object({ moved: v.number() }))
-    .action(async ({ args }) => {
+    .action(async ({ args, ctx: context }) => {
+        // The guest's pins on other owners' threads move to the new account on each owner's shard first, while their routes still name the
+        // guest; the routes move with the guest's global rows below. Each move is idempotent, so a redelivery repeats it safely.
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await context.runQuery(
+                internal.chat.pins.functions.listSharedPinRoutesForExport,
+                { cursor, userId: args.from },
+            );
+
+            for (const route of routes.page) {
+                await callOnShard(
+                    internal.chat.pins.functions.reassignUserPinsOnThread,
+                    { from: args.from, threadId: route.threadId as never, to: args.to },
+                    { shardKey: route.ownerId },
+                );
+            }
+
+            isDone = routes.isDone;
+            cursor = routes.continueCursor;
+        }
+
         const result = await mergeGuestInto(
             async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
             {

@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { authMutation, authQuery, internalQuery, rateLimit } from "../../lib/crpc";
+import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
@@ -180,6 +180,62 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
         await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
     }
 };
+
+/**
+ * Deletes one user's pins on one thread, on the thread owner's shard where a collaborator's pins are written. Account erasure calls it
+ * for each route before the routes go (`gdpr/steps.ts#erasePinsOnOwnerShards`).
+ */
+export const eraseUserPinsOnThread = internalMutation
+    .input({ threadId: v.id("threads"), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const result = await context.db
+                .query("threadPins")
+                .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
+                .paginate({ cursor, numItems: PIN_EXPORT_PAGE });
+
+            for (const pin of result.page) {
+                await context.db.delete("threadPins", pin._id);
+            }
+
+            isDone = result.isDone;
+            cursor = result.continueCursor;
+        }
+
+        return null;
+    });
+
+/**
+ * Moves one guest's pins on one thread to the new account, on the thread owner's shard, so a guest conversion keeps the pins the guest
+ * made on a shared thread (`lib/account-merge.ts#runGuestMerge`).
+ */
+export const reassignUserPinsOnThread = internalMutation
+    .input({ from: v.string().max(MAX_LENGTH.id), threadId: v.id("threads"), to: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx: context }) => {
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const result = await context.db
+                .query("threadPins")
+                .withIndex("by_user_and_thread", (q) => q.eq("userId", args.from).eq("threadId", args.threadId))
+                .paginate({ cursor, numItems: PIN_EXPORT_PAGE });
+
+            for (const pin of result.page) {
+                await context.db.patch("threadPins", pin._id, { userId: args.to });
+            }
+
+            isDone = result.isDone;
+            cursor = result.continueCursor;
+        }
+
+        return null;
+    });
 
 export const createPin = authMutation
     .use(rateLimit("pins/create"))

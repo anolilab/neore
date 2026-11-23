@@ -404,6 +404,29 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
     return shared;
 });
 
+/**
+ * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
+ * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
+ */
+export const erasePinsOnOwnerShards = internalAction
+    .input({ userId: v.string() })
+    .output(v.null())
+    .action(async ({ args: { userId }, ctx: context }) => {
+        const routes = await readAllPages(
+            async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }),
+        );
+
+        for (const route of routes) {
+            await callOnShard(
+                internal.chat.pins.functions.eraseUserPinsOnThread,
+                { threadId: route.threadId as Id<"threads">, userId },
+                { shardKey: route.ownerId },
+            );
+        }
+
+        return null;
+    });
+
 export const collectFiles = internalQuery
     .input({ userId: v.string() })
     .output(
