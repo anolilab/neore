@@ -2752,6 +2752,7 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .global()
+        .index("by_owner", ["ownerId"])
         .index("by_user_and_thread", ["userId", "threadId"]),
 
     /**

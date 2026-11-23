@@ -9,6 +9,26 @@ import { dropGuestLinkRoutes } from "./lib/guest-link-store";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
+ * The pin routes that name the user, as the collaborator who pinned or as the owner of the thread: a route names no one else, so
+ * it goes with the account.
+ */
+const eraseSharedPinRoutesFor = async (ctx: MutationCtx, userId: string): Promise<void> => {
+    for (const where of [{ userId }, { ownerId: userId }]) {
+        let cursor: string | undefined;
+
+        do {
+            const { continueCursor, isDone, page } = await ctx.db.sharedPinRoutes.findMany({ cursor, limit: 500, where });
+
+            for (const route of page) {
+                await ctx.db.delete("sharedPinRoutes", route._id);
+            }
+
+            cursor = isDone ? undefined : (continueCursor ?? undefined);
+        } while (cursor !== undefined);
+    }
+};
+
+/**
  * The user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
  * with the run state, {@link erasePersistentStreamsForUser}).
  */
@@ -25,6 +45,7 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
     ]);
 
     await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
+    await eraseSharedPinRoutesFor(ctx, userId);
 };
 
 /**

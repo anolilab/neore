@@ -50,6 +50,8 @@ const SYSTEM_DB_IMPORTERS = [
     // Decisions only: a lock check drops rows the caller already passed RLS for; the proof check reads a passcode row to verify it.
     "agent/messages.ts",
     "agent/thread-passcode.ts",
+    // The thread OWNER's id, read to record where a collaborator's pin lives: no thread row is returned, and the route written is the caller's own.
+    "chat/pins/functions.ts",
     "chat/functions.ts",
     "lib/stored-url-fields.ts",
     "skills/validators.ts",

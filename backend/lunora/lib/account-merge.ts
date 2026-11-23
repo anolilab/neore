@@ -74,6 +74,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     promptHistory: ["userId", "contentBy"],
     prompts: ["userId", "contentBy"],
     shardRoutes: ["ownerId"],
+    // A guest's pins on a shared thread stay findable by the guest's new account, and the owner-side route follows an owner who moved.
+    sharedPinRoutes: ["userId", "ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
