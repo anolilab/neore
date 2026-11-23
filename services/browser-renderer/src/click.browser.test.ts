@@ -555,6 +555,38 @@ describe("readTarget in a page", () => {
         expect(page.url()).not.toContain("/cart/pay");
     });
 
+    it("an approved image button submits its coordinates, and a named submit button submits its name and value", async () => {
+        const gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm"><input id="buy" type="image" name="buy" alt="Buy" src="${gif}"></form><form id="second" action="/cart/second"><button id="intent" type="submit" name="intent" value="confirm">Confirm</button></form>`,
+        );
+        const urls: string[] = [];
+
+        page.on("request", (request) => {
+            urls.push(request.url());
+        });
+        const image = await page.$("#buy");
+        const seen = await image!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await image!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        await page.waitForURL("**/cart/confirm**", { timeout: 3000 });
+        expect(page.url()).toContain("buy.x=");
+        expect(page.url()).toContain("buy.y=");
+
+        const intent = await page.$("#intent");
+        const named = await intent!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        await intent!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: named.target });
+
+        await page.waitForURL("**/cart/second**", { timeout: 3000 });
+        expect(page.url()).toContain("intent=confirm");
+        expect(urls.some((url) => url.includes("intent=confirm"))).toBe(true);
+    });
+
     it("a regrouped name that keeps the joined text but makes a bare Subscribe changes the fingerprint", async () => {
         await pageWith(page, `<button id="plan" aria-label="Subscribe" title="Monthly plan">→</button>`);
         const element = await page.$("#plan");
