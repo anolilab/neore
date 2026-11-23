@@ -110,7 +110,17 @@ export function readTarget(
                             target.textContent ?? "",
                         );
 
-                        for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
+                        // A bounded walk (the scan's cap): a page cannot make a label reference traverse an unbounded subtree.
+                        const innerWalk = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
+                        const inners: Element[] = [];
+
+                        for (let visited = 0, walked = innerWalk.nextNode(); walked !== null && visited < 2000; walked = innerWalk.nextNode(), visited++) {
+                            if ((walked as Element).matches("img[alt], [aria-label], [title]")) {
+                                inners.push(walked as Element);
+                            }
+                        }
+
+                        for (const inner of inners) {
                             names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
                         }
                     }
@@ -209,7 +219,17 @@ export function readTarget(
                             target.textContent ?? "",
                         );
 
-                        for (const inner of target.querySelectorAll("img[alt], [aria-label], [title]")) {
+                        // A bounded walk (the scan's cap): a page cannot make a label reference traverse an unbounded subtree.
+                        const innerWalk = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
+                        const inners: Element[] = [];
+
+                        for (let visited = 0, walked = innerWalk.nextNode(); walked !== null && visited < 2000; walked = innerWalk.nextNode(), visited++) {
+                            if ((walked as Element).matches("img[alt], [aria-label], [title]")) {
+                                inners.push(walked as Element);
+                            }
+                        }
+
+                        for (const inner of inners) {
                             names.push(inner.getAttribute("alt") ?? "", inner.getAttribute("aria-label") ?? "", inner.getAttribute("title") ?? "");
                         }
                     }
@@ -598,6 +618,11 @@ export function readTarget(
             // its handlers, so the caller must not retry it as a changed target.
             if (readNow().target !== first.target) {
                 refused = "pressed";
+            } else if (isDisabledIn(control)) {
+                // A press handler can disable the control without changing the fingerprint: it is not clicked then.
+                refused = "disabled";
+            } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden") {
+                refused = "hidden";
             } else if (isCoveredIn(control)) {
                 refused = "covered";
             } else {

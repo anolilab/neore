@@ -385,10 +385,31 @@ const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse):
         const isLapsed = Date.now() >= expiresAt;
         const ownOptions = isLapsed ? ({ ...(options as NeedsApprovalOptions), asking: true } as never) : options;
         const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, ownOptions);
-        const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
+        // The grant can run out during the tool's own check (a renderer read takes seconds). A check that started inside the grant
+        // ran without asking, so it recorded nothing: it runs again, asking, so the approved click has a target to be checked against.
+        const settle = async (asked: boolean): Promise<boolean> => {
+            if (asked) {
+                return true;
+            }
+
+            const isLapsedNow = await lapsed(input, options);
+
+            if (isLapsedNow && !isLapsed) {
+                try {
+                    await (own as (this: unknown, input: never, options: never) => unknown).call(this, input, {
+                        ...(options as NeedsApprovalOptions),
+                        asking: true,
+                    } as never);
+                } catch {
+                    // The look failed: the call still asks, and its record stays empty.
+                }
+            }
+
+            return isLapsedNow;
+        };
 
         return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);
-    } as OwnApproval;
+    } as unknown as OwnApproval;
 };
 
 /**

@@ -110,20 +110,7 @@ export const executeBrowserAction = internalAction
 
                 decisionSession = sessionId;
 
-                // A click the person approved is checked against the target its decision read recorded, taken here, before the
-                // hold. Only a recorded target lets it run: a decision that was pushed out, could not read one, or never recorded
-                // one (`none`) is refused, so nothing is clicked unseen.
-                let approvedTarget: string | undefined;
-
-                if (action === "click" && args.approvedCallId !== undefined) {
-                    const taken = await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId });
-
-                    if (taken.kind !== "target" || taken.target === undefined) {
-                        return { error: APPROVED_TARGET_UNKNOWN, success: false };
-                    }
-
-                    approvedTarget = taken.target;
-                }
+                // The approved click's target is taken further down, once the hold and the rate limit have let this action run.
 
                 // The row is in use from here on, not only once the action returns: no person takes control mid-action, and
                 // a slow action on a browser still alive does not read as idle (one read as reaped is held without being
@@ -193,6 +180,26 @@ export const executeBrowserAction = internalAction
 
                 callSignal = AbortSignal.timeout(budget);
                 callEndsBy = Date.now() + budget;
+
+                // A click the person approved is checked against the target its decision read recorded. It is taken here, once the hold
+                // and the rate limit have let this action run, so a refusal before the press keeps the record (the approval stays
+                // usable). A look-first screenshot does not send the click, so it takes nothing.
+                let approvedTarget: string | undefined;
+
+                if (action === "click" && args.approvedCallId !== undefined && !looksFirst) {
+                    const taken = await ctx.runMutation(internal.browser.functions.takePurchaseLook, { sessionId, toolCallId: args.approvedCallId });
+
+                    if (taken.kind !== "target" || taken.target === undefined) {
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                        await refund();
+
+                        const unknown = { error: APPROVED_TARGET_UNKNOWN, success: false };
+
+                        return returned === undefined ? unknown : handedBackResult(unknown, returned);
+                    }
+
+                    approvedTarget = taken.target;
+                }
 
                 // A click the person approved is checked against the target they were shown (taken above). Otherwise a click the
                 // tool checked itself carries its own `expectTarget`.

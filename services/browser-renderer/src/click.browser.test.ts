@@ -308,6 +308,18 @@ describe("readTarget in a page", () => {
         expect(read.clicked).toBe(false);
     });
 
+    it("a press handler that disables the control stops the click, though the fingerprint did not change", async () => {
+        await pageWith(page, `<button id="pay" onpointerdown="this.disabled = true" onclick="window.clicked = true">Continue</button>`);
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("disabled");
+        expect(read.clicked).toBe(false);
+        expect(await wasClicked(page)).toBe(false);
+    });
+
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
         await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
         const element = await page.$("#label");

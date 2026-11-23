@@ -4199,7 +4199,7 @@ export const setBrowserClickMode = authMutation
         const prefs = await context.db
             .query("aiUserPreferences")
             .withIndex("by_userId", (q) => q.eq("userId", context.user.userId))
-            .unique();
+            .first();
 
         await saveAiUserPreferences(context.db, prefs, context.user.userId, { browserClickMode: mode }, context.user.activeOrganization?.id ?? null);
         context.log.event("chat.set_browser_click_mode", { mode });
