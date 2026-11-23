@@ -47,7 +47,7 @@ describe("threadSearchTriggers", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
         await expect(
-            triggers.threadSearchInsert({ scheduler: failingScheduler() }, { doc: { title: "Hello", userId: "u1" }, id: "t1" }),
+            triggers.threadSearchInsert({ scheduler: failingScheduler() }, { doc: { title: "Hello", userId: "u1", userTurnCount: 4 }, id: "t1" }),
         ).resolves.toBeUndefined();
 
         warn.mockRestore();
@@ -56,7 +56,7 @@ describe("threadSearchTriggers", () => {
     it("schedules an insert's sync with the retry policy, on the owner's shard", async () => {
         const scheduler = { runAfter: vi.fn(async () => "job") };
 
-        await triggers.threadSearchInsert({ scheduler }, { doc: { title: "Hello", userId: "u1" }, id: "t1" });
+        await triggers.threadSearchInsert({ scheduler }, { doc: { title: "Hello", userId: "u1", userTurnCount: 4 }, id: "t1" });
 
         expect(scheduler.runAfter).toHaveBeenCalledWith(
             0,

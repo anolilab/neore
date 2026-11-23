@@ -22,6 +22,7 @@ const thread = (overrides: Partial<SearchRow> = {}): SearchRow => {
         lastReplyAt: 1,
         title: "PDF totals off by one",
         userId: "user-1",
+        userTurnCount: 4,
         ...overrides,
     };
 };
@@ -64,6 +65,25 @@ describe(searchKindsChanged, () => {
     it("names a kind on a reply only while it has no vector, so the turn gate is re-read a bounded number of times", () => {
         expect(searchKindsChanged(thread({ lastReplyAt: 1 }), thread({ lastReplyAt: 2 }))).toEqual(["title"]);
         expect(searchKindsChanged(thread({ lastReplyAt: 1 }), thread({ lastReplyAt: 2, titleVectorId: "v1" }))).toEqual([]);
+    });
+
+    it("names nothing while the thread stays at or below the turn gate and holds no vector", () => {
+        const young = { userTurnCount: 3 };
+
+        expect(searchKindsChanged(undefined, thread(young))).toEqual([]);
+        expect(searchKindsChanged(thread({ ...young, lastReplyAt: 1 }), thread({ ...young, lastReplyAt: 2 }))).toEqual([]);
+        expect(searchKindsChanged(thread(young), thread({ ...young, title: "Renamed" }))).toEqual([]);
+        expect(searchKindsChanged(thread({ userTurnCount: undefined }), thread({ lockedAt: 5, userTurnCount: undefined }))).toEqual([]);
+    });
+
+    it("names nothing for an edit on a locked thread that holds no vector", () => {
+        expect(searchKindsChanged(thread({ lockedAt: 3 }), thread({ lockedAt: 3, title: "Renamed" }))).toEqual([]);
+    });
+
+    it("still clears a vector left on a thread now below the gate", () => {
+        expect(
+            searchKindsChanged(thread({ titleVectorId: "v1", userTurnCount: 3 }), thread({ title: "Renamed", titleVectorId: "v1", userTurnCount: 3 })),
+        ).toEqual(["title"]);
     });
 
     it("does not re-check a locked thread on a reply", () => {
@@ -207,7 +227,7 @@ describe(claimHolds, () => {
 });
 
 describe("a refused thread's replies", () => {
-    const previous = { lastReplyAt: 1, title: "PDF totals", userId: "u1" };
+    const previous = { lastReplyAt: 1, title: "PDF totals", userId: "u1", userTurnCount: 4 };
     const reply = { ...previous, lastReplyAt: 2 };
 
     it("re-syncs a reply on a thread whose model was never refused", () => {

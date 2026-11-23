@@ -17,6 +17,7 @@ import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { gatewayFetch } from "../lib/services";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteVectorRow } from "./table-writes";
 import {
@@ -41,6 +42,7 @@ import {
     type SearchKind,
     type SearchPlan,
 } from "./thread-search-plan";
+import { SYNC_RETRY } from "./thread-search-triggers";
 import { findVectorRow, type VectorDimension, type VectorTableName } from "./vector/tables";
 import { searchVectors } from "./vector";
 
@@ -59,6 +61,9 @@ const vSearchState = v.union(
         userId: v.string(),
     }),
 );
+
+/** Past a dead holder's claim expiry, so the follow-up sync never meets that claim still live. */
+const CLAIM_LAPSE_MARGIN_MS = 5000;
 
 const nullable = <T>(value: T | undefined): T | null => value ?? null;
 const defined = (value: string | null): string | undefined => value ?? undefined;
@@ -252,13 +257,28 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
         texts = await textsStillWanted(ctx, args.threadId, state, texts);
     }
 
-    // One job embeds a thread's texts at a time. A job that finds them already claimed has nothing to add: the holder commits them.
+    // One job embeds a thread's texts at a time. A job that finds them already claimed leaves them to the holder.
     const claimId = texts.length > 0 ? crypto.randomUUID() : undefined;
+    const claim =
+        claimId === undefined ? undefined : await ctx.runMutation(internal.agent.thread_search.claimThreadSearch, { claimId, texts, threadId: args.threadId });
 
-    if (claimId !== undefined && !(await ctx.runMutation(internal.agent.thread_search.claimThreadSearch, { claimId, texts, threadId: args.threadId }))) {
+    if (claim !== undefined && !claim.claimed) {
         // The holder embeds these texts and commits them. Its plan may not clear what this one does, so clear that here too.
         if (plan.clear.length > 0) {
             await ctx.runMutation(internal.agent.thread_search.commitThreadSearch, { clear: plan.clear, embedded: [], threadId: args.threadId });
+        }
+
+        // The holder may have died without committing or releasing, and this job's retries would all meet its claim. One sync
+        // once the claim has lapsed embeds whatever is still missing; `changed: []` keeps a vector the holder did commit.
+        if (claim.heldUntil !== null) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                Math.max(0, claim.heldUntil - Date.now()) + CLAIM_LAPSE_MARGIN_MS,
+                internal.agent.thread_search.syncThreadSearch,
+                { changed: [], threadId: args.threadId },
+                state.userId,
+                SYNC_RETRY,
+            );
         }
 
         return;
@@ -294,23 +314,29 @@ export const markThreadSearchRefused = internalMutation
 const vClaimTexts = v.array(v.object({ kind: vSearchKind, text: v.string() }));
 
 /**
- * Takes the claim on a thread's texts before the gateway call. `false` when a live claim already
- * covers these texts (another job embeds them now), or when the thread is gone.
+ * Takes the claim on a thread's texts before the gateway call. Not claimed when a live claim already
+ * covers these texts (another job embeds them now; `heldUntil` is when that claim lapses), or when
+ * the thread is gone (`heldUntil: null`).
  */
 export const claimThreadSearch = internalMutation
     .input({ claimId: v.string(), texts: vClaimTexts, threadId: v.id("threads") })
-    .output(v.boolean())
+    .output(v.object({ claimed: v.boolean(), heldUntil: v.union(v.number(), v.null()) }))
     .mutation(async ({ args, ctx }) => {
         const thread = (await ctx.db.get("threads", args.threadId)) as Doc<"threads"> | null;
+
+        if (!thread) {
+            return { claimed: false, heldUntil: null };
+        }
+
         const now = Date.now();
 
-        if (!thread || claimHolds(thread.searchClaim, args.texts, now)) {
-            return false;
+        if (thread.searchClaim !== undefined && claimHolds(thread.searchClaim, args.texts, now)) {
+            return { claimed: false, heldUntil: thread.searchClaim.expiresAt };
         }
 
         await patchRow(ctx.db, "threads", thread, { searchClaim: { expiresAt: now + SEARCH_CLAIM_MS, id: args.claimId, texts: args.texts } });
 
-        return true;
+        return { claimed: true, heldUntil: null };
     });
 
 /** Releases the claim this job took, if it still holds it. Another job's claim is left as it is. */

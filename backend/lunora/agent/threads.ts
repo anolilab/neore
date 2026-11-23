@@ -37,10 +37,11 @@ import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     // The palette-search vector ids are internal (`agent/thread-search.ts`): no client reads them.
-    const result = omit(thread, ["parentThreadIds", "searchClaim", "searchRefusedAt", "summaryVectorId", "titleVectorId", "userTurnCount"]);
+    const result = omit(thread, ["parentThreadIds", ...SEARCH_INTERNAL_FIELDS]);
 
     // `vThreadDoc` types `projectId` as a plain string, and `Id<"projects">` is a
     // branded `string`, so the widening needs no cast — the branch stays only to

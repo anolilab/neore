@@ -10,6 +10,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { addMessagesHandler, updateMessage } from "./messages";
 import { MEANING_MIN_CHARS } from "./thread-search-plan";
+import { SYNC_RETRY } from "./thread-search-triggers";
 import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch } from "./thread-search";
 
 const mocks = vi.hoisted(() => {
@@ -77,7 +78,7 @@ const makeCtx = (fixture: Fixture) => {
         }
 
         if (reference === internal.agent.thread_search.claimThreadSearch) {
-            return true;
+            return { claimed: true, heldUntil: null };
         }
 
         return null;
@@ -160,21 +161,40 @@ describe(runThreadSearchSync, () => {
         expect(commit?.[1]).toMatchObject({ embedded: [{ kind: "title", text: "PDF totals off by one" }] });
     });
 
-    it("sends nothing when another job's live claim already covers these texts", async () => {
-        const runQuery = vi.fn(async () => readyThread());
-        const runMutation = vi.fn(async (reference: unknown) => (reference === internal.agent.thread_search.claimThreadSearch ? false : null));
+    /** A claim mutation that finds these texts held by another job until `heldUntil`. */
+    const heldClaim = (heldUntil: number) =>
+        vi.fn(async (reference: unknown) => (reference === internal.agent.thread_search.claimThreadSearch ? { claimed: false, heldUntil } : null));
 
-        await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title"], threadId: THREAD });
+    it("sends nothing when another job's live claim already covers these texts, and syncs again once that claim lapses", async () => {
+        vi.useFakeTimers({ now: 1_000_000 });
 
-        expect(mocks.embedMany).not.toHaveBeenCalled();
-        expect(runMutation).toHaveBeenCalledTimes(1);
+        try {
+            const runQuery = vi.fn(async () => readyThread());
+            const runMutation = heldClaim(1_000_000 + 240_000);
+            const scheduler = { runAfter: vi.fn(async () => "job") };
+
+            await runThreadSearchSync({ runMutation, runQuery, scheduler } as never, { changed: ["title"], threadId: THREAD });
+
+            expect(mocks.embedMany).not.toHaveBeenCalled();
+            expect(runMutation).toHaveBeenCalledTimes(1);
+            // The holder may have died before committing: one sync after its claim lapses embeds what is still missing.
+            expect(scheduler.runAfter).toHaveBeenCalledExactlyOnceWith(
+                240_000 + 5000,
+                internal.agent.thread_search.syncThreadSearch,
+                { changed: [], threadId: THREAD },
+                { retry: SYNC_RETRY, shardKey: "user-1" },
+            );
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("still clears a stale vector when another job's live claim covers the texts", async () => {
         const runQuery = vi.fn(async () => readyThread({ summary: { text: null, vectorId: "old-summary" } }));
-        const runMutation = vi.fn(async (reference: unknown) => (reference === internal.agent.thread_search.claimThreadSearch ? false : null));
+        const runMutation = heldClaim(Date.now() + 60_000);
+        const scheduler = { runAfter: vi.fn(async () => "job") };
 
-        await runThreadSearchSync({ runMutation, runQuery } as never, { changed: ["title", "summary"], threadId: THREAD });
+        await runThreadSearchSync({ runMutation, runQuery, scheduler } as never, { changed: ["title", "summary"], threadId: THREAD });
 
         expect(runMutation).toHaveBeenCalledWith(internal.agent.thread_search.commitThreadSearch, {
             clear: [{ kind: "summary", vectorId: "old-summary" }],
@@ -209,7 +229,7 @@ describe(runThreadSearchSync, () => {
             }
 
             if (reference === internal.agent.thread_search.claimThreadSearch) {
-                return true;
+                return { claimed: true, heldUntil: null };
             }
 
             return null;

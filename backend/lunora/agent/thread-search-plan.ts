@@ -63,6 +63,8 @@ export interface SearchRow {
     title?: string;
     titleVectorId?: string;
     userId?: string;
+    /** The user turns the messages triggers count on the row (`thread-search-triggers.ts`); absent reads as none. */
+    userTurnCount?: number;
 }
 
 /** A stored text and the vector embedded from it, if any. */
@@ -131,6 +133,12 @@ export const SEARCH_REFUSAL_RECHECK_MS = 24 * 60 * 60_000;
 
 const refusedRecently = (row: SearchRow, now: number): boolean => row.searchRefusedAt !== undefined && now - row.searchRefusedAt < SEARCH_REFUSAL_RECHECK_MS;
 
+/** Whether the thread is wanted in the index: eligible and past the turn gate. */
+const isSearchWanted = (row: SearchRow): boolean => isSearchEligible(row) && hasEnoughTurns(row.userTurnCount ?? 0);
+
+/** Whether the row points at a stored vector of either kind. */
+const holdsVector = (row: SearchRow): boolean => SEARCH_KINDS.some((kind) => row[SEARCH_VECTOR_FIELD[kind]] !== undefined);
+
 const kindTexts = (row: SearchRow): Record<SearchKind, string | undefined> => {
     return {
         summary: searchText(row.summary),
@@ -148,8 +156,16 @@ const kindTexts = (row: SearchRow): Record<SearchKind, string | undefined> => {
  * - A reply on an eligible thread: each kind with text but no vector yet, so a
  *   thread that just crossed the turn gate gets its vectors. Bounded: a kind with
  *   a vector is never named by a reply.
+ *
+ * A write that leaves the thread unwanted on both sides (locked, or at or below the
+ * turn gate) and holding no vector names nothing: its sync would find nothing to do.
+ * Crossing the gate is scheduled by the messages triggers (`moveUserTurns`).
  */
 export const searchKindsChanged = (previous: SearchRow | undefined, next: SearchRow, now: number = Date.now()): SearchKind[] => {
+    if (!isSearchWanted(next) && (previous === undefined || !isSearchWanted(previous)) && !holdsVector(next)) {
+        return [];
+    }
+
     const changed = new Set<SearchKind>();
     const nextTexts = kindTexts(next);
 
