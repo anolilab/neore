@@ -137,11 +137,23 @@ export const listSharedPinGrantsForExport = internalQuery
     .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(v.object({ ownerId: v.string(), threadId: v.string() })))
     .query(async ({ args, ctx: context }) => {
-        const grants = await context.db.threadAccess.findMany({ where: { userId: args.userId } });
+        const shared: { ownerId: string; threadId: string }[] = [];
+        let cursor: string | undefined;
 
-        return grants.page.flatMap((grant) =>
-            typeof grant.ownerId === "string" && grant.ownerId !== args.userId ? [{ ownerId: grant.ownerId, threadId: grant.threadId }] : [],
-        );
+        // A `.global()` read is capped per page, so every page is read until the last.
+        do {
+            const { continueCursor, isDone, page } = await context.db.threadAccess.findMany({ cursor, limit: 500, where: { userId: args.userId } });
+
+            for (const grant of page) {
+                if (typeof grant.ownerId === "string" && grant.ownerId !== args.userId) {
+                    shared.push({ ownerId: grant.ownerId, threadId: grant.threadId });
+                }
+            }
+
+            cursor = isDone ? undefined : (continueCursor ?? undefined);
+        } while (cursor !== undefined);
+
+        return shared;
     });
 
 export const createPin = authMutation
