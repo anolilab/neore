@@ -86,6 +86,10 @@ export const executeBrowserAction = internalAction
             let callSignal: AbortSignal | undefined;
             // The session this call acts on, once it is known: a decision look that fails records its empty target there.
             let decisionSession: Id<"browserSessions"> | undefined;
+            // The rate-limit charge's refund, once the charge is made, and whether the renderer call was sent: a failure before the
+            // send gives the charge back, so a failed attempt does not use up an hourly action.
+            let refundCharge: (() => Promise<void>) | undefined;
+            let mayHaveSent = false;
             let callEndsBy: number | undefined;
 
             try {
@@ -165,6 +169,8 @@ export const executeBrowserAction = internalAction
                     }
                 };
 
+                refundCharge = refund;
+
                 // After a hand back the page is not the one the agent planned against: it looks before it acts. A
                 // navigate to a browser that was closed runs as asked: there is no page left to look at.
                 const reopens = action === "navigate" && (returned === "browser_closed" || cfSessionId === undefined);
@@ -223,6 +229,8 @@ export const executeBrowserAction = internalAction
                           url: args.url,
                           ...(args.approvalLook === true && { visibleOnly: true }),
                       };
+
+                mayHaveSent = true;
                 let { data, error, response } = await browserAction({ body: sent, client, signal: callSignal });
                 // The row's browser when the result below is logged: none, once a retired one is dropped.
                 let startedWith = startedWithProviderSessionId;
@@ -428,6 +436,11 @@ export const executeBrowserAction = internalAction
                     await ctx
                         .runMutation(internal.browser.functions.recordPurchaseLook, { sessionId: decisionSession, target: "", toolCallId: args.decisionCallId })
                         .catch(() => undefined);
+                }
+
+                // Nothing reached the renderer and the charge was made: give it back.
+                if (!mayHaveSent && refundCharge !== undefined) {
+                    await refundCharge().catch(() => undefined);
                 }
 
                 const failed = { error: `CF Browser Rendering error: ${sanitizeBrowserError(error)}`, success: false };
