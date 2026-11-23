@@ -23,6 +23,8 @@ vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 
 describe("BotAvatar without a canvas", () => {
     beforeEach(() => {
+        // Without an observer every label counts as in view; the still image is shown here because there is no canvas.
+        vi.stubGlobal("IntersectionObserver", undefined);
         vi.clearAllMocks();
     });
 

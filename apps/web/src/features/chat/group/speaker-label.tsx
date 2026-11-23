@@ -27,7 +27,7 @@ export const getMessageSpeakerName = (message: UIMessage): string | undefined =>
 /** A bot speaker's name chip: its avatar beside the name, which stays real text for screen readers. */
 const BotSpeakerChip: FC<{ className?: string; name: string }> = ({ className, name }) => (
     <span className={cn("text-foreground inline-flex items-center gap-1.5 text-sm font-medium dark:text-white", className)}>
-        <BotAvatar size={24} />
+        <BotAvatar name={name} size={24} />
         <span className="truncate">{name}</span>
     </span>
 );
