@@ -424,8 +424,9 @@ export function readTarget(
             // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
             // different targets share a fingerprint. The page digests it below.
             const isCheckout = isCardFields || isCheckoutPage;
-            // The submit-like flag is part of it too: a name change that makes a control submit-like (an arrow named "Review" with a
-            // title "Confirm") invalidates an earlier approval, as the checkout flag does.
+            // The submit-like and subscribe-like flags are part of it too: a name change that makes a control submit-like (an arrow named
+            // "Review" with a title "Confirm") or subscription-like (one name source "Subscribe" with a title "Monthly plan") invalidates
+            // an earlier approval, as the checkout flag does, even when the joined name reads the same.
             const canonical = [
                 document.URL,
                 steps.join(">"),
@@ -434,6 +435,7 @@ export function readTarget(
                 destinations,
                 String(isCheckout),
                 String(isSubmitLike),
+                String(isSubscribeLike),
                 String(isScanCapped || isReferenceCapped),
             ].join("\u{0}");
 
@@ -607,7 +609,9 @@ export function readTarget(
             // moved one is not submitted there. A handler that cancelled the submission keeps it cancelled. Known limit: a page that
             // stops the submit event's propagation before it reaches the window, or adds a window listener during the click after
             // this one, is submitted to whatever destination it set.
-            const submitter = control instanceof HTMLButtonElement || control instanceof HTMLInputElement ? control : null;
+            // A label's click activates its own control, so a label submits through the control it labels (`HTMLLabelElement.control`).
+            const activated: Element | null = control instanceof HTMLLabelElement ? control.control : control;
+            const submitter = activated instanceof HTMLButtonElement || activated instanceof HTMLInputElement ? activated : null;
             const isSubmitter =
                 submitter !== null && (submitter instanceof HTMLButtonElement ? submitter.type === "submit" : ["image", "submit"].includes(submitter.type));
             const ownForm = isSubmitter && submitter !== null ? submitter.form : null;

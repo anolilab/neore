@@ -499,4 +499,36 @@ describe("readTarget in a page", () => {
         expect(joined.subscribeLike).toBe(true);
         expect(newsletter.subscribeLike).toBe(false);
     });
+
+    it("a label's click submits through its own button, and a page handler's move of that button's destination does not redirect it", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm"><label id="pay-label" for="pay">Pay now</label><button id="pay" type="submit" formaction="/cart/pay">Pay</button></form><script>document.addEventListener("submit", () => { document.getElementById("pay").setAttribute("formaction", "/elsewhere"); });</script>`,
+        );
+        const label = await page.$("#pay-label");
+        const seen = await label!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await label!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        await page.waitForURL("**/cart/pay**", { timeout: 3000 });
+        expect(page.url()).not.toContain("/elsewhere");
+    });
+
+    it("a regrouped name that keeps the joined text but makes a bare Subscribe changes the fingerprint", async () => {
+        await pageWith(page, `<button id="plan" aria-label="Subscribe" title="Monthly plan">→</button>`);
+        const element = await page.$("#plan");
+        const before = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        // The name is regrouped into one source: a bare Subscribe is no longer one of its parts, so the decision changes.
+        await element!.evaluate((node) => {
+            node.setAttribute("aria-label", "Subscribe Monthly plan");
+            node.removeAttribute("title");
+        });
+        const after = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(before.subscribeLike).toBe(true);
+        expect(after.subscribeLike).toBe(false);
+        expect(after.target).not.toBe(before.target);
+    });
 });
