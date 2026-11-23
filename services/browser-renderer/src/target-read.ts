@@ -563,7 +563,11 @@ export function readTarget(
 
         if (isDisabledIn(control)) {
             refused = "disabled";
-        } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden" || getComputedStyle(control).opacity === "0") {
+        } else if (
+            control.getClientRects().length === 0 ||
+            getComputedStyle(control).visibility === "hidden" ||
+            control.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false
+        ) {
             refused = "hidden";
         } else if (isCoveredIn(control)) {
             refused = "covered";
