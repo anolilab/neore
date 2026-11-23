@@ -430,7 +430,13 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
         enabled: !!activeDocumentId && isCanvasOpen,
     });
 
-    const { mutateAsync: updateDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());
+    const { mutateAsync: saveDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());
+    // A document in a shared thread is stored on the thread owner's shard, so every save names its thread to reach that shard.
+    const updateDocument = useCallback(
+        async (args: Omit<Parameters<typeof saveDocument>[0], "threadId">) =>
+            await saveDocument({ ...args, threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined }),
+        [saveDocument, canvasThreadId],
+    );
 
     useEffect(() => {
         lastSeenVersionRef.current = 0;

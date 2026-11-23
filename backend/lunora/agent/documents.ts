@@ -214,6 +214,9 @@ export const updateDocument = authMutation
         contentJson: v.optional(vJsonValue),
         documentId: v.id("documents"),
         language: v.optional(v.string().max(MAX_LENGTH.short)),
+        // The document's thread, when the caller knows it: a document in a shared thread is stored on the thread owner's shard, and the
+        // save routes there by this id.
+        threadId: v.optional(v.id("threads")),
         title: v.optional(v.string().max(MAX_LENGTH.long)),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
@@ -230,6 +233,10 @@ export const updateDocument = authMutation
         const documentRow = await ctx.db.get("documents", args.documentId);
 
         assert(documentRow, `Document ${args.documentId} not found`);
+
+        if (args.threadId !== undefined && documentRow.threadId !== args.threadId) {
+            throw new LunoraError("NOT_FOUND", "Document not found in this chat");
+        }
 
         if (documentRow.userId !== identity.userId) {
             throw new LunoraError("FORBIDDEN", "Forbidden");
@@ -379,15 +386,23 @@ export const deleteDocument = internalMutation
 
         // A document pin names the document: drop the thread's pins that name it, so none is left pointing at nothing. The pins of a
         // thread sit on the same shard as its documents.
-        const pins = await ctx.db
-            .query("threadPins")
-            .withIndex("by_thread", (q) => q.eq("threadId", documentRow.threadId))
-            .take(500);
+        let cursor: string | null = null;
+        let isDone = false;
 
-        for (const pin of pins) {
-            if (pin.documentId === args.documentId) {
-                await ctx.db.delete("threadPins", pin._id);
+        while (!isDone) {
+            const result = await ctx.db
+                .query("threadPins")
+                .withIndex("by_thread", (q) => q.eq("threadId", documentRow.threadId))
+                .paginate({ cursor, numItems: 500 });
+
+            for (const pin of result.page) {
+                if (pin.documentId === args.documentId) {
+                    await ctx.db.delete("threadPins", pin._id);
+                }
             }
+
+            isDone = result.isDone;
+            cursor = result.continueCursor;
         }
 
         return null;
