@@ -530,6 +530,31 @@ describe("readTarget in a page", () => {
         expect(page.url()).not.toContain("/elsewhere");
     });
 
+    it("a label whose page re-points its for attribute after the approval read is refused, and nothing is submitted", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm"><label id="pay-label" for="pay">Pay now</label><button id="pay" type="submit" formaction="/cart/pay">Pay</button><button id="other" type="submit" formaction="/cart/other">Other</button></form>`,
+        );
+        const label = await page.$("#pay-label");
+        const seen = await label!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        await label!.evaluate((node) => {
+            node.setAttribute("for", "other");
+        });
+        const read = await label!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.clicked).toBe(false);
+        expect(read.refused).toBe("changed");
+        // A navigation would start within the same task; a short beat lets it show itself.
+        await page.evaluate(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 300);
+            });
+        });
+        expect(page.url()).not.toContain("/cart/other");
+        expect(page.url()).not.toContain("/cart/pay");
+    });
+
     it("a regrouped name that keeps the joined text but makes a bare Subscribe changes the fingerprint", async () => {
         await pageWith(page, `<button id="plan" aria-label="Subscribe" title="Monthly plan">→</button>`);
         const element = await page.$("#plan");

@@ -424,6 +424,26 @@ export function readTarget(
             // The whole canonical string, the checkout flag included (a field that appears after the decision changes it), so no two
             // different targets share a fingerprint. The page digests it below.
             const isCheckout = isCardFields || isCheckoutPage;
+            // The control a click activates (a label's, or the button around a child): part of the fingerprint, so a page that re-points
+            // a label's `for` (or changes the button it activates) makes an earlier approval refuse. The selected element itself is left
+            // out: its own attributes may change in a press handler, and the press re-read must not refuse an ordinary click for that.
+            const activatable = control.closest("button, input, label, a");
+            const activatedControl = activatable instanceof HTMLLabelElement ? activatable.control : activatable;
+            const activatedKey = [
+                activatable instanceof HTMLLabelElement ? (activatable.getAttribute("for") ?? "") : "",
+                activatedControl === null || activatedControl === control
+                    ? ""
+                    : [
+                          activatedControl.tagName,
+                          activatedControl.id,
+                          activatedControl.getAttribute("name") ?? "",
+                          activatedControl.getAttribute("type") ?? "",
+                          activatedControl.getAttribute("formaction") ?? "",
+                          activatedControl.getAttribute("formmethod") ?? "",
+                          activatedControl.getAttribute("formtarget") ?? "",
+                          (activatedControl as { form?: HTMLFormElement | null }).form?.getAttribute("action") ?? "",
+                      ].join("\u{1}"),
+            ].join("\u{2}");
             // The submit-like and subscribe-like flags are part of it too: a name change that makes a control submit-like (an arrow named
             // "Review" with a title "Confirm") or subscription-like (one name source "Subscribe" with a title "Monthly plan") invalidates
             // an earlier approval, as the checkout flag does, even when the joined name reads the same.
@@ -436,6 +456,7 @@ export function readTarget(
                 String(isCheckout),
                 String(isSubmitLike),
                 String(isSubscribeLike),
+                activatedKey,
                 String(isScanCapped || isReferenceCapped),
             ].join("\u{0}");
 
