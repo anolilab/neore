@@ -28,6 +28,7 @@ import {
 } from "./events-webhook";
 import { checkCallbackHost } from "./events-webhook-address";
 import type { ApiKeyIdentity } from "./identity";
+import { verifyCallback } from "./events-webhook-wire";
 
 export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyIdentity, request: SubscribeRequest): Promise<SubscribeResult> => {
     const { userId } = identity;
@@ -62,6 +63,33 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
 
     const keyHash = await subscriptionKeyHash(identity.apiKeyId, request.url, request.name, request.argumentsKey);
     const id = subscriptionIdOf(keyHash);
+
+    // Nothing is queued for a callback that has not confirmed. A fresh verification is needed unless one is cached for this
+    // (principal, URL); the handshake is signed with the secret being subscribed, and is answered before the store is written.
+    const cached = await inShard(
+        lunora,
+        userId,
+        async (ctx) => await ctx.runQuery(internal.public_api.event_webhooks.verificationCached, { principal: identity.apiKeyId, url: request.url, userId }),
+    );
+    let recordVerification = false;
+
+    if (!cached.cached) {
+        const verdict = await verifyCallback({
+            fetch: async (input, init) => await fetch(input, init),
+            id,
+            now: Date.now(),
+            secret: request.secret,
+            subscriptionId: id,
+            url: request.url,
+        });
+
+        if (!verdict.ok) {
+            throw new EventsWebhookError(CALLBACK_ENDPOINT_ERROR, "The callback endpoint did not confirm the subscription.", { reason: verdict.reason });
+        }
+
+        recordVerification = true;
+    }
+
     const secretCiphertext = await encryptKey(request.secret, "tool-keys");
     const outcome = await inShard(
         lunora,
@@ -77,6 +105,7 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
                 ...(request.maxAgeMs !== null && { maxAgeMs: request.maxAgeMs }),
                 name: request.name,
                 principal: identity.apiKeyId,
+                recordVerification,
                 secretCiphertext,
                 url: request.url,
                 userId,

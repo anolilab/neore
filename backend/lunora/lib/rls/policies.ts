@@ -193,7 +193,9 @@ const OWNER_TABLES = [
     "evalResults",
     "evalRuns",
     "eventWebhookHosts",
+    "eventWebhookDeliveries",
     "eventWebhookSubscriptions",
+    "eventWebhookVerifications",
     "feedback",
     "folders",
     "gatewayNotifications",
@@ -442,10 +444,10 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     cronRuns: "cron slot claims; system only",
     documentHistory: "audit trail written by triggers; no client read",
     idempotencyClaims: "internal claims; no client access",
-    mcpEvents:
-        "the Events log (`public-api/events-log.ts`): written by the run end and the approval request, read by `events/poll` and the GDPR erase; all internal on the owner's shard, no client procedure reaches it",
     invitation: "better-auth organization invitations; org-scoped, checked by org role",
     jwks: "better-auth signing keys",
+    mcpEvents:
+        "the Events log (`public-api/events-log.ts`): written by the run end and the approval request, read by `events/poll` and the GDPR erase; all internal on the owner's shard, no client procedure reaches it",
     member: "organization membership; org-scoped, read to PROVE membership",
     memberCredits: "org billing rows managed by org and platform admins",
     nodeExecutions: "no owner column; internal only",

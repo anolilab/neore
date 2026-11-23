@@ -1181,6 +1181,30 @@ export const schema = defineSchema({
         .index("by_user_and_status", ["userId", "status"])
         .index("by_dataset_and_createdAt", ["datasetId", "createdAt"]),
 
+    // One queued Events webhook delivery (`public-api/event-webhook-deliveries.ts`): a matched log position (`kind` "event") or a
+    // gap ("gap"). `status` is "pending", "delivered" or "abandoned"; `webhookId` is stable across its attempts.
+    eventWebhookDeliveries: defineTable({
+        attempts: v.number(),
+        createdAt: v.number(),
+        eventId: v.string(),
+        firstAttemptAt: v.number(),
+        keyHash: v.string(),
+        kind: v.string(),
+        lastError: v.string(),
+        leaseUntil: v.number(),
+        name: v.string(),
+        nextAttemptAt: v.number(),
+        seq: v.number(),
+        status: v.string(),
+        timestamp: v.number(),
+        updatedAt: v.number(),
+        userId: v.string(),
+        webhookId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_status_nextAttemptAt", ["status", "nextAttemptAt"])
+        .index("by_userId_keyHash", ["userId", "keyHash"]),
+
     // The owner's approved callback hosts for Events webhooks (`auth/event-webhook-hosts.ts`). Written only from the owner's session.
     eventWebhookHosts: defineTable({
         createdAt: v.number(),
@@ -1210,6 +1234,17 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId_keyHash", ["userId", "keyHash"])
         .index("by_expiresAt", ["expiresAt"]),
+
+    // The verification handshake's cache (SEP-3415): one row per (principal, callback URL), valid until `verifiedUntil`.
+    eventWebhookVerifications: defineTable({
+        createdAt: v.number(),
+        principal: v.string(),
+        url: v.string(),
+        userId: v.string(),
+        verifiedUntil: v.number(),
+    })
+        .shardBy("userId")
+        .index("by_userId_principal_url", ["userId", "principal", "url"]),
 
     /**
      * What a user sent through "Send feedback": a kind, their text, up to

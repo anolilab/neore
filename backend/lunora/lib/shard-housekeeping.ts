@@ -82,6 +82,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "pruneMcpEvents", ref: internal.public_api.events.pruneMcpEvents },
     // Events webhook subscriptions past their granted expiry (`public-api/event-webhooks.ts`).
     { name: "reapExpiredEventSubscriptions", ref: internal.public_api.event_webhooks.reapExpiredEventSubscriptions },
+    // Queues the matched events and the due sends, and ends subscriptions whose host left the allowlist (`event-webhook-deliveries.ts`).
+    { name: "dispatchEventWebhooks", ref: internal.public_api.event_webhook_deliveries.dispatchEventWebhooks },
     // Rate-limit rows charged on this shard, past every limit's window (`lib/rate-limit-sweep.ts`).
     { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },
