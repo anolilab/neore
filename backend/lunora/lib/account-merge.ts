@@ -19,7 +19,9 @@
  *    collaborator's comment, a guest tab still open, a scheduled job) so
  *    arrives as it is at the clear, never deleted uncopied;
  * 3. `.global()` rows naming the guest are re-pointed ({@link reassignGlobalRows}),
- *    and its thread follows a page per mutation ({@link reassignThreadFollowsPage});
+ *    its thread follows a page per mutation ({@link reassignThreadFollowsPage}),
+ *    and its pins on other owners' threads on each owner's shard, each thread's
+ *    pin route moving only after its pins ({@link moveSharedPinRouteOf});
  * 4. once the guest's shard is empty, the guest itself is deleted
  *    (`auth/hooks.ts#deleteMergedGuest`), as the anonymous plugin does when a
  *    conversion completes in the guest's own browser. A cross-browser
@@ -27,7 +29,11 @@
  *
  * An import never overwrites the new account's own edit: every row it writes
  * leaves an import marker (the digest of what it wrote), and a row on the new
- * shard is replaced only while it still matches its marker. A run spends at most
+ * shard is replaced only while it still matches its marker. When the merge ends,
+ * a completion fence ({@link MERGE_FENCE_SCOPE}) goes in with the first marker
+ * drop, and from then on every import of that guest writes nothing, so an older
+ * delivery that read rows before the end cannot bring back one the account
+ * deleted. A run spends at most
  * {@link MERGE_CALLS_PER_RUN} cross-shard calls and then queues the next run with
  * where it stopped ({@link MergeProgress}), so no guest is too large to finish
  * and no job is acknowledged with rows left behind.
@@ -40,6 +46,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { AUDIT_TABLES } from "./audit-triggers";
@@ -50,13 +57,17 @@ import { enqueueJob } from "./job-queue";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
+import { firstPinRouteOf, moveSharedPinRoute } from "../chat/pins/pin-route-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
 
 /**
- * Rows per round trip on an audited table (`files`, `folders`, `gdprConsent`, `teammateConnectorAccess`): each write
- * also writes a `documentHistory` row to D1, and an invocation's D1 budget (32 statements, two per write) covers 16.
+ * Rows per round trip on an audited table (`files`, `folders`, `gdprConsent`, `teammateConnectorAccess`). Of what an
+ * import or delete does per row, only the audit trigger's `documentHistory` insert reaches D1 (a `.global()` table): one
+ * statement a write. The import marker's lookup and write, the row's read and the row's write are the shard's own
+ * SQLite, which counts no D1 statement and no subrequest, only the shard transaction's 50,000 written rows. 16 rows is
+ * 16 D1 statements, inside a budget that allows two a row (32 of the Free plan's 50 per invocation).
  */
 export const AUDITED_MERGE_PAGE_SIZE = 16;
 
@@ -103,8 +114,9 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     promptHistory: ["userId", "contentBy"],
     prompts: ["userId", "contentBy"],
     shardRoutes: ["ownerId"],
-    // A guest's pins on a shared thread stay findable by the guest's new account, and the owner-side route follows an owner who moved.
-    sharedPinRoutes: ["userId", "ownerId"],
+    // The owner-side route follows an owner who moved. The guest's own routes (`userId`) move in the merge's `pins` step, each
+    // only after the guest's pins behind it, so a pin made between runs never stays the guest's under a route that is not.
+    sharedPinRoutes: ["ownerId"],
     skillRatings: ["userId"],
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
@@ -167,12 +179,27 @@ const ownFields = (row: Record<string, unknown>): Record<string, unknown> => Obj
 
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
+/** Sorted by code unit, not locale: the order must not change with the runtime. */
+const byCodeUnit = (a: string, b: string): number => {
+    if (a === b) {
+        return 0;
+    }
+
+    return a < b ? -1 : 1;
+};
+
+/** The byte views the store hands back as plain bytes: a top-level binary column decodes to an `ArrayBuffer`. */
+const PLAIN_BYTES = new Set(["DataView", "Uint8Array"]);
+
 /**
  * A stored value as deterministic text: object keys sorted, absent (`undefined`) keys dropped, and every value JSON
- * cannot carry tagged with its type — a bigint by its digits, binary by the hex of its bytes, a date by its time. JSON
- * throws on a bigint and writes every `ArrayBuffer` as `{}`; this tells them apart, so two rows with the same text hold
- * the same values. The tags (`<bigint:…>`) are no JSON token, so they cannot meet a string or an array of the row's own.
- * A value no Lunora column holds throws: a row that cannot be compared is never deleted.
+ * cannot carry tagged with its type. These are the types Lunora's storage codec (`@lunora/wire`) gives back: a bigint by
+ * its digits, binary by the hex of its bytes (a typed array other than `Uint8Array` with its type), a date by its time,
+ * a URL by its address, a `Map` by its entries and a `Set` by its members (each sorted by its own text, so insertion
+ * order does not count), an `Error` by its name, message, fields and cause. JSON throws on a bigint and writes every
+ * `ArrayBuffer`, `Map` and `Set` as `{}`; this tells them apart, so two rows with the same text hold the same values.
+ * The tags (`<bigint:…>`) are no JSON token, so they cannot meet a string or an array of the row's own. A value no
+ * Lunora column holds throws: a row that cannot be compared is never deleted.
  */
 export const canonicalValue = (value: unknown): string => {
     if (value === null) {
@@ -205,11 +232,40 @@ export const canonicalValue = (value: unknown): string => {
     }
 
     if (ArrayBuffer.isView(value)) {
-        return `<bytes:${hex(new Uint8Array(value.buffer, value.byteOffset, value.byteLength))}>`;
+        const bytes = hex(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+        const type = value.constructor.name;
+
+        return PLAIN_BYTES.has(type) ? `<bytes:${bytes}>` : `<bytes:${type}:${bytes}>`;
     }
 
     if (value instanceof Date) {
         return `<date:${String(value.getTime())}>`;
+    }
+
+    if (value instanceof URL) {
+        return `<url:${JSON.stringify(value.href)}>`;
+    }
+
+    if (value instanceof Map) {
+        const entries = [...value.entries()]
+            .map(([key, item]) => [canonicalValue(key), canonicalValue(item)] as const)
+            .toSorted(([a], [b]) => byCodeUnit(a, b));
+
+        return `<map:${entries.map(([key, item]) => `${key}=>${item}`).join(",")}>`;
+    }
+
+    if (value instanceof Set) {
+        return `<set:${[...value]
+            .map((item) => canonicalValue(item))
+            .toSorted(byCodeUnit)
+            .join(",")}>`;
+    }
+
+    if (value instanceof Error) {
+        const fields = Object.fromEntries(Object.entries(value));
+        const parts = [value.name, value.message, fields, ...("cause" in value && value.cause !== undefined ? [value.cause] : [])];
+
+        return `<error:${canonicalValue(parts)}>`;
     }
 
     if (Array.isArray(value)) {
@@ -221,8 +277,7 @@ export const canonicalValue = (value: unknown): string => {
     if (prototype === Object.prototype || prototype === null) {
         const entries = Object.entries(value as Record<string, unknown>)
             .filter(([, field]) => field !== undefined)
-            // By code unit, not locale: the order must not change with the runtime. An object's keys are never equal.
-            .toSorted(([a], [b]) => (a < b ? -1 : 1));
+            .toSorted(([a], [b]) => byCodeUnit(a, b));
 
         return `{${entries.map(([key, field]) => `${JSON.stringify(key)}:${canonicalValue(field)}`).join(",")}}`;
     }
@@ -324,32 +379,59 @@ export const IMPORT_MARKER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const markerKey = (from: string, table: string, id: string): string => `${from}:${table}:${id}`;
 
 /**
+ * The claim scope of a merge's completion fence: one row per guest on the new account's shard, keyed by the guest's id,
+ * written in the same transaction that drops the first page of import markers. Once it is there no import of that
+ * guest writes anything: an older delivery still holding rows it read before the merge finished would otherwise insert
+ * a row the account has deleted since, with no marker left to say so. Tagged with the new account, so its erasure takes
+ * it.
+ */
+export const MERGE_FENCE_SCOPE = "guest-merge-done";
+
+/** Far past any delivery a queue would still retry; the fence then lapses with the claim purge. */
+export const MERGE_FENCE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** The guest's merge into this shard has finished: its fence is here and not lapsed. */
+const mergeFinished = async (db: MutationCtx["db"], from: string, now: number): Promise<boolean> => {
+    const fence = await db
+        .query("idempotencyClaims")
+        .withIndex("by_scope_key", (q) => q.eq("scope", MERGE_FENCE_SCOPE).eq("key", from))
+        .first();
+
+    return fence !== null && fence.expiresAt > now;
+};
+
+/**
  * On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. An id already here is brought up to
  * the guest's row as it is now (a row edited after the copy) only while it still holds what the merge last wrote there
  * (its import marker): a row the new account changed, or one written here by anything but the merge, stays as it is,
  * and an id whose marker remains but whose row is gone (the account deleted it) is not written again. `present` names
  * every id the guest's shard may now delete: each is on this shard as the merge or the account left it, or (for the
- * tables the new account keeps its own row of) handled.
+ * tables the new account keeps its own row of) handled. Once the guest's merge has finished ({@link MERGE_FENCE_SCOPE})
+ * it writes nothing and confirms nothing: `fenced` tells a stale delivery to stop.
  */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
-    .output(v.object({ imported: v.number(), present: v.array(v.string()) }))
+    .output(v.object({ fenced: v.boolean(), imported: v.number(), present: v.array(v.string()) }))
     .mutation(async ({ args, ctx }) => {
         const db = rawDb(ctx);
         const rows = args.rows as Record<string, unknown>[];
         const ids = rows.map((row) => row._id as string);
+        const { now } = ctx;
+
+        if (await mergeFinished(ctx.db, args.from, now)) {
+            return { fenced: true, imported: 0, present: [] };
+        }
 
         if (args.table === "userSettings") {
             await carrySetupSteps(ctx, rows, args.from, args.to);
 
-            return { imported: 0, present: ids };
+            return { fenced: false, imported: 0, present: ids };
         }
 
         if (KEEP_NEW_USERS.has(args.table)) {
-            return { imported: 0, present: ids };
+            return { fenced: false, imported: 0, present: ids };
         }
 
-        const { now } = ctx;
         let imported = 0;
 
         for (const row of rows) {
@@ -402,14 +484,35 @@ export const importShardRows = internalMutation
             }
         }
 
-        return { imported, present: ids };
+        return { fenced: false, imported, present: ids };
     });
 
-/** On the NEW user's shard: drop a page of the guest's import markers, once its merge is done; `hasMore` while some may remain. */
+/**
+ * On the NEW user's shard: once the guest's merge is done, fence it ({@link MERGE_FENCE_SCOPE}) and drop a page of its
+ * import markers; `hasMore` while some may remain. The fence goes in with the first page, so no import ever runs
+ * between a marker's drop and the fence. Markers and fence are this shard's own rows, not D1's: a page of deletes costs
+ * no D1 statement.
+ */
 export const dropImportMarkersPage = internalMutation
-    .input({ from: v.string() })
+    .input({ from: v.string(), to: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
+        const { now } = ctx;
+        const fence = await ctx.db
+            .query("idempotencyClaims")
+            .withIndex("by_scope_key", (q) => q.eq("scope", MERGE_FENCE_SCOPE).eq("key", args.from))
+            .first();
+
+        if (fence === null) {
+            await ctx.db.insert("idempotencyClaims", {
+                claimedAt: now,
+                expiresAt: now + MERGE_FENCE_TTL_MS,
+                key: args.from,
+                scope: MERGE_FENCE_SCOPE,
+                userId: args.to,
+            });
+        }
+
         return { hasMore: await releaseClaimsWithPrefix(ctx, IMPORT_MARKER_SCOPE, `${args.from}:`) };
     });
 
@@ -502,6 +605,22 @@ export const reassignThreadFollowsPage = internalMutation
     .output(v.object({ hasMore: v.boolean(), moved: v.number() }))
     .mutation(async ({ args, ctx }) => await mergeThreadFollowsPage(ctx.db, args.from, args.to));
 
+/** The first `.global()` pin route that still names the guest, with the shard its pins live on; `null` once none does. */
+export const nextSharedPinRoute = internalQuery
+    .input({ from: v.string() })
+    .output(v.union(v.object({ ownerId: v.string(), threadId: v.string() }), v.null()))
+    .query(async ({ args, ctx }) => await firstPinRouteOf(ctx.db, args.from));
+
+/** Hands the guest's pin route on `threadId` to the new account, once the guest's pins there have moved. */
+export const moveSharedPinRouteOf = internalMutation
+    .input({ from: v.string(), threadId: v.string(), to: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await moveSharedPinRoute(ctx.db, args.from, args.to, args.threadId);
+
+        return null;
+    });
+
 /** A caller into a named shard, as `createShardClient(...).call` is. */
 export type ShardCall = <R>(reference: { __lunoraRef: string }, args: Record<string, unknown>, shardKey: string) => Promise<R>;
 
@@ -519,7 +638,7 @@ export const MERGE_CALLS_PER_RUN = 40;
 export const MAX_MERGE_RUNS = 1000;
 
 /** The merge's steps, in order. */
-export type MergePhase = "clear" | "copy" | "follows" | "global" | "guest" | "markers";
+export type MergePhase = "clear" | "copy" | "follows" | "global" | "guest" | "markers" | "pins";
 
 /** Where a merge run stopped, for the next run to start from: the step, its table and that table's copy cursor. */
 export interface MergeProgress {
@@ -550,7 +669,7 @@ interface MergeContext {
 }
 
 /** The most cross-shard calls one step of each phase makes: a run stops before a step it could not finish. */
-const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 1, guest: 1, markers: 1 };
+const STEP_CALLS: Readonly<Record<MergePhase, number>> = { clear: 3, copy: 2, follows: 1, global: 1, guest: 1, markers: 1, pins: 3 };
 
 /** Moves `state` to the first table of `phase`. */
 const enter = (state: MergeState, phase: MergePhase): void => {
@@ -582,8 +701,13 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         }
 
         state.calls -= 1;
+        const cleared = await clearPage(call, references, table, from, to);
 
-        if (await clearPage(call, references, table, from, to)) {
+        if (cleared === "fenced") {
+            return true;
+        }
+
+        if (cleared === "page") {
             state.calls -= 2;
         } else {
             nextTable(state, tables, "global");
@@ -610,7 +734,13 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
         if (page.page.length > 0) {
             state.calls -= 1;
-            await call(references.importRows, { from, rows: page.page, table, to }, to);
+            const { fenced }: { fenced: boolean } = await call(references.importRows, { from, rows: page.page, table, to }, to);
+
+            // Another delivery finished this merge: this one read its rows before that and must write none of them.
+            if (fenced) {
+                return true;
+            }
+
             state.moved += page.page.length;
         }
 
@@ -629,7 +759,7 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         state.moved += page.moved;
 
         if (!page.hasMore) {
-            enter(state, "guest");
+            enter(state, "pins");
         }
 
         return false;
@@ -648,25 +778,54 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
     // Only now: every table was copied, then cleared to empty, so nothing of the guest's is left to move.
     guest: async ({ call, from, references }, state) => {
         state.calls -= 1;
-        const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
+        const result: { deleted: boolean; followsRemain?: boolean; pinsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);
 
-        // A follow written under the guest's id after the last page: move it, then try again.
-        enter(state, result.followsRemain === true ? "follows" : "markers");
+        // A follow or a pin made under the guest's id after its step: move it, then try again.
+        if (result.followsRemain === true) {
+            enter(state, "follows");
+        } else if (result.pinsRemain === true) {
+            enter(state, "pins");
+        } else {
+            enter(state, "markers");
+        }
 
         return false;
     },
     markers: async ({ call, from, references, to }, state) => {
         state.calls -= 1;
-        const { hasMore }: { hasMore: boolean } = await call(references.dropMarkers, { from }, to);
+        const { hasMore }: { hasMore: boolean } = await call(references.dropMarkers, { from, to }, to);
 
         return !hasMore;
+    },
+    // The guest's pins on one thread another user owns, moved on that owner's shard, a batch per step; its route follows
+    // only once none is left. Right before the guest's deletion, which sends the merge back here while a route remains.
+    pins: async ({ call, from, references, to }, state) => {
+        state.calls -= 1;
+        const route: { ownerId: string; threadId: string } | null = await call(references.nextPinRoute, { from }, to);
+
+        if (route === null) {
+            enter(state, "guest");
+
+            return false;
+        }
+
+        state.calls -= 1;
+        const { hasMore }: { hasMore: boolean } = await call(references.reassignPins, { from, threadId: route.threadId, to }, route.ownerId);
+
+        if (!hasMore) {
+            state.calls -= 1;
+            await call(references.movePinRoute, { from, threadId: route.threadId, to }, to);
+        }
+
+        return false;
     },
 };
 
 /**
  * Run the merge of guest `from` into user `to` from `resume` (from the start without it), for at most `budget`
  * cross-shard calls. `next` is where it stopped, for the next run, or `null` once the merge is done: every table
- * copied, then cleared, the global rows and follows moved, the guest deleted and the import markers dropped. Throws past
+ * copied, then cleared, the global rows, follows and pins moved, the guest deleted and the import markers dropped, or
+ * another delivery found to have done all that (the fence). Throws past
  * `maxRuns`, so a merge that cannot finish fails with the guest and its remaining rows kept.
  */
 export const mergeGuestInto = async (
@@ -708,10 +867,11 @@ export const mergeGuestInto = async (
 
 /**
  * Clear one page of `table` on the guest's shard: the page is imported again before it is deleted, so a row written or
- * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. `false`
- * when the table holds none of the guest's rows any more (one call), `true` after a page (three calls).
+ * edited there since the table was copied arrives as it is now; only ids the new shard confirms are deleted. `empty`
+ * when the table holds none of the guest's rows any more (one call), `page` after a page (three calls), `fenced` when
+ * another delivery already finished the merge (two calls, nothing deleted).
  */
-const clearPage = async (call: ShardCall, references: MergeReferences, table: string, from: string, to: string): Promise<boolean> => {
+const clearPage = async (call: ShardCall, references: MergeReferences, table: string, from: string, to: string): Promise<"empty" | "fenced" | "page"> => {
     const { digests, rows }: { digests: string[]; rows: Record<string, unknown>[] } = await call(
         references.listClear,
         KEEP_NEW_USERS.has(table) ? { ownedBy: from, table } : { table },
@@ -719,10 +879,16 @@ const clearPage = async (call: ShardCall, references: MergeReferences, table: st
     );
 
     if (rows.length === 0) {
-        return false;
+        return "empty";
     }
 
-    const { present }: { present: string[] } = await call(references.importRows, { from, rows, table, to }, to);
+    const { fenced, present }: { fenced: boolean; present: string[] } = await call(references.importRows, { from, rows, table, to }, to);
+
+    // Another delivery finished this merge: nothing of this page is confirmed, so nothing of it is deleted.
+    if (fenced) {
+        return "fenced";
+    }
+
     const confirmed = new Set(present);
     const deletable = rows
         .map((row, index) => {
@@ -738,7 +904,7 @@ const clearPage = async (call: ShardCall, references: MergeReferences, table: st
         throw new Error(`the new shard of ${to} did not confirm ${String(rows.length - deletable.length)} ${table} rows of guest ${from}; they stay`);
     }
 
-    return true;
+    return "page";
 };
 
 /** The generated references `mergeGuestInto` calls (passed in, so this module does not import `_generated/api`). */
@@ -749,8 +915,11 @@ export interface MergeReferences {
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listClear: { __lunoraRef: string };
+    movePinRoute: { __lunoraRef: string };
+    nextPinRoute: { __lunoraRef: string };
     reassignFollows: { __lunoraRef: string };
     reassignGlobal: { __lunoraRef: string };
+    reassignPins: { __lunoraRef: string };
 }
 
 /**
@@ -769,7 +938,15 @@ export const runGuestMerge = internalAction
             v.object({
                 cursor: v.union(v.string(), v.null()),
                 moved: v.number(),
-                phase: v.union(v.literal("clear"), v.literal("copy"), v.literal("follows"), v.literal("global"), v.literal("guest"), v.literal("markers")),
+                phase: v.union(
+                    v.literal("clear"),
+                    v.literal("copy"),
+                    v.literal("follows"),
+                    v.literal("global"),
+                    v.literal("guest"),
+                    v.literal("markers"),
+                    v.literal("pins"),
+                ),
                 run: v.number(),
                 table: v.string(),
             }),
@@ -777,37 +954,7 @@ export const runGuestMerge = internalAction
         to: v.string(),
     })
     .output(v.object({ done: v.boolean(), moved: v.number() }))
-    .action(async ({ args, ctx: context }) => {
-        // The guest's pins on other owners' threads move to the new account on each owner's shard first, while their routes still name the
-        // guest; the routes move with the guest's global rows below. Each move is idempotent, so a redelivery repeats it safely.
-        let cursor: string | null = null;
-        let isDone = args.resume !== undefined;
-
-        while (!isDone) {
-            const routes: { continueCursor: string | null; isDone: boolean; page: { ownerId: string; threadId: string }[] } = await context.runQuery(
-                internal.chat.pins.functions.listSharedPinRoutesForExport,
-                { cursor, userId: args.from },
-            );
-
-            for (const route of routes.page) {
-                // One batch per call on the owner's shard: repeat until none is left.
-                let more = true;
-
-                while (more) {
-                    const result = await callOnShard(
-                        internal.chat.pins.functions.reassignUserPinsOnThread,
-                        { from: args.from, threadId: route.threadId as never, to: args.to },
-                        { shardKey: route.ownerId },
-                    );
-
-                    more = result.hasMore;
-                }
-            }
-
-            isDone = routes.isDone;
-            cursor = routes.continueCursor;
-        }
-
+    .action(async ({ args }) => {
         const { moved, next } = await mergeGuestInto(
             async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
             {
@@ -817,8 +964,11 @@ export const runGuestMerge = internalAction
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,
                 listClear: internal.lib.account_merge.listShardRowsToClear,
+                movePinRoute: internal.lib.account_merge.moveSharedPinRouteOf,
+                nextPinRoute: internal.lib.account_merge.nextSharedPinRoute,
                 reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
                 reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
+                reassignPins: internal.chat.pins.functions.reassignUserPinsOnThread,
             },
             args.from,
             args.to,

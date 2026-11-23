@@ -18,6 +18,7 @@ import {
     listShardRowsPage,
     listShardRowsToClear,
     MERGE_CALLS_PER_RUN,
+    MERGE_FENCE_SCOPE,
     MERGE_PAGE_SIZE,
 } from "./account-merge";
 import {
@@ -31,7 +32,6 @@ import {
     shardLocalTables,
 } from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
-import { listSharedPinRoutesForExport } from "../chat/pins/functions";
 
 // The action's own query runs in the harness, which takes the registered procedure; every other reference stays plain.
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -72,9 +72,19 @@ const REFERENCES: MergeReferences = {
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
     listClear: ref("listShardRowsToClear"),
+    movePinRoute: ref("moveSharedPinRouteOf"),
+    nextPinRoute: ref("nextSharedPinRoute"),
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
+    reassignPins: { __lunoraRef: "chat_pins_functions:reassignUserPinsOnThread" },
 };
+
+/** A guest's pin on a thread another user owns, and its `.global()` route, as the fake shards keep them. */
+interface FakePin {
+    ownerId: string;
+    threadId: string;
+    userId: string;
+}
 
 type Row = Record<string, unknown> & { _id: string };
 
@@ -102,14 +112,28 @@ const mergeToEnd = async (
 
 /**
  * Two shards as `shardKey → table → rows`, and a caller that plays the procedures against them. `follows` is how many
- * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports.
+ * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports. `pins` are
+ * the guest's pins on other owners' threads, each with its route; `onGuestDeletion` runs before each guest deletion.
  */
 const fakeShards = (
     seed: Record<string, Record<string, Row[]>>,
     pageSize = 2,
-    { follows = 0, followsRemain = false }: { follows?: number; followsRemain?: boolean } = {},
+    {
+        follows = 0,
+        followsRemain = false,
+        onGuestDeletion,
+        pins = [],
+    }: { follows?: number; followsRemain?: boolean; onGuestDeletion?: (pins: FakePin[], routes: FakePin[]) => void; pins?: FakePin[] } = {},
 ) => {
     let followsLeft = follows;
+    const pinRows = pins.map((pin) => {
+        return { ...pin };
+    });
+    const routes = pins.map((pin) => {
+        return { ...pin };
+    });
+    /** Each route move, with how many of the guest's pins on that thread were left at that moment. */
+    const routeMoves: { guestPinsLeft: number; threadId: string }[] = [];
     let followPageCalls = 0;
     const shards = new Map(Object.entries(seed).map(([key, tables]) => [key, new Map(Object.entries(tables).map(([table, rows]) => [table, [...rows]]))]));
     const reassigned: { from: string; to: string }[] = [];
@@ -133,8 +157,14 @@ const fakeShards = (
 
         switch (name) {
             case "deleteMergedGuest": {
+                onGuestDeletion?.(pinRows, routes);
+
                 if (followsRemain) {
                     return { deleted: false, followsRemain: true } as never;
+                }
+
+                if (routes.some((route) => route.userId === args.userId)) {
+                    return { deleted: false, pinsRemain: true } as never;
                 }
 
                 const left = [...(shards.get(shardKey)?.values() ?? [])].reduce((count, rows) => count + rows.length, 0);
@@ -172,7 +202,7 @@ const fakeShards = (
                     }
                 }
 
-                return { imported: 0, present: (args.rows as Row[]).map((row) => row._id) } as never;
+                return { fenced: false, imported: 0, present: (args.rows as Row[]).map((row) => row._id) } as never;
             }
             case "listShardRowsPage": {
                 const rows = tableOf(shardKey, table);
@@ -187,6 +217,24 @@ const fakeShards = (
 
                 return { digests: rows.map(() => ""), rows } as never;
             }
+            case "moveSharedPinRouteOf": {
+                const left = pinRows.filter((pin) => pin.userId === args.from && pin.threadId === args.threadId).length;
+
+                routeMoves.push({ guestPinsLeft: left, threadId: args.threadId as string });
+
+                for (const route of routes) {
+                    if (route.userId === args.from && route.threadId === args.threadId) {
+                        route.userId = args.to as string;
+                    }
+                }
+
+                return null as never;
+            }
+            case "nextSharedPinRoute": {
+                const route = routes.find((each) => each.userId === args.from);
+
+                return (route === undefined ? null : { ownerId: route.ownerId, threadId: route.threadId }) as never;
+            }
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
 
@@ -200,20 +248,71 @@ const fakeShards = (
 
                 return { hasMore: followsLeft > 0, moved } as never;
             }
+            case "reassignUserPinsOnThread": {
+                // One pin per call, so a thread with several takes several steps.
+                const pin = pinRows.find((each) => each.ownerId === shardKey && each.threadId === args.threadId && each.userId === args.from);
+
+                if (pin !== undefined) {
+                    pin.userId = args.to as string;
+                }
+
+                return { hasMore: pinRows.some((each) => each.threadId === args.threadId && each.userId === args.from) } as never;
+            }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
             }
         }
     };
 
-    return { call, deletedGuests, followPageCalls: () => followPageCalls, reassigned, shards };
+    return { call, deletedGuests, followPageCalls: () => followPageCalls, pinRows, reassigned, routeMoves, routes, shards };
 };
+
+/** A class instance and a pattern: no Lunora column holds either. */
+class Custom {
+    public readonly kind = "custom";
+}
+
+const ANY_PATTERN = /x/u;
 
 describe("canonicalValue", () => {
     it("tells apart what JSON cannot: the bytes of binary, and a bigint from its digits", () => {
         expect(canonicalValue({ a: new Uint8Array([1]).buffer })).not.toBe(canonicalValue({ a: new Uint8Array([2]).buffer }));
         expect(canonicalValue({ a: 5n })).not.toBe(canonicalValue({ a: "5" }));
         expect(canonicalValue({ a: 1, b: [2] })).toBe(canonicalValue({ a: 1, b: [2] }));
+    });
+
+    it("compares a Map and a Set the store gives back by content, whatever their insertion order", () => {
+        const entries: [unknown, unknown][] = [
+            [1n, new Set([1, 2])],
+            ["b", 2],
+        ];
+        const reversed: [unknown, unknown][] = entries.toReversed().map(([key, item]) => [key, item instanceof Set ? new Set([...item].toReversed()) : item]);
+
+        expect(canonicalValue(new Map(entries))).toBe(canonicalValue(new Map(reversed)));
+        expect(canonicalValue(new Map([["a", 1]]))).not.toBe(canonicalValue(new Map([["a", 2]])));
+        expect(canonicalValue(new Set(["a"]))).not.toBe(canonicalValue(new Set(["b"])));
+        // Not one another, nor the `{}` and array JSON would write for them.
+        const texts = [new Map([["a", 1]]), { a: 1 }, new Set(["a"]), ["a"], new Map(), new Set(), {}].map((value) => canonicalValue(value));
+
+        expect(new Set(texts).size).toBe(texts.length);
+    });
+
+    it("tells apart every other value the storage codec revives: a URL, an Error, and a typed array's type", () => {
+        expect(canonicalValue(new URL("https://example.com/a"))).not.toBe(canonicalValue(new URL("https://example.com/b")));
+        expect(canonicalValue(new URL("https://example.com/a"))).not.toBe(canonicalValue("https://example.com/a"));
+        expect(canonicalValue(new TypeError("x"))).not.toBe(canonicalValue(new RangeError("x")));
+        expect(canonicalValue(new Error("x", { cause: 1 }))).not.toBe(canonicalValue(new Error("x", { cause: 2 })));
+        const buffer = new ArrayBuffer(4);
+
+        new Float32Array(buffer).set([1]);
+        expect(canonicalValue(new Float32Array(buffer))).not.toBe(canonicalValue(new Int32Array(buffer)));
+        // A binary column comes back as an `ArrayBuffer`, the same bytes the guest's `Uint8Array` held.
+        expect(canonicalValue(new Uint8Array(buffer))).toBe(canonicalValue(buffer));
+    });
+
+    it("still refuses a value the store cannot hold, so a row it cannot compare is never deleted", () => {
+        expect(() => canonicalValue({ a: new Custom() })).toThrow(TypeError);
+        expect(() => canonicalValue({ a: ANY_PATTERN })).toThrow(TypeError);
     });
 });
 
@@ -447,9 +546,8 @@ describe("mergeGuestInto", () => {
 
     it("queues its next run, from where it stopped, before a run that did not finish returns", async () => {
         const { call, deletedGuests } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
-        const harness = lunoraTest(schemaWithShardedTables(["sharedPinRoutes"]) as never);
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
-        registry.set("chat_pins_functions:listSharedPinRoutesForExport", listSharedPinRoutesForExport);
         transport.call = call;
         transport.queued = [];
 
@@ -467,6 +565,38 @@ describe("mergeGuestInto", () => {
         } finally {
             harness.close();
         }
+    });
+
+    it("moves a pin the guest makes on a shared thread during the merge before its route, and keeps the guest until none is left", async () => {
+        let late = true;
+        const { call, deletedGuests, pinRows, routeMoves, routes } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, {
+            onGuestDeletion: (pins, pinRoutes) => {
+                // A pin made between the pin step and the guest's deletion, on a thread whose route already moved: it gets a route of its own.
+                if (!late) {
+                    return;
+                }
+
+                late = false;
+                pins.push({ ownerId: "owner-b", threadId: "shared-2", userId: "guest" });
+                pinRoutes.push({ ownerId: "owner-b", threadId: "shared-2", userId: "guest" });
+            },
+            pins: [
+                { ownerId: "owner-a", threadId: "shared-1", userId: "guest" },
+                { ownerId: "owner-a", threadId: "shared-1", userId: "guest" },
+            ],
+        });
+
+        // A small budget, so the pin step spans runs and every later run is a resumed one.
+        const { runs } = await mergeToEnd(call, "guest", "user", { budget: 4 });
+
+        expect(runs.length).toBeGreaterThan(1);
+        expect(pinRows.every((pin) => pin.userId === "user")).toBe(true);
+        expect(routes.every((route) => route.userId === "user")).toBe(true);
+        expect(routeMoves).toStrictEqual([
+            { guestPinsLeft: 0, threadId: "shared-1" },
+            { guestPinsLeft: 0, threadId: "shared-2" },
+        ]);
+        expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
     });
 
     it("is safe to run twice", async () => {
@@ -684,7 +814,18 @@ describe("reassignThreadFollowsPage", () => {
 describe("deleteMergedGuest", () => {
     const harnessWithUsers = () =>
         lunoraTest(
-            schemaWithShardedTables(["user", "session", "account", "member", "twoFactor", "passkey", "shardRoutes", "shardActivity", "threadFollows"]) as never,
+            schemaWithShardedTables([
+                "user",
+                "session",
+                "account",
+                "member",
+                "twoFactor",
+                "passkey",
+                "shardRoutes",
+                "shardActivity",
+                "threadFollows",
+                "sharedPinRoutes",
+            ]) as never,
         );
 
     const insertUser = async (harness: ReturnType<typeof harnessWithUsers>, isAnonymous: boolean) =>
@@ -745,6 +886,27 @@ describe("deleteMergedGuest", () => {
             const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
 
             expect(result).toStrictEqual({ deleted: false, followsRemain: true });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps a guest that a shared pin route still names, and says so", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(async (context: any) => {
+                const threadId = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "T", userId: "owner" });
+
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: "owner", threadId, userId: guest });
+            });
+
+            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
+
+            expect(result).toStrictEqual({ deleted: false, pinsRemain: true });
             await expect(userExists(harness, guest)).resolves.toBe(true);
         } finally {
             harness.close();
@@ -926,6 +1088,9 @@ describe("mergeGuestInto across two real shards", () => {
             switch (name) {
                 case "deleteMergedGuest": {
                     return { deleted: true } as never;
+                }
+                case "nextSharedPinRoute": {
+                    return null as never;
                 }
                 case "reassignGlobalRows": {
                     return { done: true, reassigned: 0 } as never;
@@ -1159,6 +1324,42 @@ describe("mergeGuestInto across two real shards", () => {
             expect([...new Uint8Array(moved.blob)]).toStrictEqual([9, 9, 9]);
             expect(moved.count).toBe(5n);
             expect(await documentOn(merge, "guest", id)).toBeNull();
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("stops an older delivery that read a row before another finished the merge, and never brings back a row the account deleted since", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("guest title")))) as string;
+            let finished = false;
+
+            // The older delivery has read the threads page; before its import lands, a later delivery runs the whole merge
+            // and drops the markers, and the account deletes the moved row.
+            merge.onceBefore("importShardRows", async () => {
+                await mergeToEnd(merge.call, "guest", "user");
+                await merge.shards.user.run(async (context: any) => await context.db.delete("threads", id));
+                finished = true;
+            });
+
+            // The older delivery's own chain of runs ends at the fence instead of importing what it read.
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(finished).toBe(true);
+            expect(await merge.threadsOn("user")).toStrictEqual([]);
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+
+            const fence = await merge.shards.user.run(
+                async (context: any) =>
+                    await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_FENCE_SCOPE).eq("key", "guest"))
+                        .first(),
+            );
+
+            expect(fence).toMatchObject({ userId: "user" });
         } finally {
             merge.close();
         }
