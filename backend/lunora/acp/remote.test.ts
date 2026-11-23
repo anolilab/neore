@@ -1052,8 +1052,8 @@ describe("a project remembers its runner", () => {
         await startOpened(live, device, "tap-u0");
 
         // Right after the live entry, one of each kind that can never be returned again: a project moved out of the organization,
-        // one moved after its thread started, one of an organization the person is not in, and one on a computer that is not
-        // theirs. Then live projects up to the cap, so the live entry is the oldest and every checked project still exists.
+        // one moved after its thread started, one of an organization the person is not in, one on a computer that is not
+        // theirs, and one whose folder their computer no longer offers. Then live projects up to the cap, so the live entry is the oldest and every checked project still exists.
         const unusable = await run(async (ctx) => {
             const insert = async (fields: Record<string, unknown>) =>
                 (await ctx.db.insert("projects", { createdAt: 0, title: "Unusable", userId: ownerId, ...fields })) as string;
@@ -1063,6 +1063,7 @@ describe("a project remembers its runner", () => {
                 [await insert({ organizationChangedAt: 2000, organizationId: "org-a" }), { ...runner, threadAt: 1000 }],
                 [await insert({ organizationId: "org-b", userId: creator }), runner],
                 [await insert({ organizationId: "org-a" }), { ...runner, deviceId: otherDevice.deviceId }],
+                [await insert({ organizationId: "org-a" }), { ...runner, folderId: "no-longer-offered" }],
             ] as [string, Record<string, unknown>][];
         });
 
@@ -1286,6 +1287,60 @@ describe("a project remembers its runner", () => {
         expect(stored?.runnerDeviceId).toBeUndefined();
     });
 
+    it.each([
+        ["records the newer thread's runner when an older thread's write lands between its read and its write", 1000, 2000, 2000],
+        ["leaves a newer thread's runner that lands between an older thread's read and its write", 3000, 2000, 3000],
+    ])("%s", async (_, landedAt, threadAt, kept) => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const read = (await projectRow(projectId)) as never;
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+
+        await run(
+            async (ctx) =>
+                await ctx.db.patch("projects", projectId as never, {
+                    runnerAgentKey: "other",
+                    runnerDeviceId: device.deviceId,
+                    runnerFolderId: "f1",
+                    runnerKind: "host",
+                    runnerThreadAt: landedAt,
+                }),
+        );
+        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, read, ownerId, runner, threadAt));
+
+        expect(await projectRow(projectId)).toMatchObject({ runnerAgentKey: kept === threadAt ? "claude" : "other", runnerThreadAt: kept });
+    });
+
+    it("saves no organization default for a starter whose membership was revoked before the session opened", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+        const started = (await startIn(projectId, device, "tap-revoked")) as { threadId: string };
+        const [session] = await rows("acpSessions", { threadId: started.threadId });
+        const [membership] = await rows("member", { userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.delete("member", membership?._id as never));
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: session?.hostSessionId as string }),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+    });
+
     it("answers a lost-answer retry with the thread after its project was deleted", async () => {
         const device = await pairedDevice(ownerId);
         const projectId = await insertProject({ userId: ownerId });
@@ -1355,15 +1410,14 @@ describe("a project remembers its runner", () => {
 
         const moved = await projectRow(projectId);
 
-        expect(moved?.organizationId).toBe("org-a");
-        expect(moved?.runnerDeviceId).toBeUndefined();
-        expect(moved?.runnerAgentKey).toBeUndefined();
+        // Emptied in a patch, not removed by a whole-row replace, so no personal id stays on the organization's row.
+        expect(moved).toMatchObject({ organizationId: "org-a", runnerAgentKey: "", runnerDeviceId: "", runnerFolderId: "" });
 
         await run(async (ctx) => await ctx.runMutation(agentProjects.updateProject, { patch: { organizationId: "" }, projectId: projectId as never }));
 
         const movedBack = await projectRow(projectId);
 
-        expect(movedBack?.runnerAgentKey).toBeUndefined();
+        expect(movedBack?.runnerAgentKey).toBe("");
         expect(await defaultOf(projectId)).toBeNull();
     });
 

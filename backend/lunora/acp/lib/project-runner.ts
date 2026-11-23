@@ -64,8 +64,9 @@ const entryApplies = (project: Pick<Doc<"projects">, "organizationChangedAt" | "
 /**
  * The entries with the ones that go to make room for one more: of the oldest few, those that can never be used again (the
  * project was deleted, left its organization or moved after the entry's thread started, the person is no longer its owner or
- * a member of its organization, or the computer is gone or no longer theirs), so they never push out a default that still
- * applies; the oldest one when all of those still can be.
+ * a member of its organization, or the computer would no longer be offered: gone, not theirs, unpaired, no longer offering the
+ * agent and folder, or kept out of the project, as `runnerStillOffered` judges a default), so they never push out a default
+ * that still applies; the oldest one when all of those still can be.
  */
 const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [string, StoredRunner][]): Promise<[string, StoredRunner][]> => {
     const oldest = entries.slice(0, ENTRIES_CHECKED_AT_CAP);
@@ -75,7 +76,7 @@ const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [strin
     const { page: projects } = projectIds.length > 0 ? await ctx.db.projects.findMany({ where: { _id: { in: projectIds } } }) : { page: [] };
     const { page: devices } = deviceIds.length > 0 ? await ctx.db.devices.findMany({ where: { _id: { in: deviceIds }, userId } }) : { page: [] };
     const projectOf = new Map(projects.map((row) => [row._id as string, row]));
-    const ownDevices = new Set<string>(devices.map((row) => row._id));
+    const deviceOf = new Map<string, Doc<"devices">>(devices.map((row) => [row._id as string, row]));
     const organizations = [...new Set(projects.flatMap((row) => (row.userId !== userId && row.organizationId ? [row.organizationId] : [])))];
     const memberOf = new Set<string>();
 
@@ -93,7 +94,7 @@ const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [strin
             project !== undefined &&
             entryApplies(project, runner.threadAt) &&
             (project.userId === userId || memberOf.has(project.organizationId ?? "")) &&
-            ownDevices.has(runner.deviceId)
+            runnerStillOffered(deviceOf.get(runner.deviceId) ?? null, runner, project._id)
         );
     };
     const gone = new Set(oldest.filter((entry) => !usable(entry)).map(([key]) => key));
@@ -120,6 +121,12 @@ export const rememberOpenedRunner = async (
         return;
     }
 
+    // An organization project's default is saved only for a current member, read from the primary: a membership revoked between
+    // the start and the session opening saves nothing that a later rejoin would hand back.
+    if (project.organizationId && (await getMemberByOrganizationAndUser(ctx, project.organizationId, session.userId, "primary")) === null) {
+        return;
+    }
+
     await rememberProjectRunner(
         ctx,
         project,
@@ -143,10 +150,7 @@ export const rememberProjectRunner = async (
     threadAt: number,
 ): Promise<void> => {
     if (!project.organizationId) {
-        if ((project.runnerThreadAt ?? -Infinity) > threadAt) {
-            return;
-        }
-
+        // It leaves a runner a newer thread recorded, and retries a write another one got in before.
         await setProjectRunnerDefault(ctx.db, project, runner, threadAt);
 
         return;

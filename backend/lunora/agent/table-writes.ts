@@ -66,11 +66,16 @@ export type TemporaryThreadPatch = Partial<Pick<Doc<"temporaryThreads">, "skillD
 export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> =>
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
+/** How many times a runner write retries after another write changed the project in between. */
+const RUNNER_WRITE_ATTEMPTS = 3;
+
 /**
  * Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`), with that thread's start
- * time. The row is its owner's, so no other member reads it. One conditional write on the organization and the stamp `project`
- * was read with: a `.global()` read and a later write are not one transaction, so a project moved into an organization in
- * between must not take the owner's runner along, and a newer thread's runner recorded in between is not replaced.
+ * time. The row is its owner's, so no other member reads it. Each write is conditional on the organization, the owner and the
+ * stamp the row was read with: a `.global()` read and a later write are not one transaction, so a project moved into an
+ * organization in between must not take the owner's runner along, and a newer thread's runner recorded in between is not
+ * replaced. When another write got in first, the row as it now stands is checked again: the write is retried only while the
+ * project is still the same owner's personal project and no thread newer than this one recorded its runner.
  */
 export const setProjectRunnerDefault = async (
     db: Database,
@@ -78,16 +83,30 @@ export const setProjectRunnerDefault = async (
     runner: { agentKey: string; deviceId: string; folderId: string },
     threadAt: number,
 ): Promise<void> => {
-    await db.patchIf("projects", project._id, {
-        patch: {
-            runnerAgentKey: runner.agentKey,
-            runnerDeviceId: runner.deviceId,
-            runnerFolderId: runner.folderId,
-            runnerKind: "host",
-            runnerThreadAt: threadAt,
-        },
-        where: { organizationId: project.organizationId ?? null, runnerThreadAt: project.runnerThreadAt ?? null },
-    });
+    let current: Doc<"projects"> | null = project;
+
+    for (let attempt = 0; attempt < RUNNER_WRITE_ATTEMPTS && current !== null; attempt += 1) {
+        if (current.userId !== project.userId || current.organizationId || (current.runnerThreadAt ?? -Infinity) > threadAt) {
+            return;
+        }
+
+        const { applied, doc } = await db.patchIf("projects", current._id, {
+            patch: {
+                runnerAgentKey: runner.agentKey,
+                runnerDeviceId: runner.deviceId,
+                runnerFolderId: runner.folderId,
+                runnerKind: "host",
+                runnerThreadAt: threadAt,
+            },
+            where: { organizationId: current.organizationId ?? null, runnerThreadAt: current.runnerThreadAt ?? null, userId: current.userId },
+        });
+
+        if (applied) {
+            return;
+        }
+
+        current = doc as Doc<"projects"> | null;
+    }
 };
 
 /**
