@@ -5710,6 +5710,12 @@
           "optional": true,
           "unique": false
         },
+        "fixesSetupStep": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "log": {
           "kind": "string",
           "nullable": false,
@@ -5797,6 +5803,53 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "setupFailure": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "logTail": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "step": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "setupFixOf": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
+        "setupFixRunId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
+        "setupFixRunIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "codingAgentRuns"
+          }
         },
         "startedAt": {
           "kind": "number",
