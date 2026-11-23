@@ -91,7 +91,7 @@ const SUBSCRIBE_WORD = /^(?:subscribe|abonnieren)[.!]?$/iu;
  * `TARGET_READ_OPTIONS.submit` holds the same words; a test checks the two lists agree.
  */
 export const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [
-    /^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
+    /^(?:confirm|submit|continue|complete|order|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
 ];
 
 /** Whether one read of a click's target asks the person first. A read that was cut short asks; a read that errored is handled by the caller. */

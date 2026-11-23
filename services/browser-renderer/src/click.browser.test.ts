@@ -739,6 +739,29 @@ describe("readTarget in a page", () => {
         expect(read.checkout).toBe(false);
     });
 
+    it("a button named by a label elsewhere on the page reads that label's text", async () => {
+        await pageWith(page, `<label for="place">Place order</label><button id="place" type="submit">→</button>`);
+        const element = await page.$("#place");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.label).toContain("Place order");
+    });
+
+    it("a click whose page moves the address with pushState does not cancel an ordinary submit on a form with no action", async () => {
+        await pageWith(
+            page,
+            `<form id="wizard" method="post"><button id="next" type="submit" onclick="history.pushState({}, '', '/wizard/2')">Next</button></form>`,
+        );
+        const element = await page.$("#next");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        expect(read.clicked).toBe(true);
+    });
+
     it("a control whose rendered text is longer than the cap reads as truncated, so the gate asks", async () => {
         await pageWith(page, `<button id="long">${"x".repeat(TARGET_READ_OPTIONS.max + 1)}</button>`);
         const element = await page.$("#long");

@@ -4,7 +4,7 @@ export const TARGET_READ_OPTIONS = {
     pathSplitter: /\P{L}+/u,
     payment: /pay|stripe|adyen|braintree|checkout|klarna|mollie|sumup|worldpay|saferpay|sofort|wirecard/iu,
     splitter: /\s+/u,
-    submit: /^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
+    submit: /^(?:confirm|submit|continue|complete|order|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
     subscribe: /^(?:subscribe|abonnieren)[.!]?$/iu,
 };
 
@@ -140,6 +140,16 @@ export function readTarget(
                 // A submit-style button's value is its label. A text field's value is never read: a person may have typed into it.
                 if (node instanceof HTMLInputElement && ["button", "reset", "submit"].includes(node.type)) {
                     names.push(node.value);
+                }
+
+                // The labels that name this control (a label elsewhere on the page, "Place order" beside an arrow button) are part of its name.
+                if (node === control && (node instanceof HTMLButtonElement || node instanceof HTMLInputElement)) {
+                    const labels = node.labels ?? [];
+
+                    for (const label of labels) {
+                        // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- rendered text on purpose, as for the control itself
+                        names.push(label.innerText);
+                    }
                 }
 
                 // A label is clicked as the control it labels (a submit input, or a button): that control's name and value count too.
@@ -386,7 +396,11 @@ export function readTarget(
                         // The resolved address (the `href` and `formAction` properties), not the raw attribute: a `<base>` change or a relative
                         // path moves the same attribute to another site.
                         const link = node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement ? node.href : "";
-                        const formTarget = node instanceof HTMLButtonElement || node instanceof HTMLInputElement ? node.formAction : "";
+                        // A button without its own `formaction` submits to its form: its destination is the attribute only (the page address would move with pushState).
+                        const formTarget =
+                            (node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && Element.prototype.hasAttribute.call(node, "formaction")
+                                ? node.formAction
+                                : "";
                         // A button's type decides whether its click submits the form ("submit" by default, "button" does not): a change to it
                         // is a change of what the click does.
                         // What a submit sends with the form: a submit control's name and value (an order intent is often a value), and how it
@@ -419,7 +433,12 @@ export function readTarget(
                             : `|${Element.prototype.getAttribute.call(ownerNow, "method") ?? ""}|${Element.prototype.hasAttribute.call(ownerNow, "novalidate")}`;
 
                     // The form's destination: the browser's own resolved `action`, read through the native getter. A `<base>` change moves it.
-                    return destinations + (ownerNow === null || formActionGetter === undefined ? "" : String(formActionGetter.call(ownerNow)));
+                    return (
+                        destinations +
+                        (ownerNow === null || formActionGetter === undefined || !Element.prototype.hasAttribute.call(ownerNow, "action")
+                            ? ""
+                            : String(formActionGetter.call(ownerNow)))
+                    );
                 },
             ];
             const destinations = destinationsOf();
@@ -521,7 +540,9 @@ export function readTarget(
                           String([...document.forms].indexOf(activatedForm)),
                           Element.prototype.getAttribute.call(activatedForm, "id") ?? "",
                           // The resolved address, through the native getter: a `<base>` change moves the destination with the attribute unchanged.
-                          formActionGetter === undefined ? "" : String(formActionGetter.call(activatedForm)),
+                          formActionGetter === undefined || !Element.prototype.hasAttribute.call(activatedForm, "action")
+                              ? ""
+                              : String(formActionGetter.call(activatedForm)),
                           Element.prototype.getAttribute.call(activatedForm, "method") ?? "",
                           Element.prototype.getAttribute.call(activatedForm, "enctype") ?? "",
                           Element.prototype.getAttribute.call(activatedForm, "target") ?? "",
