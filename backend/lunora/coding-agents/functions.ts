@@ -420,7 +420,11 @@ export const createRun = internalMutation
  */
 export const startSetupFix = authMutation
     .use(rateLimit("chat/update"))
-    .input({ prompt: v.string(), runId: v.id("codingAgentRuns") })
+    .input({
+        // Bounded at the boundary: the editor's own limit is the same, and a larger string is refused before any work.
+        prompt: v.string().check((value) => value.length <= PROMPT_MAX, { message: "The task is too long" }),
+        runId: v.id("codingAgentRuns"),
+    })
     .output(v.union(v.object({ runId: v.id("codingAgentRuns") }), v.object({ error: v.string() })))
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get("codingAgentRuns", args.runId);
