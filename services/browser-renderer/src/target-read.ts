@@ -4,7 +4,7 @@ export const TARGET_READ_OPTIONS = {
     pathSplitter: /\P{L}+/u,
     payment: /pay|stripe|adyen|braintree|checkout|klarna|mollie|sumup|worldpay|saferpay|sofort|wirecard/iu,
     splitter: /\s+/u,
-    submit: /^(?:confirm|submit|continue|complete|place|weiter|bestätigen|absenden)[.!]?$/iu,
+    submit: /^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
 };
 
 /** What one read of an element reports. `target` is the fingerprint: SHA-256 of `canonical`, computed in the page. */
@@ -17,7 +17,7 @@ export interface TargetRead {
     labelTruncated: boolean;
     /** Why a click given `click` or `expect` did not run: the target changed, or the control is disabled or hidden. */
     /** `changed`: the target differs before any click. `moved`: the click ran, and a page handler moved its destination, so the browser was stopped. */
-    refused?: "changed" | "disabled" | "hidden" | "moved";
+    refused?: "changed" | "covered" | "disabled" | "hidden" | "moved";
     shown: string;
     submitLike: boolean;
     target: string;
@@ -299,6 +299,16 @@ export function readTarget(
                 (): string => {
                     let destinations = "";
 
+                    // The owner now: a submit control's `form` attribute can move it to another form after the check, and the browser
+                    // submits to the form it has now.
+                    let ownerNow: HTMLFormElement | null = control.closest("form");
+
+                    for (const node of nodes) {
+                        if ((node instanceof HTMLButtonElement || node instanceof HTMLInputElement) && node.form !== null) {
+                            ownerNow = node.form;
+                        }
+                    }
+
                     for (const node of nodes) {
                         // The resolved address (the `href` and `formAction` properties), not the raw attribute: a `<base>` change or a relative
                         // path moves the same attribute to another site.
@@ -319,10 +329,10 @@ export function readTarget(
                     }
 
                     // The form's method is part of what a submit does (a GET form puts its fields in the address).
-                    destinations += enclosingForm === null ? "" : `|${Element.prototype.getAttribute.call(enclosingForm, "method") ?? ""}`;
+                    destinations += ownerNow === null ? "" : `|${Element.prototype.getAttribute.call(ownerNow, "method") ?? ""}`;
 
                     // The form's destination: the browser's own resolved `action`, read through the native getter. A `<base>` change moves it.
-                    return destinations + (enclosingForm === null || formActionGetter === undefined ? "" : String(formActionGetter.call(enclosingForm)));
+                    return destinations + (ownerNow === null || formActionGetter === undefined ? "" : String(formActionGetter.call(ownerNow)));
                 },
             ];
             const destinations = destinationsOf();
@@ -379,7 +389,9 @@ export function readTarget(
             const isCheckout = isCardFields || isCheckoutPage;
             // The submit-like flag is part of it too: a name change that makes a control submit-like (an arrow named "Review" with a
             // title "Confirm") invalidates an earlier approval, as the checkout flag does.
-            const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout), String(isSubmitLike)].join("\u{0}");
+            const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout), String(isSubmitLike), String(isScanCapped)].join(
+                "\u{0}",
+            );
 
             // SHA-256 of the canonical string, computed here, in the page, with no `await`: a digest the page could only await would
             // leave a gap in which the page changes the element between the check and the click (`clicked` below).
@@ -459,17 +471,67 @@ export function readTarget(
 
     // The check and the click are this same step: nothing the page does can run between them. The press runs the page's handlers,
     // so the element is read again after it, and nothing is clicked if it no longer reads as it did.
+    // Helpers for the click check, each an array element so the bundler does not name it. Disabled: the control or an ancestor, across
+    // shadow roots, is disabled. Covered: the element at the control's centre is neither the control, its ancestors nor its
+    // descendants, so another element (a dialog, an overlay) takes the press.
+    const [isDisabledIn] = [
+        (node: Element): boolean => {
+            for (let current: Element | null = node; current !== null;) {
+                if (current.matches(":disabled") || current.getAttribute("aria-disabled") === "true") {
+                    return true;
+                }
+
+                const owner = current.getRootNode();
+
+                current = current.parentElement ?? (owner instanceof ShadowRoot ? owner.host : null);
+            }
+
+            return false;
+        },
+    ];
+    const [isCoveredIn] = [
+        (node: Element): boolean => {
+            const box = node.getBoundingClientRect();
+            const owner = node.getRootNode() as Document | ShadowRoot;
+            const hit = owner.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+
+            if (hit === null) {
+                return true;
+            }
+
+            if (node.contains(hit)) {
+                return false;
+            }
+
+            for (let current: Element | null = node; current !== null;) {
+                if (current === hit) {
+                    return false;
+                }
+
+                const root = current.getRootNode();
+
+                current = current.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+            }
+
+            return true;
+        },
+    ];
+
     let refused: TargetRead["refused"];
     let isClicked = false;
 
     if (options.expect !== undefined && first.target !== options.expect) {
         refused = "changed";
     } else if (options.click === true) {
-        // The control or any ancestor is disabled: a click on a child of a disabled button reaches its handler as a synthetic event.
-        if (control.closest(":disabled, [aria-disabled='true']") !== null) {
+        // A control scrolled out of view is brought into view first (as a click does), so the cover check below can see it.
+        control.scrollIntoView({ block: "center", inline: "center" });
+
+        if (isDisabledIn(control)) {
             refused = "disabled";
         } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden") {
             refused = "hidden";
+        } else if (isCoveredIn(control)) {
+            refused = "covered";
         } else {
             // The page's handlers run during the click. A destination one of them moved is refused at the boundary where it would
             // be used: a click (the window's bubble phase), a form's submission (a capture listener, which no handler can skip), and a
@@ -533,11 +595,13 @@ export function readTarget(
 
             // The press's handlers ran after the check: the element is read again, and nothing is clicked if it reads differently
             // (a label, a name or a child's text changed in them).
-            if (readNow().target === first.target) {
+            if (readNow().target !== first.target) {
+                refused = "changed";
+            } else if (isCoveredIn(control)) {
+                refused = "covered";
+            } else {
                 control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
                 isClicked = true;
-            } else {
-                refused = "changed";
             }
 
             stop.abort();

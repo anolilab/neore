@@ -279,6 +279,35 @@ describe("readTarget in a page", () => {
         expect(await wasClicked(page)).toBe(false);
     });
 
+    it("a dialog that covers an approved button refuses the click, and nothing is clicked", async () => {
+        await pageWith(
+            page,
+            `<button id="pay" style="position: absolute; top: 40px; left: 40px; width: 160px; height: 48px" onclick="window.clicked = true">Pay now</button><div id="modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.3)"></div>`,
+        );
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("covered");
+        expect(read.clicked).toBe(false);
+        expect(await wasClicked(page)).toBe(false);
+    });
+
+    it("a submit control moved to another form during the press is refused", async () => {
+        await pageWith(
+            page,
+            `<form id="a" action="/cart/confirm"></form><form id="b" action="/elsewhere"><button id="pay" type="submit" onpointerdown="this.setAttribute('form', 'a')">Pay now</button></form>`,
+        );
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("changed");
+        expect(read.clicked).toBe(false);
+    });
+
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
         await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
         const element = await page.$("#label");

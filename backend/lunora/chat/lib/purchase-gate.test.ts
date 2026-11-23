@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { approvalMessagesFor } from "../../agent/client/tool-approval";
-import { approvedToolCallIds, browserActionNeedsPurchaseApproval, isPurchaseText } from "./purchase-gate";
+import { approvedToolCallIds, browserActionNeedsPurchaseApproval, isPurchaseText, purchaseTargetNeedsApproval } from "./purchase-gate";
+
+describe("a checkout's subscribe control", () => {
+    it("asks on a checkout, and an ordinary newsletter subscribe does not", () => {
+        const subscribe = { content: "Subscribe", label: "Subscribe", success: true, target: "t" };
+
+        expect(purchaseTargetNeedsApproval({ ...subscribe, checkout: true })).toBe(true);
+        expect(purchaseTargetNeedsApproval({ ...subscribe, checkout: false })).toBe(false);
+    });
+});
 
 describe("isPurchaseText", () => {
     it.each([

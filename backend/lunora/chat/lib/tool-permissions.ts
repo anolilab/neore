@@ -348,15 +348,19 @@ const needsApprovalUnless =
  */
 const askAfterLook = (own: OwnApproval): OwnApproval =>
     async function needsApprovalAfterLook(this: unknown, input: unknown, options: NeedsApprovalOptions): Promise<boolean> {
+        // The tool can report that the call cannot run at all (no action budget left): then nothing is asked, and the call is
+        // refused when it runs. Any other outcome asks, as before.
+        const outcome: { cannotRun?: boolean } = {};
+
         try {
             if (typeof own === "function") {
-                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true });
+                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true, outcome });
             }
         } catch {
             // The read failed: the call still asks, and its record stays empty.
         }
 
-        return true;
+        return outcome.cannotRun !== true;
     } as OwnApproval;
 
 /**

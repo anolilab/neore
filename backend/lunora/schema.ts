@@ -461,18 +461,28 @@ export const schema = defineSchema({
         inText: v.optional(v.boolean()),
         /** The agent said a person is needed (`needs_person`, e.g. a sign-in wall) rather than a check being detected. */
         reported: v.optional(v.boolean()),
+        /**
+         * The person's answer on the card (`browser/human-check-card.ts#resolveHumanCheck`): `done` (cleared it), `declined`
+         * (will not; the agent is told so and asks nobody about the site again in that reply). Set once, never changed.
+         */
+        resolution: v.optional(v.union(v.literal("declined"), v.literal("done"))),
+        resolvedAt: v.optional(v.number()),
         run: v.string(),
         /** The page's host, `""` when it had no readable URL. */
         site: v.string(),
         threadId: v.id("threads"),
         /** The thread's owner, whose shard holds the row, whoever's turn asked. */
         userId: v.string(),
+        /** The agent waited for the answer once (`wait_for_person`): a second wait on the ask returns at once. */
+        waitedAt: v.optional(v.number()),
     })
         .shardBy("userId")
         // Unique: two actions of one reply that claim the same site at once insert one row, so the person is asked once.
         .index("by_threadId_site_run", ["threadId", "site", "run"], { unique: true })
         // An earlier reply's recent ask, for the first look after a hand back (`browser/human-check.ts#afterHandBack`).
         .index("by_threadId_site_askedAt", ["threadId", "site", "askedAt"])
+        // The run's latest ask on any site, which the agent's `wait_for_person` waits on.
+        .index("by_threadId_run_askedAt", ["threadId", "run", "askedAt"])
         .index("by_userId", ["userId"]),
 
     browserSessions: defineTable({
@@ -4115,6 +4125,9 @@ export const schema = defineSchema({
         // The names of the values an admin acting as the user changed or added, and kept (`prompts/functions.ts#markedNames`):
         // filled into a prompt, such a value marks the draft (`impersonated`).
         variablesByImpersonator: v.optional(v.array(v.string())),
+        // A fresh id from every write of the values or marks (`updatedAt` can repeat within a millisecond): a "Keep as mine"
+        // clears a mark only while it is still the one read (`clearDefaultsMark`). Absent on a row no such write has had yet.
+        writeId: v.optional(v.string()),
     })
         // `.global()`, not `.shardBy("userId")`: read across users.
         .global()

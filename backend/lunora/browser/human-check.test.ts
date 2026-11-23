@@ -809,11 +809,11 @@ describe("the ask record", () => {
             await harness.action(async (ctx: any) => await ctx.runQuery(wasHumanCheckAsked, { run, site, threadId }));
 
         await expect(wasAsked("r1", "a.example")).resolves.toBeNull();
-        await expect(claim("r1", "a.example")).resolves.toBe(true);
-        await expect(claim("r1", "a.example")).resolves.toBe(false);
+        await expect(claim("r1", "a.example")).resolves.toEqual(expect.any(String));
+        await expect(claim("r1", "a.example")).resolves.toBeNull();
         await expect(wasAsked("r1", "a.example")).resolves.toBe("detected");
-        await expect(claim("r1", "b.example")).resolves.toBe(true);
-        await expect(claim("r2", "a.example")).resolves.toBe(true);
+        await expect(claim("r1", "b.example")).resolves.toEqual(expect.any(String));
+        await expect(claim("r2", "a.example")).resolves.toEqual(expect.any(String));
 
         // A check found only in the text is told apart, so a long page after its hand back is not read as cleared.
         await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { inText: true, run: "r4", site: "d.example", threadId }));
@@ -826,7 +826,7 @@ describe("the ask record", () => {
         // A report on a site the run already asked about for a check marks that ask, and asks nobody again.
         await expect(
             harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { reported: true, run: "r1", site: "a.example", threadId })),
-        ).resolves.toBe(false);
+        ).resolves.toBeNull();
         await expect(wasAsked("r1", "a.example")).resolves.toBe("reported");
     });
 
@@ -886,7 +886,7 @@ describe("the ask record", () => {
 
         await expect(
             harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId: ownerless })),
-        ).resolves.toBe(true);
+        ).resolves.toEqual(expect.any(String));
         await expect(
             harness.action(async (ctx: any) => await ctx.runQuery(wasHumanCheckAsked, { run: "r1", site: "a.example", threadId: ownerless })),
         ).resolves.toBe("detected");

@@ -115,9 +115,12 @@ export async function approveToolCallFor<CustomContext extends object, AgentTool
         // `__acceptsCtx` / `getCtx(this)`, which is what `toolCtx` above is
         // doing. Nothing here uses the SDK's, so it is empty rather than
         // duplicated.
+        // Only a tool that reads its approval from `messages` (`readsApproval`: the browser's checked clicks) gets the synthetic
+        // pair. Any other tool runs with no messages, as before: a saved-login turn validates its messages and refuses the pair.
+        const readsApproval = (tool as { readsApproval?: boolean }).readsApproval === true;
         const output = await wrappedTool.execute?.call(wrappedTool, toolInput, {
             context: {},
-            messages: approvalMessagesFor(approvalId, toolCallId),
+            messages: readsApproval ? approvalMessagesFor(approvalId, toolCallId) : [],
             toolCallId,
         });
 
