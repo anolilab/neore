@@ -88,8 +88,10 @@ const insertMessage = (
         ...(fields.agentName !== undefined && { agentName: fields.agentName }),
     });
 
-const insertThread = (context: any, fields: { deleted?: boolean; isTemporary?: boolean; lockedAt?: number; title: string; userId: string }) =>
-    context.db.insert("threads", { model: "gpt-4o", status: "active", ...fields });
+const insertThread = (
+    context: any,
+    fields: { deleted?: boolean; deletingAt?: number; isTemporary?: boolean; lockedAt?: number; title: string; userId: string },
+) => context.db.insert("threads", { model: "gpt-4o", status: "active", ...fields });
 
 const search = async (harness: ReturnType<typeof lunoraTest>, searchQuery: string, userId = OWNER) => {
     const result: any = await harness.withIdentity({ userId } as never).query(searchSentPrompts as never, { searchQuery } as never);
@@ -252,7 +254,7 @@ describe("searchSentPrompts", () => {
         }
     });
 
-    it("leaves out a temporary chat's prompt", async () => {
+    it("leaves out a temporary chat's prompt and one of a chat deleted for good", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
@@ -279,14 +281,25 @@ describe("searchSentPrompts", () => {
                     threadId: temporary,
                     userId: OWNER,
                 });
+                // Deleted for good: its rows are erased in batches after the delete, so they are still there for a while.
+                const deleting = await insertThread(context, { deletingAt: 1, title: "Deleting", userId: OWNER });
+                const erasing = await insertMessage(context, {
+                    createdAt: 300,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the deleted chat",
+                    threadId: deleting,
+                    userId: OWNER,
+                });
 
-                return { hidden, shown };
+                return { erasing, hidden, shown };
             });
 
             const prompts = await search(harness, "deploy");
 
             expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.shown]);
             expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.hidden);
+            expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.erasing);
         } finally {
             harness.close();
         }
@@ -876,13 +889,14 @@ describe("currentSentPrompt", () => {
                     threadId: busy,
                     userId: OWNER,
                 });
-                const promptIn = async (fields: { deleted?: boolean; isTemporary?: boolean; lockedAt?: number }, userId = OWNER) => {
+                const promptIn = async (fields: { deleted?: boolean; deletingAt?: number; isTemporary?: boolean; lockedAt?: number }, userId = OWNER) => {
                     const threadId = await insertThread(context, { ...fields, title: "Other", userId });
 
                     return insertMessage(context, { createdAt: 70, order: 0, role: "user", text: "deploy elsewhere", threadId, userId });
                 };
 
                 return {
+                    deleting: await promptIn({ deletingAt: 1 }),
                     goalRound,
                     guestNote,
                     locked: await promptIn({ lockedAt: 1 }),
@@ -899,7 +913,7 @@ describe("currentSentPrompt", () => {
             expect(listed.map((prompt) => prompt.messageId)).not.toContain(ids.pushed);
             await expect(current(harness, ids.pushed)).resolves.toEqual({ text: "deploy number 0" });
 
-            for (const refused of [ids.goalRound, ids.guestNote, ids.locked, ids.reply, ids.temporary, ids.theirs, ids.trashed]) {
+            for (const refused of [ids.deleting, ids.goalRound, ids.guestNote, ids.locked, ids.reply, ids.temporary, ids.theirs, ids.trashed]) {
                 await expect(current(harness, refused)).resolves.toBeNull();
             }
         } finally {

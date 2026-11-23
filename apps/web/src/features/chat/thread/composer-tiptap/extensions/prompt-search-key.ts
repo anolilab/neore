@@ -13,8 +13,12 @@ export interface PromptSearchKeyOptions {
     onOpen: () => boolean;
 }
 
-const isPromptSearchKey = (event: KeyboardEvent): boolean =>
-    event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "r";
+/**
+ * Ctrl+R, alone. The physical key counts as well as the typed letter: on a non-Latin layout (Cyrillic, Greek) the key
+ * in the R position types another letter, and the browser's reload still answers it there.
+ */
+export const isPromptSearchKey = (event: Pick<KeyboardEvent, "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey">): boolean =>
+    event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && (event.key.toLowerCase() === "r" || event.code === "KeyR");
 
 const PromptSearchKey = Extension.create<PromptSearchKeyOptions>({
     addOptions() {

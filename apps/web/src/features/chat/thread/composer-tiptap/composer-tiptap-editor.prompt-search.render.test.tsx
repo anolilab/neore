@@ -93,8 +93,9 @@ const renderEditor = async (onPromptSearch?: () => boolean) => {
     return { element: view.container.querySelector(".ProseMirror") as HTMLElement, ref };
 };
 
-const pressCtrlR = (element: HTMLElement) => {
-    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key: "r" });
+const pressCtrlR = (element: HTMLElement, key = "r") => {
+    // `code` is the physical key: the one in the R position, whatever letter the layout gives it.
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyR", ctrlKey: true, key });
 
     act(() => {
         element.focus();
@@ -116,6 +117,16 @@ describe("ComposerTiptapEditor Ctrl+R", () => {
         const { element } = await renderEditor(onPromptSearch);
 
         const event = pressCtrlR(element);
+
+        expect(onPromptSearch).toHaveBeenCalledTimes(1);
+        expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("opens the search from the R key on a Cyrillic layout, where it types another letter", async () => {
+        const onPromptSearch = vi.fn(() => true);
+        const { element } = await renderEditor(onPromptSearch);
+
+        const event = pressCtrlR(element, "к");
 
         expect(onPromptSearch).toHaveBeenCalledTimes(1);
         expect(event.defaultPrevented).toBe(true);

@@ -3527,16 +3527,19 @@ const sentPromptOf = (message: MessageDoc): { draftFrom: DraftFrom | undefined; 
     return { draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), typed };
 };
 
-/** Whether the search may list a thread's prompts: the caller's own chat, not trashed, locked or temporary. */
+/**
+ * Whether the search may list a thread's prompts: the caller's own chat, not trashed, deleted for good (`deletingAt`,
+ * erased in batches after the delete), locked or temporary. The same rule as the thread search (`isSearchEligible`).
+ */
 const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
-    thread !== null && thread.userId === userId && !thread.deleted && !isThreadLocked(thread) && thread.isTemporary !== true;
+    thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
 
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index
  * (`typed_text_search`, `typedText`: what the person typed, no attached document or page, no quoted line and no app
  * placeholder) through `typedTextSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt
  * never lists. Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index
- * matches. Trashed threads, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are
+ * matches. Trashed threads, chats deleted for good, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are
  * dropped too, and so are a guest's note or an outside agent's text sent on. A branch copies its rows, so the same prompt
  * in chats of one branch family (`threadRelationships`) lists once; the same words sent in unrelated chats list once per
  * chat. A query longer than the search reads is cut to its first characters and words, not refused. `truncated` says a
@@ -3704,7 +3707,7 @@ export const searchSentPrompts = authQuery
 /**
  * A prompt the search listed, as it reads now: its typed words (`typedText`, kept current by an edit) and its not-typed
  * mark, as {@link searchSentPrompts} would list them, or `null` when it may no longer go in the draft: not the caller's
- * own sent prompt, no typed words left, or a chat that is trashed, locked or temporary. The composer puts this in the
+ * own sent prompt, no typed words left, or a chat that is trashed, deleted for good, locked or temporary. The composer puts this in the
  * draft, never the list's copy, which an edit since the search may have changed. It reads that one prompt rather than
  * running the search again: a prompt pushed past the search's 50 by newer matches is still available.
  */

@@ -10,6 +10,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { isPromptSearchKey } from "./composer-tiptap/extensions/prompt-search-key";
+
 const SEARCH_DEBOUNCE_MS = 200;
 /** The server searches the first 500 characters (`searchSentPrompts`); a longer paste is cut here, not refused there. */
 const SEARCH_MAX_LENGTH = 500;
@@ -170,7 +172,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         }
 
         // Ctrl+R again steps to the next match, as a shell's reverse search does, and never reaches the browser's reload.
-        if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "r") {
+        if (isPromptSearchKey(event)) {
             event.preventDefault();
             event.stopPropagation();
             moveActive(Math.min(index + 1, Math.max(prompts.length - 1, 0)));

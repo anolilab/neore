@@ -481,9 +481,16 @@ describe("ComposerPromptSearch", () => {
         fireEvent.change(input, { target: { value: "deploy" } });
         await settle();
 
-        const reload = fireEvent.keyDown(input, { ctrlKey: true, key: "r" });
+        const reload = fireEvent.keyDown(input, { code: "KeyR", ctrlKey: true, key: "r" });
 
         expect(reload).toBe(false);
+        expect(screen.getAllByRole("option")[1]?.getAttribute("aria-selected")).toBe("true");
+
+        // The same key on a Cyrillic layout types another letter; it still steps.
+        fireEvent.keyDown(input, { key: "ArrowUp" });
+        const cyrillic = fireEvent.keyDown(input, { code: "KeyR", ctrlKey: true, key: "к" });
+
+        expect(cyrillic).toBe(false);
         expect(screen.getAllByRole("option")[1]?.getAttribute("aria-selected")).toBe("true");
     });
 
