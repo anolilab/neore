@@ -51,7 +51,7 @@ const LazyPresentationArtifact = lazy(() =>
 );
 
 // Suspense-wrapped adapters so chat-ui's MessageContent doesn't need to know about lazy loading
-const DocumentArtifact: FC<{ documentId: string; kind: string; title: string; version: number }> = ({ kind, ...props }) => (
+const DocumentArtifact: FC<{ documentId: string; kind: string; threadId?: string; title: string; version: number }> = ({ kind, ...props }) => (
     <Suspense fallback={null}>
         <LazyDocumentArtifact kind={kind as "code" | "design" | "image" | "sheet" | "text"} {...props} />
     </Suspense>

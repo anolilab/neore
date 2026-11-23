@@ -5638,6 +5638,12 @@
           "optional": true,
           "unique": false
         },
+        "fixesSetupStep": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "log": {
           "kind": "string",
           "nullable": false,
@@ -5725,6 +5731,53 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "setupFailure": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "logTail": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "step": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "setupFixOf": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
+        "setupFixRunId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "codingAgentRuns"
+        },
+        "setupFixRunIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "codingAgentRuns"
+          }
         },
         "startedAt": {
           "kind": "number",
@@ -7237,6 +7290,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7309,6 +7368,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7381,6 +7446,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7453,6 +7524,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7525,6 +7602,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7597,6 +7680,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -7669,6 +7758,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "vectorText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -25127,6 +25222,60 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "sharedPinRoutes": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_thread": {
+          "fields": [
+            "userId",
+            "threadId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "signUpInvitation": {
       "commitOrdered": false,
       "fields": {
@@ -28986,6 +29135,19 @@
           "optional": false,
           "unique": false
         },
+        "documentId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "documents"
+        },
+        "documentKind": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "imageIndex": {
           "kind": "number",
           "nullable": false,
@@ -29009,6 +29171,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"document\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"image\""
             },
             {
@@ -29023,7 +29192,7 @@
         "messageId": {
           "kind": "string",
           "nullable": false,
-          "optional": false,
+          "optional": true,
           "unique": false
         },
         "messageRole": {
@@ -29084,6 +29253,20 @@
         "by_thread": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_document": {
+          "fields": [
+            "threadId",
+            "documentId"
+          ],
+          "unique": false
+        },
+        "by_user_and_document": {
+          "fields": [
+            "userId",
+            "documentId"
           ],
           "unique": false
         },
@@ -29885,6 +30068,74 @@
           "unique": false,
           "literal": "\"host\""
         },
+        "searchClaim": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "expiresAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "id": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "texts": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "kind": {
+                    "kind": "union",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "members": [
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"summary\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"title\""
+                      }
+                    ]
+                  },
+                  "text": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "searchRefusedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "snoozeChosenAt": {
           "kind": "number",
           "nullable": false,
@@ -29933,6 +30184,12 @@
           "optional": true,
           "unique": false
         },
+        "summaryVectorId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "tagIds": {
           "kind": "array",
           "nullable": false,
@@ -29969,6 +30226,12 @@
           "optional": true,
           "unique": false
         },
+        "titleVectorId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "updatedAt": {
           "kind": "number",
           "nullable": false,
@@ -29977,6 +30240,12 @@
         },
         "userId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userTurnCount": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
