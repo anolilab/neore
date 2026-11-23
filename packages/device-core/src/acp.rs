@@ -313,8 +313,20 @@ fn probe_folder() -> Result<PathBuf, String> {
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
 
     builder.create(&folder).map_err(|error| error.to_string())?;
+    #[cfg(test)]
+    created_probes().insert(folder.clone());
 
     Ok(folder)
+}
+
+/// Every probe folder [`probe_folder`] made in this test process, by the exact path it returned.
+#[cfg(test)]
+fn created_probes() -> std::sync::MutexGuard<'static, BTreeSet<PathBuf>> {
+    static CREATED: std::sync::Mutex<BTreeSet<PathBuf>> = std::sync::Mutex::new(BTreeSet::new());
+
+    CREATED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// The start of every probe folder's name this process makes.
@@ -323,12 +335,17 @@ fn probe_prefix() -> String {
 }
 
 /// The probe folder `plan` names, for a test to remove, only when it is provably one this process made: the plan is
-/// a probe and its real path (links and `..` resolved) is a folder directly in the real temp folder with this
-/// process's probe prefix. Anything else is left alone, so a plan that wrongly names a real folder fails its test
-/// without deleting that folder.
+/// a probe, its path is one [`probe_folder`] returned and is still a folder, not a link, and its real path (the temp
+/// folder may sit behind a link) is directly in the real temp folder with this process's probe prefix. Anything else
+/// is left alone, so a plan that wrongly names a real folder fails its test without deleting that folder.
 #[cfg(test)]
 pub(crate) fn probe_scratch(plan: &SpawnPlan) -> Option<crate::test_dir::TestDir> {
-    if !plan.scratch {
+    let path = Path::new(&plan.cwd);
+
+    if !plan.scratch
+        || !created_probes().contains(path)
+        || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir())
+    {
         return None;
     }
 
@@ -1131,6 +1148,20 @@ mod tests {
                 probe_scratch(&plan(&link, true)).is_none(),
                 "a probe-named link"
             );
+        }
+
+        #[cfg(unix)]
+        {
+            let other = TestDir::adopt(probe_folder().unwrap());
+            let swapped = TestDir::adopt(probe_folder().unwrap());
+
+            fs::remove_dir(&swapped).unwrap();
+            std::os::unix::fs::symlink(&*other, &swapped).unwrap();
+            assert!(
+                probe_scratch(&plan(&swapped, true)).is_none(),
+                "a link to another probe folder"
+            );
+            assert!(other.is_dir(), "the other probe folder stays");
         }
 
         assert!(dir.is_dir() && probe.is_dir(), "nothing was removed");
