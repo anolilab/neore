@@ -28,6 +28,8 @@ export const vDocumentDoc = v.object({
     kind: vDocumentKind,
     language: v.optional(v.string()),
     messageId: v.optional(v.string()),
+    // Whether the caller owns the document's thread, so the document sits on their own shard (where a page can be made from it).
+    ownsThread: v.optional(v.boolean()),
     status: v.optional(v.union(v.literal("idle"), v.literal("streaming"))),
     threadId: v.string(),
     title: v.string(),
@@ -90,6 +92,7 @@ export const getDocument = query
                 return {
                     ...publicDocument(documentRow),
                     canEdit: documentRow.userId === identity.userId && meetsThreadPermission(access.permission, "write"),
+                    ownsThread: access.thread.userId === identity.userId,
                 };
             }
 
@@ -113,7 +116,11 @@ export const getDocument = query
             return null;
         }
 
-        return { ...publicDocument(authoredRow), canEdit: meetsThreadPermission(access.permission, "write") };
+        return {
+            ...publicDocument(authoredRow),
+            canEdit: meetsThreadPermission(access.permission, "write"),
+            ownsThread: access.thread.userId === identity.userId,
+        };
     });
 
 /** Internal: a locked thread's document is skipped (null) without its proof. */

@@ -798,7 +798,8 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                             </TooltipIconButton>
                         </>
                     )}
-                    {document?.kind === "text" && isAuthor && !isStreaming && <OpenAsPageButton documentId={document._id} />}
+                    {/* A page is made on the caller's own shard, so the button shows only where the document is stored there: the author's own thread. */}
+                    {document?.kind === "text" && isAuthor && document.ownsThread === true && !isStreaming && <OpenAsPageButton documentId={document._id} />}
                     <TooltipIconButton onClick={handleCopy} tooltip={t`Copy content`}>
                         {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
                     </TooltipIconButton>
