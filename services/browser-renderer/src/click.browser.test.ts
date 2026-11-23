@@ -631,8 +631,10 @@ describe("readTarget in a page", () => {
         const intent = await page.$("#intent");
         const named = await intent!.evaluate(readTarget, TARGET_READ_OPTIONS);
 
-        await intent!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: named.target });
+        const namedClick = await intent!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: named.target });
 
+        expect(namedClick.refused).toBeUndefined();
+        expect(namedClick.clicked).toBe(true);
         await page.waitForURL("**/cart/second**", { timeout: 3000 });
         expect(page.url()).toContain("intent=confirm");
         expect(urls.some((url) => url.includes("intent=confirm"))).toBe(true);
