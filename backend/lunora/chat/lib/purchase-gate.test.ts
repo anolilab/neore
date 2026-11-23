@@ -15,6 +15,11 @@ describe("a bare subscribe control", () => {
         expect(purchaseTargetNeedsApproval({ checkout: false, content: "Abonnieren", label: "Abonnieren", success: true })).toBe(true);
     });
 
+    it("asks when the renderer reports a name part that is exactly Subscribe, though the joined name is longer", () => {
+        expect(purchaseTargetNeedsApproval({ content: "→", label: "Subscribe Monthly plan", subscribeLike: true, success: true })).toBe(true);
+        expect(purchaseTargetNeedsApproval({ content: "Continue", label: "Subscribe Continue", subscribeLike: true, success: true })).toBe(true);
+    });
+
     it("leaves a longer subscribe label outside a checkout alone", () => {
         expect(
             purchaseTargetNeedsApproval({

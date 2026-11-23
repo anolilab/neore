@@ -336,6 +336,10 @@
                         "type": "boolean",
                         "description": "One of the element's name sources is exactly a submit word (visibleOnly reads only)"
                     },
+                    "subscribeLike": {
+                        "type": "boolean",
+                        "description": "One of the element's name sources is exactly a bare subscription word (visibleOnly reads only)"
+                    },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },

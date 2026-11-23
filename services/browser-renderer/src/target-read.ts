@@ -5,6 +5,7 @@ export const TARGET_READ_OPTIONS = {
     payment: /pay|stripe|adyen|braintree|checkout|klarna|mollie|sumup|worldpay|saferpay|sofort|wirecard/iu,
     splitter: /\s+/u,
     submit: /^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
+    subscribe: /^(?:subscribe|abonnieren)[.!]?$/iu,
 };
 
 /** What one read of an element reports. `target` is the fingerprint: SHA-256 of `canonical`, computed in the page. */
@@ -20,6 +21,7 @@ export interface TargetRead {
     refused?: "changed" | "covered" | "disabled" | "hidden" | "moved" | "pressed";
     shown: string;
     submitLike: boolean;
+    subscribeLike: boolean;
     target: string;
 }
 
@@ -47,6 +49,7 @@ export function readTarget(
         /** An approved click: an element opacity hides is refused too. An ordinary click ignores opacity (a styled checkbox's input is 0). */
         strict?: boolean;
         submit: RegExp;
+        subscribe: RegExp;
     },
 ): TargetRead {
     // The read, as one function. A click reads the element again after its press, so a change inside a child element (which the
@@ -290,6 +293,8 @@ export function readTarget(
 
             // Each name source on its own: a submit word is a name only when a source is exactly that word (joined names never are).
             const isSubmitLike = names.some((part) => options.submit.test(part.trim()));
+            // The same for a bare subscription word ("Subscribe", "Abonnieren"): the gate asks for it on any page.
+            const isSubscribeLike = names.some((part) => options.subscribe.test(part.trim()));
             // A name found by two sources (the control's own aria-label is read in both the nodes and the scan) counts once: it would
             // otherwise use up the cap twice.
             const joined = [...new Set(names.filter(Boolean))].join(" ");
@@ -502,6 +507,7 @@ export function readTarget(
                 labelTruncated: joined.length > options.max || isScanCapped || isReferenceCapped,
                 shown,
                 submitLike: isSubmitLike,
+                subscribeLike: isSubscribeLike,
                 target,
             };
         },
@@ -716,6 +722,7 @@ export function readTarget(
         ...(refused !== undefined && { refused }),
         shown: first.shown,
         submitLike: first.submitLike,
+        subscribeLike: first.subscribeLike,
         target: first.target,
     };
 }

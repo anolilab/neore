@@ -48,6 +48,8 @@ export interface ClickTargetLook {
     labelTruncated?: boolean;
     /** One of the control's name sources is exactly a submit word (the renderer's check on each name part). */
     submitLike?: boolean;
+    /** One of the control's name sources is exactly a bare subscription word (the renderer's check on each name part). */
+    subscribeLike?: boolean;
     success: boolean;
     /** The renderer cut the text short: a purchase word may sit past the cut, so the gate cannot clear it. */
     truncated?: boolean;
@@ -105,7 +107,8 @@ export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean =>
         target.checkout === true && (target.submitLike === true || [text, name].some((part) => CHECKOUT_SUBMIT_WORDS.some((pattern) => pattern.test(part))));
 
     // A bare "Subscribe" (a paid signup, or a newsletter's) asks on any page: a paid one must not run unapproved where no checkout is recognized.
-    const isBareSubscribe = [text, name].some((part) => SUBSCRIBE_WORD.test(part.trim()));
+    // The renderer reports it per name part, so a name joined with another part ("Subscribe Monthly plan") still counts.
+    const isBareSubscribe = target.subscribeLike === true || [text, name].some((part) => SUBSCRIBE_WORD.test(part.trim()));
 
     return (text === "" && name === "") || isPurchaseText(text) || isPurchaseText(name) || isBareSubscribe || submitsOnCheckout;
 };

@@ -155,6 +155,10 @@ export type BrowserActionResponse = {
      */
     checkout?: boolean;
     /**
+     * One of the element's name sources is exactly a bare subscription word (visibleOnly reads only)
+     */
+    subscribeLike?: boolean;
+    /**
      * One of the element's name sources is exactly a submit word (visibleOnly reads only)
      */
     submitLike?: boolean;

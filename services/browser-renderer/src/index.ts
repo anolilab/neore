@@ -277,6 +277,8 @@ interface ActionResult {
     scrollPosition?: { maxY: number; x: number; y: number };
     /** One of the control's name sources is exactly a submit word (`visibleOnly` reads only). */
     submitLike?: boolean;
+    /** One of the control's name sources is exactly a bare subscription word (`visibleOnly` reads only). */
+    subscribeLike?: boolean;
     success: boolean;
     /** The fingerprint of the extracted element (`visibleOnly` reads only), which a click can be checked against. */
     target?: string;
@@ -644,6 +646,7 @@ const actHeld = async (
                 let target: string | undefined;
                 let isCheckout = false;
                 let isSubmitLike = false;
+                let isSubscribeLike = false;
 
                 if (selector) {
                     const element = await page.$(selector);
@@ -668,6 +671,7 @@ const actHeld = async (
                         target = read.target;
                         isCheckout = read.checkout;
                         isSubmitLike = read.submitLike;
+                        isSubscribeLike = read.subscribeLike;
                     } else {
                         // An ordinary extract keeps the raw text it always returned.
                         extractedText = (await element.textContent()) ?? "";
@@ -700,6 +704,7 @@ const actHeld = async (
                     ...(isLabelTruncated && { labelTruncated: true }),
                     ...(target !== undefined && { target }),
                     ...(isCheckout && { checkout: true }),
+                    ...(isSubscribeLike && { subscribeLike: true }),
                     ...(isSubmitLike && { submitLike: true }),
                 };
                 break;

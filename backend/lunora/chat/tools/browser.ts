@@ -61,6 +61,8 @@ export interface BrowserResult {
     scrollPosition?: { maxY: number; x: number; y: number };
     /** One of the element's name sources is exactly a submit word (`visibleOnly` reads): on a checkout it is the payment. */
     submitLike?: boolean;
+    /** One of the element's name sources is exactly a bare subscription word (`visibleOnly` reads): it asks on any page. */
+    subscribeLike?: boolean;
     success: boolean;
     /** The fingerprint of the element a look read: a click is checked against it (`expectTarget`). */
     target?: string;

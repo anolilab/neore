@@ -487,4 +487,16 @@ describe("readTarget in a page", () => {
         expect(page.url()).toContain("/cart");
         expect(page.url()).not.toContain("/cart/confirm");
     });
+
+    it("reports a bare Subscribe name part, even when the joined name is longer, and not a longer subscribe label", async () => {
+        await pageWith(
+            page,
+            `<button id="join" aria-label="Subscribe" title="Monthly plan">→</button><button id="news" aria-label="Subscribe to our newsletter">→</button>`,
+        );
+        const joined = await (await page.$("#join"))!.evaluate(readTarget, TARGET_READ_OPTIONS);
+        const newsletter = await (await page.$("#news"))!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(joined.subscribeLike).toBe(true);
+        expect(newsletter.subscribeLike).toBe(false);
+    });
 });
