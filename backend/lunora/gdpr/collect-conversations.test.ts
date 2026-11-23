@@ -15,7 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { registeredApi } from "../../test/registered-api";
 
 import { listGuestLinksForExport, listGuestNotesForExport } from "../chat/guest-links";
-import { listPinsForExport, listSharedPinGrantsForExport } from "../chat/pins/functions";
+import { listPinsForExport, listSharedPinRoutesForExport } from "../chat/pins/functions";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
@@ -332,9 +332,9 @@ describe("collectConversations", () => {
  * built for the user the workflow names, so another user's locked chat stays out.
  */
 describe("collectSharedPins", () => {
-    it("reads a collaborator's pins on each thread shared with them, and skips a grant with no recorded owner", async () => {
+    it("reads a collaborator's pins on each thread they pinned, from the owner, after their grant is gone, and skips a pin with no route", async () => {
         registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
-        registry.set("chat_pins_functions:listSharedPinGrantsForExport", listSharedPinGrantsForExport);
+        registry.set("chat_pins_functions:listSharedPinRoutesForExport", listSharedPinRoutesForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -360,16 +360,10 @@ describe("collectSharedPins", () => {
                     updatedAt: 4,
                     userId: "user-collab",
                 });
-                await context.db.insert("threadAccess", {
-                    grantedAt: 0,
-                    grantedBy: "user-owner",
-                    ownerId: "user-owner",
-                    permission: "read",
-                    threadId: sharedThreadId,
-                    userId: "user-collab",
-                });
+                // The route outlives the grant: the collaborator holds no grant on this thread any more.
+                await context.db.insert("sharedPinRoutes", { createdAt: 0, ownerId: "user-owner", threadId: sharedThreadId, userId: "user-collab" });
 
-                // A grant saved before owners were recorded: the owner is unknown here, so it is skipped.
+                // A pin written before routes were recorded has no route, so it is not found from here.
                 const legacyThreadId = await context.db.insert("threads", {
                     mode: "text",
                     model: "gpt-4o",
@@ -378,11 +372,12 @@ describe("collectSharedPins", () => {
                     userId: "user-owner",
                 });
 
-                await context.db.insert("threadAccess", {
-                    grantedAt: 0,
-                    grantedBy: "user-owner",
-                    permission: "read",
+                await context.db.insert("threadPins", {
+                    createdAt: 5,
+                    messageRole: "assistant",
+                    note: "unrouted note",
                     threadId: legacyThreadId,
+                    updatedAt: 5,
                     userId: "user-collab",
                 });
 

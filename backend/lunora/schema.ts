@@ -2741,6 +2741,20 @@ export const schema = defineSchema({
         .index("by_owner", ["ownerId"]),
 
     /**
+     * Where a collaborator's pins on a thread another user owns live: the owner's shard. The pin writers record the route here
+     * (`chat/pins/functions.ts`), and the collaborator's data export reads it (`gdpr/steps.ts#collectSharedPins`), so the pins
+     * still export after the collaborator's grant is revoked.
+     */
+    sharedPinRoutes: defineTable({
+        createdAt: v.number(),
+        ownerId: v.string(),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_user_and_thread", ["userId", "threadId"]),
+
+    /**
      * Sign-up invitations for `@lunora/auth`'s `inviteOnly()` plugin.
      *
      * Hand-transcribed from the plugin's own `schema` block, like every other

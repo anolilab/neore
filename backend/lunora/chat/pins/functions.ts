@@ -1,8 +1,10 @@
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
+import type { MutationCtx } from "../../_generated/server";
 import { authMutation, authQuery, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
+import { systemDb } from "../../lib/rls/scope";
 import { isThreadLocked } from "../../lib/thread-lock";
 import { threadGateOutcome, throwUnlessGranted } from "../lib/thread-gate";
 import { isPinnableDocumentKind } from "./pinnable";
@@ -130,31 +132,49 @@ export const listPinsForExport = internalQuery
     });
 
 /**
- * The threads another user shared with the caller, each with its owner: the export reads the caller's pins on them from the
- * owner's shard (`gdpr/steps.ts#collectSharedPins`). A grant saved without its owner is skipped, since the owner is unknown here.
+ * The threads another user owns where the caller has pinned something, each with its owner: the export reads the caller's pins
+ * on them from the owner's shard (`gdpr/steps.ts#collectSharedPins`). The routes outlive the grant, so a revoked collaborator's
+ * pins still export.
  */
-export const listSharedPinGrantsForExport = internalQuery
+export const listSharedPinRoutesForExport = internalQuery
     .input({ userId: v.string().max(MAX_LENGTH.id) })
     .output(v.array(v.object({ ownerId: v.string(), threadId: v.string() })))
     .query(async ({ args, ctx: context }) => {
-        const shared: { ownerId: string; threadId: string }[] = [];
+        const routes: { ownerId: string; threadId: string }[] = [];
         let cursor: string | undefined;
 
         // A `.global()` read is capped per page, so every page is read until the last.
         do {
-            const { continueCursor, isDone, page } = await context.db.threadAccess.findMany({ cursor, limit: 500, where: { userId: args.userId } });
+            const { continueCursor, isDone, page } = await context.db.sharedPinRoutes.findMany({ cursor, limit: 500, where: { userId: args.userId } });
 
-            for (const grant of page) {
-                if (typeof grant.ownerId === "string" && grant.ownerId !== args.userId) {
-                    shared.push({ ownerId: grant.ownerId, threadId: grant.threadId });
-                }
+            for (const route of page) {
+                routes.push({ ownerId: route.ownerId, threadId: route.threadId });
             }
 
             cursor = isDone ? undefined : (continueCursor ?? undefined);
         } while (cursor !== undefined);
 
-        return shared;
+        return routes;
     });
+
+/**
+ * Records where the caller's pin on `threadId` lives when the caller is not the thread's owner, so the caller's export still finds
+ * it once their grant is revoked. Runs on the owner's shard, where the pin is written.
+ */
+const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads">, userId: string, now: number): Promise<void> => {
+    // The owner is read past row-level security: a collaborator is not the thread row's reader, so the caller's own view cannot give it.
+    const thread = await systemDb(context).get("threads", threadId);
+
+    if (thread?.userId === undefined || thread.userId === userId) {
+        return;
+    }
+
+    const existing = await context.db.sharedPinRoutes.findFirst({ where: { threadId, userId } });
+
+    if (!existing) {
+        await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
+    }
+};
 
 export const createPin = authMutation
     .use(rateLimit("pins/create"))
@@ -197,6 +217,8 @@ export const createPin = authMutation
             updatedAt: now,
             userId,
         });
+
+        await recordSharedPinRoute(context, threadId as Id<"threads">, userId, now);
 
         context.log.event("chat.create_pin", { hasSelectedText: selectedText !== undefined, kind: kind ?? "message", messageRole });
 
@@ -261,6 +283,8 @@ export const createDocumentPin = authMutation
             updatedAt: now,
             userId,
         });
+
+        await recordSharedPinRoute(context, threadId as Id<"threads">, userId, now);
 
         context.log.event("chat.create_document_pin", { documentKind: document.kind });
 

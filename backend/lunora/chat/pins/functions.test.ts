@@ -255,6 +255,25 @@ describe("document pins", () => {
     });
 });
 
+describe("the route a collaborator's pin leaves", () => {
+    it("records the owner, so the collaborator's export finds the pin after the grant is revoked", async () => {
+        await harness.run(
+            async (context: any) =>
+                await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" }),
+        );
+
+        await as("user-collaborator").mutation(createPin as never, { messageId: "m-9", messageRole: "assistant", threadId } as never);
+
+        const routes = await harness.run(async (context: any) => {
+            const { page } = await context.db.sharedPinRoutes.findMany({ where: { userId: "user-collaborator" } });
+
+            return page as unknown[];
+        });
+
+        expect(routes).toMatchObject([{ ownerId: OWNER, threadId, userId: "user-collaborator" }]);
+    });
+});
+
 describe("listing a thread's pins after a grant is revoked", () => {
     const COLLABORATOR = "user-collaborator";
 

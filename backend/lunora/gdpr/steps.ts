@@ -383,21 +383,21 @@ export const collectConversations = internalAction.input({ userId: v.string() })
  * pins are read there, page by page, by the caller's own id. A thread's pins that the caller made nothing on are left out.
  */
 export const collectSharedPins = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
-    const grants = await context.runQuery(internal.chat.pins.functions.listSharedPinGrantsForExport, { userId });
+    const routes = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { userId });
     const shared: { pins: unknown[]; threadId: string }[] = [];
 
-    for (const grant of grants) {
+    for (const route of routes) {
         const pins = await readAllPages(
             async (cursor) =>
                 await callOnShard(
                     internal.chat.pins.functions.listPinsForExport,
-                    { cursor, threadId: grant.threadId as Id<"threads">, userId },
-                    { shardKey: grant.ownerId },
+                    { cursor, threadId: route.threadId as Id<"threads">, userId },
+                    { shardKey: route.ownerId },
                 ),
         );
 
         if (pins.length > 0) {
-            shared.push({ pins, threadId: grant.threadId });
+            shared.push({ pins, threadId: route.threadId });
         }
     }
 
