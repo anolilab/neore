@@ -67,11 +67,14 @@ import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
+import { messageCarriesGuestText, messageCarriesOutsideAgentText } from "./lib/attached-text";
 import { readChildThreads } from "./lib/child-threads";
+import { typedPromptText } from "./lib/first-user-prompt";
+import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
 import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
-import { statelessPrompt } from "../lib/not-typed-text";
-import { vNotTypedMarks } from "../lib/not-typed-text-validator";
+import { draftFromOfMarks, notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
+import { vDraftFrom, vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { readableProject } from "../projects/functions";
@@ -3470,6 +3473,8 @@ export const searchMessages = authQuery
 /** A prompt the person sent, as the composer's Ctrl+R search lists it (`composer-prompt-search.tsx`). */
 const vSentPrompt = v.object({
     createdAt: v.optional(v.number()),
+    /** The prompt's not-typed mark, so a pick goes out marked again, as an ArrowUp recall does. */
+    draftFrom: v.optional(vDraftFrom),
     messageId: v.string(),
     text: v.string(),
     threadId: v.string(),
@@ -3485,18 +3490,22 @@ const SENT_PROMPT_LOOKUP_BATCH = 16;
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the message text index
  * through `textSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt never lists.
- * Word match only: the index has no prefix match. Trashed threads, temporary chats, other people's threads and goal
- * continuation rounds (typed by nobody) are dropped too. A query longer than the search reads is cut to its first
- * characters, not refused. `truncated` says the index window was full, so a matching prompt may sit past it.
+ * Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index matches.
+ * Trashed threads, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are dropped
+ * too, and so are a guest's note or an outside agent's text sent on. A prompt is what the person typed: an attached
+ * document or page is neither listed nor searched, and the same prompt in a branched copy of a chat lists once. A query
+ * longer than the search reads is cut to its first characters and words, not refused. `truncated` says the index
+ * window was full, so a matching prompt may sit past it.
  */
 export const searchSentPrompts = authQuery
-    .input({ searchQuery: v.string() })
+    .input({ searchQuery: v.string().max(MAX_LENGTH.long) })
     .output(v.object({ prompts: v.array(vSentPrompt), truncated: v.boolean() }))
     .query(async ({ args: { searchQuery }, ctx: context }) => {
         const { userId } = context.user;
-        const text = searchQuery.trim().slice(0, MAX_LENGTH.short).trim();
+        const text = capSearchTerms(searchQuery.trim().slice(0, MAX_LENGTH.short).trim());
+        const terms = queryTerms(text);
 
-        if (!text) {
+        if (terms.length === 0) {
             return { prompts: [], truncated: false };
         }
 
@@ -3505,13 +3514,24 @@ export const searchSentPrompts = authQuery
             searchAllMessagesForUserId: userId,
             text,
         });
-        const sent = hits.filter(
-            (message) =>
-                (message.message as { role?: string } | undefined)?.role === "user" &&
-                (message.text ?? "").trim() !== "" &&
-                message.agentName !== GOAL_CONTINUATION_AGENT,
-        );
-        const threadIds = [...new Set(sent.map((message) => message.threadId))];
+        // The index reads every text part, attachments included: a hit counts only when the typed words match.
+        const sent = hits.flatMap((message) => {
+            const stored = message.message as { content?: unknown; role?: string } | undefined;
+
+            if (
+                stored?.role !== "user" ||
+                message.agentName === GOAL_CONTINUATION_AGENT ||
+                messageCarriesGuestText(stored) ||
+                messageCarriesOutsideAgentText(stored)
+            ) {
+                return [];
+            }
+
+            const typed = typedPromptText(stored.content).trim();
+
+            return typed !== "" && matchesQueryTerms(typed, terms) ? [{ draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), message, typed }] : [];
+        });
+        const threadIds = [...new Set(sent.map(({ message }) => message.threadId))];
         const titles = new Map<string, string>();
 
         // Each lookup is a nested query and Lunora caps how many run at once, so they go in small batches. A failed lookup
@@ -3548,15 +3568,38 @@ export const searchSentPrompts = authQuery
             }
         }
 
+        const sentAt = (message: (typeof sent)[number]["message"]): number => message.createdAt ?? message._creationTime;
+        // A branch copies its rows with the same text and send time: one prompt, listed once, from its newest copy.
+        const seen = new Set<string>();
         const prompts = sent
-            .filter((message) => titles.has(message.threadId))
-            .toSorted((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || b.order - a.order || b.stepOrder - a.stepOrder)
+            .filter(({ message }) => titles.has(message.threadId))
+            .toSorted(
+                (a, b) =>
+                    sentAt(b.message) - sentAt(a.message) ||
+                    b.message._creationTime - a.message._creationTime ||
+                    a.message.threadId.localeCompare(b.message.threadId) ||
+                    b.message.order - a.message.order ||
+                    b.message.stepOrder - a.message.stepOrder ||
+                    String(a.message._id).localeCompare(String(b.message._id)),
+            )
+            .filter(({ message, typed }) => {
+                const key = `${String(sentAt(message))}\u{0}${typed}`;
+
+                if (seen.has(key)) {
+                    return false;
+                }
+
+                seen.add(key);
+
+                return true;
+            })
             .slice(0, SENT_PROMPT_LIMIT)
-            .map((message) => {
+            .map(({ draftFrom, message, typed }) => {
                 return {
                     createdAt: message.createdAt,
+                    ...(draftFrom !== undefined && { draftFrom }),
                     messageId: message._id as string,
-                    text: message.text ?? "",
+                    text: typed,
                     threadId: message.threadId,
                     threadTitle: titles.get(message.threadId) ?? "",
                 };

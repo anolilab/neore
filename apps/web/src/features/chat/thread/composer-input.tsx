@@ -83,6 +83,7 @@ import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText
 import { takesPaste } from "./composer-paste/paste-target";
 import { useComposerPrefill } from "./composer-prefill";
 import ComposerPromptQueue from "./composer-prompt-queue";
+import type { PickedPrompt } from "./composer-prompt-search";
 import ComposerPromptSearch from "./composer-prompt-search";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
@@ -552,20 +553,24 @@ const ComposerInput = ({
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
     // Ctrl+R opens the search over the person's sent prompts (`composer-prompt-search.tsx`). Only a thread composer has one.
-    const [promptSearchOpen, setPromptSearchOpen] = useState(false);
+    // The chat the search was opened in; `null` while it is closed. It belongs to that chat: the composer stays mounted when
+    // another chat opens, and a pick must not land in that chat's draft.
+    const [promptSearchThread, setPromptSearchThread] = useState<string | null>(null);
+    const promptSearchOpen = promptSearchThread !== null;
+    const promptSearchLocked = disabled || isComparisonLoading;
 
-    // A composer disabled while the search is open closes it: a pick must not change a draft that is locked.
-    // Adjusted during render, as `useDebouncedValue` does, so the search is never shown again on re-enable.
-    if (disabled && promptSearchOpen) {
-        setPromptSearchOpen(false);
+    // A composer that locks, or moves to another chat, while the search is open closes it: a pick must not change a draft
+    // that is locked or another chat's. Adjusted during render, as `useDebouncedValue` does, so it never shows again.
+    if (promptSearchOpen && (promptSearchLocked || promptSearchThread !== (threadId ?? ""))) {
+        setPromptSearchThread(null);
     }
 
     const openPromptSearch = useCallback((): boolean => {
-        setPromptSearchOpen(true);
+        setPromptSearchThread(threadId ?? "");
 
         return true;
-    }, []);
-    const closePromptSearch = useCallback(() => setPromptSearchOpen(false), []);
+    }, [threadId]);
+    const closePromptSearch = useCallback(() => setPromptSearchThread(null), []);
 
     // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
     useEffect(() => {
@@ -605,7 +610,7 @@ const ComposerInput = ({
 
     // The prompt becomes the draft, and is never sent. Text already typed stays, with the prompt below it.
     const pickSentPrompt = useCallback(
-        (prompt: string) => {
+        ({ draftFrom, text: prompt }: PickedPrompt) => {
             const draft = useChatUIStore.getState().composerText;
 
             // A picked prompt is a new draft: an ArrowUp recall ends here, so Escape keeps the picked text.
@@ -632,7 +637,13 @@ const ComposerInput = ({
                 }
             }
 
-            setPromptSearchOpen(false);
+            // A prompt saved as not typed by the person goes out marked again, as an ArrowUp recall does. An admin's writing
+            // (`impersonated`) replaces a weaker mark the draft already has.
+            if (draftFrom !== undefined && (composerDraftFrom() === undefined || draftFrom === "impersonated")) {
+                markComposerDraft(draftFrom);
+            }
+
+            setPromptSearchThread(null);
             inputAreaRef.current?.focus();
         },
         [promptHistory, setText],
@@ -2079,7 +2090,7 @@ const ComposerInput = ({
                 onDraw={compact ? undefined : onOpenDraw}
                 onHistoryNavigate={isThreadComposer ? promptHistory.navigate : undefined}
                 onPaste={compact ? undefined : handlePaste}
-                onPromptSearch={isThreadComposer && !disabled ? openPromptSearch : undefined}
+                onPromptSearch={isThreadComposer && !promptSearchLocked ? openPromptSearch : undefined}
                 onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}

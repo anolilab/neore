@@ -82,14 +82,14 @@ const splitAttached = (text: string): { attached: string; typed: string } => {
 };
 
 /** What a piece contributes to the want: its typed text, or its attached text. Whitespace before its text is skipped without counting. */
-const contribution = (piece: Piece, want: "attached" | "typed"): string => {
+const contribution = (piece: Piece, want: "attached" | "typed", limit: number): string => {
     const start = piece.text.search(NON_SPACE);
 
     if (start === -1) {
         return "";
     }
 
-    const body = piece.text.slice(start, start + READ_LIMIT);
+    const body = piece.text.slice(start, start + limit);
 
     if (piece.whole) {
         return want === "attached" ? body.trimEnd() : "";
@@ -104,23 +104,29 @@ const contribution = (piece: Piece, want: "attached" | "typed"): string => {
 const appendCapped = (out: string, piece: string, limit: number): string => out + piece.slice(0, Math.max(0, limit - out.length));
 
 /** The text of a message that is `want`: its typed pieces joined by a space, or its attached pieces, read to the limit. */
-const textWanted = (content: unknown, want: "attached" | "typed"): string => {
+const textWanted = (content: unknown, want: "attached" | "typed", limit: number = READ_LIMIT): string => {
     let out = "";
 
     for (const piece of pieces(content)) {
-        if (out.length >= READ_LIMIT) {
+        if (out.length >= limit) {
             break;
         }
 
-        const chunk = contribution(piece, want);
+        const chunk = contribution(piece, want, limit);
 
         if (chunk) {
-            out = appendCapped(out ? appendCapped(out, " ", READ_LIMIT) : out, chunk, READ_LIMIT);
+            out = appendCapped(out ? appendCapped(out, " ", limit) : out, chunk, limit);
         }
     }
 
     return out;
 };
+
+/**
+ * What the person typed in a stored user message, whole: no attached document or page text and no file-only placeholder.
+ * Empty for a message with nothing typed (a file sent with no question).
+ */
+export const typedPromptText = (content: unknown): string => textWanted(content, "typed", Infinity);
 
 /**
  * The first `MAX_PROMPT_CHARS` characters of `text`, by code point, so a cut never splits a surrogate pair. It stops at the limit: a

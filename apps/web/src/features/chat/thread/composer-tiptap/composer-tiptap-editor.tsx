@@ -370,7 +370,18 @@ const ComposerTiptapEditor = ({
             }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             PromptSearchKey.configure({
-                onOpen: () => keyHandlersRef.current.onPromptSearch?.() ?? false,
+                onOpen: () => {
+                    const opened = keyHandlersRef.current.onPromptSearch?.() ?? false;
+
+                    // An open suggestion list takes the arrows, Enter and Escape on `window`; it closes so the search gets them.
+                    if (opened) {
+                        setSlashMatch(null);
+                        setFileMentionMatch(null);
+                        setVariableMatch(null);
+                    }
+
+                    return opened;
+                },
             }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SubmitOnEnter.configure({

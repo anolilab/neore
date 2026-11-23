@@ -6,24 +6,44 @@
  * reaches this extension there as well.
  */
 import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 export interface PromptSearchKeyOptions {
     /** Opens the search. Returns `false` when nothing is listening, so the key is left to the browser. */
     onOpen: () => boolean;
 }
 
-const PromptSearchKey = Extension.create<PromptSearchKeyOptions>({
-    addKeyboardShortcuts() {
-        return {
-            // ProseMirror calls preventDefault on a key a shortcut claims, which stops the browser's reload.
-            "Ctrl-r": () => this.options.onOpen(),
-        };
-    },
+const isPromptSearchKey = (event: KeyboardEvent): boolean =>
+    event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "r";
 
+const PromptSearchKey = Extension.create<PromptSearchKeyOptions>({
     addOptions() {
         return {
             onOpen: () => false,
         };
+    },
+
+    addProseMirrorPlugins() {
+        const { options } = this;
+
+        return [
+            new Plugin({
+                key: new PluginKey("promptSearchKey"),
+                props: {
+                    handleKeyDown: (_view, event) => {
+                        if (!isPromptSearchKey(event) || !options.onOpen()) {
+                            return false;
+                        }
+
+                        // A taken key stops here: not the browser's reload, and not a shortcut someone recorded on Ctrl+R.
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        return true;
+                    },
+                },
+            }),
+        ];
     },
 
     name: "promptSearchKey",

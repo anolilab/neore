@@ -1,21 +1,52 @@
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { KeyboardEvent } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 const SEARCH_DEBOUNCE_MS = 200;
+/** The server searches the first 500 characters (`searchSentPrompts`); a longer paste is cut here, not refused there. */
+const SEARCH_MAX_LENGTH = 500;
 /** The keys the search answers itself; they do not also reach a global shortcut. */
 const SEARCH_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape"]);
 
+type PickOutcome<T> = { kind: "failed" } | { fresh: T; kind: "gone" } | { kind: "found" };
+
+/**
+ * Runs the search again and says whether the picked prompt is still in it. Outside the component: the React Compiler skips
+ * a component with a conditional inside a `catch`.
+ */
+const recheckPick = async <T extends { prompts: ReadonlyArray<{ messageId: string }> }>(
+    search: () => Promise<T>,
+    messageId: string,
+): Promise<PickOutcome<T>> => {
+    let fresh: T;
+
+    try {
+        fresh = await search();
+    } catch {
+        return { kind: "failed" };
+    }
+
+    return fresh.prompts.some((item) => item.messageId === messageId) ? { kind: "found" } : { fresh, kind: "gone" };
+};
+
+export interface PickedPrompt {
+    /** Set when the prompt was saved as not typed by the person (`@neore/backend/not-typed-text`), so it goes out marked again. */
+    draftFrom?: DraftFrom;
+    text: string;
+}
+
 export interface ComposerPromptSearchProps {
     onClose: () => void;
-    /** The chosen prompt's text. The caller puts it in the composer as a draft; nothing is sent. */
-    onPick: (prompt: string) => void;
+    /** The chosen prompt and its not-typed mark. The caller puts it in the composer as a draft; nothing is sent. */
+    onPick: (prompt: PickedPrompt) => void;
 }
 
 /**
@@ -31,14 +62,31 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const listId = useId();
     const listRef = useRef<HTMLDivElement>(null);
     const pickingRef = useRef(false);
+    // A pick still checking when the search closes is dropped: the composer it was meant for may be locked or showing another chat.
+    const mountedRef = useRef(true);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     // Set when a pick is refused or could not be checked; cleared by the next keystroke.
     const [pickNotice, setPickNotice] = useState<"gone" | "failed" | null>(null);
     const searched = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
-    const { data, isError, isFetching } = useQuery(
-        crpc.chat.functions.searchSentPrompts.queryOptions(searched === "" ? skipToken : { searchQuery: searched }, { live: false }),
-    );
+    // While the debounce runs, the list is the previous search's: it stays on screen, but nothing in it can be picked.
+    const settled = query.trim() === searched;
+    // Read fresh on every open, and dropped once the search closes: prompts are private text, and a cached answer would outlive
+    // a sent prompt, a deleted chat or a switch to another account.
+    const { data, isError, isFetching } = useQuery({
+        ...crpc.chat.functions.searchSentPrompts.queryOptions(searched === "" ? skipToken : { searchQuery: searched }, { live: false }),
+        gcTime: 0,
+        staleTime: 0,
+    });
+
+    useEffect(() => {
+        mountedRef.current = true;
+
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
     const prompts = data?.prompts ?? [];
     // Typing or a new answer can leave the highlight past the end of the list; clamp it rather than reset it in an effect.
     const index = Math.min(active, Math.max(prompts.length - 1, 0));
@@ -51,29 +99,31 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
 
     // The list on screen is one search old: a thread locked since then drops its prompts from a new search. So a pick runs
     // the same search again first, and a prompt that is no longer in it is not put in the composer.
-    const pick = async (prompt: { messageId: string; text: string }) => {
-        if (searched === "" || pickingRef.current) {
+    const pick = async (prompt: PickedPrompt & { messageId: string }) => {
+        if (searched === "" || !settled || pickingRef.current) {
             return;
         }
 
         pickingRef.current = true;
 
         const options = crpc.chat.functions.searchSentPrompts.queryOptions({ searchQuery: searched }, { live: false });
-
-        try {
-            const fresh = await queryClient.fetchQuery({ ...options, staleTime: 0 });
-
-            if (fresh.prompts.some((item) => item.messageId === prompt.messageId)) {
-                onPick(prompt.text);
-            } else {
-                queryClient.setQueryData(options.queryKey, fresh);
-                setPickNotice("gone");
-            }
-        } catch {
-            setPickNotice("failed");
-        }
+        const outcome = await recheckPick(() => queryClient.fetchQuery({ ...options, gcTime: 0, staleTime: 0 }), prompt.messageId);
 
         pickingRef.current = false;
+
+        // Closed while the check ran: nothing goes in the draft.
+        if (!mountedRef.current) {
+            return;
+        }
+
+        if (outcome.kind === "found") {
+            onPick({ ...(prompt.draftFrom !== undefined && { draftFrom: prompt.draftFrom }), text: prompt.text });
+        } else if (outcome.kind === "gone") {
+            queryClient.setQueryData(options.queryKey, outcome.fresh);
+            setPickNotice("gone");
+        } else {
+            setPickNotice("failed");
+        }
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -85,6 +135,15 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         // run as well. The dialog's own dismissal listens on the document, which this key no longer reaches, so Escape closes here.
         if (SEARCH_KEYS.has(event.key)) {
             event.stopPropagation();
+        }
+
+        // Ctrl+R again steps to the next match, as a shell's reverse search does, and never reaches the browser's reload.
+        if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "r") {
+            event.preventDefault();
+            event.stopPropagation();
+            moveActive(Math.min(index + 1, Math.max(prompts.length - 1, 0)));
+
+            return;
         }
 
         switch (event.key) {
@@ -133,9 +192,17 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         } else if (prompts.length === 0) {
             status = t`No sent prompts match "${searched}".`;
         } else {
-            status = t`${prompts.length} prompts found`;
+            // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
+            // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
+            status = t`${plural(prompts.length, { one: "# prompt found", other: "# prompts found" })}`;
         }
     }
+
+    // Inside the status, so a screen reader hears that the list may be incomplete along with the count.
+    const truncatedNotice =
+        searched !== "" && pickNotice === null && data?.truncated === true
+            ? t`Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search.`
+            : undefined;
 
     return (
         <Dialog
@@ -156,10 +223,12 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                 </label>
                 <Input
                     aria-activedescendant={prompts.length > 0 ? optionId(index) : undefined}
+                    aria-autocomplete="list"
                     aria-controls={listId}
                     aria-expanded={prompts.length > 0}
                     autoComplete="off"
                     id={inputId}
+                    maxLength={SEARCH_MAX_LENGTH}
                     onChange={(event) => {
                         setQuery(event.target.value);
                         setActive(0);
@@ -190,14 +259,10 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                         </button>
                     ))}
                 </div>
-                <p aria-live="polite" className="text-muted-foreground mt-2 text-xs" role="status">
-                    {status}
-                </p>
-                {data?.truncated === true && (
-                    <p className="text-muted-foreground mt-1 text-xs">
-                        {t`Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search.`}
-                    </p>
-                )}
+                <div aria-live="polite" className="text-muted-foreground mt-2 space-y-1 text-xs" role="status">
+                    <p>{status}</p>
+                    {truncatedNotice !== undefined && <p>{truncatedNotice}</p>}
+                </div>
             </DialogContent>
         </Dialog>
     );

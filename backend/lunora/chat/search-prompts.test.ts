@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { searchSentPrompts } from "./functions";
+import { documentTextPart } from "./lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -50,11 +51,20 @@ const OTHER = "user-other";
 
 const insertMessage = (
     context: any,
-    fields: { agentName?: string; createdAt: number; order: number; role: string; text: string; threadId: string; userId: string },
+    fields: {
+        agentName?: string;
+        content?: unknown;
+        createdAt: number | undefined;
+        order: number;
+        role: string;
+        text: string;
+        threadId: string;
+        userId: string;
+    },
 ) =>
     context.db.insert("messages", {
-        createdAt: fields.createdAt,
-        message: { content: fields.text, role: fields.role },
+        ...(fields.createdAt !== undefined && { createdAt: fields.createdAt }),
+        message: { content: fields.content ?? fields.text, role: fields.role },
         order: fields.order,
         status: "success",
         stepOrder: 0,
@@ -71,7 +81,7 @@ const insertThread = (context: any, fields: { lockedAt?: number; title: string; 
 const search = async (harness: ReturnType<typeof lunoraTest>, searchQuery: string, userId = OWNER) => {
     const result: any = await harness.withIdentity({ userId } as never).query(searchSentPrompts as never, { searchQuery } as never);
 
-    return result.prompts as { createdAt?: number; messageId: string; text: string; threadId: string; threadTitle: string }[];
+    return result.prompts as { createdAt?: number; draftFrom?: string; messageId: string; text: string; threadId: string; threadTitle: string }[];
 };
 
 describe("searchSentPrompts", () => {
@@ -371,6 +381,127 @@ describe("searchSentPrompts", () => {
             });
 
             expect(await search(harness, " ".repeat(3))).toEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("searches a query of more words than the index takes by its first ones, not failing it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const shown = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Words", userId: OWNER });
+
+                return insertMessage(context, { createdAt: 1, order: 0, role: "user", text: "alpha beta gamma", threadId: thread, userId: OWNER });
+            });
+            const words = ["alpha", "beta", "gamma", ...Array.from({ length: 14 }, (_, index) => `word${String(index)}`)];
+
+            expect(words).toHaveLength(17);
+            // The 17th word is cut, so the search runs, and the prompt has none of the extra words: nothing matches.
+            expect(await search(harness, words.join(" "))).toEqual([]);
+            const prefixed = await search(harness, "alpha beta gam");
+
+            expect(prefixed.map((prompt) => prompt.messageId)).toEqual([shown]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a query far past the search's length before reading anything", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await expect(search(harness, "a".repeat(10_001))).rejects.toThrow();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("lists and searches only what was typed, never an attached document's text", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const shown = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Report", userId: OWNER });
+                const content = [documentTextPart("report.pdf", "quarterly revenue table"), { text: "summarise this report", type: "text" }];
+
+                return insertMessage(context, {
+                    content,
+                    createdAt: 1,
+                    order: 0,
+                    role: "user",
+                    text: content.map((part) => part.text).join(" "),
+                    threadId: thread,
+                    userId: OWNER,
+                });
+            });
+
+            expect(await search(harness, "revenue")).toEqual([]);
+
+            const prompts = await search(harness, "summarise");
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([shown]);
+            expect(prompts[0]?.text).toBe("summarise this report");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("lists a prompt copied into a branch once, and keeps a not-typed prompt's mark", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const original = await insertThread(context, { title: "Original", userId: OWNER });
+                const branch = await insertThread(context, { title: "Branch", userId: OWNER });
+
+                for (const threadId of [original, branch]) {
+                    await insertMessage(context, { createdAt: 5, order: 0, role: "user", text: "deploy it now", threadId, userId: OWNER });
+                }
+
+                await insertMessage(context, {
+                    content: [{ providerOptions: { neore: { notTyped: { draft: "suggestion" } } }, text: "deploy a preview", type: "text" }],
+                    createdAt: 9,
+                    order: 1,
+                    role: "user",
+                    text: "deploy a preview",
+                    threadId: original,
+                    userId: OWNER,
+                });
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts.map((prompt) => prompt.text)).toEqual(["deploy a preview", "deploy it now"]);
+            expect(prompts.map((prompt) => prompt.draftFrom)).toEqual(["suggestion", undefined]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("orders a prompt saved without a send time by when it was stored, not as the oldest", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Times", userId: OWNER });
+                const timed = await insertMessage(context, { createdAt: 1, order: 0, role: "user", text: "deploy first", threadId: thread, userId: OWNER });
+                const untimed = await insertMessage(context, {
+                    createdAt: undefined,
+                    order: 1,
+                    role: "user",
+                    text: "deploy second",
+                    threadId: thread,
+                    userId: OWNER,
+                });
+
+                return { timed, untimed };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.untimed, ids.timed]);
         } finally {
             harness.close();
         }

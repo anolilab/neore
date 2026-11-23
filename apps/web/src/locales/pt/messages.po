@@ -61,19 +61,19 @@ msgstr "\"{0}\" vai começar assim que as dependências forem concluídas"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "\"{badLogin}\" não é um login válido. Um login começa com uma letra ou um dígito, tem no máximo {0} caracteres e usa apenas letras, dígitos e hífens ou sublinhados simples."
 
-#: src/features/chat/thread/composer-input.tsx:711
+#: src/features/chat/thread/composer-input.tsx:712
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Não é possível anexar \"{fileName}\": este tipo de arquivo não é compatível."
 
-#: src/features/chat/thread/composer-input.tsx:704
+#: src/features/chat/thread/composer-input.tsx:705
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "Não foi possível anexar \"{fileName}\": o conteúdo não corresponde ao tipo de arquivo."
 
-#: src/features/chat/thread/composer-input.tsx:1232
+#: src/features/chat/thread/composer-input.tsx:1233
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "Não foi possível enviar \"{fileName}\", então a mensagem não foi enviada."
 
-#: src/features/chat/thread/composer-input.tsx:706
+#: src/features/chat/thread/composer-input.tsx:707
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Não foi possível enviar \"{fileName}\". Verifique sua conexão e tente novamente."
 
@@ -81,11 +81,11 @@ msgstr "Não foi possível enviar \"{fileName}\". Verifique sua conexão e tente
 #~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
 #~ msgstr "Não foi possível enviar \"{fileName}\". Remova-o para enviar."
 
-#: src/features/chat/thread/composer-input.tsx:709
+#: src/features/chat/thread/composer-input.tsx:710
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" é grande demais. Os documentos podem ter no máximo {maxMegabytes} MB."
 
-#: src/features/chat/thread/composer-input.tsx:710
+#: src/features/chat/thread/composer-input.tsx:711
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "\"{fileName}\" é grande demais. Arquivos deste tipo podem ter no máximo {maxMegabytes} MB."
 
@@ -376,7 +376,7 @@ msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, one {# comentário pendente} other {# comentários pendentes}}"
 
 #. placeholder {0}: prompts.length
-#: src/features/chat/thread/composer-prompt-search.tsx:193
+#: src/features/chat/thread/composer-prompt-search.tsx:197
 msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, one {# prompt encontrado} other {# prompts encontrados}}"
 
@@ -8474,8 +8474,8 @@ msgstr "Conversas e comentários pendentes em arquivos que esta lista não mostr
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversas em linhas que este diff não mostra mais"
 
-#: src/features/chat/thread/composer-input.tsx:895
-#: src/features/chat/thread/composer-input.tsx:1879
+#: src/features/chat/thread/composer-input.tsx:896
+#: src/features/chat/thread/composer-input.tsx:1880
 msgid "Conversion failed"
 msgstr "Falha na conversão"
 
@@ -8805,7 +8805,7 @@ msgstr "Não foi possível anexar {0}. Os outros arquivos foram anexados; tente 
 msgid "Could not attach {0}. Try those again."
 msgstr "Não foi possível anexar {0}. Tente novamente."
 
-#: src/features/chat/thread/composer-input.tsx:1909
+#: src/features/chat/thread/composer-input.tsx:1910
 msgid "Could not attach the chat"
 msgstr "Não foi possível anexar a conversa"
 
@@ -9117,11 +9117,11 @@ msgstr "Não foi possível acessar o servidor para iniciar a geração. Verifiqu
 msgid "Could not reach the server. Try again."
 msgstr "Não foi possível acessar o servidor. Tente novamente."
 
-#: src/features/chat/thread/composer-input.tsx:1912
+#: src/features/chat/thread/composer-input.tsx:1913
 msgid "Could not read that chat"
 msgstr "Não foi possível ler essa conversa"
 
-#: src/features/chat/thread/composer-input.tsx:1913
+#: src/features/chat/thread/composer-input.tsx:1914
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Não foi possível ler essa conversa. Se estiver bloqueada, desbloqueie-a primeiro."
 
@@ -11646,7 +11646,7 @@ msgstr "Solte um arquivo ou clique para enviar"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2108
+#: src/features/chat/thread/composer-input.tsx:2109
 msgid "Drop files here"
 msgstr "Solte os arquivos aqui"
 
@@ -12691,7 +12691,7 @@ msgstr "Digite o slug da organização"
 msgid "Enter pull requests as owner/name#123."
 msgstr "Digite os pull requests como owner/name#123."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:215
+#: src/features/chat/thread/composer-prompt-search.tsx:219
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "Enter coloca o prompt no compositor. Ele não é enviado."
 
@@ -13694,7 +13694,7 @@ msgid "Failed to attach collection"
 msgstr "Falha ao anexar a coleção"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1692
+#: src/features/chat/thread/composer-input.tsx:1693
 msgid "Failed to attach file"
 msgstr "Falha ao anexar o arquivo"
 
@@ -14104,7 +14104,7 @@ msgstr "Falha ao solicitar a exportação"
 msgid "Failed to reset to defaults"
 msgstr "Falha ao redefinir para o padrão"
 
-#: src/features/chat/thread/composer-input.tsx:1724
+#: src/features/chat/thread/composer-input.tsx:1725
 msgid "Failed to restore attachment"
 msgstr "Falha ao restaurar o anexo"
 
@@ -20220,7 +20220,7 @@ msgstr "Texto longo detectado"
 msgid "Long text generation in images"
 msgstr "Geração de textos longos em imagens"
 
-#: src/features/chat/thread/composer-input.tsx:971
+#: src/features/chat/thread/composer-input.tsx:972
 msgid "Long text was attached as a file."
 msgstr "O texto longo foi anexado como arquivo."
 
@@ -20662,7 +20662,7 @@ msgstr "Corresponder ao layout e à estrutura"
 msgid "Matching messages"
 msgstr "Mensagens correspondentes"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:238
+#: src/features/chat/thread/composer-prompt-search.tsx:243
 msgid "Matching prompts"
 msgstr "Prompts correspondentes"
 
@@ -23261,7 +23261,7 @@ msgstr "Nenhum resultado encontrado."
 msgid "No runs yet. Start one to score every case."
 msgstr "Nenhuma execução ainda. Inicie uma para pontuar todos os casos."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:191
+#: src/features/chat/thread/composer-prompt-search.tsx:193
 msgid "No sent prompts match \"{searched}\"."
 msgstr "Nenhum prompt enviado corresponde a \"{searched}\"."
 
@@ -24132,7 +24132,7 @@ msgstr "Só quem pode escrever neste chat pode assumir o controle do navegador."
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "Apenas as {0} conversas carregadas aqui são filtradas por estado; as mais antigas não são incluídas."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:200
+#: src/features/chat/thread/composer-prompt-search.tsx:204
 msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
 msgstr "Só as melhores correspondências são pesquisadas, então um prompt mais antigo ou mais recente pode não aparecer. Acrescente uma palavra para restringir a pesquisa."
 
@@ -29892,7 +29892,7 @@ msgstr "Pontuação"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Pontua cada resposta de 0 a 100% em relação à resposta esperada ou à rubrica. Adiciona uma pequena chamada de modelo por caso."
 
-#: src/features/chat/thread/composer-input.tsx:1651
+#: src/features/chat/thread/composer-input.tsx:1652
 msgid "Screen capture failed. Please try again."
 msgstr "A captura de tela falhou. Tente novamente."
 
@@ -30094,9 +30094,9 @@ msgstr "Resultados da pesquisa"
 msgid "Search Results ({0})"
 msgstr "Resultados da pesquisa ({0})"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:214
 #: src/features/chat/thread/composer-prompt-search.tsx:218
-#: src/features/chat/thread/composer-prompt-search.tsx:233
+#: src/features/chat/thread/composer-prompt-search.tsx:222
+#: src/features/chat/thread/composer-prompt-search.tsx:238
 msgid "Search sent prompts"
 msgstr "Pesquisar prompts enviados"
 
@@ -30204,7 +30204,7 @@ msgstr "Pesquisar..."
 msgid "Searched the latest messages only"
 msgstr "Pesquisou apenas as mensagens mais recentes"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:189
+#: src/features/chat/thread/composer-prompt-search.tsx:191
 msgid "Searching"
 msgstr "Pesquisando"
 
@@ -34214,7 +34214,7 @@ msgstr "Essa senha não está correta."
 msgid "That path is a file."
 msgstr "Esse caminho é um arquivo."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:182
+#: src/features/chat/thread/composer-prompt-search.tsx:184
 msgid "That prompt is no longer available. Pick another."
 msgstr "Esse prompt não está mais disponível. Escolha outro."
 
@@ -34485,7 +34485,7 @@ msgstr "a alteração foi recusada"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "O agente de chat executa a tarefa com suas ferramentas, seguindo opcionalmente uma habilidade."
 
-#: src/features/chat/thread/composer-input.tsx:1071
+#: src/features/chat/thread/composer-input.tsx:1072
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "O chat mudou antes de a colagem ficar pronta, por isso não foi inserida."
 
@@ -34521,8 +34521,8 @@ msgstr "A linha de comando não foi conectada. Você pode fechar esta aba."
 msgid "The comparison could not be loaded."
 msgstr "Não foi possível carregar a comparação."
 
-#: src/features/chat/thread/composer-input.tsx:1079
-#: src/features/chat/thread/composer-input.tsx:1101
+#: src/features/chat/thread/composer-input.tsx:1080
+#: src/features/chat/thread/composer-input.tsx:1102
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "O editor foi bloqueado antes de a colagem ficar pronta, por isso não foi inserida."
 
@@ -34904,7 +34904,7 @@ msgstr "O modelo do link não está disponível. O chat mantém o modelo dele."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "O seletor de modelos agora lista {0} modelos de {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1586
+#: src/features/chat/thread/composer-input.tsx:1587
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "A seleção de modelos mudou durante os uploads, então a mensagem não foi enviada. Pressione Enviar para enviá-la."
 
@@ -34981,7 +34981,7 @@ msgstr "A página que você abriu ainda está carregando."
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "A página, todas as subpáginas, os comentários e o histórico de versões serão excluídos. Isso não pode ser desfeito."
 
-#: src/features/chat/thread/composer-input.tsx:1127
+#: src/features/chat/thread/composer-input.tsx:1128
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Não foi possível anexar o texto colado e ele não foi inserido."
 
@@ -35010,7 +35010,7 @@ msgstr "Não foi possível carregar os repositórios do projeto, por isso a impo
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "O prompt vira a entrada do caso e esta resposta vira a resposta esperada. Edite qualquer um antes de salvar."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:184
+#: src/features/chat/thread/composer-prompt-search.tsx:186
 msgid "The prompt could not be checked. Try again."
 msgstr "Não foi possível verificar o prompt. Tente novamente."
 
@@ -35128,7 +35128,7 @@ msgstr "A execução vai para onde você escolheu: um novo chat a cada vez, o me
 msgid "The screenshot could not be saved."
 msgstr "Não foi possível salvar a captura de tela."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:187
+#: src/features/chat/thread/composer-prompt-search.tsx:189
 msgid "The search failed. Try again."
 msgstr "A pesquisa falhou. Tente novamente."
 
@@ -35205,11 +35205,11 @@ msgstr "As duas senhas não coincidem."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "O gateway unificado de LLMs para aplicações modernas de IA."
 
-#: src/features/chat/thread/composer-input.tsx:705
+#: src/features/chat/thread/composer-input.tsx:706
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "O envio de \"{fileName}\" expirou. Anexe o arquivo novamente."
 
-#: src/features/chat/thread/composer-input.tsx:1599
+#: src/features/chat/thread/composer-input.tsx:1600
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "Os uploads terminaram, mas a mensagem não foi enviada. Pressione Enviar para enviá-la."
 
@@ -37114,7 +37114,7 @@ msgstr "Digite novamente"
 msgid "Type to search"
 msgstr "Digite para pesquisar"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:179
+#: src/features/chat/thread/composer-prompt-search.tsx:181
 msgid "Type to search the prompts you have sent."
 msgstr "Digite para pesquisar nos prompts enviados."
 
@@ -37124,7 +37124,7 @@ msgid "Type your answer…"
 msgstr "Digite sua resposta…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2098
+#: src/features/chat/thread/composer-input.tsx:2099
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:231
 msgid "Type your message..."
 msgstr "Digite sua mensagem..."
@@ -37294,7 +37294,7 @@ msgstr "Sublinhado"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:973
+#: src/features/chat/thread/composer-input.tsx:974
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Desfazer"
@@ -37546,7 +37546,7 @@ msgstr "Documentação atualizada de qualquer biblioteca ou framework"
 msgid "Update Duration"
 msgstr "Atualizar duração"
 
-#: src/features/chat/thread/composer-input.tsx:1948
+#: src/features/chat/thread/composer-input.tsx:1949
 msgid "Update failed"
 msgstr "Falha na atualização"
 
@@ -37745,13 +37745,13 @@ msgid "Upload documents to your knowledge base and group them into collections. 
 msgstr "Envie documentos para sua base de conhecimento e agrupe-os em coleções. A IA pesquisa neles o contexto relevante e cita os trechos que usou."
 
 #: src/features/chat/thread/composer-input.tsx:436
-#: src/features/chat/thread/composer-input.tsx:750
-#: src/features/chat/thread/composer-input.tsx:1854
+#: src/features/chat/thread/composer-input.tsx:751
+#: src/features/chat/thread/composer-input.tsx:1855
 msgid "Upload failed"
 msgstr "Falha no envio"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1847
+#: src/features/chat/thread/composer-input.tsx:1848
 msgid "Upload failed: {0}"
 msgstr "Falha no envio: {0}"
 
@@ -39863,8 +39863,8 @@ msgstr "Você está offline. O Neore vai reconectar quando a rede voltar."
 msgid "You are offline. Reconnect and try again."
 msgstr "Você está offline. Reconecte-se e tente novamente."
 
-#: src/features/chat/thread/composer-input.tsx:1186
-#: src/features/chat/thread/composer-input.tsx:1311
+#: src/features/chat/thread/composer-input.tsx:1187
+#: src/features/chat/thread/composer-input.tsx:1312
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Você está offline. Sua mensagem fica aqui; envie-a quando voltar a ficar online."
@@ -40253,12 +40253,12 @@ msgid "Your GitHub sign-in has expired. Connect GitHub again in Settings → Con
 msgstr "Seu login no GitHub expirou. Conecte o GitHub novamente em Configurações → Conectores."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:815
+#: src/features/chat/thread/composer-input.tsx:816
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Sua entrada é grande (~{0} tokens) e vai ocupar uma parte significativa da janela de contexto do modelo."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:808
+#: src/features/chat/thread/composer-input.tsx:809
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Sua entrada é grande demais (~{0} tokens) e excede a janela de contexto do modelo. Reduza o tamanho da mensagem ou remova anexos para enviar."
 
@@ -40291,7 +40291,7 @@ msgstr "Sua localização (ex.: \"São Paulo, Brasil\", \"Berlim, Alemanha\")."
 msgid "Your message"
 msgstr "Sua mensagem"
 
-#: src/features/chat/thread/composer-input.tsx:1571
+#: src/features/chat/thread/composer-input.tsx:1572
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Sua mensagem mudou durante os uploads, então não foi enviada. Pressione Enviar para enviá-la."
 
