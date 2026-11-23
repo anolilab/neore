@@ -321,3 +321,15 @@ export const addRunArgsSystemContext = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A person's organization-project runner defaults (`userSettings.projectRunnerDefaults`, `acp/lib/project-runner.ts`)
+ * gained an optional `threadAt`, the start time of the thread an entry came from. Nothing to fill: an entry without it is
+ * read as older than any thread and any move. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addProjectRunnerThreadAt = defineMigration({
+    id: "add-project-runner-thread-at",
+    table: "userSettings",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

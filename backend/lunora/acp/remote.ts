@@ -252,7 +252,8 @@ export const getProjectRunnerDefault = authQuery
     .output(v.union(v.object({ agentKey: v.string(), deviceId: v.string(), folderId: v.string() }), v.null()))
     .query(async ({ args, ctx }) => {
         const { userId } = ctx.user;
-        const project = await readableProject(ctx, args.projectId, userId);
+        // From the primary: a membership revoked a moment ago must not hand back the saved runner from a lagging replica.
+        const project = await readableProject(ctx, args.projectId, userId, { primary: true });
 
         if (!project) {
             return null;
@@ -261,7 +262,8 @@ export const getProjectRunnerDefault = authQuery
         const settings = project.organizationId ? await ctx.db.userSettings.findFirst({ where: { userId } }) : null;
         const runner = projectRunnerOf(project, settings);
         const deviceId = runner ? ctx.db.normalizeId("devices", runner.deviceId) : null;
-        const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId } }) : null;
+        // From the primary too, as the start reads it: an unpaired computer or a narrowed project scope must not be preselected.
+        const device = deviceId ? await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: deviceId, userId } }) : null;
 
         return runner && runnerStillOffered(device, runner, project._id) ? runner : null;
     });

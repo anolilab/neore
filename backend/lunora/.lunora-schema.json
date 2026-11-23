@@ -11,6 +11,7 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-project-runner-thread-at",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",

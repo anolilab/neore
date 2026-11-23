@@ -6,6 +6,7 @@
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { setProjectRunnerDefault } from "../../agent/table-writes";
+import { getMemberByOrganizationAndUser } from "../../auth/lib/better-auth-queries";
 import { saveUserSettings } from "../../auth/lib/preference-writes";
 import { isDeviceInScope } from "../../devices/lib/scope";
 import { offerOf } from "./start";
@@ -56,17 +57,46 @@ export const runnerStillOffered = (device: Doc<"devices"> | null, runner: Projec
  */
 const ENTRIES_CHECKED_AT_CAP = 8;
 
+/** Whether a stored entry would still be returned for `project`: it is an organization project, and the entry is from after its last move. */
+const entryApplies = (project: Pick<Doc<"projects">, "organizationChangedAt" | "organizationId">, threadAt: number | undefined): boolean =>
+    Boolean(project.organizationId) && (threadAt ?? -Infinity) >= (project.organizationChangedAt ?? -Infinity);
+
 /**
- * The entries with the ones that go to make room for one more: of the oldest few, those whose project was deleted, so they
- * never push out a default that still applies; the oldest one when all of those still exist.
+ * The entries with the ones that go to make room for one more: of the oldest few, those that can never be used again (the
+ * project was deleted, left its organization or moved after the entry's thread started, the person is no longer its owner or
+ * a member of its organization, or the computer is gone or no longer theirs), so they never push out a default that still
+ * applies; the oldest one when all of those still can be.
  */
-const entriesWithRoom = async <T>(ctx: MutationCtx, entries: [string, T][]): Promise<[string, T][]> => {
+const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [string, StoredRunner][]): Promise<[string, StoredRunner][]> => {
     const oldest = entries.slice(0, ENTRIES_CHECKED_AT_CAP);
-    const ids = oldest.map(([key]) => ctx.db.normalizeId("projects", key)).filter((id) => id !== null);
+    const projectIds = oldest.map(([key]) => ctx.db.normalizeId("projects", key)).filter((id) => id !== null);
+    const deviceIds = oldest.map(([, runner]) => ctx.db.normalizeId("devices", runner.deviceId)).filter((id) => id !== null);
     // `ctx.db` sees every row here: this runs only inside the internal ingest mutation (`acp/ingest.ts`), which has no RLS scope.
-    const { page } = ids.length > 0 ? await ctx.db.projects.findMany({ where: { _id: { in: ids } } }) : { page: [] };
-    const live = new Set<string>(page.map((row) => row._id));
-    const gone = new Set(oldest.filter(([key]) => !live.has(key)).map(([key]) => key));
+    const { page: projects } = projectIds.length > 0 ? await ctx.db.projects.findMany({ where: { _id: { in: projectIds } } }) : { page: [] };
+    const { page: devices } = deviceIds.length > 0 ? await ctx.db.devices.findMany({ where: { _id: { in: deviceIds }, userId } }) : { page: [] };
+    const projectOf = new Map(projects.map((row) => [row._id as string, row]));
+    const ownDevices = new Set<string>(devices.map((row) => row._id));
+    const organizations = [...new Set(projects.flatMap((row) => (row.userId !== userId && row.organizationId ? [row.organizationId] : [])))];
+    const memberOf = new Set<string>();
+
+    for (const organizationId of organizations) {
+        // From the primary: a membership revoked a moment ago leaves an entry that can no longer be read.
+        if ((await getMemberByOrganizationAndUser(ctx, organizationId, userId, "primary")) !== null) {
+            memberOf.add(organizationId);
+        }
+    }
+
+    const usable = ([key, runner]: [string, StoredRunner]): boolean => {
+        const project = projectOf.get(key);
+
+        return (
+            project !== undefined &&
+            entryApplies(project, runner.threadAt) &&
+            (project.userId === userId || memberOf.has(project.organizationId ?? "")) &&
+            ownDevices.has(runner.deviceId)
+        );
+    };
+    const gone = new Set(oldest.filter((entry) => !usable(entry)).map(([key]) => key));
 
     return gone.size > 0 ? entries.filter(([key]) => !gone.has(key)) : entries.slice(1);
 };
@@ -122,6 +152,12 @@ export const rememberProjectRunner = async (
         return;
     }
 
+    // A thread started before the project's last move records nothing: `projectRunnerOf` would never return the entry, and at the
+    // cap it would push out one that still applies.
+    if (!entryApplies(project, threadAt)) {
+        return;
+    }
+
     const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
     const current: StoredRunner | undefined = settings?.projectRunnerDefaults?.[project._id];
 
@@ -131,7 +167,7 @@ export const rememberProjectRunner = async (
 
     // Re-recording a project moves it to the end, so the entries at the front are the ones used longest ago.
     const others = Object.entries(settings?.projectRunnerDefaults ?? {}).filter(([key]) => key !== project._id);
-    const roomy = others.length < MAX_PROJECT_RUNNER_DEFAULTS ? others : await entriesWithRoom(ctx, others);
+    const roomy = others.length < MAX_PROJECT_RUNNER_DEFAULTS ? others : await entriesWithRoom(ctx, userId, others);
     const kept = roomy.slice(-(MAX_PROJECT_RUNNER_DEFAULTS - 1));
 
     await saveUserSettings(ctx.db, settings, userId, { projectRunnerDefaults: { ...Object.fromEntries(kept), [project._id]: { ...runner, threadAt } } }, null);

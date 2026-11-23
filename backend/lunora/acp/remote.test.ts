@@ -34,8 +34,9 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 // A read replica that still holds a project row the primary has changed: a project read that does not ask for the primary
 // gets `replica.project` while it is set, the way a lagging replica answers just after the project moved organization.
+// `replica.readable` is a project a replica still admits the caller to, the way it answers just after their membership was revoked.
 const { replica } = vi.hoisted(() => {
-    return { replica: {} as { project?: Record<string, unknown> } };
+    return { replica: {} as { project?: Record<string, unknown>; readable?: Record<string, unknown> } };
 });
 
 vi.mock("../projects/functions", async (importOriginal) => {
@@ -43,6 +44,8 @@ vi.mock("../projects/functions", async (importOriginal) => {
 
     return {
         ...original,
+        readableProject: async (...args: Parameters<typeof original.readableProject>) =>
+            args[3]?.primary !== true && replica.readable?._id === args[1] ? (replica.readable as never) : await original.readableProject(...args),
         writableProject: async (...args: Parameters<typeof original.writableProject>) =>
             args[3]?.primary !== true && replica.project?._id === args[1] ? (replica.project as never) : await original.writableProject(...args),
     };
@@ -278,6 +281,7 @@ beforeEach(async () => {
     ownerId = await insertUser();
     activeOrganization.current = null;
     delete replica.project;
+    delete replica.readable;
 });
 
 afterEach(() => {
@@ -974,6 +978,118 @@ describe("a project remembers its runner", () => {
         await startOpened(await insertProject({ organizationId: "org-a", userId: ownerId }), device, "tap-new");
 
         expect(await defaultOf(live)).toEqual(runner);
+    });
+
+    it("hands no default to a member whose membership was revoked, though a replica still admits them", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        const creator = await insertUser();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: creator });
+
+        const project = (await projectRow(projectId)) as never;
+
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(ctx, project, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, Date.now()),
+        );
+
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        const [membership] = await rows("member", { userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.delete("member", membership?._id as never));
+        replica.readable = (await projectRow(projectId)) as Record<string, unknown>;
+
+        expect(await defaultOf(projectId)).toBeNull();
+    });
+
+    it("records nothing for a thread started before the project's last move", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationChangedAt: 2000, organizationId: "org-a", userId: ownerId });
+        const project = (await projectRow(projectId)) as never;
+
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(ctx, project, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, 1000),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+
+        expect((settings?.projectRunnerDefaults as Record<string, unknown> | undefined)?.[projectId]).toBeUndefined();
+    });
+
+    it("drops defaults that can never be used again before it pushes out a live one at the cap", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const otherDevice = await pairedDevice(await insertUser());
+        const creator = await insertUser();
+        const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
+        const live = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        await startOpened(live, device, "tap-u0");
+
+        // Right after the live entry, one of each kind that can never be returned again: a project moved out of the organization,
+        // one moved after its thread started, one of an organization the person is not in, and one on a computer that is not
+        // theirs. Then live projects up to the cap, so the live entry is the oldest and every checked project still exists.
+        const unusable = await run(async (ctx) => {
+            const insert = async (fields: Record<string, unknown>) =>
+                (await ctx.db.insert("projects", { createdAt: 0, title: "Unusable", userId: ownerId, ...fields })) as string;
+
+            return [
+                [await insert({ organizationId: "" }), runner],
+                [await insert({ organizationChangedAt: 2000, organizationId: "org-a" }), { ...runner, threadAt: 1000 }],
+                [await insert({ organizationId: "org-b", userId: creator }), runner],
+                [await insert({ organizationId: "org-a" }), { ...runner, deviceId: otherDevice.deviceId }],
+            ] as [string, Record<string, unknown>][];
+        });
+
+        await run(async (ctx) => {
+            const others: [string, unknown][] = [];
+
+            for (let index = 0; index < 199 - unusable.length; index += 1) {
+                others.push([(await ctx.db.insert("projects", { createdAt: 0, organizationId: "org-a", title: "Live", userId: ownerId })) as string, runner]);
+            }
+
+            const settings = await ctx.db.userSettings.findFirst({ where: { userId: ownerId } });
+
+            await ctx.db.patch(
+                "userSettings",
+                settings?._id as never,
+                { projectRunnerDefaults: { ...settings?.projectRunnerDefaults, ...Object.fromEntries([...unusable, ...others]) } } as never,
+            );
+        });
+
+        await startOpened(await insertProject({ organizationId: "org-a", userId: ownerId }), device, "tap-u1");
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+        const stored = settings?.projectRunnerDefaults as Record<string, unknown>;
+
+        expect(await defaultOf(live)).toEqual(runner);
+        expect(unusable.filter(([key]) => stored[key] !== undefined)).toEqual([]);
+        expect(Object.keys(stored)).toHaveLength(200 - unusable.length + 1);
     });
 
     it("looks up only the oldest few defaults at the cap, and drops the oldest when their projects all exist", async () => {
