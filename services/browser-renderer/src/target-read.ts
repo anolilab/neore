@@ -76,6 +76,10 @@ export function readTarget(
             const scope = control.matches(actionableSelector) ? control : (nodes[1] ?? control);
             const names: string[] = [];
 
+            // The label-reference budget (every reference of this read, in total) and whether it ran out.
+            let referenceBudget = 2000;
+            let isReferenceCapped = false;
+
             // The elements between the control and the scope (a span with an aria-label around an icon inside a button): their names
             // count, so an icon named that way does not read as unnamed. Their text does not, as the scope's is what the click reads.
             const between: Element[] = [];
@@ -102,22 +106,24 @@ export function readTarget(
                     const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
 
                     if (target !== null) {
-                        // The referenced element's own name (an image's alt, its aria-label or title), its text, and the names inside it.
-                        names.push(
-                            target.getAttribute("alt") ?? "",
-                            target.getAttribute("aria-label") ?? "",
-                            target.getAttribute("title") ?? "",
-                            target.textContent ?? "",
-                        );
-
-                        // A bounded walk (the scan's cap): a page cannot make a label reference traverse an unbounded subtree.
+                        // The referenced element's own name (an image's alt, its aria-label or title), then its text and the names inside it.
+                        // One budget covers every reference of this read: past it the read is capped (the gate asks), and no more text is read.
+                        names.push(target.getAttribute("alt") ?? "", target.getAttribute("aria-label") ?? "", target.getAttribute("title") ?? "");
                         const innerWalk = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
                         const inners: Element[] = [];
 
-                        for (let visited = 0, walked = innerWalk.nextNode(); walked !== null && visited < 2000; walked = innerWalk.nextNode(), visited++) {
-                            if ((walked as Element).matches("img[alt], [aria-label], [title]")) {
+                        for (let walked = innerWalk.nextNode(); walked !== null && !isReferenceCapped; walked = innerWalk.nextNode()) {
+                            referenceBudget--;
+
+                            if (referenceBudget < 0) {
+                                isReferenceCapped = true;
+                            } else if ((walked as Element).matches("img[alt], [aria-label], [title]")) {
                                 inners.push(walked as Element);
                             }
+                        }
+
+                        if (!isReferenceCapped) {
+                            names.push(target.textContent ?? "");
                         }
 
                         for (const inner of inners) {
@@ -211,22 +217,24 @@ export function readTarget(
                     const target = (node.getRootNode() as Document).querySelector(`#${CSS.escape(id)}`);
 
                     if (target !== null) {
-                        // The referenced element's own name (an image's alt, its aria-label or title), its text, and the names inside it.
-                        names.push(
-                            target.getAttribute("alt") ?? "",
-                            target.getAttribute("aria-label") ?? "",
-                            target.getAttribute("title") ?? "",
-                            target.textContent ?? "",
-                        );
-
-                        // A bounded walk (the scan's cap): a page cannot make a label reference traverse an unbounded subtree.
+                        // The referenced element's own name (an image's alt, its aria-label or title), then its text and the names inside it.
+                        // One budget covers every reference of this read: past it the read is capped (the gate asks), and no more text is read.
+                        names.push(target.getAttribute("alt") ?? "", target.getAttribute("aria-label") ?? "", target.getAttribute("title") ?? "");
                         const innerWalk = document.createTreeWalker(target, NodeFilter.SHOW_ELEMENT);
                         const inners: Element[] = [];
 
-                        for (let visited = 0, walked = innerWalk.nextNode(); walked !== null && visited < 2000; walked = innerWalk.nextNode(), visited++) {
-                            if ((walked as Element).matches("img[alt], [aria-label], [title]")) {
+                        for (let walked = innerWalk.nextNode(); walked !== null && !isReferenceCapped; walked = innerWalk.nextNode()) {
+                            referenceBudget--;
+
+                            if (referenceBudget < 0) {
+                                isReferenceCapped = true;
+                            } else if ((walked as Element).matches("img[alt], [aria-label], [title]")) {
                                 inners.push(walked as Element);
                             }
+                        }
+
+                        if (!isReferenceCapped) {
+                            names.push(target.textContent ?? "");
                         }
 
                         for (const inner of inners) {
@@ -409,9 +417,16 @@ export function readTarget(
             const isCheckout = isCardFields || isCheckoutPage;
             // The submit-like flag is part of it too: a name change that makes a control submit-like (an arrow named "Review" with a
             // title "Confirm") invalidates an earlier approval, as the checkout flag does.
-            const canonical = [document.URL, steps.join(">"), joined, shown, destinations, String(isCheckout), String(isSubmitLike), String(isScanCapped)].join(
-                "\u{0}",
-            );
+            const canonical = [
+                document.URL,
+                steps.join(">"),
+                joined,
+                shown,
+                destinations,
+                String(isCheckout),
+                String(isSubmitLike),
+                String(isScanCapped || isReferenceCapped),
+            ].join("\u{0}");
 
             // SHA-256 of the canonical string, computed here, in the page, with no `await`: a digest the page could only await would
             // leave a gap in which the page changes the element between the check and the click (`clicked` below).
@@ -480,7 +495,7 @@ export function readTarget(
                 destinations,
                 destinationsOf,
                 label,
-                labelTruncated: joined.length > options.max || isScanCapped,
+                labelTruncated: joined.length > options.max || isScanCapped || isReferenceCapped,
                 shown,
                 submitLike: isSubmitLike,
                 target,
