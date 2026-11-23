@@ -1412,6 +1412,32 @@ describe("a project remembers its runner", () => {
         expect(await rows("acpSessions")).toHaveLength(1);
     });
 
+    it("refuses a retry naming a project for a start claimed before claims recorded their project", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const first = (await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId: "tap-p6", deviceId: device.deviceId, folderId: "f1" } as never,
+        )) as { threadId: string };
+
+        // A claim from before the project was recorded on it carries no result.
+        const [startClaim] = await rows("idempotencyClaims", { scope: "host-start" });
+        const { _id, claimedAt, expiresAt, key, scope, userId } = startClaim as Row;
+
+        await run(async (ctx) => {
+            await ctx.db.delete("idempotencyClaims", _id as never);
+            await ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, scope, userId });
+        });
+
+        await expect(startIn(projectId, device, "tap-p6")).rejects.toThrow(ANOTHER_PROJECT);
+        expect(
+            await as(ownerId).mutation(
+                remote.startHostSession as never,
+                { agentKey: "claude", clientId: "tap-p6", deviceId: device.deviceId, folderId: "f1" } as never,
+            ),
+        ).toEqual({ started: false, threadId: first.threadId });
+    });
+
     it("answers a lost-answer retry with the thread even after that thread was moved to another project", async () => {
         const device = await pairedDevice(ownerId);
         const projectId = await insertProject({ userId: ownerId });

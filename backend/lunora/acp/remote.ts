@@ -124,11 +124,12 @@ const answerRetry = async (
     projectId: string,
 ): Promise<{ started: boolean; threadId?: string }> => {
     const first = await ctx.db.acpSessions.findFirst({ where: { deviceId, hostSessionId } });
-    // The project the first try was for, as its claim recorded it. A claim from before that was recorded has none, and is not refused on it.
+    // The project the first try was for, as its claim recorded it. A claim from before that was recorded has none: those starts
+    // took no project, so a retry naming one is not the same start.
     const claim = await claimRow(ctx, "host-start", startKey);
-    const requested = claim?.result;
+    const requested = claim?.result ?? "";
 
-    if (first && requested !== undefined && requested !== projectId) {
+    if (first && requested !== projectId) {
         throw new LunoraError("BAD_REQUEST", "That start was made for another project. Start it again from the project it was made in.");
     }
 
