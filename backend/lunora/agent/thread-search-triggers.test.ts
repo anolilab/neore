@@ -45,7 +45,7 @@ describe("threadSearchTriggers", () => {
         warn.mockRestore();
     });
 
-    it("schedules an insert's sync with the retry policy", async () => {
+    it("schedules an insert's sync with the retry policy, on the owner's shard", async () => {
         const scheduler = { runAfter: vi.fn(async () => "job") };
 
         await triggers.threadSearchInsert({ scheduler }, { doc: { title: "Hello", userId: "u1" }, id: "t1" });
@@ -54,7 +54,7 @@ describe("threadSearchTriggers", () => {
             0,
             internal.agent.thread_search.syncThreadSearch,
             { changed: ["title"], threadId: "t1" },
-            { retry: SYNC_RETRY },
+            { retry: SYNC_RETRY, shardKey: "u1" },
         );
     });
 });

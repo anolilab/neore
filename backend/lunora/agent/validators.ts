@@ -762,6 +762,8 @@ export const vThreadDocFields = {
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),
     titleVectorId: v.optional(v.string()),
+    // User turns on the thread, kept by the messages triggers. Internal: `publicThread` omits it.
+    userTurnCount: v.optional(v.number()),
     // Written only by `sub-agents/functions.ts#setWorkerPolicy`, which checks the caller owns the thread.
     workerPolicy: v.optional(vWorkerPolicy),
 };

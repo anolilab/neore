@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
     bestMeaningThreadIds,
     claimHolds,
-    countUserTurns,
     decideCommit,
     EMBED_MAX_CHARS,
     embedInput,
@@ -15,10 +14,6 @@ import {
     searchText,
     type SearchRow,
     type SearchState,
-    TURN_SCAN_MAX_PAGES,
-    TURN_SCAN_PAGE_ROWS,
-    type TurnPage,
-    userTurnsEnoughFrom,
     withoutSearchVectors,
 } from "./thread-search-plan";
 
@@ -183,63 +178,6 @@ describe(embedInput, () => {
     });
 });
 
-describe(userTurnsEnoughFrom, () => {
-    /** Pages of rows, each row a user turn (`true`) or not. The cursor is the page index. */
-    const pagesOf =
-        (pages: boolean[][], reads: number[]) =>
-        async (cursor: string | null): Promise<TurnPage> => {
-            const index = cursor === null ? 0 : Number(cursor);
-
-            reads.push(index);
-
-            return {
-                continueCursor: String(index + 1),
-                isDone: index + 1 >= pages.length,
-                rows: (pages[index] ?? []).map((isUser) => {
-                    return { message: { role: isUser ? "user" : "assistant" } };
-                }),
-            };
-        };
-
-    it("finds a fourth user turn that sits past the first page", async () => {
-        const reads: number[] = [];
-        const idleRows: boolean[] = [];
-
-        for (let row = 0; row < TURN_SCAN_PAGE_ROWS; row += 1) {
-            idleRows.push(false);
-        }
-
-        const pages = [idleRows, [true, true, true, true]];
-
-        expect(await userTurnsEnoughFrom(pagesOf(pages, reads))).toBe(true);
-        expect(reads).toEqual([0, 1]);
-    });
-
-    it("stops reading at the page that reaches the gate", async () => {
-        const reads: number[] = [];
-
-        expect(await userTurnsEnoughFrom(pagesOf([[true, true, true, true], [true]], reads))).toBe(true);
-        expect(reads).toEqual([0]);
-    });
-
-    it("answers no when the whole thread has no more than the gate's turns", async () => {
-        const reads: number[] = [];
-
-        expect(await userTurnsEnoughFrom(pagesOf([[true, true], [true]], reads))).toBe(false);
-        expect(reads).toEqual([0, 1]);
-    });
-
-    it("gives up after the page cap, so a huge thread costs a bounded scan", async () => {
-        const reads: number[] = [];
-        const pages = Array.from({ length: TURN_SCAN_MAX_PAGES + 5 }, () => [false]);
-
-        pages[TURN_SCAN_MAX_PAGES + 2] = [true, true, true, true];
-
-        expect(await userTurnsEnoughFrom(pagesOf(pages, reads))).toBe(false);
-        expect(reads).toHaveLength(TURN_SCAN_MAX_PAGES);
-    });
-});
-
 describe(claimHolds, () => {
     const texts = [{ kind: "title" as const, text: "PDF totals" }];
     const claim = { expiresAt: 1000, id: "job-a", texts };
@@ -286,14 +224,6 @@ describe("a refused thread's replies", () => {
 });
 
 describe("user turns", () => {
-    const turn = (role: string) => {
-        return { message: { role } };
-    };
-
-    it("counts only user rows", () => {
-        expect(countUserTurns([turn("user"), turn("assistant"), turn("tool"), turn("user")])).toBe(2);
-    });
-
     it("needs MORE than three user turns: three is not enough, four is", () => {
         expect(hasEnoughTurns(3)).toBe(false);
         expect(hasEnoughTurns(4)).toBe(true);
@@ -347,6 +277,17 @@ describe(bestMeaningThreadIds, () => {
 describe("export and text", () => {
     it("strips the vector ids from a thread document, and leaves the rest", () => {
         const exported = withoutSearchVectors({ _id: "t1", summaryVectorId: "s", title: "Hello", titleVectorId: "t" });
+
+        expect(exported).toEqual({ _id: "t1", title: "Hello" });
+    });
+
+    it("strips the sync's claim and refusal marker, which hold copies of text and timing", () => {
+        const exported = withoutSearchVectors({
+            _id: "t1",
+            searchClaim: { expiresAt: 1, id: "job", texts: [{ kind: "title", text: "Secret title" }] },
+            searchRefusedAt: 5,
+            title: "Hello",
+        });
 
         expect(exported).toEqual({ _id: "t1", title: "Hello" });
     });

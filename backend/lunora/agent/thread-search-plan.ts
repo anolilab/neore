@@ -35,15 +35,6 @@ export const SEARCH_KINDS: ReadonlyArray<SearchKind> = ["title", "summary"];
 
 /** A thread is embedded only once it has MORE than this many user turns (plan section 7, decision 3). */
 export const MIN_TURNS_TO_EMBED = 3;
-/** Message rows read per page when counting a thread's user turns. */
-export const TURN_SCAN_PAGE_ROWS = 400;
-/**
- * Pages read at most when counting a thread's user turns. A thread whose first
- * 20,000 rows hold no more than {@link MIN_TURNS_TO_EMBED} user turns counts as not
- * yet qualifying; the cap keeps a huge, tool-heavy thread from costing a full scan on
- * every reply.
- */
-export const TURN_SCAN_MAX_PAGES = 50;
 
 /** Nearest vectors read per kind for one query. */
 export const MEANING_TOP_K = 50;
@@ -131,46 +122,6 @@ export const isSearchEligible = (row: SearchRow): boolean =>
 
 /** Whether a thread has MORE than {@link MIN_TURNS_TO_EMBED} user turns. */
 export const hasEnoughTurns = (userTurns: number): boolean => userTurns > MIN_TURNS_TO_EMBED;
-
-/** The user turns among a thread's message rows; a row's `message` is the AI SDK message. */
-export const countUserTurns = (rows: ReadonlyArray<{ message?: unknown }>): number =>
-    rows.filter((row) => (row.message as { role?: unknown } | undefined)?.role === "user").length;
-
-/** One page of a thread's message rows, in order. */
-export interface TurnPage {
-    continueCursor: string | null;
-    isDone: boolean;
-    rows: ReadonlyArray<{ message?: unknown }>;
-}
-
-/**
- * Whether a thread has enough user turns. Reads its pages in order and stops at the
- * page that reaches the gate, so a fourth user turn is found wherever it sits in the
- * thread, not only within the first page. `readPage` gets the cursor to continue
- * from, `null` for the first page.
- */
-export const userTurnsEnoughFrom = async (readPage: (cursor: string | null) => Promise<TurnPage>): Promise<boolean> => {
-    let cursor: string | null = null;
-    let userTurns = 0;
-
-    for (let pageNumber = 0; pageNumber < TURN_SCAN_MAX_PAGES; pageNumber += 1) {
-        const page: TurnPage = await readPage(cursor);
-
-        userTurns += countUserTurns(page.rows);
-
-        if (hasEnoughTurns(userTurns)) {
-            return true;
-        }
-
-        if (page.isDone) {
-            return false;
-        }
-
-        cursor = page.continueCursor;
-    }
-
-    return false;
-};
 
 /**
  * How long a refusal holds back the replies' re-sync. The owner's model rules are not
@@ -357,6 +308,11 @@ export const bestMeaningThreadIds = (
         .slice(0, limit);
 };
 
-/** The vector ids are derived data: an export of the thread carries none of them. */
-export const withoutSearchVectors = <T extends object>(thread: T): Omit<T, "summaryVectorId" | "titleVectorId"> =>
-    omit(thread as Record<string, unknown>, ["summaryVectorId", "titleVectorId"]) as Omit<T, "summaryVectorId" | "titleVectorId">;
+/**
+ * The palette sync's own bookkeeping: vector ids, the claim (it holds a copy of the embedded text),
+ * and the refusal marker. A thread's export carries none of them.
+ */
+export const SEARCH_INTERNAL_FIELDS = ["searchClaim", "searchRefusedAt", "summaryVectorId", "titleVectorId", "userTurnCount"] as const;
+
+export const withoutSearchVectors = <T extends object>(thread: T): Omit<T, (typeof SEARCH_INTERNAL_FIELDS)[number]> =>
+    omit(thread as Record<string, unknown>, [...SEARCH_INTERNAL_FIELDS]) as Omit<T, (typeof SEARCH_INTERNAL_FIELDS)[number]>;

@@ -12,7 +12,7 @@ import { type Infer, LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
-import { type ActionCtx, internalAction, internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
+import { type ActionCtx, internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
@@ -25,6 +25,7 @@ import {
     decideCommit,
     type EmbeddedVector,
     embedInput,
+    hasEnoughTurns,
     isSearchEligible,
     MEANING_MIN_CHARS,
     MEANING_MIN_SCORE,
@@ -39,8 +40,6 @@ import {
     SEARCH_VECTOR_FIELD,
     type SearchKind,
     type SearchPlan,
-    TURN_SCAN_PAGE_ROWS,
-    userTurnsEnoughFrom,
 } from "./thread-search-plan";
 import { findVectorRow, type VectorDimension, type VectorTableName } from "./vector/tables";
 import { searchVectors } from "./vector";
@@ -64,17 +63,6 @@ const vSearchState = v.union(
 const nullable = <T>(value: T | undefined): T | null => value ?? null;
 const defined = (value: string | null): string | undefined => value ?? undefined;
 
-/** The turn gate's read: whether the thread has more user turns than the gate needs, reading its messages page by page. */
-const readEnoughTurns = (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<boolean> =>
-    userTurnsEnoughFrom(async (cursor) => {
-        const page = await ctx.db
-            .query("messages")
-            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
-            .paginate({ cursor, numItems: TURN_SCAN_PAGE_ROWS });
-
-        return { continueCursor: page.continueCursor, isDone: page.isDone, rows: page.page };
-    });
-
 export const readThreadSearchState = internalQuery
     .input({ threadId: v.id("threads") })
     .output(vSearchState)
@@ -85,11 +73,10 @@ export const readThreadSearchState = internalQuery
             return null;
         }
 
-        const enoughTurns = await readEnoughTurns(ctx, args.threadId);
-
         return {
             eligible: isSearchEligible(thread),
-            enoughTurns,
+            // The count the messages triggers keep on the thread (`agent/thread-search-triggers.ts`): no message scan.
+            enoughTurns: hasEnoughTurns(thread.userTurnCount ?? 0),
             summary: { text: nullable(thread.summary), vectorId: nullable(thread.summaryVectorId) },
             title: { text: nullable(thread.title), vectorId: nullable(thread.titleVectorId) },
             userId: thread.userId,
@@ -350,8 +337,9 @@ export const commitThreadSearch = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const thread = (await ctx.db.get("threads", args.threadId)) as Doc<"threads"> | null;
-        // A thread that is gone or no longer eligible keeps none of what was embedded for it.
-        const keep = thread && isSearchEligible(thread) ? args.embedded : [];
+        // A thread that is gone, no longer eligible, or below the turn gate keeps none of what was embedded for it. The gate is read
+        // here, in the commit, so a job that finished embedding before a turn was deleted cannot restore vectors after that delete's check.
+        const keep = thread && isSearchEligible(thread) && hasEnoughTurns(thread.userTurnCount ?? 0) ? args.embedded : [];
         const decision = decideCommit(
             {
                 summary: { text: thread?.summary, vectorId: thread?.summaryVectorId },

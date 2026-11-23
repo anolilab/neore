@@ -3607,6 +3607,8 @@ export const schema = defineSchema({
         titleVectorId: v.optional(v.string()),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
+        // User turns on the thread, kept by the messages triggers (`agent/thread-search-triggers.ts`): the palette's turn gate reads it.
+        userTurnCount: v.optional(v.number()),
         // Which sources may dispatch to this lead's workers; unset = the lead and the user.
         workerPolicy: v.optional(vWorkerPolicy),
     })
