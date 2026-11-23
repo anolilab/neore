@@ -26,6 +26,8 @@ const harness = vi.hoisted(() => {
         meaningArgs: [] as unknown[],
         /** Whether the meaning search is refused, as a rate limit would. */
         meaningFails: false,
+        /** Whether the account's model rules refuse the meaning search's embedding model. */
+        meaningRefused: false,
         /** The project rows the palette lists; a test may replace them. */
         projects: [] as { _id: string; title: string }[],
         /** Whether the project list has more pages than the palette loaded. */
@@ -107,6 +109,13 @@ vi.mock("@/lib/lunora/crpc", () => {
 
             if (harness.meaningFails) {
                 throw new Error("Rate limited");
+            }
+
+            if (harness.meaningRefused) {
+                throw Object.assign(new Error("Search by meaning is not available under your model rules"), {
+                    code: "FORBIDDEN",
+                    data: { code: "MEANING_SEARCH_REFUSED" },
+                });
             }
 
             return harness.meaning;
@@ -194,6 +203,7 @@ const LOADED_ONLY = /threads loaded here are filtered;/;
 const BETA_TEXT = /beta cohort starts/;
 const FIRST_PROJECTS_ONLY = /Only the first 1 projects are listed here/;
 const MEANING_FAILED = /Search by meaning failed/;
+const MEANING_REFUSED = /isn't available under your account's model rules/;
 const PROJECTS_FAILED = /projects could not be loaded/;
 const ARCHIVED_MEANING_NOTE = /closest matches across all your threads/;
 
@@ -450,6 +460,7 @@ describe("command palette filters and meaning search", () => {
         harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
         harness.meaning = [];
         harness.meaningFails = false;
+        harness.meaningRefused = false;
         harness.projects = [];
         harness.projectsHasMore = false;
         harness.projectsFail = false;
@@ -560,6 +571,22 @@ describe("command palette filters and meaning search", () => {
 
         expect(alert.textContent).toMatch(MEANING_FAILED);
         expect(screen.queryByText("No results found.")).toBeNull();
+    });
+
+    it("says the account's model rules refuse the meaning search instead of finding nothing or a passing failure", async () => {
+        harness.threads = [];
+        harness.meaningRefused = true;
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+
+        const alert = await screen.findByRole("alert", undefined, { timeout: 3000 });
+
+        expect(alert.textContent).toMatch(MEANING_REFUSED);
+        expect(alert.textContent).not.toMatch(MEANING_FAILED);
+        expect(screen.queryByText("No results found.")).toBeNull();
+        expect(harness.meaningArgs).toHaveLength(1);
     });
 
     it("keeps the meaning hits when a message is sent to a thread while the palette is open", async () => {

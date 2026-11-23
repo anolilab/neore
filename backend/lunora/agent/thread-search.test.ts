@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { addMessagesHandler, updateMessage } from "./messages";
-import { MEANING_MIN_CHARS } from "./thread-search-plan";
+import { MEANING_MIN_CHARS, MEANING_SEARCH_REFUSED } from "./thread-search-plan";
 import { SYNC_RETRY } from "./thread-search-triggers";
 import { runThreadSearchSync, searchThreadsByMeaningFor, visibleThreadsForSearch } from "./thread-search";
 
@@ -365,6 +365,17 @@ describe(searchThreadsByMeaningFor, () => {
         mocks.embedMany.mockRejectedValueOnce(new Error("gateway unavailable"));
 
         await expect(searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" })).rejects.toThrow("gateway unavailable");
+        expect(mocks.searchVectors).not.toHaveBeenCalled();
+    });
+
+    it("throws FORBIDDEN with its own code when the model rules refuse the embedding model, not an empty list", async () => {
+        mocks.embeddingModelAllowed.mockReturnValue(false);
+
+        await expect(searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" })).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            data: { code: MEANING_SEARCH_REFUSED },
+        });
+        expect(mocks.embedMany).not.toHaveBeenCalled();
         expect(mocks.searchVectors).not.toHaveBeenCalled();
     });
 

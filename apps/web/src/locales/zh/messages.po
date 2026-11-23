@@ -2487,7 +2487,7 @@ msgstr "活跃天数"
 msgid "Active Sessions ({0})"
 msgstr "活跃会话（{0}）"
 
-#: src/components/command-palette.tsx:689
+#: src/components/command-palette.tsx:714
 msgid "Active Threads"
 msgstr "活跃对话"
 
@@ -4345,13 +4345,13 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "归档当前对话；若已归档则取消归档（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:629
-#: src/components/command-palette.tsx:896
+#: src/components/command-palette.tsx:654
+#: src/components/command-palette.tsx:925
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "归档对话"
 
-#: src/components/command-palette.tsx:844
+#: src/components/command-palette.tsx:873
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:644
 #: src/features/sub-agents/components/worker-list.tsx:86
 #: src/features/tasks/components/goal-form-dialog.tsx:47
@@ -4363,7 +4363,7 @@ msgstr "已归档"
 msgid "Archived for at least"
 msgstr "已归档至少"
 
-#: src/components/command-palette.tsx:706
+#: src/components/command-palette.tsx:731
 msgid "Archived Threads"
 msgstr "已归档的对话"
 
@@ -7056,7 +7056,7 @@ msgstr "克隆或新建…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:967
+#: src/components/command-palette.tsx:996
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -9472,7 +9472,7 @@ msgstr "创建 API 密钥"
 msgid "Create bot"
 msgstr "创建机器人"
 
-#: src/components/command-palette.tsx:613
+#: src/components/command-palette.tsx:638
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9784,7 +9784,7 @@ msgstr "古巴"
 msgid "Currency Conversion"
 msgstr "货币换算"
 
-#: src/components/command-palette.tsx:892
+#: src/components/command-palette.tsx:921
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10688,8 +10688,8 @@ msgid "Delete this login?"
 msgstr "删除此登录信息？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:635
-#: src/components/command-palette.tsx:920
+#: src/components/command-palette.tsx:660
+#: src/components/command-palette.tsx:949
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -13874,10 +13874,10 @@ msgstr "删除数据集失败"
 msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
 msgstr "无法删除对话。{0, plural, other {已删除 # 个分支。}}"
 
-#: src/components/command-palette.tsx:469
-#: src/components/command-palette.tsx:477
-#: src/components/command-palette.tsx:520
-#: src/components/command-palette.tsx:527
+#: src/components/command-palette.tsx:494
+#: src/components/command-palette.tsx:502
+#: src/components/command-palette.tsx:545
+#: src/components/command-palette.tsx:552
 msgid "Failed to delete thread"
 msgstr "无法删除对话"
 
@@ -15077,7 +15077,7 @@ msgstr "按类型筛选记忆"
 msgid "Filter path"
 msgstr "筛选路径"
 
-#: src/components/command-palette.tsx:824
+#: src/components/command-palette.tsx:853
 msgid "Filter results"
 msgstr "筛选结果"
 
@@ -16253,7 +16253,7 @@ msgstr "从创意到成品，无需切换工具。文本、图像、视频和文
 msgid "Go to chat"
 msgstr "前往聊天"
 
-#: src/components/command-palette.tsx:561
+#: src/components/command-palette.tsx:586
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "前往聊天"
@@ -16296,7 +16296,7 @@ msgstr "前往配对"
 msgid "Go to previous page"
 msgstr "上一页"
 
-#: src/components/command-palette.tsx:567
+#: src/components/command-palette.tsx:592
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
@@ -16308,7 +16308,7 @@ msgstr "转到回复"
 msgid "Go to servers"
 msgstr "前往服务器"
 
-#: src/components/command-palette.tsx:579
+#: src/components/command-palette.tsx:604
 msgid "Go to Settings"
 msgstr "前往设置"
 
@@ -16333,7 +16333,7 @@ msgstr "转到第 {slideNumber} 张幻灯片"
 msgid "Go to step {0}"
 msgstr "前往第 {0} 步"
 
-#: src/components/command-palette.tsx:573
+#: src/components/command-palette.tsx:598
 msgid "Go to Vault"
 msgstr "前往文件库"
 
@@ -21115,7 +21115,7 @@ msgstr "消息版本"
 msgid "Message..."
 msgstr "输入消息..."
 
-#: src/components/command-palette.tsx:725
+#: src/components/command-palette.tsx:750
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -22192,7 +22192,7 @@ msgid "navigate"
 msgstr "导航"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:953
+#: src/components/command-palette.tsx:982
 msgid "Navigate"
 msgstr "导航"
 
@@ -22221,7 +22221,7 @@ msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:586
+#: src/components/command-palette.tsx:611
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:68
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -22593,7 +22593,7 @@ msgstr "新建临时聊天"
 msgid "New Temporary Chat"
 msgstr "新建临时聊天"
 
-#: src/components/command-palette.tsx:602
+#: src/components/command-palette.tsx:627
 msgid "New temporary thread"
 msgstr "新建临时对话"
 
@@ -22601,7 +22601,7 @@ msgstr "新建临时对话"
 msgid "New this week"
 msgstr "本周新增"
 
-#: src/components/command-palette.tsx:595
+#: src/components/command-palette.tsx:620
 msgid "New thread"
 msgstr "新建对话"
 
@@ -23289,7 +23289,7 @@ msgstr "未找到结果"
 msgid "No results found for “{searchTerm}”"
 msgstr "未找到“{searchTerm}”的结果"
 
-#: src/components/command-palette.tsx:870
+#: src/components/command-palette.tsx:899
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "未找到结果。"
@@ -24166,12 +24166,12 @@ msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
 #~ msgstr "仅按状态筛选此处已加载的 {0} 个对话；更早的对话不包括在内。"
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:856
+#: src/components/command-palette.tsx:885
 msgid "Only the {0} threads loaded here are filtered; older ones are not included."
 msgstr "仅筛选此处已加载的 {0} 个对话；较早的对话未包含在内。"
 
 #. placeholder {0}: projects.length
-#: src/components/command-palette.tsx:860
+#: src/components/command-palette.tsx:889
 msgid "Only the first {0} projects are listed here."
 msgstr "此处仅列出前 {0} 个项目。"
 
@@ -24261,7 +24261,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:779
-#: src/components/command-palette.tsx:959
+#: src/components/command-palette.tsx:988
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -26013,7 +26013,7 @@ msgid "Pin message"
 msgstr "置顶消息"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:619
+#: src/components/command-palette.tsx:644
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "置顶对话"
@@ -26969,12 +26969,12 @@ msgid "Project repository"
 msgstr "项目仓库"
 
 #. placeholder {0}: projectFilter.title
-#: src/components/command-palette.tsx:848
+#: src/components/command-palette.tsx:877
 msgid "Project: {0}"
 msgstr "项目：{0}"
 
-#: src/components/command-palette.tsx:668
-#: src/components/command-palette.tsx:841
+#: src/components/command-palette.tsx:693
+#: src/components/command-palette.tsx:870
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:606
 msgid "Projects"
 msgstr "项目"
@@ -28174,11 +28174,11 @@ msgstr "拒绝"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "在审阅中拒绝结果会将运行标记为失败。被拒绝的回答会保留在记录中。"
 
-#: src/components/command-palette.tsx:865
+#: src/components/command-palette.tsx:894
 msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
 msgstr "相关的已归档对话是从你所有对话中最接近的匹配里选出的，因此可能有部分未列出。"
 
-#: src/components/command-palette.tsx:749
+#: src/components/command-palette.tsx:774
 msgid "Related threads"
 msgstr "相关对话"
 
@@ -30025,9 +30025,13 @@ msgstr "搜索学术论文和 PDF"
 msgid "Search across the entire internet"
 msgstr "搜索整个互联网"
 
-#: src/components/command-palette.tsx:809
+#: src/components/command-palette.tsx:838
 msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
 msgstr "按含义搜索失败，因此未列出相关对话。请稍后重试。"
+
+#: src/components/command-palette.tsx:837
+msgid "Search by meaning isn't available under your account's model rules, so related threads are not listed."
+msgstr "根据你账户的模型规则，按含义搜索不可用，因此未列出相关对话。"
 
 #: src/features/admin/components/users-management-card.tsx:122
 msgid "Search by name or email..."
@@ -30235,7 +30239,7 @@ msgstr "搜索对话"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "搜索对话（{focusSearchShortcut}）"
 
-#: src/components/command-palette.tsx:823
+#: src/components/command-palette.tsx:852
 msgid "Search threads, navigate, or perform actions..."
 msgstr "搜索对话、导航或执行操作..."
 
@@ -36196,7 +36200,7 @@ msgstr "对话"
 msgid "Thread"
 msgstr "对话"
 
-#: src/components/command-palette.tsx:644
+#: src/components/command-palette.tsx:669
 msgid "Thread Actions"
 msgstr "对话操作"
 
@@ -36294,7 +36298,7 @@ msgstr "对话变量"
 msgid "Thread will auto-delete in {0}"
 msgstr "对话将在 {0} 后自动删除"
 
-#: src/components/command-palette.tsx:826
+#: src/components/command-palette.tsx:855
 #: src/features/admin/components/admin-shard-footprint-row.tsx:125
 #: src/features/admin/components/admin-shard-footprint-row.tsx:142
 #: src/features/admin/components/admin-shard-footprint-row.tsx:163
@@ -37300,8 +37304,8 @@ msgstr "超广角，建筑感"
 msgid "unarchive"
 msgstr "取消归档"
 
-#: src/components/command-palette.tsx:629
-#: src/components/command-palette.tsx:896
+#: src/components/command-palette.tsx:654
+#: src/components/command-palette.tsx:925
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "取消归档对话"
@@ -37508,7 +37512,7 @@ msgid "Unpin memory"
 msgstr "取消置顶记忆"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:619
+#: src/components/command-palette.tsx:644
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "取消置顶对话"
@@ -37576,10 +37580,10 @@ msgstr "无标题"
 msgid "Untitled chat"
 msgstr "未命名对话"
 
-#: src/components/command-palette.tsx:401
-#: src/components/command-palette.tsx:414
-#: src/components/command-palette.tsx:717
+#: src/components/command-palette.tsx:426
+#: src/components/command-palette.tsx:439
 #: src/components/command-palette.tsx:742
+#: src/components/command-palette.tsx:767
 #: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "无标题对话"
@@ -40443,7 +40447,7 @@ msgstr "你的方案"
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "你的方案和额度取决于你的订阅。"
 
-#: src/components/command-palette.tsx:811
+#: src/components/command-palette.tsx:840
 msgid "Your projects could not be loaded. Try again in a moment."
 msgstr "无法加载你的项目。请稍后再试。"
 

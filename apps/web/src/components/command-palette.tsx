@@ -53,6 +53,7 @@ import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { useCurrentThreadId, useThreadMetadata } from "@/features/chat/core/stores/thread-store-hooks";
+import { errorCode } from "@/features/chat/guest-links/error-code";
 import { scrollToMessage } from "@/features/chat/thread/message-list";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
 import type { ThreadState } from "@/features/chat/thread-list/lib/derived-sections";
@@ -325,12 +326,17 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         trimmedSearch.length >= MEANING_SEARCH_MIN_CHARS &&
         trimmedSearch.length <= MEANING_SEARCH_MAX_CHARS &&
         trimmedSearch === debouncedSearch;
-    const { data: meaningHits, isError: isMeaningSearchFailed } = useQuery({
+    const {
+        data: meaningHits,
+        error: meaningSearchError,
+        isError: isMeaningSearchFailed,
+    } = useQuery({
         // The hits are a user's own thread titles: kept briefly while the palette is open, removed when it closes (above).
         gcTime: MEANING_CACHE_MS,
         queryFn: isMeaningSearchCurrent ? () => searchMeaning({ archivedOnly: scope.archived, query: debouncedSearch }) : skipToken,
         queryKey: [...MEANING_QUERY_KEY, sessionUserId, scope.archived, debouncedSearch],
-        // Each try embeds the query again, so a failure is said (below) and never retried on its own.
+        // Each try embeds the query again, so a failure is said (below) and never retried on its own; a refusal by the
+        // account's model rules would only be refused again.
         retry: false,
         staleTime: MEANING_CACHE_MS,
     });
@@ -825,7 +831,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     let listFailure: string | undefined;
 
     if (isMeaningSearchCurrent && isMeaningSearchFailed) {
-        listFailure = t`Search by meaning failed, so related threads are not listed. Try again in a moment.`;
+        // `MEANING_SEARCH_REFUSED` (`agent/thread-search-plan.ts`): the account's model rules refuse the embedding model.
+        listFailure =
+            errorCode(meaningSearchError) === "MEANING_SEARCH_REFUSED"
+                ? t`Search by meaning isn't available under your account's model rules, so related threads are not listed.`
+                : t`Search by meaning failed, so related threads are not listed. Try again in a moment.`;
     } else if (projectRowsVisible(scope) && projectFilter === undefined && isProjectListFailed) {
         listFailure = t`Your projects could not be loaded. Try again in a moment.`;
     }

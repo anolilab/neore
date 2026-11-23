@@ -31,6 +31,7 @@ import {
     MEANING_MIN_CHARS,
     MEANING_MIN_SCORE,
     MEANING_RESULT_LIMIT,
+    MEANING_SEARCH_REFUSED,
     MEANING_TOP_K,
     planThreadSearch,
     SEARCH_CLAIM_MS,
@@ -464,8 +465,9 @@ export interface MeaningThread {
  * limit, so archived candidates ranked below them still fill it. The candidates are
  * still the closest vectors overall: the vectors carry no archived flag to filter on
  * in the index, so an archived thread ranked below every candidate is not found.
- * Returns `[]` for a query too short to embed, or when the model is refused for the person; rejects when the
- * embedding fails.
+ * Returns `[]` for a query too short to embed. Throws `FORBIDDEN` with `data.code` {@link MEANING_SEARCH_REFUSED}
+ * when the person's model rules refuse the embedding model, so the palette tells that apart from "nothing related";
+ * rejects when the embedding fails.
  */
 export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();
@@ -474,8 +476,12 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archived
         return [];
     }
 
-    // A refused model embeds nothing (`[]`). Any other failure rejects, so the palette says the search failed instead of
-    // showing an empty list as "nothing related"; its title matches do not depend on this call.
+    // A refused model is said as such, not answered with an empty list the palette would show as "nothing related". Any
+    // other failure rejects too, so the palette says the search failed; its title matches do not depend on this call.
+    if (!(await embeddingAllowedFor(ctx, args.userId))) {
+        throw new LunoraError("FORBIDDEN", "Search by meaning is not available under your model rules", { data: { code: MEANING_SEARCH_REFUSED } });
+    }
+
     const [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)]);
 
     if (!queryVector || queryVector.length !== SEARCH_DIMENSION) {
