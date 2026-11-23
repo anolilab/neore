@@ -23,13 +23,19 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull/42`");
         expect(prompt).not.toContain("refs/remotes/origin/pr-42");
         expect(prompt).toContain("`git rev-parse refs/remotes/origin/feat/x` differs from `git rev-parse refs/neore/pull/42`, stop");
+        // The lease is the commit checked here: another run's fetch of refs/neore/pull/42 after this step cannot move it.
+        expect(prompt).toContain(
+            "Otherwise record the commit `git rev-parse refs/neore/pull/42` printed and say it: step 7 leases on that commit. Then run `git switch feat/x`",
+        );
         expect(prompt.indexOf("`git switch feat/x`")).toBeLessThan(prompt.indexOf("`git rebase refs/remotes/origin/release/2.0`"));
         expect(prompt).toContain("`git merge --ff-only refs/remotes/origin/feat/x`");
         // A local branch ahead of origin merges as "Already up to date": only comparing the commits catches it.
         expect(prompt).toContain("or `git rev-parse HEAD` then differs from `git rev-parse refs/remotes/origin/feat/x`");
         expect(prompt).toContain("intent of both sides");
         expect(prompt).toContain("build and the tests");
-        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/feat/x:refs/neore/pull/42 origin HEAD:refs/heads/feat/x"]);
+        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/feat/x:<commit from step 3> origin HEAD:refs/heads/feat/x"]);
+        expect(prompt).toContain("`, writing the commit you recorded in step 3 in place of <commit from step 3>.");
+        expect(prompt).not.toContain("--force-with-lease=refs/heads/feat/x:refs/neore/pull/42");
         expect(prompt).toContain("Do not push to any other branch or remote.");
         // A delegated cloud coding-agent run never pushes: the steps say to run them where git has the person's own access.
         expect(prompt).toContain("Do not hand them to a cloud coding agent run: it cannot push");
@@ -60,7 +66,7 @@ describe(catchUpPrompt, () => {
 
         expect(prompt).toContain("`git fetch origin +refs/heads/pr-42:refs/remotes/origin/pr-42`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull/42`");
-        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/pr-42:refs/neore/pull/42 origin HEAD:refs/heads/pr-42"]);
+        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/pr-42:<commit from step 3> origin HEAD:refs/heads/pr-42"]);
     });
 });
 
