@@ -721,9 +721,10 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     // Only the author opens the document as a page (`createPageFromDocument`).
     const isAuthor = !!document && document.userId === sessionData?.user?.id;
     const canEdit = document?.canEdit === true;
-    const isEditable =
-        canEdit &&
-        (document?.kind === "text" || document?.kind === "code" || document?.kind === "sheet" || document?.kind === "design" || document?.kind === "image");
+    // What the document is, for any viewer (its history is readable by a member too); whether the caller may edit it is `canEdit`.
+    const isOpenableKind =
+        document?.kind === "text" || document?.kind === "code" || document?.kind === "sheet" || document?.kind === "design" || document?.kind === "image";
+    const isEditable = canEdit && isOpenableKind;
     const isStreaming = document?.status === "streaming";
     const canPreviewCode = document?.kind === "code" && getPreviewLanguage(document.language) !== undefined;
     const showCodePreview = canPreviewCode && codeView === "preview" && canvasViewMode !== "history";
@@ -783,7 +784,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                             {canvasEditMode === "edit" ? <EyeIcon className="size-4" /> : <PencilIcon className="size-4" />}
                         </TooltipIconButton>
                     )}
-                    {isEditable && !isStreaming && document && document.version > 1 && (
+                    {isOpenableKind && !isStreaming && document && document.version > 1 && (
                         <TooltipIconButton onClick={toggleHistory} tooltip={canvasViewMode === "history" ? t`Close history` : t`Version history`}>
                             <HistoryIcon className="size-4" />
                         </TooltipIconButton>
