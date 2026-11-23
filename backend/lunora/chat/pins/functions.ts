@@ -189,21 +189,20 @@ export const eraseUserPinsOnThread = internalMutation
     .input({ threadId: v.id("threads"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        let cursor: string | null = null;
-        let isDone = false;
+        // Each pass takes the first batch of what remains. A deleted pin leaves the index, so no cursor has to survive a delete.
+        let remaining = true;
 
-        while (!isDone) {
-            const result = await context.db
+        while (remaining) {
+            const batch = await context.db
                 .query("threadPins")
                 .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
-                .paginate({ cursor, numItems: PIN_EXPORT_PAGE });
+                .take(PIN_EXPORT_PAGE);
 
-            for (const pin of result.page) {
+            for (const pin of batch) {
                 await context.db.delete("threadPins", pin._id);
             }
 
-            isDone = result.isDone;
-            cursor = result.continueCursor;
+            remaining = batch.length > 0;
         }
 
         return null;
@@ -217,21 +216,20 @@ export const reassignUserPinsOnThread = internalMutation
     .input({ from: v.string().max(MAX_LENGTH.id), threadId: v.id("threads"), to: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx: context }) => {
-        let cursor: string | null = null;
-        let isDone = false;
+        // Each pass takes the first batch still under the old id. A moved pin leaves that index range, so no cursor has to survive a move.
+        let remaining = true;
 
-        while (!isDone) {
-            const result = await context.db
+        while (remaining) {
+            const batch = await context.db
                 .query("threadPins")
                 .withIndex("by_user_and_thread", (q) => q.eq("userId", args.from).eq("threadId", args.threadId))
-                .paginate({ cursor, numItems: PIN_EXPORT_PAGE });
+                .take(PIN_EXPORT_PAGE);
 
-            for (const pin of result.page) {
+            for (const pin of batch) {
                 await context.db.patch("threadPins", pin._id, { userId: args.to });
             }
 
-            isDone = result.isDone;
-            cursor = result.continueCursor;
+            remaining = batch.length > 0;
         }
 
         return null;
