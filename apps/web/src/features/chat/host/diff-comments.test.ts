@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { describe, expect, it } from "vitest";
 
 import type { DiffComment } from "./diff-comments";
@@ -159,6 +160,15 @@ describe("composeDiffComments", () => {
         const result = composeDiffComments([lineComment(["+```ts", "+let x", "+```"])]);
 
         expect((result as { text: string }).text).toContain("````diff\n@@ -3,3 +3,4 @@\n+```ts");
+    });
+
+    it("sizes the fence from the quote as the backend keeps it, without its hidden characters", () => {
+        // `/hosts/send` removes the zero-width spaces, which joins the backticks of the context line into " ````": a
+        // line of four backticks that would close a three-backtick fence.
+        const result = composeDiffComments([lineComment([" `\u{200B}`\u{200B}`\u{200B}`", "+let x"])]);
+        const stored = stripHiddenText((result as { text: string }).text).text;
+
+        expect(stored).toContain("`````diff\n@@ -3,3 +3,4 @@\n ````\n+let x\n`````\n");
     });
 
     it("refuses nothing to send", () => {

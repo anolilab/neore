@@ -8,6 +8,7 @@ import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { createLunoraActionQueryOptions, useAction, useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import { retryFailedPage } from "./failed-pages";
+import { nextMergeReread } from "./merge-reread";
 
 const MINUTE_MS = 60_000;
 
@@ -121,6 +122,40 @@ export const usePullRequestChecks = (address: PullRequestAddress | undefined, he
         enabled: enabled && address !== undefined && headSha !== undefined && userId !== undefined,
         queryKey: [DEVELOP_QUERY_ROOT, userId, "checks", address, headSha],
         staleTime: MINUTE_MS,
+    });
+};
+
+/** When each status read first answered "unknown" in a row; a known answer ends the row, so a later push starts a new one. */
+const mergeUnknownSince = new WeakMap<object, number>();
+
+/**
+ * What stands between one linked pull request and its merge (failing checks, a conflict, requested changes), for the
+ * chat header. Keyed by account and pull request, so every thread linked to it shares one read; a few minutes stale,
+ * never live and never on focus, so showing a thread does not cost a host call per render. While the host still works
+ * out whether it merges cleanly, it is read again shortly, a few times, so a conflict found then shows up.
+ */
+export const usePullRequestStatus = (address: PullRequestAddress | undefined) => {
+    const client = useLunora();
+    const userId = useDevelopUser();
+    const options = createLunoraActionQueryOptions(client, api.source_control.pr_status.getPullRequestStatus, address as PullRequestAddress);
+
+    return useQuery({
+        ...READ,
+        ...options,
+        enabled: address !== undefined && userId !== undefined,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address],
+        refetchInterval: (query) => {
+            const { delay, since } = nextMergeReread(query.state.data, mergeUnknownSince.get(query), Date.now(), query.state.status === "error");
+
+            if (since === undefined) {
+                mergeUnknownSince.delete(query);
+            } else {
+                mergeUnknownSince.set(query, since);
+            }
+
+            return delay;
+        },
+        staleTime: 5 * MINUTE_MS,
     });
 };
 
