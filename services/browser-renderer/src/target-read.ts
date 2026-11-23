@@ -643,7 +643,7 @@ export function readTarget(
             } else if (
                 control.getClientRects().length === 0 ||
                 getComputedStyle(control).visibility === "hidden" ||
-                getComputedStyle(control).opacity === "0"
+                control.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false
             ) {
                 refused = "hidden";
             } else if (isCoveredIn(control)) {

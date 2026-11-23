@@ -340,6 +340,21 @@ describe("readTarget in a page", () => {
         expect(await wasClicked(page)).toBe(false);
     });
 
+    it("a press handler that makes the parent transparent stops the click, though the fingerprint did not change", async () => {
+        await pageWith(
+            page,
+            `<div id="wrap"><button id="pay" onpointerdown="document.getElementById('wrap').style.opacity = '0'" onclick="window.clicked = true">Continue</button></div>`,
+        );
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("hidden");
+        expect(read.clicked).toBe(false);
+        expect(await wasClicked(page)).toBe(false);
+    });
+
     it("an invisible (opacity 0) control is refused as hidden, and nothing is clicked", async () => {
         await pageWith(page, `<button id="pay" style="opacity: 0" onclick="window.clicked = true">Pay now</button>`);
         const element = await page.$("#pay");
