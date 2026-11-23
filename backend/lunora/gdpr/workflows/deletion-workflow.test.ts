@@ -587,3 +587,22 @@ describe("account deletion workflow: usage exports", () => {
         expect(completionIndex()).toBeGreaterThan(-1);
     });
 });
+
+describe("account deletion workflow: the owner-shard sweep", () => {
+    it("sweeps the owner shards, waits the grace period, sweeps again, and only then drains the routes", async () => {
+        await execute();
+
+        const names = stepNames();
+        const first = names.indexOf("erase-pins-on-owner-shards");
+        const grace = names.indexOf("erase-pins-grace");
+        const again = names.indexOf("erase-pins-on-owner-shards-again");
+        const drain = names.indexOf("delete-user-shared-pin-routes");
+
+        // Each step runs once, in this order: a pin that commits after the first sweep is found by the second, while its route still exists.
+        expect([first, grace, again, drain].every((index) => index >= 0)).toBe(true);
+        expect(first).toBeLessThan(grace);
+        expect(grace).toBeLessThan(again);
+        expect(again).toBeLessThan(drain);
+        expect(sleeps).toContain("2 minutes");
+    });
+});

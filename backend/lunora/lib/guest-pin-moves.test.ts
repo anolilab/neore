@@ -1,21 +1,40 @@
 /**
- * A guest's pins move to the account that converted, around the row merge (`lib/account-merge.ts#moveGuestPins`). The owner of the
- * thread may merge its own account in parallel: its shard moves the guest's pin and re-points the route after the guest's first pass
- * has read the route. The replay below interleaves exactly that, and checks that the second pass reaches the pin.
+ * A guest's pins move to the account that converted, around the row merge (`lib/account-merge.ts#moveGuestPins`). Two interleavings are
+ * replayed here, with the account-move marker already set (the merge sets it before the first pass):
+ *
+ * - the owner's parallel merge moves the pin and re-points the route after the guest's first pass has read the route: the second pass
+ *   must reach the pin;
+ * - a guest pin write lands during that route read: the marker refuses it, so no new pin of the guest's is left on the owner shard.
+ *
+ * The fake models the marker's refusal itself. The real check is covered by `account-moves.test.ts` and `chat/pins/functions.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 
 import { type GuestPinMoves, moveGuestPins, movePinsOnRoutesOf } from "./account-merge";
 
-type Pin = { shard: string; threadId: string; userId: string };
+type Pin = { id: string; shard: string; threadId: string; userId: string };
 type Route = { ownerId: string; threadId: string; userId: string };
+type State = { converted: boolean; marked: boolean; pins: Pin[]; routes: Route[] };
 
-const build = () => {
-    const state = {
-        // The owner's conversion has not happened yet.
+/** A guest pin write as `createPin` makes it: refused once the account is marked, otherwise a new pin on the owner shard. */
+const guestPinWrite = (state: State, id: string): "refused" | "written" => {
+    if (state.marked) {
+        return "refused";
+    }
+
+    state.pins.push({ id, shard: "owner-a", threadId: "t1", userId: "guest" });
+
+    return "written";
+};
+
+/** The fake merge's moves. `duringRead` runs after the guest's route read, which is where a concurrent write lands. */
+const build = (duringRead?: (write: (id: string) => "refused" | "written") => void) => {
+    const state: State = {
         converted: false,
-        pins: [{ shard: "owner-a", threadId: "t1", userId: "guest" }] as Pin[],
-        routes: [{ ownerId: "owner-a", threadId: "t1", userId: "guest" }] as Route[],
+        // The merge marks the guest before its first pass reads the routes.
+        marked: true,
+        pins: [{ id: "pin-1", shard: "owner-a", threadId: "t1", userId: "guest" }],
+        routes: [{ ownerId: "owner-a", threadId: "t1", userId: "guest" }],
     };
 
     // The owner's merge: after the guest's pass read the route, its shard moves the pin and the route follows to the new owner.
@@ -40,12 +59,16 @@ const build = () => {
             // The snapshot is taken first: the owner converts after the read, which is the interleaving under test.
             const page = state.routes
                 .filter((route) => route.userId === routeUserId)
-                .map(({ ownerId, threadId }) => {
-                    return { ownerId, threadId };
+                .map((route) => {
+                    return { ownerId: route.ownerId, threadId: route.threadId };
                 });
 
-            if (routeUserId === "guest" && !state.converted) {
-                ownerConverts();
+            if (routeUserId === "guest") {
+                duringRead?.((id) => guestPinWrite(state, id));
+
+                if (!state.converted) {
+                    ownerConverts();
+                }
             }
 
             return { continueCursor: null, isDone: true, page };
@@ -82,7 +105,7 @@ describe("moving a guest's pins around the row merge", () => {
         const result = await moveGuestPins(moves, "guest", "new");
 
         expect(result).toStrictEqual({ moved: 1 });
-        expect(state.pins).toStrictEqual([{ shard: "owner-b", threadId: "t1", userId: "new" }]);
+        expect(state.pins).toStrictEqual([{ id: "pin-1", shard: "owner-b", threadId: "t1", userId: "new" }]);
     });
 
     it("leaves the pin with the guest when the second pass is skipped, so the test depends on that pass", async () => {
@@ -91,6 +114,19 @@ describe("moving a guest's pins around the row merge", () => {
         await movePinsOnRoutesOf(moves, "guest");
         await moves.mergeRows();
 
-        expect(state.pins).toStrictEqual([{ shard: "owner-b", threadId: "t1", userId: "guest" }]);
+        expect(state.pins).toStrictEqual([{ id: "pin-1", shard: "owner-b", threadId: "t1", userId: "guest" }]);
+    });
+
+    it("refuses a guest pin write that lands during the route read, so none of the guest's pins is left on the owner shard", async () => {
+        const outcomes: string[] = [];
+        const { moves, state } = build((write) => {
+            outcomes.push(write("pin-late"));
+        });
+
+        await moveGuestPins(moves, "guest", "new");
+
+        expect(outcomes).toStrictEqual(["refused"]);
+        expect(state.pins.map((pin) => pin.id)).toStrictEqual(["pin-1"]);
+        expect(state.pins.every((pin) => pin.userId === "new")).toBe(true);
     });
 });
