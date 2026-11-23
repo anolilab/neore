@@ -75,8 +75,8 @@ export const getBrowserClickMode = internalQuery
     });
 
 /**
- * How many purchase decision looks a session keeps, the newest first to go: one per decision not yet clicked. An approved
- * click takes its own (`takePurchaseLook`), so only decisions never clicked accumulate.
+ * How many purchase decision looks a session keeps. Past the cap the oldest go first, to `purchaseLostCalls`: their approved
+ * clicks are refused. An approved click takes its own look (`takePurchaseLook`), so only decisions never clicked accumulate.
  */
 const PURCHASE_LOOKS_KEPT = 50;
 

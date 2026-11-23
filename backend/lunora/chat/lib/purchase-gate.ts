@@ -89,7 +89,7 @@ const SUBSCRIBE_WORD = /^(?:subscribe|abonnieren)[.!]?$/iu;
 
 const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [/^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu];
 
-/** Whether one read of a click's target asks the person first. A read that failed, or was cut short, asks. */
+/** Whether one read of a click's target asks the person first. A read that was cut short asks; a read that errored is handled by the caller. */
 export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean => {
     if (target.success !== true || target.truncated === true || target.labelTruncated === true) {
         return true;

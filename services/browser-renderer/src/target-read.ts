@@ -450,8 +450,17 @@ export function readTarget(
                 Element.prototype.hasAttribute.call(reachedControl, "formaction")
                     ? reachedControl.formAction
                     : formAction;
-            const formUrl = new URL(submitAddress, document.URL);
-            const isPaymentPost = formUrl.origin !== new URL(document.URL).origin && options.payment.test(formUrl.hostname);
+            // An address that does not parse (the native getter returns it verbatim) is no payment post: the read itself must not fail on it.
+            let isPaymentPost = false;
+
+            try {
+                const formUrl = new URL(submitAddress, document.URL);
+
+                isPaymentPost = formUrl.origin !== new URL(document.URL).origin && options.payment.test(formUrl.hostname);
+            } catch {
+                // Not a payment post: the address does not parse.
+            }
+
             const isCardFields = hasCardFields || isPaymentFrame || isPaymentPost;
             // The address's path words, not the whole address: "cart" is a page's word, "cartoon" or a host name containing it is not.
             // The path is decoded first: an encoded separator ("%2F") is a separator too. A path that will not decode is read as a checkout,
@@ -616,7 +625,7 @@ export function readTarget(
     const [isDisabledIn] = [
         (node: Element): boolean => {
             for (let current: Element | null = node; current !== null;) {
-                if (current.matches(":disabled") || current.getAttribute("aria-disabled") === "true") {
+                if (current.matches(":disabled") || (current.getAttribute("aria-disabled") ?? "").trim().toLowerCase() === "true") {
                     return true;
                 }
 

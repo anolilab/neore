@@ -4196,6 +4196,12 @@ export const setBrowserClickMode = authMutation
     .input({ mode: v.union(v.literal("page"), v.literal("pointer"), v.literal("all")) })
     .output(v.null())
     .mutation(async ({ args: { mode }, ctx: context }) => {
+        // A real-click mode lets a page change an ordinary button into a purchase unseen: an admin acting as the user may not turn it on.
+        // Going back to "page" only adds protection, so it stays allowed.
+        if (mode !== "page") {
+            refuseImpersonation(context.user.impersonatedBy, "The browser click mode cannot be made real while impersonating");
+        }
+
         const prefs = await context.db
             .query("aiUserPreferences")
             .withIndex("by_userId", (q) => q.eq("userId", context.user.userId))
