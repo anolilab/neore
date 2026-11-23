@@ -469,6 +469,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",
     sandboxActions: "no owner column; internal only",
     shardActivity: "per-shard housekeeping bookkeeping; system only",
+    shardPinFences:
+        "an erasure's fence on one owner shard: read by the pin write in its own transaction and written only by the erasure's sweep; no client reads it",
     shardRoutes: "key → owner-shard lookup (a share token, a webhook id), read before any identity; holds no user content",
     sharedPinRoutes:
         "a collaborator's pin routes: written by the pin writers on the owner's shard, read only by the owner-side export (internal); no client reads it",

@@ -520,3 +520,16 @@ describe("refused pin writes renew no lease", () => {
         expect(leases.page).toHaveLength(0);
     });
 });
+
+describe("a fenced owner shard refuses a pin write of the account", () => {
+    it("refuses the write in its own transaction, while the fence is on the shard", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" });
+            await context.db.insert("shardPinFences", { createdAt: 1, userId: "user-collaborator" });
+        });
+
+        await expect(
+            as("user-collaborator").mutation(createPin as never, { messageId: "m-fenced", messageRole: "assistant", threadId } as never),
+        ).rejects.toThrow(MOVED_ACCOUNT_ERROR);
+    });
+});

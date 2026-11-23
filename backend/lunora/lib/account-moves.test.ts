@@ -14,6 +14,8 @@ import {
     beginAccountMove,
     endAccountMove,
     eraseWaitUntil,
+    fencePinsOnShard,
+    unfencePinsOnShard,
     isErasing,
     MERGE_MARKER_MAX_AGE_MS,
     isAccountMoving,
@@ -224,6 +226,60 @@ describe("an importing marker on the destination of a merge", () => {
             await harness.run(async (context: any) => await endAccountMove(context, "user-dest", "importing"));
 
             expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-dest", 1))).toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("the owner-shard fence", () => {
+    it("refuses an account's pin writes on a fenced shard, and lets them through again once the fence is lifted", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await fencePinsOnShard(context, "user-fenced", 1));
+
+            expect(await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-fenced", 1))).toBe(true);
+
+            await harness.run(async (context: any) => await unfencePinsOnShard(context, "user-fenced"));
+
+            expect(await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-fenced", 2))).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("a stale marker a late delivery meets", () => {
+    it("is renewed by the late delivery, so the account is fenced again", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-late", "merging", 1));
+
+            const late = 1 + MERGE_MARKER_MAX_AGE_MS + 1;
+
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-late", late))).toBe(false);
+
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-late", "merging", late));
+
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-late", late))).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("ending an importing marker", () => {
+    it("keeps the destination's own pin-write lease, which is still in flight", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await admitPinWrite(context, "user-dest", 1000));
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-dest", "importing", 1000));
+            await harness.run(async (context: any) => await endAccountMove(context, "user-dest", "importing"));
+
+            expect(await harness.run(async (context: any) => await pinWritesInFlightUntil(context, "user-dest", 1000))).toBe(1000 + PIN_WRITE_LEASE_MS);
         } finally {
             harness.close();
         }

@@ -184,6 +184,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        // The account's own shard refuses its pin writes in their transaction from here on (`lib/account-moves.ts`).
+        await context.step.do(
+            "fence-own-pin-writes",
+            async () =>
+                await context.run(
+                    internal.lib.account_moves.fencePinsOnShardFor,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "fence-own-pin-writes") },
+                ),
+        );
+
         // A pin write that renewed its lease before the marker may still be in flight. Its lease runs out within a minute, so the sweeps
         // below start only once none is in flight: a write that commits after a sweep would otherwise keep its pins.
         for (let round = 0; ; round += 1) {
@@ -228,7 +239,8 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             async () =>
                 await context.run(
                     internal.gdpr.steps.erasePinsOnOwnerShards,
-                    { userId: args.userId },
+                    // The second sweep lifts the owner shards' fences: nothing after it can be refused a write it should keep.
+                    { release: true, userId: args.userId },
                     { dedupId: stepDedupId(scope, "erase-pins-on-owner-shards-again") },
                 ),
         );

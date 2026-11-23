@@ -51,9 +51,20 @@ const isLiveMarker = (row: { createdAt: number; kind: AccountMoveKind }, now: nu
 export const beginAccountMove = async (context: Pick<MutationCtx, "db">, userId: string, kind: AccountMoveKind, now: number): Promise<void> => {
     const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
-    if (page.every((row) => row.kind !== kind)) {
-        await context.db.insert("accountMoves", { createdAt: now, kind, userId });
+    const sameKind = page.filter((row) => row.kind === kind);
+
+    if (sameKind.some((row) => isLiveMarker(row, now))) {
+        return;
     }
+
+    if (sameKind.length === 0) {
+        await context.db.insert("accountMoves", { createdAt: now, kind, userId });
+
+        return;
+    }
+
+    // A marker of this kind that has gone stale no longer fences the account: it is renewed, so a late delivery of the move fences again.
+    await context.db.patch("accountMoves", sameKind[0]!._id, { createdAt: now });
 };
 
 /**
@@ -76,13 +87,13 @@ export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: st
  * the caller refuses the write. The second check closes the window where a move starts between the first check and the renewal.
  */
 export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
-    if (await isAccountMoving(context, userId, now)) {
+    if ((await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId))) {
         return true;
     }
 
     await admitPinWrite(context, userId, now);
 
-    return await isAccountMoving(context, userId, now);
+    return (await isAccountMoving(context, userId, now)) || (await isShardFenced(context, userId));
 };
 
 /**
@@ -114,6 +125,11 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
         }
     }
 
+    // An importing marker is the destination's: its leases are the destination's own pin writes, still in flight, so they stay.
+    if (kind === "importing") {
+        return;
+    }
+
     if (kind !== "erasing" && moves.some((row) => row.kind !== kind)) {
         return;
     }
@@ -131,6 +147,11 @@ export const endAccountMoveFor = internalMutation
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await endAccountMove(ctx, args.userId, args.kind);
+
+        // An erasure also lifts the fence on the account's own shard; the owner shards' fences are lifted by the sweep that set them.
+        if (args.kind === "erasing") {
+            await unfencePinsOnShard(ctx, args.userId);
+        }
 
         return null;
     });
@@ -191,4 +212,61 @@ export const eraseWaitFor = internalMutation
     .output(v.object({ until: v.union(v.number(), v.null()) }))
     .mutation(async ({ args, ctx }) => {
         return { until: await eraseWaitUntil(ctx, args.userId, ctx.now) };
+    });
+
+/**
+ * Whether this shard fences the account's pin writes. Read inside the pin write's own transaction, on the shard the write runs on, so a
+ * fence set by a sweep of this shard is seen by every write that commits after it.
+ */
+export const isShardFenced = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {
+    const rows = await context.db
+        .query("shardPinFences")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .take(1);
+
+    return rows.length > 0;
+};
+
+/** Fences the account's pin writes on this shard. Idempotent. */
+export const fencePinsOnShard = async (context: Pick<MutationCtx, "db">, userId: string, now: number): Promise<void> => {
+    const rows = await context.db
+        .query("shardPinFences")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .take(1);
+
+    if (rows.length === 0) {
+        await context.db.insert("shardPinFences", { createdAt: now, userId });
+    }
+};
+
+/** Lifts the account's fence on this shard. Idempotent. */
+export const unfencePinsOnShard = async (context: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+    const rows = await context.db
+        .query("shardPinFences")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .take(100);
+
+    for (const row of rows) {
+        await context.db.delete("shardPinFences", row._id);
+    }
+};
+
+/** Fences the account's pin writes on the shard the call runs on, from a sweep (`gdpr/steps.ts`) or the erasure workflow. */
+export const fencePinsOnShardFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await fencePinsOnShard(ctx, args.userId, ctx.now);
+
+        return null;
+    });
+
+/** Lifts the account's fence on the shard the call runs on, once the sweep that set it has finished. */
+export const unfencePinsOnShardFor = internalMutation
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await unfencePinsOnShard(ctx, args.userId);
+
+        return null;
     });

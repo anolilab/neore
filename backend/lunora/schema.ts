@@ -2601,6 +2601,7 @@ export const schema = defineSchema({
         .index("by_key", ["key"])
         // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
         .index("by_ts", ["ts"]),
+
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
      * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
@@ -2632,7 +2633,6 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
-
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
@@ -2762,6 +2762,15 @@ export const schema = defineSchema({
         .index("by_lastActiveAt", ["lastActiveAt"])
         .index("by_nextDueAt", ["nextDueAt"])
         .index("by_rateLimitsPending_lastActiveAt", ["rateLimitsPending", "lastActiveAt"]),
+
+    // An erasure's fence on one owner shard: while a row is here, pin writes of the account on this shard are refused in the same
+    // transaction as their insert, so a write that commits after the shard's sweep cannot be kept (`lib/account-moves.ts`).
+    shardPinFences: defineTable({
+        createdAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user", ["userId"]),
 
     /**
      * Lookup from a key known BEFORE the owner is to the owner's shard:
