@@ -150,6 +150,7 @@
         "my-ua-parser": "catalog:utils",
         "nanoid": "catalog:utils",
         "next-themes": "catalog:ui",
+        "open-bot-avatar": "catalog:ui",
         "posthog-js": "catalog:analytics",
         "posthog-node": "catalog:analytics",
         "pptxgenjs": "catalog:utils",

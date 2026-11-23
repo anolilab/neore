@@ -1187,6 +1187,9 @@ catalogs:
     next-themes:
       specifier: 0.4.6
       version: 0.4.6
+    open-bot-avatar:
+      specifier: 0.3.1
+      version: 0.3.1
     react-resizable-panels:
       specifier: 4.24.1
       version: 4.24.1
@@ -2282,6 +2285,9 @@ importers:
       next-themes:
         specifier: catalog:ui
         version: 0.4.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      open-bot-avatar:
+        specifier: catalog:ui
+        version: 0.3.1
       posthog-js:
         specifier: catalog:analytics
         version: 1.453.0(@types/react@19.3.0)(react@19.3.1)
@@ -22551,6 +22557,9 @@ packages:
 
   oniguruma-to-es@4.3.6:
     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
+
+  open-bot-avatar@0.3.1:
+    resolution: {integrity: sha512-TvX876wtLlmMCGY7d0Mo98Mn7pSIJAZ4swy5NhFcgyI0oMzZX0zuo8p+BedIop+yEOPLZbWZONusu4zh8C43kQ==}
 
   open-color@1.9.1:
     resolution: {integrity: sha512-vCseG/EQ6/RcvxhUcGJiHViOgrtz4x0XbZepXvKik66TMGkvbmjeJrKFyBEx6daG5rNyyd14zYXhz0hZVwQFOw==}
@@ -49256,6 +49265,8 @@ snapshots:
       oniguruma-parser: 0.12.2
       regex: 6.1.0
       regex-recursion: 6.0.2
+
+  open-bot-avatar@0.3.1: {}
 
   open-color@1.9.1: {}
 
