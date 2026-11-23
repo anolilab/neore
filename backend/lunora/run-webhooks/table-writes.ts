@@ -17,9 +17,10 @@ type RawWebhookDb = {
  * row, so a second would be unreachable. Checked per row, through the index, so a redelivered job stops at the row it wrote.
  *
  * On a shard that also holds the guest's row, that row's id is already taken: it is re-owned in place rather than inserted
- * again, so the same id is never written twice.
+ * again, so the same id is never written twice. A row under that id owned by anyone but the guest is a different user's
+ * webhook: the merge stops before it is touched, and before the clear pass deletes the guest's copy.
  */
-export const copyMergedRunWebhooks = async (ctx: { db: unknown }, rows: Record<string, unknown>[], to: string): Promise<number> => {
+export const copyMergedRunWebhooks = async (ctx: { db: unknown }, rows: Record<string, unknown>[], from: string, to: string): Promise<number> => {
     const db = ctx.db as unknown as RawWebhookDb;
     let imported = 0;
 
@@ -32,10 +33,14 @@ export const copyMergedRunWebhooks = async (ctx: { db: unknown }, rows: Record<s
 
         const id = row._id as string;
 
-        if ((await db.get("runWebhooks", id)) === null) {
+        const existing = (await db.get("runWebhooks", id)) as { userId?: unknown } | null;
+
+        if (existing === null) {
             await db.insert("runWebhooks", row, { allowExplicitId: true });
-        } else {
+        } else if (existing.userId === from) {
             await db.patch("runWebhooks", id, { userId: to });
+        } else {
+            throw new Error(`runWebhooks row ${id} already exists on the new account's shard as another user's row; the merge into ${to} stops`);
         }
 
         imported += 1;

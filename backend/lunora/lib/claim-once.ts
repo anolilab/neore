@@ -44,6 +44,7 @@
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
  * | `posthog-retry-scheduled` / `-started` / `-outcome` / `-erased` / `-deferred` | `<requestId>:<chain>:<attempt>` (`-erased`: `:<deleted\|no_profile>`, `-deferred`: `:<n>` appended; `posthog-retry-chain`: `<requestId>:<failureId>`) | 14 days (`-lease`: 10 min) | `gdpr/posthog-retry.ts` (not user-tagged: erasing the account must not reopen a finished attempt) |
+ * | `guest-merge-probe` | `<guestId>:<newUserId>` | 1 h                          | `lib/account-merge.ts` (`mergeGuestInto`: written on the new account's shard, looked for on the guest's, to tell whether both serve one store) |
  * | `gdpr-deletion-confirmed-email` | `<requestId>`  | 14 days; kept when the send throws | `gdpr/posthog-retry.ts`, `gdpr/workflows/deletion-workflow.ts` (one scope: whichever path sends first wins) |
  *
  * A key must be remembered at least as long as a replay of it could still pass

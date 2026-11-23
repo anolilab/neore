@@ -32,6 +32,8 @@ const REFERENCES: MergeReferences = {
     importRows: ref("importShardRows"),
     list: ref("listShardRowsPage"),
     listIds: ref("listShardRowIds"),
+    markProbe: { __lunoraRef: "lib_claim_once:claimKey" },
+    probeHeld: { __lunoraRef: "lib_claim_once:claimHeld" },
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
 };
@@ -40,16 +42,23 @@ type Row = Record<string, unknown> & { _id: string };
 
 /**
  * Two shards as `shardKey → table → rows`, and a caller that plays the procedures against them. `follows` is how many
- * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports.
+ * follow rows the guest holds (`pageSize` move per call); `followsRemain` is what the guest deletion reports. With
+ * `sameStore`, the new account's key serves the guest's store, as local routing can.
  */
 const fakeShards = (
     seed: Record<string, Record<string, Row[]>>,
     pageSize = 2,
-    { follows = 0, followsRemain = false }: { follows?: number; followsRemain?: boolean } = {},
+    { follows = 0, followsRemain = false, sameStore = false }: { follows?: number; followsRemain?: boolean; sameStore?: boolean } = {},
 ) => {
     let followsLeft = follows;
     let followPageCalls = 0;
     const shards = new Map(Object.entries(seed).map(([key, tables]) => [key, new Map(Object.entries(tables).map(([table, rows]) => [table, [...rows]]))]));
+    const probes = new Map<Map<string, Row[]>, Set<string>>();
+
+    if (sameStore) {
+        shards.set("user", shards.get("guest") ?? new Map<string, Row[]>());
+    }
+
     const reassigned: { from: string; to: string }[] = [];
     /** Each guest deletion, with how many rows the guest's shard still held at that moment. */
     const deletedGuests: { left: number; shardKey: string; userId: string }[] = [];
@@ -70,6 +79,19 @@ const fakeShards = (
         const table = args.table as string;
 
         switch (name) {
+            case "claimHeld": {
+                const store = shards.get(shardKey);
+
+                return (store !== undefined && (probes.get(store)?.has(args.key as string) ?? false)) as never;
+            }
+            case "claimKey": {
+                const store = shards.get(shardKey) ?? new Map<string, Row[]>();
+
+                shards.set(shardKey, store);
+                probes.set(store, (probes.get(store) ?? new Set()).add(args.key as string));
+
+                return true as never;
+            }
             case "deleteMergedGuest": {
                 if (followsRemain) {
                     return { deleted: false, followsRemain: true } as never;
@@ -95,8 +117,13 @@ const fakeShards = (
                 const target = tableOf(shardKey, table);
 
                 for (const row of args.rows as Row[]) {
-                    if (target.every((existing) => existing._id !== row._id)) {
-                        target.push(rewriteOwner(row, args.from as string, args.to as string) as Row);
+                    const existing = target.find((candidate) => candidate._id === row._id);
+                    const guestOwned = row.userId === args.from;
+
+                    if (existing === undefined) {
+                        target.push((guestOwned ? rewriteOwner(row, args.from as string, args.to as string) : row) as Row);
+                    } else if (existing.userId === args.from) {
+                        existing.userId = args.to;
                     }
                 }
 
@@ -104,6 +131,7 @@ const fakeShards = (
             }
             case "listShardRowIds": {
                 return tableOf(shardKey, table)
+                    .filter((row) => args.ownedBy === undefined || row.userId === args.ownedBy)
                     .slice(0, pageSize)
                     .map((row) => row._id) as never;
             }
@@ -234,6 +262,57 @@ describe("mergeGuestInto", () => {
         const { call } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, { followsRemain: true });
 
         await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("thread follows");
+    });
+
+    it("moves a collaborator's row on the guest's shard as it is, and clears the guest's copy of it", async () => {
+        const threads: Row[] = [
+            { _id: "c1", body: "guest's own", userId: "guest" },
+            { _id: "c2", body: "a collaborator's", userId: "collaborator" },
+        ];
+        const { call, deletedGuests, shards } = fakeShards({ guest: { threads } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("user")?.get("threads")).toStrictEqual([
+            { _id: "c1", body: "guest's own", userId: "user" },
+            { _id: "c2", body: "a collaborator's", userId: "collaborator" },
+        ]);
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([]);
+        expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
+    });
+
+    it("clears a collaborator's row an earlier, interrupted run already copied", async () => {
+        const collaboratorRow: Row = { _id: "c2", body: "a collaborator's", userId: "collaborator" };
+        const { call, shards } = fakeShards({ guest: { threads: [collaboratorRow] }, user: { threads: [{ ...collaboratorRow }] } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("user")?.get("threads")).toStrictEqual([collaboratorRow]);
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([]);
+    });
+
+    it("keeps a collaborator's row and the new account's rows when both keys serve one store", async () => {
+        const { call, shards } = fakeShards(
+            {
+                guest: {
+                    threads: [
+                        { _id: "c1", userId: "guest" },
+                        { _id: "c2", userId: "collaborator" },
+                        { _id: "c3", userId: "user" },
+                    ],
+                },
+            },
+            2,
+            { sameStore: true },
+        );
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([
+            { _id: "c1", userId: "user" },
+            { _id: "c2", userId: "collaborator" },
+            { _id: "c3", userId: "user" },
+        ]);
     });
 
     it("is safe to run twice", async () => {
@@ -674,6 +753,32 @@ describe("importShardRows for runWebhooks", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ url: "https://example.com/own" });
     });
+
+    it("stops the merge, and leaves the row alone, when another user's webhook holds the guest webhook's id", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const stored = await harness.run(async (context: any) => {
+                const strangerId = await context.db.insert("runWebhooks", webhook({ url: "https://example.com/stranger", userId: "stranger" }));
+
+                await expect(
+                    context.runMutation(importShardRows, {
+                        from: "guest",
+                        rows: [webhook({ _id: strangerId, url: "https://example.com/guest", userId: "guest" })],
+                        table: "runWebhooks",
+                        to: "user",
+                    }),
+                ).rejects.toThrow("already exists on the new account's shard");
+
+                return context.db.query("runWebhooks").take(MERGE_PAGE_SIZE);
+            });
+
+            expect(stored).toHaveLength(1);
+            expect(stored[0]).toMatchObject({ url: "https://example.com/stranger", userId: "stranger" });
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("importShardRows on an id another user's row holds", () => {
@@ -874,25 +979,31 @@ describe("clearing the guest's settings", () => {
         }
     });
 
-    it("asks for the guest's rows alone when it clears the tables the new account keeps its own row of", async () => {
-        const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } });
-        const listIdCalls: Record<string, unknown>[] = [];
+    it.each([
+        { expectedThreads: { table: "threads" }, sameStore: false },
+        { expectedThreads: { ownedBy: "guest", table: "threads" }, sameStore: true },
+    ])(
+        "asks for the guest's rows alone when it clears the tables the new account keeps its own row of (one store: $sameStore)",
+        async ({ expectedThreads, sameStore }) => {
+            const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } }, 2, { sameStore });
+            const listIdCalls: Record<string, unknown>[] = [];
 
-        await mergeGuestInto(
-            async (reference, args, shardKey) => {
-                if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
-                    listIdCalls.push(args);
-                }
+            await mergeGuestInto(
+                async (reference, args, shardKey) => {
+                    if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
+                        listIdCalls.push(args);
+                    }
 
-                return await call(reference, args, shardKey);
-            },
-            REFERENCES,
-            "guest",
-            "user",
-        );
+                    return await call(reference, args, shardKey);
+                },
+                REFERENCES,
+                "guest",
+                "user",
+            );
 
-        expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
-        expect(listIdCalls.find((args) => args.table === "runWebhooks")).toEqual({ ownedBy: "guest", table: "runWebhooks" });
-        expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ ownedBy: "guest", table: "threads" });
-    });
+            expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
+            expect(listIdCalls.find((args) => args.table === "runWebhooks")).toEqual({ ownedBy: "guest", table: "runWebhooks" });
+            expect(listIdCalls.find((args) => args.table === "threads")).toEqual(expectedThreads);
+        },
+    );
 });

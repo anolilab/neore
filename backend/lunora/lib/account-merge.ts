@@ -43,6 +43,18 @@ export const MERGE_PAGE_SIZE = 100;
 /** The guest's own copy of these is dropped: the new account already has its seeded row. */
 const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 
+/**
+ * Tables whose rows are copied for the guest alone: another user's row on the guest's shard stays where it is, so the
+ * clear pass takes only the guest's rows of these, even when the two shards are separate stores.
+ */
+const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
+
+/** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
+export const MERGE_PROBE_SCOPE = "guest-merge-probe";
+
+/** How long the probe marker is kept; a merge reads it straight after writing it, the purge cron drops it later. */
+const MERGE_PROBE_TTL_MS = 60 * 60 * 1000;
+
 /** Ephemeral bookkeeping that is not the guest's content. */
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
@@ -211,6 +223,7 @@ export const importShardRows = internalMutation
                 imported: await copyMergedRunWebhooks(
                     ctx,
                     guestRows.map((row) => rewriteOwner(row, args.from, args.to)),
+                    args.from,
                     args.to,
                 ),
             };
@@ -409,14 +422,23 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         }
     }
 
-    // Then clear the guest's shard.
+    // Then clear the guest's shard. Whether both shard keys serve one store (as local routing can) decides what goes: on one
+    // store, another user's row there is the same row the new account's shard holds, so only the guest's rows are cleared.
+    // On separate stores, every row the copy pass took now sits on the new shard too, a collaborator's row included, so the
+    // guest's copy of it goes as well. Probed on every run, so a redelivered merge decides the same way.
+    const probeKey = `${from}:${to}`;
+
+    await call(references.markProbe, { key: probeKey, scope: MERGE_PROBE_SCOPE, ttlMs: MERGE_PROBE_TTL_MS }, to);
+
+    const sharedStore: boolean = await call(references.probeHeld, { key: probeKey, scope: MERGE_PROBE_SCOPE }, from);
     let drained = true;
 
     for (const table of tables) {
         let emptied = false;
+        const listArgs = sharedStore || COPIED_FOR_GUEST_ONLY.has(table) ? { ownedBy: from, table } : { table };
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-            const ids: string[] = await call(references.listIds, { ownedBy: from, table }, from);
+            const ids: string[] = await call(references.listIds, listArgs, from);
 
             if (ids.length === 0) {
                 emptied = true;
@@ -471,6 +493,10 @@ export interface MergeReferences {
     importRows: { __lunoraRef: string };
     list: { __lunoraRef: string };
     listIds: { __lunoraRef: string };
+    /** `claimKey`, run on the new account's shard to leave the store probe's marker. */
+    markProbe: { __lunoraRef: string };
+    /** `claimHeld`, run on the guest's shard: `true` when it sees the marker, so both keys serve one store. */
+    probeHeld: { __lunoraRef: string };
     reassignFollows: { __lunoraRef: string };
     reassignGlobal: { __lunoraRef: string };
 }
@@ -523,6 +549,8 @@ export const runGuestMerge = internalAction
                 importRows: internal.lib.account_merge.importShardRows,
                 list: internal.lib.account_merge.listShardRowsPage,
                 listIds: internal.lib.account_merge.listShardRowIds,
+                markProbe: internal.lib.claim_once.claimKey,
+                probeHeld: internal.lib.claim_once.claimHeld,
                 reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
                 reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
             },
