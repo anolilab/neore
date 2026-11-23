@@ -10,7 +10,16 @@ import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
 import { BATCH } from "../../gdpr/batch";
 import schema from "../../schema";
-import { createDocumentPin, createPin, deletePin, eraseUserPinsOnThread, getThreadPins, isPinShapeValid, reassignUserPinsOnThread } from "./functions";
+import {
+    createDocumentPin,
+    createPin,
+    deletePin,
+    eraseUserPinsOnThread,
+    getThreadPins,
+    isPinShapeValid,
+    reassignUserPinsOnThread,
+    withSharedPinRoute,
+} from "./functions";
 
 const OWNER = "user-owner";
 const SHAPE_ERROR = /An image pin names the part it pins/;
@@ -454,5 +463,41 @@ describe("an account being moved or erased cannot add pins", () => {
         );
 
         await expect(as(OWNER).mutation(createPin as never, { messageId: "m-21", messageRole: "assistant", threadId } as never)).resolves.toBeDefined();
+    });
+});
+
+describe("a failed pin write takes the shared route it wrote", () => {
+    // The failure is caught inside the run: an uncaught error would roll the whole run back, route included, and prove nothing.
+    const failingWrite = async (userId: string, now: number): Promise<string | null> =>
+        await harness.run(async (context: any) => {
+            try {
+                await withSharedPinRoute(context, threadId, userId, now, async () => {
+                    throw new Error("pin write failed");
+                });
+
+                return null;
+            } catch (error) {
+                return (error as Error).message;
+            }
+        });
+
+    it("removes the route when the pin write throws and the user has no other pin on the thread", async () => {
+        expect(await failingWrite("user-collaborator", 1)).toBe("pin write failed");
+
+        const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
+
+        expect(routes.page).toHaveLength(0);
+    });
+
+    it("keeps the route when the user already has another pin on the thread", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-collaborator" });
+        });
+
+        expect(await failingWrite("user-collaborator", 2)).toBe("pin write failed");
+
+        const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
+
+        expect(routes.page).toHaveLength(1);
     });
 });

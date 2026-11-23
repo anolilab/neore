@@ -190,7 +190,13 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
  * route this call inserted goes too, unless the caller has another pin on the thread. A route left by a failure that could not be
  * undone is harmless: it names a thread with nothing in it, which every reader skips.
  */
-const withSharedPinRoute = async <T>(context: MutationCtx, threadId: Id<"threads">, userId: string, now: number, write: () => Promise<T>): Promise<T> => {
+export const withSharedPinRoute = async <T>(
+    context: MutationCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    now: number,
+    write: () => Promise<T>,
+): Promise<T> => {
     const routeId = await recordSharedPinRoute(context, threadId, userId, now);
 
     try {
