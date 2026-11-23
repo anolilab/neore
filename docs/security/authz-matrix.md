@@ -424,6 +424,7 @@ for a schema table that is neither policed nor listed:
 | `coding_agents_functions.cancelRun` | mutation | authMutation + RL | codingAgentRuns | row.userId == caller | ok |
 | `coding_agents_functions.getLatestRunForTask` | query | authQuery | tasks | row.userId == caller | ok |
 | `coding_agents_functions.getRun` | query | authQuery | codingAgentRuns | row.userId == caller | ok |
+| `coding_agents_functions.startSetupFix` | mutation | authMutation + RL | codingAgentRuns | row.userId == caller | ok — new; starts a run on the caller's own failed run's repository and branch, only for a fixable setup step, one fix at a time (a retry only after the newest fix ended failed or cancelled) |
 | `coding_agents_functions.setCodingAgentCommitIdentity` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok — new; chooses the agent or the person as the commit author for the caller's own runs |
 | `coding_agents_functions.getRunByToolCall` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `connectors_mcp_servers.listMcpServerSignIns` | query | authQuery | — | caller-scoped (ctx.user) | ok |

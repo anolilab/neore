@@ -207,7 +207,7 @@ msgstr "（离线）"
 msgid "(old side)"
 msgstr "（旧版一侧）"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:250
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:275
 #: src/features/settings/connectors/connector-card.tsx:202
 msgid "(opens in a new tab)"
 msgstr "（在新标签页中打开）"
@@ -896,7 +896,7 @@ msgstr "{activeCount}/{0} 个 MCP 服务器已启用"
 msgid "{address}: {reason}"
 msgstr "{address}：{reason}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:176
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:192
 msgid "{agentLabel} on {repo}"
 msgstr "{repo} 上的 {agentLabel}"
 
@@ -1091,7 +1091,7 @@ msgstr "{fieldLabel}与当前值相同"
 msgid "{fieldLabel} updated successfully"
 msgstr "{fieldLabel}已成功更新"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:212
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:228
 msgid "{fileCount, plural, one {Changes (# file)} other {Changes (# files)}}"
 msgstr "{fileCount, plural, other {更改（# 个文件）}}"
 
@@ -2111,6 +2111,10 @@ msgstr "某个时刻到来"
 #: src/features/chat/forward/forward-dialog.tsx:109
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "将打开一个引用所选消息的新聊天。检查后再发送。"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:92
+msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
+msgstr "在同一代码仓库和分支上的新运行会修复仓库中的原因，并重新运行该步骤。开始之前，请先阅读并编辑其任务。"
 
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:49
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
@@ -6007,7 +6011,8 @@ msgstr "加拿大"
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:118
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/develop/components/pull-request-reviewers-action.tsx:166
@@ -6092,7 +6097,7 @@ msgstr "取消选择"
 
 #: src/features/chat/thread/host-activity.tsx:130
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:164
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:180
 #: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:134
@@ -7242,7 +7247,7 @@ msgstr "编程"
 msgid "Coding"
 msgstr "编程"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:88
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:89
 msgid "Coding agent log"
 msgstr "编程智能体日志"
 
@@ -8812,7 +8817,7 @@ msgstr "无法保存"
 msgid "Could not cancel the message. It is still queued."
 msgstr "无法取消该消息。它仍在队列中。"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:142
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:143
 msgid "Could not cancel the run."
 msgstr "无法取消运行。"
 
@@ -9077,7 +9082,7 @@ msgstr "无法为此{requestNoun}打开对话。请重试。"
 msgid "Could not open as a page"
 msgstr "无法作为页面打开"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:151
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 msgid "Could not open the pull request."
 msgstr "无法打开拉取请求。"
 
@@ -9262,6 +9267,10 @@ msgstr "无法开始新的上下文，请重试。"
 #: src/features/settings/components/chat/mcp-settings.tsx:94
 msgid "Could not start sign-in"
 msgstr "无法开始登录"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:58
+msgid "Could not start the fix."
+msgstr "无法开始修复。"
 
 #: src/features/skills/components/skill-builder-test-drive.tsx:79
 msgid "Could not start the test drive."
@@ -9522,7 +9531,7 @@ msgstr "创建组织"
 msgid "Create Organization"
 msgstr "创建组织"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:259
 msgid "Create PR"
 msgstr "创建 PR"
 
@@ -11401,7 +11410,7 @@ msgstr "在此项目中不使用你的默认指令"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:118
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:168
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:383
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
@@ -13640,7 +13649,7 @@ msgstr "失败"
 
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/chat/thread/host-activity.tsx:139
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:165
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:77
 #: src/features/devices/components/devices-settings.tsx:386
 #: src/features/evals/components/model-comparison.tsx:112
@@ -15189,6 +15198,18 @@ msgstr "修复检查项"
 #: src/features/canvas/components/canvas-toolbar.tsx:33
 msgid "Fix grammar"
 msgstr "修正语法"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:84
+msgid "Fix setup"
+msgstr "修复设置"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:73
+msgid "Fix started — follow it below"
+msgstr "修复已开始——请在下方查看进度"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:90
+msgid "Fix the \"{step}\" step"
+msgstr "修复“{step}”步骤"
 
 #: src/features/develop/lib/fix-prompts.ts:60
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
@@ -20112,7 +20133,7 @@ msgstr "已锁定为{0}模型"
 msgid "Locked to {anchorModeName} models"
 msgstr "已锁定为 {anchorModeName} 模型"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:198
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:214
 msgid "Log"
 msgstr "日志"
 
@@ -24787,7 +24808,7 @@ msgstr "从此对话打开"
 msgid "Opening a blank chat"
 msgstr "正在打开空白对话"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:156
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:172
 msgid "Opening a pull request — progress is in the log"
 msgstr "正在创建拉取请求——进度见日志"
 
@@ -24795,7 +24816,7 @@ msgstr "正在创建拉取请求——进度见日志"
 msgid "Opening a thread…"
 msgstr "正在打开对话…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:233
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
 msgid "Opening pull request…"
 msgstr "正在创建拉取请求…"
 
@@ -31047,7 +31068,7 @@ msgstr "快捷键"
 msgid "Show {fieldLabel}"
 msgstr "显示{fieldLabel}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:63
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:64
 msgid "Show {hidden} more lines"
 msgstr "再显示 {hidden} 行"
 
@@ -32357,6 +32378,10 @@ msgstr "免费开始聊天"
 msgid "Start editing cell"
 msgstr "开始编辑单元格"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:122
+msgid "Start fix"
+msgstr "开始修复"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
@@ -32490,7 +32515,7 @@ msgstr "正在启动编程智能体…"
 msgid "Starting voice input…"
 msgstr "正在启动语音输入…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:166
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:182
 msgid "Starting…"
 msgstr "正在启动…"
 
@@ -33617,6 +33642,10 @@ msgstr "任务失败"
 msgid "Task finished"
 msgstr "任务完成"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:98
+msgid "Task for the coding agent"
+msgstr "编程智能体的任务"
+
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
 #: ../../packages/ui/src/components/tiptap-editor.tsx:228
 msgid "Task list"
@@ -34311,7 +34340,7 @@ msgstr "智能体会保留你分享的事实，并在之后的聊天中使用，
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "智能体循环始终启用，以系统化地执行任务。这些设置控制额外的专用模块，用于增强 AI 在特定任务类型上的能力。"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:220
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:236
 msgid "The agent made no file changes."
 msgstr "智能体未更改任何文件。"
 
@@ -34445,7 +34474,7 @@ msgstr "无法导入捆绑包。"
 msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
 msgstr "自你开始此审查以来，变更有了新的提交。请先提交或放弃该审查，再对新版本发表评论。"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:215
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:231
 msgid "The change is too large to show in full."
 msgstr "更改过大，无法完整显示。"
 
@@ -35730,6 +35759,10 @@ msgstr "此链接目前不接收消息。请稍后再试。"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:365
 msgid "This list is full: remove a tool before adding another."
 msgstr "此列表已满：请先移除一个工具，再添加新的。"
+
+#: src/features/vault/components/site-logins.tsx:307
+#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
+#~ msgstr "此登录信息已在别处更改，并已重新加载。你对用户名和标签的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
 
 #: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
@@ -38617,7 +38650,7 @@ msgstr "在 Google 地图上查看"
 msgid "View Privacy Policy"
 msgstr "查看隐私政策"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:274
 msgid "View pull request"
 msgstr "查看拉取请求"
 
@@ -38899,7 +38932,7 @@ msgstr "等待批准"
 msgid "Waiting for approval on {device}"
 msgstr "等待在 {device} 上批准"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:103
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:104
 msgid "Waiting for output…"
 msgstr "正在等待输出…"
 
@@ -39573,7 +39606,7 @@ msgstr "正在朝目标努力：第 {nextRound}/{0} 轮"
 #: src/features/auth/components/device-approval.tsx:233
 #: src/features/auth/components/device-approval.tsx:242
 #: src/features/chat/thread/streaming-placeholder.tsx:634
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:183
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
 msgstr "正在处理…"
@@ -39629,6 +39662,10 @@ msgstr "写点东西"
 #: src/features/develop/components/guide-tab.tsx:187
 msgid "Write the guide"
 msgstr "撰写指南"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:111
+msgid "Write the task for the agent before you start the fix."
+msgstr "开始修复前，请先填写给编码代理的任务。"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
 msgid "Write, or type '/' for commands…"
