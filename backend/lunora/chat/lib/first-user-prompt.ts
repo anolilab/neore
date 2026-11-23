@@ -1,4 +1,4 @@
-import { isAttachedLine } from "./attached-text";
+import { isAttachedLine, withoutQuotedLines } from "./attached-text";
 
 /** The longest prompt text a title is generated from; the title needs its subject, not the whole message. */
 const MAX_PROMPT_CHARS = 2000;
@@ -103,8 +103,8 @@ const contribution = (piece: Piece, want: "attached" | "typed", limit: number): 
 /** `out` followed by as much of `piece` as keeps the result within `limit` code units. */
 const appendCapped = (out: string, piece: string, limit: number): string => out + piece.slice(0, Math.max(0, limit - out.length));
 
-/** The text of a message that is `want`: its typed pieces joined by a space, or its attached pieces, read to the limit. */
-const textWanted = (content: unknown, want: "attached" | "typed", limit: number = READ_LIMIT): string => {
+/** The text of a message that is `want`: its typed pieces joined by a space, or its attached pieces, read to the limit. `own` narrows each piece further. */
+const textWanted = (content: unknown, want: "attached" | "typed", limit: number = READ_LIMIT, own: (text: string) => string = (text) => text): string => {
     let out = "";
 
     for (const piece of pieces(content)) {
@@ -112,7 +112,7 @@ const textWanted = (content: unknown, want: "attached" | "typed", limit: number 
             break;
         }
 
-        const chunk = contribution(piece, want, limit);
+        const chunk = own(contribution(piece, want, limit)).trim();
 
         if (chunk) {
             out = appendCapped(out ? appendCapped(out, " ", limit) : out, chunk, limit);
@@ -122,11 +122,19 @@ const textWanted = (content: unknown, want: "attached" | "typed", limit: number 
     return out;
 };
 
+/** Whether a text part is the image request's placeholder ({@link imagePromptPart}), known by its tag, not its wording. */
+const isImagePlaceholder = (part: unknown): boolean =>
+    typeof part === "object" &&
+    part !== null &&
+    (part as { providerOptions?: { neore?: { placeholder?: unknown } } }).providerOptions?.neore?.placeholder === true;
+
 /**
- * What the person typed in a stored user message, whole: no attached document or page text and no file-only placeholder.
- * Empty for a message with nothing typed (a file sent with no question).
+ * The person's own words in a stored user message, whole: no attached document or page text, no placeholder the app wrote
+ * (a file or an image sent with no prompt) and no quoted lines, which came from a reply or a forward. Empty for a message with
+ * none (a file sent with no question). A title still reads the placeholder and the quote (`firstUserPrompt`).
  */
-export const typedPromptText = (content: unknown): string => textWanted(content, "typed", Infinity);
+export const typedPromptText = (content: unknown): string =>
+    textWanted(Array.isArray(content) ? content.filter((part) => !isImagePlaceholder(part)) : content, "typed", Infinity, withoutQuotedLines);
 
 /**
  * The first `MAX_PROMPT_CHARS` characters of `text`, by code point, so a cut never splits a surrogate pair. It stops at the limit: a

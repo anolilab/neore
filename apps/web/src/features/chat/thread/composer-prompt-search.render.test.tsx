@@ -411,6 +411,39 @@ describe("ComposerPromptSearch", () => {
         expect(onPick).not.toHaveBeenCalled();
     });
 
+    it("drops a pick, and its notice, when the search changes while the check runs", async () => {
+        const onPick = vi.fn();
+
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
+
+        const input = screen.getByRole("combobox");
+
+        fireEvent.change(input, { target: { value: "deploy" } });
+        await settle();
+
+        // Typed again before the check answered: the "deploy" row must not reach the draft.
+        fireEvent.click(screen.getAllByRole("option")[0]!);
+        fireEvent.change(input, { target: { value: "deplo" } });
+        await settle();
+
+        expect(onPick).not.toHaveBeenCalled();
+
+        // A pick the check refuses after the change says nothing over the new list.
+        const index = prompts.findIndex((prompt) => prompt.messageId === "m-notes");
+        const [removed] = prompts.splice(index, 1);
+
+        try {
+            fireEvent.click(screen.getAllByRole("option")[0]!);
+            fireEvent.change(input, { target: { value: "deploy" } });
+            await settle();
+
+            expect(screen.queryByText("That prompt is no longer available. Pick another.")).toBeNull();
+            expect(onPick).not.toHaveBeenCalled();
+        } finally {
+            prompts.splice(index, 0, removed!);
+        }
+    });
+
     it("counts one match in the singular and says in the status that the list may be incomplete", async () => {
         render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
 

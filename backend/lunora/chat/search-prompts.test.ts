@@ -3,12 +3,15 @@
  * own threads), newest first, at most 50, and never a locked thread's prompt.
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { searchSentPrompts } from "./functions";
 import { documentTextPart } from "./lib/attached-text";
+import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -370,6 +373,92 @@ describe("searchSentPrompts", () => {
         }
     });
 
+    it("reads the smaller window first and widens it only when too few prompts survived", async () => {
+        const harness = lunoraTest(schema as never);
+        const key = "agent_messages:textSearch";
+        const textSearch = registry.get(key);
+        const windows: number[] = [];
+
+        // Records each window the search asks the index for, then answers it as the real query does.
+        registry.set(
+            key,
+            internalQuery
+                .input({ limit: v.number(), searchAllMessagesForUserId: v.optional(v.string()), text: v.optional(v.string()) })
+                .query(async ({ args, ctx }: any) => {
+                    windows.push(args.limit);
+
+                    return await ctx.runQuery(textSearch, args);
+                }),
+        );
+
+        try {
+            await harness.run(async (context: any) => {
+                const prompts = await insertThread(context, { title: "Prompts", userId: OWNER });
+                const replies = await insertThread(context, { title: "Replies", userId: OWNER });
+
+                for (let index = 0; index < 120; index += 1) {
+                    await insertMessage(context, {
+                        createdAt: index,
+                        order: index,
+                        role: "user",
+                        text: `deploy number ${index}`,
+                        threadId: prompts,
+                        userId: OWNER,
+                    });
+                }
+
+                for (let index = 0; index < 30; index += 1) {
+                    await insertMessage(context, {
+                        createdAt: index,
+                        order: 200 + index,
+                        role: "user",
+                        text: `release step ${index}`,
+                        threadId: prompts,
+                        userId: OWNER,
+                    });
+                }
+
+                // Stored after the prompts, so they win the index's tie-break on equal scores and take the first window of a
+                // "release" search: replies, and prompts of a trashed chat, which count only once the thread filter has run.
+                const trashed = await insertThread(context, { title: "Trashed", userId: OWNER });
+
+                await context.db.patch("threads", trashed, { deleted: true });
+
+                for (let index = 0; index < 60; index += 1) {
+                    await insertMessage(context, {
+                        createdAt: 1000 + index,
+                        order: index,
+                        role: "user",
+                        text: `release draft ${index}`,
+                        threadId: trashed,
+                        userId: OWNER,
+                    });
+                    await insertMessage(context, {
+                        createdAt: 2000 + index,
+                        order: index,
+                        role: "assistant",
+                        text: `release note ${index}`,
+                        threadId: replies,
+                        userId: OWNER,
+                    });
+                }
+            });
+
+            // A common word whose first window gives a full list reads no further.
+            expect(await search(harness, "deploy")).toHaveLength(50);
+            expect(windows).toEqual([100]);
+
+            windows.length = 0;
+
+            // Rows that list nothing filled the first window: the search widens and still finds the prompts behind them.
+            expect(await search(harness, "release")).toHaveLength(30);
+            expect(windows).toEqual([100, 400]);
+        } finally {
+            registry.set(key, textSearch);
+            harness.close();
+        }
+    });
+
     it("answers nothing for a blank query", async () => {
         const harness = lunoraTest(schema as never);
 
@@ -418,31 +507,43 @@ describe("searchSentPrompts", () => {
         }
     });
 
-    it("lists and searches only what was typed, never an attached document's text", async () => {
+    it("lists and searches only what was typed, never an attached document, a quoted line or the image request's placeholder", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
-            const shown = await harness.run(async (context: any) => {
+            const ids = await harness.run(async (context: any) => {
                 const thread = await insertThread(context, { title: "Report", userId: OWNER });
                 const content = [documentTextPart("report.pdf", "quarterly revenue table"), { text: "summarise this report", type: "text" }];
+                const quote = "> the deploy log says retry later\n\nwhy did the deploy fail";
+                const typed = (text: string, order: number, parts: unknown = text) =>
+                    insertMessage(context, { content: parts, createdAt: order + 1, order, role: "user", text, threadId: thread, userId: OWNER });
 
-                return insertMessage(context, {
-                    content,
-                    createdAt: 1,
-                    order: 0,
-                    role: "user",
-                    text: content.map((part) => part.text).join(" "),
-                    threadId: thread,
-                    userId: OWNER,
-                });
+                return {
+                    imageAsked: await typed("Generate an image", 3, [imagePromptPart()]),
+                    imageTyped: await typed("Generate an image of a lighthouse", 4),
+                    quoted: await typed(quote, 2),
+                    shown: await typed(content.map((part) => part.text).join(" "), 0, content),
+                };
             });
 
             expect(await search(harness, "revenue")).toEqual([]);
 
             const prompts = await search(harness, "summarise");
 
-            expect(prompts.map((prompt) => prompt.messageId)).toEqual([shown]);
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.shown]);
             expect(prompts[0]?.text).toBe("summarise this report");
+
+            // A word only in the quote matches nothing; the person's own words match and come back without the quote.
+            expect(await search(harness, "retry")).toEqual([]);
+
+            const replies = await search(harness, "fail");
+
+            expect(replies.map((prompt) => [prompt.messageId, prompt.text])).toEqual([[ids.quoted, "why did the deploy fail"]]);
+
+            // An image asked for with no prompt carries the app's placeholder: only the typed request with the same words lists.
+            const images = await search(harness, "generate image");
+
+            expect(images.map((prompt) => prompt.messageId)).toEqual([ids.imageTyped]);
         } finally {
             harness.close();
         }

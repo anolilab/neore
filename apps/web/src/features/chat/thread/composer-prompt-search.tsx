@@ -64,6 +64,8 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const pickingRef = useRef(false);
     // A pick still checking when the search closes is dropped: the composer it was meant for may be locked or showing another chat.
     const mountedRef = useRef(true);
+    // The query as typed, kept for a pick's check: one that finishes after the person typed again belongs to the old search.
+    const queryRef = useRef("");
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     // Set when a pick is refused or could not be checked; cleared by the next keystroke.
@@ -111,8 +113,8 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
 
         pickingRef.current = false;
 
-        // Closed while the check ran: nothing goes in the draft.
-        if (!mountedRef.current) {
+        // Closed, or the search changed, while the check ran: nothing goes in the draft and no notice covers the new list.
+        if (!mountedRef.current || queryRef.current.trim() !== searched) {
             return;
         }
 
@@ -230,6 +232,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                     id={inputId}
                     maxLength={SEARCH_MAX_LENGTH}
                     onChange={(event) => {
+                        queryRef.current = event.target.value;
                         setQuery(event.target.value);
                         setActive(0);
                         setPickNotice(null);
