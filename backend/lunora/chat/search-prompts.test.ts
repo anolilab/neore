@@ -3,7 +3,7 @@
  * own threads), newest first, at most 50, and never a locked thread's prompt.
  */
 import { lunoraTest } from "@lunora/testing";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
@@ -1065,5 +1065,39 @@ describe("typed words stay on the server", () => {
         } finally {
             harness.close();
         }
+    });
+});
+
+describe("searchSentPrompts while the typed-words index is still being built", () => {
+    const key = "agent_messages:typedTextSearch";
+
+    // Answers every index read with `error`, as Lunora does for `typed_text_search` until its backfill covers the table.
+    const searchFailingWith = async (error: Error) => {
+        const harness = lunoraTest(schema as never);
+        const textSearch = registry.get(key);
+
+        registry.set(
+            key,
+            internalQuery.input({ limit: v.number(), text: v.string(), userId: v.string() }).query(async () => {
+                throw error;
+            }),
+        );
+
+        try {
+            return await harness.withIdentity({ userId: OWNER } as never).query(searchSentPrompts as never, { searchQuery: "deploy" } as never);
+        } finally {
+            registry.set(key, textSearch);
+            harness.close();
+        }
+    };
+
+    it("answers preparing, with no prompts, when the index is still building", async () => {
+        const result: any = await searchFailingWith(new LunoraError("SEARCH_INDEX_BUILDING", "search index is still backfilling"));
+
+        expect(result).toStrictEqual({ preparing: true, prompts: [], truncated: false });
+    });
+
+    it("still fails on any other index error", async () => {
+        await expect(searchFailingWith(new LunoraError("INTERNAL", "boom"))).rejects.toThrow("boom");
     });
 });

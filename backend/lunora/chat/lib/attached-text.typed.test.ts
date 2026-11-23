@@ -26,7 +26,7 @@ describe(typedTextOf, () => {
     });
 
     it("keeps a messenger caption and drops the attachment lines messenger writes after it in the same part", () => {
-        expect.assertions(4);
+        expect.assertions(5);
 
         // As `messenger/functions.ts` saves a received message: the caption and the attachment lines joined in one marked part.
         const received = (text: string) => typedTextOf({ content: [messengerTextPart(text)], role: "user" });
@@ -34,6 +34,8 @@ describe(typedTextOf, () => {
         expect(received("fix the roof\n\n[Attached file: photo.jpg (image/jpeg) — its contents cannot be read here]")).toBe("fix the roof");
         expect(received("read this\n\n[Document: plan.pdf]\nquarterly numbers")).toBe("read this");
         expect(received('[Voice message transcript]\ncall the plumber\n\n[Attachment "a.zip" not read: this type of file is not supported]')).toBe("");
+        // The name is written as sent, quotes included (`messenger/media.ts#skippedLine` strips only control characters).
+        expect(received('see this\n[Attachment "a"b.zip" not read: this type of file is not supported]')).toBe("see this");
         expect(received("[Voice message: it could not be transcribed]")).toBe("");
     });
 

@@ -52,6 +52,11 @@ vi.mock("@/lib/lunora/crpc", () => {
                                   throw new Error("the search could not run");
                               }
 
+                              // The server's answer while the prompt index is still built after a deploy.
+                              if (needle === "warming") {
+                                  return { preparing: true, prompts: [], truncated: false };
+                              }
+
                               return {
                                   prompts: prompts
                                       .filter((prompt) => prompt.text.split(" ").some((word) => word.startsWith(needle)))
@@ -227,6 +232,17 @@ describe("ComposerPromptSearch", () => {
         expect(screen.getByText("The search failed. Try again.")).toBeTruthy();
 
         expect(screen.queryByText("No sent prompts match", { exact: false })).toBeNull();
+    });
+
+    it("says the search is still being prepared, not that nothing matched, while the index is built", async () => {
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "warming" } });
+
+        await settle();
+
+        expect(screen.getByRole("status").textContent).toBe("Prompt search is still being prepared. Try again shortly.");
+        expect(screen.queryAllByRole("option")).toHaveLength(0);
     });
 
     it("says when only the best matches were searched", async () => {
@@ -570,6 +586,25 @@ describe("ComposerPromptSearch", () => {
         } finally {
             prompts.splice(index, 0, removed!);
         }
+    });
+
+    it("drops a pick when the search was edited and typed back to the same words while the check ran", async () => {
+        const onPick = vi.fn();
+
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
+
+        const input = screen.getByRole("combobox");
+
+        fireEvent.change(input, { target: { value: "deploy" } });
+        await settle();
+
+        // The edit reset the highlight the pick was made from, so the same words again do not bring the old pick back.
+        fireEvent.click(screen.getAllByRole("option")[1]!);
+        fireEvent.change(input, { target: { value: "deplo" } });
+        fireEvent.change(input, { target: { value: "deploy" } });
+        await settle();
+
+        expect(onPick).not.toHaveBeenCalled();
     });
 
     it("counts one match in the singular and says in the status that the list may be incomplete", async () => {

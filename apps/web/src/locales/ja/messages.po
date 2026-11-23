@@ -376,7 +376,7 @@ msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, other {# 件の保留中のコメント}}"
 
 #. placeholder {0}: prompts.length
-#: src/features/chat/thread/composer-prompt-search.tsx:225
+#: src/features/chat/thread/composer-prompt-search.tsx:234
 msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, other {# 件のプロンプトが見つかりました}}"
 
@@ -12712,7 +12712,7 @@ msgstr "組織のスラッグを入力"
 msgid "Enter pull requests as owner/name#123."
 msgstr "プルリクエストは owner/name#123 の形式で入力してください。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:247
+#: src/features/chat/thread/composer-prompt-search.tsx:256
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "Enter でプロンプトを入力欄に入れます。送信はされません。"
 
@@ -20707,7 +20707,7 @@ msgstr "レイアウトと構造を合わせる"
 msgid "Matching messages"
 msgstr "一致するメッセージ"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:273
+#: src/features/chat/thread/composer-prompt-search.tsx:283
 msgid "Matching prompts"
 msgstr "一致するプロンプト"
 
@@ -23306,7 +23306,7 @@ msgstr "結果が見つかりません。"
 msgid "No runs yet. Start one to score every case."
 msgstr "実行はまだありません。実行を開始してすべてのケースを採点しましょう。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:221
+#: src/features/chat/thread/composer-prompt-search.tsx:230
 msgid "No sent prompts match \"{searched}\"."
 msgstr "\"{searched}\" に一致する送信済みのプロンプトはありません。"
 
@@ -24177,7 +24177,7 @@ msgstr "このチャットに書き込める人だけがブラウザーを操作
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "状態で絞り込まれるのは、ここに読み込まれた {0} 件のスレッドのみです。それより古いスレッドは含まれません。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:232
+#: src/features/chat/thread/composer-prompt-search.tsx:241
 msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
 msgstr "上位の一致だけを検索するため、より古い、または新しいプロンプトは表示されないことがあります。語を追加して絞り込んでください。"
 
@@ -27089,6 +27089,10 @@ msgstr "プロンプトを読み込みました"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:89
 msgid "Prompt optimized successfully"
 msgstr "プロンプトを最適化しました"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:226
+msgid "Prompt search is still being prepared. Try again shortly."
+msgstr "プロンプト検索はまだ準備中です。しばらくしてからもう一度お試しください。"
 
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:160
 msgid "Prompt to run on all models..."
@@ -30163,9 +30167,9 @@ msgstr "検索結果"
 msgid "Search Results ({0})"
 msgstr "検索結果（{0}）"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:246
-#: src/features/chat/thread/composer-prompt-search.tsx:250
-#: src/features/chat/thread/composer-prompt-search.tsx:267
+#: src/features/chat/thread/composer-prompt-search.tsx:255
+#: src/features/chat/thread/composer-prompt-search.tsx:259
+#: src/features/chat/thread/composer-prompt-search.tsx:277
 msgid "Search sent prompts"
 msgstr "送信済みのプロンプトを検索"
 
@@ -30273,7 +30277,7 @@ msgstr "検索..."
 msgid "Searched the latest messages only"
 msgstr "最新のメッセージのみを検索しました"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:219
+#: src/features/chat/thread/composer-prompt-search.tsx:228
 msgid "Searching"
 msgstr "検索中"
 
@@ -34291,7 +34295,7 @@ msgstr "パスコードが正しくありません。"
 msgid "That path is a file."
 msgstr "そのパスはファイルです。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:212
+#: src/features/chat/thread/composer-prompt-search.tsx:218
 msgid "That prompt is no longer available. Pick another."
 msgstr "このプロンプトはもう利用できません。別のものを選んでください。"
 
@@ -35091,7 +35095,7 @@ msgstr "プロジェクトのリポジトリを読み込めなかったため、
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "プロンプトがケースの入力に、この回答が期待される回答になります。保存前にどちらも編集できます。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:214
+#: src/features/chat/thread/composer-prompt-search.tsx:220
 msgid "The prompt could not be checked. Try again."
 msgstr "プロンプトを確認できませんでした。もう一度お試しください。"
 
@@ -35209,7 +35213,7 @@ msgstr "実行は選択した先に送られます: 毎回新しいチャット�
 msgid "The screenshot could not be saved."
 msgstr "スクリーンショットを保存できませんでした。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:217
+#: src/features/chat/thread/composer-prompt-search.tsx:223
 msgid "The search failed. Try again."
 msgstr "検索に失敗しました。もう一度お試しください。"
 
@@ -37195,7 +37199,7 @@ msgstr "もう一度入力"
 msgid "Type to search"
 msgstr "入力して検索"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:209
+#: src/features/chat/thread/composer-prompt-search.tsx:215
 msgid "Type to search the prompts you have sent."
 msgstr "入力して、送信済みのプロンプトを検索します。"
 

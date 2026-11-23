@@ -3527,6 +3527,9 @@ const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefin
 const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
     thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
 
+/** Lunora's answer for a search index whose backfill has not yet covered the table (`SEARCH_INDEX_BUILDING`, 503). */
+export const isSearchIndexBuilding = (error: unknown): boolean => error instanceof LunoraError && error.code === "SEARCH_INDEX_BUILDING";
+
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index
  * (`typed_text_search`, `typedText`: what the person typed, no attached document or page, no quoted line and no app
@@ -3537,11 +3540,12 @@ const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is T
  * message holding them beside typed words lists and matches by the typed words alone. A branch copies its rows, so the same prompt
  * in chats of one branch family (`threadRelationships`) lists once; the same words sent in unrelated chats list once per
  * chat. A query longer than the search reads is cut to its first characters and words, not refused. `truncated` says a
- * matching prompt may be missing: the index window was full, or more prompts matched than the list holds.
+ * matching prompt may be missing: the index window was full, or more prompts matched than the list holds. `preparing`
+ * says the index is still being built after a deploy (`isSearchIndexBuilding`), so nothing was searched yet.
  */
 export const searchSentPrompts = authQuery
     .input({ searchQuery: v.string().max(MAX_LENGTH.long) })
-    .output(v.object({ prompts: v.array(vSentPrompt), truncated: v.boolean() }))
+    .output(v.object({ preparing: v.optional(v.literal(true)), prompts: v.array(vSentPrompt), truncated: v.boolean() }))
     .query(async ({ args: { searchQuery }, ctx: context }) => {
         const { userId } = context.user;
         const text = capSearchTerms(searchQuery.trim().slice(0, MAX_LENGTH.short).trim());
@@ -3684,18 +3688,30 @@ export const searchSentPrompts = authQuery
             return { cut: distinct.length > SENT_PROMPT_LIMIT, filled, prompts };
         };
 
-        let { cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW);
-        const widened = filled && prompts.length < SENT_PROMPT_LIMIT;
+        try {
+            let { cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW);
+            const widened = filled && prompts.length < SENT_PROMPT_LIMIT;
 
-        // Branch copies and trashed or temporary chats can take the first window; a common word whose first window already
-        // gave a full list stops there.
-        if (widened) {
-            ({ cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW_MAX));
+            // Branch copies and trashed or temporary chats can take the first window; a common word whose first window already
+            // gave a full list stops there.
+            if (widened) {
+                ({ cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW_MAX));
+            }
+
+            context.log.event("chat.search_sent_prompts", { listed: prompts.length, truncated: filled || cut, widened });
+
+            return { prompts, truncated: filled || cut };
+        } catch (error) {
+            // After a deploy that adds `typed_text_search`, Lunora refuses the index until its backfill covers the existing
+            // messages. That is "not ready yet", not a failure and not "no match": the composer says so and the person retries.
+            if (isSearchIndexBuilding(error)) {
+                context.log.event("chat.search_sent_prompts", { listed: 0, preparing: true, truncated: false, widened: false });
+
+                return { preparing: true as const, prompts: [], truncated: false };
+            }
+
+            throw error;
         }
-
-        context.log.event("chat.search_sent_prompts", { listed: prompts.length, truncated: filled || cut, widened });
-
-        return { prompts, truncated: filled || cut };
     });
 
 /**

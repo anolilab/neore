@@ -165,7 +165,7 @@ export const blankQuotedLines = (text: string): string => {
  * transcript's label, a voice message or file it could not read, a file it cannot show the model. Read as such only in
  * a part messenger wrote ({@link messengerTextPart}): typed into the composer, the same line is the person's own words.
  */
-const MESSENGER_ATTACHMENT_LINE_RE = /^\s*\[(?:Voice message[ :\]]|Attached file: |Attachment(?: "[^"\n]*")? not read: )/u;
+const MESSENGER_ATTACHMENT_LINE_RE = /^\s*\[(?:Voice message[ :\]]|Attached file: |Attachment(?: "[^\n]*")? not read: )/u;
 
 /**
  * The text part messenger saves a received message in: the caption with the lines it writes about the attachments

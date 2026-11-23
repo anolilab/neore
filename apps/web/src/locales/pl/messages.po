@@ -376,7 +376,7 @@ msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, one {# oczekujący komentarz} few {# oczekujące komentarze} many {# oczekujących komentarzy} other {# oczekującego komentarza}}"
 
 #. placeholder {0}: prompts.length
-#: src/features/chat/thread/composer-prompt-search.tsx:225
+#: src/features/chat/thread/composer-prompt-search.tsx:234
 msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, one {Znaleziono # prompt} few {Znaleziono # prompty} many {Znaleziono # promptów} other {Znaleziono # promptu}}"
 
@@ -12712,7 +12712,7 @@ msgstr "Wpisz slug organizacji"
 msgid "Enter pull requests as owner/name#123."
 msgstr "Wpisz pull requesty jako właściciel/nazwa#123."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:247
+#: src/features/chat/thread/composer-prompt-search.tsx:256
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "Enter wstawia prompt do pola wpisywania. Nie zostaje wysłany."
 
@@ -20707,7 +20707,7 @@ msgstr "Dopasuj układ i strukturę"
 msgid "Matching messages"
 msgstr "Pasujące wiadomości"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:273
+#: src/features/chat/thread/composer-prompt-search.tsx:283
 msgid "Matching prompts"
 msgstr "Pasujące prompty"
 
@@ -23306,7 +23306,7 @@ msgstr "Nie znaleziono wyników."
 msgid "No runs yet. Start one to score every case."
 msgstr "Nie ma jeszcze przebiegów. Uruchom jeden, aby ocenić każdy przypadek."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:221
+#: src/features/chat/thread/composer-prompt-search.tsx:230
 msgid "No sent prompts match \"{searched}\"."
 msgstr "Brak wysłanych promptów pasujących do \"{searched}\"."
 
@@ -24177,7 +24177,7 @@ msgstr "Tylko osoba, która może pisać w tym czacie, może przejąć sterowani
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "Według stanu filtrowane są tylko {0} wątki wczytane tutaj; starsze nie są uwzględnione."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:232
+#: src/features/chat/thread/composer-prompt-search.tsx:241
 msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
 msgstr "Przeszukiwane są tylko najlepsze trafienia, więc starszy lub nowszy prompt może nie zostać wyświetlony. Dodaj słowo, aby zawęzić wyszukiwanie."
 
@@ -27089,6 +27089,10 @@ msgstr "Wczytano prompt"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:89
 msgid "Prompt optimized successfully"
 msgstr "Zoptymalizowano prompt"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:226
+msgid "Prompt search is still being prepared. Try again shortly."
+msgstr "Wyszukiwanie promptów jest jeszcze przygotowywane. Spróbuj ponownie za chwilę."
 
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:160
 msgid "Prompt to run on all models..."
@@ -30163,9 +30167,9 @@ msgstr "Wyniki wyszukiwania"
 msgid "Search Results ({0})"
 msgstr "Wyniki wyszukiwania ({0})"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:246
-#: src/features/chat/thread/composer-prompt-search.tsx:250
-#: src/features/chat/thread/composer-prompt-search.tsx:267
+#: src/features/chat/thread/composer-prompt-search.tsx:255
+#: src/features/chat/thread/composer-prompt-search.tsx:259
+#: src/features/chat/thread/composer-prompt-search.tsx:277
 msgid "Search sent prompts"
 msgstr "Szukaj wysłanych promptów"
 
@@ -30273,7 +30277,7 @@ msgstr "Szukaj..."
 msgid "Searched the latest messages only"
 msgstr "Przeszukano tylko najnowsze wiadomości"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:219
+#: src/features/chat/thread/composer-prompt-search.tsx:228
 msgid "Searching"
 msgstr "Wyszukiwanie"
 
@@ -34291,7 +34295,7 @@ msgstr "Ten kod dostępu jest nieprawidłowy."
 msgid "That path is a file."
 msgstr "Ta ścieżka jest plikiem."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:212
+#: src/features/chat/thread/composer-prompt-search.tsx:218
 msgid "That prompt is no longer available. Pick another."
 msgstr "Ten prompt nie jest już dostępny. Wybierz inny."
 
@@ -35091,7 +35095,7 @@ msgstr "Nie udało się wczytać repozytoriów projektu, więc import z repozyto
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "Prompt stanie się danymi wejściowymi przypadku, a ta odpowiedź oczekiwaną odpowiedzią. Przed zapisaniem możesz edytować jedno i drugie."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:214
+#: src/features/chat/thread/composer-prompt-search.tsx:220
 msgid "The prompt could not be checked. Try again."
 msgstr "Nie udało się sprawdzić promptu. Spróbuj ponownie."
 
@@ -35209,7 +35213,7 @@ msgstr "Uruchomienie trafia tam, gdzie wybrano: za każdym razem do nowego czatu
 msgid "The screenshot could not be saved."
 msgstr "Nie udało się zapisać zrzutu ekranu."
 
-#: src/features/chat/thread/composer-prompt-search.tsx:217
+#: src/features/chat/thread/composer-prompt-search.tsx:223
 msgid "The search failed. Try again."
 msgstr "Wyszukiwanie nie powiodło się. Spróbuj ponownie."
 
@@ -37195,7 +37199,7 @@ msgstr "Wpisz ponownie"
 msgid "Type to search"
 msgstr "Pisz, aby wyszukać"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:209
+#: src/features/chat/thread/composer-prompt-search.tsx:215
 msgid "Type to search the prompts you have sent."
 msgstr "Wpisz, aby szukać we wysłanych promptach."
 

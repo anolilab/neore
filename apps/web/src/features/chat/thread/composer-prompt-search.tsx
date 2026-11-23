@@ -76,8 +76,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     const pickingRef = useRef(false);
     // A pick still checking when the search closes is dropped: the composer it was meant for may be locked or showing another chat.
     const mountedRef = useRef(true);
-    // The query as typed, kept for a pick's check: one that finishes after the person typed again belongs to the old search.
-    const queryRef = useRef("");
+    // Counts every edit of the query, kept for a pick's check: one that finishes after any edit belongs to an old search, even
+    // when the text was typed back to what it was (the edit reset the highlight the pick was made from).
+    const editsRef = useRef(0);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     // Set when a pick is refused or could not be checked; cleared by the next keystroke.
@@ -124,6 +125,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
 
         pickingRef.current = true;
 
+        const edits = editsRef.current;
         const options = crpc.chat.functions.searchSentPrompts.queryOptions({ searchQuery: searched }, { live: false });
         const checkOptions = crpc.chat.functions.currentSentPrompt.queryOptions({ messageId: prompt.messageId }, { live: false });
         const outcome = await recheckPick(
@@ -134,7 +136,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         pickingRef.current = false;
 
         // Closed, or the search changed, while the check ran: nothing goes in the draft and no notice covers the new list.
-        if (!mountedRef.current || queryRef.current.trim() !== searched) {
+        if (!mountedRef.current || editsRef.current !== edits) {
             return;
         }
 
@@ -221,6 +223,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
     } else if (searched !== "") {
         if (isError) {
             status = t`The search failed. Try again.`;
+        } else if (data?.preparing === true) {
+            // Right after a deploy the server is still building the prompt index: nothing was searched, so it is not "no match".
+            status = t`Prompt search is still being prepared. Try again shortly.`;
         } else if (isFetching && prompts.length === 0) {
             status = t`Searching`;
         } else if (prompts.length === 0) {
@@ -265,7 +270,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                     id={inputId}
                     maxLength={SEARCH_MAX_LENGTH}
                     onChange={(event) => {
-                        queryRef.current = event.target.value;
+                        editsRef.current += 1;
                         setQuery(event.target.value);
                         setActive(0);
                         setPickNotice(null);

@@ -376,7 +376,7 @@ msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, other {# 条待提交评论}}"
 
 #. placeholder {0}: prompts.length
-#: src/features/chat/thread/composer-prompt-search.tsx:225
+#: src/features/chat/thread/composer-prompt-search.tsx:234
 msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, other {找到 # 条提示词}}"
 
@@ -12712,7 +12712,7 @@ msgstr "输入组织 slug"
 msgid "Enter pull requests as owner/name#123."
 msgstr "请按 owner/name#123 的格式输入拉取请求。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:247
+#: src/features/chat/thread/composer-prompt-search.tsx:256
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "按 Enter 将提示词放入输入框，不会发送。"
 
@@ -20707,7 +20707,7 @@ msgstr "匹配布局和结构"
 msgid "Matching messages"
 msgstr "匹配的消息"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:273
+#: src/features/chat/thread/composer-prompt-search.tsx:283
 msgid "Matching prompts"
 msgstr "匹配的提示词"
 
@@ -23306,7 +23306,7 @@ msgstr "未找到结果。"
 msgid "No runs yet. Start one to score every case."
 msgstr "还没有运行记录。开始一次运行来为每个用例评分。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:221
+#: src/features/chat/thread/composer-prompt-search.tsx:230
 msgid "No sent prompts match \"{searched}\"."
 msgstr "没有与\"{searched}\"匹配的已发送提示词。"
 
@@ -24177,7 +24177,7 @@ msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "仅按状态筛选此处已加载的 {0} 个对话；更早的对话不包括在内。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:232
+#: src/features/chat/thread/composer-prompt-search.tsx:241
 msgid "Only the best matches are searched, so an older or newer prompt may not be listed. Add a word to narrow the search."
 msgstr "只搜索最相关的结果，因此较早或较新的提示词可能不会列出。添加一个词可缩小搜索范围。"
 
@@ -27089,6 +27089,10 @@ msgstr "提示词已加载"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:89
 msgid "Prompt optimized successfully"
 msgstr "提示词优化成功"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:226
+msgid "Prompt search is still being prepared. Try again shortly."
+msgstr "提示词搜索仍在准备中，请稍后再试。"
 
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:160
 msgid "Prompt to run on all models..."
@@ -30163,9 +30167,9 @@ msgstr "搜索结果"
 msgid "Search Results ({0})"
 msgstr "搜索结果（{0}）"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:246
-#: src/features/chat/thread/composer-prompt-search.tsx:250
-#: src/features/chat/thread/composer-prompt-search.tsx:267
+#: src/features/chat/thread/composer-prompt-search.tsx:255
+#: src/features/chat/thread/composer-prompt-search.tsx:259
+#: src/features/chat/thread/composer-prompt-search.tsx:277
 msgid "Search sent prompts"
 msgstr "搜索已发送的提示词"
 
@@ -30273,7 +30277,7 @@ msgstr "搜索..."
 msgid "Searched the latest messages only"
 msgstr "仅搜索了最新消息"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:219
+#: src/features/chat/thread/composer-prompt-search.tsx:228
 msgid "Searching"
 msgstr "正在搜索"
 
@@ -34291,7 +34295,7 @@ msgstr "口令不正确。"
 msgid "That path is a file."
 msgstr "该路径是文件。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:212
+#: src/features/chat/thread/composer-prompt-search.tsx:218
 msgid "That prompt is no longer available. Pick another."
 msgstr "该提示词已不可用，请选择其他提示词。"
 
@@ -35091,7 +35095,7 @@ msgstr "无法加载项目的仓库，因此暂时无法从仓库导入。"
 msgid "The prompt becomes the case input and this answer the expected answer. Edit either before saving."
 msgstr "提示词将作为用例输入，此回答将作为预期答案。保存前可以编辑两者。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:214
+#: src/features/chat/thread/composer-prompt-search.tsx:220
 msgid "The prompt could not be checked. Try again."
 msgstr "无法检查该提示词，请重试。"
 
@@ -35209,7 +35213,7 @@ msgstr "运行将按你的选择进行：每次新建聊天、沿用之前的聊
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:217
+#: src/features/chat/thread/composer-prompt-search.tsx:223
 msgid "The search failed. Try again."
 msgstr "搜索失败，请重试。"
 
@@ -37195,7 +37199,7 @@ msgstr "再输入一次"
 msgid "Type to search"
 msgstr "输入以搜索"
 
-#: src/features/chat/thread/composer-prompt-search.tsx:209
+#: src/features/chat/thread/composer-prompt-search.tsx:215
 msgid "Type to search the prompts you have sent."
 msgstr "输入以搜索已发送的提示词。"
 
