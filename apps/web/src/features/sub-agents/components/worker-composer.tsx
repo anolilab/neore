@@ -40,6 +40,8 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
     const draft = useRef(text);
     const clientId = useRef<string | undefined>(undefined);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    // The fix prompts added while a send runs (`null` when none runs): they were not sent, so they outlast it.
+    const prefillsDuringSend = useRef<string[] | null>(null);
     const send = useMutation(crpc.sub_agents.functions.dispatchToWorker.mutationOptions());
 
     useEffect(
@@ -58,6 +60,7 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
         if (!draft.current.includes(clean)) {
             const next = draft.current.trim() === "" ? clean : `${draft.current.trimEnd()}\n${clean}`;
 
+            prefillsDuringSend.current?.push(clean);
             clientId.current = undefined;
             draft.current = next;
             setText(next);
@@ -83,16 +86,26 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
         }
 
         clientId.current ??= crypto.randomUUID();
+        prefillsDuringSend.current = [];
 
         send.mutate(
             { clientId: clientId.current, message, workerId: workerId as Id<"threads"> },
             {
-                onError: (error: unknown) => showError(error instanceof Error ? error : t`Could not send the message.`),
+                onError: (error: unknown) => {
+                    prefillsDuringSend.current = null;
+                    showError(error instanceof Error ? error : t`Could not send the message.`);
+                },
                 onSuccess: () => {
                     // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
-                    // A draft edited during the send is the sent message, so it empties rather than wait to go out twice.
+                    // A draft edited during the send is the sent message, so it goes rather than wait to go out twice; the
+                    // fix prompts that arrived meanwhile were not sent, so they stay, unless the person deleted them.
                     const typed = draft.current.trimStart();
-                    const rest = typed.startsWith(message) ? typed.slice(message.length).trimStart() : "";
+                    const prefills = prefillsDuringSend.current ?? [];
+                    const rest = typed.startsWith(message)
+                        ? typed.slice(message.length).trimStart()
+                        : prefills.filter((prefill) => typed.includes(prefill)).join("\n");
+
+                    prefillsDuringSend.current = null;
 
                     clientId.current = undefined;
                     draft.current = rest;

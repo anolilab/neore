@@ -4,6 +4,7 @@
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
+import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import PullRequestFixes from "./pull-request-fixes";
@@ -133,7 +134,7 @@ describe(PullRequestFixes, () => {
 
         const action = await screen.findByRole("button", { name: "Resolve conflicts" });
 
-        expect((action as HTMLButtonElement).disabled).toBe(true);
+        expect(action.getAttribute("aria-disabled")).toBe("true");
 
         fireEvent.click(action);
 
@@ -171,5 +172,57 @@ describe(PullRequestFixes, () => {
 
         expect(screen.getByRole("button", { name: "Problems on octo/hello#7: 1" })).toBeDefined();
         expect(screen.queryByText("Conflicts with main")).toBeNull();
+    });
+
+    // eslint-disable-next-line testing-library/no-node-access -- where focus lands is what these assert
+    const focused = () => document.activeElement;
+
+    it("moves focus to the pull request's link when a read clears the focused chip", () => {
+        const returnFocusTo = createRef<HTMLAnchorElement>();
+        const view = () => (
+            <>
+                <a href="#pr" ref={returnFocusTo}>
+                    octo/hello#7
+                </a>
+                <PullRequestFixes address={{ number: 7, repository: "octo/hello" }} returnFocusTo={returnFocusTo} threadId="thread-1" />
+            </>
+        );
+
+        open({ conflicting: true });
+
+        const { rerender } = render(view());
+
+        screen.getByRole("button", { name: "Problems on octo/hello#7: 1" }).focus();
+        open({});
+        rerender(view());
+
+        expect(focused()).toBe(screen.getByRole("link", { name: "octo/hello#7" }));
+    });
+
+    it("moves focus from a retry that worked to the chip that replaced it", () => {
+        status.current = { data: { status: "host_error" } };
+
+        const { rerender } = renderFixes();
+
+        screen.getByRole("button", { name: "Could not read what blocks octo/hello#7. Try again" }).focus();
+        open({ conflicting: true });
+        rerender(<PullRequestFixes address={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />);
+
+        expect(focused()).toBe(screen.getByRole("button", { name: "Problems on octo/hello#7: 1" }));
+    });
+
+    it("keeps focus in the open list, on its heading, when a read removes the focused action", async () => {
+        open({ conflicting: true, failingChecks: ["lint"] });
+
+        const { rerender } = renderFixes();
+
+        fireEvent.click(screen.getByRole("button", { name: "Problems on octo/hello#7: 2" }));
+        const action = await screen.findByRole("button", { name: "Fix checks" });
+
+        action.focus();
+        open({ conflicting: true });
+        rerender(<PullRequestFixes address={{ number: 7, repository: "octo/hello" }} threadId="thread-1" />);
+
+        expect(focused()).toBe(screen.getByText("What blocks octo/hello#7"));
     });
 });

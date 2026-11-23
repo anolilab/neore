@@ -143,4 +143,22 @@ describe("the worker composer", () => {
 
         expect(box.value).toBe("");
     });
+
+    it("keeps a fix prompt that arrived after the draft was edited during its send, and drops the edit", () => {
+        render(<WorkerComposer archived={false} busy={false} followUp="queue" workerId="w5" />);
+
+        const box = screen.getByLabelText("Message the worker") as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "run the tests" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        fireEvent.change(box, { target: { value: "run the test" } });
+        act(() => {
+            prefillComposer("w5", "Fix checks on octo/hello#7");
+        });
+        act(() => {
+            sent.onSuccess?.();
+        });
+
+        expect(box.value).toBe("Fix checks on octo/hello#7");
+    });
 });

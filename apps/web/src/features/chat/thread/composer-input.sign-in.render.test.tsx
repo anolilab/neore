@@ -619,6 +619,32 @@ describe("ComposerInput fix prompts from the pull request chip", () => {
         expect(useChatUIStore.getState().composerText).toBe("");
     });
 
+    it("keeps a fix prompt that arrived after the draft was edited during its comparison send, and drops the edit", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+        act(() => {
+            useChatUIStore.getState().setComposerText("compare those");
+        });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
     it("still empties the draft after a comparison send when nothing joined it", async () => {
         const onSubmitOverride = vi.fn(async () => undefined);
 

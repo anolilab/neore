@@ -145,7 +145,7 @@ export const usePullRequestStatus = (address: PullRequestAddress | undefined) =>
         enabled: address !== undefined && userId !== undefined,
         queryKey: [DEVELOP_QUERY_ROOT, userId, "status", address],
         refetchInterval: (query) => {
-            const { delay, since } = nextMergeReread(query.state.data, mergeUnknownSince.get(query), Date.now());
+            const { delay, since } = nextMergeReread(query.state.data, mergeUnknownSince.get(query), Date.now(), query.state.status === "error");
 
             if (since === undefined) {
                 mergeUnknownSince.delete(query);

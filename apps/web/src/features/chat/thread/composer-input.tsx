@@ -527,6 +527,8 @@ const ComposerInput = ({
     }, [disabled]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
+    // The fix prompts added while a comparison send runs (`null` when none runs): they were not sent, so they outlast it.
+    const prefillsDuringSend = useRef<string[] | null>(null);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
     const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
@@ -1318,30 +1320,50 @@ const ComposerInput = ({
         useChatUIStore.getState().setIsSubmitting(true);
 
         if (onSubmitOverride) {
+            prefillsDuringSend.current = [];
             // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(draftText, draftAttachments, draftFrom).then(() => {
-                // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
-                // A prefill trims the draft's trailing whitespace before it appends (`textAfterRestore`), so match without it.
-                const now = getComposerText();
-                const sentText = draftText.trimEnd();
+            void onSubmitOverride(draftText, draftAttachments, draftFrom)
+                .then(() => {
+                    const prefills = prefillsDuringSend.current ?? [];
 
-                if (now === draftText) {
-                    clear();
-                } else if (now.startsWith(sentText)) {
-                    setText(now.slice(sentText.length).trimStart());
+                    prefillsDuringSend.current = null;
 
-                    for (const attachment of draftAttachments) {
-                        useChatUIStore.getState().removeAttachment(attachment.id);
+                    // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                    // A prefill trims the draft's trailing whitespace before it appends (`textAfterRestore`), so match without it.
+                    const now = getComposerText();
+                    const sentText = draftText.trimEnd();
+
+                    if (now === draftText) {
+                        clear();
+                    } else if (now.startsWith(sentText)) {
+                        setText(now.slice(sentText.length).trimStart());
+
+                        for (const attachment of draftAttachments) {
+                            useChatUIStore.getState().removeAttachment(attachment.id);
+                        }
+                    } else {
+                        // Edited while it went out: what is left is the sent message, so it must not stay to be sent again. The fix
+                        // prompts that arrived meanwhile were not sent: they come back, still marked as not typed.
+                        clear();
+
+                        // A prompt the person deleted meanwhile stays deleted.
+                        const kept = prefills.filter((prefill) => now.includes(prefill));
+
+                        if (kept.length > 0) {
+                            setText(kept.join("\n"));
+                            markComposerDraft("suggestion");
+                        }
                     }
-                } else {
-                    // Edited while it went out: what is left is the sent message, so it must not stay to be sent again.
-                    clear();
-                }
 
-                useChatUIStore.getState().setIsSubmitting(false);
+                    useChatUIStore.getState().setIsSubmitting(false);
 
-                return undefined;
-            });
+                    return undefined;
+                })
+                .catch((error: unknown) => {
+                    prefillsDuringSend.current = null;
+
+                    throw error;
+                });
         } else if (isComparisonValid) {
             void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments, draftFrom).then(() => {
                 useChatUIStore.getState().setIsSubmitting(false);
@@ -1692,6 +1714,7 @@ const ComposerInput = ({
         promptHistory.reset();
 
         if (!current.includes(clean)) {
+            prefillsDuringSend.current?.push(clean);
             setText(textAfterRestore(current, { append: true, files: [], text: clean }));
 
             if (composerDraftFrom() === undefined) {

@@ -4,7 +4,8 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@neore/ui/components/popover";
 import { RefreshCw, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import type { RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { prefillComposer } from "@/features/chat/thread/composer-prefill";
 
@@ -15,12 +16,82 @@ import { usePullRequestStatus } from "../lib/use-develop";
 
 const namesOf = (names: ReadonlyArray<string>, more: number): string => (more > 0 ? `${names.join(", ")} (+${String(more)})` : names.join(", "));
 
+/**
+ * Calls `onLost` when the component unmounts while one of these elements holds focus, which the browser would drop to
+ * the page. The cleanup of an unmounting component runs before React removes its nodes, so focus is still where it was.
+ * Only on unmount: an update never reports, so a flag set here always means the element went away. `onLost` only sets a
+ * ref, so the one from the first render is enough.
+ */
+const useReportFocusLoss = (onLost: () => void, ...refs: ReadonlyArray<RefObject<HTMLElement | null>>) => {
+    const watched = refs;
+
+    useLayoutEffect(
+        () => () => {
+            const active = document.activeElement;
+
+            if (watched.some((ref) => ref.current?.contains(active) === true)) {
+                onLost();
+            }
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount only, see above
+        [],
+    );
+};
+
+/** Focus went nowhere: nothing holds it, so moving it takes nothing from the person. */
+const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
+
 /** Failed reads a retry can help with; a missing connection or access is not fixed by reading again. */
 const RETRYABLE = new Set(["host_error", "rate_limited"]);
 
+/** One action in the list; it reports when it goes away holding focus (its problem was fixed while the list was open). */
+const FixAction = ({ disabled, label, onClick, onFocusLost }: { disabled: boolean; label: string; onClick: () => void; onFocusLost: () => void }) => {
+    const ref = useRef<HTMLButtonElement>(null);
+
+    useReportFocusLoss(onFocusLost, ref);
+
+    return (
+        // Focusable while unavailable: a disabled button drops focus to the page.
+        <Button aria-busy={disabled} disabled={disabled} focusableWhenDisabled onClick={onClick} ref={ref} size="sm" variant="outline">
+            {label}
+        </Button>
+    );
+};
+
+interface RetryButtonProps {
+    buttonRef: RefObject<HTMLButtonElement | null>;
+    label: string;
+    onFocusLost: () => void;
+    onRetry: () => void;
+    reading: boolean;
+}
+
+/** Reads again. Focusable while it reads: a disabled button drops focus to the page. */
+const RetryButton = ({ buttonRef, label, onFocusLost, onRetry, reading }: RetryButtonProps) => {
+    useReportFocusLoss(onFocusLost, buttonRef);
+
+    return (
+        <Button
+            aria-busy={reading}
+            aria-label={label}
+            className="text-muted-foreground size-6"
+            disabled={reading}
+            focusableWhenDisabled
+            onClick={onRetry}
+            ref={buttonRef}
+            size="icon"
+            variant="ghost"
+        >
+            <RefreshCw aria-hidden className="size-3" />
+        </Button>
+    );
+};
+
 interface FixesListProps {
+    chipRef: RefObject<HTMLButtonElement | null>;
     fixes: ReadonlyArray<FixKind>;
     name: string;
+    onFocusLost: () => void;
     onOpen: () => void;
     problems: PullRequestProblems;
     /** A read is running: an action waits for it, so its prompt is built from what blocks the pull request now. */
@@ -29,9 +100,28 @@ interface FixesListProps {
 }
 
 /** The chip and its list. Its own component, so the open state goes when the chip goes and never reopens it later. */
-const FixesList = ({ fixes, name, onOpen, problems, refreshing, threadId }: FixesListProps) => {
+const FixesList = ({ chipRef, fixes, name, onFocusLost, onOpen, problems, refreshing, threadId }: FixesListProps) => {
     const { i18n, t } = useLingui();
     const [open, setOpen] = useState(false);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const titleRef = useRef<HTMLHeadingElement>(null);
+    const actionLostFocus = useRef(false);
+
+    useReportFocusLoss(onFocusLost, chipRef, popupRef);
+
+    // An action that went away holding focus (its problem was fixed): focus stays in the list, on its heading.
+    useEffect(() => {
+        if (!actionLostFocus.current) {
+            return;
+        }
+
+        actionLostFocus.current = false;
+
+        if (focusIsLost()) {
+            titleRef.current?.focus();
+        }
+    });
+
     const reviewers = namesOf(
         problems.changeRequests.map((review) => review.authorLogin),
         problems.changeRequestsMore,
@@ -57,6 +147,7 @@ const FixesList = ({ fixes, name, onOpen, problems, refreshing, threadId }: Fixe
             open={open}
         >
             <PopoverTrigger
+                ref={chipRef}
                 render={
                     <Button aria-label={t`Problems on ${name}: ${count}`} className="text-destructive h-6 gap-1 px-1.5 text-xs" size="sm" variant="ghost" />
                 }
@@ -64,25 +155,24 @@ const FixesList = ({ fixes, name, onOpen, problems, refreshing, threadId }: Fixe
                 <TriangleAlert aria-hidden className="size-3" />
                 <span aria-hidden>{count}</span>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-80">
-                <PopoverTitle className="text-sm font-medium">{t`What blocks ${name}`}</PopoverTitle>
+            <PopoverContent align="start" className="w-80" ref={popupRef}>
+                <PopoverTitle className="text-sm font-medium outline-none" ref={titleRef} tabIndex={-1}>{t`What blocks ${name}`}</PopoverTitle>
                 <p className="text-muted-foreground mt-1 text-xs">{t`Each action puts a prompt into this chat's message box. Read it, then send it yourself.`}</p>
                 <ul className="mt-2 space-y-2">
                     {fixes.map((kind) => (
                         <li className="flex items-center justify-between gap-2" key={kind}>
                             <span className="min-w-0 text-xs break-words">{rows[kind].problem}</span>
-                            <Button
-                                aria-busy={refreshing}
+                            <FixAction
                                 disabled={refreshing}
+                                label={rows[kind].action}
                                 onClick={() => {
                                     prefillComposer(threadId, buildFixPrompt(kind, problems, i18n));
                                     setOpen(false);
                                 }}
-                                size="sm"
-                                variant="outline"
-                            >
-                                {rows[kind].action}
-                            </Button>
+                                onFocusLost={() => {
+                                    actionLostFocus.current = true;
+                                }}
+                            />
                         </li>
                     ))}
                 </ul>
@@ -97,29 +187,52 @@ const FixesList = ({ fixes, name, onOpen, problems, refreshing, threadId }: Fixe
  * it. Shows nothing while the state loads, when nothing blocks the pull request, or when the host cannot be read for a
  * reason reading again does not fix (no connection, no access); a read that failed for a passing reason says so, with a
  * retry, so it never looks like a pull request with nothing in its way. Opening the list reads the state again, so an
- * action builds its prompt from what blocks the pull request now, not from a read minutes old.
+ * action builds its prompt from what blocks the pull request now, not from a read minutes old. When a read removes the
+ * focused chip, list or retry, focus moves to what replaced it, or else to `returnFocusTo` (the pull request's link).
  */
-const PullRequestFixes = ({ address, threadId }: { address: PullRequestAddress; threadId: string }) => {
+const PullRequestFixes = ({
+    address,
+    returnFocusTo,
+    threadId,
+}: {
+    address: PullRequestAddress;
+    returnFocusTo?: RefObject<HTMLElement | null>;
+    threadId: string;
+}) => {
     const { t } = useLingui();
     const status = usePullRequestStatus(address);
     const { data } = status;
     const name = `${address.repository}#${String(address.number)}`;
+    const chipRef = useRef<HTMLButtonElement>(null);
+    const retryRef = useRef<HTMLButtonElement>(null);
+    const lostFocus = useRef(false);
+    const reportLost = () => {
+        lostFocus.current = true;
+    };
+
+    useEffect(() => {
+        if (!lostFocus.current) {
+            return;
+        }
+
+        lostFocus.current = false;
+
+        if (focusIsLost()) {
+            (chipRef.current ?? retryRef.current ?? returnFocusTo?.current)?.focus();
+        }
+    });
 
     if (status.isError || (data !== undefined && RETRYABLE.has(data.status))) {
         return (
-            <Button
-                aria-busy={status.isFetching}
-                aria-label={t`Could not read what blocks ${name}. Try again`}
-                className="text-muted-foreground size-6"
-                disabled={status.isFetching}
-                onClick={() => {
+            <RetryButton
+                buttonRef={retryRef}
+                label={t`Could not read what blocks ${name}. Try again`}
+                onFocusLost={reportLost}
+                onRetry={() => {
                     void status.refetch();
                 }}
-                size="icon"
-                variant="ghost"
-            >
-                <RefreshCw aria-hidden className="size-3" />
-            </Button>
+                reading={status.isFetching}
+            />
         );
     }
 
@@ -135,8 +248,10 @@ const PullRequestFixes = ({ address, threadId }: { address: PullRequestAddress; 
 
     return (
         <FixesList
+            chipRef={chipRef}
             fixes={fixes}
             name={name}
+            onFocusLost={reportLost}
             onOpen={() => {
                 void status.refetch();
             }}
