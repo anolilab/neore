@@ -43,6 +43,7 @@ import {
     type SearchPlan,
 } from "./thread-search-plan";
 import { SYNC_RETRY } from "./thread-search-triggers";
+import { alignVectorArchived, isThreadArchived } from "./thread-vector-archived";
 import { findVectorRow, type VectorDimension, type VectorTableName } from "./vector/tables";
 import { searchVectors } from "./vector";
 
@@ -54,6 +55,7 @@ const vSlot = v.object({ text: v.union(v.string(), v.null()), vectorId: v.union(
 const vSearchState = v.union(
     v.null(),
     v.object({
+        archived: v.boolean(),
         eligible: v.boolean(),
         enoughTurns: v.boolean(),
         summary: vSlot,
@@ -79,6 +81,7 @@ export const readThreadSearchState = internalQuery
         }
 
         return {
+            archived: isThreadArchived(thread),
             eligible: isSearchEligible(thread),
             // The count the messages triggers keep on the thread (`agent/thread-search-triggers.ts`): no message scan.
             enoughTurns: hasEnoughTurns(thread.userTurnCount ?? 0),
@@ -144,7 +147,7 @@ const textsStillWanted = async <T extends { kind: SearchKind; text: string }>(
 const embedAndCommit = async (
     ctx: ActionCtx,
     threadId: Id<"threads">,
-    userId: string,
+    { archived, userId }: { archived: boolean; userId: string },
     plan: SearchPlan,
     texts: { kind: SearchKind; text: string }[],
 ): Promise<void> => {
@@ -184,6 +187,8 @@ const embedAndCommit = async (
                 vectorDimension: SEARCH_DIMENSION as VectorDimension,
                 vectors: [
                     {
+                        // As read before the embed; the commit corrects it if an archive or restore landed since.
+                        archived,
                         messageId: undefined,
                         model: SEARCH_MODEL,
                         table: SEARCH_TABLE[entry.kind],
@@ -285,7 +290,7 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
     }
 
     try {
-        await embedAndCommit(ctx, args.threadId, state.userId, plan, texts);
+        await embedAndCommit(ctx, args.threadId, { archived: state.archived, userId: state.userId }, plan, texts);
     } finally {
         if (claimId !== undefined) {
             await ctx.runMutation(internal.agent.thread_search.releaseThreadSearch, { claimId, threadId: args.threadId });
@@ -386,6 +391,11 @@ export const commitThreadSearch = internalMutation
 
             if (Object.keys(changes).length > 0) {
                 await patchRow(ctx.db, "threads", thread, changes);
+            }
+
+            // The flag was read before the embed: an archive or restore since then set nothing on these rows yet.
+            for (const vectorId of decision.accepted) {
+                await alignVectorArchived(ctx.db, thread, vectorId);
             }
         }
 

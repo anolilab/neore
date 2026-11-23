@@ -102,6 +102,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     // Guest links past their 24 hours, with what guests left on them (`chat/guest-links.ts`).
     { name: "sweepGuestLinks", ref: internal.chat.guest_links.sweepGuestLinks },
     { name: "backfillUnindexedFileLinks", ref: internal.agent.file_link_backfill.backfillUnindexedFileLinks },
+    // Thread vectors written before they carried `archived` get it, once per shard (`agent/thread-vector-archived.ts`).
+    { name: "sweepThreadVectorArchived", ref: internal.agent.thread_vector_archived.sweepThreadVectorArchived },
     // A bot whose delete failed after its tombstone was written is labelled live again (`bots/owner.ts`).
     { name: "restoreLiveBotOwners", ref: internal.bots.owner.restoreLiveBotOwners },
 ];

@@ -58,6 +58,8 @@ export interface SearchRow {
     lockedAt?: number | null;
     /** When a sync last found the owner's model rules refusing the embedding model. */
     searchRefusedAt?: number;
+    /** `archived` sets the flag on the thread's vectors (`thread-vector-archived.ts`). */
+    status?: string;
     summary?: string;
     summaryVectorId?: string;
     title?: string;

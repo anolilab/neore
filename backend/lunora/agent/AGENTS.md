@@ -87,3 +87,12 @@
   exactly that one (`model: "auto"` and `/internal/route` are for other callers). The cost-notice
   threshold is `PROMPT_CACHE_COLD_START_TOKENS` (`@neore/ai/models`), shared with the gateway's
   downgrade policy.
+
+- **Archived flag on thread vectors** (`agent/thread-vector-archived.ts`) — title/summary vectors carry
+  `archived`, Vectorize metadata on `embeddings-1024` only (metadata index in `alchemy.run.ts`), so a meaning
+  search can filter archived threads before its top-K cut. It is a row column: Lunora's vector sync writes it
+  after commit, so keeping it current is a row patch. Set at insert, corrected in `commitThreadSearch`, moved by
+  the threads update trigger on any change into or out of `archived` (every writer: bulk, undo, auto-archive),
+  and backfilled once per shard by the housekeeping sweep (place kept on an `idempotencyClaims` row). Every
+  writer reads the thread's current status, patches only the thread's own vectors of the same owner, and skips a
+  thread that is gone or being deleted. Vectorize indexes a property only for vectors written after its index.

@@ -102,9 +102,25 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
                     { retry: SYNC_RETRY, shardKey: doc.userId },
                 );
             }
+
+            // Archived or restored, by whatever writer: the thread's vectors carry the flag a meaning search filters on.
+            if (archivedChanged(event.previous as unknown as SearchRow, doc) && hasSearchVector(doc) && doc.userId !== undefined) {
+                await scheduleOrLog(
+                    context,
+                    (internal) => internal.agent.thread_vector_archived.syncThreadVectorArchived,
+                    { threadId: event.id },
+                    { retry: SYNC_RETRY, shardKey: doc.userId },
+                );
+            }
         }),
     };
 };
+
+/** Pure: whether a write moved the thread into or out of `archived`. */
+export const archivedChanged = (previous: Pick<SearchRow, "status">, doc: Pick<SearchRow, "status">): boolean =>
+    (previous.status === "archived") !== (doc.status === "archived");
+
+const hasSearchVector = (row: SearchRow): boolean => SEARCH_KINDS.some((kind) => row[SEARCH_VECTOR_FIELD[kind]] !== undefined);
 
 /** A thread's user-turn count; a thread written before the count existed has none. */
 const userTurnsOf = (thread: Record<string, unknown>): number => (typeof thread.userTurnCount === "number" ? thread.userTurnCount : 0);

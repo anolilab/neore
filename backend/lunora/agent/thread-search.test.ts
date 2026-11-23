@@ -89,6 +89,7 @@ const makeCtx = (fixture: Fixture) => {
 
 const readyThread = (overrides: Record<string, unknown> = {}) => {
     return {
+        archived: false,
         eligible: true,
         enoughTurns: true,
         summary: { text: null, vectorId: null },
@@ -111,6 +112,17 @@ describe(runThreadSearchSync, () => {
 
         expect(mocks.embedMany).toHaveBeenCalledOnce();
         expect(mocks.embedMany.mock.calls[0]?.[1]).toMatchObject({ userId: "user-1", values: ["PDF totals off by one"] });
+    });
+
+    it("writes the thread's archived flag on the vector it inserts", async () => {
+        const ctx = makeCtx({ readThreadSearchState: readyThread({ archived: true }) }) as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
+
+        expect(ctx.runMutation).toHaveBeenCalledWith(internal.agent.vector.insertBatch, {
+            vectorDimension: 1024,
+            vectors: [expect.objectContaining({ archived: true, table: "threadTitle", userId: "user-1" })],
+        });
     });
 
     it("embeds nothing for a locked thread, and clears the vectors it still holds", async () => {
