@@ -1,0 +1,67 @@
+/**
+ * The owner's approved callback hosts, through the real session check: approving, listing, and removing a host, the refusal of a
+ * name that is not a host, and the idempotent add and remove.
+ */
+/* eslint-disable sonarjs/no-hardcoded-ip -- test data: an address the host rule must refuse, never dialled */
+import { lunoraTest } from "@lunora/testing";
+import { describe, expect, it } from "vitest";
+
+import schema from "../schema";
+import { addEventWebhookHost, listEventWebhookHosts, removeEventWebhookHost } from "./event-webhook-hosts";
+
+const signedIn = async (harness: ReturnType<typeof lunoraTest>) =>
+    (await harness.run(async (context: any) => {
+        const user = await context.db.insert("user", {
+            createdAt: 0,
+            email: "hosts@example.com",
+            emailVerified: true,
+            name: "Hosts",
+            updatedAt: 0,
+        });
+
+        await context.db.insert("session", {
+            createdAt: 0,
+            expiresAt: Date.now() + 86_400_000,
+            token: "hosts-session-token",
+            updatedAt: 0,
+            userId: user,
+        });
+
+        return { sessionId: "hosts-session", userId: user };
+    })) as { sessionId: string; userId: string };
+
+describe("the owner's approved callback hosts", () => {
+    it("approves a host, lists it, approves it again without a second row, and removes it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const as = harness.withIdentity((await signedIn(harness)) as never);
+
+            expect(await as.mutation(addEventWebhookHost as never, { host: "Hooks.Example.com" } as never)).toStrictEqual({ host: "hooks.example.com" });
+            expect(await as.mutation(addEventWebhookHost as never, { host: "hooks.example.com" } as never)).toStrictEqual({ host: "hooks.example.com" });
+
+            const listed = (await as.query(listEventWebhookHosts as never, {} as never)) as { hosts: { host: string }[] };
+
+            expect(listed.hosts.map((row) => row.host)).toStrictEqual(["hooks.example.com"]);
+            expect(await as.mutation(removeEventWebhookHost as never, { host: "hooks.example.com" } as never)).toStrictEqual({ removed: true });
+            expect(await as.mutation(removeEventWebhookHost as never, { host: "hooks.example.com" } as never)).toStrictEqual({ removed: false });
+            expect(await as.query(listEventWebhookHosts as never, {} as never)).toStrictEqual({ hosts: [] });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a value that is not a host name: an address, a single label, or a URL", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const as = harness.withIdentity((await signedIn(harness)) as never);
+
+            for (const host of ["10.0.0.1", "localhost", "https://hooks.example.com"]) {
+                await expect(as.mutation(addEventWebhookHost as never, { host } as never)).rejects.toThrow();
+            }
+        } finally {
+            harness.close();
+        }
+    });
+});

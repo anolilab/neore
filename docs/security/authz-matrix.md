@@ -609,6 +609,9 @@ for a schema table that is neither policed nor listed:
 | `run_webhooks_functions.rotateRunWebhookSecret` | mutation | authMutation + RL | runWebhooks | row.userId == caller; the new secret is returned once and the old one stops at once | ok — new; rate limit `runWebhooks/update` |
 | `run_webhooks_functions.saveRunWebhook` | mutation | authMutation + RL | runWebhooks | row.userId == caller; the URL must be https, carry no credentials and no private literal address (`runWebhookUrlProblem`); the secret is created with the first save only and returned once | ok — new; rate limit `runWebhooks/update` |
 | `run_webhooks_functions.sendRunWebhookTest` | action | authAction + RL | runWebhooks | row.userId == caller; one signed test POST to the saved https URL, redirects not followed, response body not read, only the status and time returned | ok — new; rate limit `runWebhooks/test` |
+| `auth_event_webhook_hosts.addEventWebhookHost` | mutation | authMutation + RL | eventWebhookHosts | caller-scoped (ctx.user), owner session only (an API key cannot reach it); a host name only, capped per account | ok — new; rate limit `eventWebhookHosts/update` |
+| `auth_event_webhook_hosts.listEventWebhookHosts` | query | authQuery | eventWebhookHosts | caller-scoped (ctx.user) | ok — new |
+| `auth_event_webhook_hosts.removeEventWebhookHost` | mutation | authMutation + RL | eventWebhookHosts | caller-scoped (ctx.user); idempotent | ok — new; rate limit `eventWebhookHosts/update` |
 | `saas_notification_functions.listNotifications` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `saas_notification_functions.markNotificationsRead` | mutation | authMutation | — | caller-scoped (ctx.user) | ok |
 | `saas_usage_functions.createMyNotificationRule` | action | authAction | — | caller-scoped (ctx.user) | ok |

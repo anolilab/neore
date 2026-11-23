@@ -80,6 +80,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
     // The Events log's seven-day window (`public-api/events-log.ts`): older events go, the newest row of each log stays.
     { name: "pruneMcpEvents", ref: internal.public_api.events.pruneMcpEvents },
+    // Events webhook subscriptions past their granted expiry (`public-api/event-webhooks.ts`).
+    { name: "reapExpiredEventSubscriptions", ref: internal.public_api.event_webhooks.reapExpiredEventSubscriptions },
     // Rate-limit rows charged on this shard, past every limit's window (`lib/rate-limit-sweep.ts`).
     { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },

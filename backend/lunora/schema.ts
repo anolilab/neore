@@ -1181,6 +1181,36 @@ export const schema = defineSchema({
         .index("by_user_and_status", ["userId", "status"])
         .index("by_dataset_and_createdAt", ["datasetId", "createdAt"]),
 
+    // The owner's approved callback hosts for Events webhooks (`auth/event-webhook-hosts.ts`). Written only from the owner's session.
+    eventWebhookHosts: defineTable({
+        createdAt: v.number(),
+        host: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_host", ["userId", "host"]),
+
+    // An Events webhook subscription (`public-api/event-webhooks.ts`): one row per subscription key. The secret is encrypted
+    // ("tool-keys") and never read back. `scanSeq` is the log position the subscription has been scanned to.
+    eventWebhookSubscriptions: defineTable({
+        argumentsKey: v.string(),
+        createdAt: v.number(),
+        expiresAt: v.number(),
+        id: v.string(),
+        keyHash: v.string(),
+        minTimestamp: v.number(),
+        name: v.string(),
+        principal: v.string(),
+        scanSeq: v.number(),
+        secretCiphertext: v.string(),
+        updatedAt: v.number(),
+        url: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_keyHash", ["userId", "keyHash"])
+        .index("by_expiresAt", ["expiresAt"]),
+
     /**
      * What a user sent through "Send feedback": a kind, their text, up to
      * `MAX_FEEDBACK_IMAGES` images (R2 keys under `feedback/<userId>/`) and,
@@ -1497,6 +1527,25 @@ export const schema = defineSchema({
         .index("by_userId_collectionId", ["userId", "collectionId"])
         .index("by_vaultFileId", ["vaultFileId"]),
 
+    /**
+     * The Events log (`public-api/events-log.ts`): one row per run end and approval request, read by `events/poll`. `seq` is
+     * one past the user's highest; `eventId` is stable per upstream event; `data` is the payload as JSON text. Kept seven days
+     * (`RETENTION_MS`), but never the highest row, so the sequence does not restart.
+     */
+    mcpEvents: defineTable({
+        createdAt: v.number(),
+        data: v.string(),
+        eventId: v.string(),
+        name: v.string(),
+        seq: v.number(),
+        timestamp: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_seq", ["userId", "seq"])
+        .index("by_userId_eventId", ["userId", "eventId"])
+        .index("by_createdAt", ["createdAt"]),
+
     // An OAuth grant for one of the user's own MCP servers
     // (`aiUserPreferences.mcpServers`), keyed by server name AND url: a grant
     // for a server whose URL was since edited is never sent to the new URL.
@@ -1693,7 +1742,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     messengerConnections: defineTable({
         connectedAt: v.number(),
         displayName: v.optional(v.string()),
@@ -1728,7 +1776,6 @@ export const schema = defineSchema({
         .index("by_platform_and_chatId", ["platform", "platformChatId"])
         .index("by_platform_and_userId", ["platform", "platformUserId"])
         .index("by_status", ["status"]),
-
     nodeExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
@@ -1756,6 +1803,7 @@ export const schema = defineSchema({
         .index("by_userId_readAt_createdAt", ["userId", "readAt", "createdAt"])
         .index("by_userId_dedupeKey", ["userId", "dedupeKey"])
         .index("by_createdAt", ["createdAt"]),
+
     // One open connector OAuth flow. `state` is the SHA-256 of the value sent to
     // the provider; `flow` carries what completion needs (PKCE verifier and any
     // DCR client secret encrypted). Single-use: completion deletes the row.
@@ -1774,6 +1822,7 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -2489,7 +2538,6 @@ export const schema = defineSchema({
         // Unique: two registrations of one phone racing each other must not leave a row for each account.
         .index("by_token", ["token"], { unique: true })
         .index("by_userId", ["userId"]),
-
     /**
      * better-auth's own rate-limit store.
      *
@@ -2569,6 +2617,7 @@ export const schema = defineSchema({
         .index("by_expiresAt", ["expiresAt"])
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Develop mode (`source-control/`): the review a user is writing on a pull request, kept on the
     // server so it follows them across devices. One row per (user, host origin, repository, number);
     // `commitId` is the head the comment lines refer to. A submit claims the row (`submittingAt` > 0,
@@ -3212,7 +3261,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     /**
      * A rolling summary of the older rows of ONE path of a thread, made while it
      * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
@@ -3246,6 +3294,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+
     // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
     // once a state is set (by the person, or by share/accept); no row means "off".
     // Global (D1) like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
@@ -3264,7 +3313,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -3320,6 +3368,7 @@ export const schema = defineSchema({
         .index("by_linkHash", ["linkHash"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
+
     /**
      * A message a guest left through a link. UNTRUSTED text that waits here: nothing reads it into a model,
      * a title or a summary. Only the owner's Send hands it to the owner's own client, which sends it through
@@ -3657,25 +3706,6 @@ export const schema = defineSchema({
         .index("by_status_resolvedAt", ["status", "resolvedAt"])
         // The home dashboard's "needs you" (`home/overview.ts`).
         .index("by_userId_status_createdAt", ["userId", "status", "createdAt"]),
-
-    /**
-     * The Events log (`public-api/events-log.ts`): one row per run end and approval request, read by `events/poll`. `seq` is
-     * one past the user's highest; `eventId` is stable per upstream event; `data` is the payload as JSON text. Kept seven days
-     * (`RETENTION_MS`), but never the highest row, so the sequence does not restart.
-     */
-    mcpEvents: defineTable({
-        createdAt: v.number(),
-        data: v.string(),
-        eventId: v.string(),
-        name: v.string(),
-        seq: v.number(),
-        timestamp: v.number(),
-        userId: v.string(),
-    })
-        .shardBy("userId")
-        .index("by_userId_seq", ["userId", "seq"])
-        .index("by_userId_eventId", ["userId", "eventId"])
-        .index("by_createdAt", ["createdAt"]),
 
     triggerExecutions: defineTable({
         completedAt: v.optional(v.number()),
