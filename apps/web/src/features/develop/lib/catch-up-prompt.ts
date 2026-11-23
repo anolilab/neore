@@ -33,7 +33,9 @@ export const isPlainRepo = (repo: string): boolean => PLAIN_REPO.test(repo) && !
  * Whether the head may be pushed is decided only by `headInBaseRepository`, the host's repository identity: a fork's branch can
  * share a name and even a commit with one of origin's. Then the only push is to `refs/heads/<headBranch>` of origin, after origin
  * is checked to be `repository` and its branch to be the pull request's head. For a fork, or a head the host no longer names, the
- * prompt holds no push at all. Callers pass plain names only ({@link isPlainBranchName}, {@link isPlainRepo}).
+ * prompt holds no push at all. The steps are for an agent that runs git with the person's own access (a host-run thread, or a
+ * paired device or server): a delegated cloud coding-agent run never pushes (`buildAgentPrompt`, and its run script drops the
+ * credential before the agent starts), so the prompt says not to hand the steps to one. Callers pass plain names only ({@link isPlainBranchName}, {@link isPlainRepo}).
  */
 export const catchUpPrompt = ({
     baseBranch,
@@ -57,6 +59,10 @@ export const catchUpPrompt = ({
     // Fetch and push URLs can differ (`pushurl`, `pushInsteadOf`, several URLs): each must be exactly one, and this repository.
     const checkOrigin = `1. Check that \`git remote get-url --all origin\` and \`git remote get-url --push --all origin\` each print exactly one URL, and that both are ${repository} on ${host} (ignoring case and a trailing \`.git\`). Otherwise stop and say so.`;
     const fetchBaseAndPull = `\`git fetch origin +refs/heads/${baseBranch}:${base}\` and the pull request's own head with \`git fetch origin +refs/pull/${pull}/head:${pullRef}\``;
+    // A delegated coding-agent run clones in a sandbox, has no credential once its agent starts, and turns its result into a
+    // new pull request from a diff: it can neither push this branch nor leave commits the person can reach.
+    const whereToRun =
+        "Run these steps yourself, in a checkout where git uses the person's own access to origin (their computer, or a device or server they paired). Do not hand them to a cloud coding agent run: it cannot push, and its result becomes a new pull request instead of updating this one.";
     const finish = [
         `4. Run \`git rebase ${base}\`.`,
         "5. Resolve any conflicts so the result keeps the intent of both sides: this branch's change and what landed on the base.",
@@ -65,7 +71,8 @@ export const catchUpPrompt = ({
 
     if (!headInBaseRepository) {
         return [
-            `The branch ${headBranch} of ${repository}#${pull} comes from a fork and is behind ${baseBranch}. Rebase it here; it is not pushed, since origin is not where that branch lives:`,
+            `The branch ${headBranch} of ${repository}#${pull} comes from a fork and is behind ${baseBranch}. Rebase it here; it is not pushed, since origin is not where that branch lives.`,
+            whereToRun,
             "",
             checkOrigin,
             `2. Fetch by name, which also works in a clone of one branch: ${fetchBaseAndPull}.`,
@@ -78,7 +85,8 @@ export const catchUpPrompt = ({
     const head = `refs/remotes/origin/${headBranch}`;
 
     return [
-        `The branch ${headBranch} of ${repository}#${pull} is behind ${baseBranch}. Bring it up to date:`,
+        `The branch ${headBranch} of ${repository}#${pull} is behind ${baseBranch}. Bring it up to date.`,
+        whereToRun,
         "",
         checkOrigin,
         `2. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,

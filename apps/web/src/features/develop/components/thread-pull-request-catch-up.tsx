@@ -14,7 +14,8 @@ import { useMergeStatus } from "../lib/use-merge";
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
  * rebase prompt in this thread's composer and sends nothing. Reads the same cached queries as Develop: the pull request
  * (open, and its base), then the host's mergeability once it is open. Shows nothing while loading, on a failure, or once the
- * pull request is merged or closed, while the latest read of either failed (a cached "behind" is no longer known to hold), for
+ * pull request is merged or closed, while either is being read again or its latest read failed (a cached "behind" is not known
+ * to hold until a read confirms it), for
  * a branch name that is not plain enough to put in a command. Whether the prompt pushes is the host's word on the head's
  * repository, never a guess from names or commits: a fork's branch is not pushed.
  */
@@ -26,7 +27,7 @@ const CatchUpControl = ({ link, threadId }: { link: { number: number; repository
     const open = detail?.state === "open";
     const merge = useMergeStatus(address, open);
 
-    if (!open || pull.isError || merge.isError || merge.data?.status !== "ok" || merge.data.state !== "behind") {
+    if (!open || pull.isFetching || pull.isError || merge.isFetching || merge.isError || merge.data?.status !== "ok" || merge.data.state !== "behind") {
         return null;
     }
 

@@ -12,13 +12,14 @@ import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 const { composer, merge, prefill, pull, reads } = vi.hoisted(() => {
     return {
         composer: { takes: true },
-        merge: { current: {} as { data?: { state: string; status: string }; isError?: boolean } },
+        merge: { current: {} as { data?: { state: string; status: string }; isError?: boolean; isFetching?: boolean } },
         prefill: vi.fn(),
         reads: vi.fn(),
         pull: {
             current: {} as {
                 data?: { detail?: { baseBranch: string; headBranch: string; headInBaseRepository?: boolean; state: string; url: string }; status: string };
                 isError?: boolean;
+                isFetching?: boolean;
             },
         },
     };
@@ -127,6 +128,28 @@ describe("ThreadPullRequestCatchUp", () => {
         renderCatchUp();
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it.each([
+        ["pull request", "fetching"],
+        ["pull request", "failed"],
+        ["merge status", "fetching"],
+        ["merge status", "failed"],
+    ])("hides a cached open and behind state while a read of the %s is %s", (query, read) => {
+        given("open", "behind");
+
+        const flag = read === "fetching" ? { isFetching: true } : { isError: true };
+
+        if (query === "pull request") {
+            pull.current = { ...pull.current, ...flag };
+        } else {
+            merge.current = { ...merge.current, ...flag };
+        }
+
+        renderCatchUp();
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(screen.queryByText("Behind main")).toBeNull();
     });
 
     it("shows nothing for a branch name that could shape the prompt", () => {

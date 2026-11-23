@@ -33,6 +33,8 @@ describe(catchUpPrompt, () => {
             "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:refs/remotes/origin/feat/x origin HEAD:refs/heads/feat/x",
         ]);
         expect(prompt).toContain("Do not push to any other branch or remote.");
+        // A delegated cloud coding-agent run never pushes: the steps say to run them where git has the person's own access.
+        expect(prompt).toContain("Do not hand them to a cloud coding agent run: it cannot push");
         expect(prompt).not.toContain("gh pr checkout");
         expect(prompt).not.toContain("origin/main");
         // The composer stores a prompt without hidden characters: this one is stored as written, so its code spans stay whole.
