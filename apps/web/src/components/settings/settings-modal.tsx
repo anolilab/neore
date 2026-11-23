@@ -31,6 +31,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 const AccountSettingsCards = lazy(() => import("@/features/auth/components/settings/account-settings-cards"));
 const SecuritySettingsCards = lazy(() => import("@/features/auth/components/settings/security-settings-cards"));
 const APIKeysCard = lazy(() => import("@/features/auth/components/settings/api-key/api-keys-card"));
+const EventWebhookHostsCard = lazy(() => import("@/features/auth/components/settings/event-webhook/event-webhook-hosts-card"));
 const OrganizationsCard = lazy(() => import("@/features/auth/components/organization/organizations-card"));
 const OrganizationSettingsCards = lazy(() => import("@/features/auth/components/organization/organization-settings-cards"));
 const OrganizationMembersCard = lazy(() => import("@/features/auth/components/organization/organization-members-card"));
@@ -423,7 +424,12 @@ export const SettingsModal: FC = () => {
                 return <AccountSettingsCards />;
             }
             case "auth-api-keys": {
-                return <APIKeysCard />;
+                return (
+                    <div className="space-y-6">
+                        <APIKeysCard />
+                        <EventWebhookHostsCard />
+                    </div>
+                );
             }
             case "auth-billing": {
                 return (
