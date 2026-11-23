@@ -102,7 +102,8 @@ vi.mock("electron", () => {
         themeWatches: [],
         trayFails: false,
         trays: 0,
-        userData: path.join(os.tmpdir(), "neore-desktop-test"),
+        // This worker's own: the app writes into it, and the teardown removes it.
+        userData: path.join(os.tmpdir(), `neore-desktop-test-${process.pid}`),
         windows: [],
     };
 
@@ -1424,7 +1425,7 @@ describe("tray failure", () => {
 const temporaryDirectories: string[] = [];
 
 afterAll(() => {
-    for (const directory of temporaryDirectories) {
+    for (const directory of [...temporaryDirectories, path.join(os.tmpdir(), `neore-desktop-test-${process.pid}`)]) {
         rmSync(directory, { force: true, recursive: true });
     }
 
