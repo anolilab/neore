@@ -37,15 +37,8 @@ vi.mock("./device-scope", () => {
     return { default: () => null };
 });
 
-const { projectList, startCalls } = vi.hoisted(() => {
-    return {
-        projectList: { isAnswered: true, projects: [] as { _id: string; title: string }[] },
-        startCalls: [] as unknown[],
-    };
-});
-
-vi.mock("@/features/projects/hooks/use-projects", () => {
-    return { useProjectList: () => projectList };
+const { startCalls } = vi.hoisted(() => {
+    return { startCalls: [] as unknown[] };
 });
 
 const { bridge } = vi.hoisted(() => {
@@ -143,27 +136,20 @@ describe("<StartAgents>", () => {
 });
 
 describe("<StartAgents> on a computer limited to some projects", () => {
-    const renderLimited = (projectIds: string[] | undefined, projects: { _id: string; title: string }[]) => {
-        projectList.isAnswered = true;
-        projectList.projects = projects;
+    // `scopeProjects` is what `listDevices` returns: the still-existing projects of `projectIds`, with their titles.
+    const renderLimited = (projectIds: string[] | undefined, scopeProjects: { _id: string; title: string }[] | undefined) => {
         startCalls.length = 0;
 
         return render(
             <QueryClientProvider client={new QueryClient()}>
-                <StartAgents device={{ ...device, projectIds } as never} online />
+                <StartAgents device={{ ...device, projectIds, scopeProjects } as never} online />
             </QueryClientProvider>,
         );
     };
     const startButton = () => screen.getByRole("button", { name: "Start Claude in app" }) as HTMLButtonElement;
 
     it("starts in the one allowed project without asking", async () => {
-        renderLimited(
-            ["p1"],
-            [
-                { _id: "p1", title: "Billing" },
-                { _id: "p2", title: "Elsewhere" },
-            ],
-        );
+        renderLimited(["p1"], [{ _id: "p1", title: "Billing" }]);
 
         expect(screen.queryByRole("combobox")).toBeNull();
         expect(screen.getByText("Starts in Billing, the one project this computer may be used in.")).toBeTruthy();
@@ -180,7 +166,6 @@ describe("<StartAgents> on a computer limited to some projects", () => {
             [
                 { _id: "p1", title: "Billing" },
                 { _id: "p2", title: "Search" },
-                { _id: "p3", title: "Not allowed" },
             ],
         );
 
@@ -205,7 +190,7 @@ describe("<StartAgents> on a computer limited to some projects", () => {
     });
 
     it("cannot start, and says why, when none of the allowed projects is available", () => {
-        renderLimited(["gone"], [{ _id: "p1", title: "Billing" }]);
+        renderLimited([], []);
 
         expect(screen.queryByRole("combobox")).toBeNull();
         expect(startButton().disabled).toBe(true);
@@ -215,7 +200,7 @@ describe("<StartAgents> on a computer limited to some projects", () => {
     });
 
     it("starts with no project on a computer offered in any chat", async () => {
-        renderLimited(undefined, [{ _id: "p1", title: "Billing" }]);
+        renderLimited(undefined, undefined);
 
         expect(screen.queryByRole("combobox")).toBeNull();
         expect(startButton().disabled).toBe(false);

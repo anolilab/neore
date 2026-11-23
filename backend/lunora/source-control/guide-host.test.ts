@@ -238,6 +238,26 @@ describe("beginHostGuide", () => {
             expect(thread).toMatchObject({ _id: started.threadId, projectId });
         });
 
+        it("finds the computer's project however many of the person's other projects list the repository first", async () => {
+            const deviceId = await pairedDevice(ownerId);
+
+            // More than one lookup page of older projects listing the same repository, none of them in scope.
+            for (let index = 0; index < 25; index += 1) {
+                await addRepo(await insertProject(`Older ${String(index)}`));
+            }
+
+            const projectId = await insertProject("Hello");
+
+            await addRepo(projectId);
+            await limitTo(deviceId, [projectId]);
+
+            const started = await begin(deviceId);
+            const [thread] = await rows("threads");
+
+            expect(started).toMatchObject({ status: "started" });
+            expect(thread).toMatchObject({ _id: started.threadId, projectId });
+        });
+
         it("is out of scope, not busy, and writes nothing, when none of the computer's projects lists this repository", async () => {
             const deviceId = await pairedDevice(ownerId);
             const projectId = await insertProject("Hello");

@@ -38,7 +38,7 @@ import { isAppVersion } from "./lib/app-version";
 import { scheduleClearDeviceProjects } from "./internal";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
-import { filterOwnProjectIds } from "./lib/scope";
+import { filterOwnProjectIds, ownProjectTitles } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
 import { capUtf8, clockSkewData, clockSkewMessage, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
@@ -156,7 +156,7 @@ export const listDevices = authQuery
     .query(async ({ ctx }) => {
         const { page } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER, orderBy: [{ createdAt: "asc" }], where: { userId: ctx.user.userId } });
         // A deleted project silently drops out of a device's list.
-        const liveProjects = await filterOwnProjectIds(
+        const liveProjects = await ownProjectTitles(
             ctx,
             ctx.user.userId,
             page.flatMap((device) => device.projectIds ?? []),
@@ -173,7 +173,14 @@ export const listDevices = authQuery
                 ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
                 ...(device.appVersion !== undefined && { appVersion: device.appVersion }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
-                ...(device.projectIds !== undefined && { projectIds: device.projectIds.filter((id) => liveProjects.has(id)) }),
+                ...(device.projectIds !== undefined && {
+                    projectIds: device.projectIds.filter((id) => liveProjects.has(id)),
+                    scopeProjects: device.projectIds.flatMap((id) => {
+                        const title = liveProjects.get(id);
+
+                        return title === undefined ? [] : [{ _id: id as string, title }];
+                    }),
+                }),
                 ...(device.transport !== undefined && { transport: device.transport }),
                 ...(device.viaDeviceId !== undefined && { viaDeviceId: device.viaDeviceId as string }),
             };

@@ -24,7 +24,6 @@ import { hostOrganizationRefusal } from "../acp/lib/organization-cap";
 import { sendToHostFor } from "../acp/send";
 import { authAction, rateLimit } from "../lib/crpc";
 import { resolveGithubToken } from "../connectors/lib/github-token";
-import { isDeviceInScope } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
 import type { DeviceTaintSource } from "../devices/lib/taint";
 import { enqueueJob } from "../lib/job-queue";
@@ -64,13 +63,9 @@ const guideProjectOf = async (
         return { project: undefined };
     }
 
-    const listing = await ownProjectIdsListingRepo(ctx, userId, repo);
+    const listing = await ownProjectIdsListingRepo(ctx, userId, repo, device.projectIds);
 
     for (const projectId of listing) {
-        if (!isDeviceInScope(device, projectId)) {
-            continue;
-        }
-
         // The same check the start makes: the caller's client never names this project, the repository does.
         const project = await writableProject(ctx, projectId, userId, { primary: true });
 

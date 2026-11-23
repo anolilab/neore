@@ -18,16 +18,29 @@ export const isProjectFolderPath = (path: string): boolean =>
 /**
  * The project as `viewerId` may see it. A machine belongs to its owner alone, so the machine and folder (a device id and
  * an absolute path that often carries the OS username) are dropped for anyone else, such as another member of the
- * project's organization. Every project row a client reads passes through here.
+ * project's organization. So is the owner's runner (`acp/lib/project-runner.ts`): a project moved into an organization
+ * keeps the id and start time of the owner's last host thread, which no member reads. Every project row a client reads
+ * passes through here.
  */
 export const forViewer = <T extends { machineId?: unknown; path?: unknown; userId?: string | null }>(project: T, viewerId: string): T => {
     if (project.userId === viewerId) {
         return project;
     }
 
-    // The two names are dropped by the rest pattern, never read: that is how the fields leave the row.
-    // eslint-disable-next-line sonarjs/no-unused-vars -- the rest pattern is the point of this line
-    const { machineId: _machineId, path: _path, ...rest } = project;
+    // The names are dropped by the rest pattern, never read: that is how the fields leave the row.
+    /* eslint-disable sonarjs/no-unused-vars -- the rest pattern is the point of this statement */
+    const {
+        machineId: _machineId,
+        path: _path,
+        runnerAgentKey: _runnerAgentKey,
+        runnerDeviceId: _runnerDeviceId,
+        runnerFolderId: _runnerFolderId,
+        runnerKind: _runnerKind,
+        runnerThreadAt: _runnerThreadAt,
+        runnerThreadId: _runnerThreadId,
+        ...rest
+    } = project as Partial<Record<`runner${"AgentKey" | "DeviceId" | "FolderId" | "Kind" | "ThreadAt" | "ThreadId"}`, unknown>> & T;
+    /* eslint-enable sonarjs/no-unused-vars */
 
     return rest as T;
 };

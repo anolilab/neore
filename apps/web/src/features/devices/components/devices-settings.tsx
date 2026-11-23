@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import SettingsCard from "@/components/settings/settings-card";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import SetupChecklist from "@/features/onboarding/components/setup-checklist";
-import { useProjectList } from "@/features/projects/hooks/use-projects";
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
 import {
@@ -47,6 +46,8 @@ interface DeviceView {
     platform: NativeDevicePlatform;
     /** Unset: offered in any chat. A list: only threads of these projects (empty: nowhere). */
     projectIds?: string[];
+    /** The projects of `projectIds` with their titles. */
+    scopeProjects?: { _id: string; title: string }[];
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
     transport?: "headless" | "ssh";
@@ -88,8 +89,6 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     const start = useMutation(crpc.acp.remote.startHostSession.mutationOptions());
     const offers = device.acpOffers ?? [];
     const scope = device.projectIds;
-    // Only a limited computer needs the project list.
-    const { isAnswered, projects } = useProjectList(scope !== undefined && offers.length > 0);
     const [picked, setPicked] = useState<string>("");
 
     if (offers.length === 0) {
@@ -97,7 +96,8 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     }
 
     const outdated = device.updateRequired === true;
-    const allowed = scope === undefined ? [] : projects.filter((project) => scope.includes(project._id));
+    // The computer's projects come with the device row, so one past the first page of the person's projects is offered too.
+    const allowed = scope === undefined ? [] : (device.scopeProjects ?? []);
     // The only allowed project is the one; of several, the person's pick while it is still allowed.
     const projectId = allowed.length === 1 ? allowed[0]?._id : allowed.find((project) => project._id === picked)?._id;
     const needsProject = scope !== undefined && projectId === undefined;
@@ -106,9 +106,7 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
 
     let hint: string | null = null;
 
-    if (scope !== undefined && !isAnswered) {
-        hint = t`Loading the projects this computer may be used in…`;
-    } else if (scope !== undefined && allowed.length === 0) {
+    if (scope !== undefined && allowed.length === 0) {
         hint = t`This computer may only be used in some projects, and none of them is available to you. Change where it is offered below.`;
     } else if (needsProject) {
         hint = t`This computer may only be used in some projects. Choose the project to start the agent in.`;

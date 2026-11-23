@@ -828,7 +828,7 @@ msgstr "Wykryte narzędzia: {0}"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:353
 msgid "{0} tools: {1}"
 msgstr "Narzędzia ({0}): {1}"
 
@@ -1589,7 +1589,7 @@ msgstr "{stateLabel} Zatrzymaj tryb głosowy bez użycia rąk"
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {Połączono # pull request.} few {Połączono # pull requesty.} many {Połączono # pull requestów.} other {Połączono # pull requestu.}}"
 
-#: src/features/devices/components/devices-settings.tsx:224
+#: src/features/devices/components/devices-settings.tsx:222
 msgid "{text} (gave up after {attempts} attempts)"
 msgstr "{text} (zrezygnowano po {attempts} próbach)"
 
@@ -2550,7 +2550,7 @@ msgstr "Dodaj notatkę..."
 msgid "Add a note…"
 msgstr "Dodaj notatkę…"
 
-#: src/features/devices/components/devices-settings.tsx:534
+#: src/features/devices/components/devices-settings.tsx:532
 msgid "Add a server over SSH"
 msgstr "Dodaj serwer przez SSH"
 
@@ -2913,7 +2913,7 @@ msgstr "Dodawanie dokumentów… {0} z {1}"
 msgid "Adding the project…"
 msgstr "Dodawanie projektu…"
 
-#: src/features/devices/components/devices-settings.tsx:516
+#: src/features/devices/components/devices-settings.tsx:514
 msgid "Adding the server was cancelled on this computer."
 msgstr "Dodawanie serwera zostało anulowane na tym komputerze."
 
@@ -2926,7 +2926,7 @@ msgstr "Dodawanie Twoich wcześniejszych odpowiedzi…"
 msgid "Adding…"
 msgstr "Dodawanie…"
 
-#: src/features/devices/components/devices-settings.tsx:547
+#: src/features/devices/components/devices-settings.tsx:545
 msgid "Address"
 msgstr "Adres"
 
@@ -3173,7 +3173,7 @@ msgstr "Po aktywowaniu połączenia tutaj otrzymasz adres URL webhooka do ustawi
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "Po aktywowaniu połączenia tutaj otrzymasz adres URL webhooka do ustawienia jako Request URL w Event Subscriptions aplikacji Slack."
 
-#: src/features/devices/components/devices-settings.tsx:463
+#: src/features/devices/components/devices-settings.tsx:461
 msgid "After outside content"
 msgstr "Po treści z zewnątrz"
 
@@ -6647,7 +6647,7 @@ msgstr "Wybierz .md lub .zip"
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr "Wybierz model dla każdego rodzaju pracy, którą asystent przekazuje podagentowi. Rola z modelem jest proponowana asystentowi; rola bez modelu pozostaje wyłączona."
 
-#: src/features/devices/components/devices-settings.tsx:131
+#: src/features/devices/components/devices-settings.tsx:129
 msgid "Choose a project"
 msgstr "Wybierz projekt"
 
@@ -7276,7 +7276,7 @@ msgid "Coding agent runs"
 msgstr "Uruchomienia agenta kodowania"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:148
+#: src/features/devices/components/devices-settings.tsx:146
 msgid "Coding agents you can start on {0}"
 msgstr "Agenci kodowania, których możesz uruchomić na {0}"
 
@@ -7926,7 +7926,7 @@ msgstr "Potwierdź swoje hasło"
 msgid "Conflicts with {base}"
 msgstr "Konflikty z {base}"
 
-#: src/features/devices/components/devices-settings.tsx:299
+#: src/features/devices/components/devices-settings.tsx:297
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
 #: src/routes/auth/extension.tsx:156
@@ -7970,7 +7970,7 @@ msgstr "Podłącz węzeł audio/pliku jako wejście"
 msgid "Connect an image node as input"
 msgstr "Podłącz węzeł obrazu jako wejście"
 
-#: src/features/devices/components/devices-settings.tsx:565
+#: src/features/devices/components/devices-settings.tsx:563
 msgid "Connect and add"
 msgstr "Połącz i dodaj"
 
@@ -8149,7 +8149,7 @@ msgstr "połączenie nie powiodło się"
 msgid "Connection failed"
 msgstr "Połączenie nie powiodło się"
 
-#: src/features/devices/components/devices-settings.tsx:377
+#: src/features/devices/components/devices-settings.tsx:375
 msgid "Connection lost"
 msgstr "Utracono połączenie"
 
@@ -8591,12 +8591,12 @@ msgstr "Kopiuj polecenie: {label}"
 msgid "Copy content"
 msgstr "Kopiuj treść"
 
-#: src/features/devices/components/devices-settings.tsx:395
+#: src/features/devices/components/devices-settings.tsx:393
 msgid "Copy diagnostics"
 msgstr "Kopiuj diagnostykę"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:392
 msgid "Copy diagnostics for {0}"
 msgstr "Kopiuj diagnostykę dla {0}"
 
@@ -8779,7 +8779,7 @@ msgstr "Aplikacje wrażliwe na koszty, które potrzebują niezawodnej AI od Goog
 msgid "Costa Rica"
 msgstr "Kostaryka"
 
-#: src/features/devices/components/devices-settings.tsx:526
+#: src/features/devices/components/devices-settings.tsx:524
 msgid "Could not add the server."
 msgstr "Nie udało się dodać serwera."
 
@@ -8883,7 +8883,7 @@ msgstr "Nie udało się tego potwierdzić. Sprawdź w {hostLabel}, zanim spróbu
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "Nie udało się potwierdzić zmiany automatycznego scalania. Sprawdź w {hostLabel}, zanim spróbujesz ponownie."
 
-#: src/features/devices/components/devices-settings.tsx:320
+#: src/features/devices/components/devices-settings.tsx:318
 msgid "Could not connect to the server."
 msgstr "Nie udało się połączyć z serwerem."
 
@@ -8910,7 +8910,7 @@ msgstr "Nie udało się skopiować sekretu. Zaznacz go i skopiuj ręcznie."
 
 #: src/features/auth/components/settings/api-key/use-copy-to-clipboard.ts:18
 #: src/features/chat/thread/copy-last-code-block.tsx:41
-#: src/features/devices/components/devices-settings.tsx:272
+#: src/features/devices/components/devices-settings.tsx:270
 msgid "Could not copy to the clipboard"
 msgstr "Nie udało się skopiować do schowka"
 
@@ -9090,7 +9090,7 @@ msgstr "Nie udało się otworzyć jako strony"
 msgid "Could not open the pull request."
 msgstr "Nie udało się otworzyć pull requesta."
 
-#: src/features/devices/components/devices-settings.tsx:630
+#: src/features/devices/components/devices-settings.tsx:628
 msgid "Could not pair this computer. Try again."
 msgstr "Nie udało się sparować tego komputera. Spróbuj ponownie."
 
@@ -9150,7 +9150,7 @@ msgstr "Nie udało się dopracować szkicu. Spróbuj ponownie."
 msgid "Could not refresh this {requestNoun} from {0}. What you see may be out of date."
 msgstr "Nie udało się odświeżyć tego {requestNoun} z {0}. To, co widzisz, może być nieaktualne."
 
-#: src/features/devices/components/devices-settings.tsx:411
+#: src/features/devices/components/devices-settings.tsx:409
 msgid "Could not remove the device."
 msgstr "Nie udało się usunąć urządzenia."
 
@@ -9158,7 +9158,7 @@ msgstr "Nie udało się usunąć urządzenia."
 msgid "Could not remove the participant"
 msgstr "Nie udało się usunąć uczestnika"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:345
 msgid "Could not rename the device."
 msgstr "Nie udało się zmienić nazwy urządzenia."
 
@@ -10774,7 +10774,7 @@ msgstr "Wymagające zadania, w których najważniejsze są maksymalne możliwoś
 
 #: src/features/auth/components/device-approval.tsx:130
 #: src/features/auth/components/device-approval.tsx:134
-#: src/features/devices/components/devices-settings.tsx:448
+#: src/features/devices/components/devices-settings.tsx:446
 msgid "Denied"
 msgstr "Odrzucono"
 
@@ -11080,24 +11080,24 @@ msgstr "Dla deweloperów, którzy potrzebują mocnych możliwości programistycz
 msgid "Development"
 msgstr "Programowanie"
 
-#: src/features/devices/components/devices-settings.tsx:709
+#: src/features/devices/components/devices-settings.tsx:707
 msgid "Device activity"
 msgstr "Aktywność urządzeń"
 
-#: src/features/devices/components/devices-settings.tsx:336
+#: src/features/devices/components/devices-settings.tsx:334
 msgid "Device name"
 msgstr "Nazwa urządzenia"
 
-#: src/features/devices/components/devices-settings.tsx:414
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "Device removed"
 msgstr "Usunięto urządzenie"
 
-#: src/features/devices/components/devices-settings.tsx:642
+#: src/features/devices/components/devices-settings.tsx:640
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "Urządzenia"
 
-#: src/features/devices/components/devices-settings.tsx:284
+#: src/features/devices/components/devices-settings.tsx:282
 msgid "Diagnostics copied"
 msgstr "Skopiowano diagnostykę"
 
@@ -11212,7 +11212,7 @@ msgstr "Odrzucić zmiany w plikach reguł?"
 msgid "Discard the review"
 msgstr "Odrzuć recenzję"
 
-#: src/features/devices/components/devices-settings.tsx:302
+#: src/features/devices/components/devices-settings.tsx:300
 #: src/features/settings/connectors/connector-card.tsx:189
 #: src/features/settings/connectors/connector-card.tsx:209
 msgid "Disconnect"
@@ -11249,7 +11249,7 @@ msgstr "Discord Public Key"
 #: src/features/chat/thread/ask-user-prompt.tsx:345
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:391
+#: src/features/devices/components/devices-settings.tsx:389
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Zamknij"
@@ -11411,7 +11411,7 @@ msgstr "Nie używaj swoich domyślnych instrukcji w tym projekcie"
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:184
-#: src/features/devices/components/devices-settings.tsx:447
+#: src/features/devices/components/devices-settings.tsx:445
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:62
@@ -13385,7 +13385,7 @@ msgid "expired"
 msgstr "wygasło"
 
 #: src/features/chat/thread-list/thread-node.tsx:344
-#: src/features/devices/components/devices-settings.tsx:449
+#: src/features/devices/components/devices-settings.tsx:447
 #: src/features/settings/connectors/connector-card.tsx:76
 msgid "Expired"
 msgstr "Wygasło"
@@ -13651,7 +13651,7 @@ msgstr "niezaliczone"
 #: src/features/chat/thread/host-activity.tsx:139
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:77
-#: src/features/devices/components/devices-settings.tsx:450
+#: src/features/devices/components/devices-settings.tsx:448
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:181
@@ -18767,7 +18767,7 @@ msgstr "Kenia"
 msgid "Kept as yours"
 msgstr "Zachowano jako twoje"
 
-#: src/features/devices/components/devices-settings.tsx:559
+#: src/features/devices/components/devices-settings.tsx:557
 msgid "Key file (optional, absolute path)"
 msgstr "Plik klucza (opcjonalnie, ścieżka bezwzględna)"
 
@@ -19418,11 +19418,11 @@ msgstr "Pozwól szybkiej kontroli zatwierdzać wywołania niskiego ryzyka"
 msgid "Let replies use tools"
 msgstr "Pozwól odpowiedziom używać narzędzi"
 
-#: src/features/devices/components/devices-settings.tsx:640
+#: src/features/devices/components/devices-settings.tsx:638
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Pozwól agentowi korzystać z plików, terminala i lokalnych serwerów MCP na Twoim komputerze przez aplikację desktopową Neore. Każda akcja najpierw pyta Cię o zgodę na tym komputerze, a nic nie uruchamia się z udostępnionych czatów ani zadań w tle."
 
-#: src/features/devices/components/devices-settings.tsx:700
+#: src/features/devices/components/devices-settings.tsx:698
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Pozwól agentowi pracować na serwerze, z którym łączysz się przez SSH, za pomocą własnego klienta SSH i kluczy. Neore prosi o zaufanie kluczowi serwera przy pierwszym połączeniu, a każda akcja wymaga Twojej zgody na tym komputerze, zanim zostanie wysłana. Serwer nie przechowuje żadnego Twojego sekretu."
 
@@ -19977,8 +19977,8 @@ msgid "Loading the linked pull requests…"
 msgstr "Wczytywanie połączonych pull requestów…"
 
 #: src/features/devices/components/devices-settings.tsx:110
-msgid "Loading the projects this computer may be used in…"
-msgstr "Wczytywanie projektów, w których można używać tego komputera…"
+#~ msgid "Loading the projects this computer may be used in…"
+#~ msgstr "Wczytywanie projektów, w których można używać tego komputera…"
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:48
 msgid "Loading the sub-agent's requests…"
@@ -21981,11 +21981,11 @@ msgstr "Wycisz wątek"
 msgid "my data"
 msgstr "moje dane"
 
-#: src/features/devices/components/devices-settings.tsx:604
+#: src/features/devices/components/devices-settings.tsx:602
 msgid "My Linux computer"
 msgstr "Mój komputer z Linuksem"
 
-#: src/features/devices/components/devices-settings.tsx:604
+#: src/features/devices/components/devices-settings.tsx:602
 msgid "My Mac"
 msgstr "Mój Mac"
 
@@ -21997,7 +21997,7 @@ msgstr "Mój serwer MCP"
 msgid "My skills"
 msgstr "Moje umiejętności"
 
-#: src/features/devices/components/devices-settings.tsx:604
+#: src/features/devices/components/devices-settings.tsx:602
 msgid "My Windows PC"
 msgstr "Mój komputer z Windows"
 
@@ -22023,7 +22023,7 @@ msgstr "nazwa"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:543
+#: src/features/devices/components/devices-settings.tsx:541
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
@@ -22254,7 +22254,7 @@ msgid "Neore (timestamped)"
 msgstr "Neore (ze znacznikiem czasu)"
 
 #. placeholder {0}: device.appVersion
-#: src/features/devices/components/devices-settings.tsx:360
+#: src/features/devices/components/devices-settings.tsx:358
 msgid "Neore {0}"
 msgstr "Neore {0}"
 
@@ -22318,7 +22318,7 @@ msgstr "Neore zawiera ponad 30 modeli: GPT-4, Claude, Gemini i DeepSeek do czatu
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr "Neore dba o ich aktualność i powiadamia Cię, gdy ktoś poprosi o Twoją recenzję."
 
-#: src/features/devices/components/devices-settings.tsx:369
+#: src/features/devices/components/devices-settings.tsx:367
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr "Neore na tym komputerze jest nieaktualne, więc agent nie może z niego korzystać. Zaktualizuj tam aplikację, aby włączyć go ponownie."
 
@@ -22330,7 +22330,7 @@ msgstr "Neore na Twoim komputerze jest nieaktualne. Zaktualizuj je i spróbuj po
 msgid "Neore use cases"
 msgstr "Przypadki użycia Neore"
 
-#: src/features/devices/components/devices-settings.tsx:360
+#: src/features/devices/components/devices-settings.tsx:358
 msgid "Neore version not reported"
 msgstr "Nie zgłoszono wersji Neore"
 
@@ -22908,7 +22908,7 @@ msgstr "Brak opisu"
 msgid "No description provided."
 msgstr "Nie podano opisu."
 
-#: src/features/devices/components/devices-settings.tsx:694
+#: src/features/devices/components/devices-settings.tsx:692
 msgid "No devices paired."
 msgstr "Brak sparowanych urządzeń."
 
@@ -23392,7 +23392,7 @@ msgstr "Nie ma jeszcze wątków"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "Brak danych o planach. Informacje o planie są zapisywane dla nowych żądań po aktualizacji bramy."
 
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:353
 msgid "No tools shared yet"
 msgstr "Nie udostępniono jeszcze narzędzi"
 
@@ -23668,7 +23668,7 @@ msgstr "Uwaga: moduły są stosowane dla całej rozmowy, a nie dla pojedynczej w
 msgid "Nothing found"
 msgstr "Nic nie znaleziono"
 
-#: src/features/devices/components/devices-settings.tsx:442
+#: src/features/devices/components/devices-settings.tsx:440
 msgid "Nothing has run on a device yet."
 msgstr "Na żadnym urządzeniu nic jeszcze nie uruchomiono."
 
@@ -23837,7 +23837,7 @@ msgstr "Oficjalna"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:374
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Offline"
@@ -24066,7 +24066,7 @@ msgstr "Hasło jednorazowe jest wymagane"
 
 #: src/features/code/components/code-shell.tsx:81
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:374
 msgid "Online"
 msgstr "Online"
 
@@ -24372,7 +24372,7 @@ msgstr "Otwórz selektor modeli"
 msgid "Open Model Picker"
 msgstr "Otwórz selektor modeli"
 
-#: src/features/devices/components/devices-settings.tsx:646
+#: src/features/devices/components/devices-settings.tsx:644
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Otwórz Neore w aplikacji desktopowej, aby sparować ten komputer. Wcześniej sparowane urządzenia są wymienione poniżej."
 
@@ -25352,7 +25352,7 @@ msgstr "Sparować tę maszynę?"
 msgid "Paired"
 msgstr "Sparowano"
 
-#: src/features/devices/components/devices-settings.tsx:679
+#: src/features/devices/components/devices-settings.tsx:677
 msgid "Paired devices"
 msgstr "Sparowane urządzenia"
 
@@ -25360,7 +25360,7 @@ msgstr "Sparowane urządzenia"
 msgid "Pairing request"
 msgstr "Żądanie parowania"
 
-#: src/features/devices/components/devices-settings.tsx:620
+#: src/features/devices/components/devices-settings.tsx:618
 msgid "Pairing was cancelled on this computer."
 msgstr "Parowanie zostało anulowane na tym komputerze."
 
@@ -26175,7 +26175,7 @@ msgstr "Dopracowany hollywoodzki wygląd"
 msgid "Popular"
 msgstr "Popularne"
 
-#: src/features/devices/components/devices-settings.tsx:555
+#: src/features/devices/components/devices-settings.tsx:553
 msgid "Port"
 msgstr "Port"
 
@@ -26894,7 +26894,7 @@ msgstr "Postęp"
 msgid "Progress of {toolName}"
 msgstr "Postęp: {toolName}"
 
-#: src/features/devices/components/devices-settings.tsx:123
+#: src/features/devices/components/devices-settings.tsx:121
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:451
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:104
@@ -27853,7 +27853,7 @@ msgstr "Połącz ponownie {0}"
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Połącz ponownie hosta Git w ustawieniach, aby połączyć pull request."
 
-#: src/features/devices/components/devices-settings.tsx:378
+#: src/features/devices/components/devices-settings.tsx:376
 msgid "Reconnecting"
 msgstr "Ponowne łączenie"
 
@@ -28235,8 +28235,8 @@ msgstr "Zapamiętaj mnie"
 #: src/features/chat/thread/composer-input.tsx:365
 #: src/features/chat/thread/composer-input.tsx:419
 #: src/features/chat/thread/composer-input.tsx:428
-#: src/features/devices/components/devices-settings.tsx:398
-#: src/features/devices/components/devices-settings.tsx:404
+#: src/features/devices/components/devices-settings.tsx:396
+#: src/features/devices/components/devices-settings.tsx:402
 #: src/features/projects/components/project-form-dialog.tsx:323
 #: src/features/projects/components/project-form-dialog.tsx:364
 #: src/features/settings/components/chat/custom-providers-settings.tsx:653
@@ -28253,7 +28253,7 @@ msgid "Remove \"{0}\"?"
 msgstr "Usunąć „{0}”?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:421
+#: src/features/devices/components/devices-settings.tsx:419
 msgid "Remove “{0}”?"
 msgstr "Usunąć „{0}”?"
 
@@ -29002,7 +29002,7 @@ msgstr "ponów"
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:304
+#: src/features/devices/components/devices-settings.tsx:302
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
@@ -30689,7 +30689,7 @@ msgstr "Wysyłanie…"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:283
 #: src/features/chat/guest-links/guest-link-panel.tsx:411
-#: src/features/devices/components/devices-settings.tsx:451
+#: src/features/devices/components/devices-settings.tsx:449
 msgid "Sent"
 msgstr "Wysłano"
 
@@ -30757,7 +30757,7 @@ msgstr "Szeryfowa"
 msgid "Served from cache"
 msgstr "Z pamięci podręcznej"
 
-#: src/features/devices/components/devices-settings.tsx:523
+#: src/features/devices/components/devices-settings.tsx:521
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Dodano serwer. Wybierz, które jego foldery udostępnić, w aplikacji desktopowej."
 
@@ -30777,7 +30777,7 @@ msgstr "Nazwa serwera jest wymagana"
 msgid "server not reachable"
 msgstr "serwer jest nieosiągalny"
 
-#: src/features/devices/components/devices-settings.tsx:375
+#: src/features/devices/components/devices-settings.tsx:373
 msgid "Server over SSH"
 msgstr "Serwer przez SSH"
 
@@ -30801,7 +30801,7 @@ msgstr "Bezserwerowa baza danych Postgres z rozgałęzianiem"
 msgid "servers"
 msgstr "serwery"
 
-#: src/features/devices/components/devices-settings.tsx:702
+#: src/features/devices/components/devices-settings.tsx:700
 msgid "Servers over SSH"
 msgstr "Serwery przez SSH"
 
@@ -30979,7 +30979,7 @@ msgstr "udostępniona"
 msgid "Shared conversation"
 msgstr "Udostępniona rozmowa"
 
-#: src/features/devices/components/devices-settings.tsx:674
+#: src/features/devices/components/devices-settings.tsx:672
 msgid "Shared folders and local servers…"
 msgstr "Udostępnione foldery i lokalne serwery…"
 
@@ -32302,7 +32302,7 @@ msgstr "Początek"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:176
+#: src/features/devices/components/devices-settings.tsx:174
 msgid "Start {0} in {1}"
 msgstr "Uruchom {0} w {1}"
 
@@ -32517,7 +32517,7 @@ msgstr "Uruchamianie wprowadzania głosowego…"
 msgid "Starting…"
 msgstr "Uruchamianie…"
 
-#: src/features/devices/components/devices-settings.tsx:141
+#: src/features/devices/components/devices-settings.tsx:139
 msgid "Starts in {onlyProject}, the one project this computer may be used in."
 msgstr "Uruchamia się w {onlyProject}, jedynym projekcie, w którym można używać tego komputera."
 
@@ -34263,7 +34263,7 @@ msgstr "Agent odpowiedział z opóźnieniem: {0} ma teraz wartość {1}."
 msgid "The agent asks before a risky action"
 msgstr "Agent pyta przed ryzykowną akcją"
 
-#: src/features/devices/components/devices-settings.tsx:405
+#: src/features/devices/components/devices-settings.tsx:403
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "Agent nie będzie już mógł o nic prosić tego urządzenia. Dziennik aktywności pozostanie do czasu wygaśnięcia."
 
@@ -34545,7 +34545,7 @@ msgstr "Warunek jest sprawdzany bez pytania modelu; agent uruchamia się tylko w
 msgid "The connection could not be completed."
 msgstr "Nie udało się dokończyć łączenia."
 
-#: src/features/devices/components/devices-settings.tsx:221
+#: src/features/devices/components/devices-settings.tsx:219
 msgid "The connection was lost."
 msgstr "Połączenie zostało utracone."
 
@@ -35531,7 +35531,7 @@ msgstr "Tryb tego porównania dotyczy każdej kolumny. Zmień go w porównaniu."
 msgid "this computer"
 msgstr "ten komputer"
 
-#: src/features/devices/components/devices-settings.tsx:374
+#: src/features/devices/components/devices-settings.tsx:372
 #: src/features/projects/components/add-project-dialog.tsx:173
 #: src/features/projects/components/add-project-dialog.tsx:177
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
@@ -35550,28 +35550,28 @@ msgstr "Ten komputer nie jest już sparowany."
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "Ten komputer nie jest już sparowany. Sparuj go ponownie w Ustawienia → Urządzenia."
 
-#: src/features/devices/components/devices-settings.tsx:651
+#: src/features/devices/components/devices-settings.tsx:649
 msgid "This computer is not paired yet."
 msgstr "Ten komputer nie jest jeszcze sparowany."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:667
+#: src/features/devices/components/devices-settings.tsx:665
 msgid "This computer is paired as “{0}”."
 msgstr "Ten komputer jest sparowany jako „{0}”."
 
-#: src/features/devices/components/devices-settings.tsx:651
+#: src/features/devices/components/devices-settings.tsx:649
 msgid "This computer is paired with another account."
 msgstr "Ten komputer jest sparowany z innym kontem."
 
-#: src/features/devices/components/devices-settings.tsx:627
+#: src/features/devices/components/devices-settings.tsx:625
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Ten komputer jest sparowany. Wybierz w aplikacji desktopowej, które foldery udostępnić."
 
-#: src/features/devices/components/devices-settings.tsx:112
+#: src/features/devices/components/devices-settings.tsx:110
 msgid "This computer may only be used in some projects, and none of them is available to you. Change where it is offered below."
 msgstr "Tego komputera można używać tylko w niektórych projektach i żaden z nich nie jest dla ciebie dostępny. Zmień poniżej, gdzie jest oferowany."
 
-#: src/features/devices/components/devices-settings.tsx:114
+#: src/features/devices/components/devices-settings.tsx:112
 msgid "This computer may only be used in some projects. Choose the project to start the agent in."
 msgstr "Tego komputera można używać tylko w niektórych projektach. Wybierz projekt, w którym uruchomić agenta."
 
@@ -38006,7 +38006,7 @@ msgstr "Używaj dozwolonych modeli organizacji"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Używaj tych skrótów klawiszowych, aby sprawniej poruszać się po siatce danych i z nią pracować."
 
-#: src/features/devices/components/devices-settings.tsx:661
+#: src/features/devices/components/devices-settings.tsx:659
 msgid "Use this computer for agent tools"
 msgstr "Używaj tego komputera do narzędzi agenta"
 
@@ -38046,7 +38046,7 @@ msgstr "użytkownik"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:551
+#: src/features/devices/components/devices-settings.tsx:549
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -38938,7 +38938,7 @@ msgstr "{device}: oczekuje na odebranie…"
 msgid "Waiting for {name}…"
 msgstr "Czekam na {name}…"
 
-#: src/features/devices/components/devices-settings.tsx:446
+#: src/features/devices/components/devices-settings.tsx:444
 msgid "Waiting for approval"
 msgstr "Oczekuje na zatwierdzenie"
 
@@ -39298,7 +39298,7 @@ msgstr "Jak AI ma się do ciebie zwracać?"
 msgid "What should the guide pay attention to?"
 msgstr "Na co przewodnik powinien zwrócić uwagę?"
 
-#: src/features/devices/components/devices-settings.tsx:709
+#: src/features/devices/components/devices-settings.tsx:707
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Co agent zlecał twoim urządzeniom w ciągu ostatnich 30 dni."
 
@@ -39533,7 +39533,7 @@ msgstr "Z e-mailem/hasłem"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "Przy tym ustawieniu uruchamia się, gdy tekst zaczyna zawierać frazę, a nie przy każdej zmianie."
 
-#: src/features/devices/components/devices-settings.tsx:561
+#: src/features/devices/components/devices-settings.tsx:559
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "Bez niego używane są Twój agent SSH i domyślne klucze. Hasła nie są jeszcze obsługiwane."
 
