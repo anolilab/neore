@@ -207,7 +207,7 @@ msgstr "(offline)"
 msgid "(old side)"
 msgstr "(alte Seite)"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:250
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:275
 #: src/features/settings/connectors/connector-card.tsx:202
 msgid "(opens in a new tab)"
 msgstr "(öffnet in einem neuen Tab)"
@@ -896,7 +896,7 @@ msgstr "{activeCount} von {0} MCP-Servern aktiv"
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:176
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:192
 msgid "{agentLabel} on {repo}"
 msgstr "{agentLabel} in {repo}"
 
@@ -1091,7 +1091,7 @@ msgstr "{fieldLabel} entspricht dem aktuellen Wert"
 msgid "{fieldLabel} updated successfully"
 msgstr "{fieldLabel} erfolgreich aktualisiert"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:212
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:228
 msgid "{fileCount, plural, one {Changes (# file)} other {Changes (# files)}}"
 msgstr "{fileCount, plural, one {Änderungen (# Datei)} other {Änderungen (# Dateien)}}"
 
@@ -2111,6 +2111,10 @@ msgstr "Ein Zeitpunkt tritt ein"
 #: src/features/chat/forward/forward-dialog.tsx:109
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "Ein neuer Chat öffnet sich mit den ausgewählten Nachrichten als Zitat. Prüfe ihn und sende ihn dann ab."
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:92
+msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
+msgstr "Ein neuer Lauf im selben Repository und Branch behebt die Ursache im Repository und führt den Schritt erneut aus. Lies und bearbeite die Aufgabe, bevor du ihn startest."
 
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:49
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
@@ -6011,7 +6015,8 @@ msgstr "Kanada"
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:118
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/develop/components/pull-request-reviewers-action.tsx:166
@@ -6096,7 +6101,7 @@ msgstr "Auswahl abbrechen"
 
 #: src/features/chat/thread/host-activity.tsx:130
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:164
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:180
 #: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:134
@@ -7254,7 +7259,7 @@ msgstr "Coding"
 msgid "Coding"
 msgstr "Programmierung"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:88
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:89
 msgid "Coding agent log"
 msgstr "Coding-Agent-Protokoll"
 
@@ -8482,7 +8487,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Unterhaltungen zu Zeilen, die dieser Diff nicht mehr zeigt"
 
 #: src/features/chat/thread/composer-input.tsx:834
-#: src/features/chat/thread/composer-input.tsx:1824
+#: src/features/chat/thread/composer-input.tsx:1831
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -8812,7 +8817,7 @@ msgstr "{0} konnte nicht angehängt werden. Die übrigen Dateien wurden angehän
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} konnte nicht angehängt werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1854
+#: src/features/chat/thread/composer-input.tsx:1861
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -8824,7 +8829,7 @@ msgstr "konnte nicht gespeichert werden"
 msgid "Could not cancel the message. It is still queued."
 msgstr "Die Nachricht konnte nicht abgebrochen werden. Sie ist weiterhin in der Warteschlange."
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:142
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:143
 msgid "Could not cancel the run."
 msgstr "Der Durchlauf konnte nicht abgebrochen werden."
 
@@ -9089,7 +9094,7 @@ msgstr "Für diesen {requestNoun} konnte kein Thread geöffnet werden. Versuche 
 msgid "Could not open as a page"
 msgstr "Konnte nicht als Seite geöffnet werden"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:151
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 msgid "Could not open the pull request."
 msgstr "Der Pull Request konnte nicht geöffnet werden."
 
@@ -9124,11 +9129,11 @@ msgstr "Der Server ist nicht erreichbar, um die Generierung zu starten. Prüfe d
 msgid "Could not reach the server. Try again."
 msgstr "Der Server ist nicht erreichbar. Versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1857
+#: src/features/chat/thread/composer-input.tsx:1864
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1858
+#: src/features/chat/thread/composer-input.tsx:1865
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -9274,6 +9279,10 @@ msgstr "Neuer Kontext konnte nicht gestartet werden. Versuche es erneut."
 #: src/features/settings/components/chat/mcp-settings.tsx:94
 msgid "Could not start sign-in"
 msgstr "Anmeldung konnte nicht gestartet werden"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:58
+msgid "Could not start the fix."
+msgstr "Die Korrektur konnte nicht gestartet werden."
 
 #: src/features/skills/components/skill-builder-test-drive.tsx:79
 msgid "Could not start the test drive."
@@ -9530,7 +9539,7 @@ msgstr "Organisation erstellen"
 msgid "Create Organization"
 msgstr "Organisation erstellen"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:259
 msgid "Create PR"
 msgstr "PR erstellen"
 
@@ -11409,7 +11418,7 @@ msgstr "Deine Standardanweisungen in diesem Projekt nicht verwenden"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:118
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:168
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:383
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
@@ -11653,7 +11662,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2051
+#: src/features/chat/thread/composer-input.tsx:2058
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -13648,7 +13657,7 @@ msgstr "fehlgeschlagen"
 
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/chat/thread/host-activity.tsx:139
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:165
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:77
 #: src/features/devices/components/devices-settings.tsx:386
 #: src/features/evals/components/model-comparison.tsx:112
@@ -13697,7 +13706,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1631
+#: src/features/chat/thread/composer-input.tsx:1634
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -14107,7 +14116,7 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:1663
+#: src/features/chat/thread/composer-input.tsx:1666
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
@@ -15197,6 +15206,18 @@ msgstr "Prüfungen beheben"
 #: src/features/canvas/components/canvas-toolbar.tsx:33
 msgid "Fix grammar"
 msgstr "Grammatik korrigieren"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:84
+msgid "Fix setup"
+msgstr "Einrichtung korrigieren"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:73
+msgid "Fix started — follow it below"
+msgstr "Korrektur gestartet – siehe unten"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:90
+msgid "Fix the \"{step}\" step"
+msgstr "Schritt „{step}“ korrigieren"
 
 #: src/features/develop/lib/fix-prompts.ts:60
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
@@ -20120,7 +20141,7 @@ msgstr "Auf {0}-Modelle beschränkt"
 msgid "Locked to {anchorModeName} models"
 msgstr "Auf {anchorModeName}-Modelle beschränkt"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:198
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:214
 msgid "Log"
 msgstr "Protokoll"
 
@@ -24794,7 +24815,7 @@ msgstr "Aus diesem Thread geöffnet"
 msgid "Opening a blank chat"
 msgstr "Leeren Chat öffnen"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:156
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:172
 msgid "Opening a pull request — progress is in the log"
 msgstr "Pull Request wird geöffnet – der Fortschritt steht im Protokoll"
 
@@ -24802,7 +24823,7 @@ msgstr "Pull Request wird geöffnet – der Fortschritt steht im Protokoll"
 msgid "Opening a thread…"
 msgstr "Thread wird geöffnet…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:233
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
 msgid "Opening pull request…"
 msgstr "Pull Request wird geöffnet…"
 
@@ -29891,7 +29912,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:1590
+#: src/features/chat/thread/composer-input.tsx:1593
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
@@ -31056,7 +31077,7 @@ msgstr "Tastenkürzel"
 msgid "Show {fieldLabel}"
 msgstr "{fieldLabel} anzeigen"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:63
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:64
 msgid "Show {hidden} more lines"
 msgstr "{hidden} weitere Zeilen anzeigen"
 
@@ -32366,6 +32387,10 @@ msgstr "Kostenlos chatten starten"
 msgid "Start editing cell"
 msgstr "Zelle bearbeiten"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:122
+msgid "Start fix"
+msgstr "Korrektur starten"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
@@ -32499,7 +32524,7 @@ msgstr "Coding-Agent wird gestartet…"
 msgid "Starting voice input…"
 msgstr "Spracheingabe wird gestartet…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:166
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:182
 msgid "Starting…"
 msgstr "Wird gestartet…"
 
@@ -33626,6 +33651,10 @@ msgstr "Aufgabe fehlgeschlagen"
 msgid "Task finished"
 msgstr "Aufgabe abgeschlossen"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:98
+msgid "Task for the coding agent"
+msgstr "Aufgabe für den Coding-Agent"
+
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
 #: ../../packages/ui/src/components/tiptap-editor.tsx:228
 msgid "Task list"
@@ -34320,7 +34349,7 @@ msgstr "Der Agent behält die Fakten, die du teilst, und nutzt sie in späteren 
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "Die Agentenschleife ist für eine systematische Aufgabenausführung immer aktiv. Diese Einstellungen steuern zusätzliche spezialisierte Module, die die Fähigkeiten der KI für bestimmte Aufgabentypen erweitern."
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:220
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:236
 msgid "The agent made no file changes."
 msgstr "Der Agent hat keine Dateien geändert."
 
@@ -34454,7 +34483,7 @@ msgstr "Das Bundle konnte nicht importiert werden."
 msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
 msgstr "Die Änderung hat neue Commits, seit du dieses Review begonnen hast. Sende das Review zuerst ab oder verwirf es, und kommentiere dann die neue Version."
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:215
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:231
 msgid "The change is too large to show in full."
 msgstr "Die Änderung ist zu groß, um sie vollständig anzuzeigen."
 
@@ -34885,7 +34914,7 @@ msgstr "Das Modell im Link ist nicht verfügbar. Der Chat behält sein Modell."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "Die Modellauswahl listet jetzt {0} Modelle von {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1525
+#: src/features/chat/thread/composer-input.tsx:1528
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "Die Modellauswahl hat sich während der Uploads geändert, daher wurde die Nachricht nicht gesendet. Drücke auf Senden, um sie zu senden."
 
@@ -35182,7 +35211,7 @@ msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
 
-#: src/features/chat/thread/composer-input.tsx:1538
+#: src/features/chat/thread/composer-input.tsx:1541
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "Die Uploads sind abgeschlossen, aber die Nachricht wurde nicht gesendet. Drücke auf Senden, um sie zu senden."
 
@@ -37093,7 +37122,7 @@ msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2041
+#: src/features/chat/thread/composer-input.tsx:2048
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
@@ -37515,7 +37544,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1893
+#: src/features/chat/thread/composer-input.tsx:1900
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -37715,12 +37744,12 @@ msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Samml
 
 #: src/features/chat/thread/composer-input.tsx:434
 #: src/features/chat/thread/composer-input.tsx:689
-#: src/features/chat/thread/composer-input.tsx:1799
+#: src/features/chat/thread/composer-input.tsx:1806
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1792
+#: src/features/chat/thread/composer-input.tsx:1799
 msgid "Upload failed: {0}"
 msgstr "Upload fehlgeschlagen: {0}"
 
@@ -38630,7 +38659,7 @@ msgstr "Auf Google Maps ansehen"
 msgid "View Privacy Policy"
 msgstr "Datenschutzrichtlinie anzeigen"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:274
 msgid "View pull request"
 msgstr "Pull Request ansehen"
 
@@ -38912,7 +38941,7 @@ msgstr "Wartet auf Genehmigung"
 msgid "Waiting for approval on {device}"
 msgstr "{device}: wartet auf Genehmigung"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:103
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:104
 msgid "Waiting for output…"
 msgstr "Wartet auf Ausgabe…"
 
@@ -39582,7 +39611,7 @@ msgstr "Arbeit am Ziel: Runde {nextRound} von {0}"
 #: src/features/auth/components/device-approval.tsx:233
 #: src/features/auth/components/device-approval.tsx:242
 #: src/features/chat/thread/streaming-placeholder.tsx:634
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:183
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
 msgstr "Wird bearbeitet…"
@@ -39638,6 +39667,10 @@ msgstr "Etwas schreiben"
 #: src/features/develop/components/guide-tab.tsx:187
 msgid "Write the guide"
 msgstr "Leitfaden schreiben"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:111
+msgid "Write the task for the agent before you start the fix."
+msgstr "Schreibe die Aufgabe für den Agenten, bevor du die Korrektur startest."
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
 msgid "Write, or type '/' for commands…"
@@ -40260,7 +40293,7 @@ msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 msgid "Your message"
 msgstr "Deine Nachricht"
 
-#: src/features/chat/thread/composer-input.tsx:1510
+#: src/features/chat/thread/composer-input.tsx:1513
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Deine Nachricht hat sich während der Uploads geändert, daher wurde sie nicht gesendet. Drücke auf Senden, um sie zu senden."
 

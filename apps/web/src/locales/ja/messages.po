@@ -207,7 +207,7 @@ msgstr "（オフライン）"
 msgid "(old side)"
 msgstr "（旧側）"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:250
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:275
 #: src/features/settings/connectors/connector-card.tsx:202
 msgid "(opens in a new tab)"
 msgstr "（新しいタブで開きます）"
@@ -896,7 +896,7 @@ msgstr "{0} 個中 {activeCount} 個の MCP サーバーが有効"
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:176
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:192
 msgid "{agentLabel} on {repo}"
 msgstr "{repo} の {agentLabel}"
 
@@ -1091,7 +1091,7 @@ msgstr "{fieldLabel}が現在の値と同じです"
 msgid "{fieldLabel} updated successfully"
 msgstr "{fieldLabel}を更新しました"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:212
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:228
 msgid "{fileCount, plural, one {Changes (# file)} other {Changes (# files)}}"
 msgstr "{fileCount, plural, other {変更（# ファイル）}}"
 
@@ -2111,6 +2111,10 @@ msgstr "ある時刻になったとき"
 #: src/features/chat/forward/forward-dialog.tsx:109
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "選択したメッセージを引用した新しいチャットが開きます。確認してから送信してください。"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:92
+msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
+msgstr "同じリポジトリとブランチで新しい実行を始めると、リポジトリ内の原因を修正し、そのステップをもう一度実行します。開始する前にタスクを確認して編集できます。"
 
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:49
 msgid "A new secret is shown once. The old secret stops working at once unless you keep it below, so update the sender right after. The webhook URL stays the same."
@@ -6011,7 +6015,8 @@ msgstr "カナダ"
 #: src/features/chat/thread/edit-composer.tsx:162
 #: src/features/chat/thread/fork-branch-dialog.tsx:91
 #: src/features/chat/thread/generation-model-menu.tsx:163
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:227
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:118
 #: src/features/develop/components/comment-composer.tsx:62
 #: src/features/develop/components/pull-request-edit-action.tsx:172
 #: src/features/develop/components/pull-request-reviewers-action.tsx:166
@@ -6096,7 +6101,7 @@ msgstr "選択をキャンセル"
 
 #: src/features/chat/thread/host-activity.tsx:130
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:164
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:180
 #: src/features/develop/components/checks-tab.tsx:76
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:134
@@ -7254,7 +7259,7 @@ msgstr "コーディング"
 msgid "Coding"
 msgstr "コーディング"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:88
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:89
 msgid "Coding agent log"
 msgstr "コーディングエージェントのログ"
 
@@ -8482,7 +8487,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "この差分に表示されなくなった行の会話"
 
 #: src/features/chat/thread/composer-input.tsx:834
-#: src/features/chat/thread/composer-input.tsx:1824
+#: src/features/chat/thread/composer-input.tsx:1831
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -8812,7 +8817,7 @@ msgstr "{0} を添付できませんでした。ほかのファイルは添付�
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} を添付できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1854
+#: src/features/chat/thread/composer-input.tsx:1861
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -8824,7 +8829,7 @@ msgstr "保存できませんでした"
 msgid "Could not cancel the message. It is still queued."
 msgstr "メッセージをキャンセルできませんでした。まだキューに入っています。"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:142
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:143
 msgid "Could not cancel the run."
 msgstr "実行をキャンセルできませんでした。"
 
@@ -9089,7 +9094,7 @@ msgstr "この{requestNoun}のスレッドを開けませんでした。もう�
 msgid "Could not open as a page"
 msgstr "ページとして開けませんでした"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:151
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 msgid "Could not open the pull request."
 msgstr "プルリクエストを作成できませんでした。"
 
@@ -9124,11 +9129,11 @@ msgstr "生成を開始するためにサーバーに接続できませんでし
 msgid "Could not reach the server. Try again."
 msgstr "サーバーに接続できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1857
+#: src/features/chat/thread/composer-input.tsx:1864
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1858
+#: src/features/chat/thread/composer-input.tsx:1865
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -9274,6 +9279,10 @@ msgstr "新しいコンテキストを開始できませんでした。もう一
 #: src/features/settings/components/chat/mcp-settings.tsx:94
 msgid "Could not start sign-in"
 msgstr "サインインを開始できませんでした"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:58
+msgid "Could not start the fix."
+msgstr "修正を開始できませんでした。"
 
 #: src/features/skills/components/skill-builder-test-drive.tsx:79
 msgid "Could not start the test drive."
@@ -9530,7 +9539,7 @@ msgstr "組織を作成"
 msgid "Create Organization"
 msgstr "組織を作成"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:243
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:259
 msgid "Create PR"
 msgstr "PR を作成"
 
@@ -11409,7 +11418,7 @@ msgstr "このプロジェクトでは既定の指示を使わない"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:118
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:168
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:383
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
@@ -11653,7 +11662,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:2051
+#: src/features/chat/thread/composer-input.tsx:2058
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -13648,7 +13657,7 @@ msgstr "不合格"
 
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/chat/thread/host-activity.tsx:139
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:165
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:77
 #: src/features/devices/components/devices-settings.tsx:386
 #: src/features/evals/components/model-comparison.tsx:112
@@ -13697,7 +13706,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1631
+#: src/features/chat/thread/composer-input.tsx:1634
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -14107,7 +14116,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1663
+#: src/features/chat/thread/composer-input.tsx:1666
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -15197,6 +15206,18 @@ msgstr "チェックを修正"
 #: src/features/canvas/components/canvas-toolbar.tsx:33
 msgid "Fix grammar"
 msgstr "文法を修正"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:84
+msgid "Fix setup"
+msgstr "セットアップを修正"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:73
+msgid "Fix started — follow it below"
+msgstr "修正を開始しました。下で進行状況を確認できます"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:90
+msgid "Fix the \"{step}\" step"
+msgstr "「{step}」ステップを修正"
 
 #: src/features/develop/lib/fix-prompts.ts:60
 msgid "Fix the failing checks on pull request {address}. Read each failing check's log, find the cause and fix it on the pull request's branch. Before you push, run the failing tests or builds locally and show that they pass; after you push, confirm the checks are green on the pull request. Tell me which checks you fixed and how you know they pass."
@@ -20120,7 +20141,7 @@ msgstr "{0}モデルに固定"
 msgid "Locked to {anchorModeName} models"
 msgstr "{anchorModeName} モデルに固定"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:198
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:214
 msgid "Log"
 msgstr "ログ"
 
@@ -24794,7 +24815,7 @@ msgstr "このスレッドから開きました"
 msgid "Opening a blank chat"
 msgstr "空のチャットを開いています"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:156
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:172
 msgid "Opening a pull request — progress is in the log"
 msgstr "プルリクエストを作成しています — 進捗はログで確認できます"
 
@@ -24802,7 +24823,7 @@ msgstr "プルリクエストを作成しています — 進捗はログで確�
 msgid "Opening a thread…"
 msgstr "スレッドを開いています…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:233
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
 msgid "Opening pull request…"
 msgstr "プルリクエストを作成しています…"
 
@@ -29891,7 +29912,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:1590
+#: src/features/chat/thread/composer-input.tsx:1593
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -31056,7 +31077,7 @@ msgstr "ショートカット"
 msgid "Show {fieldLabel}"
 msgstr "{fieldLabel}を表示"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:63
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:64
 msgid "Show {hidden} more lines"
 msgstr "さらに {hidden} 行を表示"
 
@@ -32366,6 +32387,10 @@ msgstr "無料でチャットを始める"
 msgid "Start editing cell"
 msgstr "セルの編集を開始"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:122
+msgid "Start fix"
+msgstr "修正を開始"
+
 #: src/features/workflow/components/nodes/video-frames-section.tsx:40
 #: src/features/workflow/components/nodes/video-model-options.tsx:152
 msgid "Start frame"
@@ -32499,7 +32524,7 @@ msgstr "コーディングエージェントを起動しています…"
 msgid "Starting voice input…"
 msgstr "音声入力を開始しています…"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:166
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:182
 msgid "Starting…"
 msgstr "開始しています…"
 
@@ -33626,6 +33651,10 @@ msgstr "タスクが失敗しました"
 msgid "Task finished"
 msgstr "タスクが完了しました"
 
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:98
+msgid "Task for the coding agent"
+msgstr "コーディングエージェントへのタスク"
+
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
 #: ../../packages/ui/src/components/tiptap-editor.tsx:228
 msgid "Task list"
@@ -34320,7 +34349,7 @@ msgstr "エージェントは、あなたが共有した事実（希望する単
 msgid "The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the AI's capabilities for specific task types."
 msgstr "エージェントループは体系的なタスク実行のため常に有効です。これらの設定では、特定の種類のタスクで AI の能力を高める追加の専用モジュールを制御します。"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:220
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:236
 msgid "The agent made no file changes."
 msgstr "エージェントはファイルを変更しませんでした。"
 
@@ -34454,7 +34483,7 @@ msgstr "バンドルをインポートできませんでした。"
 msgid "The change has new commits since you started this review. Submit or discard the review first, then comment on the new version."
 msgstr "このレビューを開始してから、変更に新しいコミットが追加されました。先にレビューを送信または破棄してから、新しいバージョンにコメントしてください。"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:215
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:231
 msgid "The change is too large to show in full."
 msgstr "変更が大きすぎるため、すべてを表示できません。"
 
@@ -34885,7 +34914,7 @@ msgstr "リンク内のモデルは利用できません。チャットは現在
 msgid "The model picker now lists {0} models from {1}"
 msgstr "モデル選択に {1} の {0} 個のモデルが表示されるようになりました"
 
-#: src/features/chat/thread/composer-input.tsx:1525
+#: src/features/chat/thread/composer-input.tsx:1528
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "アップロード中にモデルの選択が変更されたため、メッセージは送信されませんでした。送信ボタンを押して送信してください。"
 
@@ -35182,7 +35211,7 @@ msgstr "モダンな AI アプリケーションのための統合 LLM ゲート
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "「{fileName}」のアップロードの有効期限が切れました。もう一度添付してください。"
 
-#: src/features/chat/thread/composer-input.tsx:1538
+#: src/features/chat/thread/composer-input.tsx:1541
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "アップロードは完了しましたが、メッセージは送信されていません。送信ボタンを押して送信してください。"
 
@@ -37093,7 +37122,7 @@ msgid "Type your answer…"
 msgstr "回答を入力…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:2041
+#: src/features/chat/thread/composer-input.tsx:2048
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
 msgid "Type your message..."
 msgstr "メッセージを入力..."
@@ -37515,7 +37544,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1893
+#: src/features/chat/thread/composer-input.tsx:1900
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -37715,12 +37744,12 @@ msgstr "ドキュメントをナレッジベースにアップロードし、コ
 
 #: src/features/chat/thread/composer-input.tsx:434
 #: src/features/chat/thread/composer-input.tsx:689
-#: src/features/chat/thread/composer-input.tsx:1799
+#: src/features/chat/thread/composer-input.tsx:1806
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1792
+#: src/features/chat/thread/composer-input.tsx:1799
 msgid "Upload failed: {0}"
 msgstr "アップロードに失敗しました: {0}"
 
@@ -38630,7 +38659,7 @@ msgstr "Google マップで表示"
 msgid "View Privacy Policy"
 msgstr "プライバシーポリシーを表示"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:249
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:274
 msgid "View pull request"
 msgstr "プルリクエストを表示"
 
@@ -38912,7 +38941,7 @@ msgstr "承認待ち"
 msgid "Waiting for approval on {device}"
 msgstr "{device} で承認待ち"
 
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:103
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:104
 msgid "Waiting for output…"
 msgstr "出力を待っています…"
 
@@ -39582,7 +39611,7 @@ msgstr "目標に向けて作業中: ラウンド {nextRound} / {0}"
 #: src/features/auth/components/device-approval.tsx:233
 #: src/features/auth/components/device-approval.tsx:242
 #: src/features/chat/thread/streaming-placeholder.tsx:634
-#: src/features/coding-agents/components/coding-agent-run-view.tsx:167
+#: src/features/coding-agents/components/coding-agent-run-view.tsx:183
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"
 msgstr "処理しています…"
@@ -39638,6 +39667,10 @@ msgstr "何か書いてください"
 #: src/features/develop/components/guide-tab.tsx:187
 msgid "Write the guide"
 msgstr "ガイドを作成"
+
+#: src/features/coding-agents/components/setup-fix-dialog.tsx:111
+msgid "Write the task for the agent before you start the fix."
+msgstr "修正を開始する前に、エージェントへのタスクを入力してください。"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
 msgid "Write, or type '/' for commands…"
@@ -40260,7 +40293,7 @@ msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、
 msgid "Your message"
 msgstr "あなたのメッセージ"
 
-#: src/features/chat/thread/composer-input.tsx:1510
+#: src/features/chat/thread/composer-input.tsx:1513
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "アップロード中にメッセージが変更されたため、送信されませんでした。送信ボタンを押して送信してください。"
 

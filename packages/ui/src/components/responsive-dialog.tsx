@@ -68,21 +68,38 @@ const DialogTrigger = (props: React.ComponentProps<typeof BaseDialogTrigger>) =>
 };
 
 /**
+ * The drawer returns focus to its trigger on close, which may already be gone. A `finalFocus` ref, as the desktop dialog
+ * takes, is focused instead; any other `finalFocus` leaves the drawer's default in place.
+ */
+const focusOnClose = (finalFocus: DialogPopupProps["finalFocus"]) => (event: Event) => {
+    const target = finalFocus !== null && typeof finalFocus === "object" && "current" in finalFocus ? finalFocus.current : undefined;
+
+    if (target) {
+        event.preventDefault();
+        target.focus();
+    }
+};
+
+/**
  * Responsive dialog content. Renders DialogPopup (with portal, backdrop,
  * close button) on desktop and DrawerContent (bottom sheet with drag handle)
  * on mobile.
  *
  * Desktop-only props like `bottomStickOnMobile` are ignored in mobile mode.
  */
-const DialogContent = ({ bottomStickOnMobile, children, className, showCloseButton = true, ...props }: DialogPopupProps) => {
+const DialogContent = ({ bottomStickOnMobile, children, className, finalFocus, showCloseButton = true, ...props }: DialogPopupProps) => {
     const isMobile = React.use(IsMobileContext);
 
     if (isMobile) {
-        return <DrawerContent className={cn(className)}>{children}</DrawerContent>;
+        return (
+            <DrawerContent className={cn(className)} onCloseAutoFocus={focusOnClose(finalFocus)}>
+                {children}
+            </DrawerContent>
+        );
     }
 
     return (
-        <BaseDialogPopup bottomStickOnMobile={bottomStickOnMobile} className={className} showCloseButton={showCloseButton} {...props}>
+        <BaseDialogPopup bottomStickOnMobile={bottomStickOnMobile} className={className} finalFocus={finalFocus} showCloseButton={showCloseButton} {...props}>
             {children}
         </BaseDialogPopup>
     );
