@@ -438,7 +438,8 @@ export function readTarget(
                     : [
                           String([...document.forms].indexOf(activatedForm)),
                           activatedForm.id,
-                          activatedForm.getAttribute("action") ?? "",
+                          // The resolved address, through the native getter: a `<base>` change moves the destination with the attribute unchanged.
+                          formActionGetter === undefined ? "" : String(formActionGetter.call(activatedForm)),
                           activatedForm.getAttribute("method") ?? "",
                           activatedForm.getAttribute("enctype") ?? "",
                           activatedForm.getAttribute("target") ?? "",

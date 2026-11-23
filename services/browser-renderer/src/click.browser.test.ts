@@ -572,6 +572,23 @@ describe("readTarget in a page", () => {
         expect(read.refused).toBe("changed");
     });
 
+    it("a label outside its form is refused when a base change moves the form's resolved action, and nothing is submitted", async () => {
+        await pageWith(page, `<label id="pay-label" for="pay">Pay now</label><form id="a" action="confirm"><button id="pay" type="submit">Pay</button></form>`);
+        const label = await page.$("#pay-label");
+        const seen = await label!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        await page.evaluate(() => {
+            const base = document.createElement("base");
+
+            base.href = "https://shop.example/other/";
+            document.head.insertBefore(base, document.head.firstChild);
+        });
+        const read = await label!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.clicked).toBe(false);
+        expect(read.refused).toBe("changed");
+    });
+
     it("a label whose submit button's value changes after the approval read is refused, and nothing is submitted", async () => {
         await pageWith(
             page,
