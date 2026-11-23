@@ -448,12 +448,28 @@ const readStatus = async (socket: EgressSocket): Promise<number> => {
     }
 };
 
+/** The share of the whole deadline one address may spend on its connection and TLS setup. */
+const ADDRESS_SHARE = 3;
+
+/**
+ * How long one address may take to connect and finish TLS setup: a third of the whole deadline, never more than the time
+ * left before it, so an address that drops packets leaves time for the next one.
+ */
+export const addressTimeoutMs = (timeoutMs: number, remainingMs: number): number => Math.max(0, Math.min(Math.ceil(timeoutMs / ADDRESS_SHARE), remainingMs));
+
+/**
+ * The errors raised when one address did not finish its connection and TLS setup in its share of the deadline. Plain
+ * errors, not `EgressError`s, so the next address is tried.
+ */
+const addressTimeouts = new WeakSet<Error>();
+
 /**
  * POSTs `request.body` to `request.url` and returns the status. A 3xx is returned as it is. The addresses are tried in the
  * order the lookup gave them, all of them already checked: a connection or TLS setup that fails, before any byte of the
- * request is written, closes that address's sockets and moves on to the next one, within the same deadline. Once writing
- * has begun, a failure is final, even one on the first write: bytes may already have reached the receiver, so no receiver
- * gets the request twice. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the
+ * request is written, closes that address's sockets and moves on to the next one, within the same deadline. Each address
+ * gets at most `addressTimeoutMs` for its connection and TLS setup, so one that never answers does not use the whole
+ * deadline. Once writing has begun, a failure is final, even one on the first write: bytes may already have reached the
+ * receiver, so no receiver gets the request twice. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the
  * message.
  */
 export const postCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressResponse> => {
@@ -462,6 +478,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
     assertHeaders(request.headers);
 
     const timeoutMs = request.timeoutMs ?? EGRESS_TIMEOUT_MS;
+    const startedAt = Date.now();
     const controller = new AbortController();
     const opened: EgressSocket[] = [];
     const closeAll = async (): Promise<void> => {
@@ -480,13 +497,28 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
      */
     const open = async (address: string): Promise<EgressSocket> => {
         const sockets: EgressSocket[] = [];
+        let addressTimer: ReturnType<typeof setTimeout> | undefined;
+        const limit = new Promise<never>((_resolve, reject) => {
+            addressTimer = setTimeout(
+                () => {
+                    const error = new Error("The address did not answer in time.");
+
+                    addressTimeouts.add(error);
+                    reject(error);
+                },
+                addressTimeoutMs(timeoutMs, startedAt + timeoutMs - Date.now()),
+            );
+        });
+
+        // Raced, not awaited alone: a rejection after the address is up must not surface as unhandled.
+        limit.catch(() => undefined);
 
         try {
             const plain = dependencies.connect({ hostname: address, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
 
             sockets.push(plain);
             opened.push(plain);
-            await plain.opened;
+            await Promise.race([plain.opened, limit]);
             assertInTime();
 
             // The certificate is checked against the URL's host name, whichever address the connection went to.
@@ -494,7 +526,7 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
 
             sockets.push(socket);
             opened.push(socket);
-            await socket.opened;
+            await Promise.race([socket.opened, limit]);
             assertInTime();
 
             return socket;
@@ -505,6 +537,8 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
             }
 
             throw error;
+        } finally {
+            clearTimeout(addressTimer);
         }
     };
 
@@ -532,6 +566,11 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
             await writeRequest(socket, target, request);
 
             return { status: await readStatus(socket) };
+        }
+
+        // Every address was silent: that is the request timing out, not a refused connection.
+        if (lastError instanceof Error && addressTimeouts.has(lastError)) {
+            throw new EgressError("timeout", "The request timed out.");
         }
 
         throw lastError;

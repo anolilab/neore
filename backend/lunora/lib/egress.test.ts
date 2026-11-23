@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { EgressConnect, EgressDependencies, EgressSocket } from "./egress";
-import { EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
+import { addressTimeoutMs, EgressError, isCloudflareAddress, isPublicIPv4, isPublicIPv6, postCheckedHttps } from "./egress";
 
 const textStream = (text: string) =>
     new ReadableStream<Uint8Array>({
@@ -540,23 +540,77 @@ describe("postCheckedHttps", () => {
         expect(tried).toStrictEqual([]);
     });
 
-    it("stops trying addresses at the deadline", async () => {
-        const { connect, tried } = perAddressConnect({});
-        // A handshake that never finishes: the deadline must end the call without moving on to another address.
-        const hangingConnect = vi.fn(((address, options) => {
+    it("moves on to the next address when the first one never answers, within the deadline", async () => {
+        const { connect, sockets, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+        // The first address drops every packet: its connection never opens and never fails.
+        const silentFirst = vi.fn(((address, options) => {
             const socket = connect(address, options);
+
+            return address.hostname === "93.184.216.34" ? { ...socket, opened: new Promise<never>(() => {}) } : socket;
+        }) as EgressConnect);
+        const startedAt = Date.now();
+
+        const result = await postCheckedHttps(
+            { body: "", headers: {}, timeoutMs: 300, url: HOOK },
+            { connect: silentFirst, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) },
+        );
+
+        expect(result).toEqual({ status: 204 });
+        expect(Date.now() - startedAt).toBeLessThan(300);
+        expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+        // The silent address's socket was closed before the next address was connected.
+        const silent = sockets.find(({ address }) => address === "93.184.216.34")!;
+
+        expect(silent.close.mock.invocationCallOrder[0]!).toBeLessThan(connect.mock.invocationCallOrder[1]!);
+    });
+
+    it("gives the next address a turn when a TLS setup never finishes", async () => {
+        const { connect, tried } = perAddressConnect({ "8.8.8.8": "HTTP/1.1 204 No Content\r\n\r\n" });
+        const hangingTls = vi.fn(((address, options) => {
+            const socket = connect(address, options);
+
+            if (address.hostname !== "93.184.216.34") {
+                return socket;
+            }
+
             const tlsSocket = { ...socket, opened: new Promise<never>(() => {}) };
 
             return { ...socket, opened: Promise.resolve(), startTls: () => tlsSocket };
         }) as EgressConnect);
 
+        const result = await postCheckedHttps(
+            { body: "", headers: {}, timeoutMs: 300, url: HOOK },
+            { connect: hangingTls, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8"] }) },
+        );
+
+        expect(result).toEqual({ status: 204 });
+        expect(tried).toStrictEqual(["93.184.216.34", "8.8.8.8"]);
+    });
+
+    it.each([
+        ["two", ["93.184.216.34", "8.8.8.8"]],
+        ["four", ["93.184.216.34", "8.8.8.8", "9.9.9.9", "1.1.1.1"]],
+    ])("times out when all %s addresses are silent, and writes nothing", async (_count, addresses) => {
+        const { connect, tried, writes } = perAddressConnect({});
+        const silent = vi.fn(((address, options) => {
+            return { ...connect(address, options), opened: new Promise<never>(() => {}) };
+        }) as EgressConnect);
+        const startedAt = Date.now();
+
         await expect(
-            postCheckedHttps(
-                { body: "", headers: {}, timeoutMs: 20, url: HOOK },
-                { connect: hangingConnect, fetch: dnsFetch({ A: ["93.184.216.34", "8.8.8.8", "9.9.9.9"] }) },
-            ),
+            postCheckedHttps({ body: "", headers: {}, timeoutMs: 60, url: HOOK }, { connect: silent, fetch: dnsFetch({ A: addresses }) }),
         ).rejects.toMatchObject({ code: "timeout" });
-        expect(tried).toStrictEqual(["93.184.216.34"]);
+        // One deadline for all addresses, not one per address.
+        expect(Date.now() - startedAt).toBeLessThan(200);
+        expect(tried.length).toBeLessThanOrEqual(addresses.length);
+        expect(Object.keys(writes)).toStrictEqual([]);
+    });
+
+    it("never gives one address more than the time left before the deadline", () => {
+        expect(addressTimeoutMs(10_000, 10_000)).toBe(3334);
+        expect(addressTimeoutMs(10_000, 1200)).toBe(1200);
+        expect(addressTimeoutMs(10_000, 0)).toBe(0);
+        expect(addressTimeoutMs(10_000, -5)).toBe(0);
     });
 
     it("returns the timeout even when a graceful close never finishes", async () => {
