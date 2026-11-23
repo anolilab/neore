@@ -987,12 +987,11 @@ pub(crate) mod commit_tests;
 mod tests {
     use super::*;
     use crate::acp::AcpUpdate;
+    use crate::test_dir::TestDir;
     use std::io::Write;
 
-    fn state(name: &str) -> (DeviceState, PathBuf) {
-        let dir =
-            std::env::temp_dir().join(format!("neore-acp-install-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    fn state(name: &str) -> (DeviceState, TestDir) {
+        let dir = TestDir::at(&format!("acp-install-{name}"));
         fs::create_dir_all(&dir).unwrap();
 
         (DeviceState::new(&dir, Box::new(|_| {})), dir)

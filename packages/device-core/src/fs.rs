@@ -993,6 +993,13 @@ pub fn make_dir(raw: &str) -> Result<Value, String> {
     Ok(json!({ "path": folder.to_string_lossy(), "created": created }))
 }
 
+/// Opens `path` (canonical, inside one of `roots`) for reading as every read here is opened: on Unix no link is
+/// followed below `/` and a FIFO does not block the open; on Windows a reparse point is opened as itself and the
+/// handle's real path must still lie inside a root.
+pub(crate) fn open_confined(roots: &[PathBuf], path: &Path) -> io::Result<fs::File> {
+    confined::open_file(roots, path, Open::Read)
+}
+
 /// Up to [`MAX_FILE_BYTES`] of a file as text. Binary files are described, not dumped.
 pub fn read(roots: &[PathBuf], path: &Path) -> Result<String, String> {
     if roots.iter().any(|root| root == path) {
@@ -1202,11 +1209,10 @@ pub fn write(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
-    fn scratch(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-fs-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    fn scratch(name: &str) -> TestDir {
+        let dir = TestDir::new(&format!("device-fs-{name}"));
         fs::create_dir_all(dir.join("root/sub")).unwrap();
         fs::write(dir.join("root/a.txt"), "hello").unwrap();
         fs::write(dir.join("secret.txt"), "nope").unwrap();
@@ -1522,7 +1528,7 @@ mod tests {
 
     const PNG_HEAD: [u8; 10] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
 
-    fn media_scratch(name: &str) -> (PathBuf, Vec<PathBuf>) {
+    fn media_scratch(name: &str) -> (TestDir, Vec<PathBuf>) {
         let dir = scratch(name);
 
         fs::write(dir.join("root/chart.png"), PNG_HEAD).unwrap();

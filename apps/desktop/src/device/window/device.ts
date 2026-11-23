@@ -7,6 +7,7 @@
  * with textContent only — never as HTML.
  */
 import { describeLink, multiplexingNote } from "../link-status";
+import { promptHeading, promptOrigin } from "../prompt-origin";
 import type { FileEntry, HostView, McpServer, McpServerStatus, NetworkTier, Prompt, SettingsView } from "../types";
 import { initAcp } from "./acp-page";
 import { serverAgentsSection } from "./server-agents";
@@ -172,8 +173,8 @@ const renderPrompt = (prompt: Prompt | null): void => {
             break;
         }
         default: {
-            setText("prompt-heading", body.host === undefined ? `Allow “${body.tool}”?` : `Allow “${body.tool}” on ${body.host}?`);
-            setText("prompt-context", body.threadTitle ? `Requested by the agent in “${body.threadTitle}”.` : "Requested by the agent.");
+            setText("prompt-heading", promptHeading(body.tool, body.host));
+            setText("prompt-context", promptOrigin(body.tool, body.threadTitle));
 
             const taints = body.taintedBy.map((source) => TAINT_LABELS[source] ?? source);
 

@@ -56,6 +56,7 @@ import {
     setRunOrganizationId,
     setRunReplyKey,
     setRunStartedBy,
+    setRunToolSources,
     setRunTurn,
     setThreadStatus,
     stampSavedToolCalls,
@@ -678,6 +679,7 @@ export const runStreamingAgent = internalAction
                 );
 
                 setRunTurn(ctx, { impersonated, promptMessageId: messageId, systemContext });
+                setRunToolSources(ctx, toolResult.permissionKeys);
 
                 if (additionalParts.length > 0) {
                     const baseInstructions = agent.options.instructions || "";
@@ -996,12 +998,17 @@ export const runStreamingAgent = internalAction
                     return;
                 }
 
-                void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
-                    threadId,
-                    userId,
-                });
-
                 await setThreadStatus(ctx, threadId, "active", { awaitingInput: finished.awaitingInput, replied: !finished.paused });
+
+                // A reply paused on an approval is not finished: its suggestions wait for the reply that finishes after it. Queued after the
+                // status is settled, so the scheduler's latency cannot hold the thread in `running`. A failed hand-off is logged: the reply is saved.
+                if (!finished.paused) {
+                    await ctx.scheduler
+                        .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId })
+                        .catch((error: unknown) => {
+                            streamLogger.warn(`[AgentRun] Could not queue the follow-up suggestions of ${threadId}:`, error);
+                        });
+                }
 
                 streamLogger.debug(`[BgAgent] Execution complete`, {
                     elapsedMs: Date.now() - startTime,
@@ -1255,6 +1262,22 @@ export const continueAfterToolApproval = internalAction
                 await ctx.runMutation(internal.agent.threads.endStoppedPause, { threadId: threadId as Id<"threads"> });
                 // The stop ended the reply for good, so what it kept through its pause goes with it.
                 await discardRunSecrets(ctx, { streamId, threadId });
+            }
+
+            // A reply that finishes after an approval gets its suggestions, as any finished reply does. A continuation that saved only tool
+            // results has no new reply to suggest for, and a sub-agent's child thread does not get any.
+            // The continuation runs as the owner, so the job takes the run's own actor (`config.startedBy`) for the actor gate, billing and the
+            // reply-author check: a collaborator's approved reply is theirs. Owner-started replies keep the owner.
+            if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped && resumed.savedReply === true) {
+                await ctx.scheduler
+                    .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
+                        replyUserId: userId,
+                        threadId,
+                        userId: config.startedBy ?? userId,
+                    })
+                    .catch((error: unknown) => {
+                        streamLogger.warn(`[ToolApproval] Could not queue the follow-up suggestions of ${threadId}:`, error);
+                    });
             }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);

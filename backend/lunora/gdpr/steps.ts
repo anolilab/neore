@@ -6,6 +6,7 @@ import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { callOnShard } from "../lib/cross-shard";
 import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
@@ -396,6 +397,7 @@ export const collectFiles = internalQuery
                 v.object({
                     createdAt: v.number(),
                     label: v.optional(v.string()),
+                    signInUrl: v.optional(v.string()),
                     site: v.string(),
                     teammateIds: v.array(v.id("bots")),
                     updatedAt: v.number(),
@@ -444,6 +446,7 @@ export const collectFiles = internalQuery
                 return {
                     createdAt: login.createdAt,
                     label: login.label,
+                    signInUrl: login.signInUrl,
                     site: login.origin,
                     teammateIds: login.teammateIds ?? [],
                     updatedAt: login.updatedAt,
@@ -570,6 +573,12 @@ export const generateExportFile = internalAction
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         bots: v.optional(v.any()),
+        // The workflow stopped at `BROWSER_EXPORT_PAGES` with history left: the section is marked as cut.
+        browserCut: v.optional(v.boolean()),
+        // How many browser pages the workflow stored under `browserPrefix` (`browser/export-pages.ts`), read here. Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        browserPages: v.optional(v.number()),
+        browserPrefix: v.optional(v.string()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -703,9 +712,22 @@ export const generateExportFile = internalAction
             ),
             PROJECT_CONTEXT_EXPORT_BYTES,
         );
+        // The browser pages, read from their objects, so neither this action's arguments nor its read budget carry them.
+        // Held to its share of the file: past it the section is cut and says so, and the rest of the export is written.
+        const { browserCut, browserPages, browserPrefix } = args;
+        const browser =
+            browserPrefix === undefined || browserPages === undefined
+                ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
+                : await readAllBrowserPages(
+                      async (page) => await readStoredText(context.storage, browserExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      browserPages,
+                      BROWSER_EXPORT_BYTES,
+                      browserCut === true,
+                  );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
+            browser,
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {

@@ -1,6 +1,7 @@
 /**
  * An export is handed out as a SIGNED url (`ctx.storage.getUrl` is unsigned and nothing serves it), and a
- * generation failure maps to a fixed, user-safe message.
+ * generation failure maps to a fixed, user-safe message. An admin acting as the owner neither starts nor downloads one,
+ * and a refused call spends none of the owner's `gdpr/request` quota.
  */
 import { lunoraTest } from "@lunora/testing";
 import { LunoraError } from "lunorash/server";
@@ -8,17 +9,29 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { getExportDownloadUrl } from "./functions";
+import { getExportDownloadUrl, requestDataExport } from "./functions";
 import { exportFailureMessage } from "./workflows/export-workflow";
 
-const { registry, sessionFrom, signedReadUrl } = vi.hoisted(() => {
+const { rateLimitGuard, registry, sessionFrom, signedReadUrl, state } = vi.hoisted(() => {
+    const impersonation = { by: null as string | null };
+
     return {
+        rateLimitGuard: vi.fn(async (_ctx: unknown) => undefined),
         registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
-                ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
+                ? {
+                      activeOrganization: null,
+                      id: context.auth.userId,
+                      impersonatedBy: impersonation.by,
+                      isAdmin: false,
+                      plan: null,
+                      role: null,
+                      userId: context.auth.userId,
+                  }
                 : null,
         signedReadUrl: vi.fn(async (_storage: unknown, key: string, _ttlSeconds: number) => `https://files.example/${key}?sig=abc`),
+        state: impersonation,
     };
 });
 
@@ -40,7 +53,7 @@ vi.mock("../lib/storage-read", async (importOriginal) => {
 });
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard };
 });
 
 const USER = "user-1";
@@ -57,21 +70,76 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    state.by = null;
+    signedReadUrl.mockClear();
+    rateLimitGuard.mockClear();
     harness.close();
 });
 
-describe("getExportDownloadUrl", () => {
-    it("returns a signed url for the stored export key", async () => {
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("gdprRequests", {
-                requestedAt: Date.now(),
-                requestType: "export",
-                status: "completed",
-                storageId: KEY,
-                userEmail: "a@example.com",
-                userId: USER,
-            });
+const insertCompletedExport = async (): Promise<void> => {
+    await harness.run(async (ctx: any) => {
+        await ctx.db.insert("gdprRequests", {
+            requestedAt: Date.now(),
+            requestType: "export",
+            status: "completed",
+            storageId: KEY,
+            userEmail: "a@example.com",
+            userId: USER,
         });
+    });
+};
+
+const exportRequests = async (): Promise<unknown[]> => await harness.run(async (ctx: any) => await ctx.db.query("gdprRequests").collect());
+
+describe("requestDataExport", () => {
+    it("starts an export for the owner", async () => {
+        await harness.withIdentity({ userId: USER } as never).mutation(requestDataExport as never, {} as never);
+
+        expect(await exportRequests()).toHaveLength(1);
+        expect(rateLimitGuard).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses an admin acting as the owner, and records no request", async () => {
+        state.by = "admin-1";
+
+        await expect(harness.withIdentity({ userId: USER } as never).mutation(requestDataExport as never, {} as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: "A data export cannot be requested while impersonating",
+        });
+        expect(await exportRequests()).toHaveLength(0);
+        expect(rateLimitGuard).not.toHaveBeenCalled();
+    });
+});
+
+describe("getExportDownloadUrl", () => {
+    it("refuses an admin acting as the owner, and signs no link", async () => {
+        await insertCompletedExport();
+        state.by = "admin-1";
+
+        await expect(harness.withIdentity({ userId: USER } as never).action(getExportDownloadUrl as never, {} as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: "A data export cannot be downloaded while impersonating",
+        });
+        expect(signedReadUrl).not.toHaveBeenCalled();
+    });
+
+    it("spends none of the owner's quota on a refused download", async () => {
+        await insertCompletedExport();
+        state.by = "admin-1";
+
+        await expect(harness.withIdentity({ userId: USER } as never).action(getExportDownloadUrl as never, {} as never)).rejects.toMatchObject({
+            code: "FORBIDDEN",
+        });
+        expect(rateLimitGuard).not.toHaveBeenCalled();
+
+        state.by = null;
+        await harness.withIdentity({ userId: USER } as never).action(getExportDownloadUrl as never, {} as never);
+
+        expect(rateLimitGuard).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns a signed url for the stored export key", async () => {
+        await insertCompletedExport();
 
         const result = (await harness.withIdentity({ userId: USER } as never).action(getExportDownloadUrl as never, {} as never)) as { url: string };
 

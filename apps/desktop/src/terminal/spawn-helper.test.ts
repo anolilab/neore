@@ -1,17 +1,26 @@
-import { chmodSync, mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 import { loadableDirectory, makeSpawnHelperExecutable } from "./spawn-helper";
 
 const modeOf = (file: string): number => statSync(file).mode % 0o1000;
 
+/** A fresh folder, removed when the test ends, whether it passed or not. */
+const scratch = (): string => {
+    const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
+
+    onTestFinished(() => rmSync(root, { force: true, recursive: true }));
+
+    return root;
+};
+
 // File modes are not a thing on Windows, which has no spawn-helper either.
 describe.skipIf(process.platform === "win32")("makeSpawnHelperExecutable", () => {
     it("adds the execute bit the tarball leaves out, for this platform's prebuild only", () => {
-        const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
+        const root = scratch();
         const mine = path.join(root, "prebuilds", "darwin-arm64", "spawn-helper");
         const other = path.join(root, "prebuilds", "darwin-x64", "spawn-helper");
 
@@ -28,7 +37,7 @@ describe.skipIf(process.platform === "win32")("makeSpawnHelperExecutable", () =>
     });
 
     it("does not touch a packaged app, whose signature a changed file would break", () => {
-        const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
+        const root = scratch();
         const packaged = path.join(root, "app.asar.unpacked", "node_modules", "node-pty");
         const helper = path.join(packaged, "prebuilds", "darwin-arm64", "spawn-helper");
 
@@ -43,7 +52,7 @@ describe.skipIf(process.platform === "win32")("makeSpawnHelperExecutable", () =>
     });
 
     it("leaves an executable file alone and tolerates a missing one", () => {
-        const root = mkdtempSync(path.join(tmpdir(), "neore-pty-"));
+        const root = scratch();
         const built = path.join(root, "build", "Release", "spawn-helper");
 
         mkdirSync(path.dirname(built), { recursive: true });

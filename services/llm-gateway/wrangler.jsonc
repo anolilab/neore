@@ -3,7 +3,8 @@
     "name": "llm-gateway",
     "main": "src/index.ts",
     "compatibility_date": "2026-09-01",
-    "compatibility_flags": ["nodejs_compat_v2"],
+    // `enable_request_signal`: the request's signal aborts when the caller disconnects, so a cancelled model call stops at the provider.
+    "compatibility_flags": ["nodejs_compat_v2", "enable_request_signal"],
     // Smart Placement: keeps execution close to AI provider endpoints.
     "placement": {
         "mode": "smart"

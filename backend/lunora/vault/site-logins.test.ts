@@ -91,6 +91,7 @@ const SAVE_WHILE_IMPERSONATING = /cannot be saved while impersonating/;
 const DELETE_WHILE_IMPERSONATING = /cannot be deleted while impersonating/;
 const CHANGED_ELSEWHERE = /changed elsewhere/;
 const NAMES_NO_VERSION = /which version/;
+const { SITE_LOGIN_SIGN_IN_PAGE_REFUSED } = await import("./lib/site-login-shape");
 
 // Built at run time, so no secret-shaped literal sits in the source.
 const PASSWORD = ["pw", crypto.randomUUID(), "x"].join("-");
@@ -305,6 +306,78 @@ describe("saving a site login", () => {
         const renamed = await firstRow();
 
         expect(renamed?.["label"]).toBe("Renamed");
+    });
+
+    it("keeps a sign-in page only on the login's own https origin, without its fragment", async () => {
+        const id = await save({ password: PASSWORD, signInUrl: " https://example.com/account/login?next=/orders#form " });
+
+        const PAGE = "https://example.com/account/login?next=/orders";
+        const signInUrlNow = async () => {
+            const row = await firstRow();
+
+            return row?.["signInUrl"];
+        };
+        const listed = await listLogins(OWNER);
+
+        expect(await signInUrlNow()).toBe(PAGE);
+        expect(listed.logins[0]?.["signInUrl"]).toBe(PAGE);
+
+        // The save answers with the page as stored, which the form then holds as the one it opened; an edit that sends
+        // none answers with the page it kept.
+        const answered = (await as(OWNER).mutation(
+            saveSiteLogin as never,
+            {
+                expectedUpdatedAt: await updatedAtOf(id),
+                loginId: id,
+                signInUrl: `${PAGE}#again`,
+                site: SITE,
+                teammateIds: [],
+                username: "ada@example.com",
+            } as never,
+        )) as { signInUrl?: string };
+
+        expect(answered.signInUrl).toBe(PAGE);
+
+        const kept = (await as(OWNER).mutation(
+            saveSiteLogin as never,
+            {
+                expectedUpdatedAt: await updatedAtOf(id),
+                loginId: id,
+                site: SITE,
+                teammateIds: [],
+                username: "ada@example.com",
+            } as never,
+        )) as { signInUrl?: string };
+
+        expect(kept.signInUrl).toBe(PAGE);
+
+        const refused = [
+            [INSECURE_SITE, "login"].join("/"),
+            "https://other.example/login",
+            "https://login.example.com/",
+            "https://example.com:8443/login",
+            // No scheme: the parser reads `example.com` as one, which is not https.
+            "example.com:443/login",
+            // Credentials in the URL, joined so no such literal sits in the source.
+            ["https://ada", "pw@example.com/login"].join(":"),
+            ["https://ada", "example.com/login"].join("@"),
+            "example.com/login",
+            "not a url",
+        ];
+
+        for (const signInUrl of refused) {
+            await expect(save({ loginId: id, signInUrl })).rejects.toMatchObject({ code: "BAD_REQUEST", data: { code: SITE_LOGIN_SIGN_IN_PAGE_REFUSED } });
+        }
+
+        expect(await signInUrlNow()).toBe(PAGE);
+
+        // An edit that does not send it keeps it; an empty one clears it.
+        await save({ label: "Renamed", loginId: id });
+        expect(await signInUrlNow()).toBe(PAGE);
+        await save({ loginId: id, signInUrl: "  " });
+        expect(await firstRow()).not.toHaveProperty("signInUrl");
+        await expect(save({ password: PASSWORD, signInUrl: "https://other.example/login", site: "https://new.example" })).rejects.toThrow("sign-in page");
+        expect(await rows()).toHaveLength(1);
     });
 
     it("refuses an edit that names no version", async () => {
@@ -946,6 +1019,13 @@ describe("which chats may use a login", () => {
         const login = await forFill(plainThread, "https://example.com/sign-in");
 
         expect(login?.site).toBe(SITE);
+        expect(login).not.toHaveProperty("signInUrl");
+    });
+
+    it("the fill lookup names the saved sign-in page, the only page the fill opens", async () => {
+        await save({ password: PASSWORD, signInUrl: "https://example.com/login" });
+
+        expect(await forFill(plainThread)).toMatchObject({ signInUrl: "https://example.com/login", site: SITE });
     });
 });
 

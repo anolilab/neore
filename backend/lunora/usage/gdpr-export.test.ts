@@ -76,7 +76,7 @@ const exportIo = (requestId: string, userId: string, overrides: Partial<UsageExp
     const run = async (function_: unknown, args: unknown) => (await harness.run(async (ctx: any) => await ctx.runMutation(function_, args))) as never;
 
     return {
-        clear: async () => await run(clearUsageExportPieces, { requestId, userId }),
+        clear: async (_name, keepRun) => await run(clearUsageExportPieces, { keepRun, requestId, userId }),
         clearVerified: async (_name, pass) => await run(clearVerifiedUsagePieces, { pass, requestId, userId }),
         countRows: async (_name, page) =>
             (await harness.run(async (ctx: any) => await ctx.runQuery(countUsageRowsPage, { cursor: page.cursor, cutoff: page.cutoff, userId }))) as never,

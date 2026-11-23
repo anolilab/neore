@@ -32,6 +32,12 @@ this is not test-only: a procedure that admits several threads reads each one's 
 (`admittedThreadDb`, `admittedThreadMessages`; `findSentNote`, `listSubAgentApprovals`).
 `agent/messages.ts#pinFollowingRowParent` is exposed.
 
+**Not filed yet (owner to decide): a subscription answer for a resume.** A reconnect the server answers with a `resume`
+frame calls no rows callback, so a live subscription cannot show the connection is back. The mobile project screen works
+around it with one direct read per refresh tick (`useProjectConfirm`, `apps/mobile/src/projects/use-projects.ts`). A
+public per-subscription `onAnswered(ok | refused)` that fires on data, `resume` and `settled` frames would replace that
+read; switch to it when it ships.
+
 **Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`
 read `"loading"` on the server and while hydrating (`getServerSnapshot`), and on the client until `getCurrentUser()`
 answers, even when SSR already minted the token. `apps/web/src/features/auth/components/optimistic-auth-gate.tsx`

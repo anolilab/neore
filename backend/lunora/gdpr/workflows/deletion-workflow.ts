@@ -651,6 +651,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // Writes made while the export was live are removed as well.
         await eraseUsage("delete-user-usage-daily-after-purge");
 
+        // Browser pages an export run stored and never cleaned up, killed before its ending (`browser/export-pages.ts`).
+        await context.step.do(
+            "delete-user-browser-export-pages",
+            async () =>
+                await context.run(
+                    internal.browser.gdpr.deleteUserBrowserExportPages,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-browser-export-pages") },
+                ),
+        );
+
         await context.step.do(
             "delete-user-settings",
             async () =>

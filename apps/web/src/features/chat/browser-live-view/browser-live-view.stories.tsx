@@ -155,7 +155,14 @@ const controlledBy = (byYou: boolean, until = STORY_NOW + 120_000) =>
 
 /** `takeControl` gives the lease until `until` (story time). */
 const tookControl = (until = STORY_NOW + 120_000) =>
-    lunora(api.browser.live_view.takeControl, { claim: "claim-1", connectBy: STORY_NOW + 60_000, status: "ok" as const, until, url: CONTROL_VIEW });
+    lunora(api.browser.live_view.takeControl, {
+        claim: "claim-1",
+        claimId: "claim-id-1",
+        connectBy: STORY_NOW + 60_000,
+        status: "ok" as const,
+        until,
+        url: CONTROL_VIEW,
+    });
 
 const controlHandlers = (status: ReturnType<typeof controlledBy>, ...overrides: ReturnType<typeof lunora>[]) =>
     lunoraHandlers(

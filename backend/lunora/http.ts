@@ -221,6 +221,10 @@ app.post("/source-control/webhook/:watchId", async (c) => {
     return await routeWatchWebhook(c.var.lunora, c.req.raw, c.req.param("watchId"));
 });
 
+// The hand back of a page that closes while its person controls the agent's browser: a beacon, so no session. The
+// body is the claim's signed release token, which names the shard (`browser/release-http.ts`).
+app.post("/browser/release", httpAction(lazy(async () => await import("./browser/release-http"), "releaseControlHttpAction")));
+
 // A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
 // owner's shard itself (`acp/http.ts`).
 app.post("/hosts/ingest", httpAction(lazy(async () => await import("./acp/http"), "hostIngestHttpAction")));

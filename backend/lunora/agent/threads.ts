@@ -10,6 +10,7 @@ import { deleteHumanChecksOfThread } from "../browser/gdpr";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
+import { followupDispatchInFlight } from "./followup-suggestions";
 import { revokeThreadGrants } from "./sharing";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
@@ -57,7 +58,16 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
  * Unread, snooze and "needs you" belong to the thread's OWNER, as does the organization a temporary chat was started in; the
  * row is shared with grantees, who must not see (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "capOrganizationId", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = [
+    "awaitingInput",
+    "capOrganizationId",
+    "lastReplyAt",
+    "lastViewedAt",
+    "permissionMode",
+    "pinnedGoal",
+    "snoozeChosenAt",
+    "snoozedUntil",
+] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -494,6 +504,12 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     // A coding agent's live turn and session end before the first page of messages goes: the ingest keeps taking
     // posts into the thread until the session is ended, and a paged delete leaves it standing for several calls.
     if (args.cursor === undefined) {
+        // The first deletion-state write. A suggestion claim is checked in this same transaction (the thread's own shard), so the
+        // delete refuses rather than removing the chat under a model request. Once the thread is marked deleting, no claim can start.
+        if (await followupDispatchInFlight(context, args.threadId)) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         const host = await context.db.get("threads", args.threadId);
 
         if (host) {
@@ -778,6 +794,11 @@ export const softDeleteThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
+        // Checked in the same transaction as the trash write: a suggestion claim held here refuses the trash (see the delete writer).
+        if (await followupDispatchInFlight(ctx, args.threadId)) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
