@@ -913,6 +913,7 @@ export const vProjectDocFields = {
     runnerFolderId: v.optional(v.string()),
     runnerKind: v.optional(v.literal("host")),
     runnerThreadAt: v.optional(v.number()),
+    runnerThreadId: v.optional(v.string()),
     updatedAt: v.optional(v.number()),
 };
 

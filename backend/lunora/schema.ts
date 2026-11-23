@@ -2334,6 +2334,8 @@ export const schema = defineSchema({
         runnerKind: v.optional(v.literal("host")),
         // When the thread that recorded the runner started: an older thread opening a session later leaves it.
         runnerThreadAt: v.optional(v.number()),
+        // That thread's id: of two threads started in the same millisecond, the one with the greater id keeps the runner.
+        runnerThreadId: v.optional(v.string()),
         // Per-project overrides of the owner's sub-agent roles (`sub-agents/roles.ts`).
         subAgentRoles: v.optional(vSubAgentRoles),
         title: v.string(),
@@ -4072,7 +4074,16 @@ export const schema = defineSchema({
         profession: v.optional(v.string()),
         // The runner a new thread in each organization project starts on for this person, keyed by project id (`acp/lib/project-runner.ts`). Written server-side only, at most 200 projects.
         projectRunnerDefaults: v.optional(
-            v.record(v.string(), v.object({ agentKey: v.string(), deviceId: v.string(), folderId: v.string(), threadAt: v.optional(v.number()) })),
+            v.record(
+                v.string(),
+                v.object({
+                    agentKey: v.string(),
+                    deviceId: v.string(),
+                    folderId: v.string(),
+                    threadAt: v.optional(v.number()),
+                    threadId: v.optional(v.string()),
+                }),
+            ),
         ),
         // A run whose worker died resumes from its last saved row, up to 3 times per reply (`chat/streaming/persistent/interrupted.ts`). Absent = on.
         resumeInterruptedRuns: v.optional(v.boolean()),

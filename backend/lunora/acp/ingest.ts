@@ -152,6 +152,9 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
 
         // The runner a project remembers is the one that opened: a start the computer refused or never opened records nothing.
         // Its own mutation: the record reads `.global()` rows and writes settings, and none of that may roll this open back.
+        // The catch sees only a refusal inside the transaction; the job is handed to the scheduler after the commit, and a failed
+        // handoff there (kept in Lunora's outbox and retried) answers this post with an error. The desktop posts the open again
+        // (`session-link.ts`), and the session is no longer `starting`, so the retry is answered with the thread and schedules nothing.
         if (opened && thread?.projectId) {
             try {
                 await ctx.scheduler.runAfter(0, internal.acp.ingest.recordOpenedRunner, {

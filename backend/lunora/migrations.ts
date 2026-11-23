@@ -333,3 +333,15 @@ export const addProjectRunnerThreadAt = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * Each entry of `userSettings.projectRunnerDefaults` gained an optional `threadId`, the id of the thread it came from: of two
+ * threads started in the same millisecond, the one with the greater id keeps the default (`agent/table-writes.ts#runnerReplaces`).
+ * Nothing to fill: an entry without it loses a tie. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addProjectRunnerThreadId = defineMigration({
+    id: "add-project-runner-thread-id",
+    table: "userSettings",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

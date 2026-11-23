@@ -66,6 +66,15 @@ export type TemporaryThreadPatch = Partial<Pick<Doc<"temporaryThreads">, "skillD
 export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> =>
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
+/**
+ * Whether a runner from the thread started at `threadAt` with id `threadId` may replace the one stored with `stored`: a thread
+ * started later, or in the same millisecond, the one with the greater id, so two threads started in one millisecond keep the
+ * same runner whichever records first. The same thread (equal time and id) rewrites; a stored runner with no time is older than
+ * any, and one with no id loses a tie.
+ */
+export const runnerReplaces = (threadAt: number, threadId: string, stored: { threadAt?: number; threadId?: string } | undefined): boolean =>
+    stored?.threadAt === undefined || threadAt > stored.threadAt || (threadAt === stored.threadAt && threadId >= (stored.threadId ?? ""));
+
 /** How many times a runner write retries after another write changed the project in between. */
 const RUNNER_WRITE_ATTEMPTS = 3;
 
@@ -84,6 +93,7 @@ export const setProjectRunnerDefault = async (
     project: Doc<"projects">,
     runner: { agentKey: string; deviceId: string; folderId: string },
     threadAt: number,
+    threadId: string,
 ): Promise<void> => {
     let current: Doc<"projects"> | null = project;
 
@@ -92,7 +102,7 @@ export const setProjectRunnerDefault = async (
             current.userId !== project.userId ||
             current.organizationId ||
             (current.organizationChangedAt ?? -Infinity) >= threadAt ||
-            (current.runnerThreadAt ?? -Infinity) > threadAt
+            !runnerReplaces(threadAt, threadId, { threadAt: current.runnerThreadAt ?? undefined, threadId: current.runnerThreadId ?? undefined })
         ) {
             return;
         }
@@ -104,11 +114,13 @@ export const setProjectRunnerDefault = async (
                 runnerFolderId: runner.folderId,
                 runnerKind: "host",
                 runnerThreadAt: threadAt,
+                runnerThreadId: threadId,
             },
             where: {
                 organizationChangedAt: current.organizationChangedAt ?? null,
                 organizationId: current.organizationId ?? null,
                 runnerThreadAt: current.runnerThreadAt ?? null,
+                runnerThreadId: current.runnerThreadId ?? null,
                 userId: current.userId,
             },
         });

@@ -5,7 +5,7 @@
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { setProjectRunnerDefault } from "../../agent/table-writes";
+import { runnerReplaces, setProjectRunnerDefault } from "../../agent/table-writes";
 import { getMemberByOrganizationAndUser } from "../../auth/lib/better-auth-queries";
 import { saveUserSettings } from "../../auth/lib/preference-writes";
 import { isDeviceInScope } from "../../devices/lib/scope";
@@ -20,8 +20,8 @@ export interface ProjectRunner {
     folderId: string;
 }
 
-/** A runner as it is stored, with the start time of the thread it came from, so an older thread cannot replace it. */
-type StoredRunner = ProjectRunner & { threadAt?: number };
+/** A runner as it is stored, with the start time and id of the thread it came from, so an older thread cannot replace it. */
+type StoredRunner = ProjectRunner & { threadAt?: number; threadId?: string };
 
 /**
  * Whether a stored entry would still be returned for `project`: it is an organization project, and the entry's thread started
@@ -81,8 +81,12 @@ const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [strin
     const projectIds = oldest.map(([key]) => ctx.db.normalizeId("projects", key)).filter((id) => id !== null);
     const deviceIds = oldest.map(([, runner]) => ctx.db.normalizeId("devices", runner.deviceId)).filter((id) => id !== null);
     // `ctx.db` sees every row here: this runs only inside the internal ingest mutation (`acp/ingest.ts`), which has no RLS scope.
-    const { page: projects } = projectIds.length > 0 ? await ctx.db.projects.findMany({ where: { _id: { in: projectIds } } }) : { page: [] };
-    const { page: devices } = deviceIds.length > 0 ? await ctx.db.devices.findMany({ where: { _id: { in: deviceIds }, userId } }) : { page: [] };
+    // From the primary, as `getProjectRunnerDefault` reads them: a replica that has not seen a project's move back or a computer let
+    // back into a project would take a live entry for one that can never be returned and push it out.
+    const { page: projects } =
+        projectIds.length > 0 ? await ctx.db.projects.findMany({ consistency: "primary", where: { _id: { in: projectIds } } }) : { page: [] };
+    const { page: devices } =
+        deviceIds.length > 0 ? await ctx.db.devices.findMany({ consistency: "primary", where: { _id: { in: deviceIds }, userId } }) : { page: [] };
     const projectOf = new Map(projects.map((row) => [row._id as string, row]));
     const deviceOf = new Map<string, Doc<"devices">>(devices.map((row) => [row._id as string, row]));
     const organizations = [...new Set(projects.flatMap((row) => (row.userId !== userId && row.organizationId ? [row.organizationId] : [])))];
@@ -118,7 +122,7 @@ const entriesWithRoom = async (ctx: MutationCtx, userId: string, entries: [strin
  */
 export const rememberOpenedRunner = async (
     ctx: MutationCtx,
-    thread: Pick<Doc<"threads">, "_creationTime" | "createdAt"> & { projectId: Id<"projects"> },
+    thread: Pick<Doc<"threads">, "_creationTime" | "_id" | "createdAt"> & { projectId: Id<"projects"> },
     session: Doc<"acpSessions">,
 ): Promise<void> => {
     // The internal ingest mutation has no RLS scope, so `ctx.db` finds the project whichever space the thread was started from.
@@ -142,12 +146,14 @@ export const rememberOpenedRunner = async (
         session.userId,
         { agentKey: session.agentKey, deviceId: session.deviceId as string, folderId: session.folderId },
         thread.createdAt ?? thread._creationTime,
+        thread._id,
     );
 };
 
 /**
  * Records the runner a host thread in `project` started on, for the next new thread there, unless a thread started after
- * `threadAt` (the thread's own start time) recorded one already. Runs in the internal ingest mutation, a device post with no
+ * `threadAt` (the thread's own start time) recorded one already, or one started in the same millisecond with a greater id
+ * (`runnerReplaces`). Runs in the internal ingest mutation, a device post with no
  * signed-in user, so the settings write has no active organization to pass; the key is not a managed setting either
  * (`settings-lock.guard.test.ts` lists this writer).
  */
@@ -157,11 +163,12 @@ export const rememberProjectRunner = async (
     userId: string,
     runner: ProjectRunner,
     threadAt: number,
+    threadId: string,
 ): Promise<void> => {
     if (!project.organizationId) {
         // It records nothing for a thread started before the project's last move (strictly after, as `entryApplies`), leaves a
         // runner a newer thread recorded, and retries a write another one got in before.
-        await setProjectRunnerDefault(ctx.db, project, runner, threadAt);
+        await setProjectRunnerDefault(ctx.db, project, runner, threadAt, threadId);
 
         return;
     }
@@ -175,7 +182,7 @@ export const rememberProjectRunner = async (
     const settings = await ctx.db.userSettings.findFirst({ where: { userId } });
     const current: StoredRunner | undefined = settings?.projectRunnerDefaults?.[project._id];
 
-    if ((current?.threadAt ?? -Infinity) > threadAt) {
+    if (!runnerReplaces(threadAt, threadId, current)) {
         return;
     }
 
@@ -198,5 +205,11 @@ export const rememberProjectRunner = async (
         return;
     }
 
-    await saveUserSettings(ctx.db, settings, userId, { projectRunnerDefaults: { ...Object.fromEntries(kept), [project._id]: { ...runner, threadAt } } }, null);
+    await saveUserSettings(
+        ctx.db,
+        settings,
+        userId,
+        { projectRunnerDefaults: { ...Object.fromEntries(kept), [project._id]: { ...runner, threadAt, threadId } } },
+        null,
+    );
 };

@@ -102,6 +102,7 @@ const NOT_OFFERED = /did not offer/u;
 const NOT_FOUND = /not found/u;
 const ANOTHER_PROJECT = /another project/u;
 const NOT_IN_PROJECT = /not allowed in this project/u;
+const SOME_PROJECTS_ONLY = /only be used in some projects/u;
 
 const OFFER = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore" };
 const SESSION_OPEN = { ...OFFER, kind: "session_open" };
@@ -1028,7 +1029,14 @@ describe("a project remembers its runner", () => {
 
         await run(
             async (ctx) =>
-                await projectRunner.rememberProjectRunner(ctx, project, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, Date.now()),
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    project,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    Date.now(),
+                    "thread-a",
+                ),
         );
 
         expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
@@ -1048,7 +1056,14 @@ describe("a project remembers its runner", () => {
 
         await run(
             async (ctx) =>
-                await projectRunner.rememberProjectRunner(ctx, project, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, 1000),
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    project,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    1000,
+                    "thread-a",
+                ),
         );
 
         const [settings] = await rows("userSettings", { userId: ownerId });
@@ -1236,7 +1251,12 @@ describe("a project remembers its runner", () => {
         expect(await sessionStatusOf(started.threadId)).toBe("idle");
         expect(await defaultOf(projectId)).toBeNull();
 
-        await recordOf(session);
+        // The record the open scheduled, run with the arguments it was scheduled with (only that job: the scheduler is not run here).
+        // The harness leaves `functionPath` empty for a function reference: the job is the one carrying the open's time.
+        const job = harness.scheduler.list().find((entry) => "openedAt" in entry.args);
+
+        expect(job?.args).toMatchObject({ projectId, sessionId: session?._id });
+        await run(async (ctx) => await ctx.runMutation(recordOpenedRunner, job?.args));
         expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
     });
 
@@ -1275,7 +1295,7 @@ describe("a project remembers its runner", () => {
         const project = (await projectRow(projectId)) as never;
         const runner = { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" };
 
-        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, project, ownerId, runner, 2000));
+        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, project, ownerId, runner, 2000, "thread-a"));
 
         const [settings] = await rows("userSettings", { userId: ownerId });
 
@@ -1292,7 +1312,14 @@ describe("a project remembers its runner", () => {
         await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 5000, organizationId: "org-b" }));
         await run(
             async (ctx) =>
-                await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, 3000),
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    read,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    3000,
+                    "thread-a",
+                ),
         );
 
         const [settings] = await rows("userSettings", { userId: ownerId });
@@ -1388,7 +1415,14 @@ describe("a project remembers its runner", () => {
         await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationId: "org-a" }));
         await run(
             async (ctx) =>
-                await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, Date.now()),
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    read,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    Date.now(),
+                    "thread-a",
+                ),
         );
 
         const stored = await projectRow(projectId);
@@ -1415,9 +1449,64 @@ describe("a project remembers its runner", () => {
                     runnerThreadAt: landedAt,
                 }),
         );
-        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, read, ownerId, runner, threadAt));
+        await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, read, ownerId, runner, threadAt, "thread-a"));
 
         expect(await projectRow(projectId)).toMatchObject({ runnerAgentKey: kept === threadAt ? "claude" : "other", runnerThreadAt: kept });
+    });
+
+    it.each([
+        ["personal", ["thread-a", "thread-b"]],
+        ["personal", ["thread-b", "thread-a"]],
+        ["organization", ["thread-a", "thread-b"]],
+        ["organization", ["thread-b", "thread-a"]],
+    ] as const)("keeps one runner for two %s threads started in the same millisecond, recorded in the order %j", async (space, order) => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ ...(space === "organization" && { organizationId: "org-a" }), userId: ownerId });
+        const agentOf = { "thread-a": "claude", "thread-b": "codex" } as const;
+
+        for (const threadId of order) {
+            // Read before each write: the personal writer's `patchIf` is conditional on the row it was handed.
+            const read = (await projectRow(projectId)) as never;
+
+            await run(
+                async (ctx) =>
+                    await projectRunner.rememberProjectRunner(
+                        ctx,
+                        read,
+                        ownerId,
+                        { agentKey: agentOf[threadId], deviceId: device.deviceId, folderId: "f1" },
+                        2000,
+                        threadId,
+                    ),
+            );
+        }
+
+        // The same thread records again: an equal time and id rewrites.
+        const again = (await projectRow(projectId)) as never;
+
+        await run(
+            async (ctx) =>
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    again,
+                    ownerId,
+                    { agentKey: "codex", deviceId: device.deviceId, folderId: "f2" },
+                    2000,
+                    "thread-b",
+                ),
+        );
+
+        const [settings] = await rows("userSettings", { userId: ownerId });
+        const stored =
+            space === "organization"
+                ? (settings?.projectRunnerDefaults as Record<string, Record<string, unknown>> | undefined)?.[projectId]
+                : await projectRow(projectId);
+
+        expect(stored).toMatchObject(
+            space === "organization"
+                ? { agentKey: "codex", folderId: "f2", threadAt: 2000, threadId: "thread-b" }
+                : { runnerAgentKey: "codex", runnerFolderId: "f2", runnerThreadAt: 2000, runnerThreadId: "thread-b" },
+        );
     });
 
     it("saves no organization default for a starter whose membership was revoked before the session opened", async () => {
@@ -1534,7 +1623,7 @@ describe("a project remembers its runner", () => {
         const movedBack = (await projectRow(projectId)) as never;
         const { organizationChangedAt: movedAt } = (await projectRow(projectId)) as { organizationChangedAt: number };
         const runnerKeyAfter = async (threadAt: number): Promise<unknown> => {
-            await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, movedBack, ownerId, runner, threadAt));
+            await run(async (ctx) => await projectRunner.rememberProjectRunner(ctx, movedBack, ownerId, runner, threadAt, "thread-a"));
             const stored = await projectRow(projectId);
 
             return stored?.runnerAgentKey;
@@ -1556,7 +1645,14 @@ describe("a project remembers its runner", () => {
         await run(async (ctx) => await ctx.db.patch("projects", projectId as never, { organizationChangedAt: 6000, organizationId: "" }));
         await run(
             async (ctx) =>
-                await projectRunner.rememberProjectRunner(ctx, read, ownerId, { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" }, 3000),
+                await projectRunner.rememberProjectRunner(
+                    ctx,
+                    read,
+                    ownerId,
+                    { agentKey: "claude", deviceId: device.deviceId, folderId: "f1" },
+                    3000,
+                    "thread-a",
+                ),
         );
 
         const stored = await projectRow(projectId);
@@ -1606,6 +1702,25 @@ describe("a project remembers its runner", () => {
 
         expect(await startIn(projectId, device, "tap-p5")).toEqual({ started: false, threadId: first.threadId });
         await expect(startIn(otherId, device, "tap-p5")).rejects.toThrow(ANOTHER_PROJECT);
+        expect(await rows("acpSessions")).toHaveLength(1);
+
+        // The same retry naming another project on another computer: that computer has no session of it, and it is still refused.
+        const second = await pairedDevice(ownerId);
+
+        await expect(startIn(otherId, second, "tap-p5")).rejects.toThrow(ANOTHER_PROJECT);
+    });
+
+    it("refuses a start with no project on a computer limited to some projects, and starts one on a computer that is not", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+        const start = async (clientId: string) =>
+            await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId: device.deviceId, folderId: "f1" } as never);
+
+        expect(await start("tap-np0")).toMatchObject({ started: true });
+
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { projectIds: [projectId] }));
+
+        await expect(start("tap-np1")).rejects.toThrow(SOME_PROJECTS_ONLY);
         expect(await rows("acpSessions")).toHaveLength(1);
     });
 

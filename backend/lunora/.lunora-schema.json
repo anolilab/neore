@@ -12,6 +12,7 @@
     "add-headless-approved",
     "add-headless-resume-bounds",
     "add-project-runner-thread-at",
+    "add-project-runner-thread-id",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
@@ -22461,6 +22462,12 @@
           "optional": true,
           "unique": false
         },
+        "runnerThreadId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "subAgentRoles": {
           "kind": "object",
           "nullable": false,
@@ -32847,6 +32854,12 @@
               },
               "threadAt": {
                 "kind": "number",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "threadId": {
+                "kind": "string",
                 "nullable": false,
                 "optional": true,
                 "unique": false

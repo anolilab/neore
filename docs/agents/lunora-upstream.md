@@ -51,6 +51,14 @@ insert into a `.global()` table re-runs the subscriptions that read it, and only
 built-in that polls D1 (every 2s). Until then a list that other members change is read with refetches, not
 subscriptions: `projects_functions:listProjectRepos` is in `NEVER_LIVE` (`apps/web/src/lib/lunora/crpc.tsx`).
 
+**Not filed yet (owner to decide): a post-commit schedule handoff fails the committed write's caller.** In the installed
+`@lunora/server`, `ctx.scheduler.runAfter`/`runAt` inside a mutation only buffer the job (`withDeferredSchedules`); the
+settle after the commit hands it to the scheduler and, when that fails, keeps it in the outbox for a retry but still throws,
+so the caller sees an error for a write that committed. A `try`/`catch` around `runAfter` cannot see it. Until a settle that
+logs instead of throwing exists, a scheduling mutation's caller must be safe to retry: the host ingest's `session_open` is
+(`acp/ingest.ts#openSession` schedules `recordOpenedRunner` only while the session is `starting`, and the desktop posts the
+open again on an error, `apps/desktop/src/acp/session-link.ts`).
+
 **Not filed yet (owner to decide): removing a field without a whole-row replace.** In `@lunora/sql-store@alpha.239`,
 `patch`/`patchIf` refuse `undefined`, and a `null` on a `v.optional` `.global()` column is stored and read back as `null`,
 which the output validators reject. Removing a column is therefore a `replace`, whose OCC is checked against the row the
