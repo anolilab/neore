@@ -342,14 +342,15 @@ const pollReviewRequests = async (request: HostRequest, repo: string, known: { e
 
 const pullSchema = z.object({
     additions: z.number(),
-    base: z.object({ ref: z.string() }),
+    base: z.object({ ref: z.string(), repo: z.object({ id: z.number() }).optional() }),
     body: z.string().nullable(),
     changed_files: z.number(),
     commits: z.number(),
     created_at: z.string(),
     deletions: z.number(),
     draft: z.boolean().optional(),
-    head: z.object({ ref: z.string(), sha: z.string() }),
+    // `repo` is null once a fork is deleted.
+    head: z.object({ ref: z.string(), repo: z.object({ id: z.number() }).nullable().optional(), sha: z.string() }),
     html_url: z.string(),
     merged: z.boolean().optional(),
     number: z.int(),
@@ -383,6 +384,9 @@ const getPullRequest = async (request: HostRequest, ref: PullRequestRef): Promis
         deletions: pull.deletions,
         draft: pull.draft === true,
         headBranch: pull.head.ref,
+        // By the repositories' ids, which survive a rename: a fork may have a branch of the same name and the same commit. Either
+        // id missing reads as a fork, which is never pushed to.
+        headInBaseRepository: pull.head.repo?.id !== undefined && pull.head.repo.id === pull.base.repo?.id,
         headSha: pull.head.sha,
         number: pull.number,
         repository: ref.repository,

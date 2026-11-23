@@ -5162,7 +5162,7 @@ msgstr "débutant"
 msgid "Behavior"
 msgstr "Comportement"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:52
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:55
 msgid "Behind {base}"
 msgstr "En retard sur {base}"
 
@@ -6221,11 +6221,11 @@ msgstr "Catalan (Espagne)"
 msgid "catalog"
 msgstr "catalogue"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:63
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:71
 msgid "Catch up"
 msgstr "Rattraper"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:48
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:49
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Rattraper {pullRequest} sur {base}"
 
@@ -27227,9 +27227,13 @@ msgstr "Notifications push sur ce navigateur"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Réunissez plusieurs agents, chacun avec son rôle, dans un même fil. Un panel de relecture peut examiner une modification sous les angles sécurité et performance, et un débat peut défendre les deux positions avant une synthèse."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:67
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:77
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Place un prompt dans la zone de saisie pour rebaser cette branche sur {base}, résoudre les conflits, vérifier la compilation et les tests, puis pousser. Rien n’est envoyé."
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:78
+msgid "Puts a prompt in the composer to rebase this fork's branch on {base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent."
+msgstr "Place un prompt dans la zone de saisie pour rebaser la branche de ce fork sur {base} dans une copie locale, résoudre les conflits et vérifier la compilation et les tests. Elle n’est pas poussée. Rien n’est envoyé."
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
 #: src/features/chat/thread/media-gallery-view.tsx:481

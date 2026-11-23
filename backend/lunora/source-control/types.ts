@@ -61,6 +61,11 @@ export interface PullRequestDetail extends PullRequestRef {
     deletions: number;
     draft: boolean;
     headBranch: string;
+    /**
+     * Whether the head branch lives in this same repository, by the host's repository identity: `false` for a fork, and for a head
+     * whose repository the host no longer reports (a deleted fork). Never inferred from branch names or commits.
+     */
+    headInBaseRepository: boolean;
     headSha: string;
     state: "closed" | "merged" | "open";
     title: string;

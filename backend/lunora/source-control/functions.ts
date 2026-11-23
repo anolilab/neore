@@ -57,6 +57,7 @@ const vDetail = v.object({
     deletions: v.number(),
     draft: v.boolean(),
     headBranch: v.string(),
+    headInBaseRepository: v.boolean(),
     headSha: v.string(),
     number: v.number(),
     repository: v.string(),

@@ -9,12 +9,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
-const { composer, merge, prefill, pull } = vi.hoisted(() => {
+const { composer, merge, prefill, pull, reads } = vi.hoisted(() => {
     return {
         composer: { takes: true },
         merge: { current: {} as { data?: { state: string; status: string }; isError?: boolean } },
         prefill: vi.fn(),
-        pull: { current: {} as { data?: { detail?: { baseBranch: string; headBranch: string; state: string }; status: string }; isError?: boolean } },
+        reads: vi.fn(),
+        pull: {
+            current: {} as {
+                data?: { detail?: { baseBranch: string; headBranch: string; headInBaseRepository?: boolean; state: string; url: string }; status: string };
+                isError?: boolean;
+            },
+        },
     };
 });
 
@@ -43,17 +49,35 @@ vi.mock("@/features/chat/thread/composer-prefill", () => {
 });
 
 vi.mock("../lib/use-develop", () => {
-    return { usePullRequest: () => pull.current };
+    return {
+        usePullRequest: () => {
+            reads();
+
+            return pull.current;
+        },
+    };
 });
 
 vi.mock("../lib/use-merge", () => {
-    return { useMergeStatus: () => merge.current };
+    return {
+        useMergeStatus: () => {
+            reads();
+
+            return merge.current;
+        },
+    };
 });
 
 const BUTTON = { name: "Catch up octo/hello#7 with main" };
 
-const given = (state: string, mergeState: string, headBranch = "feat/x") => {
-    pull.current = { data: { detail: { baseBranch: "main", headBranch, state }, status: "ok" } };
+/** `head` is what the host said of the head's repository: the same as the base unless a case says otherwise. */
+const given = (state: string, mergeState: string, headBranch = "feat/x", head?: { headInBaseRepository?: boolean }) => {
+    pull.current = {
+        data: {
+            detail: { baseBranch: "main", headBranch, ...(head ?? { headInBaseRepository: true }), state, url: "https://git.example/octo/hello/pull/7" },
+            status: "ok",
+        },
+    };
     merge.current = { data: { state: mergeState, status: "ok" } };
 };
 
@@ -62,6 +86,7 @@ const renderCatchUp = () => render(<ThreadPullRequestCatchUp link={{ number: 7, 
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
         prefill.mockClear();
+        reads.mockClear();
         composer.takes = true;
     });
 
@@ -79,7 +104,8 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(prefill).toHaveBeenCalledTimes(1);
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git switch feat/x`"));
-        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("git rebase origin/main"));
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git rebase refs/remotes/origin/main`"));
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("origin HEAD:refs/heads/feat/x`"));
     });
 
     it.each([
@@ -110,12 +136,25 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });
 
-    it("shows nothing when the thread has no composer that takes the prompt (a worker's or a comparison's)", () => {
+    it.each([
+        ["the host reports a fork", { headInBaseRepository: false }],
+        ["the host's answer predates the head repository", {}],
+    ])("fills a prompt that pushes nothing when %s", (_case, head) => {
+        given("open", "behind", "feat/x", head);
+        renderCatchUp();
+        fireEvent.click(screen.getByRole("button", BUTTON));
+
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("comes from a fork"));
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.not.stringContaining("git push"));
+    });
+
+    it("reads nothing from the host when the thread has no composer that takes the prompt (a worker's or a comparison's)", () => {
         given("open", "behind");
         composer.takes = false;
         renderCatchUp();
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
+        expect(reads).not.toHaveBeenCalled();
     });
 
     it("shows nothing when the host read failed", () => {

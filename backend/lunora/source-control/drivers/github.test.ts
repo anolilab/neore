@@ -45,14 +45,14 @@ const fakeHost = (routes: Record<string, (query: Record<string, number | string>
 const pullBody = (overrides: Record<string, unknown> = {}) => {
     return {
         additions: 10,
-        base: { ref: "main" },
+        base: { ref: "main", repo: { id: 1 } },
         body: "Fixes the thing",
         changed_files: 3,
         commits: 2,
         created_at: "2026-10-01T10:00:00Z",
         deletions: 4,
         draft: false,
-        head: { ref: "fix/thing", sha: SHA },
+        head: { ref: "fix/thing", repo: { id: 1 }, sha: SHA },
         html_url: "https://github.com/octo/hello/pull/7",
         merged: false,
         number: 7,
@@ -189,11 +189,24 @@ describe("github driver: a pull request", () => {
             changedFiles: 3,
             commitCount: 2,
             headBranch: "fix/thing",
+            headInBaseRepository: true,
             headSha: SHA,
             repository: "octo/hello",
             state: "open",
             url: "https://github.com/octo/hello/pull/7",
         });
+    });
+
+    it.each([
+        ["a fork, even on the same branch name and commit", { ref: "fix/thing", repo: { id: 2 }, sha: SHA }, { ref: "main", repo: { id: 1 } }],
+        ["a deleted fork", { ref: "fix/thing", repo: null, sha: SHA }, { ref: "main", repo: { id: 1 } }],
+        ["a pull request whose base repository the host did not name", { ref: "fix/thing", repo: { id: 1 }, sha: SHA }, { ref: "main" }],
+        ["a deleted fork whose base repository the host did not name either", { ref: "fix/thing", repo: null, sha: SHA }, { ref: "main" }],
+    ])("reads the head of %s as outside the base repository", async (_case, head, base) => {
+        const { request } = fakeHost({ "/repos/octo/hello/pulls/7": () => pullBody({ base, head }) });
+        const detail = await githubDriver.getPullRequest(request, REF);
+
+        expect(detail.headInBaseRepository).toBe(false);
     });
 
     it.each([
