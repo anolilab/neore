@@ -150,11 +150,14 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     const fixRunEnded = fixRun?.status === "failed" || fixRun?.status === "cancelled";
     // Focus returns here when the fix dialog closes: the "Fix setup" button is removed once the fix starts.
     const sectionRef = useRef<HTMLElement>(null);
-    // Earlier "Fix setup" attempts have ended (a retry starts only after the newest one ended), so each is read once rather than
-    // kept live: live subscriptions are capped per socket, and a long retry history would use them all up. The newest is `fixRun`.
+    // Earlier "Fix setup" attempts have ended (a retry starts only after the newest one ended), so each is read rather than kept
+    // live: live subscriptions are capped per socket. A read is refetched on every mount (`staleTime: 0`): the cache would
+    // otherwise show a "running" snapshot from before the attempt ended. The newest attempt is `fixRun`.
     const earlierIds = run.setupFixRunIds.slice(0, -1);
     const earlierAttempts = useQueries({
-        queries: earlierIds.map((runId) => crpc.coding_agents.functions.getRun.queryOptions({ runId }, { live: false })),
+        queries: earlierIds.map((runId) => {
+            return { ...crpc.coding_agents.functions.getRun.queryOptions({ runId }, { live: false }), staleTime: 0 };
+        }),
     });
 
     const openPullRequest = () => {
