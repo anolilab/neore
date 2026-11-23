@@ -15,6 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
+import { threadSearchMessageTriggers, threadSearchTriggers } from "./agent/thread-search-triggers";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
@@ -983,11 +984,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 128,
             embed,
             index: "embeddings-128",
@@ -1003,11 +1006,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 256,
             embed,
             index: "embeddings-256",
@@ -1023,11 +1028,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 512,
             embed,
             index: "embeddings-512",
@@ -1043,11 +1050,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 768,
             embed,
             index: "embeddings-768",
@@ -1063,11 +1072,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 1024,
             embed,
             index: "embeddings-1024",
@@ -1083,11 +1094,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 1408,
             embed,
             index: "embeddings-1408",
@@ -1103,11 +1116,13 @@ export const schema = defineSchema({
         threadId: v.optional(v.string()),
         userId: v.optional(v.string()),
         vector: v.array(v.number()),
+        // The vector as text: the source `.vectorize()` syncs from (`embed.ts`). Set on every write from `vector`.
+        vectorText: v.optional(v.string()),
     })
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("model_table_threadId", ["model", "table", "threadId"])
-        .vectorize("vector", {
+        .vectorize("vectorText", {
             dimensions: 1536,
             embed,
             index: "embeddings-1536",
@@ -1731,6 +1746,8 @@ export const schema = defineSchema({
         .index("by_threadId_parentMessageId", ["threadId", "parentMessageId"])
         .index("embeddingId_threadId", ["embeddingId", "threadId"])
         .searchIndex("text_search", { field: "text", filterFields: ["userId", "threadId"] })
+        // A deleted user turn can drop its thread below the palette search's turn gate (`agent/thread-search-triggers.ts`).
+        .triggers((t) => threadSearchMessageTriggers(t))
         .relations((r) => {
             return {
                 thread: r.one("threads", { field: "threadId" }),
@@ -3586,6 +3603,16 @@ export const schema = defineSchema({
         // Where this thread's turns run (`acp/lib/host-thread.ts`): "host" = a coding agent on a paired
         // device. Unset = the cloud. Set at creation, never changed.
         runner: v.optional(v.literal("host")),
+        // The sync's claim on embedding this thread's texts (`thread-search.ts`): one job at a time, and it expires.
+        searchClaim: v.optional(
+            v.object({
+                expiresAt: v.number(),
+                id: v.string(),
+                texts: v.array(v.object({ kind: v.union(v.literal("summary"), v.literal("title")), text: v.string() })),
+            }),
+        ),
+        // When a sync last found the owner's model rules refusing the embedding model: replies re-sync such a thread at most daily.
+        searchRefusedAt: v.optional(v.number()),
         // The newest snooze ordering: an owner's choice time (client clock, capped at the server's) or a wake's server time.
         // A queued snooze or unsnooze chosen before it changes nothing (`agent/table-writes.ts#setThreadSnooze`).
         snoozeChosenAt: v.optional(v.number()),
@@ -3600,14 +3627,20 @@ export const schema = defineSchema({
         summaryEpoch: v.optional(v.number()),
         // When a summary run found the path too long to read from the top; later runs skip the walk.
         summaryPathTooLongAt: v.optional(v.number()),
+        // Palette search by meaning (`agent/thread-search.ts`): the vector ids of the title and summary, embedded only for a
+        // thread with enough turns and not locked. Derived data: never exported, and removed with the thread.
+        summaryVectorId: v.optional(v.string()),
         // User-defined `threadTags` ids. NOT `tags` — that column holds
         // system-assigned source labels ("chat", "telegram", ...).
         tagIds: v.optional(v.array(v.string())),
         tags: v.optional(v.array(v.string())),
         teamId: v.optional(v.string()),
         title: v.optional(v.string()),
+        titleVectorId: v.optional(v.string()),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
+        // User turns on the thread, kept by the messages triggers (`agent/thread-search-triggers.ts`): the palette's turn gate reads it.
+        userTurnCount: v.optional(v.number()),
         // Which sources may dispatch to this lead's workers; unset = the lead and the user.
         workerPolicy: v.optional(vWorkerPolicy),
     })
@@ -3632,6 +3665,7 @@ export const schema = defineSchema({
         .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
+        .triggers((t) => threadSearchTriggers(t))
         .relations((r) => {
             return {
                 access: r.many("threadAccess", { field: "threadId" }),

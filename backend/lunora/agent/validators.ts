@@ -738,6 +738,16 @@ export const vThreadDocFields = {
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
+    // The palette sync's claim on a thread's texts (`agent/thread-search.ts`). Internal, like the vector ids: `publicThread` omits it.
+    searchClaim: v.optional(
+        v.object({
+            expiresAt: v.number(),
+            id: v.string(),
+            texts: v.array(v.object({ kind: v.union(v.literal("summary"), v.literal("title")), text: v.string() })),
+        }),
+    ),
+    // When a sync last found the owner's model rules refusing the embedding model. Internal: `publicThread` omits it.
+    searchRefusedAt: v.optional(v.number()),
     // The newest snooze ordering, a choice or a wake (`agent/table-writes.ts#setThreadSnooze`, `#patchThread`).
     snoozeChosenAt: v.optional(v.number()),
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
@@ -746,9 +756,14 @@ export const vThreadDocFields = {
     // Written only by `agent/thread-summaries.ts` and `agent/branches.ts` (the edit bumps the epoch).
     summaryEpoch: v.optional(v.number()),
     summaryPathTooLongAt: v.optional(v.number()),
+    // Palette-search vector ids (`agent/thread-search.ts`). Internal: `publicThread` omits them, so no response carries them.
+    summaryVectorId: v.optional(v.string()),
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),
+    titleVectorId: v.optional(v.string()),
+    // User turns on the thread, kept by the messages triggers. Internal: `publicThread` omits it.
+    userTurnCount: v.optional(v.number()),
     // Written only by `sub-agents/functions.ts#setWorkerPolicy`, which checks the caller owns the thread.
     workerPolicy: v.optional(vWorkerPolicy),
 };
