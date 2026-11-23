@@ -396,9 +396,11 @@ export function readTarget(
                                       submitter.formMethod,
                                       submitter.formEnctype,
                                       submitter.formTarget,
-                                  ].join("#");
+                                  ]
+                                      .map((part) => JSON.stringify(part))
+                                      .join("\u{3}");
 
-                        destinations += `${link}|${formTarget}|${kind}|`;
+                        destinations += `${JSON.stringify([link, formTarget, kind])}\u{2}`;
                     }
 
                     // The form's method is part of what a submit does (a GET form puts its fields in the address).
@@ -488,7 +490,9 @@ export function readTarget(
                           Element.prototype.getAttribute.call(activatedForm, "method") ?? "",
                           Element.prototype.getAttribute.call(activatedForm, "enctype") ?? "",
                           Element.prototype.getAttribute.call(activatedForm, "target") ?? "",
-                      ].join("\u{1}");
+                      ]
+                          .map((part) => JSON.stringify(part))
+                          .join("\u{3}");
             const activatedKey = [
                 activatable instanceof HTMLLabelElement ? (activatable.getAttribute("for") ?? "") : "",
                 activatedControl === null || activatedControl === control
@@ -504,7 +508,9 @@ export function readTarget(
                           activatedControl.getAttribute("form") ?? "",
                           activatedControl.getAttribute("value") ?? "",
                           activatedFormKey,
-                      ].join("\u{1}"),
+                      ]
+                          .map((part) => JSON.stringify(part))
+                          .join("\u{3}"),
             ].join("\u{2}");
             // The submit-like and subscribe-like flags are part of it too: a name change that makes a control submit-like (an arrow named
             // "Review" with a title "Confirm") or subscription-like (one name source "Subscribe" with a title "Monthly plan") invalidates

@@ -661,6 +661,21 @@ describe("readTarget in a page", () => {
         expect(urls.some((url) => url.includes("intent=confirm"))).toBe(true);
     });
 
+    it("a submit button whose name and value move across a separator changes the fingerprint", async () => {
+        await pageWith(page, `<form id="order" action="/cart/confirm"><button id="pay" type="submit" name="a#b" value="c">Pay</button></form>`);
+        const element = await page.$("#pay");
+        const before = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        // The same joined text, with the separator in a different place: an unescaped join would give both the same key.
+        await element!.evaluate((node) => {
+            node.setAttribute("name", "a");
+            node.setAttribute("value", "b#c");
+        });
+        const after = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(after.target).not.toBe(before.target);
+    });
+
     it("a control whose rendered text is longer than the cap reads as truncated, so the gate asks", async () => {
         await pageWith(page, `<button id="long">${"x".repeat(TARGET_READ_OPTIONS.max + 1)}</button>`);
         const element = await page.$("#long");
