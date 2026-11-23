@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
-import { SYNC_RETRY, threadSearchTriggers } from "./thread-search-triggers";
+import { CLEANUP_RETRY, SYNC_RETRY, threadSearchTriggers } from "./thread-search-triggers";
 
 type Handler = (context: unknown, event: unknown) => Promise<void>;
 
@@ -27,12 +27,18 @@ describe("threadSearchTriggers", () => {
         await expect(triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { titleVectorId: "v1" } })).rejects.toThrow("scheduler down");
     });
 
-    it("schedules the cleanup with the deleted thread's vector ids, on the owner's shard", async () => {
+    it("schedules the cleanup with the deleted thread's vector ids, on the owner's shard, retried until it succeeds", async () => {
         const scheduler = { runAfter: vi.fn(async () => "job") };
 
         await triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { summaryVectorId: "s1", titleVectorId: "v1", userId: "u1" } });
 
-        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds: ["v1", "s1"] }, { shardKey: "u1" });
+        expect(scheduler.runAfter).toHaveBeenCalledWith(
+            0,
+            internal.agent.thread_search.deleteThreadVectors,
+            { vectorIds: ["v1", "s1"] },
+            // `forever`: the scheduler's default policy dead-letters after five retries, and nothing queues this cleanup again.
+            { retry: { backoff: "exponential", baseMs: 60_000, forever: true }, shardKey: "u1" },
+        );
     });
 
     it("still schedules the cleanup when the deleted thread has no owner, rather than skipping it", async () => {
@@ -40,7 +46,7 @@ describe("threadSearchTriggers", () => {
 
         await triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { titleVectorId: "v1" } });
 
-        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds: ["v1"] }, undefined);
+        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds: ["v1"] }, { retry: CLEANUP_RETRY });
     });
 
     it("keeps the insert when its sync cannot be scheduled", async () => {

@@ -22,6 +22,14 @@ type ScheduledTarget = Parameters<TriggerCtx["scheduler"]["runAfter"]>[1];
 export const SYNC_RETRY = { backoff: "exponential", baseMs: 60_000, maxAttempts: 5 } as const;
 
 /**
+ * How a deleted thread's vector cleanup is retried: until it succeeds. The scheduler's default
+ * policy dead-letters a job after five retries, and nothing later queues this cleanup again, since
+ * the thread row is gone. The cleanup is idempotent (a vector already removed is skipped), and
+ * `forever` caps the wait between attempts at 30 minutes.
+ */
+export const CLEANUP_RETRY = { backoff: "exponential", baseMs: 60_000, forever: true } as const;
+
+/**
  * A failed schedule does not fail the thread write that caused it: the index is derived data, and the thread's next write
  * queues the sync again. The failure is logged, not thrown.
  *
@@ -65,7 +73,7 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
                     0,
                     internal.agent.thread_search.deleteThreadVectors,
                     { vectorIds },
-                    shardKey === undefined ? undefined : { shardKey },
+                    shardKey === undefined ? { retry: CLEANUP_RETRY } : { retry: CLEANUP_RETRY, shardKey },
                 );
             }
         }),
