@@ -82,12 +82,12 @@
   `>` lines (`carriesQuotedLines`), not marked, so deleting the chip leaves typed text usable. A plain-text paste stays unseen. A new draft kind goes in
   `NOT_TYPED_DRAFTS` and `vNotTypedDraft` (`not-typed-text-validator.ts`; a type check fails until both agree), which the
   stored mark, `steerRun` and `saveLocalTurn` use; the `/chat/start`, steer and verdict tests walk the list. Words an admin wrote while
-  impersonating are marked on their row from the session, and the mark stays (no clear path yet, as
-  `contentByImpersonator`): a bot's name or instructions (`instructionsByImpersonator`), personalization and language
+  impersonating are marked on their row from the session, and the mark stays through any own edit; only the owner's
+  "Keep as mine" clears one field's mark (`keepBotInstructions`, `keepPersonalization`, `keepVariableValue` per name;
+  FORBIDDEN while impersonating; web `features/admin/components/changed-by-admin-mark.tsx`): a bot's name or instructions (`instructionsByImpersonator`), personalization and language
   (`personalizationByImpersonator`, `auth/lib/personalization.ts`, also `initializeUserSettings`; a field sent unchanged
   marks nothing), and variable values (`variablesByImpersonator`, user, organization and thread rows, per name: only a value changed or
-  added over the stored one, `prompts/functions.ts#markedNames`;
-  `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
+  added over the stored one, `prompts/functions.ts#markedNames`; `getResolvedVariables` reports them as `impersonated` and the composer marks the draft so). `loadRunContext` names each
   system-prompt piece (`chat/lib/system-context-kinds.ts`, `systemContext`): a marked one is `…-impersonated`, and a
   thread's own language `thread-language`, which refuse. An accepted
   ghost-text completion marks an unmarked draft `suggestion`; Restore to input and prompt history of a message another

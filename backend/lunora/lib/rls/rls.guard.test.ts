@@ -74,6 +74,9 @@ const SYSTEM_DB_IMPORTERS = [
     // with no secret columns, never the row. Control (`takeControl`, `keepControl`, `handBack`) writes only the `control`
     // lease on that row, for a writer the same decision admitted, or the lease's own holder ending it.
     "browser/live-view.ts",
+    // The owner's human-check ask, for a caller the same thread decision gave full read access: its site and state,
+    // and the one answer (`resolution`), for a writer it admitted.
+    "browser/human-check-card.ts",
 ].toSorted(byName);
 
 /** `relative()` with POSIX separators, so the keys below hold on Windows too. */

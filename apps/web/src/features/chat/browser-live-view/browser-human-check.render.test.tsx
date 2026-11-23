@@ -168,6 +168,17 @@ describe("the Needs you card", () => {
         expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
     });
 
+    it.each(["https://shop.example.com./item", "https://shop.example.com../item"])(
+        "offers Take control while the browser is at %s, its host spelled with trailing dots",
+        async (currentUrl) => {
+            backend.browser = running({ currentUrl });
+            show();
+
+            expect(await screen.findByRole("button", { name: "Take control" })).toBeTruthy();
+            expect(screen.getByRole("status").textContent).not.toContain("moved on");
+        },
+    );
+
     it.each([
         [true, "You have control."],
         [false, "Someone else has control of this browser."],

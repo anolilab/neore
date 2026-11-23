@@ -1209,11 +1209,10 @@ pub fn write(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
-    fn scratch(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-fs-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    fn scratch(name: &str) -> TestDir {
+        let dir = TestDir::new(&format!("device-fs-{name}"));
         fs::create_dir_all(dir.join("root/sub")).unwrap();
         fs::write(dir.join("root/a.txt"), "hello").unwrap();
         fs::write(dir.join("secret.txt"), "nope").unwrap();
@@ -1529,7 +1528,7 @@ mod tests {
 
     const PNG_HEAD: [u8; 10] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0];
 
-    fn media_scratch(name: &str) -> (PathBuf, Vec<PathBuf>) {
+    fn media_scratch(name: &str) -> (TestDir, Vec<PathBuf>) {
         let dir = scratch(name);
 
         fs::write(dir.join("root/chart.png"), PNG_HEAD).unwrap();

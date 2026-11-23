@@ -1,6 +1,7 @@
 import type { Infer, Validator } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { vPinnedGoal } from "../chat/goals/validators";
 import { vGroupChat } from "../chat/group/validators";
 import { vSubAgentRoles, vWorkerPolicy } from "../sub-agents/validators";
 import { vAgentRef } from "./agent-switch-validators";
@@ -732,6 +733,8 @@ export const vThreadDocFields = {
     // owner check), and by the ACP handoff's insert
     // (`acp/switch.ts`, carrying a cloud thread's mode to the thread that takes over).
     permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
+    // Written only by `chat/goals/functions.ts` (set and clear), which checks the caller owns the thread.
+    pinnedGoal: v.optional(vPinnedGoal),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),

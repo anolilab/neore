@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_dir::TestDir;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -6,22 +7,34 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::acp::EnvVars;
-use crate::acp_install::commit_tests::Scratch;
 use crate::acp_install::sweep_trash;
 
 const PACKAGE: &str = "fixture-agent";
 const PROGRAM: &str = "console.log('hello');\n";
 
 /// The state over a fresh folder under the system temp folder.
-fn state(name: &str) -> (DeviceState, Scratch) {
+fn state(name: &str) -> (DeviceState, TestDir) {
     crate::store::test_keychain::install();
 
-    let dir = std::env::temp_dir().join(format!("neore-acp-npm-{name}-{}", std::process::id()));
-
-    let _ = fs::remove_dir_all(&dir);
+    let dir = TestDir::at(&format!("acp-npm-{name}"));
     fs::create_dir_all(&dir).unwrap();
 
-    (DeviceState::new(&dir, Box::new(|_| {})), Scratch(dir))
+    (DeviceState::new(&dir, Box::new(|_| {})), dir)
+}
+
+/// A probe's plan with the scratch folder it made already removed, as the desktop removes it after the probe.
+fn probe(state: &DeviceState) -> Result<crate::acp::SpawnPlan, String> {
+    without_scratch(state.acp_spawn_plan("fixture", None))
+}
+
+fn without_scratch(
+    plan: Result<crate::acp::SpawnPlan, String>,
+) -> Result<crate::acp::SpawnPlan, String> {
+    if let Ok(plan) = &plan {
+        drop(crate::acp::probe_scratch(plan));
+    }
+
+    plan
 }
 
 /// A stand-in `node`: a file at an absolute path, which is all the start-up check looks at.
@@ -238,12 +251,12 @@ fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
     seed_install(&state, &dir, &node);
 
     let program = script(&dir);
-    let untouched = state.acp_spawn_plan("fixture", None).unwrap();
+    let untouched = probe(&state).unwrap();
 
     assert_eq!(Path::new(&untouched.command), node);
 
     fs::write(&program, "console.log('changed');\n").unwrap();
-    let changed = state.acp_spawn_plan("fixture", None).unwrap_err();
+    let changed = probe(&state).unwrap_err();
     assert!(
         changed.contains("no longer matches the files recorded"),
         "{changed}"
@@ -251,18 +264,18 @@ fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
 
     fs::write(&program, PROGRAM).unwrap();
     assert!(
-        state.acp_spawn_plan("fixture", None).is_ok(),
+        probe(&state).is_ok(),
         "restoring the bytes restores the start"
     );
 
     let extra = program.with_file_name("extra.js");
 
     fs::write(&extra, "x").unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
     fs::remove_file(&extra).unwrap();
 
     fs::remove_file(&program).unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
 }
 
 #[test]
@@ -275,7 +288,7 @@ fn an_executable_bit_changes_the_hash() {
     seed_install(&state, &dir, &node);
     fs::set_permissions(script(&dir), fs::Permissions::from_mode(0o755)).unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
 }
 
 #[test]
@@ -286,7 +299,7 @@ fn a_missing_install_folder_refuses_the_start() {
     seed_install(&state, &dir, &node);
     fs::remove_dir_all(installed(&dir)).unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
 }
 
 #[test]
@@ -304,7 +317,7 @@ fn an_agent_without_a_recorded_tree_is_not_checked() {
         .unwrap();
     fs::write(script(&dir), "changed").unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]
@@ -313,10 +326,10 @@ fn a_node_that_is_gone_stops_the_start_with_a_message_that_names_it() {
     let node = fake_node(&dir);
 
     seed_install(&state, &dir, &node);
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
     fs::remove_file(&node).unwrap();
 
-    let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+    let error = probe(&state).unwrap_err();
 
     assert!(
         error.contains("which is gone")
@@ -339,7 +352,7 @@ fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
     let node = fake_node(&dir);
 
     seed_install(&state, &dir, &node);
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 
     for planted in [
         dir.join("acp-agents/fixture/node_modules"),
@@ -348,17 +361,14 @@ fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
     ] {
         fs::create_dir_all(&planted).unwrap();
 
-        let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+        let error = probe(&state).unwrap_err();
 
         assert!(
             error.contains("node_modules folder next to its install"),
             "{error}"
         );
         fs::remove_dir_all(&planted).unwrap();
-        assert!(
-            state.acp_spawn_plan("fixture", None).is_ok(),
-            "removing it allows the start"
-        );
+        assert!(probe(&state).is_ok(), "removing it allows the start");
     }
 }
 
@@ -436,9 +446,9 @@ fn editing_the_arguments_after_the_program_keeps_the_pin_and_the_check() {
 
     assert!(edited.agents[0].install.is_some());
     assert!(Path::new(&program).is_file());
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
     fs::write(&program, "changed").unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
     fs::write(&program, PROGRAM).unwrap();
 
     // The program itself is replaced: no longer the install, and its files go with it, as for a binary.
@@ -513,7 +523,7 @@ fn a_hash_that_cannot_be_computed_is_refused_with_its_own_reason() {
     seed_install(&state, &dir, &node);
     std::os::unix::fs::symlink("/etc/hosts", script(&dir).with_file_name("out")).unwrap();
 
-    let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+    let error = probe(&state).unwrap_err();
 
     assert!(error.contains("could not be checked"), "{error}");
     assert!(error.contains("outside the package"), "{error}");
@@ -948,7 +958,7 @@ fn a_node_reached_through_a_link_with_another_name_installs() {
         link,
         "the recorded command is the link, by its own name"
     );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]
@@ -2209,7 +2219,7 @@ fn no_lifecycle_script_runs_during_an_install() {
         !marker.exists(),
         "a lifecycle script ran during the install"
     );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]
@@ -2338,7 +2348,7 @@ fn plan_with_a_change_during_the_hash(
         change(state);
         go_tx.send(()).unwrap();
 
-        plan.join().unwrap()
+        without_scratch(plan.join().unwrap())
     });
 
     crate::acp_install::tests_hook::clear_after_hash();
@@ -2443,7 +2453,7 @@ fn a_plan_is_built_from_the_settings_as_they_are_after_the_check_not_before() {
 #[test]
 fn a_reinstall_with_other_bytes_leaves_the_files_a_plan_verified_in_place() {
     let (state, scratch) = state("plan-reinstall");
-    let dir = scratch.0.clone();
+    let dir = scratch.to_path_buf();
     let (node, npm, _) = fake_tools(&dir);
     let first = tarball(&manifest(), &[]);
 
@@ -2451,7 +2461,7 @@ fn a_reinstall_with_other_bytes_leaves_the_files_a_plan_verified_in_place() {
         .acp_install_npm(request(&state, &node, &npm, &first, integrity(&first)))
         .unwrap();
 
-    let plan = state.acp_spawn_plan("fixture", None).unwrap();
+    let plan = probe(&state).unwrap();
     let verified = installed(&dir);
     let verified_hash = tree_hash(&verified).unwrap();
 
@@ -2484,7 +2494,7 @@ fn a_reinstall_with_other_bytes_leaves_the_files_a_plan_verified_in_place() {
         current, verified,
         "the new bytes went to a folder of their own"
     );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 
     state.acp_install_prune("fixture");
 
@@ -2591,7 +2601,7 @@ fn an_install_in_the_older_version_named_folder_still_starts_and_is_kept_by_a_pr
         })
         .unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 
     // A prune moves what it drops into the trash at once, so a folder still here was kept.
     state.acp_install_prune("fixture");
@@ -2600,7 +2610,7 @@ fn an_install_in_the_older_version_named_folder_still_starts_and_is_kept_by_a_pr
         legacy.exists(),
         "the folder the program is in is the one kept"
     );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]

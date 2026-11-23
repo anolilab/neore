@@ -4506,6 +4506,34 @@
           "optional": true,
           "unique": false
         },
+        "resolution": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"declined\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"done\""
+            }
+          ]
+        },
+        "resolvedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "run": {
           "kind": "string",
           "nullable": false,
@@ -4530,9 +4558,23 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "waitedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
+        "by_threadId_run_askedAt": {
+          "fields": [
+            "threadId",
+            "run",
+            "askedAt"
+          ],
+          "unique": false
+        },
         "by_threadId_site_askedAt": {
           "fields": [
             "threadId",
@@ -29751,6 +29793,27 @@
           "optional": true,
           "unique": false
         },
+        "pinnedGoal": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "maxRounds": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "text": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "refined": true
+            }
+          }
+        },
         "projectId": {
           "kind": "id",
           "nullable": false,
@@ -33340,6 +33403,12 @@
             "optional": false,
             "unique": false
           }
+        },
+        "writeId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {

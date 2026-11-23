@@ -2,6 +2,7 @@
  * Utility functions and types for tools
  */
 import { toolsLogger } from "../../lib/logger";
+import { hostSpelling, urlHost } from "../../lib/url-host";
 
 const WWW_PREFIX_RE = /^www\./;
 const TRAILING_SLASH_RE = /\/$/;
@@ -435,9 +436,8 @@ export const isSafeUrl = (url: string): boolean => {
         return false;
     }
 
-    let hostname = parsed.hostname.toLowerCase();
-
-    if (hostname.endsWith(".")) hostname = hostname.slice(0, -1);
+    // Every trailing dot: the URL parser keeps `localhost..`, which one strip would leave as `localhost.`, off the list.
+    const hostname = hostSpelling(parsed.hostname);
 
     const stripped = hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
 
@@ -510,22 +510,17 @@ export const batchArray = <T>(array: T[], batchSize: number): T[][] => {
  * while the shipped guard regressed. It now imports this.
  */
 /**
- * Extract the hostname from a URL string.
+ * Extract the hostname from a URL string, as `urlHost` spells it: a trailing dot (`blocked.example.`) is the same host
+ * to the browser, so it must not get past a list entry written without one.
  */
-const extractHostname = (url: string): string | null => {
-    try {
-        return new URL(url).hostname.toLowerCase();
-    } catch {
-        return null;
-    }
-};
+const extractHostname = (url: string): string | null => urlHost(url) || null;
 
 /**
  * Check if a domain matches an allowlist/blocklist entry.
  * Supports wildcard subdomains: "*.example.com" matches "sub.example.com".
  */
 const domainMatches = (hostname: string, pattern: string): boolean => {
-    const p = pattern.toLowerCase();
+    const p = hostSpelling(pattern);
 
     if (p.startsWith("*.")) {
         const suffix = p.slice(2);

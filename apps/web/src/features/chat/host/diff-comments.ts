@@ -6,6 +6,8 @@
  * to fit and say so, comments are never cut. If the comments alone do not fit, there is no message.
  */
 
+import { stripHiddenText } from "@neore/ai/utils";
+
 import type { PatchLineKind } from "@/features/chat/thread/host-changes-lines";
 import { classifyPatch } from "@/features/chat/thread/host-changes-lines";
 
@@ -209,11 +211,15 @@ const TRUNCATION_NOTE = "Some quoted diff lines were shortened to fit the size l
 
 const omitted = (count: number): string => `… ${String(count)} more diff ${count === 1 ? "line" : "lines"} not shown`;
 
+/**
+ * A fence longer than any run of backticks in the quote. The runs are counted with the hidden characters removed, as
+ * `/hosts/send` stores the message (`stripHiddenText`): removing a zero-width character between two backticks joins them.
+ */
 const fenceFor = (lines: ReadonlyArray<string>): string => {
     let longest = 0;
 
     for (const line of lines) {
-        const runs = line.match(/`+/gu) ?? [];
+        const runs = stripHiddenText(line).text.match(/`+/gu) ?? [];
 
         for (const run of runs) {
             longest = Math.max(longest, run.length);

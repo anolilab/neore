@@ -1,9 +1,9 @@
 use std::io::Cursor;
 
 use super::*;
-use crate::acp_install::commit_tests::Scratch;
 use crate::envelope::{sign_value, Domain};
 use crate::headless::vault::tests::scratch;
+use crate::test_dir::TestDir;
 
 const SECRET: &str = concat!(
     "0123456789abcdef",
@@ -39,7 +39,7 @@ fn line(secret: &str, value: &Value) -> String {
 }
 
 /// The service and its folder, which is removed when the test drops it.
-fn service(label: &str) -> (Service, Scratch) {
+fn service(label: &str) -> (Service, TestDir) {
     let dir = scratch(&format!("serve-{label}"));
 
     std::fs::create_dir_all(&*dir).unwrap();

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { LLM_GATEWAY_URL, LUNORA_URL } from "@/lib/env";
 import { signInWithWebAuthFlow, watchReconnectNeeded } from "@/lib/extension-grant";
+import { useSignOutUnfinished } from "@/lib/session";
 
 /** The backend and gateway host patterns, as `manifest.config.ts` declares them. */
 const hostOrigins = (): string[] =>
@@ -21,12 +22,15 @@ const hostOrigins = (): string[] =>
  * extension — see `lib/extension-grant.ts`.
  *
  * A Chrome install that used to share the web app's cookie lands here once
- * after the update, and is told why (`migrateFromCookieSession`).
+ * after the update, and is told why (`migrateFromCookieSession`). A sign-out
+ * whose grant storage kept lands here too, and says so: Settings, which ran it,
+ * is gone by then.
  */
 export function AuthPage() {
     const [error, setError] = useState<string>();
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [reconnect, setReconnect] = useState(false);
+    const signOutUnfinished = useSignOutUnfinished();
 
     useEffect(() => watchReconnectNeeded(setReconnect), []);
 
@@ -82,6 +86,11 @@ export function AuthPage() {
                     <LogInIcon aria-hidden="true" className="size-4" />
                     {isSigningIn ? "Waiting for sign-in…" : idleLabel}
                 </button>
+                {signOutUnfinished && (
+                    <p className="text-center text-sm text-red-600 dark:text-red-400" role="alert">
+                        Sign-out did not finish: this browser could not forget the account. It stays signed out, and is removed the next time the panel opens.
+                    </p>
+                )}
                 {error && (
                     <p className="text-center text-sm text-red-600 dark:text-red-400" role="alert">
                         {error}

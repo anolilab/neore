@@ -120,6 +120,9 @@ export const RATE_LIMIT_CONFIGS = {
     // Each call mints a live view URL at the provider (`browser/live-view.ts`).
     "browser/liveView:free": Ratelimit.fixedWindow(30, HOUR),
     "browser/liveView:premium": Ratelimit.fixedWindow(120, HOUR),
+    // A closing page's hand back (`POST /browser/release`) per client address, on the root shard, once its token is
+    // proven: a page closes a few times a minute at most, and a replayed token must not keep the owner's shard busy.
+    "browser/releaseIp": Ratelimit.fixedWindow(30, MINUTE),
 
     "byok/decrypt:free": Ratelimit.fixedWindow(100, MINUTE),
 

@@ -88,6 +88,23 @@ Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on →
 (`browser_specific_settings.gecko.id`), so a temporary install keeps the same
 sign-in redirect URI.
 
+## Publishing to the Chrome Web Store
+
+The store assigns the extension's id on the first upload, so the store build's
+redirect URI is not known until then, and the backend refuses every sign-in from
+that build until it is listed. Before the first release (and again if the id ever
+changes):
+
+1. Upload `release/crx-*.zip` (`pnpm build`) and copy the id the developer
+   dashboard shows.
+2. Add `https://<store id>.chromiumapp.org/` to the production
+   `TRUSTED_EXTENSION_REDIRECT_URIS` GitHub secret (`.github/workflows/deploy.yml`
+   passes it to the backend). A value replaces the whole list: keep the Firefox,
+   desktop and mobile entries already there.
+3. Deploy the backend, then sign in from the store build to confirm it.
+
+The Firefox add-on needs no such step: its id is fixed in the manifest.
+
 ## Firefox
 
 One source tree, two manifests: `src/manifest/build-manifest.ts` produces both
