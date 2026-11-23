@@ -37,12 +37,15 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ finalFocusRef, prompt: prepar
     const fieldId = useId();
     const helpId = useId();
     const [open, setOpen] = useState(false);
+    // Set once a fix has started: then the button is gone, so focus goes to the run. Otherwise focus returns to the button.
+    const [started, setStarted] = useState(false);
     const [prompt, setPrompt] = useState(preparedPrompt);
     const start = useMutation(crpc.coding_agents.functions.startSetupFix.mutationOptions());
     const trimmed = prompt.trim();
 
     const openDialog = () => {
         setPrompt(preparedPrompt);
+        setStarted(false);
         setOpen(true);
     };
 
@@ -58,6 +61,7 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ finalFocusRef, prompt: prepar
                         return;
                     }
 
+                    setStarted(true);
                     setOpen(false);
                     showSuccess(t`Fix started — follow it below`);
                 },
@@ -72,7 +76,7 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ finalFocusRef, prompt: prepar
                 {t`Fix setup`}
             </Button>
             <Dialog onOpenChange={setOpen} open={open}>
-                <DialogContent className="sm:max-w-2xl" finalFocus={finalFocusRef}>
+                <DialogContent className="sm:max-w-2xl" finalFocus={started ? finalFocusRef : undefined}>
                     <DialogHeader>
                         <DialogTitle>{t`Fix the "${step}" step`}</DialogTitle>
                         <DialogDescription>
