@@ -12,7 +12,7 @@ import useCanvasPanel from "@/features/chat/use-canvas-panel";
 import type { ChatMessage } from "@/storybook/fixtures/chat";
 import { assistantMessage, chatFixtures, CONVERSATION, pageOf, STREAM_ID, streamingBody, THREAD_IDS, THREADS, userMessage } from "@/storybook/fixtures/chat";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
-import { ownedBy } from "@/storybook/fixtures/owner";
+import { ownedBy, OWNER } from "@/storybook/fixtures/owner";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
 import { lunora, lunoraError, lunoraHandlers } from "@/storybook/lunora";
@@ -70,7 +70,7 @@ const LAUNCH_NOTES = {
     status: "idle",
     threadId: THREAD_IDS.main,
     title: "Launch notes",
-    userId: "user-1",
+    userId: OWNER,
     version: 1,
 } as never;
 /** Counts the saves the panel makes: opening a document must not save it. */
@@ -95,7 +95,7 @@ const perThread = (streaming?: string) => [
             }) as never,
     ),
     lunora(api.chat.functions.getThreadUIMessages, ({ threadId }) => pageOf(ownedAll(MESSAGES[threadId] ?? CONVERSATION)) as never),
-    lunora(api.agent.documents.getDocument, () => LAUNCH_NOTES),
+    lunora(api.agent.documents.getDocument, () => ownedBy(LAUNCH_NOTES)),
     lunora(api.agent.documents.updateDocument, documentUpdate),
     lunora(api.chat.streaming.getActiveStreamForThread, ({ threadId }) =>
         streaming !== undefined && threadId === streaming ? ({ streamId: STREAM_ID } as never) : null,
