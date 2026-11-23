@@ -8,6 +8,7 @@
  * thread, embeds through the gateway, inserts the vectors, then commits them in a
  * mutation. A commit that finds its text already changed deletes its own vectors.
  */
+import type { ModelFilterRules } from "@neore/ai/models";
 import { type Infer, LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
@@ -96,10 +97,13 @@ const embeddingAllowedFor = async (ctx: ActionCtx, userId: string): Promise<bool
     return embeddingModelAllowed(await loadModelFilterRules(ctx, userId));
 };
 
-/** Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model. */
-const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[]): Promise<number[][]> => {
+/**
+ * Embeds the texts through the gateway, billed to the thread's owner. `[]` when the owner's model rules refuse the model.
+ * A caller that already read those rules passes them, so one request reads them once.
+ */
+const embedTexts = async (ctx: ActionCtx, userId: string, texts: string[], loadedRules?: ModelFilterRules): Promise<number[][]> => {
     const { createGatewayEmbeddingModel, embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
-    const modelFilterRules = await loadModelFilterRules(ctx, userId);
+    const modelFilterRules = loadedRules ?? (await loadModelFilterRules(ctx, userId));
 
     if (!embeddingModelAllowed(modelFilterRules)) {
         return [];
@@ -478,11 +482,14 @@ export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archived
 
     // A refused model is said as such, not answered with an empty list the palette would show as "nothing related". Any
     // other failure rejects too, so the palette says the search failed; its title matches do not depend on this call.
-    if (!(await embeddingAllowedFor(ctx, args.userId))) {
+    const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
+    const modelFilterRules = await loadModelFilterRules(ctx, args.userId);
+
+    if (!embeddingModelAllowed(modelFilterRules)) {
         throw new LunoraError("FORBIDDEN", "Search by meaning is not available under your model rules", { data: { code: MEANING_SEARCH_REFUSED } });
     }
 
-    const [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)]);
+    const [queryVector] = await embedTexts(ctx, args.userId, [query.slice(0, 2000)], modelFilterRules);
 
     if (!queryVector || queryVector.length !== SEARCH_DIMENSION) {
         return [];

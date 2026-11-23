@@ -59,6 +59,7 @@ import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-hand
 import type { ThreadState } from "@/features/chat/thread-list/lib/derived-sections";
 import { nextSnoozeWake, threadStateOf } from "@/features/chat/thread-list/lib/derived-sections";
 import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list/lib/state-query";
+import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
@@ -206,6 +207,8 @@ interface Group {
 
 interface ThreadItem {
     id: string;
+    /** A locked chat's list row is a stub without its project, so a project filter cannot place it. */
+    isLocked?: boolean;
     isPinned?: boolean;
     projectId?: string;
     state: ThreadState;
@@ -408,6 +411,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
                 threads.push({
                     id: threadId,
+                    isLocked: isThreadLocked((thread as { lockedAt?: unknown }).lockedAt),
                     isPinned: pinnedThreadIds.has(threadId),
                     projectId: (thread as { projectId?: string }).projectId,
                     state: threadStateOf(
@@ -576,6 +580,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     // A leading `#state` tag narrows the thread lists to that state; the rest of the input searches their titles.
     const stateFilter = parseStateQuery(searchInput).state;
     const visibleThreads = stateFilter === undefined ? allThreads : allThreads.filter((candidate) => candidate.state === stateFilter);
+    // A locked chat's stub does not say its project, so under a chosen project it cannot be listed or ruled out.
+    const projectMayMissLocked =
+        projectFilter !== undefined && visibleThreads.some((candidate) => candidate.isLocked === true && threadRowVisible(scope, candidate.status));
 
     const groupedItems = (() => {
         const groups: Group[] = [];
@@ -884,6 +891,9 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                             <p className="text-muted-foreground px-3 pt-2 text-xs">
                                 {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered; older ones are not included.`}
                             </p>
+                        )}
+                        {projectMayMissLocked && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Locked chats do not reveal their project, so some may be missing here.`}</p>
                         )}
                         {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
                             <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>

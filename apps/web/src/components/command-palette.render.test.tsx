@@ -202,6 +202,7 @@ const RESULT_TEXT = /alpha rollout date/;
 const LOADED_ONLY = /threads loaded here are filtered;/;
 const BETA_TEXT = /beta cohort starts/;
 const FIRST_PROJECTS_ONLY = /Only the first 1 projects are listed here/;
+const LOCKED_MAY_BE_MISSING = /Locked chats do not reveal their project/;
 const MEANING_FAILED = /Search by meaning failed/;
 const MEANING_REFUSED = /isn't available under your account's model rules/;
 const PROJECTS_FAILED = /projects could not be loaded/;
@@ -790,5 +791,36 @@ describe("command palette filters and meaning search", () => {
         expect(screen.getByText("Refund flow")).toBeTruthy();
         expect(screen.queryByText("Other chat")).toBeNull();
         expect(screen.getByRole("button", { name: "Project: Billing" })).toBeTruthy();
+    });
+
+    it("says locked chats may be missing under a chosen project, whose stubs carry no project", async () => {
+        harness.threads = [
+            { _id: "thread-1a", projectId: "p-billing", status: "active", title: "Refund flow" },
+            { _id: "thread-locked", lockedAt: 1, status: "active" },
+        ];
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        expect(screen.queryByText(LOCKED_MAY_BE_MISSING)).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+        fireEvent.click(screen.getByText("Billing"));
+
+        expect(screen.getByText("Refund flow")).toBeTruthy();
+        expect(screen.getByText(LOCKED_MAY_BE_MISSING)).toBeTruthy();
+    });
+
+    it("says nothing about locked chats under a project when none are loaded", async () => {
+        harness.threads = [{ _id: "thread-1a", projectId: "p-billing", status: "active", title: "Refund flow" }];
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+        fireEvent.click(screen.getByText("Billing"));
+
+        expect(screen.getByText("Refund flow")).toBeTruthy();
+        expect(screen.queryByText(LOCKED_MAY_BE_MISSING)).toBeNull();
     });
 });

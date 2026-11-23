@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => {
         embedMany: vi.fn(async (_ctx: unknown, { values }: { values: string[] }) => {
             return { embeddings: values.map(() => Array.from({ length: 1024 }, (_unused, index) => (index === 0 ? 1 : 0))) };
         }),
+        loadModelFilterRules: vi.fn(async () => {
+            return {};
+        }),
         searchVectors: vi.fn(async (_ctx: unknown, _vector: number[], _args: { table: string }) => [] as { _id: string; _score: number }[]),
     };
 });
@@ -33,9 +36,7 @@ vi.mock("../chat/lib/gateway-embedding-model", () => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
-        loadModelFilterRules: async () => {
-            return {};
-        },
+        loadModelFilterRules: mocks.loadModelFilterRules,
     };
 });
 vi.mock("../lib/services", () => {
@@ -377,6 +378,13 @@ describe(searchThreadsByMeaningFor, () => {
         });
         expect(mocks.embedMany).not.toHaveBeenCalled();
         expect(mocks.searchVectors).not.toHaveBeenCalled();
+    });
+
+    it("reads the person's model rules once per search", async () => {
+        await searchThreadsByMeaningFor(makeCtx({}) as never, { query: "the invoice bug", userId: "user-1" });
+
+        expect(mocks.loadModelFilterRules).toHaveBeenCalledTimes(1);
+        expect(mocks.embedMany).toHaveBeenCalledTimes(1);
     });
 
     it("answers nothing for a query too short to embed", async () => {
