@@ -35,7 +35,8 @@ export const useProjectList = (enabled: boolean = true) => {
     // Memoize to ensure stable reference and consistency with useThreads pattern
     const projects = useMemo(() => data?.page ?? [], [data]);
 
-    return { isAnswered: data !== undefined, projects };
+    // More projects exist than this first page holds; a list built from it says it is cut.
+    return { hasMore: data?.isDone === false, isAnswered: data !== undefined, projects };
 };
 
 /**

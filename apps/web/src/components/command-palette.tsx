@@ -46,6 +46,7 @@ import React, { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
@@ -76,6 +77,8 @@ const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
 /** The meaning search embeds the query, so it waits for a few characters, as the backend does (`agent/thread-search-plan.ts`). */
 const MEANING_SEARCH_MIN_CHARS = 3;
+/** The longest query `searchThreadsByMeaning` accepts (`agent/thread-search.ts`); a longer one is not sent. */
+const MEANING_SEARCH_MAX_CHARS = 2000;
 const MAX_MEANING_HITS = 10;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -178,7 +181,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const { deleteBranch, switchToBranch } = useThreadManager(shouldQuery);
     const { data: pinnedThreads } = useQuery(crpc.chat.functions.getPinnedThreads.queryOptions(shouldQuery ? {} : skipToken));
 
-    // The palette's input is uncontrolled; mirror it so message search can follow it.
+    // The palette's input text: message search follows it, and picking a project clears it.
     const [searchInput, setSearchInput] = useState("");
     // The filters and the project the palette is narrowed to. Each closes with the palette.
     const [scope, setScope] = useState<PaletteScope>(NO_PALETTE_SCOPE);
@@ -197,7 +200,10 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const debouncedSearch = useDebouncedValue(trimmedSearch, MESSAGE_SEARCH_DEBOUNCE_MS);
     // A state tag narrows to threads and drops message hits, so a tagged input never needs the full-text query.
     const isStateTagged = parseStateQuery(trimmedSearch).state !== undefined;
-    const isMessageSearchCurrent = shouldQuery && !isStateTagged && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
+    // A filter narrows the palette to its kinds: navigation, actions and message hits show only without one.
+    const unscopedRows = unscopedRowsVisible(scope) && projectFilter === undefined;
+    const isMessageSearchCurrent =
+        shouldQuery && unscopedRows && !isStateTagged && trimmedSearch.length >= MESSAGE_SEARCH_MIN_CHARS && trimmedSearch === debouncedSearch;
     const { data: messageSearchResults } = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
             isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
@@ -207,21 +213,27 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     // Search by meaning embeds the query on the server, so it waits as message search does. Its hits are threads, so it is not
     // asked for while the palette is narrowed to a project or to project rows.
     const searchMeaning = useAction(api.agent.thread_search.searchThreadsByMeaning);
+    // The hits are one account's thread titles: the key names the account, so a switch never shows the previous one's.
+    const { data: sessionData } = useAuthSession();
+    const sessionUserId = sessionData?.user.id;
     const showsThreadRows = !isPaletteScoped(scope) || scope.threads || scope.archived;
     const isMeaningSearchCurrent =
         shouldQuery &&
         !isStateTagged &&
         showsThreadRows &&
         projectFilter === undefined &&
+        sessionUserId !== undefined &&
         trimmedSearch.length >= MEANING_SEARCH_MIN_CHARS &&
+        trimmedSearch.length <= MEANING_SEARCH_MAX_CHARS &&
         trimmedSearch === debouncedSearch;
     const { data: meaningHits } = useQuery({
         // The hits are a user's own thread titles: they are not kept once the palette closes.
         gcTime: 0,
         queryFn: isMeaningSearchCurrent ? () => searchMeaning({ query: debouncedSearch }) : skipToken,
-        queryKey: ["command-palette", "meaning", debouncedSearch],
+        queryKey: ["command-palette", "meaning", sessionUserId, debouncedSearch],
     });
-    const { projects } = useProjectList(shouldQuery);
+    // Project rows show only under the Projects filter, so the list is read only then.
+    const { hasMore: hasMoreProjects, projects } = useProjectList(shouldQuery && scope.projects);
 
     const setLoadingStates = () => {};
     const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
@@ -459,8 +471,6 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     const groupedItems = (() => {
         const groups: Group[] = [];
-        // A filter narrows the palette to its kinds: navigation, actions and message hits show only without one.
-        const unscopedRows = unscopedRowsVisible(scope) && projectFilter === undefined;
 
         const navigationItems: Item[] = [
             {
@@ -565,6 +575,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         onClick: () => {
                             setProjectFilter({ id: project._id, title: project.title });
                             setScope(NO_PALETTE_SCOPE);
+                            // The text found the project; left in place it would narrow the project's threads by the project's name.
+                            setSearchInput("");
                         },
                         value: `project-${project._id}`,
                     };
@@ -714,13 +726,25 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             open={isOpen}
         >
             <CommandDialogPopup>
-                <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput}>
+                <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput} value={searchInput}>
                     <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
                     <div aria-label={t`Filter results`} className="flex flex-wrap items-center gap-1.5 px-3 pt-2" role="group">
                         <Toggle onPressedChange={(pressed) => setScope({ ...scope, threads: pressed })} pressed={scope.threads} size="sm" variant="outline">
                             {t`Threads`}
                         </Toggle>
-                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, projects: pressed })} pressed={scope.projects} size="sm" variant="outline">
+                        <Toggle
+                            onPressedChange={(pressed) => {
+                                setScope({ ...scope, projects: pressed });
+
+                                // Project rows hide under a chosen project, and the Projects filter hides thread rows: together they list nothing.
+                                if (pressed) {
+                                    setProjectFilter(undefined);
+                                }
+                            }}
+                            pressed={scope.projects}
+                            size="sm"
+                            variant="outline"
+                        >
                             {t`Projects`}
                         </Toggle>
                         <Toggle onPressedChange={(pressed) => setScope({ ...scope, archived: pressed })} pressed={scope.archived} size="sm" variant="outline">
@@ -733,11 +757,14 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         )}
                     </div>
                     <CommandPanel>
-                        {/* A state tag filters the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
-                        {stateFilter !== undefined && allThreadsData.hasMore && (
+                        {/* A state tag, the Archived filter and a chosen project filter the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
+                        {(stateFilter !== undefined || scope.archived || projectFilter !== undefined) && allThreadsData.hasMore && (
                             <p className="text-muted-foreground px-3 pt-2 text-xs">
-                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered by state; older ones are not included.`}
+                                {t`Only the ${allThreadsData.lunora.length} threads loaded here are filtered; older ones are not included.`}
                             </p>
+                        )}
+                        {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>
                         )}
                         <CommandEmpty>{t`No results found.`}</CommandEmpty>
                         <CommandList>

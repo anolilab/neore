@@ -50,8 +50,8 @@ describe(threadRowVisible, () => {
 });
 
 describe(projectRowsVisible, () => {
-    it("shows project rows with no filter, or with the projects filter", () => {
-        expect(projectRowsVisible(NO_PALETTE_SCOPE)).toBe(true);
+    it("shows project rows only under the projects filter, so the unfiltered palette keeps its rows", () => {
+        expect(projectRowsVisible(NO_PALETTE_SCOPE)).toBe(false);
         expect(projectRowsVisible(scope({ projects: true }))).toBe(true);
     });
 

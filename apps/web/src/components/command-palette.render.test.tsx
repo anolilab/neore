@@ -26,6 +26,10 @@ const harness = vi.hoisted(() => {
         meaningArgs: [] as unknown[],
         /** The project rows the palette lists; a test may replace them. */
         projects: [] as { _id: string; title: string }[],
+        /** Whether the project list has more pages than the palette loaded. */
+        projectsHasMore: false,
+        /** The signed-in account; a test may switch it. */
+        userId: "user-1",
     };
 });
 
@@ -111,7 +115,15 @@ vi.mock("@/lib/lunora/crpc", () => {
 vi.mock("@/features/projects/hooks/use-projects", () => {
     return {
         useProjectList: () => {
-            return { isAnswered: true, projects: harness.projects };
+            return { hasMore: harness.projectsHasMore, isAnswered: true, projects: harness.projects };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: harness.userId } } };
         },
     };
 });
@@ -170,8 +182,9 @@ vi.mock("@/features/layout/hooks/use-ui-state", () => {
 });
 
 const RESULT_TEXT = /alpha rollout date/;
-const LOADED_ONLY = /threads loaded here are filtered by state/;
+const LOADED_ONLY = /threads loaded here are filtered;/;
 const BETA_TEXT = /beta cohort starts/;
+const FIRST_PROJECTS_ONLY = /Only the first 1 projects are listed here/;
 
 /** True when `later` comes after `earlier` in document order. */
 const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumentPosition(later) === Node.DOCUMENT_POSITION_FOLLOWING;
@@ -419,6 +432,87 @@ describe("command palette filters and meaning search", () => {
         harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
         harness.meaning = [];
         harness.projects = [];
+        harness.projectsHasMore = false;
+        harness.hasMore = false;
+        harness.searchArgs.length = 0;
+    });
+
+    it("lists no project rows without the projects filter", async () => {
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        expect(screen.getByText("Alpha plan")).toBeTruthy();
+        expect(screen.queryByText("Billing")).toBeNull();
+    });
+
+    it("runs no message search under a filter, whose rows it could not show", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+        fireEvent.change(input, { target: { value: "alpha" } });
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 400);
+        });
+
+        expect(messageQueries()).toHaveLength(0);
+    });
+
+    it("does not send a meaning query longer than the server accepts", async () => {
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "a".repeat(2001) } });
+        await new Promise<void>((resolve) => {
+            setTimeout(resolve, 400);
+        });
+
+        expect(harness.meaningArgs).toHaveLength(0);
+    });
+
+    it("says an archived list covers only the loaded threads, and a project list only the first page", async () => {
+        harness.hasMore = true;
+        harness.projectsHasMore = true;
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        expect(screen.queryByText(LOADED_ONLY)).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+        expect(screen.getByText(LOADED_ONLY)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+        expect(screen.getByText(FIRST_PROJECTS_ONLY)).toBeTruthy();
+    });
+
+    it("picking a project found by its name clears the text, so the project's threads show", async () => {
+        harness.threads = [{ _id: "thread-1a", projectId: "p-billing", status: "active", title: "Refund flow" }];
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+        fireEvent.change(input, { target: { value: "Bill" } });
+        fireEvent.click(screen.getByText("Billing"));
+
+        expect((input as HTMLInputElement).value).toBe("");
+        expect(screen.getByText("Refund flow")).toBeTruthy();
+    });
+
+    it("turning on the projects filter clears a chosen project, so the list is not left empty", async () => {
+        harness.threads = [{ _id: "thread-1a", projectId: "p-billing", status: "active", title: "Refund flow" }];
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+        fireEvent.click(screen.getByText("Billing"));
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+
+        expect(screen.queryByRole("button", { name: "Project: Billing" })).toBeNull();
+        expect(screen.getByText("Billing")).toBeTruthy();
     });
 
     it("the archived filter limits the palette to archived threads", async () => {

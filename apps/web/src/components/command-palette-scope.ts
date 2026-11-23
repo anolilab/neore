@@ -29,8 +29,8 @@ export const threadRowVisible = (scope: PaletteScope, status: "active" | "archiv
     return (scope.threads || scope.archived) && (!scope.archived || status === "archived");
 };
 
-/** Whether project rows are shown. */
-export const projectRowsVisible = (scope: PaletteScope): boolean => !isPaletteScoped(scope) || scope.projects;
+/** Whether project rows are shown: only under the Projects filter, so the unfiltered palette keeps the rows it always had. */
+export const projectRowsVisible = (scope: PaletteScope): boolean => scope.projects;
 
 /** Navigation, thread actions and message hits are shown only without a filter. */
 export const unscopedRowsVisible = (scope: PaletteScope): boolean => !isPaletteScoped(scope);
