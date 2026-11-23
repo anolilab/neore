@@ -717,10 +717,12 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
         return null;
     }
 
-    // Only the author saves edits (`updateDocument`): a member who can read the document sees it without the edit controls.
+    // The server says whether this caller may save (the author with the thread's write grant); a viewer sees the document without the edit controls.
+    // Only the author opens the document as a page (`createPageFromDocument`).
     const isAuthor = !!document && document.userId === sessionData?.user?.id;
+    const canEdit = document?.canEdit === true;
     const isEditable =
-        isAuthor &&
+        canEdit &&
         (document?.kind === "text" || document?.kind === "code" || document?.kind === "sheet" || document?.kind === "design" || document?.kind === "image");
     const isStreaming = document?.status === "streaming";
     const canPreviewCode = document?.kind === "code" && getPreviewLanguage(document.language) !== undefined;
@@ -787,7 +789,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                         </TooltipIconButton>
                     )}
                     {/* XLSX import (sheets only) */}
-                    {document?.kind === "sheet" && isAuthor && !isStreaming && (
+                    {document?.kind === "sheet" && canEdit && !isStreaming && (
                         <>
                             <input accept=".xlsx,.xls" className="hidden" onChange={handleXlsxImport} ref={xlsxInputRef} type="file" />
                             <TooltipIconButton onClick={() => xlsxInputRef.current?.click()} tooltip={t`Import XLSX`}>

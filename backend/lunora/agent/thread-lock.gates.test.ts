@@ -387,7 +387,7 @@ describe("documents", () => {
         });
         const read = async (userId: string) => await as(userId).query(getDocument as never, { documentId, threadId } as never);
 
-        expect(await read("user-member")).toMatchObject({ title: "Shared plan" });
+        expect(await read("user-member")).toMatchObject({ canEdit: false, title: "Shared plan" });
         expect(await read("user-stranger")).toBeNull();
 
         // Without the thread (a document opened outside a chat), only the author reads it.

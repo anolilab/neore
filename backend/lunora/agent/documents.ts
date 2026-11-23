@@ -21,6 +21,8 @@ const vDocumentKind = v.union(v.literal("text"), v.literal("code"), v.literal("s
 export const vDocumentDoc = v.object({
     _creationTime: v.number(),
     _id: v.string(),
+    // Whether the caller may save it: the author, with the thread's write grant. Set by `getDocument` only.
+    canEdit: v.optional(v.boolean()),
     content: v.optional(v.string()),
     contentJson: v.optional(v.any()),
     kind: vDocumentKind,
@@ -88,7 +90,10 @@ export const getDocument = query
                 return null;
             }
 
-            return publicDocument(documentRow);
+            return {
+                ...publicDocument(documentRow),
+                canEdit: documentRow.userId === identity.userId && meetsThreadPermission(access.permission, "write"),
+            };
         }
 
         const authoredRow = await ctx.db.get("documents", args.documentId);
@@ -107,7 +112,7 @@ export const getDocument = query
             return null;
         }
 
-        return publicDocument(authoredRow);
+        return { ...publicDocument(authoredRow), canEdit: meetsThreadPermission(access.permission, "write") };
     });
 
 /** Internal: a locked thread's document is skipped (null) without its proof. */
