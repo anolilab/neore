@@ -14,6 +14,7 @@ import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { decryptKey, encryptKey } from "../lib/encryption";
+import { onOwnShard } from "../lib/own-shard";
 import { deliverRunWebhook } from "./delivery";
 import { buildTestEvent, generateRunWebhookSecret, MAX_RUN_WEBHOOK_URL_LENGTH, runWebhookUrlProblem } from "./payload";
 
@@ -37,11 +38,22 @@ const ownRow = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc<"r
     return page[0] ?? null;
 };
 
+/**
+ * The webhook lives on its owner's own shard only, where export, erasure and the account merge read it. A call that
+ * names a shared thread owner's shard, or `__root__`, is refused there: a row saved on it would escape all three.
+ */
+const assertOwnShard = (userId: string): void => {
+    if (!onOwnShard(userId)) {
+        throw new LunoraError("FORBIDDEN", "The run webhook is saved on your own account only.");
+    }
+};
+
 export const getRunWebhook = authQuery
     .input({})
     .output(vRunWebhookView)
     .query(async ({ ctx }) => {
-        const row = await ownRow(ctx, ctx.user.userId);
+        // Off the caller's own shard nothing of theirs is there to read.
+        const row = onOwnShard(ctx.user.userId) ? await ownRow(ctx, ctx.user.userId) : null;
 
         return row ? { configured: true, enabled: row.enabled, url: row.url } : { configured: false, enabled: false };
     });
@@ -59,6 +71,9 @@ export const saveRunWebhook = authMutation
     .output(v.object({ secret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx: context }) => {
         const { userId } = context.user;
+
+        assertOwnShard(userId);
+
         const problem = runWebhookUrlProblem(args.url);
 
         if (problem !== null) {
@@ -98,6 +113,8 @@ export const rotateRunWebhookSecret = authMutation
     .use(rateLimit("runWebhooks/update"))
     .output(v.object({ secret: v.string() }))
     .mutation(async ({ ctx: context }) => {
+        assertOwnShard(context.user.userId);
+
         const existing = await ownRow(context, context.user.userId);
 
         if (!existing) {
@@ -135,6 +152,9 @@ export const sendRunWebhookTest = authAction
     .output(vDeliveryResult)
     .action(async ({ ctx: context }) => {
         const { userId } = context.user;
+
+        assertOwnShard(userId);
+
         const row = await context.runQuery(internal.run_webhooks.functions.getRunWebhookInternal, { userId });
 
         if (!row.found || row.url === undefined || row.secretCiphertext === undefined) {
