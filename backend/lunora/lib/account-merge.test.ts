@@ -10,7 +10,7 @@ import { deleteMergedGuest } from "../auth/hooks";
 import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
-import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
+import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE, shardOwnerField } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
@@ -165,8 +165,9 @@ const fakeShards = (
                 return { imported: 0 } as never;
             }
             case "listShardRowIds": {
+                // A table with no owner column is listed whole, as the procedure once did: the merge must not ask for one.
                 return tableOf(shardKey, table)
-                    .filter((row) => args.ownedBy === undefined || row.userId === args.ownedBy)
+                    .filter((row) => args.ownedBy === undefined || shardOwnerField(table) === undefined || row.userId === args.ownedBy)
                     .slice(0, pageSize)
                     .map((row) => row._id) as never;
             }
@@ -354,6 +355,45 @@ describe("mergeGuestInto", () => {
             { _id: "c2", userId: "collaborator" },
             { _id: "c3", userId: "user" },
         ]);
+    });
+
+    it("clears no table without an owner column when both keys serve one store, so every user's rows of it stay", async () => {
+        const suggestions: Row[] = [
+            { _id: "s1", threadId: "t-guest" },
+            { _id: "s2", threadId: "t-other-user" },
+        ];
+        const { call, shards } = fakeShards({ guest: { followupSuggestions: suggestions, threads: [{ _id: "t-guest", userId: "guest" }] } }, 2, {
+            sameStore: true,
+        });
+        const listIdCalls: Record<string, unknown>[] = [];
+
+        await mergeGuestInto(
+            async (reference, args, shardKey) => {
+                if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
+                    listIdCalls.push(args);
+                }
+
+                return await call(reference, args, shardKey);
+            },
+            REFERENCES,
+            "guest",
+            "user",
+        );
+
+        expect(shardOwnerField("followupSuggestions")).toBeUndefined();
+        expect(shards.get("guest")?.get("followupSuggestions")).toStrictEqual(suggestions);
+        expect(listIdCalls.some((args) => args.table === "followupSuggestions")).toBe(false);
+        expect(shards.get("guest")?.get("threads")).toStrictEqual([{ _id: "t-guest", userId: "user" }]);
+    });
+
+    it("copies a table without an owner column and clears the guest's copy when the stores are separate", async () => {
+        const suggestions: Row[] = [{ _id: "s1", threadId: "t-guest" }];
+        const { call, shards } = fakeShards({ guest: { followupSuggestions: suggestions } });
+
+        await mergeGuestInto(call, REFERENCES, "guest", "user");
+
+        expect(shards.get("user")?.get("followupSuggestions")).toStrictEqual(suggestions);
+        expect(shards.get("guest")?.get("followupSuggestions")).toStrictEqual([]);
     });
 
     it("probes with a key of its own on every attempt and releases it, so an earlier attempt's marker is never the one read", async () => {
@@ -1061,6 +1101,29 @@ describe("clearing the guest's settings", () => {
             });
 
             expect(result.ids).toEqual([result.guestId]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("lists none of a table without an owner column when asked for one user's rows, never the whole table", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const row = { createdAt: 1, lastMessageId: "m1", suggestions: ["next"], updatedAt: 1 };
+
+                await context.db.insert("followupSuggestions", { ...row, threadId: "t-guest" });
+                await context.db.insert("followupSuggestions", { ...row, threadId: "t-other-user" });
+
+                return {
+                    owned: await context.runQuery(listShardRowIds, { ownedBy: "guest", table: "followupSuggestions" }),
+                    whole: await context.runQuery(listShardRowIds, { table: "followupSuggestions" }),
+                };
+            });
+
+            expect(result.owned).toEqual([]);
+            expect(result.whole).toHaveLength(2);
         } finally {
             harness.close();
         }

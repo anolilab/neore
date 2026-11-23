@@ -144,7 +144,7 @@ export const listShardRowsPage = internalQuery
     });
 
 /** The column a user-sharded table is sharded on, which names the row's owner. Undefined for a table that is not user-sharded. */
-const shardOwnerField = (table: string): string | undefined => {
+export const shardOwnerField = (table: string): string | undefined => {
     const shardMode = (schema as unknown as { tables: Record<string, { shardMode?: { field?: string; kind?: string } }> }).tables[table]?.shardMode;
 
     return shardMode?.kind === "shardBy" ? shardMode.field : undefined;
@@ -153,13 +153,18 @@ const shardOwnerField = (table: string): string | undefined => {
 /**
  * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's rows,
  * so a shard that also holds the new account's rows (one shard serving both, as local routing can) keeps them. A table that
- * is not user-sharded has no owner to filter on and is listed whole.
+ * is not user-sharded has no owner to filter on: asked for one user's rows of it, this lists none, never the whole table,
+ * which on a shared store holds everyone's rows. Without `ownedBy`, the first page of any table.
  */
 export const listShardRowIds = internalQuery
     .input({ ownedBy: v.optional(v.string()), table: v.string() })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
         const ownerField = shardOwnerField(args.table);
+
+        if (args.ownedBy !== undefined && ownerField === undefined) {
+            return [];
+        }
 
         if (args.ownedBy !== undefined && ownerField !== undefined) {
             const facades = ctx.db as unknown as Record<
@@ -453,15 +458,33 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
     }
 
     // Then clear the guest's shard. Whether both shard keys serve one store (as local routing can) decides what goes: on one
-    // store, another user's row there is the same row the new account's shard holds, so only the guest's rows are cleared.
-    // On separate stores, every row the copy pass took now sits on the new shard too, a collaborator's row included, so the
-    // guest's copy of it goes as well. Probed on every run, so a redelivered merge decides the same way.
+    // store, another user's row there is the same row the new account's shard holds, so only the guest's rows are cleared,
+    // and a table with no owner column (not user-sharded) is not cleared at all: its rows are the new account's rows too, and
+    // every other user's. On separate stores, the guest's store holds only rows written under the guest's key, and the copy
+    // pass put every one of them on the new shard, a collaborator's row included, so the guest's copy of each goes as well;
+    // that holds for a table with no owner column too. Probed on every run, so a redelivered merge decides the same way.
     const sharedStore = await probeSharedStore(call, references, from, to);
+    const clearPlan = tables.flatMap((table): { ownedBy?: string; table: string }[] => {
+        if (!sharedStore && !COPIED_FOR_GUEST_ONLY.has(table)) {
+            return [{ table }];
+        }
+
+        if (shardOwnerField(table) !== undefined) {
+            return [{ ownedBy: from, table }];
+        }
+
+        if (sharedStore) {
+            return [];
+        }
+
+        // A table copied for the guest alone must name its owner, or its clear would take another user's row too.
+        throw new Error(`${table} is cleared for the guest alone but has no owner column; the merge of guest ${from} into ${to} stops before clearing`);
+    });
     let drained = true;
 
-    for (const table of tables) {
+    for (const listArgs of clearPlan) {
+        const { table } = listArgs;
         let emptied = false;
-        const listArgs = sharedStore || COPIED_FOR_GUEST_ONLY.has(table) ? { ownedBy: from, table } : { table };
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
             const ids: string[] = await call(references.listIds, listArgs, from);
