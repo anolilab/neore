@@ -25135,6 +25135,60 @@
       "relations": {},
       "shardMode": "global:d1"
     },
+    "sharedPinRoutes": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_user_and_thread": {
+          "fields": [
+            "userId",
+            "threadId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "signUpInvitation": {
       "commitOrdered": false,
       "fields": {
@@ -28994,6 +29048,19 @@
           "optional": false,
           "unique": false
         },
+        "documentId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "ref": "documents"
+        },
+        "documentKind": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "imageIndex": {
           "kind": "number",
           "nullable": false,
@@ -29017,6 +29084,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"document\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"image\""
             },
             {
@@ -29031,7 +29105,7 @@
         "messageId": {
           "kind": "string",
           "nullable": false,
-          "optional": false,
+          "optional": true,
           "unique": false
         },
         "messageRole": {
@@ -29092,6 +29166,20 @@
         "by_thread": {
           "fields": [
             "threadId"
+          ],
+          "unique": false
+        },
+        "by_thread_and_document": {
+          "fields": [
+            "threadId",
+            "documentId"
+          ],
+          "unique": false
+        },
+        "by_user_and_document": {
+          "fields": [
+            "userId",
+            "documentId"
           ],
           "unique": false
         },
