@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Wrench } from "lucide-react";
-import type { FC } from "react";
+import type { FC, RefObject } from "react";
 import { useId, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -24,12 +24,14 @@ import { showError, showSuccess } from "@/lib/toast";
 const PROMPT_MAX = 20_000;
 
 interface SetupFixButtonProps {
+    /** Where focus goes when the dialog closes. The button itself leaves the page once the fix starts. */
+    finalFocusRef: RefObject<HTMLElement | null>;
     prompt: string;
     runId: Id<"codingAgentRuns">;
     step: string;
 }
 
-const SetupFixButton: FC<SetupFixButtonProps> = ({ prompt: preparedPrompt, runId, step }) => {
+const SetupFixButton: FC<SetupFixButtonProps> = ({ finalFocusRef, prompt: preparedPrompt, runId, step }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const fieldId = useId();
@@ -70,7 +72,7 @@ const SetupFixButton: FC<SetupFixButtonProps> = ({ prompt: preparedPrompt, runId
                 {t`Fix setup`}
             </Button>
             <Dialog onOpenChange={setOpen} open={open}>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="sm:max-w-2xl" finalFocus={finalFocusRef}>
                     <DialogHeader>
                         <DialogTitle>{t`Fix the "${step}" step`}</DialogTitle>
                         <DialogDescription>

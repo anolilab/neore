@@ -148,6 +148,8 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     const { data: fixRun } = useQuery(crpc.coding_agents.functions.getRun.queryOptions(run.setupFixRunId ? { runId: run.setupFixRunId } : skipToken));
     // A retry is offered once the linked fix run has ended without finishing; the server checks again when it starts.
     const fixRunEnded = fixRun?.status === "failed" || fixRun?.status === "cancelled";
+    // Focus returns here when the fix dialog closes: the "Fix setup" button is removed once the fix starts.
+    const sectionRef = useRef<HTMLElement>(null);
     // Earlier "Fix setup" attempts have ended (a retry starts only after the newest one ended), so each is read once rather than
     // kept live: live subscriptions are capped per socket, and a long retry history would use them all up. The newest is `fixRun`.
     const earlierIds = run.setupFixRunIds.slice(0, -1);
@@ -180,7 +182,12 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     };
 
     return (
-        <section aria-labelledby={headingId} className={cn("my-2 w-full max-w-3xl rounded-lg border p-3", className)}>
+        <section
+            aria-labelledby={headingId}
+            className={cn("my-2 w-full max-w-3xl rounded-lg border p-3 focus:outline-none", className)}
+            ref={sectionRef}
+            tabIndex={-1}
+        >
             <header className="flex flex-wrap items-center gap-2">
                 <SquareTerminal aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                 <h3 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>
@@ -255,7 +262,7 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                     </Button>
                 )}
                 {run.setupFix && (run.setupFixRunId === null || fixRunEnded) && (
-                    <SetupFixButton prompt={run.setupFix.prompt} runId={run._id} step={run.setupFix.step} />
+                    <SetupFixButton finalFocusRef={sectionRef} prompt={run.setupFix.prompt} runId={run._id} step={run.setupFix.step} />
                 )}
                 {run.prUrl?.startsWith("https://github.com/") && (
                     <a className={buttonVariants({ size: "sm", variant: "outline" })} href={run.prUrl} rel="noopener noreferrer" target="_blank">

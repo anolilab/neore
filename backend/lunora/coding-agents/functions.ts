@@ -407,7 +407,8 @@ export const createRun = internalMutation
 
 /**
  * "Fix setup" in the run view: start a run on the same repository and branch, in the same thread, with the task the
- * person read and may have edited. Only from the caller's own failed run that stopped at a fixable step, and once.
+ * person read and may have edited. Only from the caller's own failed run that stopped at a fixable step, one fix at a
+ * time: a retry starts only after the newest fix ended failed or cancelled.
  */
 export const startSetupFix = authMutation
     .use(rateLimit("chat/update"))
