@@ -23,6 +23,7 @@ export type AiUserPreferencesPatch = Partial<
     Pick<
         Doc<"aiUserPreferences">,
         | "autoApproveLowRisk"
+        | "browserClickMode"
         | "browserSettings"
         | "codingAgentCommitIdentity"
         | "customAIProviders"

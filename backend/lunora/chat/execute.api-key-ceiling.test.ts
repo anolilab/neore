@@ -182,7 +182,17 @@ describe("the continuation of a run started with an API key", () => {
         expect(Object.keys(tools).length).toBeGreaterThan(1);
 
         for (const [name, tool] of Object.entries(tools)) {
-            expect(tool.needsApproval, name).toBe(true);
+            // The browser tool reads its target before it asks (`askAfterLook`): its check is a function that always asks, so
+            // it is a function here; every other tool asks outright.
+            if (name === "browser") {
+                // Called with no user or thread context: the approval still resolves true, never false.
+                const needsApproval = tool.needsApproval as unknown as (input: unknown, options: object) => Promise<boolean>;
+
+                expect(typeof needsApproval, name).toBe("function");
+                expect(await needsApproval({}, {}), name).toBe(true);
+            } else {
+                expect(tool.needsApproval, name).toBe(true);
+            }
         }
     });
 

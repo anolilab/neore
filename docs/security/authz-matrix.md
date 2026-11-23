@@ -346,6 +346,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.undoDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller | ok |
 | `chat_functions.unpinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateBrowserSettings` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
+| `chat_functions.setBrowserClickMode` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok — new; chooses how the caller's agent clicks (`browserClickMode`); a real-click mode (`pointer`, `all`) is refused while impersonating (`refuseImpersonation`), going back to `page` is not |
 | `chat_functions.updateThread` | action | authAction + RL | threads | thread access (owner/grant); a `status` change (archive, which withdraws the guest link and held notes, or unarchive) is refused while impersonating | accepted — admin grantees may edit by design |
 | `chat_functions.regenerateThreadTitle` | action | authAction + RL | threads | admin access (owner), as the rename | overwrites the title and bills the requester, as the summary does; refuses a locked, a host-run and a deleted thread |
 | `chat_functions.updateThreadDictationLanguage` | mutation | authMutation + RL | threads | row.userId == caller | ok |
