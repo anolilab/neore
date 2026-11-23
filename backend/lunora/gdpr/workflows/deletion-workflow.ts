@@ -810,6 +810,18 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        // The pins, tags and routes are gone, and nothing after this point touches them. The marker names the account, and an erasing marker
+        // never expires, so it goes before PostHog and the completion below: a PostHog failure must not leave it behind (`lib/account-moves.ts`).
+        await context.step.do(
+            "end-account-erasure",
+            async () =>
+                await context.run(
+                    internal.lib.account_moves.endAccountMoveFor,
+                    { kind: "erasing", userId: args.userId },
+                    { dedupId: stepDedupId(scope, "end-account-erasure") },
+                ),
+        );
+
         // --- Phase 5: Delete external analytics data ---
 
         // Throws on a PostHog failure, so the step retries and the request is never
@@ -973,17 +985,6 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
         // so a re-run of a request the retry already confirmed mails nothing while the claim lasts (a
         // re-run no longer starts over a completed request at all). A send that is exhausted keeps the
         // claim: nothing keeps the address afterwards, so there is nothing a later sender could send.
-        // The erasure is done: the account's move marker names the account, so it goes now (`lib/account-moves.ts`).
-        await context.step.do(
-            "end-account-erasure",
-            async () =>
-                await context.run(
-                    internal.lib.account_moves.endAccountMoveFor,
-                    { kind: "erasing", userId: args.userId },
-                    { dedupId: stepDedupId(scope, "end-account-erasure") },
-                ),
-        );
-
         try {
             const isEmailClaimed = await context.step.do(
                 "claim-deletion-confirmed-email",

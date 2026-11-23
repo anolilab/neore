@@ -468,6 +468,12 @@ export const moveGuestPins = async (moves: GuestPinMoves, from: string, to: stri
     return result;
 };
 
+/** The claim a guest merge holds while one of its deliveries moves the guest's pins. Long enough for a merge run and its deferrals. */
+export const GUEST_MERGE_SCOPE = "guest-merge";
+export const GUEST_MERGE_CLAIM_TTL_MS = 30 * 60 * 1000;
+/** How long a duplicate delivery waits before it looks again, while another delivery of the same merge holds the claim. */
+export const GUEST_MERGE_RECHECK_MS = 30 * 1000;
+
 /**
  * The move, as a queue job on the NEW user's shard (`auth.ts` enqueues it).
  * Off the sign-up request: a guest's rows are one round trip per table and
@@ -481,59 +487,91 @@ export const runGuestMerge = internalAction
     .input({ from: v.string(), to: v.string() })
     .output(v.object({ moved: v.number() }))
     .action(async ({ args, ctx: context }) => {
-        // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
-        await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
+        // One delivery of this merge moves the guest's pins at a time. A duplicate delivery (a queue redelivery that overlaps a running
+        // merge) waits for the running one, so the first to finish cannot remove a marker the other is still moving pins under.
+        const claimedAt = await context.runMutation(internal.lib.claim_once.claimKeyFenced, {
+            key: args.from,
+            scope: GUEST_MERGE_SCOPE,
+            ttlMs: GUEST_MERGE_CLAIM_TTL_MS,
+        });
 
-        // An erasure of the guest has priority: it removes the guest's pins, so a merge that moved one now would leave it under the new
-        // account. The merge stops, and its own marker goes.
-        const { erasing } = await context.runMutation(internal.lib.account_moves.isErasingFor, { userId: args.from });
+        if (claimedAt === null) {
+            await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: GUEST_MERGE_RECHECK_MS, shardKey: args.to });
 
-        if (erasing) {
+            return { moved: 0 };
+        }
+
+        try {
+            // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
+            await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
+
+            // The destination is marked as receiving rows before any lands on it. Its erasure waits for that marker, and this check stops the
+            // merge if the erasure has begun: each side writes its marker before it reads the other's, so one of them always sees the other.
+            await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "importing", userId: args.to });
+            const { erasing: destinationErasing } = await context.runMutation(internal.lib.account_moves.isErasingFor, { userId: args.to });
+
+            if (destinationErasing) {
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "importing", userId: args.to });
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
+
+                return { moved: 0 };
+            }
+
+            // An erasure of the guest has priority: it removes the guest's pins, so a merge that moved one now would leave it under the new
+            // account. The merge stops, and its own markers go.
+            const { erasing } = await context.runMutation(internal.lib.account_moves.isErasingFor, { userId: args.from });
+
+            if (erasing) {
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "importing", userId: args.to });
+                await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
+
+                return { moved: 0 };
+            }
+
+            const { until } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
+
+            if (until !== null) {
+                // One extra second for clock skew between the writer and this job, so the lease has run out when the job runs.
+                await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: Math.max(0, until - Date.now()) + 1000, shardKey: args.to });
+
+                return { moved: 0 };
+            }
+
+            const moves: GuestPinMoves = {
+                listRoutes: async (routeUserId, cursor) =>
+                    await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId: routeUserId }),
+                mergeRows: async () =>
+                    await mergeGuestInto(
+                        async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
+                        {
+                            deleteGuest: internal.auth.hooks.deleteMergedGuest,
+                            deleteRows: internal.lib.account_merge.deleteShardRows,
+                            importRows: internal.lib.account_merge.importShardRows,
+                            list: internal.lib.account_merge.listShardRowsPage,
+                            listIds: internal.lib.account_merge.listShardRowIds,
+                            reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
+                            reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
+                        },
+                        args.from,
+                        args.to,
+                    ),
+                moveBatch: async (route) =>
+                    await callOnShard(
+                        internal.chat.pins.functions.reassignUserPinsOnThread,
+                        { from: args.from, threadId: route.threadId as never, to: args.to },
+                        { shardKey: route.ownerId },
+                    ),
+            };
+
+            const result = await moveGuestPins(moves, args.from, args.to);
+
+            await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "importing", userId: args.to });
             await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
 
-            return { moved: 0 };
+            authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
+
+            return result;
+        } finally {
+            await context.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: args.from, scope: GUEST_MERGE_SCOPE });
         }
-
-        const { until } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
-
-        if (until !== null) {
-            // One extra second for clock skew between the writer and this job, so the lease has run out when the job runs.
-            await enqueueJob(internal.lib.account_merge.runGuestMerge, args, { delayMs: Math.max(0, until - Date.now()) + 1000, shardKey: args.to });
-
-            return { moved: 0 };
-        }
-
-        const moves: GuestPinMoves = {
-            listRoutes: async (routeUserId, cursor) =>
-                await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId: routeUserId }),
-            mergeRows: async () =>
-                await mergeGuestInto(
-                    async (reference, callArgs, shardKey) => (await callOnShard(reference as never, callArgs as never, { shardKey })) as never,
-                    {
-                        deleteGuest: internal.auth.hooks.deleteMergedGuest,
-                        deleteRows: internal.lib.account_merge.deleteShardRows,
-                        importRows: internal.lib.account_merge.importShardRows,
-                        list: internal.lib.account_merge.listShardRowsPage,
-                        listIds: internal.lib.account_merge.listShardRowIds,
-                        reassignFollows: internal.lib.account_merge.reassignThreadFollowsPage,
-                        reassignGlobal: internal.lib.account_merge.reassignGlobalRows,
-                    },
-                    args.from,
-                    args.to,
-                ),
-            moveBatch: async (route) =>
-                await callOnShard(
-                    internal.chat.pins.functions.reassignUserPinsOnThread,
-                    { from: args.from, threadId: route.threadId as never, to: args.to },
-                    { shardKey: route.ownerId },
-                ),
-        };
-
-        const result = await moveGuestPins(moves, args.from, args.to);
-
-        await context.runMutation(internal.lib.account_moves.endAccountMoveFor, { kind: "merging", userId: args.from });
-
-        authLogger.info(`[auth] moved ${String(result.moved)} rows from guest ${args.from} to ${args.to}`);
-
-        return result;
     });

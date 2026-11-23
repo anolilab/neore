@@ -156,6 +156,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"importing\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"merging\""
             }
           ]

@@ -15,7 +15,11 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { MAX_LENGTH } from "./validators";
 
-export type AccountMoveKind = "erasing" | "merging";
+/**
+ * The marker kinds. An erasure and a guest merge fence the account's pins; an importing marker only fences the erasure of the account a
+ * merge imports rows into (the destination), so it does not block the destination's own pin writes.
+ */
+export type AccountMoveKind = "erasing" | "importing" | "merging";
 
 /**
  * How long a pin write holds the account's lease. Longer than any pin mutation runs, so a lease that has run out has nothing left in
@@ -24,11 +28,21 @@ export type AccountMoveKind = "erasing" | "merging";
 export const PIN_WRITE_LEASE_MS = 60_000;
 
 /** Whether the account's pins are being moved or erased right now. */
-export const isAccountMoving = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {
-    const row = await context.db.accountMoves.findFirst({ consistency: "primary", where: { userId } });
+export const isAccountMoving = async (context: Pick<QueryCtx, "db">, userId: string, now: number): Promise<boolean> => {
+    const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
-    return row !== null;
+    return page.some((row) => row.kind !== "importing" && isLiveMarker(row, now));
 };
+
+/**
+ * How long a guest merge's marker fences the account. A merge that fails and is given up on leaves its marker; past this age the marker
+ * stops blocking, so the account can pin again and its erasure can run. It is well past the merge's retry window and lease deferrals.
+ */
+export const MERGE_MARKER_MAX_AGE_MS = 60 * 60 * 1000;
+
+/** Whether a marker still fences its account: an erasure always does; a merge does until it is too old to be a live merge. */
+const isLiveMarker = (row: { createdAt: number; kind: AccountMoveKind }, now: number): boolean =>
+    row.kind === "erasing" || row.createdAt > now - MERGE_MARKER_MAX_AGE_MS;
 
 /**
  * Marks the account as moving for one operation. Idempotent for that operation: a retry or a redelivery leaves its marker in place. Another
@@ -62,13 +76,13 @@ export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: st
  * the caller refuses the write. The second check closes the window where a move starts between the first check and the renewal.
  */
 export const admitPinWriteUnlessMoving = async (context: MutationCtx, userId: string, now: number): Promise<boolean> => {
-    if (await isAccountMoving(context, userId)) {
+    if (await isAccountMoving(context, userId, now)) {
         return true;
     }
 
     await admitPinWrite(context, userId, now);
 
-    return await isAccountMoving(context, userId);
+    return await isAccountMoving(context, userId, now);
 };
 
 /**
@@ -94,12 +108,13 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
     const { page: moves } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
     for (const row of moves) {
-        if (row.kind === kind) {
+        // An erasure ends the account, so every marker of it goes, a stale merge's too. A merge ends only its own.
+        if (kind === "erasing" || row.kind === kind) {
             await context.db.delete("accountMoves", row._id);
         }
     }
 
-    if (moves.some((row) => row.kind !== kind)) {
+    if (kind !== "erasing" && moves.some((row) => row.kind !== kind)) {
         return;
     }
 
@@ -112,7 +127,7 @@ export const endAccountMove = async (context: Pick<MutationCtx, "db">, userId: s
 
 /** Removes the operation's marker, from a workflow or a job once its pins are moved or erased. Idempotent. */
 export const endAccountMoveFor = internalMutation
-    .input({ kind: v.union(v.literal("erasing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ kind: v.union(v.literal("erasing"), v.literal("importing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await endAccountMove(ctx, args.userId, args.kind);
@@ -132,7 +147,7 @@ export const pinWritesInFlightFor = internalMutation
 
 /** The marker, written from a workflow or a job before the account's pins are touched. */
 export const beginAccountMoveFor = internalMutation
-    .input({ kind: v.union(v.literal("erasing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })
+    .input({ kind: v.union(v.literal("erasing"), v.literal("importing"), v.literal("merging")), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await beginAccountMove(ctx, args.userId, args.kind, ctx.now);
@@ -155,7 +170,7 @@ export const eraseWaitUntil = async (context: Pick<QueryCtx, "db">, userId: stri
     const leaseUntil = await pinWritesInFlightUntil(context, userId, now);
     const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId } });
 
-    if (page.some((row) => row.kind === "merging")) {
+    if (page.some((row) => (row.kind === "merging" || row.kind === "importing") && isLiveMarker(row, now))) {
         return Math.max(leaseUntil ?? 0, now + PIN_WRITE_LEASE_MS);
     }
 

@@ -359,11 +359,7 @@ export const createDocumentPin = authMutation
             throw new LunoraError("BAD_REQUEST", "A document still being written cannot be pinned yet");
         }
 
-        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
-        if (await admitPinWriteUnlessMoving(context, userId, now)) {
-            throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
-        }
-
+        // A pin that already exists is returned as it is: no write, so no lease is renewed for it.
         const [existing] = await context.db
             .query("threadPins")
             .withIndex("by_user_and_document", (q) => q.eq("userId", userId).eq("documentId", document._id))
@@ -371,6 +367,11 @@ export const createDocumentPin = authMutation
 
         if (existing) {
             return existing._id;
+        }
+
+        // A refused write renews no lease; an admitted one holds its lease until it commits (`lib/account-moves.ts`).
+        if (await admitPinWriteUnlessMoving(context, userId, now)) {
+            throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
 
         const pinId = await withSharedPinRoute(

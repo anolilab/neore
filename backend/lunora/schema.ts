@@ -177,7 +177,7 @@ export const schema = defineSchema({
      */
     accountMoves: defineTable({
         createdAt: v.number(),
-        kind: v.union(v.literal("erasing"), v.literal("merging")),
+        kind: v.union(v.literal("erasing"), v.literal("importing"), v.literal("merging")),
         userId: v.string(),
     })
         .global()

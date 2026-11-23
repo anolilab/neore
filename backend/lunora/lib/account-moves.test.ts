@@ -15,6 +15,7 @@ import {
     endAccountMove,
     eraseWaitUntil,
     isErasing,
+    MERGE_MARKER_MAX_AGE_MS,
     isAccountMoving,
     pinWritesInFlightUntil,
 } from "./account-moves";
@@ -26,11 +27,11 @@ describe("the account move marker", () => {
         try {
             await harness.run(async (context: any) => await beginAccountMove(context, "user-guest", "merging", 1));
 
-            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-guest"))).toBe(true);
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-guest", 1))).toBe(true);
 
             await harness.run(async (context: any) => await endAccountMove(context, "user-guest", "merging"));
 
-            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-guest"))).toBe(false);
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-guest", 1))).toBe(false);
 
             const rows = await harness.run(async (context: any) => await context.db.accountMoves.findMany({ where: { userId: "user-guest" } }));
 
@@ -50,7 +51,7 @@ describe("the account move marker", () => {
             });
             await harness.run(async (context: any) => await endAccountMove(context, "user-both", "merging"));
 
-            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-both"))).toBe(true);
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-both", 1))).toBe(true);
 
             const rows = await harness.run(async (context: any) => await context.db.accountMoves.findMany({ where: { userId: "user-both" } }));
 
@@ -172,6 +173,57 @@ describe("an erasure against a guest merge", () => {
             await harness.run(async (context: any) => await endAccountMove(context, "user-both", "merging"));
 
             expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-both", 5000))).toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("a merge marker that outlives its merge", () => {
+    it("stops fencing the account and blocking the erasure once it is older than the bound", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-stale", "merging", 1));
+
+            const later = 1 + MERGE_MARKER_MAX_AGE_MS + 1;
+
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-stale", later))).toBe(false);
+            expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-stale", later))).toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("is cleared by the erasure of the account, so no marker of it outlives the erasure", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-stale", "merging", 1));
+            await harness.run(async (context: any) => await endAccountMove(context, "user-stale", "erasing"));
+
+            const rows = await harness.run(async (context: any) => await context.db.accountMoves.findMany({ where: { userId: "user-stale" } }));
+
+            expect(rows.page).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("an importing marker on the destination of a merge", () => {
+    it("does not block the destination's own pin writes, but its erasure waits for the merge", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => await beginAccountMove(context, "user-dest", "importing", 1));
+
+            expect(await harness.run(async (context: any) => await isAccountMoving(context, "user-dest", 1))).toBe(false);
+            expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-dest", 1))).toBe(1 + PIN_WRITE_LEASE_MS);
+
+            await harness.run(async (context: any) => await endAccountMove(context, "user-dest", "importing"));
+
+            expect(await harness.run(async (context: any) => await eraseWaitUntil(context, "user-dest", 1))).toBeNull();
         } finally {
             harness.close();
         }
