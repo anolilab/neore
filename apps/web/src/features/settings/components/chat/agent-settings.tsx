@@ -62,7 +62,7 @@ const AgentSettings: FC = () => {
             mode: "page",
         },
         {
-            description: t`Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page.`,
+            description: t`Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page.`,
             label: t`Real clicks, purchases checked in the page`,
             mode: "pointer",
         },

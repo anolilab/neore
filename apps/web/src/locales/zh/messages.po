@@ -5604,8 +5604,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:807
-#: src/features/chat/browser-live-view/browser-live-view.tsx:966
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1143
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1205
 msgid "Browser"
 msgstr "浏览器"
 
@@ -8396,11 +8396,11 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:455
+#: src/features/chat/browser-live-view/browser-live-view.tsx:497
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "浏览器的控制权已交还给智能体：服务器未能及时确认你仍拥有控制权。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:456
+#: src/features/chat/browser-live-view/browser-live-view.tsx:498
 msgid "Control of the browser is back with the agent."
 msgstr "浏览器的控制权已交还给智能体。"
 
@@ -16165,7 +16165,7 @@ msgstr "授予他人访问此页面的权限，或发布一个只读链接。"
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1066
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1128
 msgid "Go"
 msgstr "前往"
 
@@ -16749,7 +16749,7 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:989
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1051
 msgid "Hand back"
 msgstr "交还"
 
@@ -16908,7 +16908,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:984
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1046
 msgid "Hide live view"
 msgstr "隐藏实时画面"
 
@@ -18682,7 +18682,7 @@ msgstr "继续接受旧密钥 24 小时"
 msgid "Keep as mine"
 msgstr "保留为我的"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1009
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1071
 msgid "Keep control"
 msgstr "保持控制"
 
@@ -19658,11 +19658,11 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1162
 msgid "Live view of the agent's browser (read-only)"
 msgstr "智能体浏览器的实时画面（只读）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1162
 msgid "Live view of the agent's browser (you have control)"
 msgstr "智能体浏览器的实时画面（由你控制）"
 
@@ -22960,7 +22960,7 @@ msgstr "还没有图片"
 msgid "No indexed files available. Files are still being processed."
 msgstr "没有已索引的文件。文件仍在处理中。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1006
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1068
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
@@ -24782,11 +24782,11 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1017
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1079
 msgid "Opening the live view…"
 msgstr "正在打开实时画面…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1072
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1134
 msgid "Opening the page. This can take up to a minute."
 msgstr "正在打开页面，最多可能需要一分钟。"
 
@@ -24957,8 +24957,12 @@ msgid "Order the models you starred in the model picker and give them your own n
 msgstr "为你在模型选择器中加星标的模型排序，并为它们起自己的名字。昵称会显示在选择器、输入框和回复中。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:65
-msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
-msgstr "普通按钮和链接接收真实点击，因此弹窗和真实点击检查可以正常工作。购买和已批准的点击仍在页面内检查。"
+msgid "Ordinary buttons and links are checked, then clicked for real, so popups and real-click checks work. A page can still change one in the moment between that check and the press. Purchases and approved clicks stay checked in the page."
+msgstr "普通按钮和链接会先检查，再真实点击，因此弹窗和真实点击检查可以正常工作。页面仍可能在检查与按下之间的瞬间更改其中一个。购买和已批准的点击仍在页面内检查。"
+
+#: src/features/settings/components/chat/agent-settings.tsx:65
+#~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
+#~ msgstr "普通按钮和链接接收真实点击，因此弹窗和真实点击检查可以正常工作。购买和已批准的点击仍在页面内检查。"
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64
@@ -25228,7 +25232,7 @@ msgstr "第 {currentPage} 页，共 {totalPages} 页"
 msgid "Page added. It is being fetched and indexed."
 msgstr "已添加网页，正在获取并建立索引。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1051
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1113
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "页面地址"
@@ -31802,8 +31806,8 @@ msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:98
-#: src/features/chat/browser-live-view/browser-live-view.tsx:970
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1029
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1032
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "Someone else has control of this browser."
 msgstr "其他人正在控制此浏览器。"
 
@@ -33501,7 +33505,7 @@ msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "输入一张图像，移除背景，然后应用风格迁移"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:149
-#: src/features/chat/browser-live-view/browser-live-view.tsx:994
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
 msgid "Take control"
 msgstr "接管控制"
 
@@ -33513,7 +33517,7 @@ msgstr "接管控制，完成验证，然后把浏览器交还。"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:318
+#: src/features/chat/browser-live-view/browser-live-view.tsx:346
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
@@ -34146,12 +34150,12 @@ msgid "That message was already sent."
 msgstr "该消息已发送。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:870
+#: src/features/chat/browser-live-view/browser-live-view.tsx:932
 msgid "That page could not be opened: {0}"
 msgstr "无法打开该页面：{0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:604
-#: src/features/chat/browser-live-view/browser-live-view.tsx:890
+#: src/features/chat/browser-live-view/browser-live-view.tsx:646
+#: src/features/chat/browser-live-view/browser-live-view.tsx:952
 msgid "That page could not be opened."
 msgstr "无法打开该页面。"
 
@@ -34256,7 +34260,7 @@ msgstr "智能体未提供该选项"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "智能体已结束，但未给出指南。请重新撰写。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1028
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1090
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "智能体正在完成一项浏览器操作，可能需要一分钟以上。请稍后再试。"
 
@@ -34268,7 +34272,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:967
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1029
 msgid "The agent is using a browser"
 msgstr "智能体正在使用浏览器"
 
@@ -34292,7 +34296,7 @@ msgstr "智能体未更改任何文件。"
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:864
+#: src/features/chat/browser-live-view/browser-live-view.tsx:926
 msgid "The agent's browser closed while the page loaded."
 msgstr "页面加载期间，智能体的浏览器已关闭。"
 
@@ -34304,7 +34308,7 @@ msgstr "代理的浏览器在 {site} 上遇到了只有真人才能通过的页�
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "代理的浏览器遇到了只有真人才能通过的页面。代理会等待，不会尝试绕过它。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:746
+#: src/features/chat/browser-live-view/browser-live-view.tsx:808
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
@@ -34382,7 +34386,7 @@ msgstr "目前无法接管此浏览器。如果仍需要该页面，请让代理
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:839
+#: src/features/chat/browser-live-view/browser-live-view.tsx:901
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "无法交还浏览器。两分钟内没有输入后，它会自动回到智能体手中。"
 
@@ -34771,11 +34775,11 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1037
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1099
 msgid "The live view could not be opened."
 msgstr "无法打开实时画面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1022
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1084
 msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
@@ -34918,7 +34922,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "包含登录表单的页面。留空则从网站首页开始。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1077
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1139
 msgid "The page you opened is still loading."
 msgstr "你打开的页面仍在加载。"
 
@@ -36439,7 +36443,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1036
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Too many live views were opened. Try again later."
 msgstr "打开的实时画面过多，请稍后再试。"
 
@@ -36857,8 +36861,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-human-check.tsx:139
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1041
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1158
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1103
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1220
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -38947,7 +38951,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:984
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1046
 msgid "Watch live"
 msgstr "观看实时画面"
 
@@ -39372,7 +39376,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1145
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1207
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "无法检查智能体是否正在使用浏览器。"
 
@@ -39859,8 +39863,8 @@ msgstr "这些是你在智能体构建器中选择的集成。每一个都会先
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "运行完成、需要你审阅或失败时，你会收到通知。已完成的运行会链接到其聊天，需要审阅的运行会链接到任务看板。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:489
-#: src/features/chat/browser-live-view/browser-live-view.tsx:818
+#: src/features/chat/browser-live-view/browser-live-view.tsx:531
+#: src/features/chat/browser-live-view/browser-live-view.tsx:880
 msgid "You handed the browser back to the agent."
 msgstr "你已将浏览器交还给智能体。"
 
@@ -39922,7 +39926,7 @@ msgstr "你今天的消息额度已用完。请稍后再试。"
 msgid "You have used today's translations. Try again later."
 msgstr "今天的翻译次数已用完。请稍后再试。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:318
+#: src/features/chat/browser-live-view/browser-live-view.tsx:346
 msgid "You may not take control of this browser."
 msgstr "你无法控制此浏览器。"
 
@@ -39930,9 +39934,10 @@ msgstr "你无法控制此浏览器。"
 msgid "You need to sign in to access this page."
 msgstr "你需要登录才能访问此页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:494
-#: src/features/chat/browser-live-view/browser-live-view.tsx:818
-#: src/features/chat/browser-live-view/browser-live-view.tsx:866
+#: src/features/chat/browser-live-view/browser-live-view.tsx:536
+#: src/features/chat/browser-live-view/browser-live-view.tsx:699
+#: src/features/chat/browser-live-view/browser-live-view.tsx:880
+#: src/features/chat/browser-live-view/browser-live-view.tsx:928
 msgid "You no longer have control of the browser."
 msgstr "你已不再控制此浏览器。"
 
@@ -40087,7 +40092,7 @@ msgstr "你的聊天和 {0}"
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1086
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1148
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "你在画面中的点击、输入和滚动都会发送到浏览器。在你交还之前，智能体会等待。"
 

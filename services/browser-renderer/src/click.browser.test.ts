@@ -259,7 +259,7 @@ describe("readTarget in a page", () => {
 
         const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
 
-        expect(read.refused).toBe("changed");
+        expect(read.refused).toBe("pressed");
         expect(read.clicked).toBe(false);
         expect(await wasClicked(page)).toBe(false);
     });
@@ -274,7 +274,7 @@ describe("readTarget in a page", () => {
 
         const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
 
-        expect(read.refused).toBe("changed");
+        expect(read.refused).toBe("pressed");
         expect(read.clicked).toBe(false);
         expect(await wasClicked(page)).toBe(false);
     });
@@ -304,7 +304,7 @@ describe("readTarget in a page", () => {
 
         const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
 
-        expect(read.refused).toBe("changed");
+        expect(read.refused).toBe("pressed");
         expect(read.clicked).toBe(false);
     });
 

@@ -60,6 +60,9 @@ const DIGITS_RE = /^\d+$/;
 /** A disabled control is not clicked on an approved target: it is not clicked until it is enabled, on a fresh look. */
 const DISABLED_TARGET = "The target is disabled, so nothing was clicked. Look at the page again before you click.";
 
+/** The target changed while the press ran its handlers: nothing was clicked, and the press is not retried (its handlers ran). */
+const PRESS_CHANGED = "The target changed while the press ran its handlers, so nothing was clicked. Its handlers did run; look at the page before you act.";
+
 /** Another element (a dialog, an overlay) covers the target, so the press would land on it: nothing is clicked. */
 const COVERED_TARGET = "Another element covers the target (a dialog or an overlay), so nothing was clicked. Look at the page again before you click.";
 
@@ -607,6 +610,11 @@ const actHeld = async (
                     // (no `targetChanged`): the click must not be retried, since its handlers already ran.
                     if (read.refused === "moved") {
                         result = { error: DESTINATION_MOVED, success: false };
+                        break;
+                    }
+
+                    if (read.refused === "pressed") {
+                        result = { error: PRESS_CHANGED, success: false };
                         break;
                     }
 

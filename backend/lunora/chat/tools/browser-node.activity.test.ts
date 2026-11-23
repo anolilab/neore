@@ -990,7 +990,7 @@ describe("a browser a person took control of", () => {
         expect(renderer).toHaveBeenCalledTimes(2);
     });
 
-    it("a click's mode reaches the renderer, and an ordinary click in pointer mode carries no fingerprint", async () => {
+    it("a click's mode reaches the renderer unchanged", async () => {
         await addSession(NOW - 1000);
         renderer.mockResolvedValueOnce(answered({ clickedSelector: "#more", success: true, url: "https://example.com/cart" }));
 
@@ -998,7 +998,8 @@ describe("a browser a person took control of", () => {
             async (ctx: any) =>
                 await ctx.runAction(executeBrowserAction, {
                     action: "click",
-                    clickMode: "pointer",
+                    clickMode: "all",
+                    expectTarget: "T-more",
                     selector: "#more",
                     threadId,
                     userId: OWNER,
@@ -1006,8 +1007,7 @@ describe("a browser a person took control of", () => {
                 }),
         );
 
-        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "click", clickMode: "pointer", selector: "#more" } });
-        expect((renderer.mock.calls[0]?.[0] as { body: Record<string, unknown> }).body).not.toHaveProperty("expectTarget");
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "click", clickMode: "all", expectTarget: "T-more", selector: "#more" } });
     });
 
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {

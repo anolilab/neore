@@ -324,7 +324,9 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                         return { error: CLICK_NEEDS_APPROVAL, success: false };
                     }
 
-                    step = clickMode === "pointer" ? { ...step, clickMode } : { ...step, clickMode, expectTarget: look.target };
+                    // An ordinary click is checked against the look, then made for real ("all"); "pointer" and "all" both do that for an
+                    // ordinary target. Only "page" keeps the check and the press in the page.
+                    step = { ...step, clickMode: clickMode === "page" ? "page" : "all", expectTarget: look.target };
                 }
             }
 

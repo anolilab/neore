@@ -17,7 +17,7 @@ export interface TargetRead {
     labelTruncated: boolean;
     /** Why a click given `click` or `expect` did not run: the target changed, or the control is disabled or hidden. */
     /** `changed`: the target differs before any click. `moved`: the click ran, and a page handler moved its destination, so the browser was stopped. */
-    refused?: "changed" | "covered" | "disabled" | "hidden" | "moved";
+    refused?: "changed" | "covered" | "disabled" | "hidden" | "moved" | "pressed";
     shown: string;
     submitLike: boolean;
     target: string;
@@ -594,9 +594,10 @@ export function readTarget(
             control.dispatchEvent(new MouseEvent("mouseup", press));
 
             // The press's handlers ran after the check: the element is read again, and nothing is clicked if it reads differently
-            // (a label, a name or a child's text changed in them).
+            // (a label, a name or a child's text changed in them). That refusal is `pressed`, not `changed`: the press already ran
+            // its handlers, so the caller must not retry it as a changed target.
             if (readNow().target !== first.target) {
-                refused = "changed";
+                refused = "pressed";
             } else if (isCoveredIn(control)) {
                 refused = "covered";
             } else {
