@@ -101,6 +101,23 @@ describe("SSRF: validateDomain", () => {
         expect(validateDomain("https://a.tracker.example", settings)).not.toBeNull();
         expect(validateDomain("https://fine.example", settings)).toBeNull();
     });
+
+    it("blocks a loopback or metadata host spelled with trailing dots", () => {
+        expect(isSafeUrl("http://localhost../")).toBe(false);
+        expect(isSafeUrl("http://metadata.google.internal../")).toBe(false);
+        expect(isSafeUrl("http://127.0.0.1../")).toBe(false);
+        expect(validateDomain("https://./")).toBe("Invalid URL");
+    });
+
+    it("reads a host's fully-qualified spelling (a trailing dot) as the host itself, in the URL and in the list", () => {
+        const settings = { domainBlocklist: ["*.tracker.example", "bad.example"] };
+
+        expect(validateDomain("https://bad.example./x", settings)).not.toBeNull();
+        expect(validateDomain("https://BAD.example../x", settings)).not.toBeNull();
+        expect(validateDomain("https://a.tracker.example./", settings)).not.toBeNull();
+        expect(validateDomain("https://bad.example/", { domainBlocklist: ["bad.example."] })).not.toBeNull();
+        expect(validateDomain("https://fine.example./", { domainAllowlist: ["fine.example"] })).toBeNull();
+    });
 });
 
 describe("isSafeUrl (the shipped guard, not a copy)", () => {
