@@ -661,6 +661,16 @@ describe("readTarget in a page", () => {
         expect(urls.some((url) => url.includes("intent=confirm"))).toBe(true);
     });
 
+    it("a control whose rendered text is longer than the cap reads as truncated, so the gate asks", async () => {
+        await pageWith(page, `<button id="long">${"x".repeat(TARGET_READ_OPTIONS.max + 1)}</button>`);
+        const element = await page.$("#long");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.labelTruncated).toBe(true);
+        expect(read.shown.length).toBeLessThanOrEqual(TARGET_READ_OPTIONS.max);
+    });
+
     it("a regrouped name that keeps the joined text but makes a bare Subscribe changes the fingerprint", async () => {
         await pageWith(page, `<button id="plan" aria-label="Subscribe" title="Monthly plan">→</button>`);
         const element = await page.$("#plan");

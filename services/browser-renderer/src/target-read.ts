@@ -321,8 +321,12 @@ export function readTarget(
             }
 
             const label = joined.slice(0, options.max);
+
+            // The rendered text is capped like the name: a longer one is cut, and the read is marked truncated, so the gate asks.
             // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- the shown text on purpose: textContent keeps hidden descendants
-            const shown = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
+            const shownFull = control instanceof HTMLElement ? control.innerText : (control.textContent ?? "");
+            const shown = shownFull.slice(0, options.max);
+            const isShownCapped = shownFull.length > options.max;
 
             // The element's place: the tag and position of each ancestor, from the root down, crossing shadow roots like the walk above.
             const steps: string[] = [];
@@ -515,7 +519,7 @@ export function readTarget(
                 String(isSubmitLike),
                 String(isSubscribeLike),
                 activatedKey,
-                String(isScanCapped || isReferenceCapped || joined.length > options.max),
+                String(isScanCapped || isReferenceCapped || isShownCapped || joined.length > options.max),
             ].join("\u{0}");
 
             // SHA-256 of the canonical string, computed here, in the page, with no `await`: a digest the page could only await would
@@ -585,7 +589,7 @@ export function readTarget(
                 destinations,
                 destinationsOf,
                 label,
-                labelTruncated: joined.length > options.max || isScanCapped || isReferenceCapped,
+                labelTruncated: joined.length > options.max || isScanCapped || isReferenceCapped || isShownCapped,
                 shown,
                 submitLike: isSubmitLike,
                 subscribeLike: isSubscribeLike,
