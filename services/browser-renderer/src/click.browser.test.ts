@@ -515,6 +515,21 @@ describe("readTarget in a page", () => {
         expect(page.url()).not.toContain("/elsewhere");
     });
 
+    it("a click on a span inside an approved button submits through the button, and a handler that moves its destination and stops propagation does not redirect it", async () => {
+        await pageWith(
+            page,
+            `<form id="order" action="/cart/confirm"><button id="pay" type="submit" formaction="/cart/pay"><span id="inner">Pay now</span></button></form><script>document.getElementById("pay").addEventListener("click", (event) => { event.stopPropagation(); document.getElementById("pay").setAttribute("formaction", "/elsewhere"); });</script>`,
+        );
+        const inner = await page.$("#inner");
+        const seen = await inner!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await inner!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBeUndefined();
+        await page.waitForURL("**/cart/pay**", { timeout: 3000 });
+        expect(page.url()).not.toContain("/elsewhere");
+    });
+
     it("a regrouped name that keeps the joined text but makes a bare Subscribe changes the fingerprint", async () => {
         await pageWith(page, `<button id="plan" aria-label="Subscribe" title="Monthly plan">→</button>`);
         const element = await page.$("#plan");

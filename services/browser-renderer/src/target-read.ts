@@ -609,8 +609,10 @@ export function readTarget(
             // moved one is not submitted there. A handler that cancelled the submission keeps it cancelled. Known limit: a page that
             // stops the submit event's propagation before it reaches the window, or adds a window listener during the click after
             // this one, is submitted to whatever destination it set.
-            // A label's click activates its own control, so a label submits through the control it labels (`HTMLLabelElement.control`).
-            const activated: Element | null = control instanceof HTMLLabelElement ? control.control : control;
+            // The browser activates the nearest activatable element: a click on a child of a button (a span in it) submits through that
+            // button, and a label's click activates the control it labels (`HTMLLabelElement.control`).
+            const activatable = control.closest("button, input, label, a");
+            const activated: Element | null = activatable instanceof HTMLLabelElement ? activatable.control : activatable;
             const submitter = activated instanceof HTMLButtonElement || activated instanceof HTMLInputElement ? activated : null;
             const isSubmitter =
                 submitter !== null && (submitter instanceof HTMLButtonElement ? submitter.type === "submit" : ["image", "submit"].includes(submitter.type));
