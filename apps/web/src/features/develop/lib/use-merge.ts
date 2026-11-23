@@ -15,12 +15,12 @@ export interface MergeRevision {
 }
 
 /**
- * The methods, auto-merge setting and mergeability the host reports; read once the merge panel is on screen. With a
- * `revision`, the answer is cached for that base and head only: a retargeted or pushed pull request reads it again
- * instead of getting the answer for its earlier revision. Without one (the merge panel), it is cached per pull request.
- * Either way the merge actions' refresh reaches it (the key starts with the pull request's).
+ * The methods, auto-merge setting and mergeability the host reports; read once the merge panel or Catch up is on screen.
+ * The answer is cached for the `revision` (base and head) it was asked for, so both share one read, and a retargeted or
+ * pushed pull request reads it again instead of getting the answer for its earlier revision. The merge actions' refresh
+ * reaches every revision (the key starts with the pull request's).
  */
-export const useMergeStatus = (address: PullRequestAddress | undefined, enabled: boolean, revision?: MergeRevision) => {
+export const useMergeStatus = (address: PullRequestAddress | undefined, enabled: boolean, revision: MergeRevision | undefined) => {
     const client = useLunora();
     const userId = useDevelopUser();
     const options = createLunoraActionQueryOptions(client, api.source_control.merge_functions.getMergeStatus, address as PullRequestAddress);
@@ -28,8 +28,8 @@ export const useMergeStatus = (address: PullRequestAddress | undefined, enabled:
     return useQuery({
         ...READ,
         ...options,
-        enabled: enabled && address !== undefined && userId !== undefined,
-        queryKey: revision === undefined ? [DEVELOP_QUERY_ROOT, userId, "merge", address] : [DEVELOP_QUERY_ROOT, userId, "merge", address, revision],
+        enabled: enabled && address !== undefined && revision !== undefined && userId !== undefined,
+        queryKey: [DEVELOP_QUERY_ROOT, userId, "merge", address, revision],
         staleTime: MINUTE_MS,
     });
 };

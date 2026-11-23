@@ -122,7 +122,14 @@ const PullRequestView = ({
                 requestNoun={requestNoun}
             />
             {detail.state === "open" && !detail.draft && (
-                <MergePanel address={address} capabilities={host.capabilities} headSha={detail.headSha} hostLabel={host.label} requestNoun={requestNoun} />
+                <MergePanel
+                    address={address}
+                    baseBranch={detail.baseBranch}
+                    capabilities={host.capabilities}
+                    headSha={detail.headSha}
+                    hostLabel={host.label}
+                    requestNoun={requestNoun}
+                />
             )}
             <PullRequestActionsPanel
                 host={{ capabilities: host.capabilities, label: host.label, maxReviewers: host.limits.reviewers, noun: requestNoun }}

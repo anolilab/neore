@@ -61,6 +61,7 @@ import { kickOffMediaGeneration } from "./media-kickoff";
 import type { SendMessageOptions, SendOutcome } from "./send-message";
 import { holdSendForSignIn, runSendMessage } from "./send-message";
 import { registerThreadErrorSink, takeUndeliveredThreadError } from "./thread-error-sinks";
+import { threadLoadOf } from "./thread-load";
 
 // The context objects, hooks and value types live in sibling files; importers keep this path.
 export {
@@ -324,7 +325,11 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         previousThreadIdRef.current = threadId;
     }, [threadId, initialThread, modelStore, splitPane]);
 
-    const { data: threadData } = useQuery({
+    const {
+        data: threadData,
+        isError: threadReadFailed,
+        isPending: threadReadPending,
+    } = useQuery({
         // `threadId` is the `/chat/$threadId` route param handed to `ChatProvider`, so
         // it is a plain string that always names an existing thread.
         ...crpc.chat.functions.getThread.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken),
@@ -352,6 +357,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // The live row wins once there is one: it is seeded from `initialThread`, so it equals it until a switch or an
     // edit moves the thread, and the loader's snapshot would otherwise keep showing the creation model after one.
     const thread: ThreadData | null = (threadData as ThreadData | null) ?? (initialThread && initialThread._id === threadId ? initialThread : null) ?? null;
+    // `thread` is null both while it loads and once its read failed: what waits on the thread tells them apart by this.
+    const threadLoad = threadLoadOf(threadId, thread !== null, { isError: threadReadFailed, isPending: threadReadPending });
 
     // Backup sync: when Lunora query resolves with fresh data, update store
     // Only if user hasn't explicitly changed model/mode for this thread
@@ -946,8 +953,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             model,
             thread,
             threadId,
+            threadLoad,
         };
-    }, [threadId, thread, isNewThread, model]);
+    }, [threadId, thread, threadLoad, isNewThread, model]);
 
     const messagesContextValue = useMemo((): ChatMessagesContextValue => {
         return {

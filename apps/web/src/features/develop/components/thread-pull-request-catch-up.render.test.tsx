@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useMergeStatus } from "../lib/use-merge";
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
 const { composer, hostMerge, prefill, pull, reads } = vi.hoisted(() => {
@@ -248,6 +249,30 @@ describe("ThreadPullRequestCatchUp", () => {
         expect(hostMerge).toHaveBeenCalledTimes(2);
         expect(screen.queryByText("Behind release")).toBeNull();
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it("shares the merge panel's cached read of the same revision", async () => {
+        given("open", "behind");
+
+        // What the merge panel asks: the pull request's base and head commit.
+        const MergePanelRead = () => {
+            useMergeStatus({ number: 7, repository: "octo/hello" }, true, { baseBranch: "main", headSha: "abc123" });
+
+            return null;
+        };
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MergePanelRead />
+            </QueryClientProvider>,
+        );
+        await waitFor(() => {
+            expect(hostMerge).toHaveBeenCalledTimes(1);
+        });
+        await renderCatchUp();
+
+        expect(screen.getByRole("button", BUTTON)).toBeTruthy();
+        expect(hostMerge).toHaveBeenCalledTimes(1);
     });
 
     it("shows nothing for a branch name that could shape the prompt", async () => {

@@ -13,6 +13,7 @@
 import { useEffect, useEffectEvent } from "react";
 import { create } from "zustand";
 
+import type { ThreadLoad } from "@/features/chat/core/context/thread-load";
 import { useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
 interface PrefillState {
@@ -34,6 +35,14 @@ export const prefillComposer = (threadId: string, text: string): void => {
         return queued.includes(text) ? state : { pending: { ...state.pending, [threadId]: [...queued, text] } };
     });
 };
+
+/**
+ * The thread whose prompts a composer takes: none for the compact bar or a new chat, nor while its thread's read has failed.
+ * Its stored draft cannot be bound then (`useStoredDrafts` waits for the thread), so a prompt it took could not go in; with
+ * the composer unregistered, Catch up hides, and a prompt queued before goes in once the read recovers.
+ */
+export const prefillThreadOf = (threadId: string | undefined, compact: boolean, threadLoad: ThreadLoad | undefined): string | undefined =>
+    !compact && threadId && threadLoad !== "failed" ? threadId : undefined;
 
 /** Whether `threadId` has a composer on the page that takes prompts. */
 export const useComposerTakesPrefill = (threadId: string | undefined): boolean =>

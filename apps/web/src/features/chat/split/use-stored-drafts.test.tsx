@@ -6,7 +6,7 @@ import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted, useBoundDraftStore } from "./composer-drafts";
 import { leaveSplitView } from "./pane-state";
 import { draftKey, flushStoredDrafts, resetStoredDraftsForTests } from "./stored-drafts";
-import useStoredDrafts, { keepsStoredDraft } from "./use-stored-drafts";
+import useStoredDrafts, { keepsStoredDraft, storedDraftKnown } from "./use-stored-drafts";
 
 const storeDrafts = (texts: Record<string, string>): void => {
     for (const [owner, t] of Object.entries(texts)) {
@@ -201,5 +201,26 @@ describe("keepsStoredDraft", () => {
         expect(keepsStoredDraft(true, false, undefined, false)).toBe(false);
         expect(keepsStoredDraft(false, false, {}, false)).toBe(false);
         expect(keepsStoredDraft(true, false, {}, true)).toBe(false);
+    });
+});
+
+describe(storedDraftKnown, () => {
+    const chat = { isNewThread: false, isSessionPending: false, isWorkerLoading: false, threadId: "t1", threadLoad: "ready" } as const;
+
+    it("knows at once for a new chat once the session is known", () => {
+        expect(storedDraftKnown({ ...chat, isNewThread: true, isWorkerLoading: true, threadLoad: "loading" })).toBe(true);
+        expect(storedDraftKnown({ ...chat, threadId: undefined, threadLoad: "loading" })).toBe(true);
+    });
+
+    it("waits while the session loads, the chat's read loads or has failed, and for its worker", () => {
+        expect(storedDraftKnown({ ...chat, isSessionPending: true })).toBe(false);
+        expect(storedDraftKnown({ ...chat, isNewThread: true, isSessionPending: true })).toBe(false);
+        expect(storedDraftKnown({ ...chat, threadLoad: "loading" })).toBe(false);
+        expect(storedDraftKnown({ ...chat, threadLoad: "failed" })).toBe(false);
+        expect(storedDraftKnown({ ...chat, isWorkerLoading: true })).toBe(false);
+    });
+
+    it("knows once the session and the chat's read answered and its worker is known", () => {
+        expect(storedDraftKnown(chat)).toBe(true);
     });
 });

@@ -9,6 +9,7 @@ import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
 import type { SendMessageOptions, SendOutcome } from "./send-message";
+import type { ThreadLoad } from "./thread-load";
 
 /**
  * Thread capabilities - what actions are available
@@ -67,6 +68,8 @@ export interface ChatThreadContextValue {
     model: string;
     thread: ThreadData | null | undefined;
     threadId: string | undefined;
+    /** Where the thread's read stands (`threadLoadOf`); absent where there is no such read (a stand-in provider): ready. */
+    threadLoad?: ThreadLoad;
 }
 
 export type ChatThreadIdentity = Pick<ChatThreadContextValue, "isNewThread" | "model" | "threadId">;

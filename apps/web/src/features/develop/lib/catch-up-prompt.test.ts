@@ -29,9 +29,7 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("or `git rev-parse HEAD` then differs from `git rev-parse refs/remotes/origin/feat/x`");
         expect(prompt).toContain("intent of both sides");
         expect(prompt).toContain("build and the tests");
-        expect(pushes(prompt)).toEqual([
-            "git push --no-follow-tags --force-with-lease=refs/heads/feat/x:refs/remotes/origin/feat/x origin HEAD:refs/heads/feat/x",
-        ]);
+        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/feat/x:refs/neore/pull/42 origin HEAD:refs/heads/feat/x"]);
         expect(prompt).toContain("Do not push to any other branch or remote.");
         // A delegated cloud coding-agent run never pushes: the steps say to run them where git has the person's own access.
         expect(prompt).toContain("Do not hand them to a cloud coding agent run: it cannot push");
@@ -62,9 +60,7 @@ describe(catchUpPrompt, () => {
 
         expect(prompt).toContain("`git fetch origin +refs/heads/pr-42:refs/remotes/origin/pr-42`");
         expect(prompt).toContain("`git fetch origin +refs/pull/42/head:refs/neore/pull/42`");
-        expect(pushes(prompt)).toEqual([
-            "git push --no-follow-tags --force-with-lease=refs/heads/pr-42:refs/remotes/origin/pr-42 origin HEAD:refs/heads/pr-42",
-        ]);
+        expect(pushes(prompt)).toEqual(["git push --no-follow-tags --force-with-lease=refs/heads/pr-42:refs/neore/pull/42 origin HEAD:refs/heads/pr-42"]);
     });
 });
 

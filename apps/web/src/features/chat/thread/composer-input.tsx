@@ -81,7 +81,7 @@ import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import { takesPaste } from "./composer-paste/paste-target";
-import { useComposerPrefill } from "./composer-prefill";
+import { prefillThreadOf, useComposerPrefill } from "./composer-prefill";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
@@ -504,7 +504,7 @@ const ComposerInput = ({
     const lunora = useChatLunora();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
-    const { isNewThread, threadId } = useChatThread();
+    const { isNewThread, threadId, threadLoad } = useChatThread();
     const { compact: compactThread } = useCompactThread(threadId);
     const { clear: clearThreadContext } = useClearContext(threadId);
     // The chat this composer shows now, and whether it is still mounted: a `/clear` that finishes after the person moved to
@@ -1707,7 +1707,7 @@ const ComposerInput = ({
     // (`awaitStoredDraft`): the comparison parent binds one too (`thread.tsx`). The person did not type the prompt, and it quotes host text: the draft is
     // marked as a clicked suggestion, unless it already has a mark.
     useComposerPrefill(
-        !compact && threadId ? threadId : undefined,
+        prefillThreadOf(threadId, compact, threadLoad),
         (prefill) => {
             if (threadId) {
                 restoreLiveComposerFor(threadId);

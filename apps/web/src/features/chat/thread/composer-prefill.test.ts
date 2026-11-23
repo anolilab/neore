@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setDraftBound, useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
-import { prefillComposer, resetComposerPrefillForTests, useComposerPrefill, useComposerTakesPrefill } from "./composer-prefill";
+import { prefillComposer, prefillThreadOf, resetComposerPrefillForTests, useComposerPrefill, useComposerTakesPrefill } from "./composer-prefill";
 
 beforeEach(() => {
     resetComposerPrefillForTests();
@@ -95,5 +95,19 @@ describe(useComposerPrefill, () => {
         rerender();
 
         expect(result.current).toBe(false);
+    });
+});
+
+describe(prefillThreadOf, () => {
+    it("takes prompts for a thread whose read is loading or ready", () => {
+        expect(prefillThreadOf("thread-a", false, "loading")).toBe("thread-a");
+        expect(prefillThreadOf("thread-a", false, "ready")).toBe("thread-a");
+        expect(prefillThreadOf("thread-a", false, undefined)).toBe("thread-a");
+    });
+
+    it("takes none while the thread's read has failed, nor for the compact bar or a new chat", () => {
+        expect(prefillThreadOf("thread-a", false, "failed")).toBeUndefined();
+        expect(prefillThreadOf("thread-a", true, "ready")).toBeUndefined();
+        expect(prefillThreadOf(undefined, false, "ready")).toBeUndefined();
     });
 });
