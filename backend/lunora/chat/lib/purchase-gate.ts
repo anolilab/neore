@@ -82,12 +82,17 @@ export const browserActionNeedsPurchaseApproval = async (
     }
 };
 
-/** Words a checkout's own submit button carries when it has no purchase word of its own (English and German). */
-// The whole label must be the word (the labels are trimmed before this): "Continue shopping" is navigation, not the payment.
 /** A bare "Subscribe" or "Abonnieren": a paid signup or a newsletter, so it asks on any page (not only a checkout). */
 const SUBSCRIBE_WORD = /^(?:subscribe|abonnieren)[.!]?$/iu;
 
-const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [/^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu];
+/**
+ * Words a checkout's own submit button carries when it has no purchase word of its own (English and German). The whole label
+ * must be the word (the labels are trimmed before this): "Continue shopping" is navigation, not the payment. The renderer's
+ * `TARGET_READ_OPTIONS.submit` holds the same words; a test checks the two lists agree.
+ */
+export const CHECKOUT_SUBMIT_WORDS: ReadonlyArray<RegExp> = [
+    /^(?:confirm|submit|continue|complete|place|subscribe|weiter|bestätigen|absenden|abonnieren)[.!]?$/iu,
+];
 
 /** Whether one read of a click's target asks the person first. A read that was cut short asks; a read that errored is handled by the caller. */
 export const purchaseTargetNeedsApproval = (target: ClickTargetLook): boolean => {

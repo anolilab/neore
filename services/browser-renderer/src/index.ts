@@ -70,11 +70,11 @@ const COVERED_TARGET = "Another element covers the target (a dialog or an overla
 /** The target is not drawn (hidden), so an approved click is not dispatched to it. */
 const NOT_VISIBLE_TARGET = "The target is not visible, so nothing was clicked. Look at the page again before you click.";
 
-/** The click found another element, or this one with other text: the person's yes was for what they were shown. */
 /** A click ran, and a page handler moved its destination during it: the browser stopped the submission. Its handlers did run. */
 const DESTINATION_MOVED =
     "The page moved this click's destination while the click ran, so the browser stopped the submission. Its handlers did run; look at the page before you act.";
 
+/** The click found another element, or this one with other text: the person's yes was for what they were shown. */
 const TARGET_CHANGED = "The target changed since it was checked, so nothing was clicked. Look at the page again before you click.";
 
 const HEX_GROUP_RE = /^[0-9a-f]{1,4}$/i;

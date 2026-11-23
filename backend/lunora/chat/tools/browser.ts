@@ -33,6 +33,9 @@ import toonEncodeOutput from "./toon-encode";
 const CLICK_NEEDS_APPROVAL =
     "This click reads as a purchase, or its target cannot be read, so it needs the person's approval. Look at the page again before you click.";
 
+/** The renderer sent no target for the look (an older renderer, or a read that did not find one): nothing to approve, so nothing ran. */
+const CLICK_UNCHECKED = "The browser could not check this click's target, so nothing was clicked. Look at the page again before you click.";
+
 export interface BrowserResult {
     /** The browser the page is on (`browser-node.ts`); for the ladder's ask only, never the model. */
     browserId?: string;
@@ -332,7 +335,11 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     }
 
                     // A look that reads no target clears nothing: a click without a fingerprint would run unchecked.
-                    if (look.target === undefined || purchaseTargetNeedsApproval(look as ClickTargetLook)) {
+                    if (look.target === undefined) {
+                        return { error: CLICK_UNCHECKED, success: false };
+                    }
+
+                    if (purchaseTargetNeedsApproval(look as ClickTargetLook)) {
                         return { error: CLICK_NEEDS_APPROVAL, success: false };
                     }
 

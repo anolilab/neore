@@ -306,6 +306,8 @@ export function readTarget(
             // The joined name is built within the cap: a name past it is cut, so a long text node costs no more than the cap, and the
             // read is marked truncated (the gate asks) rather than hashed whole.
             let joined = "";
+            // A name cut at the cap: the read is marked truncated, even when the cut lands exactly on the cap.
+            let isNameCut = false;
 
             const distinct = new Set(names.filter(Boolean));
 
@@ -314,6 +316,7 @@ export function readTarget(
 
                 if (joined.length + piece.length > options.max) {
                     joined += piece.slice(0, options.max + 1 - joined.length);
+                    isNameCut = true;
                     break;
                 }
 
@@ -388,7 +391,14 @@ export function readTarget(
                         const kind =
                             submitter === null
                                 ? ""
-                                : [submitter.type, submitter.name, submitter.formMethod, submitter.formEnctype, submitter.formTarget]
+                                : [
+                                      submitter.type,
+                                      submitter.name,
+                                      submitter.formMethod,
+                                      submitter.formEnctype,
+                                      submitter.formTarget,
+                                      String(submitter.formNoValidate),
+                                  ]
                                       .map((part) => JSON.stringify(part))
                                       .join("\u{3}");
 
@@ -396,7 +406,10 @@ export function readTarget(
                     }
 
                     // The form's method is part of what a submit does (a GET form puts its fields in the address).
-                    destinations += ownerNow === null ? "" : `|${Element.prototype.getAttribute.call(ownerNow, "method") ?? ""}`;
+                    destinations +=
+                        ownerNow === null
+                            ? ""
+                            : `|${Element.prototype.getAttribute.call(ownerNow, "method") ?? ""}|${Element.prototype.hasAttribute.call(ownerNow, "novalidate")}`;
 
                     // The form's destination: the browser's own resolved `action`, read through the native getter. A `<base>` change moves it.
                     return destinations + (ownerNow === null || formActionGetter === undefined ? "" : String(formActionGetter.call(ownerNow)));
@@ -425,8 +438,12 @@ export function readTarget(
             // A frame or a cross-origin action only counts inside a form, since those are what a hosted card form is.
             const cardSelector =
                 "input[autocomplete^='cc-'], input[name*='card' i], input[name*='cc-' i], input[name*='cvc' i], input[name*='cvv' i], input[name*='iban' i], input[name*='bic' i], input[name*='routing' i], input[name*='bank' i], input[name*='account_number' i], input[name*='accountnumber' i]";
+            // A control with no form is searched only for the browser's own payment tokens (`autocomplete="cc-…"`): the loose name
+            // patterns would match an unrelated field anywhere on the page (a gift-card code) and make every formless button ask.
             const hasCardFields =
-                (enclosingForm === null ? document.querySelector(cardSelector) : Element.prototype.querySelector.call(enclosingForm, cardSelector)) !== null;
+                (enclosingForm === null
+                    ? document.querySelector("input[autocomplete^='cc-']")
+                    : Element.prototype.querySelector.call(enclosingForm, cardSelector)) !== null;
             const frameSources =
                 enclosingForm === null
                     ? []
@@ -537,7 +554,7 @@ export function readTarget(
                 String(isSubscribeLike),
                 submitValues,
                 activatedKey,
-                String(isScanCapped || isReferenceCapped || isShownCapped || joined.length > options.max),
+                String(isScanCapped || isReferenceCapped || isShownCapped || isNameCut),
             ].join("\u{0}");
 
             // SHA-256 of the canonical string, computed here, in the page, with no `await`: a digest the page could only await would
@@ -607,7 +624,7 @@ export function readTarget(
                 destinations,
                 destinationsOf,
                 label,
-                labelTruncated: joined.length > options.max || isScanCapped || isReferenceCapped || isShownCapped,
+                labelTruncated: isNameCut || isScanCapped || isReferenceCapped || isShownCapped,
                 shown,
                 submitLike: isSubmitLike,
                 subscribeLike: isSubscribeLike,
@@ -678,6 +695,8 @@ export function readTarget(
             refused = "disabled";
         } else if (
             control.getClientRects().length === 0 ||
+            control.getBoundingClientRect().width === 0 ||
+            control.getBoundingClientRect().height === 0 ||
             getComputedStyle(control).visibility === "hidden" ||
             control.checkVisibility?.({ opacityProperty: options.strict === true, visibilityProperty: true }) === false
         ) {
@@ -772,11 +791,6 @@ export function readTarget(
 
             control.dispatchEvent(new PointerEvent("pointerdown", press));
             control.dispatchEvent(new MouseEvent("mousedown", press));
-
-            if (control instanceof HTMLElement) {
-                control.focus();
-            }
-
             control.dispatchEvent(new PointerEvent("pointerup", press));
             control.dispatchEvent(new MouseEvent("mouseup", press));
 
@@ -790,6 +804,8 @@ export function readTarget(
                 refused = "disabled";
             } else if (
                 control.getClientRects().length === 0 ||
+                control.getBoundingClientRect().width === 0 ||
+                control.getBoundingClientRect().height === 0 ||
                 getComputedStyle(control).visibility === "hidden" ||
                 control.checkVisibility?.({ opacityProperty: options.strict === true, visibilityProperty: true }) === false
             ) {
@@ -797,6 +813,12 @@ export function readTarget(
             } else if (isCoveredIn(control)) {
                 refused = "covered";
             } else {
+                // Focus moves just before the click, after the post-press check: a focus style that changes the control's text or
+                // pseudo-element content must not read as a changed target. (The focus event runs before the click, as in a person's click.)
+                if (control instanceof HTMLElement) {
+                    control.focus();
+                }
+
                 control.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
                 isClicked = true;
 

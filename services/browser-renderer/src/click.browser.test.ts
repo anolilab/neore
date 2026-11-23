@@ -692,6 +692,40 @@ describe("readTarget in a page", () => {
         expect(page.url()).toContain("intent=confirm");
     });
 
+    it("a zero-size purchase button is refused as hidden, and nothing is clicked", async () => {
+        await pageWith(
+            page,
+            `<button id="zero" style="width: 0; height: 0; padding: 0; border: 0; overflow: hidden" onclick="window.clicked = true">Pay now</button>`,
+        );
+        const element = await page.$("#zero");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("hidden");
+        expect(await wasClicked(page)).toBe(false);
+    });
+
+    it("a name cut at the cap is marked truncated even when the cut lands exactly on it", async () => {
+        const long = "x".repeat(TARGET_READ_OPTIONS.max);
+
+        await pageWith(page, `<button id="cut" aria-label="${long}" title="Pay now">→</button>`);
+        const element = await page.$("#cut");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.labelTruncated).toBe(true);
+    });
+
+    it("an unrelated gift-card field elsewhere on a formless page does not make its Continue button a checkout", async () => {
+        await pageWith(page, `<input name="gift_card" placeholder="Gift card code"><button id="go">Continue</button>`, "/offers");
+        const element = await page.$("#go");
+
+        const read = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        expect(read.checkout).toBe(false);
+    });
+
     it("a control whose rendered text is longer than the cap reads as truncated, so the gate asks", async () => {
         await pageWith(page, `<button id="long">${"x".repeat(TARGET_READ_OPTIONS.max + 1)}</button>`);
         const element = await page.$("#long");

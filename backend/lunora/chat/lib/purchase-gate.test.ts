@@ -1,7 +1,28 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { approvalMessagesFor } from "../../agent/client/tool-approval";
-import { approvedToolCallIds, browserActionNeedsPurchaseApproval, isPurchaseText, purchaseTargetNeedsApproval } from "./purchase-gate";
+import { approvedToolCallIds, browserActionNeedsPurchaseApproval, CHECKOUT_SUBMIT_WORDS, isPurchaseText, purchaseTargetNeedsApproval } from "./purchase-gate";
+
+/** The renderer's `submit` pattern, and the gate's, each written as its word group. */
+const RENDERER_SUBMIT_WORDS = /submit: \/\^\(\?:([^)]*)\)/u;
+const GATE_SUBMIT_WORDS = /\^\(\?:([^)]*)\)/u;
+
+describe("the checkout submit words", () => {
+    it("are the same list as the renderer's (a word added to one only would make the two checks disagree)", () => {
+        const rendererPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../services/browser-renderer/src/target-read.ts");
+        const renderer = readFileSync(rendererPath, "utf8");
+        const rendererWords = renderer.match(RENDERER_SUBMIT_WORDS)?.[1]?.split("|") ?? [];
+        const gateWords = CHECKOUT_SUBMIT_WORDS[0]?.source.match(GATE_SUBMIT_WORDS)?.[1]?.split("|") ?? [];
+        const byName = (a: string, b: string): number => a.localeCompare(b);
+
+        expect(rendererWords.length).toBeGreaterThan(5);
+        expect(gateWords.toSorted(byName)).toEqual(rendererWords.toSorted(byName));
+    });
+});
 
 describe("a bare subscribe control", () => {
     it("asks on any page, a checkout or not (a paid signup must not run unapproved)", () => {

@@ -373,6 +373,13 @@ export const executeBrowserAction = internalAction
                 }
 
                 const result = data as BrowserActionResponse;
+
+                // The renderer refused the click before it pressed anything (the target changed since the check): nothing ran, so the
+                // charge is given back, and the retry is charged once. A press that ran (`pressed`, `moved`) keeps its charge.
+                if (result.targetChanged === true && refundCharge !== undefined) {
+                    await refundCharge().catch(() => undefined);
+                }
+
                 const durationMs = Date.now() - startTime;
 
                 // The decision look of a tool call: a look that reads as a purchase (or cannot be read) keeps its target, so the click
