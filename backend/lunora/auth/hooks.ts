@@ -27,6 +27,7 @@ import { internalMutation } from "../_generated/server";
 import { guestHasFollowRows } from "../chat/follows/follow-writes";
 import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
 import { ADMIN } from "../env";
+import { firstTableWithGuestRows, mergeGenerationCurrent } from "../lib/account-merge";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoutesOf } from "../lib/shard-routes";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
@@ -166,12 +167,26 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
  * run on the guest's shard. Only ever an anonymous user: a missing or real one is left alone, so a second run (queue
  * redelivery) or a wrong id does nothing. A guest still named by a thread follow (one written after the merge read its
  * last page) is kept and `followsRemain` is set, and one still named by a shared pin route (a pin made after the merge's
- * pin step) is kept with `pinsRemain`, so the merge moves the row first and tries again.
+ * pin step) is kept with `pinsRemain`, and one whose shard still holds a row (written to a table after the merge cleared
+ * it) with `rowsRemain` naming the first such table, so the merge moves the row first and tries again. A merge run whose
+ * lease generation is no longer the newest this shard has seen deletes nothing (`fenced`).
  */
 export const deleteMergedGuest = internalMutation
-    .input({ userId: v.string() })
-    .output(v.object({ deleted: v.boolean(), followsRemain: v.optional(v.boolean()), pinsRemain: v.optional(v.boolean()) }))
+    .input({ generation: v.number(), userId: v.string() })
+    .output(
+        v.object({
+            deleted: v.boolean(),
+            fenced: v.optional(v.boolean()),
+            followsRemain: v.optional(v.boolean()),
+            pinsRemain: v.optional(v.boolean()),
+            rowsRemain: v.optional(v.string()),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
+        if (!(await mergeGenerationCurrent(ctx.db, args.userId, args.generation, ctx.now))) {
+            return { deleted: false, fenced: true };
+        }
+
         const user = (await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } })) as {
             _id: Id<"user">;
             isAnonymous?: boolean | null;
@@ -188,6 +203,12 @@ export const deleteMergedGuest = internalMutation
         // A pin the guest made on another owner's thread after the merge's pin step: its route still names the guest.
         if (await guestHasPinRoutes(ctx.db, user._id)) {
             return { deleted: false, pinsRemain: true };
+        }
+
+        const rowsRemain = await firstTableWithGuestRows(ctx, user._id);
+
+        if (rowsRemain !== null) {
+            return { deleted: false, rowsRemain };
         }
 
         await cascadeDelete(ctx, user._id);

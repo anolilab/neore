@@ -11,6 +11,7 @@ import { FOLLOW_MERGE_PAGE_SIZE } from "../chat/follows/follow-writes";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeProgress, MergeReferences, ShardCall } from "./account-merge";
 import {
+    acquireMergeLease,
     canonicalValue,
     deleteShardRows,
     dropImportMarkersPage,
@@ -19,14 +20,19 @@ import {
     listShardRowsToClear,
     MERGE_CALLS_PER_RUN,
     MERGE_FENCE_SCOPE,
+    MERGE_LEASE_CALLS,
+    MERGE_LEASE_SCOPE,
     MERGE_PAGE_SIZE,
+    noteMergeGeneration,
 } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
+    firstTableWithGuestRows,
     mergeGuestInto,
     reassignGlobalRows,
     reassignThreadFollowsPage,
+    releaseMergeLease,
     rewriteOwner,
     runGuestMerge,
     shardLocalTables,
@@ -66,6 +72,7 @@ const ref = (name: string) => {
 };
 
 const REFERENCES: MergeReferences = {
+    acquireLease: ref("acquireMergeLease"),
     deleteGuest: { __lunoraRef: "auth_hooks:deleteMergedGuest" },
     deleteRows: ref("deleteShardRows"),
     dropMarkers: ref("dropImportMarkersPage"),
@@ -74,9 +81,11 @@ const REFERENCES: MergeReferences = {
     listClear: ref("listShardRowsToClear"),
     movePinRoute: ref("moveSharedPinRouteOf"),
     nextPinRoute: ref("nextSharedPinRoute"),
+    noteGeneration: ref("noteMergeGeneration"),
     reassignFollows: ref("reassignThreadFollowsPage"),
     reassignGlobal: ref("reassignGlobalRows"),
     reassignPins: { __lunoraRef: "chat_pins_functions:reassignUserPinsOnThread" },
+    releaseLease: ref("releaseMergeLease"),
 };
 
 /** A guest's pin on a thread another user owns, and its `.global()` route, as the fake shards keep them. */
@@ -99,7 +108,11 @@ const mergeToEnd = async (
     let resume: MergeProgress | undefined;
 
     for (;;) {
-        const { moved, next } = await mergeGuestInto(call, REFERENCES, from, to, { ...options, ...(resume !== undefined && { resume }) });
+        const { busyUntil, moved, next } = await mergeGuestInto(call, REFERENCES, from, to, { ...options, ...(resume !== undefined && { resume }) });
+
+        if (busyUntil !== undefined) {
+            throw new Error("the merge's lease is held by another delivery");
+        }
 
         if (next === null) {
             return { moved, runs };
@@ -156,6 +169,9 @@ const fakeShards = (
         const table = args.table as string;
 
         switch (name) {
+            case "acquireMergeLease": {
+                return { generation: 1 } as never;
+            }
             case "deleteMergedGuest": {
                 onGuestDeletion?.(pinRows, routes);
 
@@ -183,10 +199,10 @@ const fakeShards = (
                     (shard.get(table) ?? []).filter((row) => !ids.has(row._id)),
                 );
 
-                return null as never;
+                return { fenced: false } as never;
             }
             case "dropImportMarkersPage": {
-                return { hasMore: false } as never;
+                return { fenced: false, hasMore: false } as never;
             }
             case "importShardRows": {
                 const target = tableOf(shardKey, table);
@@ -235,6 +251,9 @@ const fakeShards = (
 
                 return (route === undefined ? null : { ownerId: route.ownerId, threadId: route.threadId }) as never;
             }
+            case "noteMergeGeneration": {
+                return { current: true } as never;
+            }
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
 
@@ -257,6 +276,9 @@ const fakeShards = (
                 }
 
                 return { hasMore: pinRows.some((each) => each.threadId === args.threadId && each.userId === args.from) } as never;
+            }
+            case "releaseMergeLease": {
+                return null as never;
             }
             default: {
                 throw new Error(`unexpected ${String(name)}`);
@@ -469,7 +491,8 @@ describe("mergeGuestInto", () => {
             },
             "guest",
             "user",
-            { budget: 3 },
+            // The lease's three calls and one copy step.
+            { budget: 6 },
         );
 
         // Five pages of two, each read once: no run starts the table over.
@@ -500,7 +523,7 @@ describe("mergeGuestInto", () => {
                 REFERENCES,
                 "guest",
                 "user",
-                { budget: 10, ...(resume !== undefined && { resume }) },
+                { budget: 13, ...(resume !== undefined && { resume }) },
             );
 
             calls.push(made);
@@ -519,7 +542,7 @@ describe("mergeGuestInto", () => {
         }
 
         expect(clearStops).toBeGreaterThan(1);
-        expect(Math.max(...calls)).toBeLessThanOrEqual(10);
+        expect(Math.max(...calls)).toBeLessThanOrEqual(13);
         expect(shards.get("user")?.get("threads")).toHaveLength(30);
         expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
     });
@@ -567,6 +590,37 @@ describe("mergeGuestInto", () => {
         }
     });
 
+    it("queues itself again for when the lease lapses while another delivery holds it, and touches nothing meanwhile", async () => {
+        const { call, shards } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } });
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+        const made: string[] = [];
+
+        vi.useFakeTimers({ now: 1_000_000, toFake: ["Date"] });
+        transport.call = async (reference, args, shardKey) => {
+            made.push(reference.__lunoraRef);
+
+            return reference.__lunoraRef.endsWith(":acquireMergeLease")
+                ? ({ busyUntil: 1_000_000 + 90_000, generation: 4 } as never)
+                : await call(reference, args, shardKey);
+        };
+        transport.queued = [];
+
+        try {
+            const resume: MergeProgress = { cursor: null, moved: 0, phase: "clear", run: 3, table: "threads" };
+            const result = await harness.action(async (context: any) => await context.runAction(runGuestMerge, { from: "guest", resume, to: "user" }));
+
+            expect(result).toStrictEqual({ done: false, moved: 0 });
+            expect(made).toStrictEqual(["lib_account_merge:acquireMergeLease"]);
+            expect(transport.queued).toStrictEqual([
+                { args: { from: "guest", resume, to: "user" }, options: { delayMs: 90_000, shardKey: "user" }, ref: expect.objectContaining({}) },
+            ]);
+            expect(shards.get("guest")?.get("threads")).toHaveLength(1);
+        } finally {
+            vi.useRealTimers();
+            harness.close();
+        }
+    });
+
     it("moves a pin the guest makes on a shared thread during the merge before its route, and keeps the guest until none is left", async () => {
         let late = true;
         const { call, deletedGuests, pinRows, routeMoves, routes } = fakeShards({ guest: { threads: [{ _id: "t1", userId: "guest" }] } }, 2, {
@@ -587,7 +641,7 @@ describe("mergeGuestInto", () => {
         });
 
         // A small budget, so the pin step spans runs and every later run is a resumed one.
-        const { runs } = await mergeToEnd(call, "guest", "user", { budget: 4 });
+        const { runs } = await mergeToEnd(call, "guest", "user", { budget: 7 });
 
         expect(runs.length).toBeGreaterThan(1);
         expect(pinRows.every((pin) => pin.userId === "user")).toBe(true);
@@ -844,6 +898,18 @@ describe("deleteMergedGuest", () => {
     const userExists = async (harness: ReturnType<typeof harnessWithUsers>, id: string) =>
         await harness.run(async (context: any) => (await context.db.user.findFirst({ where: { _id: id } })) !== null);
 
+    /** The guest's deletion by a merge run holding `generation`, after the newest generation the shard saw is `seen`. */
+    const deleteGuest = async (
+        harness: ReturnType<typeof harnessWithUsers>,
+        userId: string,
+        { generation = 1, seen = generation }: { generation?: number; seen?: number } = {},
+    ) =>
+        await harness.run(async (context: any) => {
+            await context.runMutation(noteMergeGeneration, { from: userId, generation: seen });
+
+            return await context.runMutation(deleteMergedGuest, { generation, userId });
+        });
+
     it("deletes a guest and its sessions", async () => {
         const harness = harnessWithUsers();
 
@@ -855,7 +921,7 @@ describe("deleteMergedGuest", () => {
                     await context.db.insert("session", { createdAt: 0, expiresAt: Date.now() + 60_000, token: "t", updatedAt: 0, userId: guest }),
             );
 
-            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
+            const result = await deleteGuest(harness, guest);
 
             expect(result).toStrictEqual({ deleted: true });
             await expect(userExists(harness, guest)).resolves.toBe(false);
@@ -863,7 +929,7 @@ describe("deleteMergedGuest", () => {
 
             expect(sessions.page).toStrictEqual([]);
             // A second run (queue redelivery) finds nothing to do.
-            await expect(harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }))).resolves.toStrictEqual({
+            await expect(deleteGuest(harness, guest)).resolves.toStrictEqual({
                 deleted: false,
             });
         } finally {
@@ -883,7 +949,7 @@ describe("deleteMergedGuest", () => {
                 await context.db.insert("threadFollows", { createdAt: 1, state: "on", threadId, updatedAt: 1, userId: guest });
             });
 
-            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
+            const result = await deleteGuest(harness, guest);
 
             expect(result).toStrictEqual({ deleted: false, followsRemain: true });
             await expect(userExists(harness, guest)).resolves.toBe(true);
@@ -904,9 +970,39 @@ describe("deleteMergedGuest", () => {
                 await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: "owner", threadId, userId: guest });
             });
 
-            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: guest }));
+            const result = await deleteGuest(harness, guest);
 
             expect(result).toStrictEqual({ deleted: false, pinsRemain: true });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("keeps a guest whose shard got a row after the merge cleared its table, and names the table", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await harness.run(
+                async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "late", userId: guest }),
+            );
+
+            await expect(deleteGuest(harness, guest)).resolves.toStrictEqual({ deleted: false, rowsRemain: "threads" });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("deletes nothing for a merge run a later delivery has superseded", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            await expect(deleteGuest(harness, guest, { generation: 1, seen: 2 })).resolves.toStrictEqual({ deleted: false, fenced: true });
             await expect(userExists(harness, guest)).resolves.toBe(true);
         } finally {
             harness.close();
@@ -918,7 +1014,7 @@ describe("deleteMergedGuest", () => {
 
         try {
             const member = await insertUser(harness, false);
-            const result = await harness.run(async (context: any) => await context.runMutation(deleteMergedGuest, { userId: member }));
+            const result = await deleteGuest(harness, member);
 
             expect(result).toStrictEqual({ deleted: false });
             await expect(userExists(harness, member)).resolves.toBe(true);
@@ -942,7 +1038,9 @@ describe("importShardRows for userSettings", () => {
                     await context.db.insert("userSettings", seed);
                 }
 
-                await context.runMutation(importShardRows, { from: "guest", rows: guestRows, table: "userSettings", to: "user" });
+                const { generation } = await context.runMutation(acquireMergeLease, { from: "guest", to: "user" });
+
+                await context.runMutation(importShardRows, { from: "guest", generation, rows: guestRows, table: "userSettings", to: "user" });
 
                 const stored = await context.db.query("userSettings").take(MERGE_PAGE_SIZE + 50);
 
@@ -1051,11 +1149,14 @@ describe("clearing the guest's settings", () => {
  */
 describe("mergeGuestInto across two real shards", () => {
     const PROCEDURES: Record<string, { fn: unknown; kind: "mutation" | "query" }> = {
+        acquireMergeLease: { fn: acquireMergeLease, kind: "mutation" },
         deleteShardRows: { fn: deleteShardRows, kind: "mutation" },
         dropImportMarkersPage: { fn: dropImportMarkersPage, kind: "mutation" },
         importShardRows: { fn: importShardRows, kind: "mutation" },
         listShardRowsPage: { fn: listShardRowsPage, kind: "query" },
         listShardRowsToClear: { fn: listShardRowsToClear, kind: "query" },
+        noteMergeGeneration: { fn: noteMergeGeneration, kind: "mutation" },
+        releaseMergeLease: { fn: releaseMergeLease, kind: "mutation" },
     };
 
     const thread = (title: string, userId = "guest") => {
@@ -1068,6 +1169,8 @@ describe("mergeGuestInto across two real shards", () => {
         const shards = { guest: lunoraTest(schemaWithShardedTables([]) as never), user: lunoraTest(schemaWithShardedTables([]) as never) };
         let before: { hook: () => Promise<void>; name: string } | undefined;
         let failOnce: ((name: string, args: Record<string, unknown>) => boolean) | undefined;
+        /** Each guest deletion: the table that still held a row of the guest's, or `null` when it went. */
+        const guestDeletions: (string | null)[] = [];
 
         const call: ShardCall = async (reference, args, shardKey) => {
             const name = reference.__lunoraRef.split(":", 2)[1]!;
@@ -1086,8 +1189,15 @@ describe("mergeGuestInto across two real shards", () => {
             }
 
             switch (name) {
+                // The guest's user row is `.global()`, which this harness does not hold: the deletion's own shard check only.
                 case "deleteMergedGuest": {
-                    return { deleted: true } as never;
+                    const left = (await shards.guest.run(async (context: any) => await firstTableWithGuestRows(context, args.userId as string))) as
+                        | string
+                        | null;
+
+                    guestDeletions.push(left);
+
+                    return (left === null ? { deleted: true } : { deleted: false, rowsRemain: left }) as never;
                 }
                 case "nextSharedPinRoute": {
                     return null as never;
@@ -1125,6 +1235,19 @@ describe("mergeGuestInto across two real shards", () => {
             close: () => {
                 shards.guest.close();
                 shards.user.close();
+            },
+            guestDeletions,
+            /** The lease of a delivery that died or paused lapses, as `MERGE_LEASE_MS` after its last write would. */
+            lapseLease: async () => {
+                await shards.user.run(async (context: any) => {
+                    const lease = await context.db
+                        .query("idempotencyClaims")
+                        .withIndex("by_scope_key", (q: any) => q.eq("scope", MERGE_LEASE_SCOPE).eq("key", "guest"))
+                        .first();
+                    const { generation } = JSON.parse(lease.result) as { generation: number };
+
+                    await context.db.patch("idempotencyClaims", lease._id, { result: JSON.stringify({ generation, until: 0 }) });
+                });
             },
             /** Runs `hook` once, just before the first call of procedure `name`. */
             onceBefore: (name: string, hook: () => Promise<void>) => {
@@ -1215,6 +1338,7 @@ describe("mergeGuestInto across two real shards", () => {
             merge.onceFail((name, args) => name === "deleteShardRows" && args.table === "threads");
 
             await expect(mergeToEnd(merge.call, "guest", "user")).rejects.toThrow("cut off");
+            await merge.lapseLease();
 
             // Written before the redelivery, and an edit to a row already copied.
             const late = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("three")))) as string;
@@ -1263,6 +1387,7 @@ describe("mergeGuestInto across two real shards", () => {
             // The clear's re-import landed; the job dies before the guest's rows are deleted.
             merge.onceFail((name, args) => name === "deleteShardRows" && args.table === "documents");
             await expect(mergeToEnd(merge.call, "guest", "user")).rejects.toThrow("cut off");
+            await merge.lapseLease();
 
             await merge.shards.user.run(async (context: any) => await context.db.patch("documents", id, { title: "renamed by the account" }));
 
@@ -1339,6 +1464,8 @@ describe("mergeGuestInto across two real shards", () => {
             // The older delivery has read the threads page; before its import lands, a later delivery runs the whole merge
             // and drops the markers, and the account deletes the moved row.
             merge.onceBefore("importShardRows", async () => {
+                // It has paused past its lease, so the later delivery takes the merge over.
+                await merge.lapseLease();
                 await mergeToEnd(merge.call, "guest", "user");
                 await merge.shards.user.run(async (context: any) => await context.db.delete("threads", id));
                 finished = true;
@@ -1360,6 +1487,70 @@ describe("mergeGuestInto across two real shards", () => {
             );
 
             expect(fence).toMatchObject({ userId: "user" });
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("stops a delivery paused past its lease once a later one took the merge over, so its stale copy never replaces the later edit", async () => {
+        const merge = twoShards();
+
+        try {
+            const id = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("first title")))) as string;
+            let newer: MergeProgress | null = null;
+
+            // The first delivery has read the row and pauses past its lease. The guest edits the row, and a redelivery takes
+            // the lease over, imports the edit and deletes the guest's copy; its chain has more runs to go.
+            merge.onceBefore("importShardRows", async () => {
+                await merge.lapseLease();
+                await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
+                ({ next: newer } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", {
+                    budget: MERGE_LEASE_CALLS + 3,
+                    resume: { cursor: null, moved: 0, phase: "clear", run: 1, table: "threads" },
+                }));
+            });
+
+            // The first delivery resumes with the old title in hand: its import is refused and its chain ends.
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(newer).not.toBeNull();
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "edited during the merge", userId: "user" }]);
+
+            // The later delivery's chain carries the merge to its end.
+            let resume: MergeProgress | null = newer;
+
+            while (resume !== null) {
+                ({ next: resume } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", { resume }));
+            }
+
+            expect(await merge.threadsOn("user")).toStrictEqual([{ _id: id, title: "edited during the merge", userId: "user" }]);
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("moves a row written to an already cleared table before the guest's deletion, and deletes the guest only once its shard is empty", async () => {
+        const merge = twoShards();
+
+        try {
+            const copied = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("before")))) as string;
+            let late = "";
+
+            merge.onceBefore("deleteMergedGuest", async () => {
+                late = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("written after the clear")))) as string;
+            });
+
+            await mergeToEnd(merge.call, "guest", "user");
+
+            expect(await merge.threadsOn("user")).toStrictEqual(
+                [
+                    { _id: copied, title: "before", userId: "user" },
+                    { _id: late, title: "written after the clear", userId: "user" },
+                ].toSorted(byId),
+            );
+            expect(await merge.threadsOn("guest")).toStrictEqual([]);
+            expect(merge.guestDeletions).toStrictEqual(["threads", null]);
         } finally {
             merge.close();
         }
