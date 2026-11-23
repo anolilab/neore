@@ -779,6 +779,7 @@ export const schema = defineSchema({
                 userConnectors: r.many("userConnectors", { field: "connectorDefinitionId" }),
             };
         }),
+
     /**
      * The slot each periodic cron job last ran for (`lib/cron-schedule.ts`,
      * `crons.ts:cronTick`). One row per job name; claiming a slot is what makes
@@ -919,7 +920,6 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_userId", ["userId"]),
-
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
     // history, so it is a real table rather than a write-only log.
@@ -1796,6 +1796,7 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
         usage: v.optional(v.object({ completionTokens: v.number(), promptTokens: v.number(), totalTokens: v.number() })),
     }).index("by_execution_and_node", ["executionId", "nodeId"]),
+
     // The notification inbox (`notifications/`): one row per event for its
     // user, written only through `notify()`. `title` is the SUBJECT (a task's
     // title); the UI words what happened from `type` + `outcome`. Pruned after
@@ -1828,7 +1829,6 @@ export const schema = defineSchema({
         .index("by_state", ["state"])
         .index("by_expiresAt", ["expiresAt"])
         .index("by_userId", ["userId"]),
-
     organization: defineTable({
         allowedModels: v.optional(v.array(v.string())),
         baseTier: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise"))),
@@ -2225,6 +2225,15 @@ export const schema = defineSchema({
                 chunks: r.many("persistentChunks", { field: "streamId" }),
             };
         }),
+
+    // One row per account that writes pins: the latest time a pin write of the account may still be in flight. A move waits for it
+    // to pass before it sweeps the account's pins (`lib/account-moves.ts`).
+    pinWriteLeases: defineTable({
+        expiresAt: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_user", ["userId"]),
 
     playgroundApiKeys: defineTable({
         name: v.optional(v.string()),

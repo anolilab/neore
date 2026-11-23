@@ -455,6 +455,8 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     payment_subscriptions: "`@lunora/payment` store (Creem subscriptions); system only — the tier lands on `user` / `organization`",
     payment_usageEvents: "`@lunora/payment` usage metering; unused (Creem has none), system only",
     persistentChunks: "no owner column; read through HTTP actions keyed by a verified stream token",
+    pinWriteLeases:
+        "the in-flight pin-write lease of an account: renewed by pin writers before their move check, read by the move that waits for them; no client reads it",
     playgroundApiKeys: "internal only",
     presentationSlides: "no owner column; every access follows the parent presentation's owner check",
     projectKnowledge: "link rows with no owner column; every access follows the project's owner check",

@@ -38,6 +38,9 @@ const MAX_USAGE_PURGE_ROUNDS = 120;
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
 
+/** Minute-long waits for in-flight pin writes before the erasure gives up (a lease runs out within one minute). */
+const PIN_WRITE_WAIT_ROUNDS = 10;
+
 /** Scheduling the analytics retry is the only thing that finishes a failed erasure, so it gets a longer budget than a default step (30 s doubling, about an hour in total). */
 const SCHEDULE_RETRY_STEP_CONFIG = { retries: { backoff: "exponential", delay: "30 seconds", limit: 7 } } as const;
 
@@ -180,6 +183,30 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { dedupId: stepDedupId(scope, "begin-account-erasure") },
                 ),
         );
+
+        // A pin write that renewed its lease before the marker may still be in flight. Its lease runs out within a minute, so the sweeps
+        // below start only once none is in flight: a write that commits after a sweep would otherwise keep its pins.
+        for (let round = 0; ; round += 1) {
+            const { inFlight } = (await context.step.do(
+                `pin-writes-in-flight-${String(round)}`,
+                async () =>
+                    await context.run(
+                        internal.lib.account_moves.pinWritesInFlightFor,
+                        { userId: args.userId },
+                        { dedupId: stepDedupId(scope, "pin-writes-in-flight", round) },
+                    ),
+            )) as { inFlight: boolean };
+
+            if (!inFlight) {
+                break;
+            }
+
+            if (round >= PIN_WRITE_WAIT_ROUNDS) {
+                throw new Error("pin-writes-in-flight: pin writes were still in flight after the wait");
+            }
+
+            await context.step.sleep(`pin-writes-wait-${String(round)}`, "1 minute");
+        }
 
         // The pins this user made on other owners' threads are removed from those owners' shards first: their routes are the only way to find them.
         await context.step.do(

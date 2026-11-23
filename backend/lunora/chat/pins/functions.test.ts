@@ -488,3 +488,13 @@ describe("a failed pin write leaves its shared route", () => {
         expect(routes.page).toHaveLength(1);
     });
 });
+
+describe("a pin write renews the writer's lease before its move check", () => {
+    it("leaves the owner's lease in place after a pin is written", async () => {
+        await as(OWNER).mutation(createPin as never, { messageId: "m-lease", messageRole: "assistant", threadId } as never);
+
+        const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: OWNER } }));
+
+        expect(leases.page).toHaveLength(1);
+    });
+});

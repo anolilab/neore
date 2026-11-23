@@ -25,7 +25,7 @@
  * guest's. Re-running after a partial failure is safe: an id already on the new
  * shard is skipped, and rows already moved are gone from the old one.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
@@ -92,6 +92,8 @@ export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>>
     documentHistory: "an audit trail records who acted; it is not re-attributed",
     member: "a guest joins no organization",
     memberCredits: "a guest joins no organization",
+    pinWriteLeases:
+        "the in-flight pin-write lease of the account being merged or erased: it names no content, and the move removes it when it ends, so nothing re-points it",
     pushDevices:
         "tied to the guest's session, which ends with the guest: the notifications module drops them, and the phone registers again under the new sign-in",
     session: "better-auth's own; the guest's sessions end with the guest",
@@ -429,6 +431,14 @@ export const runGuestMerge = internalAction
     .action(async ({ args, ctx: context }) => {
         // The guest is marked as merging before its pins move, so a pin it writes meanwhile is refused (`lib/account-moves.ts`).
         await context.runMutation(internal.lib.account_moves.beginAccountMoveFor, { kind: "merging", userId: args.from });
+        // A pin write that renewed the guest's lease before the marker may still be in flight. The merge fails until none is, and the job
+        // is retried; the marker stays, so no new write gets in meanwhile (`lib/account-moves.ts`).
+        const { inFlight } = await context.runMutation(internal.lib.account_moves.pinWritesInFlightFor, { userId: args.from });
+
+        if (inFlight) {
+            throw new LunoraError("CONFLICT", "The guest's pin writes are still in flight; the merge is retried");
+        }
+
         // Moves the pins of every route held by `routeUserId` to the new account, on each route's owner shard, one batch per call. Each
         // move is idempotent, so a redelivery repeats it safely.
         const reassignPinsOnRoutesOf = async (routeUserId: string): Promise<void> => {

@@ -2,7 +2,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
-import { isAccountMoving } from "../../lib/account-moves";
+import { admitPinWrite, isAccountMoving } from "../../lib/account-moves";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../../lib/crpc";
 import { MAX_LENGTH } from "../../lib/validators";
 import { systemDb } from "../../lib/rls/scope";
@@ -293,6 +293,9 @@ export const createPin = authMutation
         // A pin is listed only through the thread's read grant (`getThreadPins`), so it is written only under that grant, locked or not.
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
 
+        // The lease comes before the move check: a move that begins after this write's check waits for the write (`lib/account-moves.ts`).
+        await admitPinWrite(context, userId, now);
+
         if (await isAccountMoving(context, userId)) {
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");
         }
@@ -357,6 +360,9 @@ export const createDocumentPin = authMutation
         if (document.status === "streaming") {
             throw new LunoraError("BAD_REQUEST", "A document still being written cannot be pinned yet");
         }
+
+        // The lease comes before the move check: a move that begins after this write's check waits for the write (`lib/account-moves.ts`).
+        await admitPinWrite(context, userId, now);
 
         if (await isAccountMoving(context, userId)) {
             throw new LunoraError("FORBIDDEN", "Pins cannot be added while this account is being moved or erased");

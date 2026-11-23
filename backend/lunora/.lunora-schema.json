@@ -21880,6 +21880,34 @@
       },
       "shardMode": "shardBy:userId"
     },
+    "pinWriteLeases": {
+      "commitOrdered": false,
+      "fields": {
+        "expiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "playgroundApiKeys": {
       "commitOrdered": false,
       "fields": {
