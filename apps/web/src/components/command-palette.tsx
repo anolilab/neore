@@ -67,7 +67,15 @@ import { showError } from "@/lib/toast";
 
 import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore } from "./command-dialog-store";
 import type { PaletteScope } from "./command-palette-scope";
-import { isPaletteScoped, matchesWithinWords, NO_PALETTE_SCOPE, projectRowsVisible, threadRowVisible, unscopedRowsVisible } from "./command-palette-scope";
+import {
+    isPaletteScoped,
+    matchesWithinWords,
+    NO_PALETTE_SCOPE,
+    projectRowsVisible,
+    threadRowsVisible,
+    threadRowVisible,
+    unscopedRowsVisible,
+} from "./command-palette-scope";
 
 ("use client");
 
@@ -86,6 +94,10 @@ const MEANING_QUERY_KEY = ["command-palette", "meaning"] as const;
 const MEANING_CACHE_MS = 60_000;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
+
+/** Whether a mutation's arguments name a thread (`threadId`, or `threadIds` for a bulk delete). */
+const namesThread = (variables: unknown): boolean =>
+    typeof variables === "object" && variables !== null && ("threadId" in variables || "threadIds" in variables);
 
 interface MessageSearchThread {
     _id: string;
@@ -205,6 +217,18 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         }
     }, [isOpen, queryClient]);
 
+    // A renamed, archived, restored or deleted thread changes the hits, wherever the edit was made: any mutation that names a thread
+    // and succeeds marks them stale. None of the thread mutations carries a key to match on, so their arguments are read.
+    useEffect(
+        () =>
+            queryClient.getMutationCache().subscribe((event) => {
+                if (event.type === "updated" && event.action.type === "success" && namesThread(event.mutation.state.variables)) {
+                    void queryClient.invalidateQueries({ queryKey: MEANING_QUERY_KEY });
+                }
+            }),
+        [queryClient],
+    );
+
     // Message search is a full-text query: it waits for the palette to be open, for
     // two characters and for the typing to pause, and is never live (NEVER_LIVE).
     // While the input and the debounced query differ, the query is skipped and no hits show.
@@ -228,17 +252,16 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     // The hits are one account's thread titles: the key names the account, so a switch never shows the previous one's.
     const { data: sessionData } = useAuthSession();
     const sessionUserId = sessionData?.user.id;
-    const showsThreadRows = !isPaletteScoped(scope) || scope.threads || scope.archived;
     const isMeaningSearchCurrent =
         shouldQuery &&
         !isStateTagged &&
-        showsThreadRows &&
+        threadRowsVisible(scope) &&
         projectFilter === undefined &&
         sessionUserId !== undefined &&
         trimmedSearch.length >= MEANING_SEARCH_MIN_CHARS &&
         trimmedSearch.length <= MEANING_SEARCH_MAX_CHARS &&
         trimmedSearch === debouncedSearch;
-    const { data: meaningHits } = useQuery({
+    const { data: meaningHits, isError: isMeaningSearchFailed } = useQuery({
         // The hits are a user's own thread titles: kept briefly while the palette is open, removed when it closes (above).
         gcTime: MEANING_CACHE_MS,
         queryFn: isMeaningSearchCurrent ? () => searchMeaning({ archivedOnly: scope.archived, query: debouncedSearch }) : skipToken,
@@ -780,7 +803,14 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
                             <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>
                         )}
-                        <CommandEmpty>{t`No results found.`}</CommandEmpty>
+                        {/* A failed meaning search is said, so an empty or short list is not taken for "nothing related". */}
+                        {isMeaningSearchCurrent && isMeaningSearchFailed ? (
+                            <p className="text-destructive px-3 pt-2 text-xs" role="alert">
+                                {t`Search by meaning failed, so related threads are not listed. Try again in a moment.`}
+                            </p>
+                        ) : (
+                            <CommandEmpty>{t`No results found.`}</CommandEmpty>
+                        )}
                         <CommandList>
                             {(group: Group, index: number) => (
                                 <React.Fragment key={group.value}>

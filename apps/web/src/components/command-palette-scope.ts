@@ -20,14 +20,12 @@ export const NO_PALETTE_SCOPE: PaletteScope = { archived: false, projects: false
 /** Whether a filter is on. With none, the palette shows its navigation, actions, thread rows, message hits and meaning hits. */
 export const isPaletteScoped = (scope: PaletteScope): boolean => scope.archived || scope.projects || scope.threads;
 
-/** Whether a thread row of this status is shown. Archived narrows the thread rows; with it on, no active thread shows. */
-export const threadRowVisible = (scope: PaletteScope, status: "active" | "archived"): boolean => {
-    if (!isPaletteScoped(scope)) {
-        return true;
-    }
+/** Whether thread rows are shown at all: without a filter, or under the Threads or Archived filter. */
+export const threadRowsVisible = (scope: PaletteScope): boolean => !isPaletteScoped(scope) || scope.threads || scope.archived;
 
-    return (scope.threads || scope.archived) && (!scope.archived || status === "archived");
-};
+/** Whether a thread row of this status is shown. Archived narrows the thread rows; with it on, no active thread shows. */
+export const threadRowVisible = (scope: PaletteScope, status: "active" | "archived"): boolean =>
+    threadRowsVisible(scope) && (!scope.archived || status === "archived");
 
 /** Whether project rows are shown: only under the Projects filter, so the unfiltered palette keeps the rows it always had. */
 export const projectRowsVisible = (scope: PaletteScope): boolean => scope.projects;

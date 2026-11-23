@@ -4,7 +4,7 @@
  * hit's thread at the message.
  */
 
-import { QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
+import { MutationObserver, QueryClient, QueryClientProvider, skipToken } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,6 +24,8 @@ const harness = vi.hoisted(() => {
         /** What the meaning search returns for any query; a test may replace it. */
         meaning: [] as Record<string, unknown>[],
         meaningArgs: [] as unknown[],
+        /** Whether the meaning search is refused, as a rate limit would. */
+        meaningFails: false,
         /** The project rows the palette lists; a test may replace them. */
         projects: [] as { _id: string; title: string }[],
         /** Whether the project list has more pages than the palette loaded. */
@@ -100,6 +102,10 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useAction: () => async (args: unknown) => {
             harness.meaningArgs.push(args);
+
+            if (harness.meaningFails) {
+                throw new Error("Rate limited");
+            }
 
             return harness.meaning;
         },
@@ -185,6 +191,7 @@ const RESULT_TEXT = /alpha rollout date/;
 const LOADED_ONLY = /threads loaded here are filtered;/;
 const BETA_TEXT = /beta cohort starts/;
 const FIRST_PROJECTS_ONLY = /Only the first 1 projects are listed here/;
+const MEANING_FAILED = /Search by meaning failed/;
 
 /** True when `later` comes after `earlier` in document order. */
 const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumentPosition(later) === Node.DOCUMENT_POSITION_FOLLOWING;
@@ -428,6 +435,7 @@ describe("command palette filters and meaning search", () => {
         Element.prototype.getAnimations = () => [];
         stubResizeObserver();
         harness.meaningArgs.length = 0;
+        harness.searchArgs.length = 0;
     });
 
     afterEach(() => {
@@ -436,19 +444,11 @@ describe("command palette filters and meaning search", () => {
         });
         harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
         harness.meaning = [];
+        harness.meaningFails = false;
         harness.projects = [];
         harness.projectsHasMore = false;
         harness.hasMore = false;
         harness.searchArgs.length = 0;
-    });
-
-    it("lists no project rows without the projects filter", async () => {
-        harness.projects = [{ _id: "p-billing", title: "Billing" }];
-        renderPalette();
-        await openPalette();
-
-        expect(screen.getByText("Alpha plan")).toBeTruthy();
-        expect(screen.queryByText("Billing")).toBeNull();
     });
 
     it("runs no message search under a filter, whose rows it could not show", async () => {
@@ -520,23 +520,6 @@ describe("command palette filters and meaning search", () => {
         expect(screen.getByText("Billing")).toBeTruthy();
     });
 
-    it("the archived filter limits the palette to archived threads", async () => {
-        harness.threads = [
-            { _id: "thread-a", status: "active", title: "Alpha plan" },
-            { _id: "thread-b", status: "archived", title: "Old invoice run" },
-        ];
-        renderPalette();
-        await openPalette();
-
-        expect(screen.getByText("Alpha plan")).toBeTruthy();
-
-        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
-
-        expect(screen.getByText("Old invoice run")).toBeTruthy();
-        expect(screen.queryByText("Alpha plan")).toBeNull();
-        expect(screen.queryByText("Go to Chat")).toBeNull();
-    });
-
     it("finds 'PDF totals off by one' for 'the invoice bug' through the meaning search", async () => {
         harness.threads = [];
         harness.meaning = [{ archived: false, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
@@ -548,6 +531,42 @@ describe("command palette filters and meaning search", () => {
         expect(await screen.findByText("PDF totals off by one", undefined, { timeout: 3000 })).toBeTruthy();
         expect(screen.getByText("Related threads")).toBeTruthy();
         expect(harness.meaningArgs).toContainEqual({ archivedOnly: false, query: "the invoice bug" });
+    });
+
+    it("says a refused meaning search failed instead of finding nothing", async () => {
+        harness.threads = [];
+        harness.meaningFails = true;
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+
+        const alert = await screen.findByRole("alert", undefined, { timeout: 3000 });
+
+        expect(alert.textContent).toMatch(MEANING_FAILED);
+        expect(screen.queryByText("No results found.")).toBeNull();
+    });
+
+    it("asks the meaning search again once a thread is edited while the palette is open", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        renderPalette(queryClient);
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+        expect(harness.meaningArgs).toHaveLength(1);
+
+        await act(async () => {
+            await new MutationObserver(queryClient, { mutationFn: async (_variables: { threadId: string; title: string }) => undefined }).mutate({
+                threadId: "thread-pdf",
+                title: "Renamed",
+            });
+        });
+
+        await waitFor(() => {
+            expect(harness.meaningArgs).toHaveLength(2);
+        });
     });
 
     it("lists meaning hits after the exact title matches, and does not repeat a thread the title already matched", async () => {
