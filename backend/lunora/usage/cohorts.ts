@@ -74,6 +74,17 @@ export const allocateCohort = async (ctx: MutationCtx, organizationId: string): 
  * the booking returns without one, so a member is never in two cohorts.
  */
 export const insertContributor = async (ctx: MutationCtx, row: { createdAt: number; organizationId: string; userId: string }): Promise<void> => {
+    // A guest whose entry a merge handed to their new account (`lib/account-merge.ts#handOverOrganizationContributors`) still has rows
+    // on their own shard until the merge deletes them: booked again, those rows would count in a second cohort.
+    const handedOver = await ctx.db.usageOrganizationContributors.findFirst({
+        consistency: "primary",
+        where: { mergedFrom: row.userId, organizationId: row.organizationId },
+    });
+
+    if (handedOver) {
+        return;
+    }
+
     const { claim, cohort } = await claimSlot(ctx, row.organizationId);
 
     try {

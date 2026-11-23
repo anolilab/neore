@@ -3947,6 +3947,9 @@ export const schema = defineSchema({
         // The stable cohort the contributor was booked into (`usage/cohorts.ts`); it never changes once set.
         cohort: v.number(),
         createdAt: v.number(),
+        // Set while a guest's merge into this account runs (`lib/account-merge.ts#handOverOrganizationContributors`): the guest whose entry,
+        // and cohort, this became, so the merge moves that guest's closed-week ledger rows with it. Cleared once the merge has moved them.
+        mergedFrom: v.optional(v.string()),
         organizationId: v.string(),
         userId: v.string(),
     })
@@ -3954,6 +3957,8 @@ export const schema = defineSchema({
         // Unique: a member has one entry under an organization, so two first replies booked at once cannot place them in two cohorts.
         .index("by_organization_and_user", ["organizationId", "userId"], { unique: true })
         .index("by_organization_and_cohort", ["organizationId", "cohort", "userId"])
+        // The entry a merging guest was handed over to: the guest is not booked again while the merge runs (`insertContributor`).
+        .index("by_organization_and_merged_from", ["organizationId", "mergedFrom"])
         .index("by_user", ["userId"]),
 
     // One row per reply filed under a project the user's organization owns, when the reply is recorded. The organization view sums

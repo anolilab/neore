@@ -144,9 +144,13 @@ const weekStart = (week: number): number => week * WEEK_MS + FIRST_MONDAY_MS;
  */
 export const organizationPeriodEnd = (now: number): number => weekStart(weekOf(now - ORGANIZATION_RECORD_LATE_MS - ORGANIZATION_RELEASE_MARGIN_MS));
 
-/** The start of the period's whole UTC weeks: the Monday of the week `since` falls in, at most {@link MAX_PERIOD_WEEKS} weeks before `until`. */
+/**
+ * The start of the period's whole UTC weeks: the Monday of the week `since` falls in, at most {@link MAX_PERIOD_WEEKS} weeks before `until`,
+ * and at least one week before it. A `since` in a week not yet closed (the last seven days, read on a Sunday) reads the last closed week,
+ * not an empty period.
+ */
 export const organizationPeriodStart = (since: number, until: number): number =>
-    Math.min(Math.max(weekStart(weekOf(since)), until - MAX_PERIOD_WEEKS * WEEK_MS), until);
+    Math.min(Math.max(weekStart(weekOf(since)), until - MAX_PERIOD_WEEKS * WEEK_MS), until - WEEK_MS);
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);
 
@@ -155,14 +159,21 @@ export const isOrganizationAdminRole = (role: string): boolean => role.split(","
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
+/** A contributor as the walk reads it; `merging` while a guest merge is moving the ledger rows of the entry (`mergedFrom`). */
+type ScopeMember = { cohort: number; merging?: true; userId: string };
+
+const scopeMember = (row: { cohort: number; mergedFrom?: string | null; userId: string }): ScopeMember => {
+    return { cohort: row.cohort, ...(typeof row.mergedFrom === "string" && { merging: true as const }), userId: row.userId };
+};
+
 /**
  * One batch of an organization's contributors in walk order: by cohort, then user id, from the cursor's position on. The cursor's cohort is
  * read from its user id on, then the later cohorts, so a booking that lands between two batches is not read twice or skipped.
  */
-const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: WalkPosition): Promise<{ cohort: number; userId: string }[]> => {
+const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: WalkPosition): Promise<ScopeMember[]> => {
     const db = systemDb(ctx);
     const limit = SCOPE_BATCH + 1;
-    const rows: { cohort: number; userId: string }[] = [];
+    const rows: ScopeMember[] = [];
 
     if (after !== undefined) {
         // From the primary: a replica that lags a new contributor's entry would drop that member's usage from the totals.
@@ -173,11 +184,7 @@ const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: W
             where: { cohort: after.cohort, organizationId, userId: { gt: after.userId } },
         });
 
-        rows.push(
-            ...page.map((row) => {
-                return { cohort: row.cohort, userId: row.userId };
-            }),
-        );
+        rows.push(...page.map((row) => scopeMember(row)));
     }
 
     if (rows.length < limit) {
@@ -188,11 +195,7 @@ const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: W
             where: { organizationId, ...(after !== undefined && { cohort: { gt: after.cohort } }) },
         });
 
-        rows.push(
-            ...page.map((row) => {
-                return { cohort: row.cohort, userId: row.userId };
-            }),
-        );
+        rows.push(...page.map((row) => scopeMember(row)));
     }
 
     return rows;
@@ -215,7 +218,8 @@ export const organizationUsageScope = internalQuery
             v.null(),
             v.object({
                 // In walk order: by cohort, then user id.
-                members: v.array(v.object({ cohort: v.number(), userId: v.string() })),
+                // `merging`: a guest merge is still moving this member's ledger rows in (`lib/account-merge.ts`), so their cohort is withheld.
+                members: v.array(v.object({ cohort: v.number(), merging: v.optional(v.literal(true)), userId: v.string() })),
                 // Whether contributors follow this batch.
                 more: v.boolean(),
                 projects: v.array(v.object({ projectId: v.string(), title: v.string() })),
@@ -348,6 +352,7 @@ interface MemberWalk {
     cells: { costMicrodollars: number; projectKey: string; replies: number; tokens: number; week: number }[];
     cohort: number;
     erasing: boolean;
+    merging?: true;
     truncated: boolean;
     userId: string;
 }
@@ -366,7 +371,7 @@ const zero = (): Totals => {
 
 /** One cohort as the walk read it, for {@link releaseCells}. */
 export interface ReleaseGroup {
-    members: ReadonlyArray<Pick<MemberWalk, "cells" | "erasing" | "truncated">>;
+    members: ReadonlyArray<Pick<MemberWalk, "cells" | "erasing" | "merging" | "truncated">>;
     /**
      * Every booking slot of the cohort is taken (`sealedCohorts`) and the walk read all its members in this call: the cohort can gain no
      * member, so its weeks show with the members it has, even when it lost some. Otherwise a week needs {@link MIN_MEMBERS_PER_GROUP} active.
@@ -378,8 +383,8 @@ export interface ReleaseGroup {
  * What the walk may release from whole cohorts' cells. A cell is one cohort's usage in one closed UTC week. In a cell:
  *
  * - the cell is withheld unless every member of the cohort was active that week (at least {@link MIN_MEMBERS_PER_GROUP} of a cohort that is
- *   not {@link ReleaseGroup.whole}, and never fewer than {@link MIN_MEMBERS_SHORT_COHORT}) ({@link pageWithheld}); a cohort with a member read past the ledger's ceiling, or being erased, is
- *   withheld in every week;
+ *   not {@link ReleaseGroup.whole}, and never fewer than {@link MIN_MEMBERS_SHORT_COHORT}) ({@link pageWithheld}); a cohort with a member read past the ledger's ceiling, being erased,
+ *   or still receiving a merging guest's rows, is withheld in every week;
  * - a project used by {@link MIN_MEMBERS_PER_GROUP} or more of its members is one bucket: named when the organization lists it, added to
  *   `removed` when the list is whole and does not, left out (and the result truncated) when the list was cut;
  * - every project used by fewer is folded into one `small` bucket, released only with as many members across it as the cell needs active.
@@ -400,7 +405,9 @@ export const releaseCells = (
     let withheld = false;
 
     for (const { members: group, whole } of groups) {
-        if (group.some((member) => member.cells.length > 0 && (member.truncated || member.erasing))) {
+        // A member a guest merge is moving rows to has some of them in place and some not yet: the cohort's weeks are withheld until the
+        // merge ends, so no read shows part of the guest's spend.
+        if (group.some((member) => member.merging === true || (member.cells.length > 0 && (member.truncated || member.erasing)))) {
             withheld = true;
             continue;
         }
@@ -622,7 +629,7 @@ export const getOrganizationProjectUsage = authAction
                         break;
                     }
 
-                    walked.push({ ...result, cohort: member.cohort, userId: member.userId });
+                    walked.push({ ...result, cohort: member.cohort, ...(member.merging && { merging: true }), userId: member.userId });
                     resume = { cohort: member.cohort, userId: member.userId };
 
                     // The call stops once it has enough members; the cohort it stops in is cut back below unless the walk has passed it.
@@ -819,7 +826,8 @@ export const reconcileOrganizationContributor = internalMutation
 
         if (row && !entry) {
             await insertContributor(ctx, { createdAt: row.at, organizationId, userId });
-        } else if (!row && entry) {
+        } else if (!row && entry && typeof entry.mergedFrom !== "string") {
+            // An entry a guest merge handed over keeps its cohort while the merge copies the guest's rows in; the merge settles it at the end.
             await ctx.db.delete("usageOrganizationContributors", entry._id);
         }
 

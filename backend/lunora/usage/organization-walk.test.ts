@@ -137,6 +137,16 @@ describe("releaseCells", () => {
         expect(released.small.costMicrodollars).toBe(510);
     });
 
+    it("withholds every week of a cohort while a guest merge is still moving rows to one of its members", () => {
+        const { members } = cohortIn(1, () => "p");
+        const group = { members: members.map((entry, index) => (index === 0 ? { ...entry, merging: true as const } : entry)), whole: true };
+        const released = releaseCells([group], new Set(["p"]), true);
+
+        expect(released.named.size).toBe(0);
+        expect(released.small.replies).toBe(0);
+        expect(released.withheld).toBe(true);
+    });
+
     it("withholds a week where some but not all of the cohort's members were active", () => {
         const { members } = cohortIn(1, () => "p");
         const group = { members: members.map((entry, index) => (index === 0 ? entry : { ...entry, cells: [] })), whole: true };

@@ -32109,6 +32109,12 @@
           "optional": false,
           "unique": false
         },
+        "mergedFrom": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "organizationId": {
           "kind": "string",
           "nullable": false,
@@ -32128,6 +32134,13 @@
             "organizationId",
             "cohort",
             "userId"
+          ],
+          "unique": false
+        },
+        "by_organization_and_merged_from": {
+          "fields": [
+            "organizationId",
+            "mergedFrom"
           ],
           "unique": false
         },

@@ -56,4 +56,8 @@
   being erased is withheld. A closed week must never change: an organization
   row is written only within `ORGANIZATION_RECORD_LATE_MS` of its reply, and
   the view ends that long (and a margin) before now. A new write to
-  `usageOrganizationReplies` keeps both.
+  `usageOrganizationReplies` keeps both. A guest merge moves older rows only
+  with the guest's own cohort (`handOverOrganizationContributors` runs before
+  the copy); where the account already has an entry, the guest's goes. A
+  marked entry (`mergedFrom`) withholds its cohort and blocks re-booking the
+  guest until the merge settles it.

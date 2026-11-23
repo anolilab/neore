@@ -63,6 +63,29 @@ describe("cohort slots in the database", () => {
         expect(entries.slots).toHaveLength(1);
     });
 
+    it("does not book a guest again while a merge hands their entry to their new account", async () => {
+        const entries = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 1, mergedFrom: "guest", organizationId: "org-1", userId: "user" });
+            // A reply the guest's shard records during the merge: its reconcile books the guest.
+            await insertContributor(ctx, { createdAt: 2, organizationId: "org-1", userId: "guest" });
+            // The guest's own entry, marked to go once their shard is empty (the new account outranks it in `org-2`).
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 1, mergedFrom: "guest", organizationId: "org-2", userId: "guest" });
+            await insertContributor(ctx, { createdAt: 2, organizationId: "org-2", userId: "guest" });
+
+            const contributors = await ctx.db.usageOrganizationContributors.findMany({ where: { mergedFrom: "guest" } });
+            const slots = await ctx.db.usageOrganizationCohortSlots.findMany({});
+
+            return {
+                contributors: contributors.page
+                    .map((row: any) => `${row.organizationId}:${row.userId}` as string)
+                    .toSorted((a: string, b: string) => a.localeCompare(b)),
+                slots: slots.page.length,
+            };
+        });
+
+        expect(entries).toStrictEqual({ contributors: ["org-1:user", "org-2:guest"], slots: 0 });
+    });
+
     it("keeps a released cohort's members when a contributor is booked after the first read", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
