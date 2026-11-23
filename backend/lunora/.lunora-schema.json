@@ -11,6 +11,7 @@
     "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "add-message-typed-text",
     "add-run-args-impersonated",
     "add-run-args-system-context",
     "add-steer-text-length",
@@ -11566,6 +11567,12 @@
           "kind": "boolean",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "typedText": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "usage": {

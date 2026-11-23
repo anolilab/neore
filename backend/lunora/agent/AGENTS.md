@@ -87,3 +87,10 @@
   exactly that one (`model: "auto"` and `/internal/route` are for other callers). The cost-notice
   threshold is `PROMPT_CACHE_COLD_START_TOKENS` (`@neore/ai/models`), shared with the gateway's
   downgrade policy.
+
+- **Typed words column** (`messages.typedText`) — `text` stays the message as it was sent; `typedText` holds only what the
+  person typed (`typedTextColumn` over `typedTextOf`: no attachment, quote, guest note or placeholder) and is what the
+  composer's prompt search indexes (`typed_text_search`). Every writer of a user row's `text` sets it beside it:
+  `addMessagesHandler`, `updateMessage`, and `insertMessageRow`/`patchMessage` (`table-writes.ts`) for the others (the
+  reply rewrite in `branches.ts` edits assistant rows only). A new writer goes through one of them, or the index and
+  `text` disagree.

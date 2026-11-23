@@ -619,6 +619,8 @@ export const vMessageDocFields = {
     threadId: v.string(),
     // Convenience fields extracted from the message
     tool: v.boolean(), // either tool call (assistant) or tool result (tool)
+    // What the person typed into a user message, for the composer's prompt search (`schema.ts`, `typedText`).
+    typedText: v.optional(v.string()),
     // Result metadata
     usage: v.optional(vUsage),
     userId: v.optional(v.string()), // useful for searching across threads

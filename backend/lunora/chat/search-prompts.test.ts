@@ -9,8 +9,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
-import { isSentPromptAvailable, searchSentPrompts } from "./functions";
-import { searchText } from "../agent/shared";
+import { isSentPromptAvailable, SENT_PROMPT_LINEAGE_READS, searchSentPrompts } from "./functions";
+import { typedTextColumn } from "../agent/shared";
 import { documentTextPart, guestTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
@@ -53,6 +53,13 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
 const OWNER = "user-owner";
 const OTHER = "user-other";
 
+const withTypedText = (message: unknown, text: string) => {
+    const typedText = typedTextColumn(message as never, text);
+
+    return typedText === undefined ? {} : { typedText };
+};
+
+/** A row as the writers save it: `text` as sent, `typedText` beside it (`typedTextColumn`). */
 const insertMessage = (
     context: any,
     fields: {
@@ -69,6 +76,7 @@ const insertMessage = (
     context.db.insert("messages", {
         ...(fields.createdAt !== undefined && { createdAt: fields.createdAt }),
         message: { content: fields.content ?? fields.text, role: fields.role },
+        ...withTypedText({ content: fields.content ?? fields.text, role: fields.role }, fields.text),
         order: fields.order,
         status: "success",
         stepOrder: 0,
@@ -379,20 +387,18 @@ describe("searchSentPrompts", () => {
 
     it("reads the smaller window first and widens it only when too few prompts survived", async () => {
         const harness = lunoraTest(schema as never);
-        const key = "agent_messages:textSearch";
+        const key = "agent_messages:typedTextSearch";
         const textSearch = registry.get(key);
         const windows: number[] = [];
 
         // Records each window the search asks the index for, then answers it as the real query does.
         registry.set(
             key,
-            internalQuery
-                .input({ limit: v.number(), searchAllMessagesForUserId: v.optional(v.string()), text: v.optional(v.string()) })
-                .query(async ({ args, ctx }: any) => {
-                    windows.push(args.limit);
+            internalQuery.input({ limit: v.number(), text: v.string(), userId: v.string() }).query(async ({ args, ctx }: any) => {
+                windows.push(args.limit);
 
-                    return await ctx.runQuery(textSearch, args);
-                }),
+                return await ctx.runQuery(textSearch, args);
+            }),
         );
 
         try {
@@ -423,12 +429,13 @@ describe("searchSentPrompts", () => {
                 }
 
                 // Stored after the prompts, so they win the index's tie-break on equal scores and take the first window of a
-                // "release" search: replies, and prompts of a trashed chat, which count only once the thread filter has run.
+                // "release" search: prompts of a trashed chat, which count only once the thread filter has run. Replies are
+                // not in the typed-words index, so they take no place in a window.
                 const trashed = await insertThread(context, { title: "Trashed", userId: OWNER });
 
                 await context.db.patch("threads", trashed, { deleted: true });
 
-                for (let index = 0; index < 60; index += 1) {
+                for (let index = 0; index < 110; index += 1) {
                     await insertMessage(context, {
                         createdAt: 1000 + index,
                         order: index,
@@ -553,42 +560,101 @@ describe("searchSentPrompts", () => {
         }
     });
 
-    it("lists a prompt as the memory's typed-text reader reads it, and the search copy puts those same words first", async () => {
+    it("stores the message as it was sent and indexes the typed words alone, as the memory's typed-text reader reads them", async () => {
         const harness = lunoraTest(schema as never);
-        const content = [
-            documentTextPart("notes.pdf", "lighthouse keeper rota"),
+        const document = documentTextPart("notes.pdf", "lighthouse keeper rota");
+        const typedParts = [
             { providerOptions: { neore: { pageContext: true } }, text: "A captured lighthouse page", type: "text" },
             { text: "plan the lighthouse visit", type: "text" },
             imagePromptPart(),
             { text: "> the guide said dawn\n\nand book the ferry", type: "text" },
         ];
-        const message = { content, role: "user" } as const;
+        const message = { content: [document, ...typedParts], role: "user" } as const;
+
+        try {
+            const { addMessagesHandler } = await import("../agent/messages");
+            const saved = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Trip", userId: OWNER });
+                const { messages } = await addMessagesHandler(context, { messages: [{ message }], threadId: thread, userId: OWNER } as never);
+
+                return messages[0];
+            });
+
+            // `text` keeps every part in the order it was sent; `typedText` is `typedTextOf`'s, each typed part its own paragraph.
+            expect(saved?.text?.startsWith(document.text)).toBe(true);
+            expect(saved?.typedText).toBe(typedTextOf(message));
+            expect(saved?.typedText).toBe("plan the lighthouse visit\n\nand book the ferry");
+            const listed = await search(harness, "lighthouse");
+
+            expect(listed.map((prompt) => [prompt.messageId, prompt.text])).toEqual([[saved?._id, saved?.typedText]]);
+            // A guest's note is no typing of the person's: it adds nothing to the indexed words.
+            expect(
+                typedTextColumn({ content: [guestTextPart("a guest wrote this", "note-1"), { text: "my words", type: "text" }], role: "user" } as never, ""),
+            ).toBe("my words");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("finds a reply to a quote longer than the index takes, by the reply's words", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const { addMessagesHandler } = await import("../agent/messages");
+            const messageId = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Quote", userId: OWNER });
+                // Past the index's 1,000 terms, in the same part as the reply: the quote is not typed, so it is not indexed.
+                const quote = `> ${Array.from({ length: 1500 }, (_, index) => `line${String(index)}`).join(" ")}`;
+                const { messages } = await addMessagesHandler(context, {
+                    messages: [{ message: { content: [{ text: `${quote}\n\nwhy did the lighthouse go dark`, type: "text" }], role: "user" } }],
+                    threadId: thread,
+                    userId: OWNER,
+                } as never);
+
+                return messages[0]?._id;
+            });
+
+            const replies = await search(harness, "lighthouse");
+
+            expect(replies.map((prompt) => [prompt.messageId, prompt.text])).toEqual([[messageId, "why did the lighthouse go dark"]]);
+            expect(await search(harness, "line5")).toEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("searches an edited prompt by its new words, never its old ones", async () => {
+        const harness = lunoraTest(schema as never);
 
         try {
             const messageId = await harness.run(async (context: any) => {
-                const thread = await insertThread(context, { title: "Trip", userId: OWNER });
+                const thread = await insertThread(context, { title: "Edits", userId: OWNER });
 
-                return insertMessage(context, {
-                    content,
-                    createdAt: 1,
-                    order: 0,
-                    role: "user",
-                    text: searchText(message as never) ?? "",
-                    threadId: thread,
-                    userId: OWNER,
-                });
+                return insertMessage(context, { createdAt: 1, order: 0, role: "user", text: "deploy the staging build", threadId: thread, userId: OWNER });
             });
+            const { updateMessage } = await import("../agent/messages");
 
-            const prompts = await search(harness, "lighthouse");
-
-            // One reader: the listed text is `typedTextOf`'s, each typed part its own paragraph, no attachment, page, placeholder or quote.
-            expect(prompts.map((prompt) => [prompt.messageId, prompt.text])).toEqual([[messageId, typedTextOf(message)]]);
-            expect(prompts[0]?.text).toBe("plan the lighthouse visit\n\nand book the ferry");
-            // The index copy leads with the typed parts, so the index's first terms are the person's own.
-            expect(searchText(message as never)?.startsWith("plan the lighthouse visit > the guide said dawn\n\nand book the ferry")).toBe(true);
-            expect(searchText({ content: [guestTextPart("a guest wrote this", "note-1"), { text: "my words", type: "text" }], role: "user" } as never)).toBe(
-                "my words a guest wrote this",
+            await harness.run(async (context: any) =>
+                context.runMutation(updateMessage, {
+                    messageId,
+                    patch: { message: { content: [documentTextPart("a.txt", "deploy notes"), { text: "rename the release", type: "text" }], role: "user" } },
+                }),
             );
+
+            expect(await search(harness, "deploy")).toEqual([]);
+            const renamed = await search(harness, "rename");
+
+            expect(renamed.map((prompt) => prompt.text)).toEqual(["rename the release"]);
+
+            // Nothing typed any more: the old words leave the index too.
+            await harness.run(async (context: any) =>
+                context.runMutation(updateMessage, {
+                    messageId,
+                    patch: { message: { content: [documentTextPart("a.txt", "rename notes")], role: "user" } },
+                }),
+            );
+
+            expect(await search(harness, "rename")).toEqual([]);
         } finally {
             harness.close();
         }
@@ -692,6 +758,44 @@ describe("searchSentPrompts", () => {
                     expect.objectContaining({ threadId: ids.work, threadTitle: "Work" }),
                 ]),
             );
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("reads a bounded number of branch links however many branch families share a search, and drops no prompt", async () => {
+        const harness = lunoraTest(schema as never);
+        const families = 50;
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < families; index += 1) {
+                    const original = await insertThread(context, { title: `Original ${index}`, userId: OWNER });
+                    const branch = await insertThread(context, { title: `Branch ${index}`, userId: OWNER });
+
+                    await context.db.insert("threadRelationships", {
+                        branchType: "branch",
+                        createdAt: index,
+                        parentThreadId: original,
+                        threadId: branch,
+                        userId: OWNER,
+                    });
+
+                    for (const threadId of [original, branch]) {
+                        await insertMessage(context, { createdAt: index, order: 0, role: "user", text: `deploy family ${index}`, threadId, userId: OWNER });
+                    }
+                }
+            });
+
+            const prompts = await search(harness, "deploy");
+            const texts = prompts.map((prompt) => prompt.text);
+            const firstRepeat = texts.findIndex((text, index) => texts.indexOf(text) !== index);
+
+            // A family takes two link reads (the branch's link, the original's lack of one): the newest families list once
+            // until the reads run out. From there a copy lists beside its original instead of costing more reads.
+            expect(firstRepeat).toBe(SENT_PROMPT_LINEAGE_READS / 2 + 1);
+            // No family is skipped: newest first, with no gap.
+            expect([...new Set(texts)]).toEqual(Array.from({ length: new Set(texts).size }, (_, index) => `deploy family ${families - 1 - index}`));
         } finally {
             harness.close();
         }

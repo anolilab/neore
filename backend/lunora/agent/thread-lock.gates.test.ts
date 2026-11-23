@@ -25,6 +25,7 @@ import {
     listMessagesByThreadId,
     listMessagesByThreadIdHandler,
     textSearch,
+    typedTextSearch,
 } from "./messages";
 import { list as listStreams } from "./streams";
 import { getDocument, getDocumentsByThread, updateDocument } from "./documents";
@@ -161,6 +162,7 @@ beforeEach(async () => {
             text: "salary figures for the year",
             threadId: lockedId,
             tool: false,
+            typedText: "salary figures for the year",
             userId: OWNER,
         });
         await ctx.db.insert("messages", {
@@ -170,6 +172,7 @@ beforeEach(async () => {
             text: "salary open note",
             threadId: openId,
             tool: false,
+            typedText: "salary open note",
             userId: OWNER,
         });
         await ctx.db.insert("documents", {
@@ -332,6 +335,14 @@ describe("message reads", () => {
 
         expect(skipped).toEqual([]);
         expect(read.map((hit) => hit.threadId)).toEqual([lockedId]);
+    });
+
+    it("typedTextSearch never returns a locked chat's prompt to the composer's prompt search", async () => {
+        const { messages: hits }: { messages: { threadId: string }[] } = await run(
+            async (ctx) => await ctx.runQuery(typedTextSearch, { limit: 10, text: "salary", userId: OWNER }),
+        );
+
+        expect(hits.map((hit) => hit.threadId)).toEqual([openId]);
     });
 
     it("streams are not read for a locked chat without its proof", async () => {

@@ -92,7 +92,6 @@ import {
 } from "./logic";
 import type { DispatchOrigin } from "../../sub-agents/logic";
 import type { GroupChatMode, GroupRunSnapshot, GroupStep } from "./validators";
-import { sentOrderText } from "../../agent/shared";
 
 /** The routing call is small; past this the turn falls back rather than stalls. */
 const ROUTER_TIMEOUT_MS = 15_000;
@@ -755,8 +754,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
 
     // Raw row: a group turn runs on a stream admitted under the thread's lock state (`streamRunThread`).
     const [message] = await ctx.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId as Id<"messages">] });
-    // As sent: the `text` column is the search copy, with typed words ahead of an attached document.
-    const promptText = (message && sentOrderText(message)) ?? "";
+    const promptText = message?.text ?? "";
     const participants = toInfo(config.participants);
 
     const turn = await loadTurnContext(ctx, {

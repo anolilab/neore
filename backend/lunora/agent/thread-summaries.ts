@@ -86,7 +86,6 @@ import {
     SUMMARY_TOO_LONG_RECHECK_MS,
     THREAD_SUMMARY_CLAIM_TTL_MS,
 } from "./thread-summary-logic";
-import { sentOrderText } from "./shared";
 
 /** Attached document or page text is a plain user text part `computeTaint` cannot see, and the summary no longer shows it. */
 export const foldedTaint = (rows: ReadonlyArray<{ content?: unknown; role?: unknown }>): DeviceTaintSource[] =>
@@ -384,7 +383,7 @@ export const prepareThreadSummary = internalMutation
                 const role = (row.message as { role?: string } | undefined)?.role ?? "assistant";
 
                 // A tool result has no words of its own; an assistant row that also called a tool keeps its text.
-                return { role, text: role === "tool" ? undefined : sentOrderText(row) };
+                return { role, text: role === "tool" ? undefined : row.text };
             }),
         );
         const covered = slice[consumed - 1];

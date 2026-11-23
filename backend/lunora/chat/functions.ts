@@ -67,7 +67,7 @@ import { insertThread, patchThread } from "../agent/table-writes";
 import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
-import { messageCarriesGuestText, messageCarriesOutsideAgentText, typedTextOf } from "./lib/attached-text";
+import { messageCarriesGuestText, messageCarriesOutsideAgentText } from "./lib/attached-text";
 import { readChildThreads } from "./lib/child-threads";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
@@ -3481,10 +3481,11 @@ const vSentPrompt = v.object({
 });
 
 /**
- * Index hits read before the role filter and the newest-first sort: whole rows, assistant replies and attached documents
- * included, against the transaction's 32 MiB read budget. The first pass reads the smaller window and widens once, only when
- * fewer than a full list of prompts survived every filter; a row read again is charged once. The index ranks by score, so a
- * common word lists the newest prompts of its best 100 hits, and `truncated` says so. A hit past the wider window is not searched.
+ * Index hits read before the thread filter and the newest-first sort, against the transaction's 32 MiB read budget. The
+ * index holds only typed words (`typedText`), so replies and attachments never take a window; the first pass reads the
+ * smaller one and widens once, only when fewer than a full list of prompts survived every filter (a row read again is
+ * charged once). The index ranks by score, so a common word lists the newest prompts of its best hits, and `truncated`
+ * says so. A hit past the wider window is not searched.
  */
 const SENT_PROMPT_WINDOW = 100;
 const SENT_PROMPT_WINDOW_MAX = 400;
@@ -3495,20 +3496,33 @@ const SENT_PROMPT_LOOKUP_BATCH = 16;
 const SENT_PROMPT_LINEAGE_DEPTH = 8;
 
 /**
- * One saved row as a sent prompt: a user row someone typed, with what they typed and its not-typed mark. `undefined` for a
- * reply, a goal continuation round (typed by nobody), a guest's note or an outside agent's text sent on, and a row with no
- * typed words (an attached document alone, a quote, the app's placeholder).
+ * `threadRelationships` reads one search may make to tell branch copies apart, across both windows. Past it a thread counts
+ * as its own family: a copy may list twice, but no prompt is dropped.
+ */
+export const SENT_PROMPT_LINEAGE_READS = 64;
+
+/**
+ * One saved row as a sent prompt: a user row someone typed, with its `typedText` (the indexed words, so what lists is
+ * what matched) and its not-typed mark. `undefined` for a reply, a goal continuation round (typed by nobody), a guest's
+ * note or an outside agent's text sent on, and a row with no typed words (an attached document alone, a quote, the app's
+ * placeholder), which has no `typedText`.
  */
 const sentPromptOf = (message: MessageDoc): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
     const stored = message.message as { content?: unknown; role?: string } | undefined;
+    const typed = message.typedText;
 
-    if (stored?.role !== "user" || message.agentName === GOAL_CONTINUATION_AGENT || messageCarriesGuestText(stored) || messageCarriesOutsideAgentText(stored)) {
+    if (
+        typed === undefined ||
+        message.tool ||
+        stored?.role !== "user" ||
+        message.agentName === GOAL_CONTINUATION_AGENT ||
+        messageCarriesGuestText(stored) ||
+        messageCarriesOutsideAgentText(stored)
+    ) {
         return undefined;
     }
 
-    const typed = typedTextOf(stored).trim();
-
-    return typed === "" ? undefined : { draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), typed };
+    return { draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), typed };
 };
 
 /** Whether the search may list a thread's prompts: the caller's own chat, not trashed, locked or temporary. */
@@ -3516,16 +3530,15 @@ const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is T
     thread !== null && thread.userId === userId && !thread.deleted && !isThreadLocked(thread) && thread.isTemporary !== true;
 
 /**
- * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the message text index
- * through `textSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt never lists.
- * Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index matches.
- * Trashed threads, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are dropped
- * too, and so are a guest's note or an outside agent's text sent on. A prompt is what the person typed: an attached
- * document or page, a quoted line and the app's own placeholder (an image asked for with no prompt) are neither listed
- * nor searched. A branch copies its rows, so the same prompt in chats of one branch family (`threadRelationships`) lists
- * once; the same words sent in unrelated chats list once per chat. A query longer than the search reads is cut to its
- * first characters and words, not refused. `truncated` says a matching prompt may be missing: the index window was full,
- * or more prompts matched than the list holds.
+ * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index
+ * (`typed_text_search`, `typedText`: what the person typed, no attached document or page, no quoted line and no app
+ * placeholder) through `typedTextSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt
+ * never lists. Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index
+ * matches. Trashed threads, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are
+ * dropped too, and so are a guest's note or an outside agent's text sent on. A branch copies its rows, so the same prompt
+ * in chats of one branch family (`threadRelationships`) lists once; the same words sent in unrelated chats list once per
+ * chat. A query longer than the search reads is cut to its first characters and words, not refused. `truncated` says a
+ * matching prompt may be missing: the index window was full, or more prompts matched than the list holds.
  */
 export const searchSentPrompts = authQuery
     .input({ searchQuery: v.string().max(MAX_LENGTH.long) })
@@ -3536,10 +3549,12 @@ export const searchSentPrompts = authQuery
         const terms = queryTerms(text);
 
         if (terms.length === 0) {
+            context.log.event("chat.search_sent_prompts", { listed: 0, truncated: false, widened: false });
+
             return { prompts: [], truncated: false };
         }
 
-        // The index reads every text part, attachments included: a hit counts only when the typed words match.
+        // The index already holds only typed words; this keeps a hit only when they match as the query reads them.
         const typedHits = (hits: ReadonlyArray<MessageDoc>) =>
             hits.flatMap((message) => {
                 const prompt = sentPromptOf(message);
@@ -3549,9 +3564,11 @@ export const searchSentPrompts = authQuery
         // Kept across both windows, so widening looks up only the threads the first window did not reach.
         const threads = new Map<string, ThreadDoc | null>();
         const roots = new Map<string, string>();
+        let lineageReads = 0;
 
         // The chat a thread was first branched from (itself when it is no branch). A sub-agent's chat copies no prompts, so its
-        // link is not followed. Read only for threads that share a prompt's words and send time with another thread.
+        // link is not followed. Read only for a prompt the list may show whose words and send time another thread shares,
+        // and at most `SENT_PROMPT_LINEAGE_READS` times per search.
         const lineageRoot = async (threadId: string): Promise<string> => {
             const walked: string[] = [];
             let current = threadId;
@@ -3564,7 +3581,13 @@ export const searchSentPrompts = authQuery
                     break;
                 }
 
+                if (lineageReads >= SENT_PROMPT_LINEAGE_READS) {
+                    // Not cached: the walk stopped for the budget, not at a root.
+                    return threadId;
+                }
+
                 walked.push(current);
+                lineageReads += 1;
 
                 const [link] = await context.db
                     .query("threadRelationships")
@@ -3587,7 +3610,7 @@ export const searchSentPrompts = authQuery
 
         // Every prompt one index window gives, after all the filters below.
         const collect = async (limit: number) => {
-            const { filled, messages } = await context.runQuery(internal.agent.messages.textSearch, { limit, searchAllMessagesForUserId: userId, text });
+            const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit, text, userId });
             const sent = typedHits(messages);
             const unseen = [...new Set(sent.map(({ message }) => message.threadId))].filter((threadId) => !threads.has(threadId));
 
@@ -3617,7 +3640,7 @@ export const searchSentPrompts = authQuery
                         b.message.stepOrder - a.message.stepOrder ||
                         String(a.message._id).localeCompare(String(b.message._id)),
                 );
-            // A branch copies its rows with the same text and send time. Only threads where that happens are walked to their root.
+            // A branch copies its rows with the same text and send time: only a thread whose prompt shares its key is walked.
             const threadsByKey = new Map<string, Set<string>>();
 
             for (const { message, typed } of listed) {
@@ -3628,27 +3651,26 @@ export const searchSentPrompts = authQuery
                 threadsByKey.set(key, group);
             }
 
-            const shared = [...new Set([...threadsByKey.values()].filter((group) => group.size > 1).flatMap((group) => [...group]))];
-            const rootOf = new Map<string, string>();
-
-            // One walk at a time, so a branch's walk stops at the ancestors a sibling's walk already reached.
-            for (const threadId of shared) {
-                rootOf.set(threadId, await lineageRoot(threadId));
-            }
-
-            // One prompt per branch family, listed from its newest copy.
+            // One prompt per branch family, listed from its newest copy. Newest first, and only until one past the list's
+            // limit is known, so no lineage is read for a prompt the list would not show.
             const seen = new Set<string>();
-            const distinct = listed.filter(({ message, typed }) => {
-                const key = `${rootOf.get(message.threadId) ?? message.threadId}\u{0}${copyKey(message, typed)}`;
+            const distinct: typeof listed = [];
 
-                if (seen.has(key)) {
-                    return false;
+            for (const entry of listed) {
+                if (distinct.length > SENT_PROMPT_LIMIT) {
+                    break;
                 }
 
-                seen.add(key);
+                const key = copyKey(entry.message, entry.typed);
+                const family = (threadsByKey.get(key)?.size ?? 0) > 1 ? await lineageRoot(entry.message.threadId) : entry.message.threadId;
+                const familyKey = `${family}\u{0}${key}`;
 
-                return true;
-            });
+                if (!seen.has(familyKey)) {
+                    seen.add(familyKey);
+                    distinct.push(entry);
+                }
+            }
+
             const prompts = distinct.slice(0, SENT_PROMPT_LIMIT).map(({ draftFrom, message, typed }) => {
                 return {
                     createdAt: message.createdAt,
@@ -3664,12 +3686,15 @@ export const searchSentPrompts = authQuery
         };
 
         let { cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW);
+        const widened = filled && prompts.length < SENT_PROMPT_LIMIT;
 
-        // Replies, documents, branch copies and trashed or temporary chats can take the first window; a common word whose first
-        // window already gave a full list stops there.
-        if (filled && prompts.length < SENT_PROMPT_LIMIT) {
+        // Branch copies and trashed or temporary chats can take the first window; a common word whose first window already
+        // gave a full list stops there.
+        if (widened) {
             ({ cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW_MAX));
         }
+
+        context.log.event("chat.search_sent_prompts", { listed: prompts.length, truncated: filled || cut, widened });
 
         return { prompts, truncated: filled || cut };
     });
@@ -3685,15 +3710,16 @@ export const isSentPromptAvailable = authQuery
     .query(async ({ args: { messageId }, ctx: context }) => {
         const { userId } = context.user;
         const [message] = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId] });
+        // No `typedText` is a row the typed-words index does not hold (`sentPromptOf`), so the search never lists it.
+        const thread =
+            message && message.userId === userId && sentPromptOf(message) !== undefined
+                ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: message.threadId as Id<"threads"> })
+                : null;
+        const available = listsSentPrompts(thread, userId);
 
-        // `text` unset is a row kept out of the search index, and a tool row is never searched.
-        if (!message || message.userId !== userId || message.tool || message.text === undefined || sentPromptOf(message) === undefined) {
-            return false;
-        }
+        context.log.event("chat.is_sent_prompt_available", { available });
 
-        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: message.threadId as Id<"threads"> });
-
-        return listsSentPrompts(thread, userId);
+        return available;
     });
 
 /**

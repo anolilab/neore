@@ -23,7 +23,7 @@ import { mergedStream, stream } from "../lib/streams";
 // Not through the `./client` barrel: it re-exports this module, so importing
 // it here is a cycle, and whichever side loads first sees the other's
 // validators as `undefined` at `.output(v.from(...))`.
-import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, isTool, searchText, sorted } from "./shared";
+import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, isTool, sorted, typedTextColumn } from "./shared";
 import {
     type Message,
     type MessageDoc,
@@ -305,14 +305,16 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             });
         }
 
+        const text = hideFromUserIdSearch ? undefined : extractText(message.message);
         const messageDocument = {
             ...rest,
             ...message,
             embeddingId,
             error: isFail ? error : message.error,
             status: isFail ? "failed" : (message.status ?? "success"),
-            text: hideFromUserIdSearch ? undefined : searchText(message.message),
+            text,
             tool: isTool(message.message),
+            typedText: typedTextColumn(message.message, text),
             userId,
             // Not `satisfies Omit<WithoutSystemFields<Doc<"messages">>, …>`.
             //
@@ -349,6 +351,8 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             await patchRow(context.db, "messages", pendingMessage, {
                 ...withoutUndefined({ ...messageDocument, order: pendingMessage.order, stepOrder: pendingMessage.stepOrder }),
                 ...(pendingMessage.embeddingId !== undefined && { embeddingId: messageDocument.embeddingId }),
+                // So are typed words: a pending row's must not stay searchable once its saved content has none.
+                ...(pendingMessage.typedText !== undefined && { typedText: messageDocument.typedText }),
             });
             // The row AS PATCHED: callers read the saved content back (the
             // approval requests a paused run records, the text memory
@@ -596,7 +600,13 @@ export const updateMessage = internalMutation
         if (args.patch.message !== undefined) {
             patch.message = args.patch.message;
             patch.tool = isTool(args.patch.message);
-            patch.text = searchText(args.patch.message);
+            patch.text = extractText(args.patch.message);
+            const typedText = typedTextColumn(args.patch.message, patch.text);
+
+            // Removed when nothing is typed any more (`patchRow` drops an unset field), so an edit leaves no old words searchable.
+            if (typedText !== undefined || message.typedText !== undefined) {
+                patch.typedText = typedText;
+            }
         }
 
         if (args.patch.status === "failed") {
@@ -1292,6 +1302,24 @@ export const textSearch = internalQuery
                 .filter((m) => !targetMessage || m.order < targetMessage.order || (m.order === targetMessage.order && m.stepOrder < targetMessage.stepOrder))
                 .map((item) => publicMessage(item)),
         };
+    });
+
+/**
+ * The caller's typed prompts that match `text`, from `typed_text_search`: only the words a person typed into a user row
+ * (`typedText`), never an attachment, a quote, a reply or a tool row. Locked threads are dropped (no proof is passed).
+ * `filled` says the index had at least `limit` hits, so a match past them may be missing.
+ */
+export const typedTextSearch = internalQuery
+    .input({ limit: v.number(), text: v.string().max(MAX_LENGTH.long), userId: v.string().max(MAX_LENGTH.short) })
+    .output(v.object({ filled: v.boolean(), messages: v.from(v.array(vMessageDocument)) }))
+    .query(async ({ args, ctx }) => {
+        const messages = await ctx.db
+            .query("messages")
+            .withSearchIndex("typed_text_search", (q) => q.search("typedText", args.text).eq("userId", args.userId))
+            .take(args.limit);
+        const visible = await withoutLockedThreads(ctx, messages, {});
+
+        return { filled: messages.length >= args.limit, messages: visible.map((item) => publicMessage(item)) };
     });
 
 export const getMessageSearchFields = internalQuery

@@ -14,7 +14,7 @@ import type {
 } from "@ai-sdk/provider-utils";
 import type { ModelMessage, TextPart, UIDataTypes, UIMessagePart, UITools } from "ai";
 
-import { isTypedPart } from "../chat/lib/attached-text";
+import { typedTextOf } from "../chat/lib/attached-text";
 import type { Message, MessageContentParts } from "./validators";
 
 /**
@@ -86,33 +86,19 @@ export const extractText = (message: Message | ModelMessage) => {
 };
 
 /**
- * The search copy of a message: the `text` column the message index reads. The index keeps only a row's first 1,000 terms,
- * and `/chat/start` saves an attached document ahead of the typed prompt, so a user message's typed parts go first here and
- * everything else (an attached document or page, a placeholder) after them. What is typed is `isTypedPart`, the one test
- * `typedTextOf` reads by. Every other message reads as {@link extractText}.
+ * The `typedText` column: what the person typed into a user message (`typedTextOf`: no attached document or page, no
+ * quote, no guest's note, no outside agent's text, no placeholder), which the composer's prompt search indexes
+ * (`typed_text_search`). Unset for every other row, for a row with nothing typed, and for a row kept out of search (no
+ * `text`), so the index and `text` agree on what is searchable. `text` stays the message as it was sent.
  */
-export const searchText = (message: Message | ModelMessage): string | undefined => {
-    if (message.role !== "user" || typeof message.content === "string") {
-        return extractText(message);
+export const typedTextColumn = (message: Message | ModelMessage | undefined, text: string | undefined): string | undefined => {
+    if (text === undefined) {
+        return undefined;
     }
 
-    return joinText([...message.content.filter((part) => isTypedPart(part)), ...message.content.filter((part) => !isTypedPart(part))]);
-};
+    const typed = typedTextOf(message as Parameters<typeof typedTextOf>[0]).trim();
 
-/**
- * A saved row's text in the order its parts were sent, for a reader that shows or sends the conversation (a summary, a group
- * turn's history, a media prompt). The `text` column is the search copy ({@link searchText}), which puts a user message's typed
- * parts ahead of an attached document; it still decides whether the row has text at all, so a row kept out of the index reads
- * as none here too.
- */
-export const sentOrderText = (row: { message?: unknown; text?: string }): string | undefined => {
-    const message = row.message as Message | undefined;
-
-    if (row.text === undefined || message?.role !== "user" || typeof message.content === "string") {
-        return row.text;
-    }
-
-    return extractText(message);
+    return typed === "" ? undefined : typed;
 };
 
 /**

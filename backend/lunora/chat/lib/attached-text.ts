@@ -161,10 +161,27 @@ export const blankQuotedLines = (text: string): string => {
 };
 
 /**
+ * The lines messenger writes about a received attachment into the caption's part (`messenger/media.ts`): a voice
+ * transcript's label, a voice message or file it could not read, a file it cannot show the model.
+ */
+const MESSENGER_ATTACHMENT_LINE_RE = /^\s*\[(?:Voice message[ :\]]|Attached file: |Attachment(?: "[^"\n]*")? not read: )/u;
+
+/** The typed lines of one text: up to the first attachment label or messenger's attachment line, without quoted lines. */
+const typedLinesOf = (text: string): string => {
+    const lines = text.split("\n");
+    const end = lines.findIndex((line) => isAttachedLine(line) || MESSENGER_ATTACHMENT_LINE_RE.test(line));
+
+    return withoutQuotedLines(end === -1 ? text : lines.slice(0, end).join("\n")).trimEnd();
+};
+
+/**
  * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's
  * note, an outside agent's text, the app's placeholders or a quoted block, each typed part kept as its own paragraph.
- * A memory quotes only this (`memory/evidence.ts`) and the composer's prompt search lists and matches only this
- * (`chat/functions.ts#searchSentPrompts`), so a sentence from an upload or a quote is never shown as their words.
+ * Typed words can come before an attachment in one text (messenger puts the caption and its attachment lines in one
+ * part): they are kept, and the rest is dropped from the first label on.
+ * A memory quotes only this (`memory/evidence.ts`), and the composer's prompt search indexes, lists and matches only this
+ * (stored as `messages.typedText` by `agent/shared.ts#typedTextColumn`), so a sentence from an upload or a quote is never
+ * shown as their words.
  */
 export const typedTextOf = (message: MessageLike | undefined): string => {
     if (message?.role !== "user") {
@@ -172,29 +189,31 @@ export const typedTextOf = (message: MessageLike | undefined): string => {
     }
 
     if (typeof message.content === "string") {
-        // Typed words can come before an attachment in one string (messenger): keep them, and drop the block from its label on.
-        const lines = message.content.split("\n");
-        const attached = lines.findIndex((line) => isAttachedLine(line));
-
-        return withoutQuotedLines(attached === -1 ? message.content : lines.slice(0, attached).join("\n")).trimEnd();
+        return typedLinesOf(message.content);
     }
 
     if (!Array.isArray(message.content)) {
         return "";
     }
 
-    return (message.content as ReadonlyArray<ContentPart>).flatMap((part) => (isTypedPart(part) ? [withoutQuotedLines(part.text)] : [])).join("\n\n");
+    return (message.content as ReadonlyArray<ContentPart>)
+        .flatMap((part) => {
+            const typed = isTypedPart(part) ? typedLinesOf(part.text) : "";
+
+            return typed.trim() === "" ? [] : [typed];
+        })
+        .join("\n\n");
 };
 
 /**
- * Whether one stored part of a user message is the person's typing: a text part that is no attached document or page, no
- * guest's note, no outside agent's text and no placeholder the app wrote. {@link typedTextOf} reads only these parts, and the
- * search copy of a message (`agent/shared.ts#searchText`) puts them first, so the two never disagree on what was typed.
+ * Whether one stored part of a user message may hold the person's typing: a text part that is no captured page, no
+ * guest's note, no outside agent's text and no placeholder the app wrote. {@link typedTextOf}, the one reader of typed words,
+ * reads only these parts, and only up to an attachment label in them.
  */
-export const isTypedPart = (part: ContentPart): part is ContentPart & { text: string } =>
+const isTypedPart = (part: ContentPart): part is ContentPart & { text: string } =>
     part.type === "text" &&
     typeof part.text === "string" &&
-    !isAttachedPart(part) &&
+    !hasPageMarker(part) &&
     !isGuestTextPart(part) &&
     !isOutsideAgentPart(part) &&
     !isPlaceholderPart(part);

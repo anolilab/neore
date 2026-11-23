@@ -91,7 +91,6 @@ import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
 import { toUserFacingError } from "./lib/user-facing-error";
-import { sentOrderText } from "../agent/shared";
 
 export const runStreamingAgent = internalAction
     .input(runStreamingAgentFields)
@@ -295,9 +294,9 @@ export const runStreamingAgent = internalAction
                     return;
                 }
 
-                // The prompt as it was sent: the `text` column is the search copy, with typed words ahead of an attached document.
+                // Get prompt from message
                 const message = sseMessages?.[0];
-                const prompt = (message && sentOrderText(message)) || "";
+                const prompt = message?.text || "";
                 // `saveMessage({ metadata: { fileIds } })` spreads its metadata onto the
                 // message row itself (see agent/client/messages.ts), so attachments land
                 // in `message.fileIds` — there is no `metadata` column on `messages`.

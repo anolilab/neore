@@ -321,3 +321,15 @@ export const addRunArgsSystemContext = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * Messages gained an optional `typedText` (`agent/shared.ts#typedTextColumn`) and its `typed_text_search` index, which the
+ * composer's prompt search reads. Nothing to fill: there is no stored data before the first deploy, and a row without it is
+ * only missing from that search. A no-op, so `lunora prepare` records the added optional column.
+ */
+export const addMessageTypedText = defineMigration({
+    id: "add-message-typed-text",
+    table: "messages",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
