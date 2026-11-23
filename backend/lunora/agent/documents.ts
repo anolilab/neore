@@ -247,7 +247,8 @@ export const updateDocument = authMutation
         }
 
         // Authorship alone is not enough: a save needs the thread's write grant now, so a removed or read-only collaborator cannot write.
-        const access = await resolveThreadReadAccess(ctx, documentRow.threadId, identity.userId, args.unlockProof);
+        // Read from the primary: a replica still holding a revoked grant must not let the save through.
+        const access = await resolveThreadReadAccess(ctx, documentRow.threadId, identity.userId, args.unlockProof, { primary: true });
 
         if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "write")) {
             throw new LunoraError("FORBIDDEN", "Forbidden");

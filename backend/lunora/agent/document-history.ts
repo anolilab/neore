@@ -8,6 +8,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { systemDb } from "../lib/rls/scope";
 import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-access";
 
 /**
@@ -75,7 +76,8 @@ export const listVersions = query
 
         const limit = args.limit ?? 50;
 
-        const versions = await ctx.db
+        // Past row-level security: the versions of a document are read by whoever `historyDocument` admitted, not only by their author.
+        const versions = await systemDb(ctx)
             .query("documentVersions")
             .withIndex("by_documentId_version", (q) => q.eq("documentId", args.documentId))
             .order("desc")
@@ -124,7 +126,8 @@ export const getVersion = query
             return null;
         }
 
-        const entry = await ctx.db
+        // Past row-level security, for the same reason as `listVersions`: the access decision was made in `historyDocument`.
+        const entry = await systemDb(ctx)
             .query("documentVersions")
             .withIndex("by_documentId_version", (q) => q.eq("documentId", args.documentId).eq("version", args.version))
             .first();
