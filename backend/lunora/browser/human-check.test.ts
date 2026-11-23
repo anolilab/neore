@@ -882,6 +882,34 @@ describe("the ask record", () => {
         await expect(wasAskedRecently()).resolves.toBe("detected");
     });
 
+    it("finds an ask stored under the site's dotted spelling, from before sites lost the dot", async () => {
+        const now = Date.now();
+        const stored = async (run: string, askedAt: number, site: string) =>
+            await harness.run(async (ctx: any) => await ctx.db.insert("browserHumanChecks", { askedAt, run, site, threadId, userId: "u-1" }));
+        const wasAsked = async (run: string, askedSince?: number) =>
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runQuery(wasHumanCheckAsked, { ...(askedSince !== undefined && { askedSince }), run, site: "a.example", threadId }),
+            );
+
+        await stored("r1", now - 60_000, "a.example.");
+
+        await expect(wasAsked("r1")).resolves.toBe("detected");
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId })),
+        ).resolves.toBeNull();
+        // A report marks that ask, rather than recording a second one.
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { reported: true, run: "r1", site: "a.example", threadId })),
+        ).resolves.toBeNull();
+        await expect(wasAsked("r1")).resolves.toBe("reported");
+
+        // An earlier reply's recent ask: the latest of the spellings.
+        await stored("r2", now - 30_000, "a.example..");
+        await expect(wasAsked("r3", now - HUMAN_CHECK_HAND_BACK_WINDOW_MS)).resolves.toBe("detected");
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect())).resolves.toHaveLength(2);
+    });
+
     it("stores the thread owner as the row's user whoever asked, so the owner's erasure removes it", async () => {
         // A collaborator's turn runs on the owner's shard; the claim takes no caller id.
         await harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "collaborator-turn", site: "a.example", threadId }));

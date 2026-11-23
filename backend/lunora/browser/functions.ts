@@ -12,6 +12,7 @@ import { isUniqueViolation } from "../lib/error-helpers";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
+import { hostSpelling } from "../lib/url-host";
 import { controlStateOf, watchableSessionId } from "./live-view-logic";
 // ── Utility ─────────────────────────────────────────────────────────────
 
@@ -373,25 +374,56 @@ const askKind = (row: { inText?: boolean; reported?: boolean } | null): "detecte
     return row.inText === true ? "detected_in_text" : "detected";
 };
 
+/**
+ * The spellings an ask about `site` may be stored under. One asked before sites lost their trailing dots
+ * (`lib/url-host.ts#urlHost`) keeps the host as the URL parser wrote it, `shop.example.` or `shop.example..`, and a reply
+ * running across that change must still find its ask and its decline there. No migration: a stored ask matters for the
+ * hand-back window, so these reads can go once every reply from before the change has ended.
+ */
+const siteSpellings = (site: string): string[] => (site === "" ? [site] : [site, `${site}.`, `${site}..`]);
+
+type HumanCheckRow = Doc<"browserHumanChecks">;
+
+/** The run's ask about `site`, under any of its spellings; `null` for none. */
+const runSiteAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string): Promise<HumanCheckRow | null> => {
+    for (const spelling of siteSpellings(site)) {
+        const row = await db
+            .query("browserHumanChecks")
+            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", spelling).eq("run", run))
+            .first();
+
+        if (row !== null) {
+            return row;
+        }
+    }
+
+    return null;
+};
+
 /** How the person was asked about `site` in this run, else (with `askedSince`) the thread's latest ask since then; `null` for none. */
 export const wasHumanCheckAsked = internalQuery
     .input({ askedSince: v.optional(v.number()), run: v.string(), site: v.string(), threadId: v.id("threads") })
     .output(v.union(v.literal("detected"), v.literal("detected_in_text"), v.literal("reported"), v.null()))
     .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
-        const inRun = await ctx.db
-            .query("browserHumanChecks")
-            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
-            .first();
+        const inRun = await runSiteAsk(ctx.db, threadId, run, site);
 
         if (inRun !== null || askedSince === undefined) {
             return askKind(inRun);
         }
 
-        const recent = await ctx.db
-            .query("browserHumanChecks")
-            .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", site).gte("askedAt", askedSince))
-            .order("desc")
-            .first();
+        let recent: HumanCheckRow | null = null;
+
+        for (const spelling of siteSpellings(site)) {
+            const row = await ctx.db
+                .query("browserHumanChecks")
+                .withIndex("by_threadId_site_askedAt", (q) => q.eq("threadId", threadId).eq("site", spelling).gte("askedAt", askedSince))
+                .order("desc")
+                .first();
+
+            if (row !== null && (recent === null || row.askedAt > recent.askedAt)) {
+                recent = row;
+            }
+        }
 
         return askKind(recent);
     });
@@ -416,19 +448,15 @@ export const claimHumanCheckAsk = internalMutation
             return null;
         }
 
-        if (reported === true) {
-            const asked = await ctx.db
-                .query("browserHumanChecks")
-                .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
-                .first();
+        // Also an ask stored under the site's dotted spelling, which the unique key does not see.
+        const asked = await runSiteAsk(ctx.db, threadId, run, site);
 
-            if (asked !== null) {
-                if (asked.reported !== true) {
-                    await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
-                }
-
-                return null;
+        if (asked !== null) {
+            if (reported === true && asked.reported !== true) {
+                await ctx.db.patch("browserHumanChecks", asked._id, { reported: true });
             }
+
+            return null;
         }
 
         try {
@@ -455,10 +483,7 @@ export const claimHumanCheckAsk = internalMutation
 /** The run's ask on `site`, else the run's latest ask since `askedSince`. */
 const runAsk = async (db: QueryCtx["db"], threadId: Id<"threads">, run: string, site: string | undefined, askedSince: number) => {
     if (site !== undefined) {
-        return await db
-            .query("browserHumanChecks")
-            .withIndex("by_threadId_site_run", (q) => q.eq("threadId", threadId).eq("site", site).eq("run", run))
-            .first();
+        return await runSiteAsk(db, threadId, run, site);
     }
 
     return await db
@@ -480,7 +505,7 @@ export const humanCheckAnswer = internalQuery
     .query(async ({ args: { askedSince, run, site, threadId }, ctx }) => {
         const row = await runAsk(ctx.db, threadId, run, site, askedSince);
 
-        return row === null ? null : { answer: row.resolution ?? "open", site: row.site };
+        return row === null ? null : { answer: row.resolution ?? "open", site: hostSpelling(row.site) };
     });
 
 /**
@@ -503,7 +528,7 @@ export const beginHumanCheckWait = internalMutation
             await ctx.db.patch("browserHumanChecks", row._id, { waitedAt: ctx.now });
         }
 
-        return { answer: row.resolution ?? "open", site: row.site, waited: row.waitedAt !== undefined };
+        return { answer: row.resolution ?? "open", site: hostSpelling(row.site), waited: row.waitedAt !== undefined };
     });
 
 // ── Browser Extension Functions (Phase 2) ───────────────────────────────

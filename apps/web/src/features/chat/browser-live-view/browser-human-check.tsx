@@ -20,17 +20,31 @@ import { usePassed, useStatusSkew } from "@/features/chat/browser-live-view/stat
 import { useChatThreadIdentity } from "@/features/chat/core/context/chat-context-hooks";
 import { useCRPC } from "@/lib/lunora/crpc";
 
-/** The host of `url`, lower case, as the backend names a check's site; `undefined` when it has none. */
+/**
+ * The host of `url` as the backend names a check's site (`backend/lunora/lib/url-host.ts#urlHost`, mirrored here, as the
+ * web app takes only types from the backend): lower case, without trailing dots, so a check at `shop.example./` is still
+ * on its site `shop.example`; `undefined` when it has none.
+ */
 const hostOf = (url: string | undefined): string | undefined => {
     if (url === undefined) {
         return undefined;
     }
 
+    let hostname: string;
+
     try {
-        return new URL(url).hostname.toLowerCase();
+        ({ hostname } = new URL(url));
     } catch {
         return undefined;
     }
+
+    let end = hostname.length;
+
+    while (end > 0 && hostname[end - 1] === ".") {
+        end -= 1;
+    }
+
+    return hostname.slice(0, end).toLowerCase();
 };
 
 interface HumanCheckOutput {
