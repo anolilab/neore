@@ -713,8 +713,9 @@ export const schema = defineSchema({
         sandboxId: v.optional(v.string()),
         // The step a `setup-failed` run stopped at and the capped, redacted end of its log, kept for "Fix setup".
         setupFailure: v.optional(v.object({ logTail: v.string(), step: v.string() })),
-        // The "Fix setup" run started from this one; at most one.
+        // The newest "Fix setup" run started from this one; every attempt is in `setupFixRunIds`, oldest first.
         setupFixRunId: v.optional(v.id("codingAgentRuns")),
+        setupFixRunIds: v.optional(v.array(v.id("codingAgentRuns"))),
         startedAt: v.optional(v.number()),
         status: vCodingAgentRunStatus,
         summary: v.optional(v.string()),

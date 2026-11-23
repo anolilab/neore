@@ -71,6 +71,8 @@ const vRunView = v.object({
     // The prepared "Fix setup" task, while one may be started from this run.
     setupFix: v.union(v.object({ prompt: v.string(), step: v.string() }), v.null()),
     setupFixRunId: v.union(v.id("codingAgentRuns"), v.null()),
+    // Every "Fix setup" attempt started from this run, oldest first; the view shows each one.
+    setupFixRunIds: v.array(v.id("codingAgentRuns")),
     startedAt: v.union(v.number(), v.null()),
     status: vCodingAgentRunStatus,
     summary: v.union(v.string(), v.null()),
@@ -162,6 +164,7 @@ const toView = (run: RunDoc) => {
         repoUrl: run.repoUrl,
         setupFix: setupFixView(run),
         setupFixRunId: run.setupFixRunId ?? null,
+        setupFixRunIds: run.setupFixRunIds ?? [],
         startedAt: run.startedAt ?? null,
         status: run.status,
         summary: run.summary ?? null,
@@ -440,7 +443,11 @@ export const startSetupFix = authMutation
         });
 
         if ("runId" in created) {
-            await patchById(ctx.db, "codingAgentRuns", run._id, { setupFixRunId: created.runId, updatedAt: ctx.now });
+            await patchById(ctx.db, "codingAgentRuns", run._id, {
+                setupFixRunId: created.runId,
+                setupFixRunIds: [...(run.setupFixRunIds ?? []), created.runId],
+                updatedAt: ctx.now,
+            });
         }
 
         ctx.log.event("coding_agents.start_setup_fix", { started: "runId" in created, step });

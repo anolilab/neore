@@ -28,7 +28,8 @@
   `skipRepoSetup` to `buildRunScript`. Nothing reads it there yet: the repo-setup
   change must honour it (its TODO is on the parameter). `startSetupFix` takes the
   task the person edited, after the provider-key check. One fix at a time per failed
-  run (`setupFixRunId`); a fix that ended `failed` or `cancelled` can be retried.
+  run (`setupFixRunId`, the newest); a fix that ended `failed` or `cancelled` can be
+  retried, and every attempt stays in `setupFixRunIds`, shown under the failed run.
 - **Project repositories** — a project lists the repositories its runs pick
   from, one `projectRepositories` row each, added and edited only by the
   per-row procedures in `projects/functions.ts`; a project delete and the

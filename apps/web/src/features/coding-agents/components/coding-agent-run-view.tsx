@@ -18,7 +18,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button, buttonVariants } from "@neore/ui/components/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronRight, CircleStop, ExternalLink, GitPullRequest, Loader2, SquareTerminal } from "lucide-react";
 import type { FC } from "react";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -148,6 +148,8 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     const { data: fixRun } = useQuery(crpc.coding_agents.functions.getRun.queryOptions(run.setupFixRunId ? { runId: run.setupFixRunId } : skipToken));
     // A retry is offered once the linked fix run has ended without finishing; the server checks again when it starts.
     const fixRunEnded = fixRun?.status === "failed" || fixRun?.status === "cancelled";
+    // Every "Fix setup" attempt under this run, oldest first, each its own live query: an earlier attempt stays reachable after a retry.
+    const attempts = useQueries({ queries: run.setupFixRunIds.map((runId) => crpc.coding_agents.functions.getRun.queryOptions({ runId })) });
 
     const openPullRequest = () => {
         createPr.mutate(
@@ -260,7 +262,11 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                 )}
             </div>
 
-            {fixRun && <CodingAgentRunView className="mb-0 max-w-none" run={fixRun} />}
+            {run.setupFixRunIds.map((runId, index) => {
+                const attempt = attempts[index]?.data;
+
+                return attempt ? <CodingAgentRunView className="mb-0 max-w-none" key={runId} run={attempt} /> : null;
+            })}
         </section>
     );
 };
