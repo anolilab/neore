@@ -429,6 +429,20 @@ export function readTarget(
             // out: its own attributes may change in a press handler, and the press re-read must not refuse an ordinary click for that.
             const activatable = control.closest("button, input, label, a");
             const activatedControl = activatable instanceof HTMLLabelElement ? activatable.control : activatable;
+            // The form that owns the activated control, by its place in the document and its submission attributes: a page that moves
+            // the control to another form, or changes the form it submits, changes the key.
+            const activatedForm = activatedControl === null ? null : ((activatedControl as { form?: HTMLFormElement | null }).form ?? null);
+            const activatedFormKey =
+                activatedForm === null
+                    ? ""
+                    : [
+                          String([...document.forms].indexOf(activatedForm)),
+                          activatedForm.id,
+                          activatedForm.getAttribute("action") ?? "",
+                          activatedForm.getAttribute("method") ?? "",
+                          activatedForm.getAttribute("enctype") ?? "",
+                          activatedForm.getAttribute("target") ?? "",
+                      ].join("\u{1}");
             const activatedKey = [
                 activatable instanceof HTMLLabelElement ? (activatable.getAttribute("for") ?? "") : "",
                 activatedControl === null || activatedControl === control
@@ -441,7 +455,9 @@ export function readTarget(
                           activatedControl.getAttribute("formaction") ?? "",
                           activatedControl.getAttribute("formmethod") ?? "",
                           activatedControl.getAttribute("formtarget") ?? "",
-                          (activatedControl as { form?: HTMLFormElement | null }).form?.getAttribute("action") ?? "",
+                          activatedControl.getAttribute("form") ?? "",
+                          activatedControl.getAttribute("value") ?? "",
+                          activatedFormKey,
                       ].join("\u{1}"),
             ].join("\u{2}");
             // The submit-like and subscribe-like flags are part of it too: a name change that makes a control submit-like (an arrow named

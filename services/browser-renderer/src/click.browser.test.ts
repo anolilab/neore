@@ -555,6 +555,23 @@ describe("readTarget in a page", () => {
         expect(page.url()).not.toContain("/cart/pay");
     });
 
+    it("a label whose submit button is moved to another form after the approval read is refused, and nothing is submitted", async () => {
+        await pageWith(
+            page,
+            `<form id="a" action="/cart/confirm"></form><form id="b" action="/cart/other"></form><label id="pay-label" for="pay">Pay now</label><button id="pay" type="submit" form="a">Pay</button>`,
+        );
+        const label = await page.$("#pay-label");
+        const seen = await label!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        await page.evaluate(() => {
+            document.querySelector("#pay")!.setAttribute("form", "b");
+        });
+        const read = await label!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.clicked).toBe(false);
+        expect(read.refused).toBe("changed");
+    });
+
     it("an approved image button submits its coordinates, and a named submit button submits its name and value", async () => {
         const gif = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
