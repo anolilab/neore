@@ -13054,8 +13054,8 @@ msgid "Every chat, unless its project sets the role."
 msgstr "Każdy czat, chyba że jego projekt ustawia tę rolę."
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
-msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-msgstr "Każde kliknięcie jest sprawdzane, a potem wykonywane naprawdę. Strona może zmienić przycisk między sprawdzeniem a naciśnięciem, więc kliknięcie zakupu może nie zostać sprawdzone."
+#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgstr "Każde kliknięcie jest sprawdzane, a potem wykonywane naprawdę. Strona może zmienić przycisk między sprawdzeniem a naciśnięciem, więc kliknięcie zakupu może nie zostać sprawdzone."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -25007,6 +25007,10 @@ msgstr "Zwykłe przyciski i linki są sprawdzane, a potem klikane naprawdę, dzi
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
 #~ msgstr "Zwykłe przyciski i linki dostają prawdziwe kliknięcia, więc wyskakujące okna i sprawdzenia prawdziwego kliknięcia działają. Zakupy i zatwierdzone kliknięcia nadal są sprawdzane na stronie."
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "Zwykłe kliknięcia są sprawdzane, a potem wykonywane naprawdę. Strona może zmienić zwykły przycisk między sprawdzeniem a kliknięciem, więc może stać się zakupem niezauważenie. Zakupy, które zatwierdzisz, nadal są sprawdzane na stronie."
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64

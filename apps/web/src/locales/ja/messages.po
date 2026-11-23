@@ -13054,8 +13054,8 @@ msgid "Every chat, unless its project sets the role."
 msgstr "プロジェクトでロールが設定されていない限り、すべてのチャット。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
-msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-msgstr "すべてのクリックは確認された後に実際に行われます。確認と押下の間にページがボタンを変更することがあるため、購入のクリックは確認されないことがあります。"
+#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgstr "すべてのクリックは確認された後に実際に行われます。確認と押下の間にページがボタンを変更することがあるため、購入のクリックは確認されないことがあります。"
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -25007,6 +25007,10 @@ msgstr "通常のボタンとリンクは確認されたあとに実際にクリ
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
 #~ msgstr "通常のボタンとリンクは実際のクリックを受け取るため、ポップアップや実クリックの確認が動作します。購入と承認済みのクリックはページ内で確認されます。"
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "通常のクリックは確認されたあとに実際に実行されます。ページは確認とクリックの間に通常のボタンを変更でき、気づかれないまま購入ボタンになる可能性があります。承認した購入は引き続きページ内で確認されます。"
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64

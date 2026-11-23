@@ -13054,8 +13054,8 @@ msgid "Every chat, unless its project sets the role."
 msgstr "Todas as conversas, a menos que o projeto defina a função."
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
-msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-msgstr "Cada clique é verificado e depois feito a sério. Uma página pode mudar um botão entre a verificação e a pressão, por isso um clique de compra pode não ser verificado."
+#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgstr "Cada clique é verificado e depois feito a sério. Uma página pode mudar um botão entre a verificação e a pressão, por isso um clique de compra pode não ser verificado."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -25007,6 +25007,10 @@ msgstr "Botões e links comuns são verificados e depois clicados de verdade, pa
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
 #~ msgstr "Botões e links comuns recebem cliques reais, por isso pop-ups e verificações de clique real funcionam. Compras e cliques aprovados continuam verificados na página."
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "Cliques comuns são verificados e depois executados de verdade. Uma página pode alterar um botão comum entre a verificação e o clique, e assim ele pode virar uma compra sem ser visto. As compras que você aprova continuam verificadas na página."
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64

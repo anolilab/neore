@@ -13053,8 +13053,8 @@ msgid "Every chat, unless its project sets the role."
 msgstr "Every chat, unless its project sets the role."
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
-msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-msgstr "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgstr "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -25006,6 +25006,10 @@ msgstr "Ordinary buttons and links are checked, then clicked for real, so popups
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
 #~ msgstr "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64

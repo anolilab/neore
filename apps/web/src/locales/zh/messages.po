@@ -13054,8 +13054,8 @@ msgid "Every chat, unless its project sets the role."
 msgstr "所有聊天，除非其项目设置了该角色。"
 
 #: src/features/settings/components/chat/agent-settings.tsx:70
-msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
-msgstr "每次点击都会先检查，然后真实执行。页面可能在检查和按下之间更改按钮，因此购买点击可能无法被检查。"
+#~ msgid "Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked."
+#~ msgstr "每次点击都会先检查，然后真实执行。页面可能在检查和按下之间更改按钮，因此购买点击可能无法被检查。"
 
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
@@ -25007,6 +25007,10 @@ msgstr "普通按钮和链接会先被检查，然后真实点击，因此弹窗
 #: src/features/settings/components/chat/agent-settings.tsx:65
 #~ msgid "Ordinary buttons and links get real clicks, so popups and real-click checks work. Purchases and approved clicks stay checked in the page."
 #~ msgstr "普通按钮和链接接收真实点击，因此弹窗和真实点击检查可以正常工作。购买和已批准的点击仍在页面内检查。"
+
+#: src/features/settings/components/chat/agent-settings.tsx:70
+msgid "Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page."
+msgstr "普通点击会先被检查，然后真实执行。页面可能在检查与点击之间改变一个普通按钮，使其在不知情的情况下变成购买按钮。你批准的购买仍会在页面中检查。"
 
 #: src/features/auth/components/organization/organization-logo.tsx:62
 #: src/features/auth/components/organization/organization-view.tsx:64

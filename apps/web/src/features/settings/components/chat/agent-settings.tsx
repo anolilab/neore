@@ -67,7 +67,7 @@ const AgentSettings: FC = () => {
             mode: "pointer",
         },
         {
-            description: t`Every click is checked, then made for real. A page can change a button between the check and the press, so a purchase click may not be checked.`,
+            description: t`Ordinary clicks are checked, then made for real. A page can change an ordinary button between the check and the press, so it can become a purchase unseen. Purchases you approve are still checked in the page.`,
             label: t`Real clicks for everything`,
             mode: "all",
         },
