@@ -5,13 +5,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { setDraftBound, useBoundDraftStore } from "@/features/chat/split/composer-drafts";
+import { setDraftBound, setRestoreAfterSend, useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
 import { prefillComposer, prefillThreadOf, resetComposerPrefillForTests, useComposerPrefill, useComposerTakesPrefill } from "./composer-prefill";
 
 beforeEach(() => {
     resetComposerPrefillForTests();
-    useBoundDraftStore.setState({ owners: new Set<string>(), restoreAfterSend: false });
+    useBoundDraftStore.setState({ owners: new Set<string>(), restoreAfterSendFor: undefined });
 });
 
 describe(useComposerPrefill, () => {
@@ -78,6 +78,31 @@ describe(useComposerPrefill, () => {
         act(() => setDraftBound("thread-a", true));
 
         expect(taken.mock.calls).toStrictEqual([["prompt"]]);
+    });
+
+    it("holds a prompt only for the thread whose draft a send brings back, and hands it over once that restore ends", () => {
+        const takenByA = vi.fn();
+        const takenByB = vi.fn();
+
+        act(() => {
+            setDraftBound("thread-a", true);
+            setDraftBound("thread-b", true);
+            setRestoreAfterSend("thread-a");
+        });
+        renderHook(() => useComposerPrefill("thread-a", takenByA, { awaitStoredDraft: true }));
+        renderHook(() => useComposerPrefill("thread-b", takenByB, { awaitStoredDraft: true }));
+        act(() => {
+            prefillComposer("thread-a", "catch up a");
+            prefillComposer("thread-b", "catch up b");
+        });
+
+        // Thread a's send is still bringing its draft back; thread b's composer does not wait for it.
+        expect(takenByA).not.toHaveBeenCalled();
+        expect(takenByB.mock.calls).toStrictEqual([["catch up b"]]);
+
+        act(() => setRestoreAfterSend(undefined));
+
+        expect(takenByA.mock.calls).toStrictEqual([["catch up a"]]);
     });
 
     it("tells a control whether its thread has a composer that takes prompts", () => {

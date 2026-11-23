@@ -27,8 +27,10 @@ export const isPlainRepo = (repo: string): boolean => PLAIN_REPO.test(repo) && !
 /**
  * The prompt the Catch up button puts in the composer for a pull request whose branch is behind its base. Written for the
  * coding agent (git commands and branch names read the same in any language), and the person edits it before sending. Every
- * ref is fetched by name: a single-branch clone has none of them until then. The pull request's head is fetched into
- * `refs/neore/`, apart from `refs/remotes/origin/`, so no branch of origin can overwrite it.
+ * ref is fetched by name: a single-branch clone has none of them until then. Each is fetched into its own flat name under
+ * `refs/neore/` (`pull-<n>-head`, `pull-<n>-base`, `pull-<n>-branch`), apart from `refs/remotes/origin/`: no branch of origin can
+ * overwrite one, and a stale tracking ref (`origin/release` after its branch was deleted) cannot block one (`origin/release/2.0`).
+ * The names hold no branch name and nest nothing, so none is ever both a ref and a directory.
  *
  * Whether the head may be pushed is decided only by `headInBaseRepository`, the host's repository identity: a fork's branch can
  * share a name and even a commit with one of origin's. Then the only push is to `refs/heads/<headBranch>` of origin, after origin
@@ -54,8 +56,8 @@ export const catchUpPrompt = ({
     repository: string;
 }): string => {
     const pull = String(number);
-    const pullRef = `refs/neore/pull/${pull}`;
-    const base = `refs/remotes/origin/${baseBranch}`;
+    const pullRef = `refs/neore/pull-${pull}-head`;
+    const base = `refs/neore/pull-${pull}-base`;
     // Fetch and push URLs can differ (`pushurl`, `pushInsteadOf`, several URLs): each must be exactly one, and this repository.
     const checkOrigin = `1. Check that \`git remote get-url --all origin\` and \`git remote get-url --push --all origin\` each print exactly one URL, and that both are ${repository} on ${host} (ignoring case and a trailing \`.git\`). Otherwise stop and say so.`;
     const fetchBaseAndPull = `\`git fetch origin +refs/heads/${baseBranch}:${base}\` and the pull request's own head with \`git fetch origin +refs/pull/${pull}/head:${pullRef}\``;
@@ -82,7 +84,7 @@ export const catchUpPrompt = ({
         ].join("\n");
     }
 
-    const head = `refs/remotes/origin/${headBranch}`;
+    const head = `refs/neore/pull-${pull}-branch`;
     // The push's lease is the commit step 3 checked and recorded, not a ref: a background fetch can move `head`, and another
     // Catch up run for this pull request in the same repository or a linked worktree can move `pullRef`, after step 3.
     const leaseCommit = "<commit from step 3>";
@@ -93,7 +95,7 @@ export const catchUpPrompt = ({
         "",
         checkOrigin,
         `2. Fetch by name, which also works in a clone of one branch: \`git fetch origin +refs/heads/${headBranch}:${head}\`, ${fetchBaseAndPull}.`,
-        `3. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, stop and say so: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 7 leases on that commit. Then run \`git switch ${headBranch}\` (\`git switch -c ${headBranch} --track ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: stop and say so.`,
+        `3. If \`git rev-parse ${head}\` differs from \`git rev-parse ${pullRef}\`, stop and say so: origin's ${headBranch} is not this pull request's head right now. Otherwise record the commit \`git rev-parse ${pullRef}\` printed and say it: step 7 leases on that commit. Then run \`git switch --no-guess ${headBranch}\` (\`git switch -c ${headBranch} ${head}\` when there is no local branch of that name), then \`git merge --ff-only ${head}\`. If that fails, or \`git rev-parse HEAD\` then differs from \`git rev-parse ${head}\`, the local branch has commits origin does not: stop and say so.`,
         ...finish,
         `7. Push only this pull request's branch: \`git push --no-follow-tags --force-with-lease=refs/heads/${headBranch}:${leaseCommit} origin HEAD:refs/heads/${headBranch}\`, writing the commit you recorded in step 3 in place of ${leaseCommit}. If this environment cannot push or the push is refused, leave the rebased commits in place and say so. Do not push to any other branch or remote.`,
     ].join("\n");

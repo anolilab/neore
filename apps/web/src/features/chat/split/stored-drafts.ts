@@ -506,7 +506,7 @@ const listen = (): void => {
             }
 
             // Only now: a prompt held back meanwhile (`composer-prefill.ts`) joins the restored draft instead of keeping it out.
-            setRestoreAfterSend(false);
+            setRestoreAfterSend(undefined);
         }
 
         if (
@@ -569,7 +569,7 @@ const listen = (): void => {
                     // Sent: a failed send hands the text back, and it must stay the prefill, not overwrite the chat's draft. The
                     // draft comes back once the send ends (above).
                     state.prefillSending = true;
-                    setRestoreAfterSend(true);
+                    setRestoreAfterSend(binding?.owner);
                 } else {
                     draftOwnership.prefill = undefined;
 
@@ -677,7 +677,7 @@ export const resetStoredDraftsForTests = (): void => {
     state.mine.clear();
     state.prefill = false;
     state.prefillSending = false;
-    setRestoreAfterSend(false);
+    setRestoreAfterSend(undefined);
     state.parkedPrefills.clear();
     state.released = undefined;
     state.isReleased = false;

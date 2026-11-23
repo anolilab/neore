@@ -6,7 +6,8 @@
  * thread: one made while that thread is not open is taken when it opens, a second one does not replace the first, the
  * same one twice is queued once, and another thread's composer leaves them alone. The shared thread composer (a comparison
  * parent's too) takes them only once its stored draft is back (`useBoundDraftStore`), and not while an untouched prefilled
- * message is sending: its saved draft comes back when the send ends, and text that arrived first would keep it out. Held
+ * message of THAT thread is sending: its saved draft comes back when the send ends, and text that arrived first would keep it
+ * out. Another thread's send holds nothing. Held
  * prompts then go in after the restored draft, in order.
  */
 
@@ -99,7 +100,7 @@ export const useComposerPrefill = (threadId: string | undefined, onPrefill: (tex
 
             const bound = useBoundDraftStore.getState();
 
-            if (awaitStoredDraft && (!bound.owners.has(threadId) || bound.restoreAfterSend)) {
+            if (awaitStoredDraft && (!bound.owners.has(threadId) || bound.restoreAfterSendFor === threadId)) {
                 return;
             }
 
