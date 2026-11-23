@@ -360,6 +360,7 @@ const insertRun = async (ctx: MutationCtx, args: NewRun): Promise<{ error: strin
     }
 
     const { now } = ctx;
+    // lunora-advisor-exempt owner_field_from_args_not_auth -- a helper, not a procedure: every caller passes the run's owner from the server side (startSetupFix: ctx.user.userId; a task: its owner from the claim; the chat tool: the authenticated user). createRun is internal.
     const runId = await ctx.db.insert("codingAgentRuns", {
         agent: args.agent,
         branch,
