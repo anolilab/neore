@@ -803,6 +803,12 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                         {projectRowsVisible(scope) && projectFilter === undefined && hasMoreProjects && (
                             <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Only the first ${projects.length} projects are listed here.`}</p>
                         )}
+                        {/* The archived hits are what is left of the closest matches overall, so archived threads ranked below many active ones can be missing. */}
+                        {isMeaningSearchCurrent && scope.archived && !isMeaningSearchFailed && (
+                            <p className="text-muted-foreground px-3 pt-2 text-xs">
+                                {t`Related archived threads are picked from the closest matches across all your threads, so some may not be listed.`}
+                            </p>
+                        )}
                         {/* A failed meaning search is said, so an empty or short list is not taken for "nothing related". */}
                         {isMeaningSearchCurrent && isMeaningSearchFailed ? (
                             <p className="text-destructive px-3 pt-2 text-xs" role="alert">

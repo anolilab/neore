@@ -4345,7 +4345,7 @@ msgstr "Archive the open thread, or restore it when it is archived ({0})"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:834
+#: src/components/command-palette.tsx:840
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "Archive thread"
@@ -7055,7 +7055,7 @@ msgstr "Clone or create new…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:905
+#: src/components/command-palette.tsx:911
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -9783,7 +9783,7 @@ msgstr "Cuba"
 msgid "Currency Conversion"
 msgstr "Currency Conversion"
 
-#: src/components/command-palette.tsx:830
+#: src/components/command-palette.tsx:836
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10688,7 +10688,7 @@ msgstr "Delete this login?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:588
-#: src/components/command-palette.tsx:858
+#: src/components/command-palette.tsx:864
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -22191,7 +22191,7 @@ msgid "navigate"
 msgstr "navigate"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:891
+#: src/components/command-palette.tsx:897
 msgid "Navigate"
 msgstr "Navigate"
 
@@ -23288,7 +23288,7 @@ msgstr "No results found"
 msgid "No results found for “{searchTerm}”"
 msgstr "No results found for “{searchTerm}”"
 
-#: src/components/command-palette.tsx:812
+#: src/components/command-palette.tsx:818
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "No results found."
@@ -24260,7 +24260,7 @@ msgid "Opacity"
 msgstr "Opacity"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:779
-#: src/components/command-palette.tsx:897
+#: src/components/command-palette.tsx:903
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -28173,6 +28173,10 @@ msgstr "Reject"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 
+#: src/components/command-palette.tsx:809
+msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+msgstr "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+
 #: src/components/command-palette.tsx:702
 msgid "Related threads"
 msgstr "Related threads"
@@ -30020,7 +30024,7 @@ msgstr "Search academic papers and PDFs"
 msgid "Search across the entire internet"
 msgstr "Search across the entire internet"
 
-#: src/components/command-palette.tsx:809
+#: src/components/command-palette.tsx:815
 msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
 msgstr "Search by meaning failed, so related threads are not listed. Try again in a moment."
 
@@ -37296,7 +37300,7 @@ msgid "unarchive"
 msgstr "unarchive"
 
 #: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:834
+#: src/components/command-palette.tsx:840
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "Unarchive thread"

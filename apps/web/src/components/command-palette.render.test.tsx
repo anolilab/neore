@@ -192,6 +192,7 @@ const LOADED_ONLY = /threads loaded here are filtered;/;
 const BETA_TEXT = /beta cohort starts/;
 const FIRST_PROJECTS_ONLY = /Only the first 1 projects are listed here/;
 const MEANING_FAILED = /Search by meaning failed/;
+const ARCHIVED_MEANING_NOTE = /closest matches across all your threads/;
 
 /** True when `later` comes after `earlier` in document order. */
 const isBefore = (earlier: Node, later: Node): boolean => earlier.compareDocumentPosition(later) === Node.DOCUMENT_POSITION_FOLLOWING;
@@ -614,6 +615,22 @@ describe("command palette filters and meaning search", () => {
         await waitPastDebounce();
 
         expect(harness.meaningArgs).toContainEqual({ archivedOnly: true, query: "the invoice bug" });
+    });
+
+    it("says archived meaning hits come from the closest matches overall, and only under the Archived filter", async () => {
+        harness.threads = [];
+        harness.meaning = [{ archived: true, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+        await waitPastDebounce();
+
+        expect(screen.queryByText(ARCHIVED_MEANING_NOTE)).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+
+        expect(await screen.findByText(ARCHIVED_MEANING_NOTE, undefined, { timeout: 3000 })).toBeTruthy();
     });
 
     it("does not embed a query again when the text is edited back to it, and drops the hits when the palette closes", async () => {

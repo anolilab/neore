@@ -4346,7 +4346,7 @@ msgstr "归档当前对话；若已归档则取消归档（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:834
+#: src/components/command-palette.tsx:840
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "归档对话"
@@ -7056,7 +7056,7 @@ msgstr "克隆或新建…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:905
+#: src/components/command-palette.tsx:911
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -9784,7 +9784,7 @@ msgstr "古巴"
 msgid "Currency Conversion"
 msgstr "货币换算"
 
-#: src/components/command-palette.tsx:830
+#: src/components/command-palette.tsx:836
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10689,7 +10689,7 @@ msgstr "删除此登录信息？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:588
-#: src/components/command-palette.tsx:858
+#: src/components/command-palette.tsx:864
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -22192,7 +22192,7 @@ msgid "navigate"
 msgstr "导航"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:891
+#: src/components/command-palette.tsx:897
 msgid "Navigate"
 msgstr "导航"
 
@@ -23289,7 +23289,7 @@ msgstr "未找到结果"
 msgid "No results found for “{searchTerm}”"
 msgstr "未找到“{searchTerm}”的结果"
 
-#: src/components/command-palette.tsx:812
+#: src/components/command-palette.tsx:818
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "未找到结果。"
@@ -24261,7 +24261,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:779
-#: src/components/command-palette.tsx:897
+#: src/components/command-palette.tsx:903
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -28174,6 +28174,10 @@ msgstr "拒绝"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "在审阅中拒绝结果会将运行标记为失败。被拒绝的回答会保留在记录中。"
 
+#: src/components/command-palette.tsx:809
+msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+msgstr "相关的已归档对话是从你所有对话中最接近的匹配里选出的，因此可能有部分未列出。"
+
 #: src/components/command-palette.tsx:702
 msgid "Related threads"
 msgstr "相关对话"
@@ -30021,7 +30025,7 @@ msgstr "搜索学术论文和 PDF"
 msgid "Search across the entire internet"
 msgstr "搜索整个互联网"
 
-#: src/components/command-palette.tsx:809
+#: src/components/command-palette.tsx:815
 msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
 msgstr "按含义搜索失败，因此未列出相关对话。请稍后重试。"
 
@@ -37297,7 +37301,7 @@ msgid "unarchive"
 msgstr "取消归档"
 
 #: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:834
+#: src/components/command-palette.tsx:840
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "取消归档对话"

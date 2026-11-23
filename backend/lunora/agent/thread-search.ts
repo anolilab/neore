@@ -461,8 +461,10 @@ export interface MeaningThread {
  * The palette's meaning search for one person: embed the query, read the nearest
  * title and summary vectors among their own, map each to its thread and keep the
  * best ones. With `archivedOnly`, active threads are dropped before the result
- * limit, so archived matches ranked below them still fill it. Returns `[]` for a
- * query too short to embed, or when the model is refused for the person.
+ * limit, so archived candidates ranked below them still fill it. The candidates are
+ * still the closest vectors overall: the vectors carry no archived flag to filter on
+ * in the index, so an archived thread ranked below every candidate is not found.
+ * Returns `[]` for a query too short to embed, or when the model is refused for the person.
  */
 export const searchThreadsByMeaningFor = async (ctx: ActionCtx, args: { archivedOnly?: boolean; query: string; userId: string }): Promise<MeaningThread[]> => {
     const query = args.query.trim();

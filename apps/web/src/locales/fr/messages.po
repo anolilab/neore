@@ -4346,7 +4346,7 @@ msgstr "Archive la conversation ouverte, ou la restaure si elle est archivée ({
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
 #: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:834
+#: src/components/command-palette.tsx:840
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "Archiver la conversation"
@@ -7056,7 +7056,7 @@ msgstr "Cloner ou créer…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:905
+#: src/components/command-palette.tsx:911
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -9784,7 +9784,7 @@ msgstr "Cuba"
 msgid "Currency Conversion"
 msgstr "Conversion de devises"
 
-#: src/components/command-palette.tsx:830
+#: src/components/command-palette.tsx:836
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -10689,7 +10689,7 @@ msgstr "Supprimer cet identifiant ?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
 #: src/components/command-palette.tsx:588
-#: src/components/command-palette.tsx:858
+#: src/components/command-palette.tsx:864
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -22192,7 +22192,7 @@ msgid "navigate"
 msgstr "naviguer"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:891
+#: src/components/command-palette.tsx:897
 msgid "Navigate"
 msgstr "Naviguer"
 
@@ -23289,7 +23289,7 @@ msgstr "Aucun résultat trouvé"
 msgid "No results found for “{searchTerm}”"
 msgstr "Aucun résultat trouvé pour « {searchTerm} »"
 
-#: src/components/command-palette.tsx:812
+#: src/components/command-palette.tsx:818
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "Aucun résultat trouvé."
@@ -24261,7 +24261,7 @@ msgid "Opacity"
 msgstr "Opacité"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:779
-#: src/components/command-palette.tsx:897
+#: src/components/command-palette.tsx:903
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -28174,6 +28174,10 @@ msgstr "Refuser"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "Rejeter un résultat en relecture marque l’exécution comme échouée. La réponse rejetée reste consignée."
 
+#: src/components/command-palette.tsx:809
+msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
+msgstr "Les conversations archivées liées sont choisies parmi les correspondances les plus proches de toutes vos conversations ; certaines peuvent donc manquer."
+
 #: src/components/command-palette.tsx:702
 msgid "Related threads"
 msgstr "Conversations associées"
@@ -30021,7 +30025,7 @@ msgstr "Rechercher des articles scientifiques et des PDF"
 msgid "Search across the entire internet"
 msgstr "Rechercher sur tout Internet"
 
-#: src/components/command-palette.tsx:809
+#: src/components/command-palette.tsx:815
 msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
 msgstr "La recherche par sens a échoué : les conversations associées ne sont pas affichées. Réessayez dans un instant."
 
@@ -37297,7 +37301,7 @@ msgid "unarchive"
 msgstr "désarchiver"
 
 #: src/components/command-palette.tsx:582
-#: src/components/command-palette.tsx:834
+#: src/components/command-palette.tsx:840
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "Désarchiver la conversation"
