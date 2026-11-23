@@ -746,6 +746,8 @@ export const vThreadDocFields = {
             texts: v.array(v.object({ kind: v.union(v.literal("summary"), v.literal("title")), text: v.string() })),
         }),
     ),
+    // When a sync last found the owner's model rules refusing the embedding model. Internal: `publicThread` omits it.
+    searchRefusedAt: v.optional(v.number()),
     // The newest snooze ordering, a choice or a wake (`agent/table-writes.ts#setThreadSnooze`, `#patchThread`).
     snoozeChosenAt: v.optional(v.number()),
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.

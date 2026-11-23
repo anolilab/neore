@@ -63,6 +63,8 @@ export interface SearchRow {
     isTemporary?: boolean;
     lastReplyAt?: number;
     lockedAt?: number | null;
+    /** When a sync last found the owner's model rules refusing the embedding model. */
+    searchRefusedAt?: number;
     summary?: string;
     summaryVectorId?: string;
     title?: string;
@@ -168,6 +170,14 @@ export const userTurnsEnoughFrom = async (readPage: (cursor: string | null) => P
     return false;
 };
 
+/**
+ * How long a refusal holds back the replies' re-sync. The owner's model rules are not
+ * watched, so a refused thread is rechecked at most this often rather than on every reply.
+ */
+export const SEARCH_REFUSAL_RECHECK_MS = 24 * 60 * 60_000;
+
+const refusedRecently = (row: SearchRow, now: number): boolean => row.searchRefusedAt !== undefined && now - row.searchRefusedAt < SEARCH_REFUSAL_RECHECK_MS;
+
 const kindTexts = (row: SearchRow): Record<SearchKind, string | undefined> => {
     return {
         summary: searchText(row.summary),
@@ -186,7 +196,7 @@ const kindTexts = (row: SearchRow): Record<SearchKind, string | undefined> => {
  *   thread that just crossed the turn gate gets its vectors. Bounded: a kind with
  *   a vector is never named by a reply.
  */
-export const searchKindsChanged = (previous: SearchRow | undefined, next: SearchRow): SearchKind[] => {
+export const searchKindsChanged = (previous: SearchRow | undefined, next: SearchRow, now: number = Date.now()): SearchKind[] => {
     const changed = new Set<SearchKind>();
     const nextTexts = kindTexts(next);
 
@@ -214,7 +224,7 @@ export const searchKindsChanged = (previous: SearchRow | undefined, next: Search
         }
     }
 
-    if (previous.lastReplyAt !== next.lastReplyAt && isSearchEligible(next)) {
+    if (previous.lastReplyAt !== next.lastReplyAt && isSearchEligible(next) && !refusedRecently(next, now)) {
         for (const kind of SEARCH_KINDS) {
             if (nextTexts[kind] !== undefined && next[SEARCH_VECTOR_FIELD[kind]] === undefined) {
                 changed.add(kind);

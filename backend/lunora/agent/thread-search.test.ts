@@ -131,14 +131,17 @@ describe(runThreadSearchSync, () => {
         expect(mocks.embedMany).not.toHaveBeenCalled();
     });
 
-    it("does not embed when the owner's model rules refuse the embedding model, and writes nothing", async () => {
+    it("does not embed when the owner's model rules refuse the embedding model, and only records the refusal", async () => {
         mocks.embeddingModelAllowed.mockReturnValue(false);
         const ctx = makeCtx({ readThreadSearchState: readyThread() });
 
         await runThreadSearchSync(ctx as never, { changed: ["title"], threadId: THREAD });
 
+        const { runMutation } = ctx as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
         expect(mocks.embedMany).not.toHaveBeenCalled();
-        expect((ctx as unknown as { runMutation: ReturnType<typeof vi.fn> }).runMutation).not.toHaveBeenCalled();
+        expect(runMutation).toHaveBeenCalledTimes(1);
+        expect(runMutation).toHaveBeenCalledWith(internal.agent.thread_search.markThreadSearchRefused, { threadId: THREAD });
     });
 
     it("embeds the trimmed title and commits the vector under that same text", async () => {

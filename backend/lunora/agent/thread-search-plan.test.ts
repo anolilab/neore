@@ -10,6 +10,7 @@ import {
     hasEnoughTurns,
     isSearchEligible,
     planThreadSearch,
+    SEARCH_REFUSAL_RECHECK_MS,
     searchKindsChanged,
     searchText,
     type SearchRow,
@@ -264,6 +265,23 @@ describe(claimHolds, () => {
                 999,
             ),
         ).toBe(false);
+    });
+});
+
+describe("a refused thread's replies", () => {
+    const previous = { lastReplyAt: 1, title: "PDF totals", userId: "u1" };
+    const reply = { ...previous, lastReplyAt: 2 };
+
+    it("re-syncs a reply on a thread whose model was never refused", () => {
+        expect(searchKindsChanged(previous, reply, 5)).toEqual(["title"]);
+    });
+
+    it("does not re-sync a reply within a day of a refusal", () => {
+        expect(searchKindsChanged(previous, { ...reply, searchRefusedAt: 1000 }, 1000 + SEARCH_REFUSAL_RECHECK_MS - 1)).toEqual([]);
+    });
+
+    it("re-syncs a reply once a day has passed since the refusal", () => {
+        expect(searchKindsChanged(previous, { ...reply, searchRefusedAt: 1000 }, 1000 + SEARCH_REFUSAL_RECHECK_MS)).toEqual(["title"]);
     });
 });
 

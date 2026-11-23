@@ -253,9 +253,11 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
         return text === undefined ? [] : [{ kind, text }];
     });
 
-    // A model the owner's rules refuse embeds nothing. Checked here, before the gateway
-    // and the commit, so a refused thread costs no send and no write on each reply.
+    // A model the owner's rules refuse embeds nothing. Checked here, before the gateway and the
+    // commit, and recorded on the thread so the replies re-sync it at most daily (`searchKindsChanged`).
     if (texts.length > 0 && !(await embeddingAllowedFor(ctx, state.userId))) {
+        await ctx.runMutation(internal.agent.thread_search.markThreadSearchRefused, { threadId: args.threadId });
+
         texts = [];
     }
 
@@ -282,6 +284,20 @@ export const runThreadSearchSync = async (ctx: ActionCtx, args: { changed: Searc
 export const syncThreadSearch = internalAction.input({ changed: v.array(vSearchKind), threadId: v.id("threads") }).action(async ({ args, ctx }) => {
     await runThreadSearchSync(ctx, { changed: args.changed, threadId: args.threadId });
 });
+
+/** Records that the owner's model rules refused the embedding model for this thread, for the replies' daily recheck. */
+export const markThreadSearchRefused = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const thread = (await ctx.db.get("threads", args.threadId)) as Doc<"threads"> | null;
+
+        if (thread) {
+            await patchRow(ctx.db, "threads", thread, { searchRefusedAt: Date.now() });
+        }
+
+        return null;
+    });
 
 const vClaimTexts = v.array(v.object({ kind: vSearchKind, text: v.string() }));
 

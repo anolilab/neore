@@ -3577,6 +3577,8 @@ export const schema = defineSchema({
                 texts: v.array(v.object({ kind: v.union(v.literal("summary"), v.literal("title")), text: v.string() })),
             }),
         ),
+        // When a sync last found the owner's model rules refusing the embedding model: replies re-sync such a thread at most daily.
+        searchRefusedAt: v.optional(v.number()),
         // The newest snooze ordering: an owner's choice time (client clock, capped at the server's) or a wake's server time.
         // A queued snooze or unsnooze chosen before it changes nothing (`agent/table-writes.ts#setThreadSnooze`).
         snoozeChosenAt: v.optional(v.number()),
