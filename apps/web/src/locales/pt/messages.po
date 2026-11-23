@@ -9273,10 +9273,6 @@ msgstr "Não foi possível interromper o worker."
 msgid "Could not switch the model. Please try again."
 msgstr "Não foi possível trocar o modelo. Tente novamente."
 
-#: src/features/home/components/home-page.tsx:241
-#~ msgid "Could not turn on the Daily Brief."
-#~ msgstr "Não foi possível ativar o Daily Brief."
-
 #: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Could not turn on the Daily Brief. Try again."
 msgstr "Não foi possível ativar o Daily Brief. Tente novamente."
@@ -9302,8 +9298,8 @@ msgid "Couldn't load follow state"
 msgstr "Não foi possível carregar o estado de acompanhamento"
 
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:166
-msgid "Counted in whole days (UTC) once each day has ended, so today's usage shows tomorrow."
-msgstr "Contado em dias inteiros (UTC) depois que cada dia termina, então o uso de hoje aparece amanhã."
+msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
+msgstr "Contado em semanas inteiras (de segunda a domingo, UTC) depois que cada semana termina, então o uso desta semana aparece na próxima semana."
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -16049,10 +16045,6 @@ msgstr "Alemanha"
 #: src/features/home/components/daily-brief-offer.tsx:126
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "Receba toda manhã um breve resumo do que terminou, do que precisa de você e do que ainda está em andamento. Conta para o seu uso diário."
-
-#: src/features/home/components/home-page.tsx:234
-#~ msgid "Get a short summary here every morning."
-#~ msgstr "Receba aqui um breve resumo toda manhã."
 
 #: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
@@ -35683,10 +35675,6 @@ msgstr "Este link não está aceitando mensagens no momento. Tente novamente mai
 msgid "This list is full: remove a tool before adding another."
 msgstr "Esta lista está cheia: remova uma ferramenta antes de adicionar outra."
 
-#: src/features/vault/components/site-logins.tsx:307
-#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
-#~ msgstr "Este login foi alterado em outro lugar e foi recarregado. Suas alterações no nome de usuário e no rótulo foram mantidas; confira os bots dele, digite a senha novamente se estava alterando-a e salve de novo."
-
 #: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "Este login foi alterado em outro lugar e foi recarregado. Suas alterações no nome de usuário, no rótulo e na página de login foram mantidas; confira os bots dele, digite a senha novamente se estava alterando-a e salve de novo."
@@ -36942,10 +36930,6 @@ msgstr "Desativar a mesclagem automática"
 #: src/features/develop/components/merge-panel.tsx:128
 msgid "Turn off auto-merge?"
 msgstr "Desativar a mesclagem automática?"
-
-#: src/features/home/components/home-page.tsx:249
-#~ msgid "Turn on Daily Brief"
-#~ msgstr "Ativar o Daily Brief"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"

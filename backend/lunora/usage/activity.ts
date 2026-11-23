@@ -156,7 +156,7 @@ const recordOrganizationReply = async (
     reply: { at: number; costMicrodollars: number; organizationId?: string; projectKey: string; replyKey: string; tokens: number; userId: string },
 ): Promise<void> => {
     // A personal project has no organization, and so no row. Nor does a reply recorded too long after it was made: the organization view
-    // may already show its day (`ORGANIZATION_RECORD_LATE_MS`), and the row would change that day's total by this one reply.
+    // may already show its week (`ORGANIZATION_RECORD_LATE_MS`), and the row would change that week's total by this one reply.
     if (!reply.organizationId || ctx.now - reply.at > ORGANIZATION_RECORD_LATE_MS) {
         return;
     }

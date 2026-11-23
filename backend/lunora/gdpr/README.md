@@ -371,6 +371,14 @@ steps (`deleteUserUsageDaily`, `deleteUserSubAgentRuns`). A failed delete fails
 its step, so the retry removes what is left. `subAgentRuns` is read with
 `collectActivityForExport`, with `knowledgeCollections`.
 
+`usageOrganizationReplies` is erased with the rest of the usage tables
+(`usage/gdpr.ts#eraseUsageForUser`). The user's entries in
+`usageOrganizationContributors` go only in the batch after their ledger rows are
+all gone: until then the organization view still reads the member, sees the
+erasure underway and withholds their cohort's weeks. Once the entry is gone the
+cohort shows with the members it has (an accepted departure, owner's decision
+of 2026-11-23); a cohort left with one member is withheld.
+
 `usageDaily` is exported in durable steps (`gdpr/usage-export-steps.ts`): a page
 of 900 rows (`USAGE_EXPORT_PAGE`, below a mutation's write limit), then a recount of the closed days (two days before the user's latest
 row, so a replay gets the same day) and of the backfill row, then the titles of four

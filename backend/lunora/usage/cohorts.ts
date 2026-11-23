@@ -10,7 +10,7 @@
  *
  * The slot and the contributor row are separate writes. If the contributor row fails after the slot is claimed, the slot is released, so no
  * cohort is left short of a member it can never get. Slots are never reused otherwise, so a contributor's removal leaves a cohort short but
- * never refills it.
+ * never refills it. Once every slot of a cohort is taken (`sealedCohortsOf`), the organization view shows the cohort with the members it has.
  */
 import type { MutationCtx } from "../_generated/server";
 import { isUniqueViolation } from "../lib/error-helpers";
@@ -22,6 +22,18 @@ const MAX_SLOT_TRIES = 8;
 
 /** Pure: the cohort the booking that claimed `slot` (0 for the first) is placed in. */
 export const cohortOfBooking = (slot: number): number => Math.floor(slot / COHORT_SIZE);
+
+/**
+ * Pure: how many cohorts, from cohort 0, have every booking slot taken when `topSlot` is the highest slot claimed (`undefined` for none). A
+ * new booking only ever takes the slot after the top one, so such a cohort never gains a member: one that lost a member stays short for good.
+ */
+export const sealedCohortsOf = (topSlot: number | undefined): number => (topSlot === undefined ? 0 : Math.floor((topSlot + 1) / COHORT_SIZE));
+
+/**
+ * How long after its claim a slot counts towards sealing a cohort. The claim and the contributor row are separate writes, so a view that
+ * read a just-claimed slot could miss its member; by this time the row has landed, or the claim was released.
+ */
+export const SLOT_SETTLE_MS = 5 * 60 * 1000;
 
 /**
  * Claims the next booking slot under an organization. Returns the cohort it falls in and the claim's row, so a failed contributor row can
@@ -37,7 +49,7 @@ const claimSlot = async (ctx: MutationCtx, organizationId: string) => {
         const slot = (top?.slot ?? -1) + 1;
 
         try {
-            const claim = await ctx.db.insert("usageOrganizationCohortSlots", { organizationId, slot });
+            const claim = await ctx.db.insert("usageOrganizationCohortSlots", { claimedAt: ctx.now, organizationId, slot });
 
             return { claim, cohort: cohortOfBooking(slot) };
         } catch (error) {
@@ -57,7 +69,9 @@ export const allocateCohort = async (ctx: MutationCtx, organizationId: string): 
 
 /**
  * Books a contributor into the next slot's cohort. If the contributor row fails, the slot is released, so it leaves no hole in its cohort;
- * a release that fails too leaves the hole, which only withholds that cohort's totals.
+ * a release that fails too leaves the hole: a slot no member ever held, so the cohort shows with the members it has once it is sealed. A
+ * member already booked (two first replies at once) keeps their one entry: the unique `(organizationId, userId)` index refuses a second, and
+ * the booking returns without one, so a member is never in two cohorts.
  */
 export const insertContributor = async (ctx: MutationCtx, row: { createdAt: number; organizationId: string; userId: string }): Promise<void> => {
     const { claim, cohort } = await claimSlot(ctx, row.organizationId);
@@ -68,7 +82,11 @@ export const insertContributor = async (ctx: MutationCtx, row: { createdAt: numb
         try {
             await ctx.db.delete("usageOrganizationCohortSlots", claim);
         } catch {
-            // The claim stays: its cohort is short by this member, which withholds that cohort rather than exposing it.
+            // The claim stays: a hole in its cohort that no member held.
+        }
+
+        if (isUniqueViolation(error)) {
+            return;
         }
 
         throw error;

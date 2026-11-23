@@ -188,12 +188,16 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string, runCur
         ctx.db.usageExportProjects.findMany({ consistency: "primary", limit: EXPORT_PIECE_BATCH, where: { userId } }),
     ]);
 
+    // The entries go only once the ledger is empty: while rows remain, the organization view reads the member, finds the erasure underway
+    // and withholds their cohort. Dropping the entries first would show the cohort short, part-way through the erasure.
+    const ledgerGone = ledger.length === 0;
+
     await Promise.all([
         ...days.map(async (row) => await ctx.db.delete("usageDaily", row._id)),
         ...keys.map(async (row) => await ctx.db.delete("usageReplies", row._id)),
         ...backfills.map(async (row) => await ctx.db.delete("usageBackfill", row._id)),
         ...ledger.map(async (row) => await ctx.db.delete("usageOrganizationReplies", row._id)),
-        ...contributors.map(async (row) => await ctx.db.delete("usageOrganizationContributors", row._id)),
+        ...(ledgerGone ? contributors : []).map(async (row) => await ctx.db.delete("usageOrganizationContributors", row._id)),
         ...pieces.page.map(async (row) => await ctx.db.delete("usageExportPieces", row._id)),
         ...projects.page.map(async (row) => await ctx.db.delete("usageExportProjects", row._id)),
     ]);
@@ -230,6 +234,7 @@ export const eraseUsageForUser = async (ctx: MutationCtx, userId: string, runCur
             full(backfills) ||
             full(ledger) ||
             full(contributors) ||
+            (contributors.length > 0 && !ledgerGone) ||
             fullPieces(pieces.page) ||
             fullPieces(projects.page) ||
             cursor !== null,

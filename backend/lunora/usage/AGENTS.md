@@ -47,9 +47,13 @@
   under a project. Older usage, and any reply the totals backfill counted,
   shows under "No project" until the project-history backfill ships (a later
   part). Do not file a project row for a reply the live record did not count.
-- **Organization view releases whole cohort-days** — every number
+- **Organization view releases whole cohort-weeks** — every number
   `getOrganizationProjectUsage` returns is a sum of cells (one cohort's closed
-  UTC day), each bucket with five members (`releaseCells`). A closed day must
-  never change: an organization row is written only within
-  `ORGANIZATION_RECORD_LATE_MS` of its reply, and the view ends that long (and a
-  margin) before now. A new write to `usageOrganizationReplies` keeps both.
+  UTC week, Monday to Monday), each shown only when every member of the cohort
+  was active that week, and a project named only with five members
+  (`releaseCells`). A sealed cohort (`sealedCohortsOf`) that lost a member shows
+  with the members it has (owner's decision, 2026-11-23); one with a member
+  being erased is withheld. A closed week must never change: an organization
+  row is written only within `ORGANIZATION_RECORD_LATE_MS` of its reply, and
+  the view ends that long (and a margin) before now. A new write to
+  `usageOrganizationReplies` keeps both.

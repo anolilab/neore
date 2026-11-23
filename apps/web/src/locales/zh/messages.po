@@ -9273,10 +9273,6 @@ msgstr "无法停止工作进程。"
 msgid "Could not switch the model. Please try again."
 msgstr "无法切换模型。请重试。"
 
-#: src/features/home/components/home-page.tsx:241
-#~ msgid "Could not turn on the Daily Brief."
-#~ msgstr "无法开启每日简报。"
-
 #: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Could not turn on the Daily Brief. Try again."
 msgstr "无法开启每日简报。请重试。"
@@ -9302,8 +9298,8 @@ msgid "Couldn't load follow state"
 msgstr "无法加载关注状态"
 
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:166
-msgid "Counted in whole days (UTC) once each day has ended, so today's usage shows tomorrow."
-msgstr "按完整的日（UTC）在每天结束后统计，因此今天的用量明天才会显示。"
+msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
+msgstr "按完整的周（周一至周日，UTC）在每周结束后统计，因此本周的用量下周才会显示。"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -16049,10 +16045,6 @@ msgstr "德国"
 #: src/features/home/components/daily-brief-offer.tsx:126
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "每天早上收到一份简短摘要：已完成的、需要你处理的以及仍在运行的。这会计入你的每日用量。"
-
-#: src/features/home/components/home-page.tsx:234
-#~ msgid "Get a short summary here every morning."
-#~ msgstr "每天早上在这里收到一份简短汇总。"
 
 #: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
@@ -35683,10 +35675,6 @@ msgstr "此链接目前不接收消息。请稍后再试。"
 msgid "This list is full: remove a tool before adding another."
 msgstr "此列表已满：请先移除一个工具，再添加新的。"
 
-#: src/features/vault/components/site-logins.tsx:307
-#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
-#~ msgstr "此登录信息已在别处更改，并已重新加载。你对用户名和标签的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
-
 #: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "此登录信息已在别处更改，并已重新加载。你对用户名、标签和登录页面的修改已保留；请检查它的机器人，如果你正在更改密码，请重新输入，然后再次保存。"
@@ -36942,10 +36930,6 @@ msgstr "关闭自动合并"
 #: src/features/develop/components/merge-panel.tsx:128
 msgid "Turn off auto-merge?"
 msgstr "要关闭自动合并吗？"
-
-#: src/features/home/components/home-page.tsx:249
-#~ msgid "Turn on Daily Brief"
-#~ msgstr "开启每日简报"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"

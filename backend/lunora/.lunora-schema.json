@@ -32062,6 +32062,12 @@
     "usageOrganizationCohortSlots": {
       "commitOrdered": false,
       "fields": {
+        "claimedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
         "organizationId": {
           "kind": "string",
           "nullable": false,
@@ -32130,7 +32136,7 @@
             "organizationId",
             "userId"
           ],
-          "unique": false
+          "unique": true
         },
         "by_user": {
           "fields": [

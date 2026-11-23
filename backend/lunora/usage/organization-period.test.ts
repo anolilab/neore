@@ -1,5 +1,5 @@
 /**
- * The organization view across period starts: a total released for one start and one released for another differ by whole cohort-days,
+ * The organization view across period starts: a total released for one start and one released for another differ by whole cohort-weeks,
  * never by one member's spend. The finding's scenario: the first cohort used a project before a cutoff, the second after, and one member of
  * the first is the only difference between the two periods.
  */
@@ -44,8 +44,11 @@ vi.mock("../lib/cross-shard", () => {
 
 const ADMIN = "admin-1";
 const DAY = 24 * 60 * 60 * 1000;
-// Day 100 at noon: days 97 to 99 have closed.
-const NOW = 100 * DAY + 12 * 60 * 60 * 1000;
+const WEEK = 7 * DAY;
+/** The Monday 00:00 UTC that starts week `week` (the epoch began on a Thursday). */
+const weekStart = (week: number): number => week * WEEK + 4 * DAY;
+// Wednesday noon of week 100: weeks 97 to 99 have closed, week 100 is open.
+const NOW = weekStart(100) + 2 * DAY + 12 * 60 * 60 * 1000;
 
 let harness: ReturnType<typeof lunoraTest>;
 
@@ -64,8 +67,11 @@ afterEach(() => {
     harness.close();
 });
 
-/** Ten contributors in two cohorts, each with one reply a day under `org-1`: `projectOf(member, day)` names its project. */
-const seed = async (projectOf: (member: number, day: number) => string, days: number[]): Promise<void> => {
+/**
+ * Ten contributors in two cohorts, each with one reply a week under `org-1`, on the week's Thursday: `projectOf(member, week)` names its
+ * project. With `slots`, the cohorts' booking slots are taken too, so both cohorts are sealed.
+ */
+const seed = async (projectOf: (member: number, week: number) => string, weeks: number[], { slots = false } = {}): Promise<void> => {
     await harness.run(async (ctx: any) => {
         await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
         await ctx.db.insert("projects", { createdAt: 1, organizationId: "org-1", title: "Team", userId: ADMIN });
@@ -75,14 +81,18 @@ const seed = async (projectOf: (member: number, day: number) => string, days: nu
 
             await ctx.db.insert("usageOrganizationContributors", { cohort: cohortOfBooking(member), createdAt: member, organizationId: "org-1", userId });
 
-            for (const day of days) {
+            if (slots) {
+                await ctx.db.insert("usageOrganizationCohortSlots", { claimedAt: 0, organizationId: "org-1", slot: member });
+            }
+
+            for (const week of weeks) {
                 await ctx.db.insert("usageOrganizationReplies", {
-                    at: day * DAY + 60_000,
+                    at: weekStart(week) + 3 * DAY + 60_000,
                     // Each member's spend is distinct, so a difference equal to one member's spend is recognisable.
                     costMicrodollars: 1000 + member,
                     organizationId: "org-1",
-                    projectKey: projectOf(member, day),
-                    replyKey: `${userId}-${String(day)}`,
+                    projectKey: projectOf(member, week),
+                    replyKey: `${userId}-${String(week)}`,
                     tokens: 10,
                     userId,
                 });
@@ -108,48 +118,95 @@ const usageSince = async (since: number) =>
 const spendOf = (result: Awaited<ReturnType<typeof usageSince>>, projectKey: string): number =>
     result.projects.find((project) => project.projectKey === projectKey)?.costMicrodollars ?? 0;
 
+/** Files the rows seeded under "TEAM" under the organization's project, and returns its id. */
+const fileTeam = async (): Promise<string> => {
+    const team = await projectId();
+
+    await harness.run(async (ctx: any) => {
+        const { page } = await ctx.db.usageOrganizationReplies.findMany({ where: { projectKey: "TEAM" } });
+
+        for (const row of page) {
+            await ctx.db.patch("usageOrganizationReplies", row._id, { projectKey: team });
+        }
+    });
+
+    return team;
+};
+
+const spendOfMembers = (members: number[]): number => members.reduce((sum, member) => sum + 1000 + member, 0);
+
 describe("the organization view across period starts", () => {
     it("never releases two totals that differ by one member's spend when the cutoff moves past that member's last reply", async () => {
-        // Day 98: member 0 is the only one on the team project; everyone else is active elsewhere. Day 99: member 0 is elsewhere and the
-        // other nine are on the team project. Moving the start from day 98 to 99 drops member 0's one team reply and nothing else of it.
-        await seed((member, day) => ((day === 98) === (member === 0) ? "TEAM" : "side"), [98, 99]);
-        const team = await projectId();
+        // Week 98: member 0 is the only one on the team project; everyone else is active elsewhere. Week 99: member 0 is elsewhere and the
+        // other nine are on the team project. Moving the start from week 98 to 99 drops member 0's one team reply and nothing else of it.
+        await seed((member, week) => ((week === 98) === (member === 0) ? "TEAM" : "side"), [98, 99]);
+        const team = await fileTeam();
 
-        await harness.run(async (ctx: any) => {
-            const { page } = await ctx.db.usageOrganizationReplies.findMany({ where: { projectKey: "TEAM" } });
-
-            for (const row of page) {
-                await ctx.db.patch("usageOrganizationReplies", row._id, { projectKey: team });
-            }
-        });
-
-        const before = await usageSince(98 * DAY);
-        const after = await usageSince(99 * DAY);
+        const before = await usageSince(weekStart(98));
+        const after = await usageSince(weekStart(99));
         const difference = spendOf(before, team) - spendOf(after, team);
 
-        // Member 0's day-98 team reply was never in a released team total: in its cohort's day it is folded with the others' projects.
+        // Member 0's week-98 team reply was never in a released team total: in its cohort's week it is folded with the others' projects.
         expect(spendOf(after, team)).toBeGreaterThan(0);
         expect(difference).not.toBe(1000);
         expect(difference).toBe(0);
     });
 
-    it("releases a closed day once: a reply recorded later, or a period start inside the day, changes no released total", async () => {
-        await seed(() => "TEAM", [99]);
+    it("releases a closed week once: a period start inside the week, or a read days later, changes no released total; the open week is left out", async () => {
+        await seed(() => "TEAM", [99, 100]);
 
-        const team = await projectId();
+        const team = await fileTeam();
+        const weekStarted = await usageSince(weekStart(99));
+        const midWeek = await usageSince(weekStart(99) + 4 * DAY);
 
+        vi.setSystemTime(NOW + 3 * DAY);
+
+        const later = await usageSince(weekStart(99));
+
+        expect(spendOf(midWeek, team)).toBe(spendOf(weekStarted, team));
+        expect(spendOf(later, team)).toBe(spendOf(weekStarted, team));
+        // Week 99 only: week 100 is still open, so its replies are not in any total yet.
+        expect(spendOf(weekStarted, team)).toBe(spendOfMembers(Array.from({ length: 10 }, (_, member) => member)));
+    });
+
+    it("shows a sealed cohort that lost a member with the members it has, and withholds it while its last slot is still settling", async () => {
+        await seed(() => "TEAM", [99], { slots: true });
+
+        const team = await fileTeam();
+
+        // Member 3 leaves the first cohort: their rows and contributor entry are gone; their booking slot stays taken.
         await harness.run(async (ctx: any) => {
-            const { page } = await ctx.db.usageOrganizationReplies.findMany({ where: { projectKey: "TEAM" } });
+            for (const table of ["usageOrganizationReplies", "usageOrganizationContributors"]) {
+                const { page } = await ctx.db[table].findMany({ where: { userId: "m3" } });
 
-            for (const row of page) {
-                await ctx.db.patch("usageOrganizationReplies", row._id, { projectKey: team });
+                for (const row of page) {
+                    await ctx.db.delete(table, row._id);
+                }
             }
         });
 
-        const dayStart = await usageSince(99 * DAY);
-        const midDay = await usageSince(99 * DAY + 60_001);
+        const shown = await usageSince(weekStart(99));
 
-        expect(spendOf(midDay, team)).toBe(spendOf(dayStart, team));
-        expect(spendOf(dayStart, team)).toBe(Array.from({ length: 10 }, (_, member) => 1000 + member).reduce((a, b) => a + b));
+        // The second cohort names the project with its five; the first, now four, shows in the folded total and names nothing.
+        expect(spendOf(shown, team)).toBe(spendOfMembers([5, 6, 7, 8, 9]));
+        expect(shown.small?.costMicrodollars).toBe(spendOfMembers([0, 1, 2, 4]));
+        expect(shown.truncated).toBe(false);
+
+        // The first cohort's last slot, and the later ones, claimed just now (slots are claimed in order): the slot's member may not be
+        // readable yet, so the first cohort counts as still filling and is withheld until the slot settles.
+        await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.usageOrganizationCohortSlots.findMany({ where: { organizationId: "org-1" } });
+
+            for (const row of page) {
+                if (row.slot >= 4) {
+                    await ctx.db.patch("usageOrganizationCohortSlots", row._id, { claimedAt: NOW });
+                }
+            }
+        });
+
+        const filling = await usageSince(weekStart(99));
+
+        expect(filling.small).toBeUndefined();
+        expect(filling.truncated).toBe(true);
     });
 });

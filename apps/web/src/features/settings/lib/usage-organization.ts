@@ -80,54 +80,12 @@ export const sumOrganizationUsage = async (fetchPage: (cursor: string | undefine
     };
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** The zone's wall-clock parts at `instant`: its calendar day, and the clock time as a UTC-style instant. */
-const zoneWallClock = (instant: number, timeZone: string): { dayKey: string; wallClockAsUtc: number } => {
-    const parts = new Intl.DateTimeFormat("en-US", {
-        day: "2-digit",
-        hour: "2-digit",
-        hourCycle: "h23",
-        minute: "2-digit",
-        month: "2-digit",
-        second: "2-digit",
-        timeZone,
-        year: "numeric",
-    }).formatToParts(new Date(instant));
-    const value = (type: string): number => Number(parts.find((part) => part.type === type)?.value);
-    const year = value("year");
-    const month = value("month");
-    const day = value("day");
-
-    return {
-        dayKey: `${String(year)}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-        wallClockAsUtc: Date.UTC(year, month - 1, day, value("hour"), value("minute"), value("second")),
-    };
-};
-
-/** The zone if the runtime knows it, else UTC: a zone it does not know must not block the view. */
-const knownZone = (timeZone: string): string => {
-    try {
-        return new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone;
-    } catch {
-        return "UTC";
-    }
-};
-
 /**
- * The instant (epoch ms) a day starts in `timeZone`: its midnight there. The organization view's period starts at the viewer's midnight,
- * so every member's replies are counted over the same stretch of time, whatever their own zone. A zone that moves its clocks at midnight
- * may have no midnight that day: then the day starts at the change. Of the instants that fall on the day, the earliest is used.
+ * The organization view's period start for a calendar date: that date's midnight in UTC. The view counts whole UTC weeks from the Monday of
+ * the date's week, so every viewer who picks the same date, whatever their zone, reads the same weeks.
  */
-export const startOfDayInZone = (dayKey: string, timeZone: string): number => {
-    const zone = knownZone(timeZone);
+export const organizationSinceOf = (dayKey: string): number => {
     const [year, month, day] = dayKey.split("-").map(Number) as [number, number, number];
-    const wall = Date.UTC(year, month - 1, day);
-    // The zone's offset at a guess instant: the wall clock there, less the instant itself.
-    const offsetAt = (guess: number): number => zoneWallClock(guess, zone).wallClockAsUtc - Math.floor(guess / 1000) * 1000;
-    // The offsets a day before, on, and a day after the date: a change at midnight makes them differ, and each may place the start.
-    const candidates = [wall - DAY_MS, wall, wall + DAY_MS].map((guess) => wall - offsetAt(guess));
-    const onDay = candidates.filter((instant) => zoneWallClock(instant, zone).dayKey === dayKey);
 
-    return onDay.length > 0 ? Math.min(...onDay) : Math.min(...candidates);
+    return Date.UTC(year, month - 1, day);
 };

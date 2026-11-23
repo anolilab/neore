@@ -9273,10 +9273,6 @@ msgstr "ワーカーを停止できませんでした。"
 msgid "Could not switch the model. Please try again."
 msgstr "モデルを切り替えられませんでした。もう一度お試しください。"
 
-#: src/features/home/components/home-page.tsx:241
-#~ msgid "Could not turn on the Daily Brief."
-#~ msgstr "Daily Brief をオンにできませんでした。"
-
 #: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Could not turn on the Daily Brief. Try again."
 msgstr "Daily Brief をオンにできませんでした。もう一度お試しください。"
@@ -9302,8 +9298,8 @@ msgid "Couldn't load follow state"
 msgstr "フォロー状態を読み込めませんでした"
 
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:166
-msgid "Counted in whole days (UTC) once each day has ended, so today's usage shows tomorrow."
-msgstr "使用量は各日（UTC）が終わってから日単位で集計されるため、今日の使用量は明日表示されます。"
+msgid "Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week."
+msgstr "使用量は各週（月曜日から日曜日、UTC）が終わってから週単位で集計されるため、今週の使用量は来週表示されます。"
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -16049,10 +16045,6 @@ msgstr "ドイツ"
 #: src/features/home/components/daily-brief-offer.tsx:126
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "毎朝、完了したこと、対応が必要なこと、実行中のことを短くまとめてお届けします。1日の使用量にカウントされます。"
-
-#: src/features/home/components/home-page.tsx:234
-#~ msgid "Get a short summary here every morning."
-#~ msgstr "毎朝ここに短いまとめが届きます。"
 
 #: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
@@ -35683,10 +35675,6 @@ msgstr "このリンクは現在メッセージを受け付けていません。
 msgid "This list is full: remove a tool before adding another."
 msgstr "このリストは上限に達しています。別のツールを追加する前に、ツールを1つ削除してください。"
 
-#: src/features/vault/components/site-logins.tsx:307
-#~ msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
-#~ msgstr "このログインは別の場所で変更されたため、再読み込みしました。ユーザー名とラベルの編集はそのまま残っています。ボットを確認し、パスワードを変更していた場合はもう一度入力してから、再度保存してください。"
-
 #: src/features/vault/components/site-logins.tsx:362
 msgid "This login was changed elsewhere and has been reloaded. Your username, label and sign-in page edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "このログインは別の場所で変更されたため、再読み込みしました。ユーザー名、ラベル、サインインページの編集はそのまま残っています。ボットを確認し、パスワードを変更していた場合はもう一度入力してから、再度保存してください。"
@@ -36942,10 +36930,6 @@ msgstr "自動マージをオフにする"
 #: src/features/develop/components/merge-panel.tsx:128
 msgid "Turn off auto-merge?"
 msgstr "自動マージをオフにしますか？"
-
-#: src/features/home/components/home-page.tsx:249
-#~ msgid "Turn on Daily Brief"
-#~ msgstr "Daily Brief をオンにする"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"

@@ -11,11 +11,12 @@
  * client sums the pages. At most {@link MAX_PROJECTS} projects, with `truncated`
  * set when the organization has more.
  *
- * Every number the view releases is a sum of cells: one cohort's usage on one UTC day that has closed (`organizationPeriodEnd`), released
- * only when at least {@link MIN_MEMBERS_PER_GROUP} of the cohort's members were active that day, and a project named in a cell only when
- * that many of them used it (`releaseCells`). The cells a call reads depend only on the period's whole days, and a closed day's cell no
- * longer changes, so two released totals (any two period starts, or the same one read later) differ by whole cells: never by one member's
- * spend.
+ * Every number the view releases is a sum of cells: one cohort's usage in one UTC week (Monday to Monday) that has closed
+ * (`organizationPeriodEnd`), released only when every member of the cohort was active that week, and a project named in a cell only when
+ * {@link MIN_MEMBERS_PER_GROUP} of them used it (`releaseCells`). The cells a call reads depend only on the period's whole weeks, and a
+ * closed week's cell no longer changes, so two released totals (any two period starts, or the same one read later) differ by whole cells:
+ * never by one member's spend. The one exception the owner accepted: a cohort that lost a member shows with the members it has, so a period
+ * read before and after the loss can differ by the departed member's spend.
  */
 import { v } from "lunorash/server";
 
@@ -30,7 +31,7 @@ import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { USAGE_DAILY_RETENTION_DAYS } from "../gdpr/retention";
 import { ORGANIZATION_RECORD_LATE_MS } from "./activity-logic";
-import { COHORT_SIZE, insertContributor } from "./cohorts";
+import { COHORT_SIZE, insertContributor, sealedCohortsOf, SLOT_SETTLE_MS } from "./cohorts";
 import { deletionUnderwayOnPrimary } from "./gdpr";
 
 /** Members one call walks, at most, once the group it is in has closed: well inside a Worker invocation's subrequest budget. */
@@ -49,10 +50,16 @@ const SHARD_CONCURRENCY = 8;
 const SCOPE_BATCH = 10;
 
 /**
- * The members in one group. A group is fixed by its place in the organization's member order, not by who was active in the period, so no
- * change of period start can swap the members a total covers. A group is shown only when no member of it was active, or all of them were.
+ * The members a project needs to be named, and a cohort's week to show when the cohort is still filling. A group is fixed by its place in
+ * the organization's member order, not by who was active in the period, so no change of period start can swap the members a total covers.
  */
 export const MIN_MEMBERS_PER_GROUP = COHORT_SIZE;
+
+/**
+ * The fewest members a sealed cohort that lost some still shows with. Below it the cohort is withheld: a cohort of one would release that
+ * member's spend alone.
+ */
+export const MIN_MEMBERS_SHORT_COHORT = 2;
 
 /**
  * Splits a walk's members into one group per cohort. The walk is in cohort order, so each cohort's members are contiguous and each group is
@@ -99,37 +106,47 @@ export interface WalkPosition {
 }
 
 /**
- * Whether a cohort's day is withheld: some of its members were active that day, but fewer than {@link MIN_MEMBERS_PER_GROUP}. The sum of a
- * few active members, with the rest quiet, is one person's spend. A day where nobody was active shows nothing to hide.
+ * Whether a cohort's week is withheld: some of its members were active that week, but fewer than `needed`. The sum of a few active members,
+ * with the rest quiet, is one person's spend. A week where nobody was active shows nothing to hide.
  */
-export const pageWithheld = (members: ReadonlyArray<{ active: boolean }>): boolean => {
+export const pageWithheld = (members: ReadonlyArray<{ active: boolean }>, needed: number = MIN_MEMBERS_PER_GROUP): boolean => {
     const active = members.filter((member) => member.active).length;
 
-    return active > 0 && active < MIN_MEMBERS_PER_GROUP;
+    return active > 0 && active < needed;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Added to {@link ORGANIZATION_RECORD_LATE_MS} where the view decides a day is closed: the clocks of the shards and the action may differ. */
+const WEEK_MS = 7 * DAY_MS;
+
+/** The epoch began on a Thursday: the first Monday 00:00 UTC is four days in. */
+const FIRST_MONDAY_MS = 4 * DAY_MS;
+
+/** Added to {@link ORGANIZATION_RECORD_LATE_MS} where the view decides a week is closed: the clocks of the shards and the action may differ. */
 const ORGANIZATION_RELEASE_MARGIN_MS = 60 * 60 * 1000;
 
-/** The oldest day the view reads, in days before its last: two days inside retention, so a day being pruned is never read part-way. */
-export const MAX_PERIOD_DAYS = USAGE_DAILY_RETENTION_DAYS - 2;
+/**
+ * The oldest week the view reads, in weeks before its end. The end is at most a week and {@link ORGANIZATION_RECORD_LATE_MS} (and a margin)
+ * before now, so the oldest row read is under 400 days old: inside retention, so a row being pruned is never read.
+ */
+export const MAX_PERIOD_WEEKS = Math.floor((USAGE_DAILY_RETENTION_DAYS - 2) / 7);
+
+/** The UTC week (weeks since the first Monday of the epoch) an instant falls in. */
+export const weekOf = (at: number): number => Math.floor((at - FIRST_MONDAY_MS) / WEEK_MS);
+
+/** The start of a UTC week (Monday 00:00 UTC), in epoch ms. */
+const weekStart = (week: number): number => week * WEEK_MS + FIRST_MONDAY_MS;
 
 /**
- * The end of the whole UTC days the view reads, in epoch ms: the start of the last day that closed at least
- * {@link ORGANIZATION_RECORD_LATE_MS} (and a margin) ago. Today, and a day that closed more recently, are left out: a reply could still be
- * added to them, and a total read before it and one after would differ by that reply.
+ * The end of the whole UTC weeks the view reads, in epoch ms: the end of the last week that closed at least
+ * {@link ORGANIZATION_RECORD_LATE_MS} (and a margin) ago. The current week, and a week that closed more recently, are left out: a reply could
+ * still be added to them, and a total read before it and one after would differ by that reply.
  */
-export const organizationPeriodEnd = (now: number): number =>
-    Math.floor((now - ORGANIZATION_RECORD_LATE_MS - ORGANIZATION_RELEASE_MARGIN_MS) / DAY_MS) * DAY_MS;
+export const organizationPeriodEnd = (now: number): number => weekStart(weekOf(now - ORGANIZATION_RECORD_LATE_MS - ORGANIZATION_RELEASE_MARGIN_MS));
 
-/** The start of the period's whole UTC days: the start of the day `since` falls in, at most {@link MAX_PERIOD_DAYS} days before `until`. */
+/** The start of the period's whole UTC weeks: the Monday of the week `since` falls in, at most {@link MAX_PERIOD_WEEKS} weeks before `until`. */
 export const organizationPeriodStart = (since: number, until: number): number =>
-    Math.min(Math.max(Math.floor(since / DAY_MS) * DAY_MS, until - MAX_PERIOD_DAYS * DAY_MS), until);
-
-/** The UTC day (days since the epoch) an instant falls in. */
-const dayOf = (at: number): number => Math.floor(at / DAY_MS);
+    Math.min(Math.max(weekStart(weekOf(since)), until - MAX_PERIOD_WEEKS * WEEK_MS), until);
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);
 
@@ -187,6 +204,8 @@ export const organizationUsageScope = internalQuery
         afterCohort: v.optional(v.number()),
         afterUserId: v.optional(v.string().max(MAX_LENGTH.id)),
         organizationId: v.string().max(MAX_LENGTH.id),
+        // Slots claimed before this instant (epoch ms) count towards sealing a cohort (`SLOT_SETTLE_MS`); without it none do.
+        slotsSettledBefore: v.optional(v.number()),
         userId: v.string().max(MAX_LENGTH.id),
         // Whether to read the project list: a walk reads it once, with its first batch, and every later batch of the call uses that list.
         withProjects: v.optional(v.boolean()),
@@ -200,11 +219,13 @@ export const organizationUsageScope = internalQuery
                 // Whether contributors follow this batch.
                 more: v.boolean(),
                 projects: v.array(v.object({ projectId: v.string(), title: v.string() })),
+                // How many cohorts, from the first, have every booking slot taken (`sealedCohortsOf`); read with the project list, else 0.
+                sealedCohorts: v.number(),
                 truncated: v.boolean(),
             }),
         ),
     )
-    .query(async ({ args: { afterCohort, afterUserId, organizationId, userId, withProjects }, ctx }) => {
+    .query(async ({ args: { afterCohort, afterUserId, organizationId, slotsSettledBefore, userId, withProjects }, ctx }) => {
         // From the primary: a replica that still holds a revoked membership must not grant the view.
         const member = await getMemberByOrganizationAndUser(ctx, organizationId, userId, "primary");
 
@@ -214,6 +235,16 @@ export const organizationUsageScope = internalQuery
 
         // Everyone with rows under the organization, current members and those who left, a batch at a time by user id: a key no change moves,
         // so someone added mid-way is not counted twice.
+        // The top settled slot (claimed before `slotsSettledBefore`), read before the contributors: a cohort sealed by then can gain no
+        // member, and its members' rows have landed, so the batch below holds all of it. A slot claimed later may not have its member yet.
+        const topSlot =
+            withProjects === false || slotsSettledBefore === undefined
+                ? undefined
+                : await systemDb(ctx).usageOrganizationCohortSlots.findFirst({
+                      consistency: "primary",
+                      orderBy: [{ slot: "desc" }],
+                      where: { claimedAt: { lte: slotsSettledBefore }, organizationId },
+                  });
         const [contributors, projects] = await Promise.all([
             contributorBatch(
                 ctx,
@@ -225,17 +256,8 @@ export const organizationUsageScope = internalQuery
                 ? undefined
                 : systemDb(ctx).projects.findMany({ consistency: "primary", limit: MAX_PROJECTS + 1, where: { organizationId } }),
         ]);
-        // Each member once: two entries for one member (a race while their first replies were recorded) must not count them twice.
-        const seen = new Set<string>();
-        const members = contributors.slice(0, SCOPE_BATCH).filter((row) => {
-            if (seen.has(row.userId)) {
-                return false;
-            }
-
-            seen.add(row.userId);
-
-            return true;
-        });
+        // One entry per member and organization (a unique index), so no member is counted twice.
+        const members = contributors.slice(0, SCOPE_BATCH);
         const listed = projects?.page ?? [];
 
         return {
@@ -244,6 +266,7 @@ export const organizationUsageScope = internalQuery
             projects: listed.slice(0, MAX_PROJECTS).map((row) => {
                 return { projectId: row._id as string, title: row.title };
             }),
+            sealedCohorts: sealedCohortsOf(topSlot?.slot),
             truncated: listed.length > MAX_PROJECTS,
         };
     });
@@ -252,11 +275,11 @@ export const organizationUsageScope = internalQuery
 const REPLY_PAGE = 500;
 const MAX_REPLY_PAGES = 20;
 
-/** One member's replies on one project on one UTC day. */
-const vDayProject = { ...vTotals, day: v.number(), projectKey: v.string() };
+/** One member's replies on one project in one UTC week. */
+const vWeekProject = { ...vTotals, projectKey: v.string(), week: v.number() };
 
 /**
- * One member's replies per UTC day and project, recorded under the organization in `[from, until)` (epoch ms, whole days); runs on the
+ * One member's replies per UTC week and project, recorded under the organization in `[from, until)` (epoch ms, whole weeks); runs on the
  * member's shard. It reads the rows recorded under the organization (`usageOrganizationReplies`), so a reply keeps the organization it was
  * recorded under: a project moved in later has no rows for the replies made before it moved. Every project the rows name is returned; the
  * walk decides which it may name (`releaseCells`).
@@ -270,15 +293,15 @@ export const memberProjectUsage = internalQuery
     })
     .output(
         v.object({
-            // Per day and project, at most one entry each.
-            cells: v.array(v.object(vDayProject)),
-            // The member's account is being erased: their rows are leaving a batch at a time, so their cohort's days are withheld.
+            // Per week and project, at most one entry each.
+            cells: v.array(v.object(vWeekProject)),
+            // The member's account is being erased: their rows are leaving a batch at a time, so their cohort's weeks are withheld.
             erasing: v.boolean(),
             truncated: v.boolean(),
         }),
     )
     .query(async ({ args: { from, organizationId, until, userId }, ctx }) => {
-        const sums = new Map<string, { costMicrodollars: number; day: number; projectKey: string; replies: number; tokens: number }>();
+        const sums = new Map<string, { costMicrodollars: number; projectKey: string; replies: number; tokens: number; week: number }>();
         let cursor: string | null = null;
         let truncated = false;
 
@@ -295,9 +318,9 @@ export const memberProjectUsage = internalQuery
             });
 
             for (const row of result.page) {
-                const day = dayOf(row.at);
-                const key = `${String(day)}:${row.projectKey}`;
-                const sum = sums.get(key) ?? { costMicrodollars: 0, day, projectKey: row.projectKey, replies: 0, tokens: 0 };
+                const week = weekOf(row.at);
+                const key = `${String(week)}:${row.projectKey}`;
+                const sum = sums.get(key) ?? { costMicrodollars: 0, projectKey: row.projectKey, replies: 0, tokens: 0, week };
 
                 sum.costMicrodollars += row.costMicrodollars;
                 sum.replies += 1;
@@ -322,7 +345,7 @@ export const memberProjectUsage = internalQuery
 
 /** One member's usage as the walk reads it. */
 interface MemberWalk {
-    cells: { costMicrodollars: number; day: number; projectKey: string; replies: number; tokens: number }[];
+    cells: { costMicrodollars: number; projectKey: string; replies: number; tokens: number; week: number }[];
     cohort: number;
     erasing: boolean;
     truncated: boolean;
@@ -341,20 +364,33 @@ const zero = (): Totals => {
     return { costMicrodollars: 0, replies: 0, tokens: 0 };
 };
 
+/** One cohort as the walk read it, for {@link releaseCells}. */
+export interface ReleaseGroup {
+    members: ReadonlyArray<Pick<MemberWalk, "cells" | "erasing" | "truncated">>;
+    /**
+     * Every booking slot of the cohort is taken (`sealedCohorts`) and the walk read all its members in this call: the cohort can gain no
+     * member, so its weeks show with the members it has, even when it lost some. Otherwise a week needs {@link MIN_MEMBERS_PER_GROUP} active.
+     */
+    whole: boolean;
+}
+
 /**
- * What the walk may release from whole cohorts' cells. A cell is one cohort's usage on one closed UTC day. In a cell:
+ * What the walk may release from whole cohorts' cells. A cell is one cohort's usage in one closed UTC week. In a cell:
  *
- * - the cell is withheld when some of the cohort's members were active that day but fewer than {@link MIN_MEMBERS_PER_GROUP}
- *   ({@link pageWithheld}); a cohort with a member read past the ledger's ceiling, or being erased, is withheld on every day;
+ * - the cell is withheld unless every member of the cohort was active that week (at least {@link MIN_MEMBERS_PER_GROUP} of a cohort that is
+ *   not {@link ReleaseGroup.whole}, and never fewer than {@link MIN_MEMBERS_SHORT_COHORT}) ({@link pageWithheld}); a cohort with a member read past the ledger's ceiling, or being erased, is
+ *   withheld in every week;
  * - a project used by {@link MIN_MEMBERS_PER_GROUP} or more of its members is one bucket: named when the organization lists it, added to
  *   `removed` when the list is whole and does not, left out (and the result truncated) when the list was cut;
- * - every project used by fewer is folded into one `small` bucket, released only with that many members across it.
+ * - every project used by fewer is folded into one `small` bucket, released only with as many members across it as the cell needs active.
  *
- * Which projects a cell folds depends only on who used them that day, and a closed day no longer changes, so each bucket covers the same
- * members whichever period or page reads it. A project that leaves the organization moves its whole bucket from its name to `removed`.
+ * Which projects a cell folds depends only on who used them that week, and a closed week no longer changes, so each bucket covers the same
+ * members whichever period or page reads it. A project that leaves the organization moves its whole bucket from its name to `removed`. A
+ * cohort that lost a member (owner's decision) still shows, with the members it has: a total read before the loss and one read after can
+ * differ by that member's spend.
  */
 export const releaseCells = (
-    groups: ReadonlyArray<ReadonlyArray<Pick<MemberWalk, "cells" | "erasing" | "truncated">>>,
+    groups: ReadonlyArray<ReleaseGroup>,
     listed: ReadonlySet<string>,
     projectsListed: boolean,
 ): { named: Map<string, Totals>; removed: Totals; small: Totals; withheld: boolean } => {
@@ -363,31 +399,34 @@ export const releaseCells = (
     const small = zero();
     let withheld = false;
 
-    for (const group of groups) {
+    for (const { members: group, whole } of groups) {
         if (group.some((member) => member.cells.length > 0 && (member.truncated || member.erasing))) {
             withheld = true;
             continue;
         }
 
-        const days = new Map<number, Map<number, Map<string, Totals>>>();
+        // A whole cohort needs all its members (five, or fewer once it lost some, but at least MIN_MEMBERS_SHORT_COHORT); a cohort still
+        // filling, or read in part, needs five.
+        const needed = whole ? Math.max(MIN_MEMBERS_SHORT_COHORT, Math.min(MIN_MEMBERS_PER_GROUP, group.length)) : MIN_MEMBERS_PER_GROUP;
+        const weeks = new Map<number, Map<number, Map<string, Totals>>>();
 
         for (const [index, member] of group.entries()) {
             for (const cell of member.cells) {
-                const day = days.get(cell.day) ?? new Map<number, Map<string, Totals>>();
-                const projects = day.get(index) ?? new Map<string, Totals>();
+                const week = weeks.get(cell.week) ?? new Map<number, Map<string, Totals>>();
+                const projects = week.get(index) ?? new Map<string, Totals>();
 
                 projects.set(cell.projectKey, cell);
-                day.set(index, projects);
-                days.set(cell.day, day);
+                week.set(index, projects);
+                weeks.set(cell.week, week);
             }
         }
 
-        for (const byMember of days.values()) {
+        for (const byMember of weeks.values()) {
             const activity = group.map((_, index) => {
                 return { active: byMember.has(index) };
             });
 
-            if (pageWithheld(activity)) {
+            if (pageWithheld(activity, needed)) {
                 withheld = true;
                 continue;
             }
@@ -429,7 +468,7 @@ export const releaseCells = (
                 }
             }
 
-            if (smallMembers.size >= MIN_MEMBERS_PER_GROUP) {
+            if (smallMembers.size >= needed) {
                 addTo(small, cellSmall);
             } else if (smallMembers.size > 0) {
                 withheld = true;
@@ -445,7 +484,7 @@ export const CURSOR_TTL_MS = 60 * 60 * 1000;
 
 /**
  * A page cursor: the walk's position, sealed so a caller can only resume a walk the server issued. It is bound to the organization and the
- * period (`since`) it was issued for, carries the period's end, so every page of a walk covers the same days, and it expires after
+ * period (`since`) it was issued for, carries the period's end, so every page of a walk covers the same weeks, and it expires after
  * {@link CURSOR_TTL_MS}. A cursor the caller makes up, takes from another organization or period, or keeps past its time, does not open.
  */
 export const sealOrganizationCursor = async (
@@ -491,8 +530,8 @@ export const openOrganizationCursor = async (
 };
 
 /**
- * Replies, tokens and cost per project of the caller's active organization over the whole UTC days from `since` (epoch ms) to the last
- * closed one (`organizationPeriodEnd`), summed over one page of its cohorts. Admins and owners only. Call again with `nextCursor` until it is
+ * Replies, tokens and cost per project of the caller's active organization over the whole UTC weeks from the Monday of `since` (epoch ms)
+ * to the last closed one (`organizationPeriodEnd`), summed over one page of its cohorts. Admins and owners only. Call again with `nextCursor` until it is
  * absent, and add the pages up.
  */
 export const getOrganizationProjectUsage = authAction
@@ -527,11 +566,13 @@ export const getOrganizationProjectUsage = authAction
         // The project list is read once, with the call's first batch: every member of the call is then summed against the same list.
         let projects: { projectId: string; title: string }[] | undefined;
         let projectsCut = false;
+        let sealedCohorts = 0;
         let remaining = false;
 
         for (;;) {
             const scope = await ctx.runQuery(internal.usage.organization.organizationUsageScope, {
                 organizationId,
+                slotsSettledBefore: Date.now() - SLOT_SETTLE_MS,
                 userId: ctx.user.userId,
                 ...(resume !== undefined && { afterCohort: resume.cohort, afterUserId: resume.userId }),
                 withProjects: projects === undefined,
@@ -544,6 +585,7 @@ export const getOrganizationProjectUsage = authAction
             if (projects === undefined) {
                 projects = scope.projects;
                 projectsCut = scope.truncated;
+                sealedCohorts = scope.sealedCohorts;
             }
 
             const batch = scope.members;
@@ -565,7 +607,7 @@ export const getOrganizationProjectUsage = authAction
 
                 index += size;
                 // Asked even with no projects left: a member's replies to projects that left the organization still count, as `removed`.
-                // Every member is asked over the same days.
+                // Every member is asked over the same weeks.
                 const results = await Promise.all(
                     chunk.map(
                         async ({ userId }) =>
@@ -606,8 +648,13 @@ export const getOrganizationProjectUsage = authAction
         // The walk stopped inside a cohort: that cohort is cut back to the cohort before it, and the next call walks it whole. A cohort is
         // released only once the walk has passed it or read every member. With no earlier cohort, the partial one stays (a booking race
         // can make a cohort very large, and the walk must still move on).
+        // The cohort the walk stopped inside and kept: the next call reads the rest of it, so it does not show with the members it has.
+        let partialKept = false;
+
         if (remaining) {
             const kept = withoutLastCohort(walked).length;
+
+            partialKept = kept === walked.length;
 
             if (kept < walked.length) {
                 walked.splice(kept);
@@ -618,8 +665,20 @@ export const getOrganizationProjectUsage = authAction
             }
         }
 
-        // Each cohort's days are released whole or not at all (`releaseCells`).
-        const released = releaseCells(groupByCohort(walked), new Set(listed.map((project) => project.projectId)), !projectsCut);
+        // Each cohort's weeks are released whole or not at all (`releaseCells`). A cohort shows with the members it has only when it is sealed
+        // and this call read all of it: not the cohort the cursor resumed inside, nor one the walk stopped inside and kept.
+        const groups = groupByCohort(walked);
+        const released = releaseCells(
+            groups.map((members, index) => {
+                const cohort = members[0]?.cohort ?? Infinity;
+                const continued = index === 0 && opened !== undefined && opened.cohort === cohort;
+                const unfinished = partialKept && index === groups.length - 1;
+
+                return { members, whole: cohort < sealedCohorts && !continued && !unfinished };
+            }),
+            new Set(listed.map((project) => project.projectId)),
+            !projectsCut,
+        );
         const titles = new Map(listed.map((project) => [project.projectId, project.title]));
         const named = [...released.named].flatMap(([projectKey, totals]) => {
             const title = titles.get(projectKey);
@@ -744,11 +803,8 @@ export const collectOrganizationReplyPages = async <Row extends { at: number }>(
     return { cut: false, rows: kept.toReversed() };
 };
 
-/** Contributor entries one reconcile sets for a member under an organization: duplicates are a race's, a few at most. */
-export const CONTRIBUTORS_PER_PAIR = 50;
-
 /**
- * Sets a member's contributor entries under an organization to match their rows on this shard: an entry while they have rows, none once
+ * Sets a member's contributor entry under an organization to match their rows on this shard: an entry while they have rows, none once
  * they have none. It runs on the member's shard after the write that changed the rows has committed (`recordOrganizationReply`, the
  * retention prune). Lunora does not commit a shard's writes and a global table's together, so the global entry is never written in the
  * same mutation as the rows; this one only reads the shard, so a run that is repeated changes nothing more.
@@ -758,24 +814,14 @@ export const reconcileOrganizationContributor = internalMutation
     .output(v.null())
     .mutation(async ({ args: { organizationId, userId }, ctx }) => {
         const row = await ctx.db.usageOrganizationReplies.findFirst({ consistency: "primary", where: { organizationId, userId } });
-        const { page: entries } = await ctx.db.usageOrganizationContributors.findMany({
-            consistency: "primary",
-            limit: CONTRIBUTORS_PER_PAIR,
-            where: { organizationId, userId },
-        });
+        // One at most: the `(organizationId, userId)` index is unique.
+        const entry = await ctx.db.usageOrganizationContributors.findFirst({ consistency: "primary", where: { organizationId, userId } });
 
-        if (row) {
-            if (entries.length === 0) {
-                await insertContributor(ctx, { createdAt: row.at, organizationId, userId });
-            }
-
-            // Two entries for one member (two first replies booked at once) would each count the member; one is kept.
-            await Promise.all(entries.slice(1).map(async (entry) => await ctx.db.delete("usageOrganizationContributors", entry._id)));
-
-            return null;
+        if (row && !entry) {
+            await insertContributor(ctx, { createdAt: row.at, organizationId, userId });
+        } else if (!row && entry) {
+            await ctx.db.delete("usageOrganizationContributors", entry._id);
         }
-
-        await Promise.all(entries.map(async (entry) => await ctx.db.delete("usageOrganizationContributors", entry._id)));
 
         return null;
     });

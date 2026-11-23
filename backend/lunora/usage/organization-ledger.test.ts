@@ -168,7 +168,7 @@ describe("the organization ledger", () => {
         expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
     });
 
-    it("reads only the period's days, so a member's reply outside it is not in the walk's cells", async () => {
+    it("reads only the period's weeks, so a member's reply outside it is not in the walk's cells", async () => {
         const project = await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
 
@@ -188,7 +188,7 @@ describe("the organization ledger", () => {
         expect(await cellsBetween(0, 1000)).toEqual([]);
     });
 
-    it("writes no organization row for a reply recorded long after it was made, since its day may already be shown", async () => {
+    it("writes no organization row for a reply recorded long after it was made, since its week may already be shown", async () => {
         const project = await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
 
@@ -224,20 +224,6 @@ describe("the organization ledger", () => {
         } | null;
 
         expect(scope?.members.map((entry: { userId: string }) => entry.userId)).toContain(MEMBER);
-    });
-
-    it("lists a member once, even when two entries exist for them", async () => {
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
-            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 1, organizationId: "org-1", userId: MEMBER });
-            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
-        });
-
-        const scope = (await harness.run(async (ctx: any) => await ctx.runQuery(organizationUsageScope, { organizationId: "org-1", userId: ADMIN }))) as {
-            members: { cohort: number; userId: string }[];
-        } | null;
-
-        expect(scope?.members.map((entry: { userId: string }) => entry.userId)).toEqual([MEMBER]);
     });
 
     it("collects every page of the ledger for the export in reply-time order, and past its budget keeps the newest rows and says it cut the oldest", async () => {
@@ -335,29 +321,6 @@ describe("the organization ledger", () => {
         expect(harness.scheduler.list()).toHaveLength(MAX_PRUNED_ORGANIZATIONS - 1);
     });
 
-    it("removes every contributor entry of a member left with no rows, not only the first", async () => {
-        const project = await harness.run(async (ctx: any) => {
-            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
-            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
-
-            return await ctx.db.insert("projects", { createdAt: 1, organizationId: "org-1", title: "Team", userId: OWNER });
-        });
-
-        await record(project, 1000);
-        // A second entry, as two first replies recorded at once would leave.
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
-        });
-        await harness.run(async (ctx: any) => await pruneOrganizationRepliesBefore(ctx, 2000, 100));
-        await harness.scheduler.runPending();
-
-        const entries = await harness.run(
-            async (ctx: any) => await ctx.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1", userId: MEMBER } }),
-        );
-
-        expect(entries.page).toEqual([]);
-    });
-
     it("books a member's contributor entry once they have rows, drops a ghost one with none, and running it again changes nothing", async () => {
         const project = await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
@@ -391,26 +354,6 @@ describe("the organization ledger", () => {
         expect(await entriesOf()).toHaveLength(1);
     });
 
-    it("keeps one contributor entry for a member with rows, when two were booked at once", async () => {
-        const project = await harness.run(async (ctx: any) => {
-            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
-
-            return await ctx.db.insert("projects", { createdAt: 1, organizationId: "org-1", title: "Team", userId: OWNER });
-        });
-
-        await record(project, 1000);
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
-        });
-        await harness.run(async (ctx: any) => await ctx.runMutation(reconcileOrganizationContributor, { organizationId: "org-1", userId: MEMBER }));
-
-        const entries = await harness.run(
-            async (ctx: any) => await ctx.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1", userId: MEMBER } }),
-        );
-
-        expect(entries.page).toHaveLength(1);
-    });
-
     it("removes a member's rows when their account is erased", async () => {
         const project = await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
@@ -419,8 +362,23 @@ describe("the organization ledger", () => {
         });
 
         await record(project, 1000);
+
+        const entries = async () =>
+            (
+                (await harness.run(
+                    async (ctx: any) => await ctx.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1", userId: MEMBER } }),
+                )) as { page: unknown[] }
+            ).page;
+        const first = (await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER))) as { hasMore: boolean };
+
+        // The entry outlasts the rows: until the ledger is empty the walk reads the member, finds the erasure and withholds their cohort,
+        // rather than showing it short part-way through.
+        expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
+        expect(await entries()).toHaveLength(1);
+        expect(first.hasMore).toBe(true);
+
         await harness.run(async (ctx: any) => await eraseUsageForUser(ctx, MEMBER));
 
-        expect(await orgUsage("org-1", 0)).toEqual({ projects: [], truncated: false });
+        expect(await entries()).toEqual([]);
     });
 });

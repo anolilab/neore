@@ -17,7 +17,7 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill, useStaleAfterBackfill } from "../../hooks/use-usage-backfill";
 import { keepAcrossDayTurn, useUsageToday } from "../../hooks/use-usage-today";
 import { formatUsd, periodStart } from "../../lib/usage-activity";
-import { startOfDayInZone, sumOrganizationUsage } from "../../lib/usage-organization";
+import { organizationSinceOf, sumOrganizationUsage } from "../../lib/usage-organization";
 
 /** The row key of what no project accounts for; never a project id. */
 const NO_PROJECT_KEY = "__no_project__";
@@ -94,8 +94,9 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                 throw new Error("The usage day or organization is not known yet");
             }
 
-            // The period starts at the viewer's midnight, as an instant, so each member's replies are counted over the same time.
-            const since = startOfDayInZone(fromDate, zone);
+            // The chosen date's UTC midnight, not the viewer's: the view counts whole UTC weeks, and viewers in different zones who pick the
+            // same date must read the same weeks.
+            const since = organizationSinceOf(fromDate);
 
             return await sumOrganizationUsage(async (cursor) => await fetchOrganization({ cursor, organizationId, since }));
         },
@@ -163,7 +164,7 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                                 : t`Your organization's projects, summed over every member, for the selected period`}
                         </CardDescription>
                         {showing === "organization" && (
-                            <p className="text-muted-foreground mt-1 text-xs">{t`Counted in whole days (UTC) once each day has ended, so today's usage shows tomorrow.`}</p>
+                            <p className="text-muted-foreground mt-1 text-xs">{t`Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week.`}</p>
                         )}
                     </div>
                     {isOrganizationAdmin && (

@@ -205,7 +205,7 @@ export const importShardRows = internalMutation
 
         for (const row of args.rows as Record<string, unknown>[]) {
             // An organization ledger row is written only close to its reply (`ORGANIZATION_RECORD_LATE_MS`): an older one moved here would
-            // change a day the organization view may already show, by the guest's spend. It stays out of the view; the guest's own totals
+            // change a week the organization view may already show, by the guest's spend. It stays out of the view; the guest's own totals
             // move with `usageDaily`.
             if (args.table === "usageOrganizationReplies" && typeof row["at"] === "number" && ctx.now - row["at"] > ORGANIZATION_RECORD_LATE_MS) {
                 continue;

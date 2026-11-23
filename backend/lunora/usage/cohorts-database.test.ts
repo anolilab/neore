@@ -1,13 +1,13 @@
 /**
- * Cohort slots against the database: its unique key refuses a second claim of a slot, and a contributor booked after the walk read a cohort
- * does not change that cohort's members in the next read.
+ * Cohort slots against the database: its unique key refuses a second claim of a slot, a member booked twice keeps one cohort, and a
+ * contributor booked after the walk read a cohort does not change that cohort's members in the next read.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { isUniqueViolation } from "../lib/error-helpers";
-import { allocateCohort, COHORT_SIZE } from "./cohorts";
+import { allocateCohort, COHORT_SIZE, insertContributor } from "./cohorts";
 import { organizationUsageScope } from "./organization";
 
 const ADMIN = "admin-1";
@@ -32,10 +32,10 @@ const firstBatch = async () =>
 describe("cohort slots in the database", () => {
     it("refuses a second claim of a slot the database already holds", async () => {
         const refused = await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageOrganizationCohortSlots", { organizationId: "org-1", slot: 0 });
+            await ctx.db.insert("usageOrganizationCohortSlots", { claimedAt: 0, organizationId: "org-1", slot: 0 });
 
             try {
-                await ctx.db.insert("usageOrganizationCohortSlots", { organizationId: "org-1", slot: 0 });
+                await ctx.db.insert("usageOrganizationCohortSlots", { claimedAt: 0, organizationId: "org-1", slot: 0 });
 
                 return false;
             } catch (error) {
@@ -44,6 +44,23 @@ describe("cohort slots in the database", () => {
         });
 
         expect(refused).toBe(true);
+    });
+
+    it("keeps a member in one cohort when they are booked twice, and gives their second slot back", async () => {
+        const entries = await harness.run(async (ctx: any) => {
+            const member = { createdAt: 1, organizationId: "org-1", userId: "m0" };
+
+            await insertContributor(ctx, member);
+            await insertContributor(ctx, member);
+
+            const contributors = await ctx.db.usageOrganizationContributors.findMany({ where: { organizationId: "org-1" } });
+            const slots = await ctx.db.usageOrganizationCohortSlots.findMany({ where: { organizationId: "org-1" } });
+
+            return { contributors: contributors.page, slots: slots.page };
+        });
+
+        expect(entries.contributors).toHaveLength(1);
+        expect(entries.slots).toHaveLength(1);
     });
 
     it("keeps a released cohort's members when a contributor is booked after the first read", async () => {

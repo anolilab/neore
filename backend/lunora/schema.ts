@@ -3933,6 +3933,8 @@ export const schema = defineSchema({
     // One claimed booking slot per contributor booked under an organization (`usage/cohorts.ts`). The unique slot is the claim: two bookings
     // cannot take the same one. Holds no user, so it carries no one's usage.
     usageOrganizationCohortSlots: defineTable({
+        // When the slot was claimed: the organization view counts a cohort sealed only once its last slot has settled (`SLOT_SETTLE_MS`).
+        claimedAt: v.number(),
         organizationId: v.string(),
         slot: v.number(),
     })
@@ -3949,7 +3951,8 @@ export const schema = defineSchema({
         userId: v.string(),
     })
         .global()
-        .index("by_organization_and_user", ["organizationId", "userId"])
+        // Unique: a member has one entry under an organization, so two first replies booked at once cannot place them in two cohorts.
+        .index("by_organization_and_user", ["organizationId", "userId"], { unique: true })
         .index("by_organization_and_cohort", ["organizationId", "cohort", "userId"])
         .index("by_user", ["userId"]),
 

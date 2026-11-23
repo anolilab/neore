@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationUsagePage } from "./usage-organization";
-import { MAX_ORGANIZATION_PAGES, startOfDayInZone, sumOrganizationUsage } from "./usage-organization";
+import { MAX_ORGANIZATION_PAGES, organizationSinceOf, sumOrganizationUsage } from "./usage-organization";
 
 const project = (projectKey: string, costMicrodollars: number) => {
     return { costMicrodollars, projectKey, replies: 1, title: projectKey, tokens: 10 };
@@ -57,30 +57,8 @@ describe("sumOrganizationUsage: the removed projects", () => {
     });
 });
 
-describe("the day an organization period starts at", () => {
-    it("is midnight in the viewer's zone", () => {
-        expect(startOfDayInZone("2026-03-10", "UTC")).toBe(Date.UTC(2026, 2, 10));
-        // New York is on daylight time from 8 March 2026: its midnight is four hours past UTC's.
-        expect(startOfDayInZone("2026-03-10", "America/New_York")).toBe(Date.UTC(2026, 2, 10, 4));
-        // Tokyo is nine hours ahead: its midnight is the afternoon before, in UTC.
-        expect(startOfDayInZone("2026-03-10", "Asia/Tokyo")).toBe(Date.UTC(2026, 2, 9, 15));
-    });
-
-    it("holds on the day daylight time starts, when the offset changes", () => {
-        // New York's clocks change at 2am on 8 March 2026; midnight that day is still on standard time, five hours past UTC.
-        expect(startOfDayInZone("2026-03-08", "America/New_York")).toBe(Date.UTC(2026, 2, 8, 5));
-    });
-});
-
-describe("the day an organization period starts at, in the zones that are hard to count", () => {
-    it("starts at the change when a zone moves its clocks at midnight, and does not take the day before", () => {
-        // Santiago's clocks jump from midnight to one o'clock on 6 September 2026, so the day starts at the change, four hours past UTC.
-        expect(startOfDayInZone("2026-09-06", "America/Santiago")).toBe(Date.UTC(2026, 8, 6, 4));
-        // The day after is on daylight time: its midnight is three hours past UTC.
-        expect(startOfDayInZone("2026-09-07", "America/Santiago")).toBe(Date.UTC(2026, 8, 7, 3));
-    });
-
-    it("counts a zone the runtime does not know as UTC, rather than failing the view", () => {
-        expect(startOfDayInZone("2026-03-10", "Not/AZone")).toBe(Date.UTC(2026, 2, 10));
+describe("the instant an organization period starts at", () => {
+    it("is the chosen date's UTC midnight, the same for viewers in every zone", () => {
+        expect(organizationSinceOf("2026-03-10")).toBe(Date.UTC(2026, 2, 10));
     });
 });
