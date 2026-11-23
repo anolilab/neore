@@ -427,6 +427,15 @@ export const startSetupFix = authMutation
             return { error: "This run cannot start a setup fix." };
         }
 
+        // A fix in a chat that is gone, not the caller's, or locked would run with no place to show its result.
+        if (run.threadId !== undefined) {
+            const thread = await ctx.db.get("threads", run.threadId as Id<"threads">);
+
+            if (!thread || thread.deleted || thread.userId !== ctx.user.userId || isThreadLocked(thread)) {
+                return { error: "The chat this run came from is gone or locked, so the fix's result could not be shown there." };
+            }
+        }
+
         // Checked before `insertRun`, which charges the run rate limit: a run without the key fails at once anyway.
         if (!(await storedProviderKey(ctx, ctx.user.userId, CODING_AGENTS[run.agent].providerKey))) {
             return { error: missingKeyMessage(run.agent) };

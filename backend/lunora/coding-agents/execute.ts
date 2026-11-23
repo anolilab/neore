@@ -211,7 +211,17 @@ export const pollCodingAgentRun = internalAction
         }
 
         // Read before `finalizeRun` kills the sandbox. A failed read keeps the log this poll has, rather than failing the poll.
-        const setupFailedTail = polled.status?.kind === "setup-failed" ? await readSetupLogTail(sandbox, secrets).catch(() => undefined) : undefined;
+        const setupFailedTail =
+            polled.status?.kind === "setup-failed"
+                ? await readSetupLogTail(sandbox, secrets).catch((error: unknown) => {
+                      ctx.log.event("coding_agents.setup_tail_unreadable", {
+                          message: error instanceof Error ? error.message : "unknown",
+                          runId,
+                      });
+
+                      return undefined;
+                  })
+                : undefined;
         const { cancelled } = await ctx.runMutation(internal.coding_agents.functions.recordPoll, {
             offset: polled.offset,
             runId,
