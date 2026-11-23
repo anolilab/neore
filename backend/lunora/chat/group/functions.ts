@@ -35,6 +35,7 @@ import type { GroupChat, GroupChatMode } from "./validators";
 import { vGroupChatMode } from "./validators";
 import { admitSkills } from "../../lib/rls/scope";
 import { MAX_LENGTH } from "../../lib/validators";
+import { sentOrderText } from "../../agent/shared";
 
 const DEFAULT_GROUP_TITLE = "Group chat";
 
@@ -617,8 +618,10 @@ export const isGroupStopRequested = internalQuery
     });
 
 const rowText = (row: Doc<"messages">): string => {
-    if (row.text) {
-        return row.text;
+    const text = sentOrderText(row);
+
+    if (text) {
+        return text;
     }
 
     const content = (row.message as { content?: unknown } | undefined)?.content;

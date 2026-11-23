@@ -10,6 +10,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { autoCompactBeforeReply, compactThreadContext, estimateContext, reportedUsageTokens, transcriptTextOf } from "./thread-compaction";
 import { COMPACT_KEEP_TURNS } from "./thread-compaction-logic";
+import { searchText } from "./shared";
 import { documentTextPart } from "../chat/lib/attached-text";
 import { clearContextRowHandler } from "../chat/context-reset";
 import {
@@ -866,24 +867,23 @@ describe("what the summariser reads of a row", () => {
         expect(transcriptTextOf(denied as never)).toBe("[tool results]\nbuy: [denied] The user declined the purchase.");
     });
 
-    it("reads an attached document's text and names an image or file, beside the typed text", () => {
+    it("reads an attached document's text in the order it was sent, and names an image or file, beside the typed text", () => {
         expect.assertions(1);
 
-        const prompt = {
-            message: {
-                content: [
-                    { text: "What do these say?", type: "text" },
-                    documentTextPart("notes.pdf", "Quarterly numbers"),
-                    { image: "storage:a", type: "image" },
-                    { data: "storage:b", filename: "plan.xlsx", mediaType: "application/vnd.ms-excel", type: "file" },
-                ],
-                role: "user",
-            },
-            text: "What do these say?",
+        const message = {
+            content: [
+                documentTextPart("notes.pdf", "Quarterly numbers"),
+                { text: "What do these say?", type: "text" },
+                { image: "storage:a", type: "image" },
+                { data: "storage:b", filename: "plan.xlsx", mediaType: "application/vnd.ms-excel", type: "file" },
+            ],
+            role: "user",
         };
+        // As saved: the `text` column is the search copy, typed words first.
+        const prompt = { message, text: searchText(message as never) };
 
         expect(transcriptTextOf(prompt as never)).toBe(
-            `What do these say?\n${documentTextPart("notes.pdf", "Quarterly numbers").text}\n[image attached]\n[file attached: plan.xlsx]`,
+            `${documentTextPart("notes.pdf", "Quarterly numbers").text} What do these say?\n[image attached]\n[file attached: plan.xlsx]`,
         );
     });
 

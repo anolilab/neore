@@ -100,6 +100,22 @@ export const searchText = (message: Message | ModelMessage): string | undefined 
 };
 
 /**
+ * A saved row's text in the order its parts were sent, for a reader that shows or sends the conversation (a summary, a group
+ * turn's history, a media prompt). The `text` column is the search copy ({@link searchText}), which puts a user message's typed
+ * parts ahead of an attached document; it still decides whether the row has text at all, so a row kept out of the index reads
+ * as none here too.
+ */
+export const sentOrderText = (row: { message?: unknown; text?: string }): string | undefined => {
+    const message = row.message as Message | undefined;
+
+    if (row.text === undefined || message?.role !== "user" || typeof message.content === "string") {
+        return row.text;
+    }
+
+    return extractText(message);
+};
+
+/**
  * Every text part, joined.
  *
  * The union is written out rather than taken as `{ type: string }[]` because the

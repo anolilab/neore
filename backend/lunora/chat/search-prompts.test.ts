@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
-import { searchSentPrompts } from "./functions";
+import { isSentPromptAvailable, searchSentPrompts } from "./functions";
 import { searchText } from "../agent/shared";
 import { documentTextPart, guestTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
@@ -79,7 +79,7 @@ const insertMessage = (
         ...(fields.agentName !== undefined && { agentName: fields.agentName }),
     });
 
-const insertThread = (context: any, fields: { lockedAt?: number; title: string; userId: string }) =>
+const insertThread = (context: any, fields: { deleted?: boolean; isTemporary?: boolean; lockedAt?: number; title: string; userId: string }) =>
     context.db.insert("threads", { model: "gpt-4o", status: "active", ...fields });
 
 const search = async (harness: ReturnType<typeof lunoraTest>, searchQuery: string, userId = OWNER) => {
@@ -203,10 +203,12 @@ describe("searchSentPrompts", () => {
                 }
             });
 
-            const prompts = await search(harness, "deploy");
+            const result: any = await harness.withIdentity({ userId: OWNER } as never).query(searchSentPrompts as never, { searchQuery: "deploy" } as never);
 
-            expect(prompts).toHaveLength(50);
-            expect(prompts[0]?.text).toBe("deploy number 59");
+            expect(result.prompts).toHaveLength(50);
+            expect(result.prompts[0]?.text).toBe("deploy number 59");
+            // 60 hits fill neither window, but the list dropped ten of them.
+            expect(result.truncated).toBe(true);
         } finally {
             harness.close();
         }
@@ -247,7 +249,8 @@ describe("searchSentPrompts", () => {
         try {
             const ids = await harness.run(async (context: any) => {
                 const kept = await insertThread(context, { title: "Kept", userId: OWNER });
-                const temporary = await insertThread(context, { title: "Temporary", userId: OWNER });
+                // As `insertTemporaryThread` saves one: the marker and the thread's flag together.
+                const temporary = await insertThread(context, { isTemporary: true, title: "Temporary", userId: OWNER });
 
                 await context.db.insert("temporaryThreads", { expiresAt: Date.now() + 60_000, threadId: temporary, userId: OWNER });
 
@@ -624,8 +627,24 @@ describe("searchSentPrompts", () => {
             await harness.run(async (context: any) => {
                 const original = await insertThread(context, { title: "Original", userId: OWNER });
                 const branch = await insertThread(context, { title: "Branch", userId: OWNER });
+                const branchOfBranch = await insertThread(context, { title: "Branch of branch", userId: OWNER });
 
-                for (const threadId of [original, branch]) {
+                await context.db.insert("threadRelationships", {
+                    branchType: "branch",
+                    createdAt: 6,
+                    parentThreadId: original,
+                    threadId: branch,
+                    userId: OWNER,
+                });
+                await context.db.insert("threadRelationships", {
+                    branchType: "branch",
+                    createdAt: 7,
+                    parentThreadId: branch,
+                    threadId: branchOfBranch,
+                    userId: OWNER,
+                });
+
+                for (const threadId of [original, branch, branchOfBranch]) {
                     await insertMessage(context, { createdAt: 5, order: 0, role: "user", text: "deploy it now", threadId, userId: OWNER });
                 }
 
@@ -644,6 +663,35 @@ describe("searchSentPrompts", () => {
 
             expect(prompts.map((prompt) => prompt.text)).toEqual(["deploy a preview", "deploy it now"]);
             expect(prompts.map((prompt) => prompt.draftFrom)).toEqual(["suggestion", undefined]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("lists the same words sent at the same time in two unrelated chats once per chat", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const work = await insertThread(context, { title: "Work", userId: OWNER });
+                const home = await insertThread(context, { title: "Home", userId: OWNER });
+
+                for (const threadId of [work, home]) {
+                    await insertMessage(context, { createdAt: 5, order: 0, role: "user", text: "deploy it now", threadId, userId: OWNER });
+                }
+
+                return { home, work };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts).toHaveLength(2);
+            expect(prompts).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ threadId: ids.home, threadTitle: "Home" }),
+                    expect.objectContaining({ threadId: ids.work, threadTitle: "Work" }),
+                ]),
+            );
         } finally {
             harness.close();
         }
@@ -671,6 +719,81 @@ describe("searchSentPrompts", () => {
             const prompts = await search(harness, "deploy");
 
             expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.untimed, ids.timed]);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("isSentPromptAvailable", () => {
+    const available = (harness: ReturnType<typeof lunoraTest>, messageId: string, userId = OWNER) =>
+        harness.withIdentity({ userId } as never).query(isSentPromptAvailable as never, { messageId } as never) as Promise<boolean>;
+
+    it("answers yes for a prompt newer matches pushed out of the search's list, and no where the search would not list it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const busy = await insertThread(context, { title: "Busy", userId: OWNER });
+                const pushed = await insertMessage(context, { createdAt: 0, order: 0, role: "user", text: "deploy number 0", threadId: busy, userId: OWNER });
+
+                for (let index = 1; index < 60; index += 1) {
+                    await insertMessage(context, {
+                        createdAt: index,
+                        order: index,
+                        role: "user",
+                        text: `deploy number ${index}`,
+                        threadId: busy,
+                        userId: OWNER,
+                    });
+                }
+
+                const reply = await insertMessage(context, { createdAt: 61, order: 60, role: "assistant", text: "deploy done", threadId: busy, userId: OWNER });
+                // Saved in a listed chat, but nobody typed it: a goal's round and a guest's note sent on.
+                const goalRound = await insertMessage(context, {
+                    agentName: GOAL_CONTINUATION_AGENT,
+                    createdAt: 62,
+                    order: 61,
+                    role: "user",
+                    text: "deploy again",
+                    threadId: busy,
+                    userId: OWNER,
+                });
+                const guestNote = await insertMessage(context, {
+                    content: [guestTextPart("deploy from a guest", "note-1")],
+                    createdAt: 63,
+                    order: 62,
+                    role: "user",
+                    text: "deploy from a guest",
+                    threadId: busy,
+                    userId: OWNER,
+                });
+                const promptIn = async (fields: { deleted?: boolean; isTemporary?: boolean; lockedAt?: number }, userId = OWNER) => {
+                    const threadId = await insertThread(context, { ...fields, title: "Other", userId });
+
+                    return insertMessage(context, { createdAt: 70, order: 0, role: "user", text: "deploy elsewhere", threadId, userId });
+                };
+
+                return {
+                    goalRound,
+                    guestNote,
+                    locked: await promptIn({ lockedAt: 1 }),
+                    pushed,
+                    reply,
+                    temporary: await promptIn({ isTemporary: true }),
+                    theirs: await promptIn({}, OTHER),
+                    trashed: await promptIn({ deleted: true }),
+                };
+            });
+
+            const listed = await search(harness, "deploy");
+
+            expect(listed.map((prompt) => prompt.messageId)).not.toContain(ids.pushed);
+            await expect(available(harness, ids.pushed)).resolves.toBe(true);
+
+            for (const refused of [ids.goalRound, ids.guestNote, ids.locked, ids.reply, ids.temporary, ids.theirs, ids.trashed]) {
+                await expect(available(harness, refused)).resolves.toBe(false);
+            }
         } finally {
             harness.close();
         }

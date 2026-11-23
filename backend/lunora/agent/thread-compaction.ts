@@ -62,6 +62,7 @@ import {
 } from "./thread-summaries";
 import { renderTranscript, SUMMARY_MAX_PATH_ROWS, SUMMARY_READ_REACH_ROWS, SUMMARY_RECENT_ROWS } from "./thread-summary-logic";
 import { mergeTaint } from "../devices/lib/taint";
+import { sentOrderText } from "./shared";
 
 type Reader = Pick<QueryCtx, "db">;
 type Row = Doc<"messages">;
@@ -523,9 +524,9 @@ export const transcriptTextOf = (row: { message?: unknown; text?: string }): str
         return toolResultsText(row.message);
     }
 
-    return (
-        [row.text, extraPartsText(row.message, row.text), toolCallsText(row.message)].filter((part): part is string => Boolean(part)).join("\n") || undefined
-    );
+    const text = sentOrderText(row);
+
+    return [text, extraPartsText(row.message, text), toolCallsText(row.message)].filter((part): part is string => Boolean(part)).join("\n") || undefined;
 };
 
 /**

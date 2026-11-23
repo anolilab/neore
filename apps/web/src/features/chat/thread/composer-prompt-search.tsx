@@ -16,25 +16,32 @@ const SEARCH_MAX_LENGTH = 500;
 /** The keys the search answers itself; they do not also reach a global shortcut. */
 const SEARCH_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape"]);
 
-type PickOutcome<T> = { kind: "failed" } | { fresh: T; kind: "gone" } | { kind: "found" };
+type PickOutcome<T> = { kind: "failed" } | { fresh: T | undefined; kind: "gone" } | { kind: "found" };
 
 /**
- * Runs the search again and says whether the picked prompt is still in it. Outside the component: the React Compiler skips
- * a component with a conditional inside a `catch`.
+ * Asks the server whether the picked prompt may still go in the draft, and on a refusal runs the search again for the list.
+ * The check reads that one prompt: the search lists at most 50, so newer matches can push a prompt out of it while it is
+ * still available. Outside the component: the React Compiler skips a component with a conditional inside a `catch`.
  */
-const recheckPick = async <T extends { prompts: ReadonlyArray<{ messageId: string }> }>(
-    search: () => Promise<T>,
-    messageId: string,
-): Promise<PickOutcome<T>> => {
-    let fresh: T;
+const recheckPick = async <T,>(check: () => Promise<boolean>, search: () => Promise<T>): Promise<PickOutcome<T>> => {
+    let available: boolean;
 
     try {
-        fresh = await search();
+        available = await check();
     } catch {
         return { kind: "failed" };
     }
 
-    return fresh.prompts.some((item) => item.messageId === messageId) ? { kind: "found" } : { fresh, kind: "gone" };
+    if (available) {
+        return { kind: "found" };
+    }
+
+    // The refusal stands without a fresh list: the notice says so, and the old list stays until the next keystroke.
+    try {
+        return { fresh: await search(), kind: "gone" };
+    } catch {
+        return { fresh: undefined, kind: "gone" };
+    }
 };
 
 export interface PickedPrompt {
@@ -101,9 +108,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         listRef.current?.children.item(position)?.scrollIntoView({ block: "nearest" });
     };
 
-    // The list on screen is one search old: a thread locked since then drops its prompts from a new search. So a pick runs
-    // the same search again first, and a prompt that is no longer in it is not put in the composer.
-    const pick = async (prompt: PickedPrompt & { messageId: string }) => {
+    // The list on screen is one search old: a thread locked, trashed or made temporary since then no longer lists. So a pick
+    // asks the server about that prompt first, and one no longer available is not put in the composer.
+    const pick = async (prompt: (typeof prompts)[number]) => {
         if (searched === "" || !settled || pickingRef.current) {
             // A click focuses its row; the arrow keys work only from the input.
             inputRef.current?.focus();
@@ -114,7 +121,11 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         pickingRef.current = true;
 
         const options = crpc.chat.functions.searchSentPrompts.queryOptions({ searchQuery: searched }, { live: false });
-        const outcome = await recheckPick(() => queryClient.fetchQuery({ ...options, gcTime: 0, staleTime: 0 }), prompt.messageId);
+        const checkOptions = crpc.chat.functions.isSentPromptAvailable.queryOptions({ messageId: prompt.messageId }, { live: false });
+        const outcome = await recheckPick(
+            () => queryClient.fetchQuery({ ...checkOptions, gcTime: 0, staleTime: 0 }),
+            () => queryClient.fetchQuery({ ...options, gcTime: 0, staleTime: 0 }),
+        );
 
         pickingRef.current = false;
 
@@ -130,7 +141,10 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         }
 
         if (outcome.kind === "gone") {
-            queryClient.setQueryData(options.queryKey, outcome.fresh);
+            if (outcome.fresh !== undefined) {
+                queryClient.setQueryData(options.queryKey, outcome.fresh);
+            }
+
             setPickNotice("gone");
         } else {
             setPickNotice("failed");

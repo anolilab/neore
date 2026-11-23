@@ -7,9 +7,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { calls, prompts } = vi.hoisted(() => {
+const { calls, prompts, searchList } = vi.hoisted(() => {
     return {
         calls: [] as { args: unknown }[],
+        // How many prompts the search lists, as the server's cap of 50 does.
+        searchList: { limit: Infinity },
         prompts: [
             { createdAt: 300, messageId: "m-notes", text: "deploy to production", threadId: "t-notes", threadTitle: "Notes" },
             { createdAt: 100, messageId: "m-release", text: "deploy the staging build", threadId: "t-release", threadTitle: "Release" },
@@ -51,7 +53,9 @@ vi.mock("@/lib/lunora/crpc", () => {
                               }
 
                               return {
-                                  prompts: prompts.filter((prompt) => prompt.text.split(" ").some((word) => word.startsWith(needle))),
+                                  prompts: prompts
+                                      .filter((prompt) => prompt.text.split(" ").some((word) => word.startsWith(needle)))
+                                      .slice(0, searchList.limit),
                                   truncated: needle === "many",
                               };
                           },
@@ -60,9 +64,19 @@ vi.mock("@/lib/lunora/crpc", () => {
         },
     };
 
+    // The pick's check reads that one prompt, whatever the search's cap leaves out.
+    const isSentPromptAvailable = {
+        queryOptions: (args: { messageId: string }) => {
+            return {
+                queryFn: async () => prompts.some((prompt) => prompt.messageId === args.messageId),
+                queryKey: ["isSentPromptAvailable", args],
+            };
+        },
+    };
+
     return {
         useCRPC: () => {
-            return { chat: { functions: { searchSentPrompts } } };
+            return { chat: { functions: { isSentPromptAvailable, searchSentPrompts } } };
         },
     };
 });
@@ -328,6 +342,30 @@ describe("ComposerPromptSearch", () => {
             expect(screen.getAllByRole("option")).toHaveLength(1);
         } finally {
             prompts.splice(index, 0, removed!);
+        }
+    });
+
+    it("puts a prompt in the draft that newer matches pushed out of the search's list since it was drawn", async () => {
+        const onPick = vi.fn();
+
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "deploy" } });
+
+        await settle();
+
+        // The search would now list only the newest match; the older one is still the person's prompt.
+        searchList.limit = 1;
+
+        try {
+            fireEvent.click(screen.getAllByRole("option")[1]!);
+
+            await settle();
+
+            expect(onPick).toHaveBeenCalledWith({ text: "deploy the staging build" });
+            expect(screen.queryByText("That prompt is no longer available. Pick another.")).toBeNull();
+        } finally {
+            searchList.limit = Infinity;
         }
     });
 

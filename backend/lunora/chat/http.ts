@@ -48,6 +48,7 @@ import { formatPageContextPart, parsePageContext } from "./lib/page-context";
 import type { ChatStartRequest, StartClaim } from "./start-claim";
 import { chatStartFingerprint, isValidClientMessageId, startChargeKey } from "./start-claim";
 import { createStreamToken } from "./streaming/persistent/stream-token";
+import { sentOrderText } from "../agent/shared";
 
 const SAFE_TOKEN_RE = /^[\w-]+$/;
 
@@ -2510,8 +2511,8 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
         }
     }
 
-    // Get prompt from message convenience field
-    const prompt = message.text || "";
+    // The prompt as it was sent: the `text` column is the search copy, with typed words ahead of an attached document.
+    const prompt = sentOrderText(message) || "";
 
     // Claimed once on the jobs queue (`lib/job-queue.ts`); if a delivery dies
     // mid-run, its pending row is failed rather than left spinning.
