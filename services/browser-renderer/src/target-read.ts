@@ -563,7 +563,7 @@ export function readTarget(
 
         if (isDisabledIn(control)) {
             refused = "disabled";
-        } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden") {
+        } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden" || getComputedStyle(control).opacity === "0") {
             refused = "hidden";
         } else if (isCoveredIn(control)) {
             refused = "covered";
@@ -636,7 +636,11 @@ export function readTarget(
             } else if (isDisabledIn(control)) {
                 // A press handler can disable the control without changing the fingerprint: it is not clicked then.
                 refused = "disabled";
-            } else if (control.getClientRects().length === 0 || getComputedStyle(control).visibility === "hidden") {
+            } else if (
+                control.getClientRects().length === 0 ||
+                getComputedStyle(control).visibility === "hidden" ||
+                getComputedStyle(control).opacity === "0"
+            ) {
                 refused = "hidden";
             } else if (isCoveredIn(control)) {
                 refused = "covered";

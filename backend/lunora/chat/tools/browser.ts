@@ -310,7 +310,7 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     return { error: "Browser automation rate limit exceeded.", success: false };
                 }
 
-                // The owner's click mode (`browserClickMode`). "pointer" clicks an ordinary target for real, with no fingerprint
+                // The owner's click mode (`browserClickMode`). "pointer" clicks an ordinary target for real, after the same check "all" makes
                 // (the purchase check above still ran); an approved click stays in the page's checked click unless the mode is "all".
                 const clickMode = await context.runQuery(internal.browser.functions.getBrowserClickMode, { userId });
 
@@ -318,6 +318,11 @@ Use this tool when you need to visit websites, fill forms, scrape data, or inter
                     step = { ...step, approvedCallId: options.toolCallId, clickMode: clickMode === "all" ? "all" : "page" };
                 } else {
                     const look = await run({ action: "extract", approvalLook: true, selector: input.selector });
+
+                    // A selector that matches nothing fails at once, with the renderer's own error (nothing to approve).
+                    if (look.error?.startsWith("Element not found") === true) {
+                        return { error: look.error, success: false };
+                    }
 
                     // A look that reads no target clears nothing: a click without a fingerprint would run unchecked.
                     if (look.target === undefined || purchaseTargetNeedsApproval(look as ClickTargetLook)) {

@@ -187,6 +187,14 @@ describe("the approval an approved tool call runs with", () => {
     });
 });
 
+describe("a selector that matches nothing", () => {
+    it("asks nothing: the click fails at once", async () => {
+        const missing = vi.fn(async () => ({ error: "Element not found: #gone", success: false, target: undefined }));
+
+        await expect(browserActionNeedsPurchaseApproval({ action: "click", selector: "#gone" }, missing)).resolves.toBe(false);
+    });
+});
+
 describe("isPurchaseText for ordinary link text", () => {
     it.each(["Check out our new arrivals", "Zahlen & Fakten", "Zahlen", "Read the payroll report"])("does not read %j as a purchase", (text) => {
         expect(isPurchaseText(text)).toBe(false);

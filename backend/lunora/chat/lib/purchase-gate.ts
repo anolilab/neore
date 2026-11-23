@@ -40,6 +40,8 @@ export interface ClickTargetLook {
     /** The element is on a checkout (a form with card fields, or a checkout page): a submit-like label there asks. */
     checkout?: boolean;
     content?: string;
+    /** Why the read failed, when it did (`Element not found: …` for a selector that matches nothing). */
+    error?: string;
     /** The control's accessible name (aria-label, labelled-by text, title), when it is not its text. */
     label?: string;
     /** The renderer cut the accessible name short: a purchase word may sit past the cut, so the gate cannot clear it. */
@@ -64,7 +66,14 @@ export const browserActionNeedsPurchaseApproval = async (
     }
 
     try {
-        return purchaseTargetNeedsApproval(await look(input.selector));
+        const target = await look(input.selector);
+
+        // A selector that matches nothing is not a purchase: the click fails at once, so nothing is asked for it.
+        if (target.error?.startsWith("Element not found") === true) {
+            return false;
+        }
+
+        return purchaseTargetNeedsApproval(target);
     } catch {
         return true;
     }

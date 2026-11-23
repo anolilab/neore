@@ -329,6 +329,17 @@ describe("readTarget in a page", () => {
         expect(read.labelTruncated).toBe(true);
     });
 
+    it("an invisible (opacity 0) control is refused as hidden, and nothing is clicked", async () => {
+        await pageWith(page, `<button id="pay" style="opacity: 0" onclick="window.clicked = true">Pay now</button>`);
+        const element = await page.$("#pay");
+        const seen = await element!.evaluate(readTarget, TARGET_READ_OPTIONS);
+
+        const read = await element!.evaluate(readTarget, { ...TARGET_READ_OPTIONS, click: true, expect: seen.target });
+
+        expect(read.refused).toBe("hidden");
+        expect(await wasClicked(page)).toBe(false);
+    });
+
     it("a click on a child of a disabled button is refused and nothing is clicked", async () => {
         await pageWith(page, `<button id="buy" disabled><span id="label" onclick="window.clicked = true">Buy</span></button>`);
         const element = await page.$("#label");
