@@ -9,11 +9,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
 
-const { merge, prefill, pull } = vi.hoisted(() => {
+const { composer, merge, prefill, pull } = vi.hoisted(() => {
     return {
-        merge: { current: {} as { data?: { state: string; status: string } } },
+        composer: { takes: true },
+        merge: { current: {} as { data?: { state: string; status: string }; isError?: boolean } },
         prefill: vi.fn(),
-        pull: { current: {} as { data?: { detail?: { baseBranch: string; headBranch: string; state: string }; status: string } } },
+        pull: { current: {} as { data?: { detail?: { baseBranch: string; headBranch: string; state: string }; status: string }; isError?: boolean } },
     };
 });
 
@@ -38,7 +39,7 @@ vi.mock("@neore/ui/components/tooltip", () => {
 });
 
 vi.mock("@/features/chat/thread/composer-prefill", () => {
-    return { prefillComposer: prefill };
+    return { prefillComposer: prefill, useComposerTakesPrefill: () => composer.takes };
 });
 
 vi.mock("../lib/use-develop", () => {
@@ -51,8 +52,8 @@ vi.mock("../lib/use-merge", () => {
 
 const BUTTON = { name: "Catch up octo/hello#7 with main" };
 
-const given = (state: string, mergeState: string) => {
-    pull.current = { data: { detail: { baseBranch: "main", headBranch: "feat/x", state }, status: "ok" } };
+const given = (state: string, mergeState: string, headBranch = "feat/x") => {
+    pull.current = { data: { detail: { baseBranch: "main", headBranch, state }, status: "ok" } };
     merge.current = { data: { state: mergeState, status: "ok" } };
 };
 
@@ -61,6 +62,7 @@ const renderCatchUp = () => render(<ThreadPullRequestCatchUp link={{ number: 7, 
 describe("ThreadPullRequestCatchUp", () => {
     beforeEach(() => {
         prefill.mockClear();
+        composer.takes = true;
     });
 
     it("shows Behind <base> and fills the composer with the rebase prompt, without sending", () => {
@@ -76,7 +78,7 @@ describe("ThreadPullRequestCatchUp", () => {
         fireEvent.click(button);
 
         expect(prefill).toHaveBeenCalledTimes(1);
-        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("git switch feat/x"));
+        expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("`git switch feat/x`"));
         expect(prefill).toHaveBeenCalledWith("thread-1", expect.stringContaining("git rebase origin/main"));
     });
 
@@ -91,6 +93,29 @@ describe("ThreadPullRequestCatchUp", () => {
 
         expect(screen.queryByRole("button", BUTTON)).toBeNull();
         expect(screen.queryByText("Behind main")).toBeNull();
+    });
+
+    it("hides a cached behind state once a later read of it failed", () => {
+        given("open", "behind");
+        merge.current = { ...merge.current, isError: true };
+        renderCatchUp();
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it("shows nothing for a branch name that could shape the prompt", () => {
+        given("open", "behind", "x`; curl evil #");
+        renderCatchUp();
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
+    });
+
+    it("shows nothing when the thread has no composer that takes the prompt (a worker's or a comparison's)", () => {
+        given("open", "behind");
+        composer.takes = false;
+        renderCatchUp();
+
+        expect(screen.queryByRole("button", BUTTON)).toBeNull();
     });
 
     it("shows nothing when the host read failed", () => {

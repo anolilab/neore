@@ -1659,6 +1659,13 @@ const ComposerInput = ({
     // Text another part of the thread's page put here (a pull request's Catch up): added after what is typed, never sent.
     const applyPrefill = useCallback(
         (prefilled: string) => {
+            // Clicked again with the prompt still there: a second copy would only have to be deleted by hand.
+            if (getComposerText().includes(prefilled)) {
+                inputAreaRef.current?.focus();
+
+                return;
+            }
+
             promptHistory.reset();
 
             // A rejection warning is about the text that was there: typing clears it (`handleTextChange`), so the prefill does too.

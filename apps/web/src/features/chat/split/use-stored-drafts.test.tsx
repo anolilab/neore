@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 
-import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted } from "./composer-drafts";
+import { clearComposerDrafts, draftOwnership, dropStoredDrafts, saveComposerDraft, setSplitViewMounted, useBoundDraftStore } from "./composer-drafts";
 import { leaveSplitView } from "./pane-state";
 import { draftKey, flushStoredDrafts, resetStoredDraftsForTests } from "./stored-drafts";
 import useStoredDrafts, { keepsStoredDraft } from "./use-stored-drafts";
@@ -24,6 +24,7 @@ beforeEach(() => {
     // A fresh page: the storage module has not loaded, so nothing is bound and no hand-over is installed.
     draftOwnership.first = undefined;
     draftOwnership.handOver = undefined;
+    useBoundDraftStore.setState({ owners: new Set<string>() });
 });
 
 describe("useStoredDrafts", () => {
@@ -70,6 +71,43 @@ describe("useStoredDrafts", () => {
         flushStoredDrafts();
 
         expect(Object.keys(localStorage).filter((key: string) => key.startsWith("neore-draft:"))).toStrictEqual([]);
+    });
+});
+
+describe("when the chat's draft is settled", () => {
+    const settled = (owner: string): boolean => useBoundDraftStore.getState().owners.has(owner);
+
+    it("only once the stored draft came back, so text put in from elsewhere does not keep it out", async () => {
+        storeDrafts({ "thread-a": "draft a" });
+        renderHook(() => {
+            useStoredDrafts("thread-a", "user-1", false);
+        });
+
+        expect(settled("thread-a")).toBe(false);
+
+        await vi.dynamicImportSettled();
+
+        expect(useChatUIStore.getState().composerText).toBe("draft a");
+        expect(settled("thread-a")).toBe(true);
+    });
+
+    it("not while the chat is still loading, and at once when it is known to keep no draft", () => {
+        const { rerender, unmount } = renderHook(
+            ({ known }: { known: boolean }) => {
+                useStoredDrafts("thread-a", undefined, false, known);
+            },
+            { initialProps: { known: false } },
+        );
+
+        expect(settled("thread-a")).toBe(false);
+
+        rerender({ known: true });
+
+        expect(settled("thread-a")).toBe(true);
+
+        unmount();
+
+        expect(settled("thread-a")).toBe(false);
     });
 });
 

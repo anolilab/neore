@@ -1310,7 +1310,7 @@ msgstr "{minutes}m remaining"
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel} mode — click to change"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 
@@ -4513,7 +4513,7 @@ msgstr "Ask a Side Question"
 msgid "Ask a side question without interrupting the reply"
 msgstr "Ask a side question without interrupting the reply"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "Ask all models anything..."
 msgstr "Ask all models anything..."
 
@@ -5161,7 +5161,7 @@ msgstr "beginner"
 msgid "Behavior"
 msgstr "Behavior"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:44
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:52
 msgid "Behind {base}"
 msgstr "Behind {base}"
 
@@ -6220,11 +6220,11 @@ msgstr "Catalan (Spain)"
 msgid "catalog"
 msgstr "catalog"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:55
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:63
 msgid "Catch up"
 msgstr "Catch up"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:40
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:48
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Catch up {pullRequest} with {base}"
 
@@ -8465,7 +8465,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
 #: src/features/chat/thread/composer-input.tsx:831
-#: src/features/chat/thread/composer-input.tsx:1767
+#: src/features/chat/thread/composer-input.tsx:1774
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -8795,7 +8795,7 @@ msgstr "Could not attach {0}. The other files were attached; try those again."
 msgid "Could not attach {0}. Try those again."
 msgstr "Could not attach {0}. Try those again."
 
-#: src/features/chat/thread/composer-input.tsx:1797
+#: src/features/chat/thread/composer-input.tsx:1804
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -9015,7 +9015,7 @@ msgid "Could not load this"
 msgstr "Could not load this"
 
 #: src/features/chat/split/chat-split-view.tsx:239
-#: src/features/chat/thread/thread.tsx:365
+#: src/features/chat/thread/thread.tsx:367
 msgid "Could not load this chat's details."
 msgstr "Could not load this chat's details."
 
@@ -9107,11 +9107,11 @@ msgstr "Could not reach the server to start generating. Check your connection an
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1800
+#: src/features/chat/thread/composer-input.tsx:1807
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1801
+#: src/features/chat/thread/composer-input.tsx:1808
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -11632,7 +11632,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1994
+#: src/features/chat/thread/composer-input.tsx:2001
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -27226,7 +27226,7 @@ msgstr "Push notifications on this browser"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:59
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:67
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 
@@ -37032,7 +37032,7 @@ msgid "Type your answer…"
 msgstr "Type your answer…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:1984
+#: src/features/chat/thread/composer-input.tsx:1991
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
 msgid "Type your message..."
 msgstr "Type your message..."
@@ -37454,7 +37454,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1836
+#: src/features/chat/thread/composer-input.tsx:1843
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -37654,12 +37654,12 @@ msgstr "Upload documents to your knowledge base and group them into collections.
 
 #: src/features/chat/thread/composer-input.tsx:433
 #: src/features/chat/thread/composer-input.tsx:686
-#: src/features/chat/thread/composer-input.tsx:1742
+#: src/features/chat/thread/composer-input.tsx:1749
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1735
+#: src/features/chat/thread/composer-input.tsx:1742
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 

@@ -1311,7 +1311,7 @@ msgstr "残り {minutes} 分"
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, other {# 個のモデルに何でも質問...}}"
 
@@ -4514,7 +4514,7 @@ msgstr "サイドクエスチョンをする"
 msgid "Ask a side question without interrupting the reply"
 msgstr "返信を中断せずにサイドクエスチョンをする"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
@@ -5162,7 +5162,7 @@ msgstr "初級"
 msgid "Behavior"
 msgstr "動作"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:44
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:52
 msgid "Behind {base}"
 msgstr "{base} より遅れています"
 
@@ -6221,11 +6221,11 @@ msgstr "カタルーニャ語（スペイン）"
 msgid "catalog"
 msgstr "カタログ"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:55
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:63
 msgid "Catch up"
 msgstr "追いつく"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:40
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:48
 msgid "Catch up {pullRequest} with {base}"
 msgstr "{pullRequest} を {base} に追いつかせる"
 
@@ -8466,7 +8466,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "この差分に表示されなくなった行の会話"
 
 #: src/features/chat/thread/composer-input.tsx:831
-#: src/features/chat/thread/composer-input.tsx:1767
+#: src/features/chat/thread/composer-input.tsx:1774
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -8796,7 +8796,7 @@ msgstr "{0} を添付できませんでした。ほかのファイルは添付�
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} を添付できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1797
+#: src/features/chat/thread/composer-input.tsx:1804
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -9016,7 +9016,7 @@ msgid "Could not load this"
 msgstr "読み込めませんでした"
 
 #: src/features/chat/split/chat-split-view.tsx:239
-#: src/features/chat/thread/thread.tsx:365
+#: src/features/chat/thread/thread.tsx:367
 msgid "Could not load this chat's details."
 msgstr "このチャットの詳細を読み込めませんでした。"
 
@@ -9108,11 +9108,11 @@ msgstr "生成を開始するためにサーバーに接続できませんでし
 msgid "Could not reach the server. Try again."
 msgstr "サーバーに接続できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1800
+#: src/features/chat/thread/composer-input.tsx:1807
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1801
+#: src/features/chat/thread/composer-input.tsx:1808
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -11633,7 +11633,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1994
+#: src/features/chat/thread/composer-input.tsx:2001
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -27227,7 +27227,7 @@ msgstr "このブラウザーでのプッシュ通知"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "役割の異なる複数のエージェントを 1 つのスレッドに配置できます。レビューパネルはセキュリティとパフォーマンスの観点から変更を確認でき、ディベートでは統合の前に両方の立場を議論できます。"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:59
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:67
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "このブランチを {base} にリベースし、コンフリクトを解消し、ビルドとテストを確認してプッシュするプロンプトをコンポーザーに入力します。送信はされません。"
 
@@ -37033,7 +37033,7 @@ msgid "Type your answer…"
 msgstr "回答を入力…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:1984
+#: src/features/chat/thread/composer-input.tsx:1991
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
 msgid "Type your message..."
 msgstr "メッセージを入力..."
@@ -37455,7 +37455,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1836
+#: src/features/chat/thread/composer-input.tsx:1843
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -37655,12 +37655,12 @@ msgstr "ドキュメントをナレッジベースにアップロードし、コ
 
 #: src/features/chat/thread/composer-input.tsx:433
 #: src/features/chat/thread/composer-input.tsx:686
-#: src/features/chat/thread/composer-input.tsx:1742
+#: src/features/chat/thread/composer-input.tsx:1749
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1735
+#: src/features/chat/thread/composer-input.tsx:1742
 msgid "Upload failed: {0}"
 msgstr "アップロードに失敗しました: {0}"
 

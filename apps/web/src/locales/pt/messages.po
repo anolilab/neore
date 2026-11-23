@@ -1311,7 +1311,7 @@ msgstr "{minutes}min restantes"
 msgid "{modeLabel} mode — click to change"
 msgstr "Modo {modeLabel} — clique para alterar"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "{modelCount, plural, one {Ask # model anything...} other {Ask # models anything...}}"
 msgstr "{modelCount, plural, one {Pergunte qualquer coisa a # modelo...} other {Pergunte qualquer coisa a # modelos...}}"
 
@@ -4514,7 +4514,7 @@ msgstr "Fazer uma pergunta paralela"
 msgid "Ask a side question without interrupting the reply"
 msgstr "Faça uma pergunta paralela sem interromper a resposta"
 
-#: src/features/chat/thread/thread.tsx:264
+#: src/features/chat/thread/thread.tsx:266
 msgid "Ask all models anything..."
 msgstr "Pergunte qualquer coisa a todos os modelos..."
 
@@ -5162,7 +5162,7 @@ msgstr "iniciante"
 msgid "Behavior"
 msgstr "Comportamento"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:44
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:52
 msgid "Behind {base}"
 msgstr "Atrás de {base}"
 
@@ -6221,11 +6221,11 @@ msgstr "Catalão (Espanha)"
 msgid "catalog"
 msgstr "catálogo"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:55
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:63
 msgid "Catch up"
 msgstr "Atualizar"
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:40
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:48
 msgid "Catch up {pullRequest} with {base}"
 msgstr "Atualizar {pullRequest} com {base}"
 
@@ -8466,7 +8466,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversas em linhas que este diff não mostra mais"
 
 #: src/features/chat/thread/composer-input.tsx:831
-#: src/features/chat/thread/composer-input.tsx:1767
+#: src/features/chat/thread/composer-input.tsx:1774
 msgid "Conversion failed"
 msgstr "Falha na conversão"
 
@@ -8796,7 +8796,7 @@ msgstr "Não foi possível anexar {0}. Os outros arquivos foram anexados; tente 
 msgid "Could not attach {0}. Try those again."
 msgstr "Não foi possível anexar {0}. Tente novamente."
 
-#: src/features/chat/thread/composer-input.tsx:1797
+#: src/features/chat/thread/composer-input.tsx:1804
 msgid "Could not attach the chat"
 msgstr "Não foi possível anexar a conversa"
 
@@ -9016,7 +9016,7 @@ msgid "Could not load this"
 msgstr "Não foi possível carregar isto"
 
 #: src/features/chat/split/chat-split-view.tsx:239
-#: src/features/chat/thread/thread.tsx:365
+#: src/features/chat/thread/thread.tsx:367
 msgid "Could not load this chat's details."
 msgstr "Não foi possível carregar os detalhes deste chat."
 
@@ -9108,11 +9108,11 @@ msgstr "Não foi possível acessar o servidor para iniciar a geração. Verifiqu
 msgid "Could not reach the server. Try again."
 msgstr "Não foi possível acessar o servidor. Tente novamente."
 
-#: src/features/chat/thread/composer-input.tsx:1800
+#: src/features/chat/thread/composer-input.tsx:1807
 msgid "Could not read that chat"
 msgstr "Não foi possível ler essa conversa"
 
-#: src/features/chat/thread/composer-input.tsx:1801
+#: src/features/chat/thread/composer-input.tsx:1808
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Não foi possível ler essa conversa. Se estiver bloqueada, desbloqueie-a primeiro."
 
@@ -11633,7 +11633,7 @@ msgstr "Solte um arquivo ou clique para enviar"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1994
+#: src/features/chat/thread/composer-input.tsx:2001
 msgid "Drop files here"
 msgstr "Solte os arquivos aqui"
 
@@ -27227,7 +27227,7 @@ msgstr "Notificações push neste navegador"
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Coloque vários agentes com papéis próprios em uma mesma conversa. Um painel de revisão pode verificar uma alteração pelos ângulos de segurança e desempenho, e um debate pode argumentar os dois lados antes de uma síntese."
 
-#: src/features/develop/components/thread-pull-request-catch-up.tsx:59
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:67
 msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
 msgstr "Coloca um prompt no compositor para fazer rebase deste branch em {base}, resolver conflitos, verificar o build e os testes e fazer push. Nada é enviado."
 
@@ -37033,7 +37033,7 @@ msgid "Type your answer…"
 msgstr "Digite sua resposta…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:250
-#: src/features/chat/thread/composer-input.tsx:1984
+#: src/features/chat/thread/composer-input.tsx:1991
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:222
 msgid "Type your message..."
 msgstr "Digite sua mensagem..."
@@ -37455,7 +37455,7 @@ msgstr "Documentação atualizada de qualquer biblioteca ou framework"
 msgid "Update Duration"
 msgstr "Atualizar duração"
 
-#: src/features/chat/thread/composer-input.tsx:1836
+#: src/features/chat/thread/composer-input.tsx:1843
 msgid "Update failed"
 msgstr "Falha na atualização"
 
@@ -37655,12 +37655,12 @@ msgstr "Envie documentos para sua base de conhecimento e agrupe-os em coleções
 
 #: src/features/chat/thread/composer-input.tsx:433
 #: src/features/chat/thread/composer-input.tsx:686
-#: src/features/chat/thread/composer-input.tsx:1742
+#: src/features/chat/thread/composer-input.tsx:1749
 msgid "Upload failed"
 msgstr "Falha no envio"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1735
+#: src/features/chat/thread/composer-input.tsx:1742
 msgid "Upload failed: {0}"
 msgstr "Falha no envio: {0}"
 

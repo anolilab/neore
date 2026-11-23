@@ -4,9 +4,9 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 
-import { prefillComposer } from "@/features/chat/thread/composer-prefill";
+import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
 
-import { catchUpPrompt } from "../lib/catch-up-prompt";
+import { catchUpPrompt, isPlainBranchName } from "../lib/catch-up-prompt";
 import { usePullRequest } from "../lib/use-develop";
 import { useMergeStatus } from "../lib/use-merge";
 
@@ -20,7 +20,9 @@ export const CATCH_UP_CHECKED_LINKS = 5;
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
  * rebase prompt in this thread's composer and sends nothing. Reads the same cached queries as Develop: the pull request
  * (open, and its base), then the host's mergeability once it is open. Shows nothing while loading, on a failure, or once the
- * pull request is merged or closed.
+ * pull request is merged or closed, while the latest read of either failed (a cached "behind" is no longer known to hold), for
+ * a branch name that is not plain enough to put in a command, and when the thread has no composer that takes the prompt (a
+ * worker's, a comparison's, or a split pane without focus).
  */
 const ThreadPullRequestCatchUp = ({ link, threadId }: { link: { number: number; repository: string }; threadId: string }) => {
     const { t } = useLingui();
@@ -29,13 +31,19 @@ const ThreadPullRequestCatchUp = ({ link, threadId }: { link: { number: number; 
     const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
     const open = detail?.state === "open";
     const merge = useMergeStatus(address, open);
+    const takesPrompt = useComposerTakesPrefill(threadId);
 
-    if (!open || merge.data?.status !== "ok" || merge.data.state !== "behind") {
+    if (!takesPrompt || !open || pull.isError || merge.isError || merge.data?.status !== "ok" || merge.data.state !== "behind") {
         return null;
     }
 
     const base = detail.baseBranch;
     const head = detail.headBranch;
+
+    if (!isPlainBranchName(base) || !isPlainBranchName(head)) {
+        return null;
+    }
+
     const pullRequest = `${link.repository}#${String(link.number)}`;
     const label = t`Catch up ${pullRequest} with ${base}`;
 

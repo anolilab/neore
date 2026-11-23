@@ -143,6 +143,34 @@ export const useParkedDraftStore = create<{ threadIds: ReadonlySet<string> }>()(
 });
 
 /**
+ * The chats whose stored draft has had its chance to come back into the live composer (`use-stored-drafts.ts`), or that keep none.
+ * Text put in a composer from elsewhere (`composer-prefill.ts`) waits for its chat here: a composer with content takes no stored
+ * draft. Replaced on each change, never mutated.
+ */
+export const useBoundDraftStore = create<{ owners: ReadonlySet<string> }>()(() => {
+    return { owners: new Set<string>() };
+});
+
+/** Marks `owner`'s draft as settled, or no longer (its binding went away). */
+export const setDraftBound = (owner: string, bound: boolean): void => {
+    const { owners } = useBoundDraftStore.getState();
+
+    if (owners.has(owner) === bound) {
+        return;
+    }
+
+    const next = new Set(owners);
+
+    if (bound) {
+        next.add(owner);
+    } else {
+        next.delete(owner);
+    }
+
+    useBoundDraftStore.setState({ owners: next });
+};
+
+/**
  * Whether the split view is on the page. Only then is the focused pane's composer the live one of its chat: on `/chat` with
  * the preference on, the composer is the new-chat composer, and its text belongs to no pane.
  */

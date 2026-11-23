@@ -151,6 +151,8 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
         isNewThread || !threadId ? "new" : threadId,
         keepsStoredDraft(composerActive, isNewThread, thread, Boolean(worker) || isWorkerLoading) ? sessionData?.user?.id : undefined,
         isThreadLocked(thread?.lockedAt),
+        // Until the chat and its worker are known, whether it keeps a stored draft is not: nothing may fill the composer yet.
+        isNewThread || !threadId || (thread !== undefined && !isWorkerLoading),
     );
 
     const crpc = useCRPC();
