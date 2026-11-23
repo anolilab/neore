@@ -1,78 +1,77 @@
+"use client";
+
 /**
- * Puts text into one thread's composer from UI that is not part of it (a header chip). It never sends: the person reads,
- * edits and sends it. Each thread keeps its own queue, so a request for one thread never displaces another's, and a queue is
- * taken only once that thread's composer is live and its stored draft is back (`useBoundDraftStore`): text that arrived first
- * would keep the saved draft out. A request still waiting when its composer goes away is dropped.
+ * Puts a prompt into one thread's composer for the person to read and send. Never sends: the composer only takes the
+ * text (after what is already typed) and gets focus. Requests wait per thread, in order, for the composer of THEIR
+ * thread: one made while that thread is not open is taken when it opens, a second one does not replace the first, the
+ * same one twice is queued once, and another thread's composer leaves them alone. The shared thread composer takes them
+ * only once its stored draft is back (`useBoundDraftStore`): text that arrived first would keep the saved draft out.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { create } from "zustand";
 
 import { useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
 interface PrefillState {
-    /** Thread ids with a composer that takes prefills mounted; a control that fills one shows only for these. */
+    /** Thread ids with a composer that takes prompts mounted; a control that fills one shows only for these. */
     composers: ReadonlySet<string>;
-    /** Texts waiting for their thread's composer, oldest first. Replaced on each change, never mutated. */
-    pending: ReadonlyMap<string, ReadonlyArray<string>>;
+    /** Prompts not yet taken, per thread, oldest first. */
+    pending: Readonly<Record<string, ReadonlyArray<string>>>;
 }
 
 const usePrefillStore = create<PrefillState>()(() => {
-    return { composers: new Set<string>(), pending: new Map<string, ReadonlyArray<string>>() };
+    return { composers: new Set<string>(), pending: {} };
 });
 
 export const prefillComposer = (threadId: string, text: string): void => {
-    const { pending } = usePrefillStore.getState();
-    const queued = pending.get(threadId) ?? [];
+    usePrefillStore.setState((state) => {
+        const queued = state.pending[threadId] ?? [];
 
-    // A second click before the composer took the first adds nothing new.
-    if (queued.includes(text)) {
-        return;
-    }
-
-    usePrefillStore.setState({ pending: new Map(pending).set(threadId, [...queued, text]) });
+        // A second click before the composer took the first adds nothing new.
+        return queued.includes(text) ? state : { pending: { ...state.pending, [threadId]: [...queued, text] } };
+    });
 };
 
-/** Whether `threadId` has a composer on the page that takes prefilled text (not a worker's or a comparison's own). */
+/** Whether `threadId` has a composer on the page that takes prompts. */
 export const useComposerTakesPrefill = (threadId: string | undefined): boolean =>
     usePrefillStore((state: PrefillState) => threadId !== undefined && state.composers.has(threadId));
 
-const take = (threadId: string): ReadonlyArray<string> => {
-    const { pending } = usePrefillStore.getState();
-    const queued = pending.get(threadId);
+/** Removes and returns every prompt waiting for `threadId`. */
+const takeFor = (threadId: string): ReadonlyArray<string> => {
+    const waiting = usePrefillStore.getState().pending[threadId];
 
-    if (!queued) {
+    if (waiting === undefined) {
         return [];
     }
 
-    const next = new Map(pending);
+    usePrefillStore.setState((state) => {
+        return { pending: Object.fromEntries(Object.entries(state.pending).filter(([key]) => key !== threadId)) };
+    });
 
-    next.delete(threadId);
-    usePrefillStore.setState({ pending: next });
-
-    return queued;
+    return waiting;
 };
 
 const setComposer = (threadId: string, mounted: boolean): void => {
-    const next = new Set(usePrefillStore.getState().composers);
+    usePrefillStore.setState((state) => {
+        const next = new Set(state.composers);
 
-    if (mounted) {
-        next.add(threadId);
-    } else {
-        next.delete(threadId);
-    }
+        if (mounted) {
+            next.add(threadId);
+        } else {
+            next.delete(threadId);
+        }
 
-    usePrefillStore.setState({ composers: next });
+        return { composers: next };
+    });
 };
 
-/** The thread composer subscribes with this; `apply` receives each text meant for `threadId`, once its draft is settled. */
-export const useComposerPrefill = (threadId: string | undefined, apply: (text: string) => void): void => {
-    // The latest `apply`, so a new callback does not resubscribe: the cleanup below drops what is waiting.
-    const applyRef = useRef(apply);
-
-    useEffect(() => {
-        applyRef.current = apply;
-    });
+/**
+ * The composer of `threadId` takes each prompt meant for it, in order; `undefined` (a new chat) takes none. With
+ * `awaitStoredDraft` (the shared composer, whose draft comes back from storage), it takes them only once that draft is.
+ */
+export const useComposerPrefill = (threadId: string | undefined, onPrefill: (text: string) => void, { awaitStoredDraft = false } = {}): void => {
+    const handle = useEffectEvent(onPrefill);
 
     useEffect(() => {
         if (threadId === undefined) {
@@ -81,32 +80,34 @@ export const useComposerPrefill = (threadId: string | undefined, apply: (text: s
 
         setComposer(threadId, true);
 
-        const drain = () => {
-            if (!useBoundDraftStore.getState().owners.has(threadId) || !usePrefillStore.getState().pending.has(threadId)) {
+        const drain = (): void => {
+            if (usePrefillStore.getState().pending[threadId] === undefined) {
                 return;
             }
 
-            for (const text of take(threadId)) {
-                applyRef.current(text);
+            if (awaitStoredDraft && !useBoundDraftStore.getState().owners.has(threadId)) {
+                return;
+            }
+
+            for (const text of takeFor(threadId)) {
+                handle(text);
             }
         };
 
         drain();
 
         const stopPending = usePrefillStore.subscribe(drain);
-        const stopBound = useBoundDraftStore.subscribe(drain);
+        const stopBound = awaitStoredDraft ? useBoundDraftStore.subscribe(drain) : undefined;
 
         return () => {
             stopPending();
-            stopBound();
+            stopBound?.();
             setComposer(threadId, false);
-            // Left before its draft settled: the request was for this visit, not for whenever the chat next opens.
-            take(threadId);
         };
-    }, [threadId]);
+    }, [awaitStoredDraft, threadId]);
 };
 
-/** For tests: forgets every queued text and mounted composer. */
+/** For tests: forgets every queued prompt and mounted composer. */
 export const resetComposerPrefillForTests = (): void => {
-    usePrefillStore.setState({ composers: new Set<string>(), pending: new Map<string, ReadonlyArray<string>>() });
+    usePrefillStore.setState({ composers: new Set<string>(), pending: {} });
 };

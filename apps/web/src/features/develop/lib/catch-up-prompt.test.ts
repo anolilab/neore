@@ -1,3 +1,4 @@
+import { stripHiddenText } from "@neore/ai/utils";
 import { describe, expect, it } from "vitest";
 
 import { catchUpPrompt, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "./catch-up-prompt";
@@ -34,6 +35,8 @@ describe(catchUpPrompt, () => {
         expect(prompt).toContain("Do not push to any other branch or remote.");
         expect(prompt).not.toContain("gh pr checkout");
         expect(prompt).not.toContain("origin/main");
+        // The composer stores a prompt without hidden characters: this one is stored as written, so its code spans stay whole.
+        expect(stripHiddenText(prompt).text).toBe(prompt);
     });
 
     it("for a fork, even one whose branch has origin's name and commit, rebases a local branch and holds no push", () => {
@@ -68,9 +71,12 @@ describe(isPlainBranchName, () => {
         expect(isPlainBranchName(name)).toBe(true);
     });
 
-    it.each(["main`; rm -rf ~ #", "a$(id)", "x;y", "-delete", "a..b", "with space", ""])("refuses %j", (name) => {
-        expect(isPlainBranchName(name)).toBe(false);
-    });
+    it.each(["main`; rm -rf ~ #", "a$(id)", "x;y", "-delete", "a..b", "with space", "", "feat\u{200B}/x", "feat/x\u{202E}", "f\u{EB}at"])(
+        "refuses %j",
+        (name) => {
+            expect(isPlainBranchName(name)).toBe(false);
+        },
+    );
 });
 
 describe(isPlainRepo, () => {

@@ -61,6 +61,7 @@ import { composerDraftFrom, draftFromField, markComposerDraft } from "@/features
 import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
+import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
@@ -526,6 +527,8 @@ const ComposerInput = ({
     }, [disabled]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
+    // The fix prompts added while a comparison send runs (`null` when none runs): they were not sent, so they outlast it.
+    const prefillsDuringSend = useRef<string[] | null>(null);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
     const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
@@ -1317,13 +1320,50 @@ const ComposerInput = ({
         useChatUIStore.getState().setIsSubmitting(true);
 
         if (onSubmitOverride) {
+            prefillsDuringSend.current = [];
             // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(draftText, draftAttachments, draftFrom).then(() => {
-                clear();
-                useChatUIStore.getState().setIsSubmitting(false);
+            void onSubmitOverride(draftText, draftAttachments, draftFrom)
+                .then(() => {
+                    const prefills = prefillsDuringSend.current ?? [];
 
-                return undefined;
-            });
+                    prefillsDuringSend.current = null;
+
+                    // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                    // A prefill trims the draft's trailing whitespace before it appends (`textAfterRestore`), so match without it.
+                    const now = getComposerText();
+                    const sentText = draftText.trimEnd();
+
+                    if (now === draftText) {
+                        clear();
+                    } else if (now.startsWith(sentText)) {
+                        setText(now.slice(sentText.length).trimStart());
+
+                        for (const attachment of draftAttachments) {
+                            useChatUIStore.getState().removeAttachment(attachment.id);
+                        }
+                    } else {
+                        // Edited while it went out: what is left is the sent message, so it must not stay to be sent again. The fix
+                        // prompts that arrived meanwhile were not sent: they come back, still marked as not typed.
+                        clear();
+
+                        // A prompt the person deleted meanwhile stays deleted.
+                        const kept = prefills.filter((prefill) => now.includes(prefill));
+
+                        if (kept.length > 0) {
+                            setText(kept.join("\n"));
+                            markComposerDraft("suggestion");
+                        }
+                    }
+
+                    useChatUIStore.getState().setIsSubmitting(false);
+
+                    return undefined;
+                })
+                .catch((error: unknown) => {
+                    prefillsDuringSend.current = null;
+
+                    throw error;
+                });
         } else if (isComparisonValid) {
             void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments, draftFrom).then(() => {
                 useChatUIStore.getState().setIsSubmitting(false);
@@ -1343,6 +1383,7 @@ const ComposerInput = ({
         isOffline,
         t,
         disabled,
+        getComposerText,
         mustSignIn,
         sendMessage,
         onSubmitProp,
@@ -1656,30 +1697,43 @@ const ComposerInput = ({
         [getComposerText, promptHistory, restoreFile, setText],
     );
 
-    // Text another part of the thread's page put here (a pull request's Catch up): added after what is typed, never sent.
-    const applyPrefill = useCallback(
-        (prefilled: string) => {
-            // Clicked again with the prompt still there: a second copy would only have to be deleted by hand.
-            if (getComposerText().includes(prefilled)) {
-                inputAreaRef.current?.focus();
-
-                return;
+    // A prompt another part of the thread's UI wrote for this thread (`composer-prefill.ts`): added after what is typed,
+    // never sent. The same prompt twice is not added twice. A comparison parent's shared composer takes one too: its send
+    // fans out through `onSubmitOverride`, but the text belongs to this thread. The thread's parked draft comes back first,
+    // so a prompt taken as a pane mounts joins that draft instead of keeping it parked; the thread composer also waits for
+    // the stored draft (`awaitStoredDraft`). The person did not type the prompt, and it quotes host text: the draft is
+    // marked as a clicked suggestion, unless it already has a mark.
+    useComposerPrefill(
+        !compact && threadId ? threadId : undefined,
+        (prefill) => {
+            if (threadId) {
+                restoreLiveComposerFor(threadId);
             }
+
+            const current = getComposerText();
+            // The draft is stored without hidden characters (`setComposerText`), so the same prompt is compared the same way.
+            const { text: clean } = stripHiddenText(prefill);
 
             promptHistory.reset();
 
-            // A rejection warning is about the text that was there: typing clears it (`handleTextChange`), so the prefill does too.
-            if (useChatUIStore.getState().composerBannedContent) {
-                useChatUIStore.getState().setComposerBannedContent(null);
+            if (!current.includes(clean)) {
+                // A rejection warning is about the text that was there: typing clears it (`handleTextChange`), so the prompt does too.
+                if (useChatUIStore.getState().composerBannedContent) {
+                    useChatUIStore.getState().setComposerBannedContent(null);
+                }
+
+                prefillsDuringSend.current?.push(clean);
+                setText(textAfterRestore(current, { append: true, files: [], text: clean }));
+
+                if (composerDraftFrom() === undefined) {
+                    markComposerDraft("suggestion");
+                }
             }
 
-            setText(textAfterRestore(getComposerText(), { append: true, files: [], text: prefilled }));
             inputAreaRef.current?.focus();
         },
-        [getComposerText, promptHistory, setText],
+        { awaitStoredDraft: !onSubmitOverride },
     );
-
-    useComposerPrefill(isThreadComposer ? threadId : undefined, applyPrefill);
 
     // Handle "Upload new file" from @ popup — open file dialog
     const handleSelectFileUpload = useCallback(() => {

@@ -11,12 +11,6 @@ import { usePullRequest } from "../lib/use-develop";
 import { useMergeStatus } from "../lib/use-merge";
 
 /**
- * How many of a thread's linked pull requests (newest first) are checked for being behind: each check is up to three
- * host reads, cached a minute and shared with Develop, so a thread with many links does not spend the host's budget.
- */
-export const CATCH_UP_CHECKED_LINKS = 5;
-
-/**
  * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
  * rebase prompt in this thread's composer and sends nothing. Reads the same cached queries as Develop: the pull request
  * (open, and its base), then the host's mergeability once it is open. Shows nothing while loading, on a failure, or once the
@@ -85,8 +79,8 @@ const CatchUpControl = ({ link, threadId }: { link: { number: number; repository
 type CatchUpProps = Parameters<typeof CatchUpControl>[0];
 
 /**
- * Mounts the control, and with it its host reads, only where the thread has a composer that takes the prompt: a worker's or a
- * comparison's thread (or a split pane without focus) never shows it, so it reads nothing there.
+ * Mounts the control, and with it its host reads, only where the thread has a composer on the page that takes the prompt
+ * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing.
  */
 const ThreadPullRequestCatchUp = ({ link, threadId }: CatchUpProps) =>
     useComposerTakesPrefill(threadId) ? <CatchUpControl link={link} threadId={threadId} /> : null;

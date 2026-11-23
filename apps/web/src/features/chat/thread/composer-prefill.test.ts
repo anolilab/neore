@@ -1,72 +1,99 @@
+/**
+ * Prompts wait per thread, in order, for the composer of their thread: a second one does not replace the first, and one
+ * for another thread made in between stays for that thread.
+ */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setDraftBound, useBoundDraftStore } from "@/features/chat/split/composer-drafts";
 
-import { prefillComposer, resetComposerPrefillForTests, useComposerPrefill } from "./composer-prefill";
+import { prefillComposer, resetComposerPrefillForTests, useComposerPrefill, useComposerTakesPrefill } from "./composer-prefill";
 
 beforeEach(() => {
     resetComposerPrefillForTests();
     useBoundDraftStore.setState({ owners: new Set<string>() });
 });
 
-const mount = (threadId: string, apply: (text: string) => void) => renderHook(() => useComposerPrefill(threadId, apply));
-
 describe(useComposerPrefill, () => {
-    it("keeps a request for each thread until its own composer takes it", () => {
-        prefillComposer("thread-a", "prompt a");
-        prefillComposer("thread-b", "prompt b");
-        setDraftBound("thread-a", true);
-        setDraftBound("thread-b", true);
+    it("hands a composer that mounts later every prompt made for its thread, in order, and leaves another thread's", () => {
+        prefillComposer("thread-a", "Fix checks");
+        prefillComposer("thread-b", "Resolve conflicts");
+        prefillComposer("thread-a", "Address review");
 
-        const applyA = vi.fn();
-        const applyB = vi.fn();
+        const takenByA = vi.fn();
+        const { unmount } = renderHook(() => useComposerPrefill("thread-a", takenByA));
 
-        mount("thread-a", applyA);
-        mount("thread-b", applyB);
+        expect(takenByA.mock.calls).toStrictEqual([["Fix checks"], ["Address review"]]);
 
-        expect(applyA.mock.calls).toEqual([["prompt a"]]);
-        expect(applyB.mock.calls).toEqual([["prompt b"]]);
+        unmount();
+
+        const takenByB = vi.fn();
+
+        renderHook(() => useComposerPrefill("thread-b", takenByB));
+
+        expect(takenByB.mock.calls).toStrictEqual([["Resolve conflicts"]]);
     });
 
-    it("waits for the thread's stored draft to come back before it fills the composer", () => {
-        const apply = vi.fn();
+    it("hands a mounted composer each later prompt for its thread once", () => {
+        const taken = vi.fn();
 
-        mount("thread-a", apply);
-        act(() => prefillComposer("thread-a", "prompt"));
+        renderHook(() => useComposerPrefill("thread-c", taken));
+        act(() => {
+            prefillComposer("thread-c", "one");
+            prefillComposer("thread-d", "not mine");
+            prefillComposer("thread-c", "two");
+        });
 
-        expect(apply).not.toHaveBeenCalled();
-
-        act(() => setDraftBound("thread-a", true));
-
-        expect(apply.mock.calls).toEqual([["prompt"]]);
+        expect(taken.mock.calls).toStrictEqual([["one"], ["two"]]);
     });
 
     it("queues the same prompt once however often it is requested before the composer takes it", () => {
         prefillComposer("thread-a", "prompt");
         prefillComposer("thread-a", "prompt");
-        setDraftBound("thread-a", true);
 
-        const apply = vi.fn();
+        const taken = vi.fn();
 
-        mount("thread-a", apply);
+        renderHook(() => useComposerPrefill("thread-a", taken));
 
-        expect(apply.mock.calls).toEqual([["prompt"]]);
+        expect(taken.mock.calls).toStrictEqual([["prompt"]]);
     });
-});
 
-describe("a composer that goes away", () => {
-    it("drops what was still waiting for its draft, instead of filling the chat on a later visit", () => {
-        const { unmount } = mount("thread-a", vi.fn());
+    it("takes nothing for a new chat", () => {
+        const taken = vi.fn();
 
+        prefillComposer("thread-e", "waits");
+        renderHook(() => useComposerPrefill(undefined, taken));
+
+        expect(taken).not.toHaveBeenCalled();
+    });
+
+    it("waits for the thread's stored draft to come back before the shared composer takes a prompt", () => {
+        const taken = vi.fn();
+
+        renderHook(() => useComposerPrefill("thread-a", taken, { awaitStoredDraft: true }));
         act(() => prefillComposer("thread-a", "prompt"));
+
+        expect(taken).not.toHaveBeenCalled();
+
+        act(() => setDraftBound("thread-a", true));
+
+        expect(taken.mock.calls).toStrictEqual([["prompt"]]);
+    });
+
+    it("tells a control whether its thread has a composer that takes prompts", () => {
+        const { rerender, result } = renderHook(() => useComposerTakesPrefill("thread-a"));
+
+        expect(result.current).toBe(false);
+
+        const { unmount } = renderHook(() => useComposerPrefill("thread-a", vi.fn()));
+
+        rerender();
+
+        expect(result.current).toBe(true);
+
         unmount();
-        setDraftBound("thread-a", true);
+        rerender();
 
-        const apply = vi.fn();
-
-        mount("thread-a", apply);
-
-        expect(apply).not.toHaveBeenCalled();
+        expect(result.current).toBe(false);
     });
 });

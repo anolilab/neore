@@ -11,15 +11,48 @@ import { Label } from "@neore/ui/components/label";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { GitPullRequestArrow } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { createDialogVisits } from "../lib/dialog-visit";
 import { MAX_PULL_REQUESTS_PER_ATTACH, parsePullRequestAddresses } from "../lib/pull-request-address";
+import type { PullRequestAddress } from "../lib/use-develop";
 import { useAttachPullRequests, useThreadPullRequests } from "../lib/use-develop";
-import ThreadPullRequestCatchUp, { CATCH_UP_CHECKED_LINKS } from "./thread-pull-request-catch-up";
+import PullRequestFixes from "./pull-request-fixes";
+import ThreadPullRequestCatchUp from "./thread-pull-request-catch-up";
+
+/**
+ * Links whose state (checks, conflicts, reviews, being behind) is read from the host: the newest few, so a long list costs
+ * no more. Each read is cached a minute and shared with Develop.
+ */
+const MAX_STATUS_READS = 5;
+
+/** One linked pull request: its link, and what blocks it. The link takes focus when a read removes the focused chip. */
+const LinkedPullRequest = ({ link, readStatus, threadId }: { link: PullRequestAddress; readStatus: boolean; threadId: string }) => {
+    const { t } = useLingui();
+    const linkRef = useRef<HTMLAnchorElement>(null);
+
+    return (
+        <li className="inline-flex items-center gap-1">
+            <Link
+                aria-label={t`Open the pull request ${link.repository}#${link.number}`}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs hover:underline"
+                ref={linkRef}
+                search={{ number: link.number, repository: link.repository }}
+                to="/develop"
+            >
+                <GitPullRequestArrow aria-hidden className="size-3" />
+                <span>
+                    {link.repository}#{link.number}
+                </span>
+            </Link>
+            {readStatus && <PullRequestFixes address={{ number: link.number, repository: link.repository }} returnFocusTo={linkRef} threadId={threadId} />}
+            {readStatus && <ThreadPullRequestCatchUp link={link} threadId={threadId} />}
+        </li>
+    );
+};
 
 type AttachStatus =
     | "already_linked"
@@ -34,8 +67,8 @@ type AttachStatus =
     | "thread_full";
 
 /**
- * The pull requests a thread is linked to, in the chat header: each opens the pull request in Develop, and a dialog
- * links more by hand. Only the thread's owner sees it, and the list is asked for after first paint, so the header does
+ * The pull requests a thread is linked to, in the chat header: each opens the pull request in Develop, an open one
+ * shows what blocks it with an action that writes a fix prompt into the composer, and a dialog links more by hand. Only the thread's owner sees it, and the list is asked for after first paint, so the header does
  * not add to the queries that wait for it.
  */
 const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
@@ -174,20 +207,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             {(links.data ?? []).length > 0 && (
                 <ul className="flex flex-wrap items-center gap-2">
                     {(links.data ?? []).map((link, index) => (
-                        <li className="inline-flex items-center gap-2" key={`${link.repository}#${link.number}`}>
-                            <Link
-                                aria-label={t`Open the pull request ${link.repository}#${link.number}`}
-                                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs hover:underline"
-                                search={{ number: link.number, repository: link.repository }}
-                                to="/develop"
-                            >
-                                <GitPullRequestArrow aria-hidden className="size-3" />
-                                <span>
-                                    {link.repository}#{link.number}
-                                </span>
-                            </Link>
-                            {index < CATCH_UP_CHECKED_LINKS && <ThreadPullRequestCatchUp link={link} threadId={threadId} />}
-                        </li>
+                        <LinkedPullRequest key={`${link.repository}#${link.number}`} link={link} readStatus={index < MAX_STATUS_READS} threadId={threadId} />
                     ))}
                 </ul>
             )}

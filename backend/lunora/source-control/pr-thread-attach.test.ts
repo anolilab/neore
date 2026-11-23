@@ -317,38 +317,36 @@ describe("the thread list and the sidebar counts", () => {
         expect(unlocked.map((row: any) => row.title)).toEqual(["a thread"]);
     });
 
-    it("lists the newest links of a thread past the per-thread read, not only the oldest", async () => {
+    it("reads a thread's newest links when it has more than the list reads, so the oldest is the one left out", async () => {
         const threadId = await threadOf(A);
-
-        await harness.run(async (ctx: any) => {
-            for (let number = 1; number <= 100; number += 1) {
-                await ctx.db.insert("pullRequestThreads", {
-                    createdAt: number,
-                    kind: "opened",
-                    number,
-                    repository: "octo/hello",
-                    threadId,
-                    title: "t",
-                    url: `https://github.com/octo/hello/pull/${String(number)}`,
-                    userId: A,
-                });
-            }
-
-            await ctx.db.insert("pullRequestThreads", {
-                createdAt: 1000,
-                kind: "opened",
-                number: 500,
-                repository: "octo/hello",
-                threadId,
-                title: "newest",
-                url: "https://github.com/octo/hello/pull/500",
-                userId: A,
+        const insertLinks = async (from: number, to: number): Promise<void> => {
+            await harness.run(async (ctx: any) => {
+                for (let number = from; number <= to; number += 1) {
+                    await ctx.db.insert("pullRequestThreads", {
+                        createdAt: number,
+                        kind: "opened",
+                        number,
+                        repository: "octo/hello",
+                        threadId,
+                        title: "t",
+                        url: `https://github.com/octo/hello/pull/${String(number)}`,
+                        userId: A,
+                    });
+                }
             });
+        };
+
+        await insertLinks(1, 1);
+        // Rows written in one millisecond tie on age: a gap makes the first one the oldest for real.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
         });
+        await insertLinks(2, 101);
 
         const listed = (await as(A).query(listForThread as never, { threadId } as never)) as any[];
 
-        expect(listed[0].number).toBe(500);
+        expect(listed[0].number).toBe(101);
+        expect(listed.map((row: any) => row.number)).not.toContain(1);
     });
 
     it("gives no badge to a thread past the per-thread read, rather than a partial count", async () => {
