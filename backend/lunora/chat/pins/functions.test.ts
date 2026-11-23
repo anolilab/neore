@@ -8,8 +8,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../../_generated/dataModel";
 import { resolveThreadReadAccess } from "../../agent/thread-read-access";
+import { BATCH } from "../../gdpr/batch";
 import schema from "../../schema";
-import { createDocumentPin, createPin, deletePin, eraseUserPinsOnThread, getThreadPins, isPinShapeValid, reassignUserPinsOnThread } from "./functions";
+import {
+    createDocumentPin,
+    createPin,
+    deletePin,
+    eraseUserPinsOnThread,
+    getThreadPins,
+    isPinShapeValid,
+    reassignUserPinsOnThread,
+    withSharedPinRoute,
+} from "./functions";
 
 const OWNER = "user-owner";
 const SHAPE_ERROR = /An image pin names the part it pins/;
@@ -17,6 +27,7 @@ const KIND_ERROR = /Only visuals and plans can be pinned/;
 const WRITING_ERROR = /still being written/;
 const NOT_FOUND_ERROR = /Document not found in this chat/;
 const NO_ACCESS_ERROR = /Thread not found or you do not have access/;
+const MOVED_ACCOUNT_ERROR = /cannot be added while this account is being moved or erased/;
 
 vi.mock("../../lib/crpc-auth-helpers", async (importOriginal) => {
     const sessionFrom = async (context: { auth: { userId?: string | null } }) =>
@@ -392,14 +403,21 @@ describe("listing a thread's pins after a grant is revoked", () => {
 
 describe("a deleted thread takes its pins and routes", () => {
     it("removes the thread's pins and the collaborator routes that name it", async () => {
-        const { eraseThreadPinsAndRoutes } = await import("../gdpr");
+        const { eraseThreadPinsAndRoutesBatch } = await import("../gdpr");
 
         await harness.run(async (context: any) => {
             await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-collaborator" });
             await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: OWNER, threadId, userId: "user-collaborator" });
         });
 
-        await harness.run(async (context: any) => await eraseThreadPinsAndRoutes(context, threadId));
+        // One batch per call: repeat until none is left, as the thread's delete chain does.
+        let hasMore = true;
+
+        while (hasMore) {
+            const batch = await harness.run(async (context: any) => await eraseThreadPinsAndRoutesBatch(context, threadId));
+
+            hasMore = batch.hasMore;
+        }
 
         const left = await harness.run(async (context: any) => {
             const pins = await context.db.query("threadPins").collect();
@@ -409,5 +427,109 @@ describe("a deleted thread takes its pins and routes", () => {
         });
 
         expect(left).toStrictEqual({ pins: 0, routes: 0 });
+    });
+
+    it("cuts a heavily pinned thread into batches: one call never deletes more than one batch", async () => {
+        const { eraseThreadPinsAndRoutesBatch } = await import("../gdpr");
+
+        await harness.run(async (context: any) => {
+            for (let n = 0; n < BATCH + 1; n += 1) {
+                await context.db.insert("threadPins", { createdAt: 1, messageRole: "assistant", threadId, updatedAt: 1, userId: "user-collaborator" });
+            }
+        });
+
+        const first = await harness.run(async (context: any) => await eraseThreadPinsAndRoutesBatch(context, threadId));
+        const pinsLeft = await harness.run(async (context: any) => await context.db.query("threadPins").collect());
+        const remaining = pinsLeft.length;
+
+        expect(first).toStrictEqual({ hasMore: true });
+        expect(remaining).toBe(1);
+
+        const second = await harness.run(async (context: any) => await eraseThreadPinsAndRoutesBatch(context, threadId));
+
+        expect(second).toStrictEqual({ hasMore: false });
+    });
+});
+
+describe("an account being moved or erased cannot add pins", () => {
+    it("refuses a pin from an account marked as erasing, and keeps accepting from an unmarked one", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" });
+            await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "user-collaborator" });
+        });
+
+        await expect(as("user-collaborator").mutation(createPin as never, { messageId: "m-20", messageRole: "assistant", threadId } as never)).rejects.toThrow(
+            MOVED_ACCOUNT_ERROR,
+        );
+
+        await expect(as(OWNER).mutation(createPin as never, { messageId: "m-21", messageRole: "assistant", threadId } as never)).resolves.toBeDefined();
+    });
+});
+
+describe("a failed pin write leaves its shared route", () => {
+    it("keeps the route, since a concurrent writer may be relying on it, and writes no pin", async () => {
+        // The failure is caught inside the run: an uncaught error would roll the whole run back, route included, and prove nothing.
+        const message = await harness.run(async (context: any) => {
+            try {
+                await withSharedPinRoute(context, threadId, "user-collaborator", 1, async () => {
+                    throw new Error("pin write failed");
+                });
+
+                return null;
+            } catch (error) {
+                return (error as Error).message;
+            }
+        });
+
+        expect(message).toBe("pin write failed");
+
+        const routes = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { threadId } }));
+
+        expect(routes.page).toHaveLength(1);
+    });
+});
+
+describe("a pin write renews the writer's lease before its move check", () => {
+    it("leaves the owner's lease in place after a pin is written", async () => {
+        await as(OWNER).mutation(createPin as never, { messageId: "m-lease", messageRole: "assistant", threadId } as never);
+
+        const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: OWNER } }));
+
+        expect(leases.page).toHaveLength(1);
+    });
+});
+
+describe("refused pin writes renew no lease", () => {
+    it("leaves no lease behind after repeated refused attempts from a marked account", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" });
+            await context.db.insert("accountMoves", { createdAt: 1, kind: "erasing", userId: "user-collaborator" });
+        });
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            await expect(
+                as("user-collaborator").mutation(
+                    createPin as never,
+                    { messageId: `m-refused-${String(attempt)}`, messageRole: "assistant", threadId } as never,
+                ),
+            ).rejects.toThrow(MOVED_ACCOUNT_ERROR);
+        }
+
+        const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-collaborator" } }));
+
+        expect(leases.page).toHaveLength(0);
+    });
+});
+
+describe("a fenced owner shard refuses a pin write of the account", () => {
+    it("refuses the write in its own transaction, while the fence is on the shard", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: "user-collaborator" });
+            await context.db.insert("shardPinFences", { createdAt: 1, userId: "user-collaborator" });
+        });
+
+        await expect(
+            as("user-collaborator").mutation(createPin as never, { messageId: "m-fenced", messageRole: "assistant", threadId } as never),
+        ).rejects.toThrow(MOVED_ACCOUNT_ERROR);
     });
 });

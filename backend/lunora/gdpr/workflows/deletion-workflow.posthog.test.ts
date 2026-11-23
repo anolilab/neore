@@ -123,6 +123,7 @@ const runWorkflow = async (
                     current = "";
                 }
             },
+            sleep: async () => undefined,
         },
     };
 
