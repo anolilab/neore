@@ -14,6 +14,9 @@ import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
 import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
+import { releaseControlHttpAction } from "./release-http";
+import { runInShard } from "../lib/shard-context";
+import { releaseTokenFor } from "./release-token";
 import { BROWSER_IDLE_REAP_MS, browserIdOf, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
@@ -26,6 +29,8 @@ const NOW = Date.UTC(2026, 10, 20, 12);
 const PROVIDER_SESSION_ID = /s-[12]/u;
 /** What a lease's holder looks like on the row: a SHA-256 HMAC in hex. */
 const HOLDER = /^[\da-f]{64}$/u;
+/** A claim's public name in the status: a truncated SHA-256 in hex. */
+const CLAIM_ID = /^[\da-f]{32}$/u;
 /** The backend's signing secret: the key of a lease's opaque holder. */
 const SIGNING_SECRET = "browser-control-test-secret";
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
@@ -131,8 +136,41 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
     };
 });
 
+// The release route crosses to the shard its token names as the system: here, straight into the harness, and the
+// shard it asked for is kept for the test to check.
+const { releaseLimit, releaseShards } = vi.hoisted(() => {
+    return { releaseLimit: { down: false, keys: [] as string[], limited: false }, releaseShards: [] as string[] };
+});
+
+vi.mock("../lib/http-shard", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/http-shard")>()),
+        inSystemShard: async (_context: unknown, shardKey: string, handler: (context: unknown) => Promise<unknown>) => {
+            releaseShards.push(shardKey);
+
+            return await handler({
+                runMutation: async (reference: unknown, args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(reference, args)),
+            });
+        },
+    };
+});
+
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        // The release route's per-address limit: `releaseLimit.limited` refuses it, and `down` is a limiter outage, answered as
+        // the caller's `failMode` says (closed unless it asks for open).
+        checkRateLimit: async (_context: unknown, _operation: string, options?: { failMode?: "closed" | "open"; key?: string }) => {
+            releaseLimit.keys.push(options?.key ?? "");
+
+            if (releaseLimit.down) {
+                return { ok: options?.failMode === "open" };
+            }
+
+            return { ok: !releaseLimit.limited };
+        },
+        rateLimitGuard: async () => undefined,
+    };
 });
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -216,6 +254,10 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    releaseShards.length = 0;
+    releaseLimit.down = false;
+    releaseLimit.keys.length = 0;
+    releaseLimit.limited = false;
     delete replica.grant;
     impersonation.by = undefined;
     actionStart.hook = undefined;
@@ -1016,6 +1058,209 @@ describe("taking control of the browser", () => {
 
         expect(after).toMatchObject({ ended: "handed_back" });
         expect(after.until).toBeLessThanOrEqual(NOW);
+    });
+});
+
+describe("a closing page's hand back", () => {
+    const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
+    const lease = async (): Promise<any> => {
+        const session: any = await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
+
+        return session.control;
+    };
+    const release = async (token: string, ip?: string): Promise<number> => {
+        const headers = ip === undefined ? undefined : { "cf-connecting-ip": ip };
+        const response = await releaseControlHttpAction(
+            {} as never,
+            new Request("https://backend.test/browser/release", { body: token, headers, method: "POST" }),
+        );
+
+        return response.status;
+    };
+
+    beforeEach(() => {
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+    });
+
+    it("names the lease's claim to its holder alone, so a tab sees at once that another of theirs took over", async () => {
+        await addSession();
+        const first = await take(OWNER);
+
+        expect(first.claimId).toMatch(CLAIM_ID);
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [first.claimId] } });
+        await expect(statusFor(READER)).resolves.not.toHaveProperty("control.claimIds");
+
+        const second = await take(OWNER);
+
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { claimIds: [second.claimId] } });
+    });
+
+    it("ends the lease its token names, once, on the owner's shard, without a session", async () => {
+        await addSession();
+        const taken = await take(WRITER);
+
+        expect(taken.release).toEqual(expect.any(String));
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual([OWNER]);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "left", until: NOW });
+
+        // A beacon sent twice changes nothing more.
+        const ended = await lease();
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toEqual(ended);
+    });
+
+    it("ends a collaborator's lease on the owner's shard when the collaborator opened the shared thread's browser", async () => {
+        // The collaborator's first action opened the browser: the row names them, but it lives on the owner's shard.
+        await addSession({ userId: WRITER });
+        const taken = await take(WRITER);
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual([OWNER]);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "left" });
+    });
+
+    it("names the shard serving the claim, where the session row is, in the token", async () => {
+        await addSession({ userId: WRITER });
+        const taken = await runInShard("owner-shard", async () => await take(WRITER));
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual(["owner-shard"]);
+    });
+
+    it("never ends a newer claim: another tab's of the same person, or someone else's", async () => {
+        await addSession();
+        const first = await take(OWNER);
+        const second = await take(OWNER);
+
+        await expect(release(first.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toMatchObject({ claim: second.claim });
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+
+        await release(second.release);
+        const writer = await take(WRITER);
+
+        await expect(release(second.release)).resolves.toBe(204);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: writer.claim });
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+
+    it("only notes how the view closed when its claim is being replaced by a renewal, which then decides", async () => {
+        await addSession();
+        const first = await take(OWNER);
+        const held = await lease();
+
+        // A renewal of the lease is still being minted under a new claim: the closing view's claim is `renewing`.
+        await harness.run(async (ctx: any) => {
+            const session = await ctx.db.query("browserSessions").first();
+
+            await ctx.db.patch("browserSessions", session._id, {
+                control: { by: held.by, claim: "claim-renewal", renewing: first.claim, since: NOW, until: NOW + CONTROL_IDLE_MS },
+            });
+        });
+
+        await expect(release(first.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toMatchObject({ claim: "claim-renewal", renewingEnded: "left" });
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+        await expect(lease()).resolves.not.toHaveProperty("renewing");
+    });
+
+    it("ends the lease as handed back when the page closed while the person's own hand back was out, once", async () => {
+        await addSession();
+        const taken = await take(WRITER);
+
+        await expect(release(`${taken.release}\nhanded_back`)).resolves.toBe(204);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "handed_back", until: NOW });
+
+        // The hand back's own mutation lands after the beacon: it changes nothing, and still answers for its claim.
+        const ended = await lease();
+
+        await expect(giveBack(WRITER, "handed_back", taken.claim)).resolves.toBe(true);
+        await expect(lease()).resolves.toEqual(ended);
+    });
+
+    it("refuses a body that names any other way to close, and ends nothing", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+        const held = await lease();
+
+        await expect(release(`${taken.release}\nidle`)).resolves.toBe(401);
+        await expect(release(`${taken.release}\nleft\nleft`)).resolves.toBe(401);
+        await expect(lease()).resolves.toEqual(held);
+    });
+
+    it("leaves a lease that already lapsed as it is", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        vi.setSystemTime(NOW + CONTROL_IDLE_MS + 1);
+        const lapsed = await lease();
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toEqual(lapsed);
+    });
+
+    it("charges an IPv6 sender by its /64, so stepping through its addresses buys no fresh allowance", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        await release(taken.release, "2001:db8:1:2::1");
+        await release(taken.release, "2001:db8:1:2:ffff::9");
+        await release(taken.release, "203.0.113.7");
+
+        expect(releaseLimit.keys).toHaveLength(3);
+        expect(releaseLimit.keys[0]).toBe(releaseLimit.keys[1]);
+        expect(releaseLimit.keys[2]).toBe("203.0.113.7");
+    });
+
+    it("refuses a proven token while the limiter is down, so no replay reaches the owner's shard", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        releaseLimit.down = true;
+        await expect(release(taken.release)).resolves.toBe(429);
+        await expect(release(taken.release)).resolves.toBe(429);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+
+    it("refuses a sender over its limit once the token is proven, and ends nothing", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        releaseLimit.limited = true;
+        await expect(release(taken.release)).resolves.toBe(429);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+        // A token naming another thread's claim ends nothing here either.
+        releaseLimit.limited = false;
+        const elsewhere = await releaseTokenFor({ claim: taken.claim, shardKey: OWNER, threadId: "other-thread" });
+
+        await expect(release(elsewhere!)).resolves.toBe(204);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+
+    it("refuses a token this backend did not sign, and one changed in any part", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+        const [version, payload, signature] = (taken.release as string).split(".") as [string, string, string];
+        const flipped = (hex: string): string => `${hex.slice(0, -1)}${hex.endsWith("0") ? "1" : "0"}`;
+
+        for (const token of [
+            "",
+            "nonsense",
+            `${version}.${flipped(payload)}.${signature}`,
+            `${version}.${payload}.${flipped(signature)}`,
+            `${taken.release}.x`,
+        ]) {
+            await expect(release(token)).resolves.toBe(401);
+        }
+
+        vi.stubEnv("STORAGE_SIGNING_SECRET", `${SIGNING_SECRET}-rotated`);
+        await expect(release(taken.release)).resolves.toBe(401);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
     });
 });
 
