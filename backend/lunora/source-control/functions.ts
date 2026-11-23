@@ -58,6 +58,17 @@ const vDetail = v.object({
     draft: v.boolean(),
     headBranch: v.string(),
     headSha: v.string(),
+    mergeState: v.optional(
+        v.union(
+            v.literal("behind"),
+            v.literal("blocked"),
+            v.literal("clean"),
+            v.literal("conflicting"),
+            v.literal("draft"),
+            v.literal("unknown"),
+            v.literal("unstable"),
+        ),
+    ),
     number: v.number(),
     repository: v.string(),
     state: v.union(v.literal("closed"), v.literal("merged"), v.literal("open")),
