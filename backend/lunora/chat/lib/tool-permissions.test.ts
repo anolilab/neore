@@ -315,6 +315,19 @@ describe("time-boxed grants", () => {
         clock.mockRestore();
     });
 
+    it("an ask-mode call runs its preread with asking set, and always asks (a skipped ask would let an unapproved click run)", async () => {
+        // One preread that answers no: the wrapper must still ask, and must have run the preread for this call.
+        const preread = vi.fn(async () => false);
+        const tools = { mcp_Files__delete: { execute: async () => "ok", looksBeforeAsk: true, needsApproval: preread } } as unknown as ToolSet;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, { [mcp.key]: "ask" });
+        const { needsApproval } = built.mcp_Files__delete as unknown as {
+            needsApproval: (input: unknown, options: object) => Promise<boolean>;
+        };
+
+        expect(await needsApproval({}, { toolCallId: "call-7" })).toBe(true);
+        expect(preread).toHaveBeenCalledWith({}, expect.objectContaining({ asking: true, toolCallId: "call-7" }));
+    });
+
     it("never lifts a tool's own approval check, whatever the grant says", async () => {
         const own = vi.fn(async (input: { host: boolean }) => input.host);
         const tools = { mcp_Files__delete: { execute: async () => "ok", needsApproval: own } } as unknown as ToolSet;
@@ -326,6 +339,27 @@ describe("time-boxed grants", () => {
         expect(await needsApproval({ host: true }, {})).toBe(true);
         expect(await needsApproval({ host: false }, {})).toBe(false);
         expect(own).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks a lapsed call's own check as an ask does, so its decision keeps the target it reads", async () => {
+        const own = vi.fn(async (_input: unknown, options: { asking?: boolean }) => options.asking === true);
+        const tools = { mcp_Files__delete: { execute: async () => "ok", needsApproval: own } } as unknown as ToolSet;
+        const expiresAt = Date.now() + 60_000;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, undefined, { timedGrants: { [mcp.key]: expiresAt } });
+        const { needsApproval } = built.mcp_Files__delete as unknown as {
+            needsApproval: (input: unknown, options: object) => Promise<boolean> | boolean;
+        };
+
+        // Inside the grant the check runs as it always did: no `asking`, and its own answer (no ask) stands.
+        expect(await needsApproval({}, {})).toBe(false);
+        expect(own).toHaveBeenLastCalledWith({}, {});
+
+        // After the lapse the call asks, and its check is asked with `asking`.
+        const clock = vi.spyOn(Date, "now").mockReturnValue(expiresAt + 1);
+
+        expect(await needsApproval({}, {})).toBe(true);
+        expect(own).toHaveBeenLastCalledWith({}, { asking: true });
+        clock.mockRestore();
     });
 });
 

@@ -21,6 +21,7 @@ const createDocumentTool = createTool<
     {
         documentId: string;
         kind: string;
+        threadId: string;
         title: string;
         version: number;
     },
@@ -65,6 +66,7 @@ Code documents in "html", "svg", "jsx" or "tsx" get a live preview. For a React 
         return {
             documentId: document._id,
             kind: document.kind,
+            threadId: context.threadId,
             title: document.title,
             version: document.version,
         };

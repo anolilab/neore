@@ -94,6 +94,10 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             "collect-conversations",
             async () => await context.run(internal.gdpr.steps.collectConversations, { userId }, { dedupId: stepDedupId(scope, "collect-conversations") }),
         );
+        const sharedThreadPins = await context.step.do(
+            "collect-shared-pins",
+            async () => await context.run(internal.gdpr.steps.collectSharedPins, { userId }, { dedupId: stepDedupId(scope, "collect-shared-pins") }),
+        );
 
         await progress({ currentStep: "collecting_files", progress: 50 });
         const files = await context.step.do(
@@ -416,6 +420,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             requestId,
                             reviewDrafts,
                             settings,
+                            sharedThreadPins,
                             tasks,
                             threadTags,
                             usageKey,

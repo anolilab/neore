@@ -4,9 +4,32 @@
  * `ctx`, so the deletes stay in the orchestrator's mutation and the writes are
  * the owner's. Batching follows `gdpr/batch.ts`.
  */
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { dropGuestLinkRoutes } from "./lib/guest-link-store";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
+
+/**
+ * The pin routes that name the user, as the collaborator who pinned or as the owner of the thread: a route names no one else, so
+ * it goes with the account.
+ */
+export const eraseSharedPinRoutesBatch = async (ctx: MutationCtx, userId: string): Promise<{ hasMore: boolean }> => {
+    let hasMore = false;
+
+    for (const where of [{ userId }, { ownerId: userId }]) {
+        const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where });
+
+        for (const route of page) {
+            await ctx.db.delete("sharedPinRoutes", route._id);
+        }
+
+        if (page.length === BATCH) {
+            hasMore = true;
+        }
+    }
+
+    return { hasMore };
+};
 
 /**
  * The user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
@@ -128,4 +151,72 @@ export const erasePresentationsForUser = async (ctx: MutationCtx, userId: string
     );
 
     return { hasMore };
+};
+
+/**
+ * Deletes the pins that name each of the given documents, one batch per document, on the thread's shard where the document is. Returns
+ * the ids of the documents whose pins are all gone; a document with more pins left than one batch is not in it, and the caller keeps it
+ * for the next round.
+ */
+export const erasePinsNamingDocuments = async (ctx: MutationCtx, documents: ReadonlyArray<Doc<"documents">>): Promise<Set<string>> => {
+    const drained = new Set<string>();
+    // One budget for the whole call: a call deletes at most one batch of pins across every document, so its transaction stays bounded.
+    let budget = BATCH;
+
+    for (const documentRow of documents) {
+        if (budget === 0) {
+            break;
+        }
+
+        const take = budget;
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread_and_document", (q) => q.eq("threadId", documentRow.threadId).eq("documentId", documentRow._id))
+            .take(take);
+
+        for (const pin of pins) {
+            await ctx.db.delete("threadPins", pin._id);
+        }
+
+        budget -= pins.length;
+
+        if (pins.length < take) {
+            drained.add(documentRow._id);
+        }
+    }
+
+    return drained;
+};
+
+/**
+ * A deleted thread takes its pins and the collaborator routes that name it: both sit on the thread owner's shard (the routes in the
+ * global table), so the owner's hard delete removes them. Each loop deletes one batch per pass, so no pass grows with the thread.
+ */
+export const eraseThreadPinsAndRoutes = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<void> => {
+    for (;;) {
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+            .take(BATCH);
+
+        for (const pin of pins) {
+            await ctx.db.delete("threadPins", pin._id);
+        }
+
+        if (pins.length < BATCH) {
+            break;
+        }
+    }
+
+    for (;;) {
+        const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
+
+        for (const route of page) {
+            await ctx.db.delete("sharedPinRoutes", route._id);
+        }
+
+        if (page.length < BATCH) {
+            break;
+        }
+    }
 };

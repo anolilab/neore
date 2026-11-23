@@ -4,13 +4,59 @@
  */
 import { v } from "lunorash/server";
 
+import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { systemDb } from "../lib/rls/scope";
+import { MAX_LENGTH } from "../lib/validators";
+import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-access";
+
+/**
+ * The document a history read is about, or `null`. With its thread, the read goes through the thread's read grant, so a member reads the
+ * history of a document they can read; the call routes to the thread owner's shard by that id. Without one, only the author reads, and
+ * only while the thread still admits them.
+ */
+const historyDocument = async (
+    ctx: QueryCtx,
+    args: { documentId: Id<"documents">; threadId?: Id<"threads">; unlockProof?: string | null },
+    userId: string,
+): Promise<Doc<"documents"> | null> => {
+    if (args.threadId !== undefined) {
+        const access = await resolveThreadReadAccess(ctx, args.threadId, userId, args.unlockProof, { primary: true });
+
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+            return null;
+        }
+
+        const row = await ctx.db.get("documents", args.documentId);
+
+        if (row && row.threadId === args.threadId) {
+            return row;
+        }
+
+        // A card from a branched chat, or from before its thread was carried, names another chat: the author path below reads it, as the
+        // document read does.
+    }
+
+    const row = await ctx.db.get("documents", args.documentId);
+
+    if (!row || row.userId !== userId) {
+        return null;
+    }
+
+    const access = await resolveThreadReadAccess(ctx, row.threadId, userId, args.unlockProof, { primary: true });
+
+    return access?.kind === "full" && meetsThreadPermission(access.permission, "read") ? row : null;
+};
 
 export const listVersions = query
     .input({
         documentId: v.id("documents"),
         limit: v.optional(v.number()),
+        // The document's thread: the read routes to its owner's shard and goes through the thread's grant (see `historyDocument`).
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.array(
@@ -29,15 +75,16 @@ export const listVersions = query
             return [];
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
+        const documentRow = await historyDocument(ctx, args, identity.userId);
 
-        if (!documentRow || documentRow.userId !== identity.userId) {
+        if (!documentRow) {
             return [];
         }
 
         const limit = args.limit ?? 50;
 
-        const versions = await ctx.db
+        // Past row-level security: the versions of a document are read by whoever `historyDocument` admitted, not only by their author.
+        const versions = await systemDb(ctx)
             .query("documentVersions")
             .withIndex("by_documentId_version", (q) => q.eq("documentId", args.documentId))
             .order("desc")
@@ -56,6 +103,9 @@ export const listVersions = query
 export const getVersion = query
     .input({
         documentId: v.id("documents"),
+        // The document's thread, as in `listVersions`.
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         version: v.number(),
     })
     .output(
@@ -78,13 +128,14 @@ export const getVersion = query
             return null;
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
+        const documentRow = await historyDocument(ctx, args, identity.userId);
 
-        if (!documentRow || documentRow.userId !== identity.userId) {
+        if (!documentRow) {
             return null;
         }
 
-        const entry = await ctx.db
+        // Past row-level security, for the same reason as `listVersions`: the access decision was made in `historyDocument`.
+        const entry = await systemDb(ctx)
             .query("documentVersions")
             .withIndex("by_documentId_version", (q) => q.eq("documentId", args.documentId).eq("version", args.version))
             .first();

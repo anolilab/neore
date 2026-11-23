@@ -55,6 +55,15 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                     },
                 },
+                chat: {
+                    functions: {
+                        setBrowserClickMode: {
+                            mutationOptions: () => {
+                                return { mutationFn: async () => null };
+                            },
+                        },
+                    },
+                },
                 coding_agents: {
                     functions: {
                         setCodingAgentCommitIdentity: {
@@ -140,6 +149,7 @@ describe(SettingsPageOutline, () => {
             "h3 Agent Modules",
             "h3 Automation",
             "h3 Coding Agent Pull Requests",
+            "h3 Browser Clicks",
             "h3 Token Cost Impact",
         ]);
         expectNoSkippedLevel(headings, 1);
