@@ -57,7 +57,16 @@ export const threadSearchTriggers = (t: TriggerBuilder) => {
                 // cleanup again, so a failed schedule must fail the delete, which then runs again.
                 const { internal } = await import("../_generated/internal");
 
-                await context.scheduler.runAfter(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds });
+                // The vector rows live on the owner's shard. Without the owner's key the cleanup runs on the default shard and
+                // finds nothing, so the key is passed whenever the thread has an owner.
+                const shardKey = previous.userId;
+
+                await context.scheduler.runAfter(
+                    0,
+                    internal.agent.thread_search.deleteThreadVectors,
+                    { vectorIds },
+                    shardKey === undefined ? undefined : { shardKey },
+                );
             }
         }),
         threadSearchInsert: t.afterInsert(async (context, event) => {

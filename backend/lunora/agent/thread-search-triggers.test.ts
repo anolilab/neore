@@ -27,12 +27,20 @@ describe("threadSearchTriggers", () => {
         await expect(triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { titleVectorId: "v1" } })).rejects.toThrow("scheduler down");
     });
 
-    it("schedules the cleanup with the deleted thread's vector ids", async () => {
+    it("schedules the cleanup with the deleted thread's vector ids, on the owner's shard", async () => {
         const scheduler = { runAfter: vi.fn(async () => "job") };
 
-        await triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { summaryVectorId: "s1", titleVectorId: "v1" } });
+        await triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { summaryVectorId: "s1", titleVectorId: "v1", userId: "u1" } });
 
-        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds: ["v1", "s1"] });
+        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds: ["v1", "s1"] }, { shardKey: "u1" });
+    });
+
+    it("still schedules the cleanup when the deleted thread has no owner, rather than skipping it", async () => {
+        const scheduler = { runAfter: vi.fn(async () => "job") };
+
+        await triggers.threadSearchDelete({ scheduler }, { id: "t1", previous: { titleVectorId: "v1" } });
+
+        expect(scheduler.runAfter).toHaveBeenCalledWith(0, internal.agent.thread_search.deleteThreadVectors, { vectorIds: ["v1"] }, undefined);
     });
 
     it("keeps the insert when its sync cannot be scheduled", async () => {
