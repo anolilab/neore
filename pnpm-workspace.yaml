@@ -566,8 +566,8 @@ minimumReleaseAgeExclude:
   - "@lunora/*"
   - "lunorash"
   # Approved by the repo owner: open-bot-avatar 0.3.1 was published 2026-11-22 and its trust check fails.
-  # Its provenance matches 0.3.0 (same repo, workflow and ref). Remove once the release is a day old and passes on its own.
-  - "open-bot-avatar"
+  # Its provenance matches 0.3.0 (same repo, workflow and ref). Only 0.3.1 is excepted; remove the entry once it passes on its own.
+  - "open-bot-avatar@0.3.1"
 
 # pnpm 11 replaced onlyBuiltDependencies with this map (true = may run its
 # build scripts). `strictDepBuilds` is on by default since 11, so a NEW
@@ -916,7 +916,7 @@ trustPolicy: no-downgrade
 trustPolicyExclude:
   - xlsx
   # See the note on open-bot-avatar in minimumReleaseAgeExclude.
-  - open-bot-avatar
+  - open-bot-avatar@0.3.1
 
 trustPolicyIgnoreAfter: 1440
 patchedDependencies:
