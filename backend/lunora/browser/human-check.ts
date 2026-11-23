@@ -5,6 +5,8 @@
  * (title, URL, extracted text): deterministic, no model call. Pure, so each step is tested without the provider.
  */
 
+import { urlHost } from "../lib/url-host";
+
 /** How long the agent waits for an interstitial to clear on its own before it asks the person. */
 export const HUMAN_CHECK_WAIT_MS = 8000;
 
@@ -133,18 +135,11 @@ export const detectHumanCheck = ({ content, title, url }: PageSignals, readConte
     return undefined;
 };
 
-/** The site a check is asked for once: the page's host, lower case; `""` when the page has no readable URL. */
-export const humanCheckSite = (url: string | undefined): string => {
-    if (url === undefined) {
-        return "";
-    }
-
-    try {
-        return new URL(url).hostname.toLowerCase();
-    } catch {
-        return "";
-    }
-};
+/**
+ * The site a check is asked for once, and a decline is keyed on: the page's host as `lib/url-host.ts#urlHost` spells it
+ * (lower case, no trailing dot), so `SHOP.example.` and `shop.example` are one site; `""` when the page has no readable URL.
+ */
+export const humanCheckSite = (url: string | undefined): string => urlHost(url);
 
 /** What the browser tool tells the agent at each step; never to solve or bypass the check itself. */
 export const humanCheckMessages = {

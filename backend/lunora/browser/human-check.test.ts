@@ -154,6 +154,12 @@ describe("humanCheckSite", () => {
         expect(humanCheckSite("not a url")).toBe("");
         expect(humanCheckSite(undefined)).toBe("");
     });
+
+    it("names one site for the fully-qualified spelling of a host, its case and its IDN form", () => {
+        expect(humanCheckSite("https://shop.example./x")).toBe("shop.example");
+        expect(humanCheckSite("https://SHOP.example../x")).toBe("shop.example");
+        expect(humanCheckSite("https://bücher.example./")).toBe(humanCheckSite("https://xn--bcher-kva.example/"));
+    });
 });
 
 describe("humanCheckLadder", () => {
@@ -259,6 +265,16 @@ describe("humanCheckLadder", () => {
         expect(dependencies.claimAsk).not.toHaveBeenCalled();
         expect(result).toMatchObject({ humanCheck: { site: "shop.example.com", status: "already_asked" }, success: false });
         expect(result.error).toMatch(ALREADY_ASKED_NOTE);
+    });
+
+    it("step 2: a block on `shop.example.` and one on `shop.example` are one site, asked about once", async () => {
+        const dotted = { ...CHECK_PAGE, url: "https://shop.example./a" };
+        const plain = { ...CHECK_PAGE, url: "https://SHOP.example/b" };
+        const { asked, dependencies } = dependenciesFor([dotted]);
+
+        await expect(humanCheckLadder(dotted, dependencies)).resolves.toMatchObject({ humanCheck: { site: "shop.example", status: "asked" } });
+        await expect(humanCheckLadder(plain, dependencies)).resolves.toMatchObject({ humanCheck: { site: "shop.example", status: "already_asked" } });
+        expect(asked).toEqual(new Set(["shop.example"]));
     });
 
     it("step 2: another site in the same run is asked about on its own", async () => {
@@ -864,6 +880,34 @@ describe("the ask record", () => {
 
         // The latest recent ask is what the person handed back: here a detected check after an earlier report.
         await expect(wasAskedRecently()).resolves.toBe("detected");
+    });
+
+    it("finds an ask stored under the site's dotted spelling, from before sites lost the dot", async () => {
+        const now = Date.now();
+        const stored = async (run: string, askedAt: number, site: string) =>
+            await harness.run(async (ctx: any) => await ctx.db.insert("browserHumanChecks", { askedAt, run, site, threadId, userId: "u-1" }));
+        const wasAsked = async (run: string, askedSince?: number) =>
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runQuery(wasHumanCheckAsked, { ...(askedSince !== undefined && { askedSince }), run, site: "a.example", threadId }),
+            );
+
+        await stored("r1", now - 60_000, "a.example.");
+
+        await expect(wasAsked("r1")).resolves.toBe("detected");
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { run: "r1", site: "a.example", threadId })),
+        ).resolves.toBeNull();
+        // A report marks that ask, rather than recording a second one.
+        await expect(
+            harness.action(async (ctx: any) => await ctx.runMutation(claimHumanCheckAsk, { reported: true, run: "r1", site: "a.example", threadId })),
+        ).resolves.toBeNull();
+        await expect(wasAsked("r1")).resolves.toBe("reported");
+
+        // An earlier reply's recent ask: the latest of the spellings.
+        await stored("r2", now - 30_000, "a.example..");
+        await expect(wasAsked("r3", now - HUMAN_CHECK_HAND_BACK_WINDOW_MS)).resolves.toBe("detected");
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("browserHumanChecks").collect())).resolves.toHaveLength(2);
     });
 
     it("stores the thread owner as the row's user whoever asked, so the owner's erasure removes it", async () => {

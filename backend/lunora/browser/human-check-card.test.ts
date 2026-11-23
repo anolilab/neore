@@ -324,6 +324,55 @@ describe("the browser result", () => {
         });
         expect(runAction).not.toHaveBeenCalled();
     });
+
+    it.each(["https://shop.example./x", "https://SHOP.example/x", "https://shop.example../x"])(
+        "opens no page on %s once the person declined shop.example",
+        async (url) => {
+            const checkId = (await claim("r1", "shop.example"))!;
+
+            await resolve(OWNER, checkId, "declined");
+
+            const runAction = vi.fn(async () => {
+                return { success: true, url };
+            });
+            const tool = { ...browserTool, ctx: { ...(context() as object), replyKey: "r1", runAction, threadId, userId: OWNER } } as unknown as {
+                execute: (input: { action: string; url?: string }, options: unknown) => Promise<unknown>;
+            };
+
+            await expect(tool.execute({ action: "navigate", url }, { messages: [], toolCallId: "call-1" })).resolves.toStrictEqual({
+                error: humanCheckMessages.answerDeclined("shop.example"),
+                humanCheck: { site: "shop.example", status: "declined" },
+                success: false,
+            });
+            expect(runAction).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(["shop.example.", "shop.example.."])("keeps a decline of an ask stored as %s, from before sites lost the dot", async (stored) => {
+        const checkId = (await claim("r1", stored))!;
+
+        await resolve(OWNER, checkId, "declined");
+
+        const runAction = vi.fn(async () => {
+            return { success: true, url: "https://shop.example/x" };
+        });
+        const tool = { ...browserTool, ctx: { ...(context() as object), replyKey: "r1", runAction, threadId, userId: OWNER } } as unknown as {
+            execute: (input: { action: string; url?: string }, options: unknown) => Promise<unknown>;
+        };
+
+        await expect(tool.execute({ action: "navigate", url: "https://shop.example/x" }, { messages: [], toolCallId: "call-1" })).resolves.toStrictEqual({
+            error: humanCheckMessages.answerDeclined("shop.example"),
+            humanCheck: { site: "shop.example", status: "declined" },
+            success: false,
+        });
+        expect(runAction).not.toHaveBeenCalled();
+        // Nor is the person asked again about it in the reply, and the agent hears the one spelling.
+        await expect(claim("r1", "shop.example")).resolves.toBeNull();
+        await expect(harness.action(async (ctx: any) => await ctx.runQuery(humanCheckAnswer, { askedSince: 0, run: "r1", threadId }))).resolves.toStrictEqual({
+            answer: "declined",
+            site: "shop.example",
+        });
+    });
 });
 
 describe("wait_for_person", () => {
