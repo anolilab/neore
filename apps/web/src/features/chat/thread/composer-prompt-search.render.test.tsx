@@ -64,19 +64,23 @@ vi.mock("@/lib/lunora/crpc", () => {
         },
     };
 
-    // The pick's check reads that one prompt, whatever the search's cap leaves out.
-    const isSentPromptAvailable = {
+    // The pick's check reads that one prompt as it is now, whatever the search's cap leaves out.
+    const currentSentPrompt = {
         queryOptions: (args: { messageId: string }) => {
             return {
-                queryFn: async () => prompts.some((prompt) => prompt.messageId === args.messageId),
-                queryKey: ["isSentPromptAvailable", args],
+                queryFn: async () => {
+                    const found: { draftFrom?: string; text: string } | undefined = prompts.find((prompt) => prompt.messageId === args.messageId);
+
+                    return found === undefined ? null : { ...(found.draftFrom !== undefined && { draftFrom: found.draftFrom }), text: found.text };
+                },
+                queryKey: ["currentSentPrompt", args],
             };
         },
     };
 
     return {
         useCRPC: () => {
-            return { chat: { functions: { isSentPromptAvailable, searchSentPrompts } } };
+            return { chat: { functions: { currentSentPrompt, searchSentPrompts } } };
         },
     };
 });
@@ -366,6 +370,35 @@ describe("ComposerPromptSearch", () => {
             expect(screen.queryByText("That prompt is no longer available. Pick another.")).toBeNull();
         } finally {
             searchList.limit = Infinity;
+        }
+    });
+
+    it("puts the prompt as it reads now in the draft, not the list's copy of a prompt edited since the search", async () => {
+        const onPick = vi.fn();
+
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={onPick} />, { wrapper });
+
+        fireEvent.change(screen.getByRole("combobox"), { target: { value: "deploy" } });
+
+        await settle();
+
+        expect(screen.getAllByRole("option")[0]?.textContent).toContain("deploy to production");
+
+        // Edited after the list was drawn, and marked as a suggestion: the draft gets the new words and the mark.
+        const edited = prompts.find((prompt) => prompt.messageId === "m-notes")!;
+        const before = { ...edited };
+
+        Object.assign(edited, { draftFrom: "suggestion", text: "deploy to production on Friday" });
+
+        try {
+            fireEvent.click(screen.getAllByRole("option")[0]!);
+
+            await settle();
+
+            expect(onPick).toHaveBeenCalledWith({ draftFrom: "suggestion", text: "deploy to production on Friday" });
+        } finally {
+            Object.assign(edited, before);
+            delete (edited as { draftFrom?: string }).draftFrom;
         }
     });
 

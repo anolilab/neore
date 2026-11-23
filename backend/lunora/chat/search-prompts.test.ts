@@ -9,8 +9,9 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
-import { isSentPromptAvailable, SENT_PROMPT_LINEAGE_READS, searchSentPrompts } from "./functions";
+import { currentSentPrompt, SENT_PROMPT_LINEAGE_READS, searchSentPrompts } from "./functions";
 import { typedTextColumn } from "../agent/shared";
+import { patchMessage } from "../agent/table-writes";
 import { documentTextPart, guestTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
@@ -829,11 +830,14 @@ describe("searchSentPrompts", () => {
     });
 });
 
-describe("isSentPromptAvailable", () => {
-    const available = (harness: ReturnType<typeof lunoraTest>, messageId: string, userId = OWNER) =>
-        harness.withIdentity({ userId } as never).query(isSentPromptAvailable as never, { messageId } as never) as Promise<boolean>;
+describe("currentSentPrompt", () => {
+    const current = (harness: ReturnType<typeof lunoraTest>, messageId: string, userId = OWNER) =>
+        harness.withIdentity({ userId } as never).query(currentSentPrompt as never, { messageId } as never) as Promise<{
+            draftFrom?: string;
+            text: string;
+        } | null>;
 
-    it("answers yes for a prompt newer matches pushed out of the search's list, and no where the search would not list it", async () => {
+    it("answers with the prompt for a prompt newer matches pushed out of the search's list, and no where the search would not list it", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
@@ -893,11 +897,75 @@ describe("isSentPromptAvailable", () => {
             const listed = await search(harness, "deploy");
 
             expect(listed.map((prompt) => prompt.messageId)).not.toContain(ids.pushed);
-            await expect(available(harness, ids.pushed)).resolves.toBe(true);
+            await expect(current(harness, ids.pushed)).resolves.toEqual({ text: "deploy number 0" });
 
             for (const refused of [ids.goalRound, ids.guestNote, ids.locked, ids.reply, ids.temporary, ids.theirs, ids.trashed]) {
-                await expect(available(harness, refused)).resolves.toBe(false);
+                await expect(current(harness, refused)).resolves.toBeNull();
             }
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("answers with the words as edited after the search listed them, and the mark the edit left", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const messageId = await harness.run(async (context: any) => {
+                const threadId = await insertThread(context, { title: "Notes", userId: OWNER });
+
+                return insertMessage(context, {
+                    content: [{ providerOptions: { neore: { notTyped: { draft: "suggestion" } } }, text: "deploy a preview", type: "text" }],
+                    createdAt: 1,
+                    order: 0,
+                    role: "user",
+                    text: "deploy a preview",
+                    threadId,
+                    userId: OWNER,
+                });
+            });
+
+            const [listed] = await search(harness, "deploy");
+
+            expect(listed).toMatchObject({ draftFrom: "suggestion", messageId, text: "deploy a preview" });
+
+            // Edited between the search and the pick: the person rewrote it, so it is typed now.
+            await harness.run(async (context: any) => {
+                await patchMessage(context.db, messageId, {
+                    message: { content: [{ text: "deploy to production", type: "text" }], role: "user" },
+                    text: "deploy to production",
+                } as never);
+            });
+
+            await expect(current(harness, messageId)).resolves.toEqual({ text: "deploy to production" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("answers null for a prompt edited down to no typed words", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const messageId = await harness.run(async (context: any) => {
+                const threadId = await insertThread(context, { title: "Notes", userId: OWNER });
+
+                return insertMessage(context, { createdAt: 1, order: 0, role: "user", text: "deploy the docs", threadId, userId: OWNER });
+            });
+
+            const listed = await search(harness, "deploy");
+
+            expect(listed.map((prompt) => prompt.messageId)).toEqual([messageId]);
+
+            // Only a quoted line is left: no words the person typed.
+            await harness.run(async (context: any) => {
+                await patchMessage(context.db, messageId, {
+                    message: { content: [{ text: "> deploy the docs", type: "text" }], role: "user" },
+                    text: "> deploy the docs",
+                } as never);
+            });
+
+            await expect(current(harness, messageId)).resolves.toBeNull();
         } finally {
             harness.close();
         }

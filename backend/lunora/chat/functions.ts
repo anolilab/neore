@@ -3702,26 +3702,29 @@ export const searchSentPrompts = authQuery
     });
 
 /**
- * Whether a prompt the search listed may still go in the draft: the caller's own sent prompt, by the same rules as
- * {@link searchSentPrompts}, in a chat that is not trashed, locked or temporary. The composer checks a pick with this, not by
+ * A prompt the search listed, as it reads now: its typed words (`typedText`, kept current by an edit) and its not-typed
+ * mark, as {@link searchSentPrompts} would list them, or `null` when it may no longer go in the draft: not the caller's
+ * own sent prompt, no typed words left, or a chat that is trashed, locked or temporary. The composer puts this in the
+ * draft, never the list's copy, which an edit since the search may have changed. It reads that one prompt rather than
  * running the search again: a prompt pushed past the search's 50 by newer matches is still available.
  */
-export const isSentPromptAvailable = authQuery
+export const currentSentPrompt = authQuery
     .input({ messageId: v.id("messages") })
-    .output(v.boolean())
+    .output(v.union(v.object({ draftFrom: v.optional(vDraftFrom), text: v.string() }), v.null()))
     .query(async ({ args: { messageId }, ctx: context }) => {
         const { userId } = context.user;
         const [message] = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: [messageId] });
         // No `typedText` is a row the typed-words index does not hold (`sentPromptOf`), so the search never lists it.
+        const prompt = message && message.userId === userId ? sentPromptOf(message) : undefined;
         const thread =
-            message && message.userId === userId && sentPromptOf(message) !== undefined
+            message && prompt !== undefined
                 ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: message.threadId as Id<"threads"> })
                 : null;
-        const available = listsSentPrompts(thread, userId);
+        const available = prompt !== undefined && listsSentPrompts(thread, userId);
 
-        context.log.event("chat.is_sent_prompt_available", { available });
+        context.log.event("chat.current_sent_prompt", { available });
 
-        return available;
+        return available ? { ...(prompt.draftFrom !== undefined && { draftFrom: prompt.draftFrom }), text: prompt.typed } : null;
     });
 
 /**

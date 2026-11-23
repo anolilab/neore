@@ -16,24 +16,25 @@ const SEARCH_MAX_LENGTH = 500;
 /** The keys the search answers itself; they do not also reach a global shortcut. */
 const SEARCH_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape"]);
 
-type PickOutcome<T> = { kind: "failed" } | { fresh: T | undefined; kind: "gone" } | { kind: "found" };
+type PickOutcome<T, P> = { kind: "failed" } | { fresh: T | undefined; kind: "gone" } | { kind: "found"; prompt: NonNullable<P> };
 
 /**
- * Asks the server whether the picked prompt may still go in the draft, and on a refusal runs the search again for the list.
- * The check reads that one prompt: the search lists at most 50, so newer matches can push a prompt out of it while it is
- * still available. Outside the component: the React Compiler skips a component with a conditional inside a `catch`.
+ * Asks the server for the picked prompt as it reads now, and on a refusal runs the search again for the list. The check
+ * reads that one prompt: the search lists at most 50, so newer matches can push a prompt out of it while it is still
+ * available, and an edit since the search may have changed its words. Outside the component: the React Compiler skips a
+ * component with a conditional inside a `catch`.
  */
-const recheckPick = async <T,>(check: () => Promise<boolean>, search: () => Promise<T>): Promise<PickOutcome<T>> => {
-    let available: boolean;
+const recheckPick = async <T, P>(check: () => Promise<P>, search: () => Promise<T>): Promise<PickOutcome<T, P>> => {
+    let current: P;
 
     try {
-        available = await check();
+        current = await check();
     } catch {
         return { kind: "failed" };
     }
 
-    if (available) {
-        return { kind: "found" };
+    if (current !== null && current !== undefined) {
+        return { kind: "found", prompt: current };
     }
 
     // The refusal stands without a fresh list: the notice says so, and the old list stays until the next keystroke.
@@ -108,8 +109,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         listRef.current?.children.item(position)?.scrollIntoView({ block: "nearest" });
     };
 
-    // The list on screen is one search old: a thread locked, trashed or made temporary since then no longer lists. So a pick
-    // asks the server about that prompt first, and one no longer available is not put in the composer.
+    // The list on screen is one search old: a thread locked, trashed or made temporary since then no longer lists, and an
+    // edited prompt reads differently. So a pick asks the server for that prompt as it is now and puts that in the composer,
+    // never the list's copy; one no longer available is not put in at all.
     const pick = async (prompt: (typeof prompts)[number]) => {
         if (searched === "" || !settled || pickingRef.current) {
             // A click focuses its row; the arrow keys work only from the input.
@@ -121,7 +123,7 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         pickingRef.current = true;
 
         const options = crpc.chat.functions.searchSentPrompts.queryOptions({ searchQuery: searched }, { live: false });
-        const checkOptions = crpc.chat.functions.isSentPromptAvailable.queryOptions({ messageId: prompt.messageId }, { live: false });
+        const checkOptions = crpc.chat.functions.currentSentPrompt.queryOptions({ messageId: prompt.messageId }, { live: false });
         const outcome = await recheckPick(
             () => queryClient.fetchQuery({ ...checkOptions, gcTime: 0, staleTime: 0 }),
             () => queryClient.fetchQuery({ ...options, gcTime: 0, staleTime: 0 }),
@@ -135,7 +137,9 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
         }
 
         if (outcome.kind === "found") {
-            onPick({ ...(prompt.draftFrom !== undefined && { draftFrom: prompt.draftFrom }), text: prompt.text });
+            const { draftFrom, text } = outcome.prompt;
+
+            onPick({ ...(draftFrom !== undefined && { draftFrom }), text });
 
             return;
         }
