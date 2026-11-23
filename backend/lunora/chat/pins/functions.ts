@@ -174,7 +174,7 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
         return;
     }
 
-    const existing = await context.db.sharedPinRoutes.findFirst({ where: { threadId, userId } });
+    const existing = await context.db.sharedPinRoutes.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (!existing) {
         await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
@@ -187,25 +187,19 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
  */
 export const eraseUserPinsOnThread = internalMutation
     .input({ threadId: v.id("threads"), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.null())
+    .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args, ctx: context }) => {
-        // Each pass takes the first batch of what remains. A deleted pin leaves the index, so no cursor has to survive a delete.
-        let remaining = true;
+        // One batch per call, so one transaction stays bounded; the caller repeats the call while `hasMore`. A deleted pin leaves the index.
+        const batch = await context.db
+            .query("threadPins")
+            .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
+            .take(PIN_EXPORT_PAGE);
 
-        while (remaining) {
-            const batch = await context.db
-                .query("threadPins")
-                .withIndex("by_user_and_thread", (q) => q.eq("userId", args.userId).eq("threadId", args.threadId))
-                .take(PIN_EXPORT_PAGE);
-
-            for (const pin of batch) {
-                await context.db.delete("threadPins", pin._id);
-            }
-
-            remaining = batch.length > 0;
+        for (const pin of batch) {
+            await context.db.delete("threadPins", pin._id);
         }
 
-        return null;
+        return { hasMore: batch.length === PIN_EXPORT_PAGE };
     });
 
 /**
@@ -214,25 +208,34 @@ export const eraseUserPinsOnThread = internalMutation
  */
 export const reassignUserPinsOnThread = internalMutation
     .input({ from: v.string().max(MAX_LENGTH.id), threadId: v.id("threads"), to: v.string().max(MAX_LENGTH.id) })
-    .output(v.null())
+    .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args, ctx: context }) => {
-        // Each pass takes the first batch still under the old id. A moved pin leaves that index range, so no cursor has to survive a move.
-        let remaining = true;
+        // One batch per call; the caller repeats it while `hasMore`. A pin the new account already has for the same document is dropped
+        // instead of moved, so the account keeps one pin per document.
+        const batch = await context.db
+            .query("threadPins")
+            .withIndex("by_user_and_thread", (q) => q.eq("userId", args.from).eq("threadId", args.threadId))
+            .take(PIN_EXPORT_PAGE);
 
-        while (remaining) {
-            const batch = await context.db
-                .query("threadPins")
-                .withIndex("by_user_and_thread", (q) => q.eq("userId", args.from).eq("threadId", args.threadId))
-                .take(PIN_EXPORT_PAGE);
+        for (const pin of batch) {
+            const { documentId } = pin;
+            const sameDocument =
+                documentId === undefined
+                    ? []
+                    : await context.db
+                          .query("threadPins")
+                          .withIndex("by_user_and_document", (q) => q.eq("userId", args.to).eq("documentId", documentId))
+                          .take(1);
+            const alreadyPinned = sameDocument.length > 0;
 
-            for (const pin of batch) {
+            if (alreadyPinned) {
+                await context.db.delete("threadPins", pin._id);
+            } else {
                 await context.db.patch("threadPins", pin._id, { userId: args.to });
             }
-
-            remaining = batch.length > 0;
         }
 
-        return null;
+        return { hasMore: batch.length === PIN_EXPORT_PAGE };
     });
 
 export const createPin = authMutation
@@ -427,7 +430,8 @@ export const deletePin = authMutation
             .query("threadPins")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId).eq("threadId", pin.threadId))
             .take(1);
-        const route = left.length === 0 ? await context.db.sharedPinRoutes.findFirst({ where: { threadId: pin.threadId, userId } }) : null;
+        const route =
+            left.length === 0 ? await context.db.sharedPinRoutes.findFirst({ consistency: "primary", where: { threadId: pin.threadId, userId } }) : null;
 
         if (route) {
             await context.db.delete("sharedPinRoutes", route._id);

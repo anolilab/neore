@@ -241,6 +241,18 @@ export const eraseDocumentsForUser = async (ctx: MutationCtx, userId: string): P
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
+    // A pin names its document, so the pins that name these documents go with them: they sit on the thread's shard, where the document is.
+    for (const documentRow of documents) {
+        const pins = await ctx.db
+            .query("threadPins")
+            .withIndex("by_thread_and_document", (q) => q.eq("threadId", documentRow.threadId).eq("documentId", documentRow._id))
+            .collect();
+
+        for (const pin of pins) {
+            await ctx.db.delete("threadPins", pin._id);
+        }
+    }
+
     const hasMore = await deleteParentsWithChildren(
         documents,
         async (documentRow) =>

@@ -193,6 +193,17 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                 ),
         );
 
+        // The routes go only after the owner-shard sweep above, one batch per step, until none is left.
+        await drain(
+            "delete-user-shared-pin-routes",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserSharedPinRoutes,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-shared-pin-routes", round) },
+                ),
+        );
+
         await drain(
             "delete-user-follow-rows",
             async (round) =>

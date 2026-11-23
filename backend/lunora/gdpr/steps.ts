@@ -386,7 +386,16 @@ export const collectSharedPins = internalAction.input({ userId: v.string() }).ac
     const routes = await readAllPages(async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }));
     const shared: { pins: unknown[]; threadId: string }[] = [];
 
+    const seen = new Set<string>();
+
     for (const route of routes) {
+        // A thread is read once, even if two routes name it (a replica can miss the first insert).
+        if (seen.has(route.threadId)) {
+            continue;
+        }
+
+        seen.add(route.threadId);
+
         const pins = await readAllPages(
             async (cursor) =>
                 await callOnShard(
@@ -417,11 +426,18 @@ export const erasePinsOnOwnerShards = internalAction
         );
 
         for (const route of routes) {
-            await callOnShard(
-                internal.chat.pins.functions.eraseUserPinsOnThread,
-                { threadId: route.threadId as Id<"threads">, userId },
-                { shardKey: route.ownerId },
-            );
+            // One batch per call on the owner's shard: repeat until none is left.
+            let more = true;
+
+            while (more) {
+                const result = await callOnShard(
+                    internal.chat.pins.functions.eraseUserPinsOnThread,
+                    { threadId: route.threadId as Id<"threads">, userId },
+                    { shardKey: route.ownerId },
+                );
+
+                more = result.hasMore;
+            }
         }
 
         return null;

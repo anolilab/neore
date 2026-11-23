@@ -12,20 +12,22 @@ import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batc
  * The pin routes that name the user, as the collaborator who pinned or as the owner of the thread: a route names no one else, so
  * it goes with the account.
  */
-const eraseSharedPinRoutesFor = async (ctx: MutationCtx, userId: string): Promise<void> => {
+export const eraseSharedPinRoutesBatch = async (ctx: MutationCtx, userId: string): Promise<{ hasMore: boolean }> => {
+    let hasMore = false;
+
     for (const where of [{ userId }, { ownerId: userId }]) {
-        let cursor: string | undefined;
+        const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where });
 
-        do {
-            const { continueCursor, isDone, page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", cursor, limit: 500, where });
+        for (const route of page) {
+            await ctx.db.delete("sharedPinRoutes", route._id);
+        }
 
-            for (const route of page) {
-                await ctx.db.delete("sharedPinRoutes", route._id);
-            }
-
-            cursor = isDone ? undefined : (continueCursor ?? undefined);
-        } while (cursor !== undefined);
+        if (page.length === BATCH) {
+            hasMore = true;
+        }
     }
+
+    return { hasMore };
 };
 
 /**
@@ -45,7 +47,6 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
     ]);
 
     await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
-    await eraseSharedPinRoutesFor(ctx, userId);
 };
 
 /**

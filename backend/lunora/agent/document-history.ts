@@ -4,13 +4,51 @@
  */
 import { v } from "lunorash/server";
 
+import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { meetsThreadPermission, resolveThreadReadAccess } from "./thread-read-access";
+
+/**
+ * The document a history read is about, or `null`. With its thread, the read goes through the thread's read grant, so a member reads the
+ * history of a document they can read; the call routes to the thread owner's shard by that id. Without one, only the author reads, and
+ * only while the thread still admits them.
+ */
+const historyDocument = async (
+    ctx: QueryCtx,
+    args: { documentId: Id<"documents">; threadId?: Id<"threads"> },
+    userId: string,
+): Promise<Doc<"documents"> | null> => {
+    if (args.threadId !== undefined) {
+        const access = await resolveThreadReadAccess(ctx, args.threadId, userId, undefined);
+
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "read")) {
+            return null;
+        }
+
+        const row = await ctx.db.get("documents", args.documentId);
+
+        return row && row.threadId === args.threadId ? row : null;
+    }
+
+    const row = await ctx.db.get("documents", args.documentId);
+
+    if (!row || row.userId !== userId) {
+        return null;
+    }
+
+    const access = await resolveThreadReadAccess(ctx, row.threadId, userId, undefined);
+
+    return access?.kind === "full" && meetsThreadPermission(access.permission, "read") ? row : null;
+};
 
 export const listVersions = query
     .input({
         documentId: v.id("documents"),
         limit: v.optional(v.number()),
+        // The document's thread: the read routes to its owner's shard and goes through the thread's grant (see `historyDocument`).
+        threadId: v.optional(v.id("threads")),
     })
     .output(
         v.array(
@@ -29,9 +67,9 @@ export const listVersions = query
             return [];
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
+        const documentRow = await historyDocument(ctx, args, identity.userId);
 
-        if (!documentRow || documentRow.userId !== identity.userId) {
+        if (!documentRow) {
             return [];
         }
 
@@ -56,6 +94,8 @@ export const listVersions = query
 export const getVersion = query
     .input({
         documentId: v.id("documents"),
+        // The document's thread, as in `listVersions`.
+        threadId: v.optional(v.id("threads")),
         version: v.number(),
     })
     .output(
@@ -78,9 +118,9 @@ export const getVersion = query
             return null;
         }
 
-        const documentRow = await ctx.db.get("documents", args.documentId);
+        const documentRow = await historyDocument(ctx, args, identity.userId);
 
-        if (!documentRow || documentRow.userId !== identity.userId) {
+        if (!documentRow) {
             return null;
         }
 

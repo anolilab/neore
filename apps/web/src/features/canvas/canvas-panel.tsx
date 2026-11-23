@@ -795,7 +795,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                             </TooltipIconButton>
                         </>
                     )}
-                    {document?.kind === "text" && !isStreaming && <OpenAsPageButton documentId={document._id} />}
+                    {document?.kind === "text" && isAuthor && !isStreaming && <OpenAsPageButton documentId={document._id} />}
                     <TooltipIconButton onClick={handleCopy} tooltip={t`Copy content`}>
                         {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
                     </TooltipIconButton>

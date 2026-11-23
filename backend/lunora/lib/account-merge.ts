@@ -437,11 +437,18 @@ export const runGuestMerge = internalAction
             );
 
             for (const route of routes.page) {
-                await callOnShard(
-                    internal.chat.pins.functions.reassignUserPinsOnThread,
-                    { from: args.from, threadId: route.threadId as never, to: args.to },
-                    { shardKey: route.ownerId },
-                );
+                // One batch per call on the owner's shard: repeat until none is left.
+                let more = true;
+
+                while (more) {
+                    const result = await callOnShard(
+                        internal.chat.pins.functions.reassignUserPinsOnThread,
+                        { from: args.from, threadId: route.threadId as never, to: args.to },
+                        { shardKey: route.ownerId },
+                    );
+
+                    more = result.hasMore;
+                }
             }
 
             isDone = routes.isDone;

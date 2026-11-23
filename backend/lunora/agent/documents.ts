@@ -246,6 +246,13 @@ export const updateDocument = authMutation
             throwThreadLocked();
         }
 
+        // Authorship alone is not enough: a save needs the thread's write grant now, so a removed or read-only collaborator cannot write.
+        const access = await resolveThreadReadAccess(ctx, documentRow.threadId, identity.userId, args.unlockProof);
+
+        if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "write")) {
+            throw new LunoraError("FORBIDDEN", "Forbidden");
+        }
+
         const patch: Partial<Doc<"documents">> = {};
 
         if (args.title !== undefined) {
