@@ -454,6 +454,22 @@ describe("ComposerPromptSearch", () => {
         expect(onPick).not.toHaveBeenCalled();
     });
 
+    it("keeps the list announced as open while nothing matches, with no active option", async () => {
+        render(<ComposerPromptSearch onClose={vi.fn()} onPick={vi.fn()} />, { wrapper });
+
+        const input = screen.getByRole("combobox");
+
+        fireEvent.change(input, { target: { value: "zzz" } });
+
+        await settle();
+
+        expect(screen.getByRole("listbox")).toBeTruthy();
+        expect(screen.queryAllByRole("option")).toHaveLength(0);
+        expect(input.getAttribute("aria-expanded")).toBe("true");
+        expect(input.hasAttribute("aria-activedescendant")).toBe(false);
+        expect(screen.getByRole("status").textContent).toContain('No sent prompts match "zzz".');
+    });
+
     it("picks nothing from the previous search while a changed query waits out the debounce", async () => {
         const onPick = vi.fn();
 

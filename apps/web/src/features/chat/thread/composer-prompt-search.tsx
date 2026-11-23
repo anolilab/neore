@@ -259,7 +259,8 @@ const ComposerPromptSearch = ({ onClose, onPick }: ComposerPromptSearchProps) =>
                     aria-activedescendant={prompts.length > 0 ? optionId(index) : undefined}
                     aria-autocomplete="list"
                     aria-controls={listId}
-                    aria-expanded={prompts.length > 0}
+                    // The listbox is on screen for as long as the dialog is open, empty or not; the status below says why it is empty.
+                    aria-expanded="true"
                     autoComplete="off"
                     id={inputId}
                     maxLength={SEARCH_MAX_LENGTH}
