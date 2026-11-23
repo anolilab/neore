@@ -28,6 +28,7 @@ import {
 } from "./events-webhook";
 import { checkCallbackHost } from "./events-webhook-address";
 import type { ApiKeyIdentity } from "./identity";
+import { liveCallbackRequest } from "./events-webhook-request";
 import { verifyCallback } from "./events-webhook-wire";
 
 export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyIdentity, request: SubscribeRequest): Promise<SubscribeResult> => {
@@ -75,9 +76,9 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
 
     if (!cached.cached) {
         const verdict = await verifyCallback({
-            fetch: async (input, init) => await fetch(input, init),
             id,
             now: Date.now(),
+            request: liveCallbackRequest,
             secret: request.secret,
             subscriptionId: id,
             url: request.url,

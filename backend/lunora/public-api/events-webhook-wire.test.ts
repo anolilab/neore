@@ -1,11 +1,22 @@
 /**
  * The wire rules of the Events webhooks: the Standard Webhooks signature (checked against a published vector), the headers of an
- * attempt, the verification handshake, and how each answer to one POST is classed. The fetch is faked; nothing leaves the test.
+ * attempt, the verification handshake, and how each answer to one POST is classed. The request is faked; nothing leaves the test.
  */
 import { describe, expect, it, vi } from "vitest";
 
 import { bytesToBase64 } from "../lib/crypto";
-import { eventBody, gapBody, messageIdOf, postOnce, signWebhook, verifyCallback, webhookHeaders } from "./events-webhook-wire";
+import { EgressError } from "../lib/egress";
+import {
+    type CallbackReply,
+    type CallbackRequest,
+    eventBody,
+    gapBody,
+    messageIdOf,
+    postOnce,
+    signWebhook,
+    verifyCallback,
+    webhookHeaders,
+} from "./events-webhook-wire";
 
 /* The Standard Webhooks test vector: this secret, message id, timestamp and body give this signature. The expectation was
  * recomputed independently with node:crypto before it was written here. */
@@ -22,12 +33,15 @@ const SIGNATURE_SHAPE = /^v1,/;
 const SECRET = `whsec_${bytesToBase64(new Uint8Array(24).fill(9))}`;
 const CALLBACK_URL = "https://hooks.example.com/neore";
 
-/** A fetch that records each call and answers with `respond`. */
-const recording = (respond: (input: string, init: RequestInit) => Response | Promise<Response>) => {
-    const spy = vi.fn(async (input: string, init: RequestInit) => await respond(input, init));
+/** A request that records each call and answers with `reply`. */
+const answering = (reply: CallbackReply | ((body: string) => CallbackReply)) =>
+    vi.fn<CallbackRequest>(async (_url, input) => (typeof reply === "function" ? reply(input.body) : reply));
 
-    return spy;
-};
+/** A request that fails the way the live one does: by throwing. */
+const failing = (error: unknown) =>
+    vi.fn<CallbackRequest>(async () => {
+        throw error;
+    });
 
 describe("the Standard Webhooks signature", () => {
     it("matches the published test vector", async () => {
@@ -71,104 +85,92 @@ describe("the bodies", () => {
 });
 
 describe("the verification handshake", () => {
-    it("is confirmed when the endpoint echoes the nonce it was sent, and the POST is signed and not redirected", async () => {
-        const fetch = recording(async (_input, init) => Response.json({ challenge: (JSON.parse(String(init.body)) as { challenge: string }).challenge }));
-        const outcome = await verifyCallback({ fetch, id: "sub_1", now: 1_000_000, secret: SECRET, subscriptionId: "sub_1", url: CALLBACK_URL });
+    it("is confirmed when the endpoint echoes the nonce it was sent, and the POST is signed", async () => {
+        const request = answering((body) => {
+            return { body: JSON.stringify({ challenge: (JSON.parse(body) as { challenge: string }).challenge }), status: 200 };
+        });
+        const outcome = await verifyCallback({ id: "sub_1", now: 1_000_000, request, secret: SECRET, subscriptionId: "sub_1", url: CALLBACK_URL });
 
         expect(outcome).toStrictEqual({ ok: true });
-        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(request).toHaveBeenCalledTimes(1);
 
-        const init = fetch.mock.calls[0]?.[1] as RequestInit & { headers: Record<string, string> };
+        const [url, input] = request.mock.calls[0] ?? [];
 
-        expect(init.redirect).toBe("manual");
-        expect(JSON.parse(String(init.body))).toMatchObject({ type: "verification" });
-        expect(init.headers["webhook-signature"]).toMatch(SIGNATURE_SHAPE);
-        expect(init.headers["X-MCP-Subscription-Id"]).toBe("sub_1");
+        expect(url).toBe(CALLBACK_URL);
+        expect(JSON.parse(input?.body ?? "")).toMatchObject({ type: "verification" });
+        expect(input?.headers["webhook-signature"]).toMatch(SIGNATURE_SHAPE);
+        expect(input?.headers["X-MCP-Subscription-Id"]).toBe("sub_1");
     });
 
-    it("is refused when the echo is wrong, the answer is not 2xx, a redirect, or not JSON", async () => {
+    it("is refused when the echo is wrong, the answer is not 2xx, or it is not JSON", async () => {
         const base = { id: "sub_1", now: 1, secret: SECRET, subscriptionId: "sub_1", url: CALLBACK_URL };
 
-        expect(await verifyCallback({ ...base, fetch: recording(async () => Response.json({ challenge: "wrong" })) })).toStrictEqual({
+        expect(await verifyCallback({ ...base, request: answering({ body: JSON.stringify({ challenge: "wrong" }), status: 200 }) })).toStrictEqual({
             ok: false,
             reason: "challenge_failed",
         });
-        expect(await verifyCallback({ ...base, fetch: recording(async () => new Response("nope", { status: 500 })) })).toStrictEqual({
-            ok: false,
-            reason: "challenge_failed",
-        });
-        expect(
-            await verifyCallback({
-                ...base,
-                fetch: recording(async () => new Response(null, { headers: { Location: "https://elsewhere.example.com" }, status: 302 })),
-            }),
-        ).toStrictEqual({
-            ok: false,
-            reason: "challenge_failed",
-        });
-        expect(await verifyCallback({ ...base, fetch: recording(async () => new Response("not json", { status: 200 })) })).toStrictEqual({
+        expect(await verifyCallback({ ...base, request: answering({ body: "nope", status: 500 }) })).toStrictEqual({ ok: false, reason: "challenge_failed" });
+        expect(await verifyCallback({ ...base, request: answering({ body: "", status: 302 }) })).toStrictEqual({ ok: false, reason: "challenge_failed" });
+        expect(await verifyCallback({ ...base, request: answering({ body: "not json", status: 200 }) })).toStrictEqual({
             ok: false,
             reason: "challenge_failed",
         });
     });
 
-    it("keeps a transport failure's category: a timeout, or a connection failure", async () => {
+    it("keeps a transport failure's reason: a timeout, a refused address, or a connection failure", async () => {
         const base = { id: "sub_1", now: 1, secret: SECRET, subscriptionId: "sub_1", url: CALLBACK_URL };
-        const timeout = new DOMException("slow", "TimeoutError");
 
-        expect(
-            await verifyCallback({
-                ...base,
-                fetch: recording(async () => {
-                    throw timeout;
-                }),
-            }),
-        ).toStrictEqual({ ok: false, reason: "timeout" });
-        expect(
-            await verifyCallback({
-                ...base,
-                fetch: recording(async () => {
-                    throw new TypeError("refused");
-                }),
-            }),
-        ).toStrictEqual({ ok: false, reason: "connection_refused" });
+        expect(await verifyCallback({ ...base, request: failing(new EgressError("timeout", "slow")) })).toStrictEqual({ ok: false, reason: "timeout" });
+        expect(await verifyCallback({ ...base, request: failing(new EgressError("blocked_address", "private")) })).toStrictEqual({
+            ok: false,
+            reason: "address_not_public",
+        });
+        expect(await verifyCallback({ ...base, request: failing(new EgressError("dns_failed", "no answer")) })).toStrictEqual({
+            ok: false,
+            reason: "connection_refused",
+        });
     });
 });
 
 describe("one POST's answer", () => {
-    const send = (respond: () => Response | Promise<Response>) =>
-        postOnce(
-            CALLBACK_URL,
-            {},
-            "{}",
-            recording(async () => await respond()),
-        );
+    const send = (reply: CallbackReply) => postOnce(CALLBACK_URL, {}, "{}", answering(reply));
 
     it("delivers on a 2xx", async () => {
-        expect(await send(() => new Response(null, { status: 204 }))).toStrictEqual({ category: "", kind: "delivered" });
+        expect(await send({ body: "", status: 204 })).toStrictEqual({ category: "", kind: "delivered" });
     });
 
     it("refuses a redirect, a 410 and a 413: none of them is retried", async () => {
-        expect(await send(() => new Response(null, { status: 302 }))).toMatchObject({ category: "redirect", kind: "refused" });
-        expect(await send(() => new Response(null, { status: 410 }))).toMatchObject({ category: "gone", kind: "refused" });
-        expect(await send(() => new Response(null, { status: 413 }))).toMatchObject({ category: "payload_too_large", kind: "refused" });
+        expect(await send({ body: "", status: 302 })).toMatchObject({ category: "redirect", kind: "refused" });
+        expect(await send({ body: "", status: 410 })).toMatchObject({ category: "gone", kind: "refused" });
+        expect(await send({ body: "", status: 413 })).toMatchObject({ category: "payload_too_large", kind: "refused" });
     });
 
-    it("fails a 4xx or a 5xx, and a transport failure, so they may be retried", async () => {
-        expect(await send(() => new Response(null, { status: 404 }))).toMatchObject({ category: "http_4xx", kind: "failed" });
-        expect(await send(() => new Response(null, { status: 503 }))).toMatchObject({ category: "http_5xx", kind: "failed" });
-        expect(
-            await postOnce(CALLBACK_URL, {}, "{}", async () => {
-                throw new TypeError("network");
-            }),
-        ).toMatchObject({ category: "connection_refused", kind: "failed" });
+    it("fails a 4xx or a 5xx, so they may be retried", async () => {
+        expect(await send({ body: "", status: 404 })).toMatchObject({ category: "http_4xx", kind: "failed" });
+        expect(await send({ body: "", status: 503 })).toMatchObject({ category: "http_5xx", kind: "failed" });
     });
 
-    it("does not follow a redirect: every POST asks the runtime for manual redirects", async () => {
-        const fetch = recording(async () => new Response(null, { status: 200 }));
+    it("classes a transport failure: a refused address is refused, a timeout or a connection failure may be retried", async () => {
+        expect(await postOnce(CALLBACK_URL, {}, "{}", failing(new EgressError("blocked_address", "private")))).toStrictEqual({
+            category: "address_not_public",
+            kind: "refused",
+        });
+        expect(await postOnce(CALLBACK_URL, {}, "{}", failing(new EgressError("unsupported_target", "cloudflare")))).toStrictEqual({
+            category: "unsupported_target",
+            kind: "refused",
+        });
+        expect(await postOnce(CALLBACK_URL, {}, "{}", failing(new EgressError("timeout", "slow")))).toStrictEqual({ category: "timeout", kind: "failed" });
+        expect(await postOnce(CALLBACK_URL, {}, "{}", failing(new TypeError("network")))).toStrictEqual({
+            category: "connection_refused",
+            kind: "failed",
+        });
+    });
 
-        await postOnce(CALLBACK_URL, {}, "{}", fetch);
+    it("sends the POST to the request it was given, with the body and headers unchanged", async () => {
+        const request = answering({ body: "", status: 200 });
 
-        expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
+        await postOnce(CALLBACK_URL, { "webhook-id": "msg_1" }, "{}", request);
+
+        expect(request).toHaveBeenCalledWith(CALLBACK_URL, { body: "{}", headers: { "webhook-id": "msg_1" } });
     });
 });

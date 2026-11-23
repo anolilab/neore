@@ -3,8 +3,8 @@
  * the argument check `events/poll` runs before it reads anything. Pure, so the dispatcher, the router and the tests share
  * one definition.
  *
- * Every event is offered by poll. Webhook delivery (`events/subscribe`, `events/unsubscribe`, `events-webhook.ts`) is wired in part 2a
- * and its deliveries in part 2b. Push (`events/stream`) is a later part and answers `-32601`.
+ * Every event is offered by poll, and by webhook once `events/subscribe` has a callback for it (`events-webhook.ts`). Push
+ * (`events/stream`) is a later part and answers `-32601`.
  *
  * Schema evolution (the spec's rule): a field may be added, never removed, retyped or narrowed, for the life of its name.
  * A breaking change gets a new name.
@@ -74,7 +74,7 @@ const approvalPayloadSchema: JsonSchema = {
 };
 
 export interface EventDescriptor {
-    delivery: ReadonlyArray<"poll">;
+    delivery: ReadonlyArray<"poll" | "webhook">;
     description: string;
     inputSchema: JsonSchema;
     name: EventName;
@@ -84,21 +84,21 @@ export interface EventDescriptor {
 /** The event types, in the order `events/list` returns them. */
 export const EVENT_CATALOG: ReadonlyArray<EventDescriptor> = [
     {
-        delivery: ["poll"],
+        delivery: ["poll", "webhook"],
         description: "A chat run finished normally.",
         inputSchema: eventInputSchema,
         name: RUN_COMPLETED_EVENT,
         payloadSchema: runPayloadSchema,
     },
     {
-        delivery: ["poll"],
+        delivery: ["poll", "webhook"],
         description: "A chat run ended with an error.",
         inputSchema: eventInputSchema,
         name: RUN_FAILED_EVENT,
         payloadSchema: runPayloadSchema,
     },
     {
-        delivery: ["poll"],
+        delivery: ["poll", "webhook"],
         description: "A chat run paused and is waiting for a person to approve, answer or supply something.",
         inputSchema: eventInputSchema,
         name: APPROVAL_REQUESTED_EVENT,

@@ -1,59 +1,60 @@
 /**
- * One attempt at one delivery: the callback host is checked again at send time, and a host that now resolves to a private address
- * is refused without a request. The resolver and the fetch are injected.
+ * One attempt at one delivery: one signed POST through the callback request, classed by its answer. The address check is the
+ * request's (`requestCheckedHttps` checks it at connect time), so these tests fake the request and check what it is given.
  */
 import { describe, expect, it, vi } from "vitest";
 
 import { bytesToBase64 } from "../lib/crypto";
+import { EgressError } from "../lib/egress";
 import { attemptDelivery } from "./events-webhook-send";
+import type { CallbackRequest } from "./events-webhook-wire";
 
 const SECRET = `whsec_${bytesToBase64(new Uint8Array(24).fill(9))}`;
 const CALLBACK_URL = "https://hooks.example.com/neore";
 const SIGNATURE_SHAPE = /^v1,/;
 
-const attempt = (
-    resolve: "private" | "public" | "unresolved",
-    fetch = vi.fn(async (_input: string, _init: RequestInit) => new Response(null, { status: 200 })),
-) =>
+const attempt = (request: CallbackRequest) =>
     attemptDelivery({
         body: "{}",
-        deps: { fetch, resolve: async () => resolve },
-        host: "hooks.example.com",
         id: "msg_1",
         now: 1_000_000,
+        request,
         secret: SECRET,
         subscriptionId: "sub_1",
         url: CALLBACK_URL,
-    }).then((outcome) => {
-        return { fetch, outcome };
     });
 
 describe("attemptDelivery", () => {
-    it("refuses a host that now resolves to a private address, and makes no request", async () => {
-        const { fetch, outcome } = await attempt("private");
+    it("refuses a callback whose address is not public, and records no delivery", async () => {
+        const request = vi.fn<CallbackRequest>(async () => {
+            throw new EgressError("blocked_address", "The host name resolves to a private or reserved address.");
+        });
 
-        expect(outcome).toStrictEqual({ category: "address_not_public", kind: "refused" });
-        expect(fetch).not.toHaveBeenCalled();
+        expect(await attempt(request)).toStrictEqual({ category: "address_not_public", kind: "refused" });
+        expect(request).toHaveBeenCalledTimes(1);
     });
 
-    it("fails, retryably, when the host has no address, and makes no request", async () => {
-        const { fetch, outcome } = await attempt("unresolved");
+    it("fails, retryably, when the host has no address", async () => {
+        const request = vi.fn<CallbackRequest>(async () => {
+            throw new EgressError("dns_failed", "The host name has no address.");
+        });
 
-        expect(outcome).toMatchObject({ kind: "failed" });
-        expect(fetch).not.toHaveBeenCalled();
+        expect(await attempt(request)).toMatchObject({ category: "connection_refused", kind: "failed" });
     });
 
-    it("POSTs a public host once, signed, without following a redirect", async () => {
-        const { fetch, outcome } = await attempt("public");
+    it("POSTs once with the signed headers, and classes a 2xx as delivered", async () => {
+        const request = vi.fn<CallbackRequest>(async () => {
+            return { body: "", status: 200 };
+        });
 
-        expect(outcome).toStrictEqual({ category: "", kind: "delivered" });
-        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(await attempt(request)).toStrictEqual({ category: "", kind: "delivered" });
+        expect(request).toHaveBeenCalledTimes(1);
 
-        const init = fetch.mock.calls[0]?.[1] as RequestInit & { headers: Record<string, string> };
+        const [url, input] = request.mock.calls[0] ?? [];
 
-        expect(init.redirect).toBe("manual");
-        expect(init.headers["webhook-id"]).toBe("msg_1");
-        expect(init.headers["webhook-signature"]).toMatch(SIGNATURE_SHAPE);
-        expect(init.headers["webhook-timestamp"]).toBe("1000");
+        expect(url).toBe(CALLBACK_URL);
+        expect(input?.headers["webhook-id"]).toBe("msg_1");
+        expect(input?.headers["webhook-signature"]).toMatch(SIGNATURE_SHAPE);
+        expect(input?.headers["webhook-timestamp"]).toBe("1000");
     });
 });

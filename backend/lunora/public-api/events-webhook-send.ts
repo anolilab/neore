@@ -2,9 +2,8 @@
  * The Events webhook sender (part 2b): the internal actions the jobs queue runs, and one attempt around one POST. Actions are where
  * outbound calls belong; the claim and the outcome are mutations on the owner's shard (`event-webhook-deliveries.ts`).
  *
- * One attempt: the callback host is checked again (the delivery-time half of the SSRF check), then one signed POST, then the
- * outcome. The check and the POST are separate steps, so the window between them is the residual rebinding window recorded in
- * `events-webhook.ts`.
+ * One attempt is one signed POST through `liveCallbackRequest`, which checks the callback's address when it connects. There is no
+ * separate check before it, so nothing sits between the check and the request for a name to change in.
  */
 import { v } from "lunorash/server";
 
@@ -13,35 +12,19 @@ import { internalAction } from "../_generated/server";
 import { BETTER_AUTH_SECRET } from "../env";
 import { decryptKey } from "../lib/encryption";
 import { encodeEventCursor } from "./events-cursor";
-import { type CallbackHostCheck, checkCallbackHost } from "./events-webhook-address";
-import { type CallbackFetch, eventBody, gapBody, messageIdOf, postOnce, type PostOutcome, terminatedBody, webhookHeaders } from "./events-webhook-wire";
+import { liveCallbackRequest } from "./events-webhook-request";
+import { type CallbackRequest, eventBody, gapBody, messageIdOf, postOnce, type PostOutcome, terminatedBody, webhookHeaders } from "./events-webhook-wire";
 
-export interface AttemptDependencies {
-    fetch: CallbackFetch;
-    resolve: (host: string) => Promise<CallbackHostCheck>;
-}
-
-/** One attempt at one URL: the address check, then one signed POST. A private host is refused without a request. */
+/** One attempt at one URL: one signed POST, classed. The request checks the address; a refused address is a refusal. */
 export const attemptDelivery = async (input: {
     body: string;
-    deps: AttemptDependencies;
-    host: string;
     id: string;
     now: number;
+    request: CallbackRequest;
     secret: string;
     subscriptionId: string;
     url: string;
 }): Promise<PostOutcome> => {
-    const address = await input.deps.resolve(input.host);
-
-    if (address === "private") {
-        return { category: "address_not_public", kind: "refused" };
-    }
-
-    if (address === "unresolved") {
-        return { category: "connection_refused", kind: "failed" };
-    }
-
     const headers = await webhookHeaders({
         body: input.body,
         id: input.id,
@@ -50,17 +33,8 @@ export const attemptDelivery = async (input: {
         timestampSeconds: Math.floor(input.now / 1000),
     });
 
-    return await postOnce(input.url, headers, input.body, input.deps.fetch);
+    return await postOnce(input.url, headers, input.body, input.request);
 };
-
-const liveDependencies = (): AttemptDependencies => {
-    return {
-        fetch: async (input, init) => await fetch(input, init),
-        resolve: async (host) => await checkCallbackHost(host),
-    };
-};
-
-const hostOf = (url: string): string => new URL(url).hostname;
 
 /** Sends one queued delivery: claims it, makes the attempt, and records the outcome. */
 export const sendDelivery = internalAction
@@ -88,10 +62,9 @@ export const sendDelivery = internalAction
 
         const outcome = await attemptDelivery({
             body,
-            deps: liveDependencies(),
-            host: hostOf(work.url),
             id: work.webhookId,
             now: Date.now(),
+            request: liveCallbackRequest,
             secret,
             subscriptionId: work.subscriptionId,
             url: work.url,
@@ -114,10 +87,9 @@ export const sendTerminated = internalAction
 
         await attemptDelivery({
             body: terminatedBody("host_not_approved"),
-            deps: liveDependencies(),
-            host: hostOf(args.url),
             id: messageIdOf("terminated"),
             now: Date.now(),
+            request: liveCallbackRequest,
             secret,
             subscriptionId: args.subscriptionId,
             url: args.url,

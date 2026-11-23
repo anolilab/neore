@@ -42,9 +42,9 @@ const logOf = (rows: StoredEvent[]): EventLogStore => {
 const NOW = 10_000;
 
 describe("event catalog", () => {
-    it("offers the three event types, all by poll, in a fixed order", () => {
+    it("offers the three event types, by poll and by webhook, in a fixed order", () => {
         expect(EVENT_CATALOG.map((event) => event.name)).toStrictEqual([RUN_COMPLETED_EVENT, RUN_FAILED_EVENT, APPROVAL_REQUESTED_EVENT]);
-        expect(describeEvents().every((event) => JSON.stringify(event.delivery) === '["poll"]')).toBe(true);
+        expect(describeEvents().every((event) => JSON.stringify(event.delivery) === '["poll","webhook"]')).toBe(true);
     });
 
     it("takes an optional threadId filter and nothing else", () => {

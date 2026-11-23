@@ -1,18 +1,30 @@
 /**
  * The wire side of Events webhooks (SEP-3415, "Webhook event delivery", "Non-event webhook bodies" and "Webhook security"): the
- * Standard Webhooks signature, the headers, the four bodies, one POST, and the verification handshake. The fetch is injected,
- * so the tests run without a network.
+ * Standard Webhooks signature, the headers, the four bodies, one POST, and the verification handshake.
  *
- * Every request is `redirect: "manual"`: a 3xx is a refusal, never followed. Every request has a deadline.
+ * Every POST goes through the injected `CallbackRequest`. The live one (`events-webhook-request.ts`) is `requestCheckedHttps`
+ * (`lib/egress.ts`): the callback's address is checked when the socket connects, so there is no window between a check and the
+ * request. It never follows a redirect, and it has a deadline. Tests inject a fake and run without a network.
  */
 import { bytesToBase64, hmacSha256, timingSafeEqual } from "../lib/crypto";
+import { EgressError } from "../lib/egress";
 import { webhookSecretBytes } from "./events-webhook";
 
 export const DELIVERY_TIMEOUT_MS = 10_000;
 
 export type PostOutcome = { category: string; kind: "delivered" } | { category: string; kind: "failed" } | { category: string; kind: "refused" };
 
-export type CallbackFetch = (input: string, init: RequestInit) => Promise<Response>;
+/** The status and body of a callback's answer. A redirect is an answer like any other: it is never followed. */
+export interface CallbackReply {
+    body: string;
+    status: number;
+}
+
+/**
+ * One signed POST to a callback URL. A refused address, a timeout or a connection failure throws (an `EgressError` from the live
+ * request); the caller classes it with `transportReasonOf`.
+ */
+export type CallbackRequest = (url: string, input: { body: string; headers: Record<string, string> }) => Promise<CallbackReply>;
 
 /** A fresh message id: `msg_` plus 32 hex, or `msg_<type>_` plus the same for a control envelope. */
 export const messageIdOf = (type?: string): string => {
@@ -61,27 +73,48 @@ export const terminatedBody = (reason: string): string =>
 
 export const verificationBody = (challenge: string): string => JSON.stringify({ challenge, type: "verification" });
 
-const categoryOf = (error: unknown): string =>
-    typeof error === "object" && error !== null && "name" in error && (error.name === "TimeoutError" || error.name === "AbortError")
-        ? "timeout"
-        : "connection_refused";
+/** Why a POST did not get an answer. The two address reasons are refusals: the callback is not one to call. */
+export type TransportReason = "address_not_public" | "connection_refused" | "timeout" | "unsupported_target";
 
-/**
- * One POST. A 2xx is delivered. A 3xx, `410` (gone) and `413` (too large) are refused: the spec makes them non-retryable. Any other
- * answer, and a transport failure, is failed and may be retried. The response body is not read.
- */
-export const postOnce = async (url: string, headers: Record<string, string>, body: string, fetchFunction: CallbackFetch): Promise<PostOutcome> => {
-    let response: Response;
-
-    try {
-        response = await fetchFunction(url, { body, headers, method: "POST", redirect: "manual", signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS) });
-    } catch (error) {
-        return { category: categoryOf(error), kind: "failed" };
+export const transportReasonOf = (error: unknown): TransportReason => {
+    if (error instanceof EgressError) {
+        switch (error.code) {
+            case "blocked_address": {
+                return "address_not_public";
+            }
+            case "timeout": {
+                return "timeout";
+            }
+            case "unsupported_target": {
+                return "unsupported_target";
+            }
+            default: {
+                return "connection_refused";
+            }
+        }
     }
 
-    await response.body?.cancel();
+    return "connection_refused";
+};
 
-    const { status } = response;
+/**
+ * One POST. A 2xx is delivered. A 3xx, `410` (gone) and `413` (too large) are refused: the spec makes them non-retryable. Any
+ * other answer, and a transport failure, is failed and may be retried. A refused address is refused, not retried.
+ */
+export const postOnce = async (url: string, headers: Record<string, string>, body: string, request: CallbackRequest): Promise<PostOutcome> => {
+    let reply: CallbackReply;
+
+    try {
+        reply = await request(url, { body, headers });
+    } catch (error) {
+        const reason = transportReasonOf(error);
+
+        return reason === "address_not_public" || reason === "unsupported_target"
+            ? { category: reason, kind: "refused" }
+            : { category: reason, kind: "failed" };
+    }
+
+    const { status } = reply;
 
     if (status >= 200 && status < 300) {
         return { category: "", kind: "delivered" };
@@ -102,16 +135,16 @@ export const postOnce = async (url: string, headers: Record<string, string>, bod
     return { category: status >= 500 ? "http_5xx" : "http_4xx", kind: "failed" };
 };
 
-export type VerificationOutcome = { ok: true } | { ok: false; reason: "challenge_failed" | "connection_refused" | "timeout" };
+export type VerificationOutcome = { ok: true } | { ok: false; reason: "challenge_failed" | TransportReason };
 
 /**
  * The verification handshake: a signed `verification` envelope with a fresh single-use nonce. The endpoint proves intent by echoing
- * the nonce in a 2xx body, compared in constant time. Anything else is `challenge_failed`; a transport failure keeps its category.
+ * the nonce in a 2xx body, compared in constant time. Anything else is `challenge_failed`; a transport failure keeps its reason.
  */
 export const verifyCallback = async (input: {
-    fetch: CallbackFetch;
     id: string;
     now: number;
+    request: CallbackRequest;
     secret: string;
     subscriptionId: string;
     url: string;
@@ -125,26 +158,20 @@ export const verifyCallback = async (input: {
         subscriptionId: input.subscriptionId,
         timestampSeconds: Math.floor(input.now / 1000),
     });
-    let response: Response;
+    let reply: CallbackReply;
 
     try {
-        response = await input.fetch(input.url, { body, headers, method: "POST", redirect: "manual", signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS) });
+        reply = await input.request(input.url, { body, headers });
     } catch (error) {
-        const category = categoryOf(error);
-
-        return { ok: false, reason: category === "timeout" ? "timeout" : "connection_refused" };
+        return { ok: false, reason: transportReasonOf(error) };
     }
 
-    if (!response.ok) {
-        await response.body?.cancel();
-
+    if (reply.status < 200 || reply.status >= 300) {
         return { ok: false, reason: "challenge_failed" };
     }
 
-    const text = await response.text();
-
     try {
-        const parsed = JSON.parse(text) as { challenge?: unknown };
+        const parsed = JSON.parse(reply.body) as { challenge?: unknown };
 
         return typeof parsed.challenge === "string" && timingSafeEqual(parsed.challenge, challenge) ? { ok: true } : { ok: false, reason: "challenge_failed" };
     } catch {
